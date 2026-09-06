@@ -1,0 +1,1 @@
+{"version":3,"names":["CLOSE_BUTTON_HIT_AREA","isPressNearCloseButton","x","viewWidth"],"sourceRoot":"../../src","sources":["press-utils.ts"],"mappings":";;AAAA,SAASA,qBAAqB,QAAQ,gBAAa;;AAEnD;AACA;AACA;AACA;AACA,OAAO,MAAMC,sBAAsB,GAAGA,CAAC;EACrCC,CAAC;EACDC;AAIF,CAAC,KAAc;EACb,OAAOD,CAAC,GAAGC,SAAS,GAAGH,qBAAqB;AAC9C,CAAC","ignoreList":[]}

@@ -1,0 +1,70 @@
+import { View, Text, TextInput, Pressable } from "react-native";
+import { useState } from "react";
+import { useServiceBooking } from "../hooks/useServiceBooking";
+import type { Id } from "@/convex/_generated/dataModel";
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  providerId: Id<"serviceProviders">;
+  onSuccess?: () => void;
+}
+
+export function ServiceBooking({
+  isOpen,
+  onClose,
+  providerId,
+  onSuccess,
+}: Props) {
+  const [message, setMessage] = useState("");
+  const [date, setDate] = useState("");
+  const { book } = useServiceBooking(providerId);
+  const [loading, setLoading] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      await book(message, date || undefined);
+      onSuccess?.();
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Pressable
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70"
+      onPress={onClose}
+    >
+      <Pressable
+        className="w-full max-w-md rounded-t-3xl p-6 bg-[#0D1117] border border-white/10"
+        onPress={(e) => e.stopPropagation()}
+      >
+        <Text className="text-white font-bold text-lg mb-4">Réserver</Text>
+        <TextInput
+          value={message}
+          onChangeText={(text) => setMessage(text)}
+          placeholder="Décrivez votre besoin..."
+         
+          className="w-full rounded-xl p-3 text-sm text-white bg-white/5 border border-white/10"
+         multiline textAlignVertical="top"/>
+        <TextInput
+         
+          value={date}
+          onChangeText={(text) => setDate(text)}
+          className="w-full rounded-xl p-3 text-sm text-white bg-white/5 border border-white/10 mt-3"
+        />
+        <Pressable
+          onPress={handleSubmit}
+          disabled={loading}
+          className="w-full py-3.5 rounded-xl text-white font-bold mt-4 bg-gradient-to-r from-orange-500 to-red-500 disabled:opacity-50"
+        >
+          {loading ? "Envoi..." : "Confirmer"}
+        </Pressable>
+      </Pressable>
+    </Pressable>
+  );
+}

@@ -1,0 +1,108 @@
+import type { ModuleManifest } from "@/core/sdk/types";
+import { fields } from "./fields";
+
+export const serviceManifest: ModuleManifest = {
+  info: {
+    id: "service",
+    label: "Services",
+    icon: "🔧",
+    color: "#F97316",
+    gradient: "from-orange-500 to-amber-600",
+    badge: "Prestataires",
+    description: "Trouvez le professionnel dont vous avez besoin",
+    version: "1.0.0",
+  },
+  subtypes: [],
+  fields,
+  actions: [],
+  metrics: [],
+  queries: {
+    list: "serviceProviders.list",
+    get: "serviceProviders.get",
+    search: "serviceProviders.search",
+  },
+  mutations: {
+    create: "serviceProviders.create",
+    book: "serviceProviders.book",
+    review: "serviceProviders.createReview",
+    toggleFavorite: "serviceProviders.toggleFavorite",
+  },
+  capabilities: ({ provider, user }) => ({
+    call: true,
+    chat: true,
+    share: true,
+    save: true,
+    whatsapp: true,
+    email: true,
+    payment: provider?.price !== undefined,
+    booking: true,
+  }),
+  card: {
+    hero: "name",
+    sections: ["specialty", "location"],
+    metrics: ["rating", "price", "responseTime"],
+  },
+  permissions: {
+    view: ["*"],
+    create: ["user"],
+    edit: ["user"],
+    delete: ["admin"],
+  },
+  search: {
+    filters: [
+      {
+        key: "category",
+        label: "Catégorie",
+        type: "select",
+        options: [
+          { label: "Tout", value: "Tout" },
+          { label: "Dépannage", value: "Dépannage" },
+          { label: "Beauté", value: "Beauté" },
+          { label: "Livraison", value: "Livraison" },
+          { label: "Éducation", value: "Éducation" },
+          { label: "Photo", value: "Photo" },
+          { label: "Bien-être", value: "Bien-être" },
+          { label: "Événementiel", value: "Événementiel" },
+        ],
+      },
+      { key: "urgent", label: "Urgence 24h", type: "checkbox" },
+      { key: "verified", label: "Vérifié", type: "checkbox" },
+      { key: "available", label: "Disponible maintenant", type: "checkbox" },
+      {
+        key: "minRating",
+        label: "Note minimum",
+        type: "range",
+        min: 0,
+        max: 5,
+      },
+      {
+        key: "maxPrice",
+        label: "Prix max",
+        type: "range",
+        min: 0,
+        max: 1000000,
+      },
+    ],
+    sorts: [
+      { key: "rating", label: "Meilleure note" },
+      { key: "recent", label: "Plus récents" },
+      { key: "distance", label: "Plus proches" },
+      { key: "price", label: "Prix croissant" },
+    ],
+    autocomplete: true,
+    aiRanking: true,
+  },
+  dependencies: { required: ["auth"] },
+  compatibility: { sdk: "1.0.0" },
+  defaults: ({ country = "Congo", currency = "USD" }) => ({
+    country,
+    currency,
+  }),
+  featureFlags: { premium: false },
+  lifecycle: {},
+  adapter: {
+    toModel: (data) => data,
+    fromModel: (data) => data,
+  },
+  plugins: ["analytics", "ai"],
+};

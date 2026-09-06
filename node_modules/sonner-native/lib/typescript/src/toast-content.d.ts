@@ -1,0 +1,31 @@
+import * as React from 'react';
+import type { ViewStyle } from 'react-native';
+import { type ToastProps, type ToastStyles } from './types';
+import type { DefaultStyles } from './use-default-styles';
+export declare const ToastContent: React.FC<{
+    id: ToastProps['id'];
+    title: string;
+    description?: string;
+    icon?: React.ReactNode;
+    variant: ToastProps['variant'];
+    action?: ToastProps['action'];
+    cancel?: ToastProps['cancel'];
+    close?: ToastProps['close'];
+    closeButton?: boolean;
+    dismissible: boolean;
+    onDismiss?: ToastProps['onDismiss'];
+    promiseOptions?: ToastProps['promiseOptions'];
+    actionButtonStyle?: ToastProps['actionButtonStyle'];
+    actionButtonTextStyle?: ToastProps['actionButtonTextStyle'];
+    cancelButtonStyle?: ToastProps['cancelButtonStyle'];
+    cancelButtonTextStyle?: ToastProps['cancelButtonTextStyle'];
+    invert: boolean;
+    richColors: boolean;
+    unstyled?: boolean;
+    allowFontScaling?: boolean;
+    maxFontSizeMultiplier?: number;
+    mergedStyles?: ToastStyles;
+    defaultStyles: DefaultStyles;
+    contentContainerStyle?: ViewStyle;
+}>;
+//# sourceMappingURL=toast-content.d.ts.map

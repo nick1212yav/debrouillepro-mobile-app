@@ -1,0 +1,10 @@
+export * as Detail from "./detail";
+export * as Order from "./order";
+export * as Menu from "./menu";
+export * as Chef from "./chef";
+export * as Delivery from "./delivery";
+export * as Payment from "./payment";
+export * as Reviews from "./reviews";
+export * as Social from "./social";
+export * as Reservation from "./reservation";
+export * as Common from "./common";

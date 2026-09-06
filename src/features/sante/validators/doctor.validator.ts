@@ -1,0 +1,43 @@
+import { z } from "zod";
+
+export const doctorSchema = z.object({
+  name: z.string().min(2, "Nom requis"),
+  specialty: z.enum([
+    "generaliste",
+    "cardiologue",
+    "pediatre",
+    "gynecologue",
+    "dentiste",
+    "ophtalmologue",
+    "dermatologue",
+    "psychiatre",
+    "neurologue",
+    "chirurgien",
+    "orthopediste",
+    "orl",
+    "urologue",
+    "endocrinologue",
+    "gastro-enterologue",
+    "pneumologue",
+    "rhumatologue",
+    "allergologue",
+    "nutritionniste",
+    "psychologue",
+  ] as const),
+  fees: z.number().positive("Tarif doit être positif").default(0),
+  currency: z.string().default("FCFA"),
+  phone: z.string().default(""),
+  email: z.string().email("Email invalide").default("").optional(),
+  address: z.string().default(""),
+  city: z.string().default(""),
+  country: z.string().default(""),
+  bio: z.string().default(""),
+  experience: z.number().min(0).default(0),
+  languages: z.string().default(""),
+  insurances: z.string().default(""),
+  schedule: z.string().default("Lun-Ven 09:00 - 18:00"),
+  online: z.boolean().default(false),
+  verified: z.boolean().default(false),
+});
+
+export type DoctorFormValues = z.infer<typeof doctorSchema>;

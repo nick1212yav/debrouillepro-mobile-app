@@ -1,0 +1,95 @@
+export const annonceFields = {
+  title: {
+    type: "string",
+    required: true,
+    maxLength: 200,
+    label: "Titre",
+  },
+  description: {
+    type: "string",
+    required: true,
+    maxLength: 5000,
+    label: "Description",
+  },
+  price: {
+    type: "number",
+    required: false,
+    min: 0,
+    label: "Prix",
+  },
+  currency: {
+    type: "string",
+    required: false,
+    default: "USD",
+    label: "Devise",
+  },
+  images: {
+    type: "array",
+    items: "string",
+    required: false,
+    label: "Images",
+  },
+  videos: {
+    type: "array",
+    items: "string",
+    required: false,
+    label: "Vidéos",
+  },
+  location: {
+    type: "string",
+    required: false,
+    label: "Localisation",
+  },
+  latitude: {
+    type: "number",
+    required: false,
+    label: "Latitude",
+  },
+  longitude: {
+    type: "number",
+    required: false,
+    label: "Longitude",
+  },
+  condition: {
+    type: "string",
+    enum: ["neuf", "comme-neuf", "tres-bon", "bon", "acceptable", "a-renover"],
+    required: false,
+    label: "État",
+  },
+  tags: {
+    type: "array",
+    items: "string",
+    required: false,
+    label: "Tags",
+  },
+  negotiable: {
+    type: "boolean",
+    required: false,
+    default: false,
+    label: "Négociable",
+  },
+  warrantyMonths: {
+    type: "number",
+    required: false,
+    min: 0,
+    label: "Garantie (mois)",
+  },
+  deliveryAvailable: {
+    type: "boolean",
+    required: false,
+    default: false,
+    label: "Livraison possible",
+  },
+  deliveryPrice: {
+    type: "number",
+    required: false,
+    min: 0,
+    label: "Frais de livraison",
+  },
+  paymentMethods: {
+    type: "array",
+    items: "string",
+    required: false,
+    label: "Moyens de paiement",
+  },
+};

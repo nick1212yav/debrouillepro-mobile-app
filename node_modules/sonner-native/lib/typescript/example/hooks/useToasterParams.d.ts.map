@@ -1,0 +1,1 @@
+{"version":3,"file":"useToasterParams.d.ts","sourceRoot":"","sources":["../../../../example/hooks/useToasterParams.ts"],"names":[],"mappings":"AAOA,OAAO,EACL,KAAK,UAAU,EACf,KAAK,cAAc,EACnB,KAAK,aAAa,EAClB,KAAK,mBAAmB,EACxB,KAAK,UAAU,EAChB,MAAM,eAAe,CAAC;AAEvB,MAAM,MAAM,mBAAmB,GAAG,SAAS,GAAG,MAAM,GAAG,OAAO,CAAC;AA2B/D,wBAAgB,gBAAgB;;;;;;;;;;;;;;;oBAoCP,MAAM,SAAS,MAAM;EAqB7C"}

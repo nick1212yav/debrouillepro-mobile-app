@@ -1,0 +1,85 @@
+// src/features/marketplace/permissions.ts
+
+export const PERMISSIONS = {
+  // Produits
+  CREATE_PRODUCT: "marketplace:create",
+  READ_PRODUCT: "marketplace:read",
+  UPDATE_PRODUCT: "marketplace:update",
+  DELETE_PRODUCT: "marketplace:delete",
+  LIST_PRODUCTS: "marketplace:list",
+
+  // Panier
+  MANAGE_CART: "marketplace:cart",
+  VIEW_CART: "marketplace:view_cart",
+
+  // Commandes
+  CREATE_ORDER: "marketplace:order:create",
+  VIEW_ORDER: "marketplace:order:view",
+  UPDATE_ORDER: "marketplace:order:update",
+
+  // Vendeur
+  VIEW_SELLER: "marketplace:seller:view",
+  FOLLOW_SELLER: "marketplace:seller:follow",
+
+  // Avis
+  CREATE_REVIEW: "marketplace:review:create",
+  VIEW_REVIEWS: "marketplace:review:view",
+
+  // Questions
+  ASK_QUESTION: "marketplace:question:ask",
+  ANSWER_QUESTION: "marketplace:question:answer",
+} as const;
+
+export type MarketplacePermission =
+  (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export const ROLES = {
+  ADMIN: [
+    PERMISSIONS.CREATE_PRODUCT,
+    PERMISSIONS.READ_PRODUCT,
+    PERMISSIONS.UPDATE_PRODUCT,
+    PERMISSIONS.DELETE_PRODUCT,
+    PERMISSIONS.LIST_PRODUCTS,
+    PERMISSIONS.MANAGE_CART,
+    PERMISSIONS.CREATE_ORDER,
+    PERMISSIONS.VIEW_ORDER,
+    PERMISSIONS.UPDATE_ORDER,
+    PERMISSIONS.VIEW_SELLER,
+    PERMISSIONS.FOLLOW_SELLER,
+    PERMISSIONS.CREATE_REVIEW,
+    PERMISSIONS.VIEW_REVIEWS,
+    PERMISSIONS.ASK_QUESTION,
+    PERMISSIONS.ANSWER_QUESTION,
+  ],
+  SELLER: [
+    PERMISSIONS.CREATE_PRODUCT,
+    PERMISSIONS.READ_PRODUCT,
+    PERMISSIONS.UPDATE_PRODUCT,
+    PERMISSIONS.DELETE_PRODUCT,
+    PERMISSIONS.LIST_PRODUCTS,
+    PERMISSIONS.VIEW_CART,
+    PERMISSIONS.VIEW_ORDER,
+    PERMISSIONS.VIEW_SELLER,
+    PERMISSIONS.FOLLOW_SELLER,
+    PERMISSIONS.VIEW_REVIEWS,
+    PERMISSIONS.ANSWER_QUESTION,
+  ],
+  BUYER: [
+    PERMISSIONS.READ_PRODUCT,
+    PERMISSIONS.LIST_PRODUCTS,
+    PERMISSIONS.MANAGE_CART,
+    PERMISSIONS.CREATE_ORDER,
+    PERMISSIONS.VIEW_ORDER,
+    PERMISSIONS.VIEW_SELLER,
+    PERMISSIONS.FOLLOW_SELLER,
+    PERMISSIONS.CREATE_REVIEW,
+    PERMISSIONS.VIEW_REVIEWS,
+    PERMISSIONS.ASK_QUESTION,
+  ],
+  GUEST: [
+    PERMISSIONS.READ_PRODUCT,
+    PERMISSIONS.LIST_PRODUCTS,
+    PERMISSIONS.VIEW_SELLER,
+    PERMISSIONS.VIEW_REVIEWS,
+  ],
+} as const;

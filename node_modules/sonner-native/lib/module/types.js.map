@@ -1,0 +1,1 @@
+{"version":3,"names":["isToastAction","action","onClick","undefined","label"],"sourceRoot":"../../src","sources":["types.ts"],"mappings":";;AAyGA,OAAO,SAASA,aAAaA,CAC3BC,MAAqC,EACd;EACvB,OACGA,MAAM,EAAkBC,OAAO,KAAKC,SAAS,IAC7CF,MAAM,EAAkBG,KAAK,KAAKD,SAAS;AAEhD;;AAqIA","ignoreList":[]}

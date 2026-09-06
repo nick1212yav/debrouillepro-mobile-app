@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/App.tsx",
+    "src/components/AIWriteAssist.tsx",
+    "src/components/ArticleEditor.tsx",
+    "nativewind-env.d.ts",
+    "expo-env.d.ts"
+  ]
+}

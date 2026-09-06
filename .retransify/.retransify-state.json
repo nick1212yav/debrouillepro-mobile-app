@@ -1,0 +1,1299 @@
+{
+  "completedFiles": {
+    "src/components/providers/auth.tsx": {
+      "hash": "b08d2481f8885788d62f4fd95fc9d69131dc1223ab31e6cff9101580a5c690bc",
+      "targetPath": "src/components/providers/auth.ts",
+      "timestamp": "2026-08-19T09:24:16.493Z"
+    },
+    "src/components/providers/convex.tsx": {
+      "hash": "dce1cccf32e78cc5dfa2e205ce72b5aaa45e4641bc431e071dada09862680ad1",
+      "targetPath": "src/components/providers/convex.tsx",
+      "timestamp": "2026-08-19T09:24:17.396Z"
+    },
+    "src/components/providers/UserSync.tsx": {
+      "hash": "f5104081135df42c8a34808c964b9a8d3fa877b57ad98798ed38aa0245236cc3",
+      "targetPath": "src/components/providers/UserSync.ts",
+      "timestamp": "2026-08-19T09:24:18.009Z"
+    },
+    "src/components/providers/query-client.tsx": {
+      "hash": "6702e5550c4f8191154f123c7a62e83f977f9f812bb81bc5a338056d2395a32e",
+      "targetPath": "src/components/providers/query-client.tsx",
+      "timestamp": "2026-08-19T09:24:18.613Z"
+    },
+    "src/components/providers/theme.tsx": {
+      "hash": "833f808ef66a5ea0a58808f2530fefaba1ed12429fa9b79bb3c2a59e16d02a69",
+      "targetPath": "src/components/providers/theme.tsx",
+      "timestamp": "2026-08-19T09:24:19.543Z"
+    },
+    "src/components/ui/sonner.tsx": {
+      "hash": "a65fe9ded89363ec546f28401a26caec1a3aa38c52259eb829cfa33723dbe3a5",
+      "targetPath": "src/components/ui/sonner.tsx",
+      "timestamp": "2026-08-19T09:24:20.138Z"
+    },
+    "src/components/ui/tooltip.tsx": {
+      "hash": "408f12d86ac9326ecf8df67c48ceaf09cac340e93b5373d7e8d5b78f81ed1c78",
+      "targetPath": "src/components/ui/tooltip.tsx",
+      "timestamp": "2026-08-19T09:24:22.214Z"
+    },
+    "src/components/providers/default.tsx": {
+      "hash": "146fe9633fc2fe80a2ca20b9944d16699c85a90e17712e4ee49b2d3eefe67e58",
+      "targetPath": "src/components/providers/default.tsx",
+      "timestamp": "2026-08-19T09:24:22.806Z"
+    },
+    "src/pages/home/_components/TopBar.tsx": {
+      "hash": "bbbb3c0656ccb1d57db19fc39ad511ba8cebf8a54fbdf90cc2d48fcf8e425257",
+      "targetPath": "src/pages/home/_components/TopBar.tsx",
+      "timestamp": "2026-08-19T09:24:23.401Z"
+    },
+    "src/pages/home/_components/WeatherBar.tsx": {
+      "hash": "27bf01fe8ce0eac00af5869e6afb2856242a2fa2f07af871f4475dd2505144c9",
+      "targetPath": "src/pages/home/_components/WeatherBar.tsx",
+      "timestamp": "2026-08-19T09:24:23.983Z"
+    },
+    "src/pages/home/_components/SmartSearch.tsx": {
+      "hash": "5d3597c5a809e28cf8b63c249d3786af0662fb712970d52e757e89a845431e68",
+      "targetPath": "src/pages/home/_components/SmartSearch.tsx",
+      "timestamp": "2026-08-19T09:24:24.605Z"
+    },
+    "src/pages/home/_components/AIBanner.tsx": {
+      "hash": "75494ba6dd3df6537c1fb3d2e8aeba1856d629fd016ef85cb17a5b1d7af908c0",
+      "targetPath": "src/pages/home/_components/AIBanner.tsx",
+      "timestamp": "2026-08-19T09:24:25.199Z"
+    },
+    "src/pages/home/_components/AIPersonalizedSuggestion.tsx": {
+      "hash": "f3995e9321812029322c7ae2c68ff207069aa8ffa2e4a4ddc785580df99f0493",
+      "targetPath": "src/pages/home/_components/AIPersonalizedSuggestion.tsx",
+      "timestamp": "2026-08-19T09:24:25.794Z"
+    },
+    "src/pages/home/_components/StoryViewer.tsx": {
+      "hash": "33b220250234762564d07352f0fabe757fc2bc348dd87b1d608ee7852e051dbd",
+      "targetPath": "src/pages/home/_components/StoryViewer.tsx",
+      "timestamp": "2026-08-19T09:24:26.382Z"
+    },
+    "src/pages/home/_components/StoryCreator.tsx": {
+      "hash": "b1833c45f593ac00026881f54b2ebcbe6b6b56a8bfb51de2d0d177c86a99fdaa",
+      "targetPath": "src/pages/home/_components/StoryCreator.tsx",
+      "timestamp": "2026-08-19T09:24:26.989Z"
+    },
+    "src/pages/home/_components/Stories.tsx": {
+      "hash": "ea014906deaf39e5818a2a8c69f9e5efdb6656b3f1de25aa12f12e9bb83baa21",
+      "targetPath": "src/pages/home/_components/Stories.tsx",
+      "timestamp": "2026-08-19T09:24:27.577Z"
+    },
+    "src/pages/home/_components/HomeWidget.tsx": {
+      "hash": "3e67eeaab74e0a1bc5b07064e82939db2071cab3aae639b3a12a6e321ae623f2",
+      "targetPath": "src/pages/home/_components/HomeWidget.tsx",
+      "timestamp": "2026-08-19T09:24:28.184Z"
+    },
+    "src/pages/home/_components/GlobalContextBar.tsx": {
+      "hash": "5fb673fdef15e97b3c9d2d33973b1bf130719fdaad771158f75ed12999708fc3",
+      "targetPath": "src/pages/home/_components/GlobalContextBar.tsx",
+      "timestamp": "2026-08-19T09:24:28.785Z"
+    },
+    "src/pages/home/_components/DailyBrief.tsx": {
+      "hash": "f00581c092123b10eeb2ca37267031d6c6e23add2691c4b962bf48deae524eb0",
+      "targetPath": "src/pages/home/_components/DailyBrief.tsx",
+      "timestamp": "2026-08-19T09:24:29.379Z"
+    },
+    "src/pages/home/_components/HomeCommandCenter.tsx": {
+      "hash": "c35b9bbbc9292b02864a1fe234999d7d79e3a7b450d25a71fbcbf5868f0f95ba",
+      "targetPath": "src/pages/home/_components/HomeCommandCenter.tsx",
+      "timestamp": "2026-08-19T09:24:29.977Z"
+    },
+    "src/pages/home/_components/SmartContextSuggestions.tsx": {
+      "hash": "a214eb60f2ccc3fe78add29eb6cf213072566c3aad4436e2e7d5209b1721d3ae",
+      "targetPath": "src/pages/home/_components/SmartContextSuggestions.tsx",
+      "timestamp": "2026-08-19T09:24:30.865Z"
+    },
+    "src/pages/home/_components/OpportunityRadar.tsx": {
+      "hash": "59679bef804ce60bd02a002f60391a6a37e16a26022dd49763dcc748c5a0f2c6",
+      "targetPath": "src/pages/home/_components/OpportunityRadar.tsx",
+      "timestamp": "2026-08-19T09:24:31.765Z"
+    },
+    "src/pages/home/_components/NearbyNow.tsx": {
+      "hash": "9678ee2139b1c4e19915acf04aab78fe0756dd38a86eca8ca81e3194be781ee6",
+      "targetPath": "src/pages/home/_components/NearbyNow.tsx",
+      "timestamp": "2026-08-19T09:24:32.651Z"
+    },
+    "src/pages/home/_components/HomeActivityPulse.tsx": {
+      "hash": "24a3bb53aa7a955b5d7a8638b2a7c7fa13ce48a7d47ced34c1d41a112f16bc75",
+      "targetPath": "src/pages/home/_components/HomeActivityPulse.tsx",
+      "timestamp": "2026-08-19T09:24:33.554Z"
+    },
+    "src/pages/home/_components/StreakWidget.tsx": {
+      "hash": "17fa7db683cde06643211e20192baf3ec232740fc16b1d06253597c8281c1481",
+      "targetPath": "src/pages/home/_components/StreakWidget.tsx",
+      "timestamp": "2026-08-19T09:24:34.442Z"
+    },
+    "src/pages/home/_components/CommentsSheet.tsx": {
+      "hash": "bfa48ab7a2217c260c451fdfb4d4233fa2adab2f7db19c0215f6fa445be06afa",
+      "targetPath": "src/pages/home/_components/CommentsSheet.tsx",
+      "timestamp": "2026-08-19T09:24:35.044Z"
+    },
+    "src/pages/home/_components/PersonalizedFeed.tsx": {
+      "hash": "c61dac831db35b022b506416e75a8b39b85bb7850d5b120e2663f6e0846356d5",
+      "targetPath": "src/pages/home/_components/PersonalizedFeed.tsx",
+      "timestamp": "2026-08-19T09:24:35.646Z"
+    },
+    "src/pages/home/_components/OfflineBanner.tsx": {
+      "hash": "25cee4a5933bd04a8b38b4bd61f9b0662320cb2d012e5e6b4a34ad1fbdd8b837",
+      "targetPath": "src/pages/home/_components/OfflineBanner.tsx",
+      "timestamp": "2026-08-19T09:24:36.275Z"
+    },
+    "src/pages/home/_components/LandingPage.tsx": {
+      "hash": "54e58471cf25e14c64596327039ad8debfc35ba7f4b1e6bfbbc2e2665ed6a8e3",
+      "targetPath": "src/pages/home/_components/LandingPage.tsx",
+      "timestamp": "2026-08-19T09:24:36.869Z"
+    },
+    "src/pages/home/_components/TabBar.tsx": {
+      "hash": "59748c94edd41b74088eed4c6f42fca09353ed02d3fa4ac0da93a40c9b084e5c",
+      "targetPath": "src/pages/home/_components/TabBar.tsx",
+      "timestamp": "2026-08-19T09:24:37.450Z"
+    },
+    "src/pages/home/_components/SideDrawer.tsx": {
+      "hash": "3d4ad86d60f0eff077b214c4632423b3c9853a72b7a4c599e1e1ec56e45a8bdf",
+      "targetPath": "src/pages/home/_components/SideDrawer.tsx",
+      "timestamp": "2026-08-19T09:24:38.320Z"
+    },
+    "src/pages/home/_components/ArticleForm.tsx": {
+      "hash": "5ad34a94f534c0c6e69acdf8e8a98ccef3f1b15982507cee1e4e9cca35f4d8b7",
+      "targetPath": "src/pages/home/_components/ArticleForm.tsx",
+      "timestamp": "2026-08-19T09:24:38.942Z"
+    },
+    "src/pages/home/_components/CreateBottomSheet.tsx": {
+      "hash": "f88ba7940729097858947d380a3859e49b2404adda1fde1f61ca0a7b8e4b6eca",
+      "targetPath": "src/pages/home/_components/CreateBottomSheet.tsx",
+      "timestamp": "2026-08-19T09:24:39.534Z"
+    },
+    "src/pages/home/_components/AIAssistant.tsx": {
+      "hash": "9fa2fc49a2c45cd016b9cbff598877da0421df58725345017127e9b08c648ef1",
+      "targetPath": "src/pages/home/_components/AIAssistant.tsx",
+      "timestamp": "2026-08-19T09:24:40.157Z"
+    },
+    "src/pages/home/_components/OnboardingScreen.tsx": {
+      "hash": "302c3aa1a5283af44fa8ab29c62be871583bcdd3b9eef8025e36b9b27256727c",
+      "targetPath": "src/pages/home/_components/OnboardingScreen.tsx",
+      "timestamp": "2026-08-19T09:24:40.809Z"
+    },
+    "src/pages/home/_components/OnboardingFlow.tsx": {
+      "hash": "1f5ac4455e7e6e961155bb196cc34bc4aad2a33bb996c38e0ba128c9bbd83abe",
+      "targetPath": "src/pages/home/_components/OnboardingFlow.tsx",
+      "timestamp": "2026-08-19T09:24:42.093Z"
+    },
+    "src/pages/home/_components/AdvancedSearch.tsx": {
+      "hash": "19fb693b5a90562137331ca3fbc46c454bb087e0e3a601e5c249b3aa260c4f67",
+      "targetPath": "src/pages/home/_components/AdvancedSearch.tsx",
+      "timestamp": "2026-08-19T09:24:43.003Z"
+    },
+    "src/pages/home/_components/PullToRefresh.tsx": {
+      "hash": "7904542a0719757177bec51fa997daca0145c4f554022723f83ea0e03a9ae269",
+      "targetPath": "src/pages/home/_components/PullToRefresh.tsx",
+      "timestamp": "2026-08-19T09:24:43.581Z"
+    },
+    "src/pages/home/_components/NotificationCenter.tsx": {
+      "hash": "3ba9452af87304d32f1e4f2db0a1de7e2dde1f9e7612d613de074bd34e6a5fb6",
+      "targetPath": "src/pages/home/_components/NotificationCenter.tsx",
+      "timestamp": "2026-08-19T09:24:44.194Z"
+    },
+    "src/pages/home/page.tsx": {
+      "hash": "de82fcaa94eda4f06cb52c0182b2f3887198f97bfed492c19f63e7c8283d6c0b",
+      "targetPath": "src/pages/home/page.tsx",
+      "timestamp": "2026-08-19T09:24:44.785Z"
+    },
+    "src/pages/auth/Callback.tsx": {
+      "hash": "6f33b43a0d65351f9f2d8fe846752bfa0fbb20b36c066537ad811d9b562fb38a",
+      "targetPath": "src/pages/auth/Callback.ts",
+      "timestamp": "2026-08-19T09:24:45.378Z"
+    },
+    "src/pages/NotFound.tsx": {
+      "hash": "e3dc024e42d6384f588c46dcf3a316c71e937878132b3fdfc24dc4681fbb567c",
+      "targetPath": "app/[...missing].tsx",
+      "timestamp": "2026-08-19T09:24:45.956Z"
+    },
+    "src/pages/modules/JobDetailPage.tsx": {
+      "hash": "dd0c8beab082c7d0b3184b6ebb59e53c0029f8f729886aecc6e5d9fe3ce1faed",
+      "targetPath": "app/job/[id].tsx",
+      "timestamp": "2026-08-19T09:24:46.872Z"
+    },
+    "src/pages/modules/ImmoDetailPage.tsx": {
+      "hash": "708ea19ed344db495c99f724314dbc3429ca822b06a742bc79ec6e47f80d7ac4",
+      "targetPath": "app/immo/[id].tsx",
+      "timestamp": "2026-08-19T09:24:47.454Z"
+    },
+    "src/pages/modules/AnnoncesDetailPage.tsx": {
+      "hash": "366b79e17862064abca2bef91bd278e98a842e3364e90459e9b672b97ab5aadd",
+      "targetPath": "app/annonce/[id].tsx",
+      "timestamp": "2026-08-19T09:24:48.042Z"
+    },
+    "src/pages/modules/ServiceDetailPage.tsx": {
+      "hash": "dd9ce47a85db5472dec8701688e85980cd68e5bfc4d5e1912c358e12d5d35dbb",
+      "targetPath": "app/service/[id].tsx",
+      "timestamp": "2026-08-19T09:24:48.613Z"
+    },
+    "src/pages/modules/CommunityPage.tsx": {
+      "hash": "dcdcc0cf11e1a6a091671392a56965f56f67abe71427d691f8b4585b6fd2cd43",
+      "targetPath": "src/pages/modules/CommunityPage.tsx",
+      "timestamp": "2026-08-19T09:24:49.199Z"
+    },
+    "src/pages/modules/CommunityDetailPage.tsx": {
+      "hash": "2c848f019e5492114ed51722c46ed48cd53d5077c8d1aba7d4f568988319d621",
+      "targetPath": "app/community/[id].tsx",
+      "timestamp": "2026-08-19T09:24:50.523Z"
+    },
+    "src/pages/modules/EvenementsPage.tsx": {
+      "hash": "8b21d1ac183c4b2ff6347b703e8a549551258dee574ebbc72c74a3016c543cdd",
+      "targetPath": "src/pages/modules/EvenementsPage.tsx",
+      "timestamp": "2026-08-19T09:24:51.108Z"
+    },
+    "src/pages/modules/EvenementDetailPage.tsx": {
+      "hash": "0717ef35c583cf8938de7845c4baea016f1f12929329929cebb9871a0cc7b805",
+      "targetPath": "app/events/[id].tsx",
+      "timestamp": "2026-08-19T09:24:51.682Z"
+    },
+    "src/pages/modules/EvenementsProPage.tsx": {
+      "hash": "daaca96d8d445c23bcb3f67c3d7eec8690c81944472db2830e412aa8e4bf92d2",
+      "targetPath": "src/pages/modules/EvenementsProPage.tsx",
+      "timestamp": "2026-08-19T09:24:52.250Z"
+    },
+    "src/pages/modules/MarketplacePage.tsx": {
+      "hash": "80b52f8fed81b7c5e70d7fc5ec71b2c564543e3dad23d05f20c49ca38d327a7c",
+      "targetPath": "src/pages/modules/MarketplacePage.tsx",
+      "timestamp": "2026-08-19T09:24:52.822Z"
+    },
+    "src/pages/modules/MarketplaceDetailPage.tsx": {
+      "hash": "e57b0be6066fce9c580df620be6cabc2ca13c35a47420c5ab7cf0835f04221fe",
+      "targetPath": "app/marketplace/[id].tsx",
+      "timestamp": "2026-08-19T09:24:53.754Z"
+    },
+    "src/pages/modules/MarketplaceProPage.tsx": {
+      "hash": "2717927bb31a33637fb8fb7660925317e375f11f235575a1292008fa7818e571",
+      "targetPath": "src/pages/modules/MarketplaceProPage.tsx",
+      "timestamp": "2026-08-19T09:24:54.330Z"
+    },
+    "src/pages/modules/SantePage.tsx": {
+      "hash": "a20d1e510f646ae851d479192be1059a95c44bdbc6f3d8d94ee88213a1c9607e",
+      "targetPath": "src/pages/modules/SantePage.tsx",
+      "timestamp": "2026-08-19T09:24:54.899Z"
+    },
+    "src/pages/modules/SanteDetailPage.tsx": {
+      "hash": "904936089350d0a6bbf55ff3f591ad490832d531c80216396cdf0996039753fa",
+      "targetPath": "app/sante/[id].tsx",
+      "timestamp": "2026-08-19T09:24:55.458Z"
+    },
+    "src/pages/modules/TransportPage.tsx": {
+      "hash": "efe8e219d9d1ef381aacf7faf3637264832799720af1cc45795df656bc89eb71",
+      "targetPath": "src/pages/modules/TransportPage.ts",
+      "timestamp": "2026-08-19T09:24:56.307Z"
+    },
+    "src/pages/modules/TransportDetailPage.tsx": {
+      "hash": "5cfe313a86c3f38ed592c6e89e81a90dda151d18c8bd68dd25edf88281653ff0",
+      "targetPath": "src/pages/modules/TransportDetailPage.ts",
+      "timestamp": "2026-08-19T09:24:57.146Z"
+    },
+    "src/features/restauration/types/enums.ts": {
+      "hash": "67c726c837a167b4386aef0f7c732d78f771d68a574b4abb9d9d35b9c04d6b10",
+      "targetPath": "src/features/restauration/types/enums.ts",
+      "timestamp": "2026-08-19T09:24:57.688Z"
+    },
+    "src/features/restauration/types/common.types.ts": {
+      "hash": "729a057b52b4bca1fd42aeea6539a123e5acfa79f2082cda4eb095b4bbcafa2d",
+      "targetPath": "src/features/restauration/types/common.types.ts",
+      "timestamp": "2026-08-19T09:24:58.962Z"
+    },
+    "src/features/restauration/types/menu.types.ts": {
+      "hash": "1d1bd4298e82a1fe7ed7d0f4dbcaf197f8f4e33250cacada21ec7a28ec603973",
+      "targetPath": "src/features/restauration/types/menu.types.ts",
+      "timestamp": "2026-08-19T09:24:59.830Z"
+    },
+    "src/features/restauration/types/chef.types.ts": {
+      "hash": "eaaf8adca26a1854d838d3ff6b554261352c479d395803c530278728d80c9cb2",
+      "targetPath": "src/features/restauration/types/chef.types.ts",
+      "timestamp": "2026-08-19T09:25:00.375Z"
+    },
+    "src/features/restauration/types/restaurant.types.ts": {
+      "hash": "7bbf9bbe411fb6a29a3eb256d530f817ed5034a2106aab138b49bb686b40e028",
+      "targetPath": "src/features/restauration/types/restaurant.types.ts",
+      "timestamp": "2026-08-19T09:25:00.922Z"
+    },
+    "src/features/restauration/search.ts": {
+      "hash": "17581ad8441a3c315edc625e8f1884baf54f8a32a3c2b4c0f366ebaaa028c185",
+      "targetPath": "src/features/restauration/search.ts",
+      "timestamp": "2026-08-19T09:25:01.463Z"
+    },
+    "src/features/restauration/validators/restaurant.validator.ts": {
+      "hash": "8edf4cdf080e26fb32708a88c2689f1af268acf963b98a444a3b8844801af54b",
+      "targetPath": "src/features/restauration/validators/restaurant.validator.ts",
+      "timestamp": "2026-08-19T09:25:02.003Z"
+    },
+    "src/features/restauration/services/RestaurantService.ts": {
+      "hash": "8d1d9e3cfcd8e962715f7ae6fb63b7ba968d69cabc7c440838798e4feffc38da",
+      "targetPath": "src/features/restauration/services/RestaurantService.ts",
+      "timestamp": "2026-08-19T09:25:02.839Z"
+    },
+    "src/features/restauration/hooks/useRestaurants.ts": {
+      "hash": "d5ef230425ffb4c98efc5bdf95c4d2cd629a24d09137c2aa5e754c066887cedd",
+      "targetPath": "src/features/restauration/hooks/useRestaurants.ts",
+      "timestamp": "2026-08-19T09:25:03.394Z"
+    },
+    "src/features/restauration/hooks/useFavorites.ts": {
+      "hash": "3721617e1500025ef30f89b559a6fe500fb53bfa6462e3dc0a05d431c0e0ec31",
+      "targetPath": "src/features/restauration/hooks/useFavorites.ts",
+      "timestamp": "2026-08-19T09:25:04.252Z"
+    },
+    "src/features/restauration/components/common/RatingStars.tsx": {
+      "hash": "9e29a40903789e0b99ddf2a40ac0d94f68dec4c9e2cdfe7d8a9867413c0823b6",
+      "targetPath": "src/features/restauration/components/common/RatingStars.tsx",
+      "timestamp": "2026-08-19T09:25:04.818Z"
+    },
+    "src/features/restauration/components/common/CuisineTag.tsx": {
+      "hash": "89ea0c3b63980d5729e50974412c8271ae61b22919171579fcc07d3e2b3aacd3",
+      "targetPath": "src/features/restauration/components/common/CuisineTag.tsx",
+      "timestamp": "2026-08-19T09:25:05.368Z"
+    },
+    "src/features/restauration/components/common/RestaurantCard.tsx": {
+      "hash": "d835264bb210bf0410c4d2c0adfa68f15dc69ec2c2105bab590130cf0afb3746",
+      "targetPath": "src/features/restauration/components/common/RestaurantCard.tsx",
+      "timestamp": "2026-08-19T09:25:05.943Z"
+    },
+    "src/features/restauration/constants/cuisines.ts": {
+      "hash": "caa84a9fff4e308da5359c302288974acaf7b4240b51194eab9388dfa31902a7",
+      "targetPath": "src/features/restauration/constants/cuisines.ts",
+      "timestamp": "2026-08-19T09:25:06.490Z"
+    },
+    "src/features/restauration/constants/paymentMethods.ts": {
+      "hash": "199fa478f5afe3e779ac2bd8a27ace720e52b2f9fc4677180ba5eb65578e2506",
+      "targetPath": "src/features/restauration/constants/paymentMethods.ts",
+      "timestamp": "2026-08-19T09:25:07.336Z"
+    },
+    "src/features/restauration/types/order.types.ts": {
+      "hash": "1bd94822554c5f9dbde2713cef2383bc9ec1966c39e82f25a603bfbe2e0ac336",
+      "targetPath": "src/features/restauration/types/order.types.ts",
+      "timestamp": "2026-08-19T09:25:07.895Z"
+    },
+    "src/features/restauration/types/analytics.types.ts": {
+      "hash": "73253b5b4fc63c91c5e70cefefa79f582bee3823727df082d757621efbbce084",
+      "targetPath": "src/features/restauration/types/analytics.types.ts",
+      "timestamp": "2026-08-19T09:25:08.440Z"
+    },
+    "src/features/restauration/validators/order.validator.ts": {
+      "hash": "6752ea58c25b2d44745e9be355a0efb2f7e01e1c5b2975c289a4db336bdd94af",
+      "targetPath": "src/features/restauration/validators/order.validator.ts",
+      "timestamp": "2026-08-19T09:25:09.281Z"
+    },
+    "src/features/restauration/tracking/LiveOrderTracker.ts": {
+      "hash": "1b2b35225d7487ebb32fd6540b923956e1a32490f6578486ffa5b0d90f947b43",
+      "targetPath": "src/features/restauration/tracking/LiveOrderTracker.ts",
+      "timestamp": "2026-08-19T09:25:09.836Z"
+    },
+    "src/features/restauration/services/NotificationService.ts": {
+      "hash": "258c6623c6db1caeca3431c5052dab44b6e7b804ecebbf71a7b6c6ab7a515bc6",
+      "targetPath": "src/features/restauration/services/NotificationService.ts",
+      "timestamp": "2026-08-19T09:25:10.385Z"
+    },
+    "src/features/restauration/services/OrderService.ts": {
+      "hash": "780c827a38bbeb7f04f6389ec2cc26c530789deacbe7ca5e54ba011c1bad9d17",
+      "targetPath": "src/features/restauration/services/OrderService.ts",
+      "timestamp": "2026-08-19T09:25:10.932Z"
+    },
+    "src/features/restauration/hooks/useOrder.ts": {
+      "hash": "99cc05eb7e3f6950067ad0cb2ca71c0c0db360aefec3ab7c2e92e163b2e4f657",
+      "targetPath": "src/features/restauration/hooks/useOrder.ts",
+      "timestamp": "2026-08-19T09:25:11.484Z"
+    },
+    "src/features/restauration/validators/menu.validator.ts": {
+      "hash": "62ac1ae313613206f696955f8d19e1027646fa4a1e630fed5e43ceb2049ee7ec",
+      "targetPath": "src/features/restauration/validators/menu.validator.ts",
+      "timestamp": "2026-08-19T09:25:12.033Z"
+    },
+    "src/features/restauration/services/MenuService.ts": {
+      "hash": "9201ddd76dae373c0e70a844b5ace57f0188ecb9d7bf6cc980adc00469e29152",
+      "targetPath": "src/features/restauration/services/MenuService.ts",
+      "timestamp": "2026-08-19T09:25:13.314Z"
+    },
+    "src/features/restauration/hooks/useMenu.ts": {
+      "hash": "2c721d9757411c770fcbe3bb5e5145209749f479f3169f6dc189290688565a39",
+      "targetPath": "src/features/restauration/hooks/useMenu.ts",
+      "timestamp": "2026-08-19T09:25:13.853Z"
+    },
+    "src/features/restauration/analytics/MenuPerformance.ts": {
+      "hash": "f8f1bea44fec7ce22d76d914e9012e0adee212fdb8fc4808a4f33a8e6848e9da",
+      "targetPath": "src/features/restauration/analytics/MenuPerformance.ts",
+      "timestamp": "2026-08-19T09:25:15.141Z"
+    },
+    "src/features/restauration/hooks/useAnalytics.ts": {
+      "hash": "d9f29159bb9336d6073f42f9cc0589138b44c0dd87921eef3c180881c345e2a6",
+      "targetPath": "src/features/restauration/hooks/useAnalytics.ts",
+      "timestamp": "2026-08-19T09:25:15.981Z"
+    },
+    "src/features/restauration/dashboard/DashboardOverview.tsx": {
+      "hash": "cde55f9eeb9dd97164edef7bd93b5b1d12eede1c8cc974d1b418f8d76767e317",
+      "targetPath": "src/features/restauration/dashboard/DashboardOverview.tsx",
+      "timestamp": "2026-08-19T09:25:16.537Z"
+    },
+    "src/features/restauration/dashboard/OrderManagement.tsx": {
+      "hash": "a720480427bb6e857923a68f57ee5e9cb4c977347dcd2cf5848ca8d7021d282d",
+      "targetPath": "src/features/restauration/dashboard/OrderManagement.tsx",
+      "timestamp": "2026-08-19T09:25:17.102Z"
+    },
+    "src/features/restauration/dashboard/MenuManagement.tsx": {
+      "hash": "dcd1dd0bbcfe072bb4890f90e1432ea1be2121525543decba9cad5f430cf081a",
+      "targetPath": "src/features/restauration/dashboard/MenuManagement.tsx",
+      "timestamp": "2026-08-19T09:25:17.648Z"
+    },
+    "src/features/restauration/dashboard/RevenueChart.tsx": {
+      "hash": "9682c2b31d9811af2958fc14f225af5faf266c83ce89da86709a5a63456b44e1",
+      "targetPath": "src/features/restauration/dashboard/RevenueChart.tsx",
+      "timestamp": "2026-08-19T09:25:18.291Z"
+    },
+    "src/features/restauration/dashboard/EmployeeManagement.tsx": {
+      "hash": "ec966e65b609f4bfe469c04e5f7f6f2cb603a1d58efb3fce81d2fef10342de68",
+      "targetPath": "src/features/restauration/dashboard/EmployeeManagement.tsx",
+      "timestamp": "2026-08-19T09:25:19.140Z"
+    },
+    "src/features/restauration/dashboard/InventoryManagement.tsx": {
+      "hash": "25711cbbf3bdabaf4bb7f90581db427ee3b80f78c9e846d9b89bfbdff9faf4e7",
+      "targetPath": "src/features/restauration/dashboard/InventoryManagement.tsx",
+      "timestamp": "2026-08-19T09:25:19.702Z"
+    },
+    "src/features/restauration/dashboard/AnalyticsDashboard.tsx": {
+      "hash": "e1012e1f7d3a83aa9a9f44b297670a5c5f311d462ebbf9d3433048acd569db9a",
+      "targetPath": "src/features/restauration/dashboard/AnalyticsDashboard.tsx",
+      "timestamp": "2026-08-19T09:25:20.542Z"
+    },
+    "src/features/restauration/dashboard/AIRecommendations.tsx": {
+      "hash": "38c2c4b50eba32916bd10211c7a74c55b0b723684cc07570356f270f2c5dd4ad",
+      "targetPath": "src/features/restauration/dashboard/AIRecommendations.tsx",
+      "timestamp": "2026-08-19T09:25:21.109Z"
+    },
+    "src/features/restauration/pages/RestaurationDashboardPage.tsx": {
+      "hash": "9d3c5bf7de33ccd799458b72eb6b7092a959f6fec18b21e83a9e6a70a757ac29",
+      "targetPath": "src/features/restauration/pages/RestaurationDashboardPage.tsx",
+      "timestamp": "2026-08-19T09:25:21.674Z"
+    },
+    "src/features/restauration/pages/RestaurationPage.tsx": {
+      "hash": "162d4e0a5d42fe955da63ad384e91006a0584b3bef6e41acafd1dca589c9b0b4",
+      "targetPath": "src/features/restauration/pages/RestaurationPage.tsx",
+      "timestamp": "2026-08-19T09:25:22.222Z"
+    },
+    "src/pages/modules/RestaurationPage.tsx": {
+      "hash": "a02a1b168b46c12df23aeafee071def2eaed1a95932c2f9d8c86daa140a9c61d",
+      "targetPath": "src/pages/modules/RestaurationPage.ts",
+      "timestamp": "2026-08-19T09:25:22.777Z"
+    },
+    "src/features/restauration/hooks/useCart.ts": {
+      "hash": "d07cb4d65d1849e217390f07e5d3bf2e815f8a6af1c8c6383a920828e22652e1",
+      "targetPath": "src/features/restauration/hooks/useCart.ts",
+      "timestamp": "2026-08-19T09:25:23.617Z"
+    },
+    "src/features/restauration/types/reservation.types.ts": {
+      "hash": "ba64e6fe007ad6d1dc4d605e45d0b8152b38c77f0758729f6d2bf11ed6327d7b",
+      "targetPath": "src/features/restauration/types/reservation.types.ts",
+      "timestamp": "2026-08-19T09:25:24.163Z"
+    },
+    "src/features/restauration/validators/reservation.validator.ts": {
+      "hash": "8e4d94d4555d7f5cfb0f3abb6c61c356a31431cd947858109614e7c600f0289c",
+      "targetPath": "src/features/restauration/validators/reservation.validator.ts",
+      "timestamp": "2026-08-19T09:25:25.422Z"
+    },
+    "src/features/restauration/services/ReservationService.ts": {
+      "hash": "18da5f3e98a0673fe0ea0de864dd7c99b43ab0405bc018e7221c3a44ecbb956b",
+      "targetPath": "src/features/restauration/services/ReservationService.ts",
+      "timestamp": "2026-08-19T09:25:26.274Z"
+    },
+    "src/features/restauration/hooks/useReservation.ts": {
+      "hash": "8f3308a59c38831ec7d6d39e3b983bfb05f33326ce3edd60774800f614d4e688",
+      "targetPath": "src/features/restauration/hooks/useReservation.ts",
+      "timestamp": "2026-08-19T09:25:26.863Z"
+    },
+    "src/features/restauration/payments/MobileMoneyAdapter.ts": {
+      "hash": "37a505902bb79f10e3fe8bdd6de36b3808d9b48a54d549bce1d9addd4a4cbfdf",
+      "targetPath": "src/features/restauration/payments/MobileMoneyAdapter.ts",
+      "timestamp": "2026-08-19T09:25:27.415Z"
+    },
+    "src/features/restauration/payments/CardAdapter.ts": {
+      "hash": "554e742a4308e4e5f0899d434fafd414856b234cc528cd487e8c3d00755eb38b",
+      "targetPath": "src/features/restauration/payments/CardAdapter.ts",
+      "timestamp": "2026-08-19T09:25:27.978Z"
+    },
+    "src/features/restauration/payments/InvoiceGenerator.ts": {
+      "hash": "2c1c3d34c7fea31105ee76b73e9a706fc6cb4c9c3afa08a21806377cf1c30fe9",
+      "targetPath": "src/features/restauration/payments/InvoiceGenerator.ts",
+      "timestamp": "2026-08-19T09:25:28.832Z"
+    },
+    "src/features/restauration/payments/CryptoAdapter.ts": {
+      "hash": "ad477ae5d90a9b5b5d9ff35a70a2d89871a82cc432b8f7766e39dff6f8471d83",
+      "targetPath": "src/features/restauration/payments/CryptoAdapter.ts",
+      "timestamp": "2026-08-19T09:25:29.408Z"
+    },
+    "src/features/restauration/payments/EscrowService.ts": {
+      "hash": "b09cb15d7d7e970154e560e44326915ee434e93d56d4f1830eee97e32dae5d84",
+      "targetPath": "src/features/restauration/payments/EscrowService.ts",
+      "timestamp": "2026-08-19T09:25:29.960Z"
+    },
+    "src/features/restauration/payments/ReceiptService.ts": {
+      "hash": "6fad99ba0aad9716553a47c9455aa44ad0d60b26f09ab78a10b5029a2a0429f1",
+      "targetPath": "src/features/restauration/payments/ReceiptService.ts",
+      "timestamp": "2026-08-19T09:25:30.530Z"
+    },
+    "src/features/restauration/payments/PaymentService.ts": {
+      "hash": "8db7a9e8524a15bd2a6771b05bd2bfbb8825196a410772ad8a77439bb20f20c3",
+      "targetPath": "src/features/restauration/payments/PaymentService.ts",
+      "timestamp": "2026-08-19T09:25:31.102Z"
+    },
+    "src/features/restauration/hooks/usePayment.ts": {
+      "hash": "9bd660dab13b2ec07d8f49b61df9ff54ca59cf357ccdfd62529d4a8c520d7773",
+      "targetPath": "src/features/restauration/hooks/usePayment.ts",
+      "timestamp": "2026-08-19T09:25:31.653Z"
+    },
+    "src/features/restauration/components/detail/RestaurantHeader.tsx": {
+      "hash": "51c306374e6a9e41989d2042dc7aabac175fc56f67eb859f48dfbcecb53800f2",
+      "targetPath": "src/features/restauration/components/detail/RestaurantHeader.tsx",
+      "timestamp": "2026-08-19T09:25:32.205Z"
+    },
+    "src/features/restauration/components/detail/RestaurantGallery.tsx": {
+      "hash": "6387d873b3ee7e121f0c33c65af077a89b15e6cc1f42201c1956a0cede0ac04c",
+      "targetPath": "src/features/restauration/components/detail/RestaurantGallery.tsx",
+      "timestamp": "2026-08-19T09:25:32.767Z"
+    },
+    "src/features/restauration/components/detail/RestaurantHero.tsx": {
+      "hash": "6b73bb9ef59d37a527e637c244ece9f7105b58c8a80fa2e64e5fbcdd168b1f4f",
+      "targetPath": "src/features/restauration/components/detail/RestaurantHero.tsx",
+      "timestamp": "2026-08-19T09:25:33.632Z"
+    },
+    "src/features/restauration/components/detail/RestaurantInfo.tsx": {
+      "hash": "e2dfa2622cbd88a39f1484e9e44b42baf870aaf18be08c7dcf38c5e0b4083f65",
+      "targetPath": "src/features/restauration/components/detail/RestaurantInfo.tsx",
+      "timestamp": "2026-08-19T09:25:34.198Z"
+    },
+    "src/features/restauration/components/detail/RestaurantHours.tsx": {
+      "hash": "b863be13ea51f1bc13bfa4c12ccaf46a966eb3fd908dd14e3ec90b1da1ee2903",
+      "targetPath": "src/features/restauration/components/detail/RestaurantHours.tsx",
+      "timestamp": "2026-08-19T09:25:34.765Z"
+    },
+    "src/features/restauration/components/detail/RestaurantLocation.tsx": {
+      "hash": "68880a3143ac9640fa4bb7f9dbcc2323f95fe031f46cdf5a3513d76de9540f90",
+      "targetPath": "src/features/restauration/components/detail/RestaurantLocation.tsx",
+      "timestamp": "2026-08-19T09:25:35.325Z"
+    },
+    "src/features/restauration/components/detail/RestaurantMap.tsx": {
+      "hash": "84e926913725cbcf5e89193e3a7212aa854d253203c34a6e55ce396e6159708e",
+      "targetPath": "src/features/restauration/components/detail/RestaurantMap.tsx",
+      "timestamp": "2026-08-19T09:25:36.603Z"
+    },
+    "src/features/restauration/components/detail/RestaurantMenuCategory.tsx": {
+      "hash": "dec37fc345c432c12e059571393589ffbb10dcb19fd35ae390b45ffaa6023e47",
+      "targetPath": "src/features/restauration/components/detail/RestaurantMenuCategory.tsx",
+      "timestamp": "2026-08-19T09:25:37.196Z"
+    },
+    "src/features/restauration/components/detail/RestaurantMenuItem.tsx": {
+      "hash": "f8d0c8ac0ced06baebb05bdc70ab9c3f543bbb7216dff59aa7595dbbd3f63623",
+      "targetPath": "src/features/restauration/components/detail/RestaurantMenuItem.tsx",
+      "timestamp": "2026-08-19T09:25:37.750Z"
+    },
+    "src/features/restauration/components/detail/RestaurantMenu.tsx": {
+      "hash": "6db8faea057f339dc4e270293666fbc0f92d445c2a98e5d3d84f64fbd0dbbb7c",
+      "targetPath": "src/features/restauration/components/detail/RestaurantMenu.tsx",
+      "timestamp": "2026-08-19T09:25:38.308Z"
+    },
+    "src/features/restauration/components/detail/RestaurantChef.tsx": {
+      "hash": "95f0b526310bcc10794ede803ccad75119607f424ac2c1f5f9fddb881d4eff93",
+      "targetPath": "src/features/restauration/components/detail/RestaurantChef.tsx",
+      "timestamp": "2026-08-19T09:25:39.203Z"
+    },
+    "src/features/restauration/components/detail/RestaurantTeam.tsx": {
+      "hash": "da38c279d9765564ed02872e8f6d3e7cb3dd4991d951d595f1b58fb4e50e9313",
+      "targetPath": "src/features/restauration/components/detail/RestaurantTeam.tsx",
+      "timestamp": "2026-08-19T09:25:39.754Z"
+    },
+    "src/features/restauration/components/detail/RestaurantReviewStats.tsx": {
+      "hash": "8633d9d9a6d91b03ec45deacc943c4214bc0669d303d0c62249097991dfabe02",
+      "targetPath": "src/features/restauration/components/detail/RestaurantReviewStats.tsx",
+      "timestamp": "2026-08-19T09:25:40.606Z"
+    },
+    "src/features/restauration/components/detail/RestaurantReviews.tsx": {
+      "hash": "7b51cc640e3a0e724f9a70877582175ea28bd3b6c7814e0e023eb509ce7fdb04",
+      "targetPath": "src/features/restauration/components/detail/RestaurantReviews.tsx",
+      "timestamp": "2026-08-19T09:25:41.444Z"
+    },
+    "src/features/restauration/components/detail/RestaurantQuestions.tsx": {
+      "hash": "4b1e7660561c05d16da1ec4115234c64c7f22a2f73032704f7d2babf41553661",
+      "targetPath": "src/features/restauration/components/detail/RestaurantQuestions.tsx",
+      "timestamp": "2026-08-19T09:25:42.011Z"
+    },
+    "src/features/restauration/components/detail/RestaurantPromotions.tsx": {
+      "hash": "e6eab3c55e05c6d3ebfd0e66b9c921e37d782c088c9b9be459fb1ca1840fcbf5",
+      "targetPath": "src/features/restauration/components/detail/RestaurantPromotions.tsx",
+      "timestamp": "2026-08-19T09:25:42.557Z"
+    },
+    "src/features/restauration/components/detail/RestaurantEvents.tsx": {
+      "hash": "60035f1a520b9142fde856b9d06e7487f5582f60da0b37ae5f86acb2fcceaa2c",
+      "targetPath": "src/features/restauration/components/detail/RestaurantEvents.tsx",
+      "timestamp": "2026-08-19T09:25:43.107Z"
+    },
+    "src/features/restauration/components/detail/RestaurantVideos.tsx": {
+      "hash": "928c7cf3112817910a4a18033e46d6247dda21193ecba35b34ecececff4c640e",
+      "targetPath": "src/features/restauration/components/detail/RestaurantVideos.tsx",
+      "timestamp": "2026-08-19T09:25:44.252Z"
+    },
+    "src/features/restauration/components/detail/RestaurantStories.tsx": {
+      "hash": "b998060b4a949c1a8b83efd3af8df0d075db0c7bc2e2500ed42af062345d79af",
+      "targetPath": "src/features/restauration/components/detail/RestaurantStories.tsx",
+      "timestamp": "2026-08-19T09:25:45.102Z"
+    },
+    "src/features/restauration/components/detail/RestaurantLive.tsx": {
+      "hash": "ca69efcb50924960b19feb0b9e271ceaf5ffceb40911489b6d2053b6c93a09d1",
+      "targetPath": "src/features/restauration/components/detail/RestaurantLive.tsx",
+      "timestamp": "2026-08-19T09:25:45.651Z"
+    },
+    "src/features/restauration/components/detail/RestaurantSimilar.tsx": {
+      "hash": "e8646e5e6f618fa9ab3faa574141f1718255dce06fcb2143e3b3488f134e24d9",
+      "targetPath": "src/features/restauration/components/detail/RestaurantSimilar.tsx",
+      "timestamp": "2026-08-19T09:25:46.558Z"
+    },
+    "src/features/restauration/components/detail/RestaurantNearby.tsx": {
+      "hash": "8691cc5c3d813a90ee6653889d2f854eaf65f3c79fb5e2d73a1b1a30a70c1fd5",
+      "targetPath": "src/features/restauration/components/detail/RestaurantNearby.tsx",
+      "timestamp": "2026-08-19T09:25:47.131Z"
+    },
+    "src/features/restauration/components/detail/RestaurantReservation.tsx": {
+      "hash": "fbc785422a5e66f29f330b316d4dc605ede7fc3e105df622fb99a0d12996fa19",
+      "targetPath": "src/features/restauration/components/detail/RestaurantReservation.tsx",
+      "timestamp": "2026-08-19T09:25:47.697Z"
+    },
+    "src/features/restauration/components/detail/RestaurantDeliveryTracking.tsx": {
+      "hash": "978aa7823152a23ab1d0be34ce633811397efde8c758de5a70b34df4f3e16458",
+      "targetPath": "src/features/restauration/components/detail/RestaurantDeliveryTracking.tsx",
+      "timestamp": "2026-08-19T09:25:48.249Z"
+    },
+    "src/features/restauration/components/detail/RestaurantSocialActions.tsx": {
+      "hash": "0b3d0d36cdbe1e47616c3e0751214c9ece25981f6ee91a7749b3439138cc15c2",
+      "targetPath": "src/features/restauration/components/detail/RestaurantSocialActions.tsx",
+      "timestamp": "2026-08-19T09:25:49.107Z"
+    },
+    "src/features/restauration/components/detail/RestaurantStickyBar.tsx": {
+      "hash": "14eb58f50f2c8442af4bcaf6d886c2c72060cf9f457bcbd8f2d732dad024a837",
+      "targetPath": "src/features/restauration/components/detail/RestaurantStickyBar.tsx",
+      "timestamp": "2026-08-19T09:25:49.668Z"
+    },
+    "src/features/restauration/components/reservation/ReservationCalendar.tsx": {
+      "hash": "77855b9f737559085ab9f64f27bd401ab46ab70104e150cfdb98abb5fe53bca1",
+      "targetPath": "src/features/restauration/components/reservation/ReservationCalendar.tsx",
+      "timestamp": "2026-08-19T09:25:50.236Z"
+    },
+    "src/features/restauration/components/reservation/ReservationForm.tsx": {
+      "hash": "842c1e3aa65a5b0ffc67f5b1b4178ab909683630de73869127fd91fb642b4e52",
+      "targetPath": "src/features/restauration/components/reservation/ReservationForm.tsx",
+      "timestamp": "2026-08-19T09:25:50.789Z"
+    },
+    "src/features/restauration/components/reservation/ReservationConfirmation.tsx": {
+      "hash": "83f4fa990c96524f00631291d623b3f616ef336bfa29bcc8f0afdf1e21b873a4",
+      "targetPath": "src/features/restauration/components/reservation/ReservationConfirmation.tsx",
+      "timestamp": "2026-08-19T09:25:51.347Z"
+    },
+    "src/features/restauration/components/payment/PaymentMethods.tsx": {
+      "hash": "e1caf89f4406900aad212d281d1472e83ef4d6fb77e23cbb14ea96c60324cc7d",
+      "targetPath": "src/features/restauration/components/payment/PaymentMethods.tsx",
+      "timestamp": "2026-08-19T09:25:51.901Z"
+    },
+    "src/features/restauration/components/order/OrderSummary.tsx": {
+      "hash": "3a3ba6bd797b141b19d41963f7fef361ada935a4d651de528bd55c1a0668fb2e",
+      "targetPath": "src/features/restauration/components/order/OrderSummary.tsx",
+      "timestamp": "2026-08-19T09:25:52.516Z"
+    },
+    "src/features/restauration/validators/payment.validator.ts": {
+      "hash": "b0625ded43255b73f1c85f673c7cc4d16885e53525e33f5790a60bcd78936576",
+      "targetPath": "src/features/restauration/validators/payment.validator.ts",
+      "timestamp": "2026-08-19T09:25:53.081Z"
+    },
+    "src/features/restauration/forms/PaymentForm.tsx": {
+      "hash": "b73111d4d5df67670c49693e662ccc943fa1c8bb56ea3ce183f6696d2742c611",
+      "targetPath": "src/features/restauration/forms/PaymentForm.tsx",
+      "timestamp": "2026-08-19T09:25:54.370Z"
+    },
+    "src/features/restauration/pages/RestaurationDetailPage.tsx": {
+      "hash": "e477a6a84d455b3469ea58b15e8e051bce45a7f9200e2506160cb12f29d20812",
+      "targetPath": "src/features/restauration/pages/RestaurationDetailPage.tsx",
+      "timestamp": "2026-08-19T09:25:54.926Z"
+    },
+    "src/pages/modules/RestaurationDetailPage.tsx": {
+      "hash": "5660af7baaa96fbe0e42524958e4af6d755f62a3c38a5888676f9c82dfcb611d",
+      "targetPath": "src/pages/modules/RestaurationDetailPage.ts",
+      "timestamp": "2026-08-19T09:25:55.480Z"
+    },
+    "src/pages/modules/HebergementPage.tsx": {
+      "hash": "69644237e9502d2ee23fc25b1cb03a982d3a9c934728c8f0bb8be984e18cab83",
+      "targetPath": "src/pages/modules/HebergementPage.ts",
+      "timestamp": "2026-08-19T09:25:56.029Z"
+    },
+    "src/pages/modules/HebergementDetailPage.tsx": {
+      "hash": "e600999d08d344f25b56d172c40350e1e995ad0645e568590106e29acb04eb43",
+      "targetPath": "src/pages/modules/HebergementDetailPage.ts",
+      "timestamp": "2026-08-19T09:25:56.582Z"
+    },
+    "src/pages/modules/AgriPage.tsx": {
+      "hash": "073d21082e8e43a03416920e1262442fe95101318a5cb87edfb6803427a096af",
+      "targetPath": "src/pages/modules/AgriPage.ts",
+      "timestamp": "2026-08-19T09:25:57.135Z"
+    },
+    "src/pages/modules/AgriDetailPage.tsx": {
+      "hash": "adddf858eb99a655f570c179618739a038037c9afdd4b5552b8150ef6cc287f5",
+      "targetPath": "src/pages/modules/AgriDetailPage.ts",
+      "timestamp": "2026-08-19T09:25:57.679Z"
+    },
+    "src/pages/modules/NetworkPage.tsx": {
+      "hash": "41e306f22f7e0fc1cbc6d46f3a16acc60b40ef5870bb675f24548363ef699c20",
+      "targetPath": "src/pages/modules/NetworkPage.ts",
+      "timestamp": "2026-08-19T09:25:58.532Z"
+    },
+    "src/pages/modules/NetworkDetailPage.tsx": {
+      "hash": "efff7ef0ab5c4e782e1f4a8c8aa25808650e3ec335e2e2ec8c7e59a5841d1769",
+      "targetPath": "src/pages/modules/NetworkDetailPage.ts",
+      "timestamp": "2026-08-19T09:26:00.108Z"
+    },
+    "src/pages/modules/NetworkProfilePage.tsx": {
+      "hash": "cfc7ffc60ba1a5e627574cd7300894901652385da956ef8b6ff5aa9805b18a84",
+      "targetPath": "src/pages/modules/NetworkProfilePage.ts",
+      "timestamp": "2026-08-19T09:26:00.951Z"
+    },
+    "src/pages/CheckoutPage.tsx": {
+      "hash": "a1576fbbe4882506d44c2e9f2c8b5595f3eb1e17276ce47113cdc69d1294c6d6",
+      "targetPath": "app/checkout.tsx",
+      "timestamp": "2026-08-19T09:26:01.500Z"
+    },
+    "src/App.tsx": {
+      "hash": "61b7973c0a4a828f23d178bf77d20fbf5ff6216b0869afa1e40943ee0743a174",
+      "targetPath": "app/_layout.tsx",
+      "timestamp": "2026-08-19T09:26:02.340Z"
+    },
+    "src/components/AIWriteAssist.tsx": {
+      "hash": "f55941fa0305d2bd08ee9b6b728bfcbf319478c3fb69c235c165be7a108e9dfd",
+      "targetPath": "src/components/AIWriteAssist.tsx",
+      "timestamp": "2026-08-19T09:26:03.196Z"
+    },
+    "src/components/ArticleEditor.tsx": {
+      "hash": "e84ef0a39b5134788b6584629efc65a7e3c682ae26e56c16f1a807821e1d3421",
+      "targetPath": "src/components/ArticleEditor.tsx",
+      "timestamp": "2026-08-19T09:26:03.775Z"
+    },
+    "src/components/CommandPalette.tsx": {
+      "hash": "f28ab58c6ed3e84c0125676c4a143fa6690200be01e36afde7c86693a8f1e9ad",
+      "targetPath": "src/components/CommandPalette.tsx",
+      "timestamp": "2026-08-19T09:26:04.314Z"
+    },
+    "src/components/Confetti.tsx": {
+      "hash": "7431fa9d38e9abd0b6bb082893dd9744643f3ba434efed86172dc5eaf94701fb",
+      "targetPath": "src/components/Confetti.tsx",
+      "timestamp": "2026-08-19T09:26:04.852Z"
+    },
+    "src/components/FavoriteButton.tsx": {
+      "hash": "3ec1c4622cd4960a323632d9c5673746c186f036db82e261581ad25f1dd755e6",
+      "targetPath": "src/components/FavoriteButton.tsx",
+      "timestamp": "2026-08-19T09:26:05.409Z"
+    },
+    "src/components/FirstTimeHint.tsx": {
+      "hash": "5f2f655dac7301a43881f325358e2ba8b8e15510eebbc5c8e4adf59b70168180",
+      "targetPath": "src/components/FirstTimeHint.tsx",
+      "timestamp": "2026-08-19T09:26:05.959Z"
+    },
+    "src/components/ImageUploader.tsx": {
+      "hash": "2f115ac8e5f0aee19ebf8f7708015331cb739922d5e5d64f2cc3afee01a893c4",
+      "targetPath": "src/components/ImageUploader.tsx",
+      "timestamp": "2026-08-19T09:26:06.800Z"
+    },
+    "src/components/PageTransition.tsx": {
+      "hash": "714387efec254102a2b56d228604f5873221746579aefaf3f108f48bdd101625",
+      "targetPath": "src/components/PageTransition.tsx",
+      "timestamp": "2026-08-19T09:26:07.638Z"
+    },
+    "src/components/ProfileProgressBar.tsx": {
+      "hash": "01399ce40f10b18ede14b0dbae5a7c93b144f8ddca9dfca866a4e49dcf878c8e",
+      "targetPath": "src/components/ProfileProgressBar.tsx",
+      "timestamp": "2026-08-19T09:26:08.488Z"
+    },
+    "src/components/ReportButton.tsx": {
+      "hash": "2f8c4b749fb93d47100e4115887cfe3b96dce4109b08b60e5fb412749b72ad21",
+      "targetPath": "src/components/ReportButton.tsx",
+      "timestamp": "2026-08-19T09:26:09.630Z"
+    },
+    "src/components/shared/Avatar.tsx": {
+      "hash": "c7f8c8b761681389b380ea98071bc2e14342d49db9c6f657a8b17c55adf63af3",
+      "targetPath": "src/components/shared/Avatar.tsx",
+      "timestamp": "2026-08-19T09:26:10.172Z"
+    },
+    "src/components/ui/accordion.tsx": {
+      "hash": "47e07f0ff3e65796626422edde75e905b27c0dfec6cd2622791a7cba5b66c888",
+      "targetPath": "src/components/ui/accordion.tsx",
+      "timestamp": "2026-08-19T09:26:10.725Z"
+    },
+    "src/components/ui/ai-floating-button.tsx": {
+      "hash": "93b69733050f91116b049dc31e4694c9912a961bf6f9892dea6a52b8e4019647",
+      "targetPath": "src/components/ui/ai-floating-button.tsx",
+      "timestamp": "2026-08-19T09:26:11.265Z"
+    },
+    "src/components/ui/alert-dialog.tsx": {
+      "hash": "5a526da6a7d6f295de839886b4462fe0bf25de0867ba3a48fa676c6e7e3eb873",
+      "targetPath": "src/components/ui/alert-dialog.tsx",
+      "timestamp": "2026-08-19T09:26:11.812Z"
+    },
+    "src/components/ui/alert.tsx": {
+      "hash": "1301332845b09618d3b74c3ee1746e9c3ee15e222b3a387c0df3f014e272fb47",
+      "targetPath": "src/components/ui/alert.tsx",
+      "timestamp": "2026-08-19T09:26:12.386Z"
+    },
+    "src/components/ui/aspect-ratio.tsx": {
+      "hash": "7706745e217bebbc2d7bdf6697e9c6d484061146ae771755c9b6f240762c7217",
+      "targetPath": "src/components/ui/aspect-ratio.tsx",
+      "timestamp": "2026-08-19T09:26:12.941Z"
+    },
+    "src/components/ui/avatar.tsx": {
+      "hash": "2c16a4a6a37cdfad225b8356f73668fc385d7da765f432684ac7a576654c74aa",
+      "targetPath": "src/components/ui/avatar.tsx",
+      "timestamp": "2026-08-19T09:26:14.165Z"
+    },
+    "src/components/ui/badge.tsx": {
+      "hash": "132e2f2780227dbf9a0b464d023d981282d60cc1fbf466aa9601b9d23ce9d6cd",
+      "targetPath": "src/components/ui/badge.tsx",
+      "timestamp": "2026-08-19T09:26:14.714Z"
+    },
+    "src/components/ui/breadcrumb.tsx": {
+      "hash": "87fc1a78362f2270dd09bb0f39aeb2a48e0b9bf50da9e38ba22bcd22c18f8c76",
+      "targetPath": "src/components/ui/breadcrumb.tsx",
+      "timestamp": "2026-08-19T09:26:15.261Z"
+    },
+    "src/components/ui/button-group.tsx": {
+      "hash": "ebc18a5ec997ac4b74b01e5d4b92e13d36ae3b32ab6ccc4c782d519046b85c8d",
+      "targetPath": "src/components/ui/button-group.tsx",
+      "timestamp": "2026-08-19T09:26:15.815Z"
+    },
+    "src/components/ui/button.tsx": {
+      "hash": "d837606f05b8b2d1a3e297f9c22d81e1b694a80c5766f6f29719b2cf5c78c6d6",
+      "targetPath": "src/components/ui/button.tsx",
+      "timestamp": "2026-08-19T09:26:16.410Z"
+    },
+    "src/components/ui/calendar.tsx": {
+      "hash": "e0a71013a9455f80429497c4466bc6126626644e4d9cd55f45ab83230636134d",
+      "targetPath": "src/components/ui/calendar.tsx",
+      "timestamp": "2026-08-19T09:26:17.678Z"
+    },
+    "src/components/ui/card.tsx": {
+      "hash": "063e1e823fbf2c25630fee851b05964d46d4e7191f0cbe566e7764e55200083f",
+      "targetPath": "src/components/ui/card.tsx",
+      "timestamp": "2026-08-19T09:26:18.229Z"
+    },
+    "src/components/ui/carousel.tsx": {
+      "hash": "2e9a740fbd6d93aaf205218df242cb1aaa0276fbcbdc3a0c9072b5ef06535297",
+      "targetPath": "src/components/ui/carousel.tsx",
+      "timestamp": "2026-08-19T09:26:18.795Z"
+    },
+    "src/components/ui/chart.tsx": {
+      "hash": "60d3b9642b4ec72d5da1dce76c68e79888f76608f204a47db40c2c70ec83ec50",
+      "targetPath": "src/components/ui/chart.tsx",
+      "timestamp": "2026-08-19T09:26:19.351Z"
+    },
+    "src/components/ui/checkbox.tsx": {
+      "hash": "6dd4770b4bacd6ad57c6e1c93898da7e25beafc01fd5d96a3c6e6f8187532745",
+      "targetPath": "src/components/ui/checkbox.tsx",
+      "timestamp": "2026-08-19T09:26:19.895Z"
+    },
+    "src/components/ui/collapsible.tsx": {
+      "hash": "5a8ae7efe91f0a787e0a41bd8557bfbea899c95d1662edd416560e7c7bf2956d",
+      "targetPath": "src/components/ui/collapsible.tsx",
+      "timestamp": "2026-08-19T09:26:20.445Z"
+    },
+    "src/components/ui/command.tsx": {
+      "hash": "f34e9421a49a3e0e3f9bc42819cd990ceac397d40c68048c68b90433d4e022eb",
+      "targetPath": "src/components/ui/command.tsx",
+      "timestamp": "2026-08-19T09:26:20.983Z"
+    },
+    "src/components/ui/confirm-dialog.tsx": {
+      "hash": "6df67eb1886e94124a2af59b9d772bfd0a00f396198174d2a2b900d85c5748a6",
+      "targetPath": "src/components/ui/confirm-dialog.tsx",
+      "timestamp": "2026-08-19T09:26:21.526Z"
+    },
+    "src/components/ui/context-menu.tsx": {
+      "hash": "626286794d4b4929febdd3c652eedbae9e0dccd28f66717d1f5bfd7eb186d2f6",
+      "targetPath": "src/components/ui/context-menu.tsx",
+      "timestamp": "2026-08-19T09:26:22.102Z"
+    },
+    "src/components/ui/dialog.tsx": {
+      "hash": "4e56e633bd74d8403a3d4f8d7bf9798877a6e8b36c81d451fc025d1e2688ecf1",
+      "targetPath": "src/components/ui/dialog.tsx",
+      "timestamp": "2026-08-19T09:26:22.647Z"
+    },
+    "src/components/ui/drawer.tsx": {
+      "hash": "42a012061f32e9bc4ace88eb4dbb201b313bff9651112f5230bf5033cbe52006",
+      "targetPath": "src/components/ui/drawer.tsx",
+      "timestamp": "2026-08-19T09:26:23.198Z"
+    },
+    "src/components/ui/dropdown-menu.tsx": {
+      "hash": "72b5070a8f8bb761141bf95926f5288631d3e2b37edf1f4c15ff96ea3f87658c",
+      "targetPath": "src/components/ui/dropdown-menu.tsx",
+      "timestamp": "2026-08-19T09:26:23.748Z"
+    },
+    "src/components/ui/empty.tsx": {
+      "hash": "322e0db73164dbfd423823d1ef5d2f8fde0f8f63e67626a17c649ea87006af27",
+      "targetPath": "src/components/ui/empty.tsx",
+      "timestamp": "2026-08-19T09:26:24.294Z"
+    },
+    "src/components/ui/error-state.tsx": {
+      "hash": "5105cdb4d906566303fe6827e3b9c739994f99c958c4b37aaa11f5395073c945",
+      "targetPath": "src/components/ui/error-state.tsx",
+      "timestamp": "2026-08-19T09:26:24.795Z"
+    },
+    "src/components/ui/field.tsx": {
+      "hash": "c96d1fa065665ad142872191c1c2de8745fa53e7ed3c5564b253193cf259501c",
+      "targetPath": "src/components/ui/field.tsx",
+      "timestamp": "2026-08-19T09:26:25.330Z"
+    },
+    "src/components/ui/form.tsx": {
+      "hash": "020a74b340414e916c752dafe39ea88af3506e30731f2e0d92a11b91959f44e5",
+      "targetPath": "src/components/ui/form.tsx",
+      "timestamp": "2026-08-19T09:26:25.877Z"
+    },
+    "src/components/ui/hover-card.tsx": {
+      "hash": "c76dc8f7d6c9605956482a0173936dc4709cde0ea81d9aa315468c59f3d1b7b8",
+      "targetPath": "src/components/ui/hover-card.tsx",
+      "timestamp": "2026-08-19T09:26:26.421Z"
+    },
+    "src/components/ui/input-group.tsx": {
+      "hash": "e878fb506fa7d588286d07658592196ac7bdc25e1cd5e13d4312db41619e5bb9",
+      "targetPath": "src/components/ui/input-group.tsx",
+      "timestamp": "2026-08-19T09:26:26.952Z"
+    },
+    "src/components/ui/input-otp.tsx": {
+      "hash": "8b0c834b30b071431df8f8eeead517857e05a08dafc159bc0c61ad6f9bf7b8ae",
+      "targetPath": "src/components/ui/input-otp.tsx",
+      "timestamp": "2026-08-19T09:26:27.792Z"
+    },
+    "src/components/ui/input.tsx": {
+      "hash": "b4ac2057b9741aca10b76d6c11dfa905738718bd61e92cafd6fd6aa6faecb4fc",
+      "targetPath": "src/components/ui/input.tsx",
+      "timestamp": "2026-08-19T09:26:28.333Z"
+    },
+    "src/components/ui/item.tsx": {
+      "hash": "22d79d76e61a98d4a9ac7dab85c03b54d0879fcd21218ebf2e473c2ec2ccb9e1",
+      "targetPath": "src/components/ui/item.tsx",
+      "timestamp": "2026-08-19T09:26:28.879Z"
+    },
+    "src/components/ui/kbd.tsx": {
+      "hash": "47d4b5488b67c853e62af9b9dfcfbfd394efa8508acb10d4e698190ff61f1ecc",
+      "targetPath": "src/components/ui/kbd.tsx",
+      "timestamp": "2026-08-19T09:26:29.438Z"
+    },
+    "src/components/ui/label.tsx": {
+      "hash": "e445a6a24cb085bc2e7cf4ba51d12be76323a462d6dd1e9380e74e1c03be0972",
+      "targetPath": "src/components/ui/label.tsx",
+      "timestamp": "2026-08-19T09:26:29.982Z"
+    },
+    "src/components/ui/menubar.tsx": {
+      "hash": "b35a36230e5725929b8aa11070f5428c32f71e4c7027e8f323031e33e0714051",
+      "targetPath": "src/components/ui/menubar.tsx",
+      "timestamp": "2026-08-19T09:26:30.518Z"
+    },
+    "src/components/ui/navigation-menu.tsx": {
+      "hash": "76c322a2fe10b24a4002574d5f1d828c7967a9c3a4774b7c8f75d9acd7c8084f",
+      "targetPath": "src/components/ui/navigation-menu.tsx",
+      "timestamp": "2026-08-19T09:26:31.057Z"
+    },
+    "src/components/ui/pagination.tsx": {
+      "hash": "e7d6bfc43a508879d40664e7fe007025ec393a29f58d0fd1bbbdc445f83f212b",
+      "targetPath": "src/components/ui/pagination.tsx",
+      "timestamp": "2026-08-19T09:26:31.602Z"
+    },
+    "src/components/ui/popover.tsx": {
+      "hash": "98e205db071106880d7ddb5cb69c93df0f25741af1f07a5a7266fffcea5d3655",
+      "targetPath": "src/components/ui/popover.tsx",
+      "timestamp": "2026-08-19T09:26:32.153Z"
+    },
+    "src/components/ui/progress.tsx": {
+      "hash": "5411493279b6750431b1ae749b079f75868553f0b98122e00c7c85672ba4114b",
+      "targetPath": "src/components/ui/progress.tsx",
+      "timestamp": "2026-08-19T09:26:32.702Z"
+    },
+    "src/components/ui/radio-group.tsx": {
+      "hash": "5edfd9e6fd7cc388927381bcbd288e3b43bc4c66173829b5f4f67ad09a77e3c0",
+      "targetPath": "src/components/ui/radio-group.tsx",
+      "timestamp": "2026-08-19T09:26:33.261Z"
+    },
+    "src/components/ui/resizable.tsx": {
+      "hash": "3b939144f0d66b2f202ea15b080c50df4f9144ba932a25b8b6de5171370db5a4",
+      "targetPath": "src/components/ui/resizable.tsx",
+      "timestamp": "2026-08-19T09:26:33.815Z"
+    },
+    "src/components/ui/reviews-panel.tsx": {
+      "hash": "940fa0e6502ba8c391c52878ff19628deee47c6fdc22223b3a7bc49d76068f2a",
+      "targetPath": "src/components/ui/reviews-panel.tsx",
+      "timestamp": "2026-08-19T09:26:34.685Z"
+    },
+    "src/components/ui/scroll-area.tsx": {
+      "hash": "3051554de165600f15bef8b46871979ef440b0673cf285aafa352e5ff119cb63",
+      "targetPath": "src/components/ui/scroll-area.tsx",
+      "timestamp": "2026-08-19T09:26:35.224Z"
+    },
+    "src/components/ui/select.tsx": {
+      "hash": "f1df5abb0b104f4d1fef9f30ebdf63e9e2154fca6f597bf47a7eadb535ef76f9",
+      "targetPath": "src/components/ui/select.tsx",
+      "timestamp": "2026-08-19T09:26:35.718Z"
+    },
+    "src/components/ui/separator.tsx": {
+      "hash": "17f3adfd5d048f7403355ce7b25a6428f47b6b0f6cf3a87bf961251504003de6",
+      "targetPath": "src/components/ui/separator.tsx",
+      "timestamp": "2026-08-19T09:26:36.547Z"
+    },
+    "src/components/ui/sheet.tsx": {
+      "hash": "2c3016556352f1d3f86f7e5563d2ab0948feeb6e4b1008ff9b07583a0b834105",
+      "targetPath": "src/components/ui/sheet.tsx",
+      "timestamp": "2026-08-19T09:26:37.105Z"
+    },
+    "src/components/ui/sidebar.tsx": {
+      "hash": "ee334c8d12e4124418cc159d1f256cda0c0f5806d7f8f36e6d6646fd185f9a01",
+      "targetPath": "src/components/ui/sidebar.tsx",
+      "timestamp": "2026-08-19T09:26:37.705Z"
+    },
+    "src/components/ui/signin.tsx": {
+      "hash": "23c0395755c3316c34380281e8319c476b942eebb6f8866dc436b804addb12c0",
+      "targetPath": "src/components/ui/signin.tsx",
+      "timestamp": "2026-08-19T09:26:38.265Z"
+    },
+    "src/components/ui/skeleton.tsx": {
+      "hash": "37b7702fa1fa6fb88c7896f3fa5ea207cc0107b9859ab485c227d04638539eb9",
+      "targetPath": "src/components/ui/skeleton.tsx",
+      "timestamp": "2026-08-19T09:26:38.815Z"
+    },
+    "src/components/ui/slider.tsx": {
+      "hash": "2a6773c7dfc5e2e2b70ca072146b74b604d5bd9103f489473b6032d14885b151",
+      "targetPath": "src/components/ui/slider.tsx",
+      "timestamp": "2026-08-19T09:26:39.375Z"
+    },
+    "src/components/ui/spinner.tsx": {
+      "hash": "c3c42d96eeb75783fd0abf8199a3172131ddfc29c7d434f83e9ad6352bb8e4da",
+      "targetPath": "src/components/ui/spinner.tsx",
+      "timestamp": "2026-08-19T09:26:39.917Z"
+    },
+    "src/components/ui/star-rating.tsx": {
+      "hash": "0c739b2943a1c9d93e9e6549239b3b5624a790b928c72096775602016472de44",
+      "targetPath": "src/components/ui/star-rating.tsx",
+      "timestamp": "2026-08-19T09:26:40.472Z"
+    },
+    "src/components/ui/switch.tsx": {
+      "hash": "ba88c06695afac1bdcf54bf459fd6aeaf8ed81b198a6b44bd7d38b11865c1469",
+      "targetPath": "src/components/ui/switch.tsx",
+      "timestamp": "2026-08-19T09:26:41.032Z"
+    },
+    "src/components/ui/table.tsx": {
+      "hash": "b16b135c24724645a59984ed4da0ecb3db96a5463162908bb3cdc81aa2e1fdef",
+      "targetPath": "src/components/ui/table.tsx",
+      "timestamp": "2026-08-19T09:26:41.599Z"
+    },
+    "src/components/ui/tabs.tsx": {
+      "hash": "c68b018349ff9834f5cbe4a9d66bc54c80d2c1bc8cf03f318e3917bc32fbb76c",
+      "targetPath": "src/components/ui/tabs.tsx",
+      "timestamp": "2026-08-19T09:26:42.162Z"
+    },
+    "src/components/ui/textarea.tsx": {
+      "hash": "dc0017696edf36d25fe9ca539ac4def3dbdbae4e67b57a0929fde61bdecd6b47",
+      "targetPath": "src/components/ui/textarea.tsx",
+      "timestamp": "2026-08-19T09:26:42.711Z"
+    },
+    "src/components/ui/toggle-group.tsx": {
+      "hash": "05d716440218c42e064f3e4a8395ae9548262ed0e31777f29ead16a2292e68b1",
+      "targetPath": "src/components/ui/toggle-group.tsx",
+      "timestamp": "2026-08-19T09:26:43.255Z"
+    },
+    "src/components/ui/toggle.tsx": {
+      "hash": "b8570a8adddd632d21c0cfc1dcb604929d0b5bb18197577447764f2437a9f996",
+      "targetPath": "src/components/ui/toggle.tsx",
+      "timestamp": "2026-08-19T09:26:43.802Z"
+    },
+    "src/components/ui/user-avatar.tsx": {
+      "hash": "6826bb0029cd051f957292a1f1c210fea848f6df4da2d35982b07c4053e6c402",
+      "targetPath": "src/components/ui/user-avatar.tsx",
+      "timestamp": "2026-08-19T09:26:44.350Z"
+    },
+    "src/config/modules/module.types.ts": {
+      "hash": "545d31de34558b0f2c2e5d083122472c1fab913fa6c951c67840865a641fcb06",
+      "targetPath": "src/config/modules/module.types.ts",
+      "timestamp": "2026-08-19T09:26:44.897Z"
+    },
+    "src/config/modules/module.constants.ts": {
+      "hash": "cfa9304587e90434418627884f5b1b94a3037aa8c0e27ea899bf58933d863642",
+      "targetPath": "src/config/modules/module.constants.ts",
+      "timestamp": "2026-08-19T09:26:45.474Z"
+    },
+    "src/config/modules/moduleRegistry.ts": {
+      "hash": "f4da5d81477f25b0bf61fd48b99eb2350e3981dfccdeddeeb7e60a1f770ff509",
+      "targetPath": "src/config/modules/moduleRegistry.ts",
+      "timestamp": "2026-08-19T09:26:46.014Z"
+    },
+    "src/constants/badges.ts": {
+      "hash": "c646c423cf24650e999b684f1267696df5845281912587cf12cb8f12d087f331",
+      "targetPath": "src/constants/badges.ts",
+      "timestamp": "2026-08-19T09:26:46.563Z"
+    },
+    "src/constants/countries.ts": {
+      "hash": "6135d24a4127625991f19effae764f814570739e16a259dceb5721c4fa2fd192",
+      "targetPath": "src/constants/countries.ts",
+      "timestamp": "2026-08-19T09:26:47.121Z"
+    },
+    "src/core/sdk/adapters/DataAdapter.ts": {
+      "hash": "8a7aa6546d5c7f765000b01f2a266bce6587ffa1d3498bf09ffa78efd6bf85d8",
+      "targetPath": "src/core/sdk/adapters/DataAdapter.ts",
+      "timestamp": "2026-08-19T09:26:47.961Z"
+    },
+    "src/core/sdk/constants.ts": {
+      "hash": "efb94e49e0a98d7ee3f5cf891630b7b0cae8823fb8978277f30fccba41600083",
+      "targetPath": "src/core/sdk/constants.ts",
+      "timestamp": "2026-08-19T09:26:48.518Z"
+    },
+    "src/core/sdk/engines/AIEngine.ts": {
+      "hash": "91eda413ba9ec7f78eadc1dbc0c0ac3bfdf8c5e2346bec13b134c1936cd650e5",
+      "targetPath": "src/core/sdk/engines/AIEngine.ts",
+      "timestamp": "2026-08-19T09:26:49.066Z"
+    },
+    "src/core/sdk/types/field.types.ts": {
+      "hash": "41a038dc68757d0a78ab25e9a09fe7e3b9176a698dfb43841b366df85bd68c9e",
+      "targetPath": "src/core/sdk/types/field.types.ts",
+      "timestamp": "2026-08-19T09:26:49.657Z"
+    },
+    "src/core/sdk/types/action.types.ts": {
+      "hash": "c5f151ad348ae5118b3e90d2933547ca9815f762ef0706d3065171ea3da99549",
+      "targetPath": "src/core/sdk/types/action.types.ts",
+      "timestamp": "2026-08-19T09:26:50.215Z"
+    },
+    "src/core/sdk/types/capability.types.ts": {
+      "hash": "b3f1a623d0e9f1fd72eed625a758cb5ef00008c2b592debc10f415074b1d08de",
+      "targetPath": "src/core/sdk/types/capability.types.ts",
+      "timestamp": "2026-08-19T09:26:50.768Z"
+    },
+    "src/core/sdk/types/manifest.types.ts": {
+      "hash": "3abef2858e50cc5e212f9244e54c6083719e3d6fd42c87aab5fc84da43d8fb9f",
+      "targetPath": "src/core/sdk/types/manifest.types.ts",
+      "timestamp": "2026-08-19T09:26:51.330Z"
+    },
+    "src/core/sdk/types/event.types.ts": {
+      "hash": "562f08464541e814012abb538c2895dae59234c17f75af32b6fb224c0b63265b",
+      "targetPath": "src/core/sdk/types/event.types.ts",
+      "timestamp": "2026-08-19T09:26:51.881Z"
+    },
+    "src/core/sdk/types/plugin.types.ts": {
+      "hash": "76b855471cabd3046f8f5b882228029380e10cd1a0a249c8e6b5116e33b9283f",
+      "targetPath": "src/core/sdk/types/plugin.types.ts",
+      "timestamp": "2026-08-19T09:26:52.719Z"
+    },
+    "src/core/sdk/types/search.types.ts": {
+      "hash": "9f6af2b0cf3340157ddca5700acd59dfbdc5ca926780daf5bbdc7d29ba593b1f",
+      "targetPath": "src/core/sdk/types/search.types.ts",
+      "timestamp": "2026-08-19T09:26:53.559Z"
+    },
+    "src/core/sdk/types/ui.types.ts": {
+      "hash": "83ad22afc7ec12dffdc0d30a2346d2b8b9048d22b3e1f981754725897ade238d",
+      "targetPath": "src/core/sdk/types/ui.types.ts",
+      "timestamp": "2026-08-19T09:26:54.118Z"
+    },
+    "src/core/sdk/registry/ActionRegistry.ts": {
+      "hash": "1c5a3e67c23ccc24ccdda983799bb9312b5fa160624811465f636666f8153ceb",
+      "targetPath": "src/core/sdk/registry/ActionRegistry.ts",
+      "timestamp": "2026-08-19T09:26:54.670Z"
+    },
+    "src/core/sdk/engines/ActionExecutor.ts": {
+      "hash": "9266807fec9dc1394b01c6d34d77d1f3875b69b385230f3cfba13d35cc06a554",
+      "targetPath": "src/core/sdk/engines/ActionExecutor.ts",
+      "timestamp": "2026-08-19T09:26:55.224Z"
+    },
+    "src/core/sdk/engines/CardEngine.ts": {
+      "hash": "e60d8cc3c7a3d1eb998eb87a0fba2c651f47c01dee13ade28b9c9a46750fb133",
+      "targetPath": "src/core/sdk/engines/CardEngine.ts",
+      "timestamp": "2026-08-19T09:26:56.056Z"
+    },
+    "src/core/sdk/engines/DetailEngine.ts": {
+      "hash": "432ddbb6b7a815979ce8a88b696062f60e33181b53d407b1e133cbdd2978ea30",
+      "targetPath": "src/core/sdk/engines/DetailEngine.ts",
+      "timestamp": "2026-08-19T09:26:56.870Z"
+    },
+    "src/core/sdk/engines/SchemaEngine.ts": {
+      "hash": "270bcc2eee9699aa509ad081366c812fef42bd756f22d5b87197686509c2bcde",
+      "targetPath": "src/core/sdk/engines/SchemaEngine.ts",
+      "timestamp": "2026-08-19T09:26:57.426Z"
+    },
+    "src/core/sdk/engines/SearchEngine.ts": {
+      "hash": "2fda3cf524b00fc837e5e41ba96116cec77e2d7d174af2bbac8881c613bd82cc",
+      "targetPath": "src/core/sdk/engines/SearchEngine.ts",
+      "timestamp": "2026-08-19T09:26:57.978Z"
+    },
+    "src/core/sdk/engines/ValidationEngine.ts": {
+      "hash": "34c46733ea8b7e33d6e3b5cf2802b9dc758b28e1bd8f7744a4e5f8648e729a81",
+      "targetPath": "src/core/sdk/engines/ValidationEngine.ts",
+      "timestamp": "2026-08-19T09:26:58.529Z"
+    },
+    "src/core/sdk/events/EventBus.ts": {
+      "hash": "d23ab8e916f55b0d14e0fbc5ee52bed16c26f4b2cf741c867aa11dc94eab65d1",
+      "targetPath": "src/core/sdk/events/EventBus.ts",
+      "timestamp": "2026-08-19T09:26:59.085Z"
+    },
+    "src/core/sdk/hooks/useCities.ts": {
+      "hash": "01235c13f7f6772e7216877b530142337d2bee3c1245853f67814ca3d4dbd37c",
+      "targetPath": "src/core/sdk/hooks/useCities.ts",
+      "timestamp": "2026-08-19T09:26:59.637Z"
+    },
+    "src/core/sdk/registry/ModuleRegistry.ts": {
+      "hash": "f3c5fa0bbf30352eafb1419bc187f8589fd4b738239f9bd887bcbd570179ec36",
+      "targetPath": "src/core/sdk/registry/ModuleRegistry.ts",
+      "timestamp": "2026-08-19T09:27:00.178Z"
+    },
+    "src/core/sdk/registry/UIRegistry.ts": {
+      "hash": "d530e148142bf17baa88733667fb90e5bfb7ef54683c3bc29c05d7db882d4eb2",
+      "targetPath": "src/core/sdk/registry/UIRegistry.ts",
+      "timestamp": "2026-08-19T09:27:01.003Z"
+    },
+    "src/core/sdk/registry/FormRegistry.ts": {
+      "hash": "1aa986f135b50a32e95420fd97e19c30cbdeb45d4fb6bdc076ef36ebef362618",
+      "targetPath": "src/core/sdk/registry/FormRegistry.ts",
+      "timestamp": "2026-08-19T09:27:01.554Z"
+    },
+    "src/core/sdk/registry/DetailRegistry.ts": {
+      "hash": "5ff83c1fd17bd2c09e74c55a641430d120f17ba7ba995f0969747dc3534f1585",
+      "targetPath": "src/core/sdk/registry/DetailRegistry.ts",
+      "timestamp": "2026-08-19T09:27:02.096Z"
+    },
+    "src/core/sdk/registry/PluginRegistry.ts": {
+      "hash": "8238567b3772e0c395a4917c4845f56f9fd77df6c8087e67dacae6e472253b13",
+      "targetPath": "src/core/sdk/registry/PluginRegistry.ts",
+      "timestamp": "2026-08-19T09:27:03.360Z"
+    },
+    "src/core/sdk/registry/LifecycleRegistry.ts": {
+      "hash": "d5b82b9f67642a745169c6d8d77624ea56d3ef2bcc9b22faade2f136eec7bc96",
+      "targetPath": "src/core/sdk/registry/LifecycleRegistry.ts",
+      "timestamp": "2026-08-19T09:27:03.903Z"
+    },
+    "src/core/sdk/registry/AdapterRegistry.ts": {
+      "hash": "5b3aa68701ed92a3d7828fe7ac71e4d08d6ce43213baf26b8df2499c8aec0b12",
+      "targetPath": "src/core/sdk/registry/AdapterRegistry.ts",
+      "timestamp": "2026-08-19T09:27:04.719Z"
+    },
+    "src/core/sdk/runtime/Boot.ts": {
+      "hash": "a3526b6715efe88250b79a9a0ce20c3600726fada9f021891308f2129062a1bf",
+      "targetPath": "src/core/sdk/runtime/Boot.ts",
+      "timestamp": "2026-08-19T09:27:05.284Z"
+    },
+    "src/core/sdk/runtime/ModuleLoader.ts": {
+      "hash": "1b2c37553eb3c97a383ef0bc20f4646b6ccb5eaf2321b771daa3472da53e89a5",
+      "targetPath": "src/core/sdk/runtime/ModuleLoader.ts",
+      "timestamp": "2026-08-19T09:27:05.872Z"
+    },
+    "src/core/sdk/runtime/DependencyResolver.ts": {
+      "hash": "545fa863b542034667dbff0e85413b428d2be58bca015b2df2949a60333dfc72",
+      "targetPath": "src/core/sdk/runtime/DependencyResolver.ts",
+      "timestamp": "2026-08-19T09:27:06.417Z"
+    },
+    "src/core/sdk/runtime/MigrationRunner.ts": {
+      "hash": "11a2f6287f376df100037a4f07d4b3e18b69aaff0398404dc62d52955a27dd91",
+      "targetPath": "src/core/sdk/runtime/MigrationRunner.ts",
+      "timestamp": "2026-08-19T09:27:06.979Z"
+    },
+    "src/core/sdk/resolvers/QueryResolver.ts": {
+      "hash": "e0bbc7e4c9a8289f3d77daba8dc1a20d53d401eb54f21060a6f81fb7362e63cc",
+      "targetPath": "src/core/sdk/resolvers/QueryResolver.ts",
+      "timestamp": "2026-08-19T09:27:07.516Z"
+    }
+  }
+}

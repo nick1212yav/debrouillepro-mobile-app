@@ -1,0 +1,16 @@
+export const subtypes = [
+  { value: "Dépannage", label: "Dépannage", icon: "🔧" },
+  { value: "Beauté", label: "Beauté", icon: "💄" },
+  { value: "Livraison", label: "Livraison", icon: "🚚" },
+  { value: "Éducation", label: "Éducation", icon: "📚" },
+  { value: "Photo", label: "Photo", icon: "📷" },
+  { value: "Bien-être", label: "Bien-être", icon: "🧘" },
+  { value: "Événementiel", label: "Événementiel", icon: "🎉" },
+  { value: "Ménage", label: "Ménage", icon: "🧹" },
+  { value: "Jardinage", label: "Jardinage", icon: "🌿" },
+  { value: "Informatique", label: "Informatique", icon: "💻" },
+  { value: "Plomberie", label: "Plomberie", icon: "🔧" },
+  { value: "Électricité", label: "Électricité", icon: "⚡" },
+  { value: "Construction", label: "Construction", icon: "🏗️" },
+  { value: "Transport", label: "Transport", icon: "🚗" },
+];

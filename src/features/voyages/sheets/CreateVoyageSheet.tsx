@@ -1,0 +1,612 @@
+import { UIService } from "@/core/sdk/ui/UIService";
+import { Picker } from "@react-native-picker/picker";
+import { View, Text, Pressable, TextInput } from "react-native";
+
+// src/features/voyages/sheets/CreateVoyageSheet.tsx
+import { useState, useEffect } from "react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import { X, Plane, Loader2, Check } from "lucide-react-native";
+import ImageUploader from "@/components/ImageUploader";
+import { cn } from "@/lib/utils";
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+type TransportType = "Bus" | "Minibus" | "Avion";
+type AmenityKey =
+  | "wifi"
+  | "ac"
+  | "usb"
+  | "snack"
+  | "meal"
+  | "luggage"
+  | "repas"
+  | "bagage";
+
+const AMENITY_OPTIONS: { key: AmenityKey; label: string; icon: string }[] = [
+  { key: "wifi", label: "Wi-Fi", icon: "📶" },
+  { key: "ac", label: "Climatisé", icon: "❄️" },
+  { key: "usb", label: "USB", icon: "🔌" },
+  { key: "snack", label: "Collation", icon: "🥤" },
+  { key: "meal", label: "Repas", icon: "🍽️" },
+  { key: "luggage", label: "Bagage inclus", icon: "🧳" },
+];
+
+const TRANSPORT_TYPES: TransportType[] = ["Bus", "Minibus", "Avion"];
+
+// ─── Props ──────────────────────────────────────────────────────────────────
+
+interface CreateVoyageSheetProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+// ─── Composant principal ────────────────────────────────────────────────────
+
+export function CreateVoyageSheet({
+  isOpen,
+  onClose,
+  onSuccess,
+}: CreateVoyageSheetProps) {
+  const createTrip = useMutation(api.voyages.createTrip);
+
+  const [form, setForm] = useState({
+    operator: "",
+    type: "Bus" as TransportType,
+    from: "",
+    to: "",
+    departure: "",
+    arrival: "",
+    durationMinutes: 0,
+    price: 0,
+    currency: "FCFA",
+    availableSeats: 0,
+    totalSeats: 0,
+    amenities: [] as AmenityKey[],
+    imageUrl: "",
+    color: "#6366F1",
+    departureDate: "",
+  });
+
+  const [images, setImages] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<"details" | "amenities" | "summary">(
+    "details",
+  );
+
+  // Réinitialiser le formulaire à l'ouverture
+  useEffect(() => {
+    if (isOpen) {
+      setForm({
+        operator: "",
+        type: "Bus",
+        from: "",
+        to: "",
+        departure: "",
+        arrival: "",
+        durationMinutes: 0,
+        price: 0,
+        currency: "FCFA",
+        availableSeats: 0,
+        totalSeats: 0,
+        amenities: [],
+        imageUrl: "",
+        color: "#6366F1",
+        departureDate: new Date().toISOString().split("T")[0],
+      });
+      setImages([]);
+      setStep("details");
+      setLoading(false);
+    }
+  }, [isOpen]);
+
+  // ─── Handlers ──────────────────────────────────────────────────────────────
+
+  const setField = (key: keyof typeof form) => (value: any) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const toggleAmenity = (key: AmenityKey) => {
+    setForm((f) => ({
+      ...f,
+      amenities: f.amenities.includes(key)
+        ? f.amenities.filter((a) => a !== key)
+        : [...f.amenities, key],
+    }));
+  };
+
+  const handleSubmit = async () => {
+    // Validation
+    if (
+      !form.operator ||
+      !form.from ||
+      !form.to ||
+      !form.departure ||
+      !form.arrival ||
+      form.durationMinutes <= 0 ||
+      form.price <= 0 ||
+      form.totalSeats <= 0 ||
+      !form.departureDate
+    ) {
+      UIService.openToast("Veuillez remplir tous les champs obligatoires", "error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await createTrip({
+        operator: form.operator,
+        type: form.type,
+        from: form.from,
+        to: form.to,
+        departure: form.departure,
+        arrival: form.arrival,
+        durationMinutes: form.durationMinutes,
+        price: form.price,
+        currency: form.currency,
+        availableSeats: form.availableSeats || form.totalSeats,
+        totalSeats: form.totalSeats,
+        amenities: form.amenities,
+        imageUrl: images.length > 0 ? images[0] : form.imageUrl || undefined,
+        color: form.color,
+        departureDate: form.departureDate,
+      });
+
+      UIService.openToast("Voyage créé avec succès !", "success");
+      onSuccess?.();
+      onClose();
+    } catch (err) {
+      console.error("Erreur création voyage:", err);
+      UIService.openToast(err instanceof Error ? err.message : "Erreur lors de la création", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── Contenu des étapes (sans les boutons) ──────────────────────────────
+
+  const renderDetailsContent = () => (
+    <View className="space-y-3 pb-4">
+      {/* Opérateur */}
+      <View>
+        <Text className="text-xs text-white/40 font-medium block mb-1">
+          Opérateur *
+        </Text>
+        <TextInput
+          value={form.operator}
+          onChangeText={(text) => setField("operator")(text)}
+          placeholder="Ex: Trans-Sahel Express"
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none"
+        />
+      </View>
+
+      {/* Type de transport */}
+      <View>
+        <Text className="text-xs text-white/40 font-medium block mb-1">
+          Type de transport *
+        </Text>
+        <View className="flex gap-2">
+          {TRANSPORT_TYPES.map((t) => (
+            <Pressable
+              key={t}
+             
+              onPress={() => setField("type")(t)}
+              className={cn(
+                "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+                form.type === t
+                  ? "bg-blue-500/30 border border-blue-500/50 text-white"
+                  : "bg-white/5 border border-white/10 text-white/50 hover:text-white",
+              )}
+            >
+              {t}
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* Départ / Destination */}
+      <View className="gap-3">
+        <View>
+          <Text className="text-xs text-white/40 font-medium block mb-1">
+            Départ *
+          </Text>
+          <TextInput
+            value={form.from}
+            onChangeText={(text) => setField("from")(text)}
+            placeholder="Ville de départ"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none"
+          />
+        </View>
+        <View>
+          <Text className="text-xs text-white/40 font-medium block mb-1">
+            Destination *
+          </Text>
+          <TextInput
+            value={form.to}
+            onChangeText={(text) => setField("to")(text)}
+            placeholder="Ville d'arrivée"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none"
+          />
+        </View>
+      </View>
+
+      {/* Heures */}
+      <View className="gap-3">
+        <View>
+          <Text className="text-xs text-white/40 font-medium block mb-1">
+            Heure de départ *
+          </Text>
+          <TextInput
+           
+            value={form.departure}
+            onChangeText={(text) => setField("departure")(text)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none [color-scheme:dark]"
+          />
+        </View>
+        <View>
+          <Text className="text-xs text-white/40 font-medium block mb-1">
+            Heure d'arrivée *
+          </Text>
+          <TextInput
+           
+            value={form.arrival}
+            onChangeText={(text) => setField("arrival")(text)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none [color-scheme:dark]"
+          />
+        </View>
+      </View>
+
+      {/* Durée */}
+      <View>
+        <Text className="text-xs text-white/40 font-medium block mb-1">
+          Durée (minutes) *
+        </Text>
+        <TextInput
+         
+          min="1"
+          value={form.durationMinutes || ""}
+          onChangeText={(text) =>
+            setField("durationMinutes")(parseInt(text) || 0)
+          }
+          placeholder="Ex: 930 pour 15h30"
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none"
+         keyboardType="numeric"/>
+      </View>
+
+      {/* Prix / Devise */}
+      <View className="gap-3">
+        <View>
+          <Text className="text-xs text-white/40 font-medium block mb-1">
+            Prix *
+          </Text>
+          <TextInput
+           
+            min="0"
+            step="100"
+            value={form.price || ""}
+            onChangeText={(text) => setField("price")(parseFloat(text) || 0)}
+            placeholder="Ex: 18500"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none"
+           keyboardType="numeric"/>
+        </View>
+        <View>
+          <Text className="text-xs text-white/40 font-medium block mb-1">
+            Devise
+          </Text>
+          <Picker
+           
+            onValueChange={(val) => setField("currency")(val)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none"
+           selectedValue={form.currency}>
+            <Picker.Item label="FCFA" value="FCFA" />
+            <Picker.Item label="USD" value="USD" />
+            <Picker.Item label="EUR" value="EUR" />
+            <Picker.Item label="CDF" value="CDF" />
+          </Picker>
+        </View>
+      </View>
+
+      {/* Places */}
+      <View className="gap-3">
+        <View>
+          <Text className="text-xs text-white/40 font-medium block mb-1">
+            Places disponibles
+          </Text>
+          <TextInput
+           
+            min="0"
+            value={form.availableSeats || ""}
+            onChangeText={(text) =>
+              setField("availableSeats")(parseInt(text) || 0)
+            }
+            placeholder="Optionnel"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none"
+           keyboardType="numeric"/>
+        </View>
+        <View>
+          <Text className="text-xs text-white/40 font-medium block mb-1">
+            Places totales *
+          </Text>
+          <TextInput
+           
+            min="1"
+            value={form.totalSeats || ""}
+            onChangeText={(text) =>
+              setField("totalSeats")(parseInt(text) || 0)
+            }
+            placeholder="Ex: 45"
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none"
+           keyboardType="numeric"/>
+        </View>
+      </View>
+
+      {/* Date de départ */}
+      <View>
+        <Text className="text-xs text-white/40 font-medium block mb-1">
+          Date de départ *
+        </Text>
+        <TextInput
+         
+          value={form.departureDate}
+          onChangeText={(text) => setField("departureDate")(text)}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/25 outline-none [color-scheme:dark]"
+        />
+      </View>
+
+      {/* Image upload */}
+      <View>
+        <Text className="text-xs text-white/40 font-medium block mb-1">
+          Image de couverture
+        </Text>
+        <ImageUploader images={images} onChange={setImages} color="#6366F1" />
+      </View>
+
+      {/* Couleur */}
+      <View>
+        <Text className="text-xs text-white/40 font-medium block mb-1">
+          Couleur (optionnelle)
+        </Text>
+        <TextInput
+         
+          value={form.color}
+          onChangeText={(text) => setField("color")(text)}
+          className="w-16 h-10 rounded-xl border border-white/10 bg-transparent"
+        />
+      </View>
+    </View>
+  );
+
+  const renderAmenitiesContent = () => (
+    <View className="space-y-4 pb-4">
+      <Text className="text-sm text-white/60">
+        Sélectionnez les équipements disponibles dans ce voyage.
+      </Text>
+      <View className="gap-3">
+        {AMENITY_OPTIONS.map(({ key, label, icon }) => (
+          <Pressable
+            key={key}
+           
+            onPress={() => toggleAmenity(key)}
+            className={cn(
+              "flex items-center gap-3 p-3 rounded-xl border transition-all",
+              form.amenities.includes(key)
+                ? "bg-blue-500/20 border-blue-500/50 text-white"
+                : "bg-white/5 border-white/10 text-white/50 hover:text-white",
+            )}
+          >
+            <Text className="text-xl">{icon}</Text>
+            <Text className="text-sm">{label}</Text>
+            {form.amenities.includes(key) && (
+              <Check size={16} className="ml-auto text-blue-400" />
+            )}
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
+  const renderSummaryContent = () => (
+    <View className="space-y-4 pb-4">
+      <View className="bg-white/5 rounded-xl p-4 space-y-2 text-sm">
+        <View className="flex justify-between">
+          <Text className="text-white/40">Opérateur</Text>
+          <Text className="text-white font-medium">{form.operator}</Text>
+        </View>
+        <View className="flex justify-between">
+          <Text className="text-white/40">Type</Text>
+          <Text className="text-white font-medium">{form.type}</Text>
+        </View>
+        <View className="flex justify-between">
+          <Text className="text-white/40">Itinéraire</Text>
+          <Text className="text-white font-medium">
+            {form.from} → {form.to}
+          </Text>
+        </View>
+        <View className="flex justify-between">
+          <Text className="text-white/40">Heures</Text>
+          <Text className="text-white font-medium">
+            {form.departure} → {form.arrival}
+          </Text>
+        </View>
+        <View className="flex justify-between">
+          <Text className="text-white/40">Durée</Text>
+          <Text className="text-white font-medium">
+            {Math.floor(form.durationMinutes / 60)}h
+            {form.durationMinutes % 60 > 0
+              ? `${form.durationMinutes % 60}min`
+              : ""}
+          </Text>
+        </View>
+        <View className="flex justify-between">
+          <Text className="text-white/40">Prix</Text>
+          <Text className="text-blue-400 font-bold">
+            {form.price.toLocaleString()} {form.currency}
+          </Text>
+        </View>
+        <View className="flex justify-between">
+          <Text className="text-white/40">Places</Text>
+          <Text className="text-white font-medium">
+            {form.availableSeats || form.totalSeats} / {form.totalSeats}
+          </Text>
+        </View>
+        <View className="flex justify-between">
+          <Text className="text-white/40">Date</Text>
+          <Text className="text-white font-medium">{form.departureDate}</Text>
+        </View>
+        <View className="flex justify-between">
+          <Text className="text-white/40">Équipements</Text>
+          <Text className="text-white font-medium">
+            {form.amenities.length > 0
+              ? form.amenities
+                  .map((a) => AMENITY_OPTIONS.find((o) => o.key === a)?.label)
+                  .join(", ")
+              : "Aucun"}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  // ─── Rendu principal ──────────────────────────────────────────────────────
+
+  if (!isOpen) return null;
+
+  return (
+    <View className="fixed inset-0 z-[200] flex items-end justify-center">
+      <Pressable
+        className="absolute inset-0 bg-black/70"
+        onPress={onClose}
+      />
+      <View
+        className="relative w-full max-w-md bg-[#0f1623] rounded-t-3xl border-t border-white/10 flex flex-col h-[90dvh] max-h-[90dvh] overflow-hidden"
+      >
+        {/* Header */}
+        <View className="flex items-center justify-between px-6 pt-5 pb-4 flex-shrink-0">
+          <View className="flex items-center gap-3">
+            <Plane size={22} className="text-blue-400" />
+            <Text className="text-xl font-bold text-white">Créer un voyage</Text>
+          </View>
+          <Pressable
+           
+            onPress={onClose}
+            className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/5"
+          >
+            <X size={18} className="text-white/60" />
+          </Pressable>
+        </View>
+
+        {/* Étapes */}
+        <View className="flex items-center gap-2 px-6 pb-4 flex-shrink-0">
+          {["Détails", "Équipements", "Résumé"].map((label, i) => {
+            const isActive =
+              (step === "details" && i === 0) ||
+              (step === "amenities" && i === 1) ||
+              (step === "summary" && i === 2);
+            const isDone =
+              (step === "amenities" && i < 1) || (step === "summary" && i < 2);
+            return (
+              <View key={i} className="flex items-center gap-2">
+                <View
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all",
+                    isActive
+                      ? "bg-blue-500 text-white"
+                      : isDone
+                        ? "bg-green-500/30 text-green-400 border border-green-500/30"
+                        : "bg-white/10 text-white/30",
+                  )}
+                >
+                  {isDone ? <Check size={14} /> : i + 1}
+                </View>
+                {i < 2 && (
+                  <View
+                    className={cn(
+                      "w-8 h-px",
+                      isDone ? "bg-green-500/30" : "bg-white/10",
+                    )}
+                  />
+                )}
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Zone de contenu scrollable */}
+        <View className="flex-1 min-h-0 overflow-y-auto px-6 pr-4 pb-28">
+          <>
+            <View
+              key={step}
+            >
+              {step === "details" && renderDetailsContent()}
+              {step === "amenities" && renderAmenitiesContent()}
+              {step === "summary" && renderSummaryContent()}
+            </View>
+          </>
+        </View>
+
+        {/* ─────────────────────────────────────────────────────────────
+            FOOTER NAVIGATION
+            Position absolue = toujours visible
+          ───────────────────────────────────────────────────────────── */}
+        <View
+          className="absolute bottom-0 left-0 right-0 z-[220] border-t border-white/10 bg-[#0f1623] px-6 pt-4 pb-5 shadow-[0_-20px_40px_rgba(0,0,0,0.35)]"
+        >
+          {/* ───────────────── STEP 1 ───────────────── */}
+          {step === "details" && (
+            <Pressable
+              type="button"
+              onPress={() => setStep("amenities")}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/20"
+            >
+              <Text>Suivant</Text><Text className="ml-2 text-white/60"><Text>→</Text></Text>
+              <Text className="ml-1"><Text>Équipements</Text></Text>
+            </Pressable>
+          )}
+
+          {/* ───────────────── STEP 2 ───────────────── */}
+          {step === "amenities" && (
+            <View className="gap-3">
+              <Pressable
+                type="button"
+                onPress={() => setStep("details")}
+                className="py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 font-semibold"
+              >
+                <Text>← Retour</Text></Pressable>
+
+              <Pressable
+                type="button"
+                onPress={() => setStep("summary")}
+                className="py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/20"
+              >
+                <Text>Résumé →</Text></Pressable>
+            </View>
+          )}
+
+          {/* ───────────────── STEP 3 ───────────────── */}
+          {step === "summary" && (
+            <View className="gap-3">
+              <Pressable
+                type="button"
+                onPress={() => setStep("amenities")}
+                disabled={loading}
+                className="py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 font-semibold disabled:opacity-50"
+              >
+                <Text>← Retour</Text></Pressable>
+
+              <Pressable
+                type="button"
+                onPress={handleSubmit}
+                disabled={loading}
+                className="py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading && <Loader2 size={18} className="animate-spin" />}
+
+                {loading ? "Création..." : "Créer le voyage"}
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
