@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 // src/features/marketplace/components/ProductAccessories.tsx
 import { Package } from "lucide-react-native";
 import { formatPrice } from "../utils/formatter";

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/events/components/EventMap.tsx
 import { MapPin, Navigation } from "lucide-react-native";
 import type { Event } from "../types";

@@ -31,7 +31,6 @@ export function AttachmentPreview({
 
       {onRemove && (
         <Pressable
-          type="button"
           onPress={onRemove}
           className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white"
           accessibilityLabel={`Supprimer ${file.name}`}

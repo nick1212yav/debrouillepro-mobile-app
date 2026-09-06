@@ -127,7 +127,7 @@ function NotifCard({ notif, onDismiss, onAction, onMarkRead, index }: {
           {notif.actionButtons && (notif.priority === "high" || expanded) && (
             <>
               <View
-                className="flex gap-2 mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", borderTopStyle: "solid" }}>
+                className="flex gap-2 mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", }}>
                 {notif.actionButtons.map(btn => (
                   <Pressable key={btn.label}
                     onPress={e => { onAction(notif.actionPage ?? "explorer"); UIService.openToast(`Action : ${btn.label}`, "success"); }}
@@ -401,7 +401,7 @@ export default function NotificationsPage({ onBack, onNavigate }: NotificationsP
         style={{  }} />
 
       {/* Header */}
-      <View className="px-5 pt-12 pb-3 flex-shrink-0" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+      <View className="px-5 pt-12 pb-3 flex-shrink-0" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
         <View className="flex items-center gap-3">
           <Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
             <ArrowLeft size={18} className="text-white" />

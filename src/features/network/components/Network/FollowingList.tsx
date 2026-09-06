@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 
 // src/features/network/components/Network/FollowingList.tsx
 import { useState } from "react";

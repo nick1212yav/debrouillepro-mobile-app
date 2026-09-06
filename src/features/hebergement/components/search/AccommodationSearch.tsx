@@ -28,7 +28,6 @@ export const AccommodationSearch: React.FC<AccommodationSearchProps> = ({
       />
       {query && (
         <Pressable
-          type="button"
           onPress={() => onQueryChange("")}
           className="p-1 rounded-lg text-white/40"
         >

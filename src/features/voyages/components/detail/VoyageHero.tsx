@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 // src/features/voyages/components/detail/VoyageHero.tsx
 import type { VoyageTrip } from "../../types/voyage.types";
 import { Star, Bus, Plane } from "lucide-react-native"; // ✅ Correction : 'Minibus' remplacé par 'Bus'

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 
 import type {
@@ -160,7 +160,6 @@ export function HomeSection({
             {section.actions.map((action, index) => (
               <Pressable
                 key={action.id ?? `section-action-${index}`}
-                type="button"
                 onPress={() =>
                   onAction?.(String(action.id ?? "action"), items[0])
                 }

@@ -33,7 +33,6 @@ export function OutgoingCall({
       </Text>
 
       <Pressable
-        type="button"
         onPress={onCancel}
         className="mt-8 rounded-full bg-red-600 px-6 py-3 font-medium"
       >

@@ -587,7 +587,6 @@ export default function Stories({ className = "" }: StoriesProps) {
           {/* CREATE */}
 
           <Pressable
-            type="button"
             onPress={() => setCreatorOpen(true)}
             className="group flex flex-shrink-0 flex-col items-center gap-1.5"
             accessibilityLabel="Ajouter une story"
@@ -631,7 +630,6 @@ export default function Stories({ className = "" }: StoriesProps) {
 
             return (
               <Pressable
-                type="button"
                 key={group.id}
                 onPress={() => openViewer(group.id)}
                 className="group flex flex-shrink-0 flex-col items-center gap-1.5"

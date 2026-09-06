@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/sante/components/DoctorLive.tsx
 import { Video, Users, Mic } from "lucide-react-native"; // Live n'existe pas, on utilise Video
 

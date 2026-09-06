@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 import type { Call } from "../types/call.types";
 
 interface IncomingCallProps {
@@ -43,14 +43,12 @@ export function IncomingCall({
 
       <View className="mt-5 flex gap-3">
         <Pressable
-          type="button"
           onPress={onReject}
           className="flex-1 rounded-xl bg-red-600 px-4 py-3 font-medium text-white"
         >
           <Text>Refuser</Text></Pressable>
 
         <Pressable
-          type="button"
           onPress={onAccept}
           className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 font-medium text-white"
         >

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 import { MapPin, Navigation } from "lucide-react-native";
 
@@ -40,7 +40,6 @@ export const AccommodationMap: React.FC<AccommodationMapProps> = ({
             </Text>
           </View>
           <Pressable
-            type="button"
             className="p-1.5 rounded-lg bg-indigo-500 text-white"
           >
             <Navigation size={12} />

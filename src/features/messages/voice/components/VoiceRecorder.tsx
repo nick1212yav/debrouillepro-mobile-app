@@ -83,7 +83,6 @@ export function VoiceRecorder({
 
       {isRecording && (
         <Pressable
-          type="button"
           onPress={handleCancel}
           className="text-xs text-white/60"
         >

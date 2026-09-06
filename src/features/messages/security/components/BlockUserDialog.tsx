@@ -74,11 +74,10 @@ export function BlockUserDialog({
         )}
 
         <View style={actionsStyle}>
-          <Pressable type="button" onPress={onClose} style={secondaryButtonStyle}>
+          <Pressable onPress={onClose} style={secondaryButtonStyle}>
             <Text>Annuler</Text></Pressable>
 
           <Pressable
-            type="button"
             onPress={handleConfirm}
             style={primaryButtonStyle}
           >

@@ -16,7 +16,6 @@ export function StarRating({ value, onChange, size = 18, color = "#F59E0B" }: St
         return (
           <Pressable
             key={star}
-            type="button"
             onPress={onChange ? () => onChange(star) : undefined}
             className={onChange ? "cursor-pointer" : "cursor-default"}
             style={{  }}

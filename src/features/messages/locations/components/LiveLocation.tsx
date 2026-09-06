@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/messages/locations/components/LiveLocation.tsx
 
 import { useEffect, useRef, useState } from "react";
@@ -159,7 +159,6 @@ export function LiveLocation({ messageId, onStopped }: LiveLocationProps) {
 
       {active && !expired && (
         <Pressable
-          type="button"
           onPress={() => void handleStop()}
           style={{ width: "100%", paddingVertical: 9, paddingHorizontal: 12, borderWidth: 0, borderRadius: 10, backgroundColor: "#fff" }}
         >

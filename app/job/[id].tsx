@@ -55,7 +55,7 @@ export default function JobDetailPage() {
     );
   }
 
-  const handleBack = () => router(-1);
+  const handleBack = () => router.back();
 
   if (job === undefined) {
     return (

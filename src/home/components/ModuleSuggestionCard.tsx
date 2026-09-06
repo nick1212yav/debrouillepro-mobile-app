@@ -69,7 +69,6 @@ export function ModuleSuggestionCard({
             ================================================== */}
         <Text
           className="shrink-0 text-gray-500"
-          accessibilityElementsHidden={true}
         >
           <Text>→</Text></Text>
       </View>

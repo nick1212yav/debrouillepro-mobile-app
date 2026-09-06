@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 
 interface AccommodationTypeFilterProps {
@@ -33,7 +33,6 @@ export const AccommodationTypeFilter: React.FC<
           return (
             <Pressable
               key={type}
-              type="button"
               onPress={() => onTypeChange(type === "Tout" ? "" : type)}
               className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer border ${
                 isSelected

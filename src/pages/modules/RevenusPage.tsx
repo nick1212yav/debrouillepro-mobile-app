@@ -179,7 +179,7 @@ function RevenusInner({ onBack }: { onBack: () => void }) {
 
       {/* Header */}
       <View className="flex-shrink-0 px-4 py-3 flex items-center gap-3 pt-safe"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
         <Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center"
           style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
           <ArrowLeft size={18} className="text-white" />

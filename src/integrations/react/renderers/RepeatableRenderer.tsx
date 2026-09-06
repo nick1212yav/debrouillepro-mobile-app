@@ -68,7 +68,6 @@ export function RepeatableRenderer({
       ))}
 
       <Pressable
-        type="button"
         onPress={addItem}
         disabled={disabled}
         className="w-full py-2 border border-dashed border-white/20 rounded-lg text-white/50 flex items-center justify-center gap-2"

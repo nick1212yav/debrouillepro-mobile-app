@@ -455,7 +455,7 @@ export default function CoCreationPage({ onBack }: CoCreationPageProps) {
         {/* Header */}
         <View
           className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3"
-          style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}
+          style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}
         >
           <Pressable
             onPress={() => setSelectedChallenge(null)}
@@ -629,7 +629,7 @@ export default function CoCreationPage({ onBack }: CoCreationPageProps) {
       {/* Header */}
       <View
         className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}
       >
         <Pressable
           onPress={onBack}

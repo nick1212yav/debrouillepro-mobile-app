@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { Plus, Minus, Flame, ShieldAlert } from "lucide-react-native";
 import type { MenuItem } from "../../types/menu.types";
 

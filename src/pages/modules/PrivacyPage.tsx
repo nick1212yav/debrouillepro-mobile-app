@@ -182,7 +182,6 @@ function ActionRow({
 }) {
   return (
     <Pressable
-      type="button"
       onPress={onClick}
       className="w-full flex items-center gap-3 px-4 py-4 text-left border-b last:border-0"
       style={{
@@ -349,7 +348,7 @@ export default function PrivacyPage({ onBack }: PrivacyPageProps) {
           className="w-10 h-10 rounded-2xl flex items-center justify-center"
           style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
         >
-          <ArrowLeft size={18} accessibilityElementsHidden={true} />
+          <ArrowLeft size={18} />
         </Pressable>
 
         <View className="flex-1 min-w-0">
@@ -719,7 +718,6 @@ export default function PrivacyPage({ onBack }: PrivacyPageProps) {
                 </View>
 
                 <Pressable
-                  type="button"
                   onPress={() => setShowDeleteDialog(false)}
                   className="w-9 h-9 rounded-xl flex items-center justify-center"
                   style={{ backgroundColor: "rgba(255,255,255,.05)" }}
@@ -745,7 +743,6 @@ export default function PrivacyPage({ onBack }: PrivacyPageProps) {
 
               <View className="gap-2.5 mt-5">
                 <Pressable
-                  type="button"
                   onPress={() => setShowDeleteDialog(false)}
                   className="h-11 rounded-2xl text-sm font-bold"
                   style={{ backgroundColor: "rgba(255,255,255,.06)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}
@@ -753,7 +750,6 @@ export default function PrivacyPage({ onBack }: PrivacyPageProps) {
                   <Text>Annuler</Text></Pressable>
 
                 <Pressable
-                  type="button"
                   onPress={handleDelete}
                   disabled={deleting}
                   className={`h-11 rounded-2xl text-sm font-black text-white ${

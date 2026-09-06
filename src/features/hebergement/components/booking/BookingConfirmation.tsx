@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 import { CheckCircle, ShieldCheck, ArrowRight } from "lucide-react-native";
 
@@ -98,7 +98,6 @@ export const BookingConfirmation: React.FC<BookingConfirmationProps> = ({
 
       <Pressable
         onPress={onClose}
-        type="button"
         className="w-full py-3.5 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-xs flex items-center justify-center gap-1.5 mt-3"
       >
         <Text><Text>Retour aux hébergements</Text></Text>

@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import { useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react-native";
 import { useLogin } from "../hooks/useLogin";
@@ -53,7 +53,6 @@ export function LoginForm({
            
             editable={!(loading)}/>
           <Pressable
-            type="button"
             onPress={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30"
           >
@@ -64,7 +63,6 @@ export function LoginForm({
 
       <View className="text-right">
         <Pressable
-          type="button"
           onPress={onForgotPasswordClick}
           className="text-xs text-violet-400"
         >
@@ -72,7 +70,6 @@ export function LoginForm({
       </View>
 
       <Pressable
-        type="submit"
         disabled={loading}
         className="w-full py-3.5 rounded-2xl font-bold text-white disabled:opacity-60"
         style={{  }}
@@ -87,7 +84,6 @@ export function LoginForm({
       <Text className="text-center text-sm text-white/40">
         <Text>Vous n'avez pas de compte ?</Text>{" "}
         <Pressable
-          type="button"
           onPress={onRegisterClick}
           className="text-violet-400 font-semibold"
         >

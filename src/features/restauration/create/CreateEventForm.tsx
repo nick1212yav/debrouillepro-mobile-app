@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import { useState } from "react";
 import {
   Calendar,
@@ -228,7 +228,6 @@ export function CreateEventForm({
       </View>
 
       <Pressable
-        type="submit"
         disabled={
           isSubmitting || !title.trim() || !eventDate || !coverImage.trim()
         }

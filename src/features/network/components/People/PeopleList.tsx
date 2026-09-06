@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 // src/features/network/components/People/PeopleList.tsx
 import { Users, Search, Filter } from "lucide-react-native";
 import { cn } from "@/lib/utils";

@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import { useState } from "react";
 import { Tag, ShieldCheck, AlertCircle, Calendar } from "lucide-react-native";
 
@@ -162,7 +162,6 @@ export function CreatePromotionForm({
       </View>
 
       <Pressable
-        type="submit"
         disabled={isSubmitting || !code.trim() || !expiryDate}
         className="w-full py-4 rounded-xl bg-orange-500 disabled:bg-slate-800 disabled:text-white/20 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-orange-500/10"
       >

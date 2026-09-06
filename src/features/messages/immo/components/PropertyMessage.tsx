@@ -61,7 +61,6 @@ export function PropertyMessage({
       <View style={actionsStyle}>
         {!requestSent && !showRequestForm && (
           <Pressable
-            type="button"
             onPress={() => setShowRequestForm(true)}
             style={primaryButtonStyle}
           >
@@ -98,7 +97,6 @@ export function PropertyMessage({
 
           <View style={formActionsStyle}>
             <Pressable
-              type="button"
               onPress={() => setShowRequestForm(false)}
               disabled={isSendingRequest}
               style={secondaryButtonStyle}
@@ -106,7 +104,6 @@ export function PropertyMessage({
               <Text>Annuler</Text></Pressable>
 
             <Pressable
-              type="submit"
               disabled={isSendingRequest || !message.trim()}
               style={primaryButtonStyle}
             >
@@ -136,7 +133,7 @@ const formStyle: ViewStyle | TextStyle | ImageStyle = {
 };
 
 const labelStyle: ViewStyle | TextStyle | ImageStyle = {
-  display: "block",
+  display: "flex",
   marginBottom: 5,
   fontSize: 12,
   fontWeight: 700,

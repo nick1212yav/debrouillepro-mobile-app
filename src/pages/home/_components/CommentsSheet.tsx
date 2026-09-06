@@ -480,7 +480,6 @@ export default function CommentsSheet({
                 </View>
 
                 <Pressable
-                  type="button"
                   onPress={() => void handleSend()}
                   disabled={!text.trim() || sending}
                   className={cn(

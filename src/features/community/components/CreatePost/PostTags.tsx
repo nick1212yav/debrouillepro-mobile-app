@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/community/components/CreatePost/PostTags.tsx
 import { useState } from "react";
 import { X, Plus } from "lucide-react-native";

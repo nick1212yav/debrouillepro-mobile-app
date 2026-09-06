@@ -64,7 +64,6 @@ function FormWrapper({
     <View className="flex min-h-0 flex-col">
       <View className="mb-5 flex items-center gap-3">
         <Pressable
-          type="button"
           onPress={onBack}
           accessibilityLabel="Retour"
           className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-white/70"
@@ -93,7 +92,6 @@ function FormWrapper({
         </View>
 
         <Pressable
-          type="button"
           onPress={onClose}
           accessibilityLabel="Fermer"
           className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-white/45"
@@ -136,7 +134,6 @@ function CategoryPills({
           return (
             <Pressable
               key={category}
-              type="button"
               onPress={() => onChange(category)}
               aria-pressed={activeCategory}
               className="flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold"
@@ -611,7 +608,6 @@ export default function ArticleForm({ onBack, onClose }: ArticleFormProps) {
         </View>
 
         <Pressable
-          type="button"
           onPress={() => setPreview((value) => !value)}
           aria-pressed={preview}
           className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[9px] font-bold"
@@ -751,7 +747,6 @@ export default function ArticleForm({ onBack, onClose }: ArticleFormProps) {
       ───────────────────────────────────────── */}
 
       <Pressable
-        type="button"
         disabled={!canPublish}
         onPress={() => void handlePublish()}
         className="group relative mt-3 flex w-full items-center justify-center gap-2 overflow-hidden rounded-[22px] py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-35"

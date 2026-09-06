@@ -28,7 +28,7 @@ export function AnnonceHeader({
     if (onBack) {
       onBack();
     } else {
-      router(-1);
+      router.back();
     }
   };
 

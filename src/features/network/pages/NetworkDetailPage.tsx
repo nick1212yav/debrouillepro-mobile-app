@@ -17,7 +17,7 @@ import {
   MessageCircle,
   Send,
   Share2,
-} from "lucide-react";
+} from "lucide-react-native";
 
 import { toast } from "sonner";
 
@@ -98,8 +98,7 @@ function CommentItem({
 
         <div className="mt-1.5 flex items-center gap-3">
           <button
-            type="button"
-            onClick={() => {
+            onPress={() => {
               void handleLike();
             }}
             disabled={isLiking}
@@ -120,7 +119,6 @@ function CommentItem({
           </button>
 
           <button
-            type="button"
             className="text-xs text-white/40 transition hover:text-white/70"
           >
             Répondre
@@ -238,7 +236,6 @@ function NetworkCommentSection({
           />
 
           <button
-            type="submit"
             disabled={isSubmitting || !newComment.trim()}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-indigo-500/30 bg-indigo-500/20 text-indigo-300 transition hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Envoyer le commentaire"
@@ -442,8 +439,7 @@ export default function NetworkDetailPage({
         </p>
 
         <button
-          type="button"
-          onClick={onBack}
+          onPress={onBack}
           className="mt-5 rounded-xl bg-white/10 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/15"
         >
           Retour
@@ -473,8 +469,7 @@ export default function NetworkDetailPage({
 
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/5 bg-[#020617]/80 px-4 pb-3 pt-10 backdrop-blur-xl">
         <button
-          type="button"
-          onClick={onBack}
+          onPress={onBack}
           className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/8 bg-white/8 transition hover:bg-white/15"
           aria-label="Retour"
         >
@@ -482,8 +477,7 @@ export default function NetworkDetailPage({
         </button>
 
         <button
-          type="button"
-          onClick={() => {
+          onPress={() => {
             void handleShare();
           }}
           className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/8 bg-white/8 transition hover:bg-white/15"
@@ -536,8 +530,7 @@ export default function NetworkDetailPage({
 
           {author?._id && (
             <button
-              type="button"
-              onClick={handleProfileNavigation}
+              onPress={handleProfileNavigation}
               className="whitespace-nowrap text-xs font-medium text-indigo-400 transition hover:text-indigo-300"
             >
               Voir profil
@@ -622,8 +615,7 @@ export default function NetworkDetailPage({
 
         <section className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/5 pt-4">
           <button
-            type="button"
-            onClick={() => {
+            onPress={() => {
               void handleLike();
             }}
             disabled={isLiking}
@@ -642,8 +634,7 @@ export default function NetworkDetailPage({
           </button>
 
           <button
-            type="button"
-            onClick={scrollToComments}
+            onPress={scrollToComments}
             className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/8 px-4 py-2 text-white/80 transition hover:bg-white/15"
           >
             <MessageCircle size={16} />
@@ -652,8 +643,7 @@ export default function NetworkDetailPage({
 
           {onMessage && author?._id && (
             <button
-              type="button"
-              onClick={() => onMessage(author._id)}
+              onPress={() => onMessage(author._id)}
               className="flex items-center gap-2 rounded-xl border border-indigo-500/30 bg-indigo-500/20 px-4 py-2 text-indigo-300 transition hover:bg-indigo-500/30"
             >
               <MessageCircle size={16} />

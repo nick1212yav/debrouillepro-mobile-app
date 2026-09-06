@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 import { Check } from "lucide-react-native";
 
@@ -39,7 +39,6 @@ export const AccommodationAmenityFilter: React.FC<
           return (
             <Pressable
               key={item.id}
-              type="button"
               onPress={() => handleToggle(item.id)}
               className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all cursor-pointer ${
                 isChecked

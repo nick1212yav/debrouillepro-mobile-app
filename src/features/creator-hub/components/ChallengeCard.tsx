@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 
 // src/features/creator-hub/components/ChallengeCard.tsx
 import { Trophy, Hash, Users, Clock, Play, Check } from "lucide-react-native";

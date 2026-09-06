@@ -127,7 +127,7 @@ function LivraisonContent({ onBack }: { onBack: () => void }) {
   return (
     <View className="h-full w-full flex flex-col" style={{  }}>
       <View className="px-5 pt-12 pb-3 flex items-center justify-between flex-shrink-0"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
         <View className="flex items-center gap-3">
           <Pressable onPress={view !== "list" ? () => setView("list") : onBack}
             className="w-9 h-9 rounded-2xl flex items-center justify-center"
@@ -249,7 +249,7 @@ function LivraisonContent({ onBack }: { onBack: () => void }) {
         )}
       </>
 
-      <View className="px-5 py-2 flex items-center justify-between flex-shrink-0" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)", borderTopStyle: "solid" }}>
+      <View className="px-5 py-2 flex items-center justify-between flex-shrink-0" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)", }}>
         <View className="flex items-center gap-1.5">
           <Shield size={10} className="text-purple-400" />
           <Text className="text-[9px] text-white/25">Livraisons assurées</Text>

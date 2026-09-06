@@ -125,7 +125,7 @@ export function ContactPicker({
       >
         {/* HEADER */}
         <View
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: "#e5e7eb", borderBottomStyle: "solid" }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: "#e5e7eb", }}
         >
           <View>
             <Text
@@ -162,7 +162,7 @@ export function ContactPicker({
 
         {/* SEARCH */}
         <View
-          style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: "#f1f5f9", borderBottomStyle: "solid" }}
+          style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: "#f1f5f9", }}
         >
           <TextInput
             value={search}
@@ -265,7 +265,7 @@ export function ContactPicker({
         {/* FOOTER MULTI */}
         {multiSelect && (
           <View
-            style={{ display: "flex", alignItems: "center", gap: 10, padding: 14, borderTopWidth: 1, borderTopColor: "#e5e7eb", borderTopStyle: "solid" }}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: 14, borderTopWidth: 1, borderTopColor: "#e5e7eb", }}
           >
             <Text
               style={{
@@ -278,7 +278,6 @@ export function ContactPicker({
             </Text>
 
             <Pressable
-              type="button"
               disabled={selectedContacts.length === 0}
               onPress={() => void handleSend()}
               style={{ paddingVertical: 10, paddingHorizontal: 16, borderWidth: 0, borderRadius: 11, backgroundColor: selectedContacts.length ? "#111827" : "#e2e8f0" }}

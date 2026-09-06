@@ -91,7 +91,6 @@ export const EditAccommodationSheet: React.FC<EditAccommodationSheetProps> = ({
           </View>
 
           <Pressable
-            type="submit"
             disabled={loading}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xs"
           >

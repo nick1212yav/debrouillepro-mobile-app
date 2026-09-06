@@ -29,7 +29,6 @@ export function NearbyCard({ item, onClick, onAction }: NearbyCardProps) {
   return (
     <View className="group overflow-hidden rounded-2xl border border-emerald-400/10 bg-white/5">
       <Pressable
-        type="button"
         onPress={onClick}
         className="block w-full text-left"
       >
@@ -72,7 +71,6 @@ export function NearbyCard({ item, onClick, onAction }: NearbyCardProps) {
       {onAction && (
         <View className="px-4 pb-4">
           <Pressable
-            type="button"
             onPress={() => onAction("directions")}
             className="w-full rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2.5 text-xs font-semibold text-emerald-300"
           >

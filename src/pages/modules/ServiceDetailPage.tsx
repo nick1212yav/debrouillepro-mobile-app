@@ -89,7 +89,7 @@ export default function ServiceDetailPage() {
         isFavorited={isFavorited}
         onFavorite={toggle}
         onShare={handleShare}
-        onBack={() => router(-1)}
+        onBack={() => router.back()}
       />
 
       <View className="flex-1 overflow-y-auto px-4 pb-8 space-y-5">

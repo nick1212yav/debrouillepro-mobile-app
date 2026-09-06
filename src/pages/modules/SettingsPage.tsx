@@ -144,7 +144,7 @@ function GeneralTabAuth({ accentHex, onNavigate }: { accentHex: string; onNaviga
         <SettingsCard>
           <Pressable onPress={() => setShowLang(!showLang)}
             className="w-full flex items-center gap-3 px-4 py-3.5"
-            style={{ borderBottomColor: "rgba(255,255,255,0.05)", borderBottomStyle: "solid" }}>
+            style={{ borderBottomColor: "rgba(255,255,255,0.05)", }}>
             <View className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(99,102,241,0.2)" }}>
               <Globe size={16} className="text-indigo-400" />
             </View>
@@ -160,7 +160,7 @@ function GeneralTabAuth({ accentHex, onNavigate }: { accentHex: string; onNaviga
               {languages.map((l) => (
                 <Pressable key={l} onPress={() => handleLangChange(l)}
                   className="flex items-center justify-between px-4 py-3"
-                  style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", borderBottomStyle: "solid" }}>
+                  style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", }}>
                   <Text className="text-sm text-white/70">{l}</Text>
                   {currentLang === l && <Check size={14} style={{ color: accentHex }} />}
                 </Pressable>
@@ -181,7 +181,7 @@ function GeneralTabAuth({ accentHex, onNavigate }: { accentHex: string; onNaviga
             { key: "paymentAlerts" as const, label: "Alertes Paiements", color: "#10B981" },
           ] satisfies { key: ToggleKey; label: string; color: string }[]).map((item, i, arr) => (
             <View key={item.key} className="flex items-center gap-3 px-4 py-3.5"
-              style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", borderBottomStyle: "solid" }}>
+              style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", }}>
               <View className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: `${item.color}18` }}>
                 <Bell size={16} style={{ color: item.color }} />
@@ -204,7 +204,7 @@ function GeneralTabAuth({ accentHex, onNavigate }: { accentHex: string; onNaviga
             const Icon = item.icon;
             return (
               <View key={item.key} className="flex items-center gap-3 px-4 py-3.5"
-                style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", borderBottomStyle: "solid" }}>
+                style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", }}>
                 <View className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: `${item.color}18` }}>
                   <Icon size={16} style={{ color: item.color }} />
@@ -234,7 +234,7 @@ function GeneralTabAuth({ accentHex, onNavigate }: { accentHex: string; onNaviga
             return (
               <Pressable key={item.label}
                 className="flex items-center gap-3 px-4 py-3.5 text-left w-full"
-                style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", borderBottomStyle: "solid" }}
+                style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", }}
                 onPress={() => onNavigate?.(item.page)}>
                 <View className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: `${item.color}18` }}>
@@ -406,7 +406,7 @@ export default function SettingsPage({ onBack, onNavigate }: SettingsPageProps) 
                     return (
                       <Pressable key={key} onPress={() => update("textSize", key)}
                         className="w-full flex items-center gap-3 px-4 py-3.5"
-                        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", borderBottomStyle: "solid", backgroundColor: isActive ? `${accentHex}12` : "transparent" }}>
+                        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", backgroundColor: isActive ? `${accentHex}12` : "transparent" }}>
                         <View className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: isActive ? `${accentHex}22` : "rgba(255,255,255,0.06)" }}>
                           <Type size={16} style={{ color: isActive ? accentHex : "rgba(255,255,255,0.4)" }} />

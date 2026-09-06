@@ -1,4 +1,4 @@
-import { View, Text, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { Pressable, View, Text, ViewStyle, TextStyle, ImageStyle } from "react-native";
 // src/features/messages/payments/components/PaymentMessage.tsx
 
 import React from "react";
@@ -62,7 +62,6 @@ export function PaymentMessage({
 
       {canConfirm && (
         <Pressable
-          type="button"
           disabled={isLoading}
           onPress={() => onConfirm?.(payment.paymentIntentId!)}
           style={confirmButtonStyle}
@@ -133,7 +132,7 @@ const confirmButtonStyle: ViewStyle | TextStyle | ImageStyle = {
 };
 
 const referenceStyle: ViewStyle | TextStyle | ImageStyle = {
-  display: "block",
+  display: "flex",
   marginTop: 10,
   opacity: 0.45,
 };

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 

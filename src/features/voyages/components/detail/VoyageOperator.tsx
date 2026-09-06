@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 
 // src/features/voyages/components/detail/VoyageOperator.tsx
 import { Building2, Star, Users, Shield, ChevronRight } from "lucide-react-native";

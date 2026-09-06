@@ -541,7 +541,6 @@ export function ChatHeader({
                   <View className="my-1.5 h-px bg-white/[0.07]" />
 
                   <Pressable
-                    type="button"
                     accessibilityRole="menuitem"
                     onPress={handleClearChat}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-red-300/80"

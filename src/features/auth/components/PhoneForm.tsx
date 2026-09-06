@@ -72,7 +72,6 @@ export function PhoneForm({ onBack }: PhoneFormProps) {
           </View>
 
           <Pressable
-            type="submit"
             disabled={loading}
             className="w-full rounded-2xl py-3.5 font-bold text-white disabled:opacity-60"
             style={{  }}
@@ -85,7 +84,6 @@ export function PhoneForm({ onBack }: PhoneFormProps) {
           </Pressable>
 
           <Pressable
-            type="button"
             onPress={onBack}
             className="w-full text-sm text-white/40"
           >
@@ -114,7 +112,6 @@ export function PhoneForm({ onBack }: PhoneFormProps) {
           />
 
           <Pressable
-            type="submit"
             disabled={loading || code.length !== 6}
             className="w-full rounded-2xl py-3.5 font-bold text-white disabled:opacity-60"
             style={{  }}
@@ -128,14 +125,12 @@ export function PhoneForm({ onBack }: PhoneFormProps) {
 
           <View className="flex justify-between text-sm">
             <Pressable
-              type="button"
               onPress={handleReset}
               className="text-white/40"
             >
               <Text>← Modifier le numéro</Text></Pressable>
 
             <Pressable
-              type="button"
               onPress={handleResend}
               disabled={loading || !phoneNumber}
               className="text-violet-400 disabled:opacity-50"

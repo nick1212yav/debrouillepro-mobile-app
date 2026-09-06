@@ -818,7 +818,6 @@ export default function NotificationCenter({ onClose, onNavigate }: Props) {
           </View>
 
           <Pressable
-            type="button"
             onPress={() => setShowRead((value) => !value)}
             className="text-[10px] font-bold text-violet-300/70"
           >
@@ -838,7 +837,6 @@ export default function NotificationCenter({ onClose, onNavigate }: Props) {
             return (
               <Pressable
                 key={filter.id}
-                type="button"
                 onPress={() => setFilterId(filter.id)}
                 className="relative flex shrink-0 items-center gap-1.5 rounded-xl border px-3.5 py-2 text-[10px] font-bold"
                 style={{ backgroundColor: active

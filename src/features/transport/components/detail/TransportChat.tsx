@@ -1,7 +1,7 @@
 // src/features/transport/components/detail/TransportChat.tsx
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { MessageSquare, Send } from "lucide-react";
+import { MessageSquare, Send } from "lucide-react-native";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,7 +122,6 @@ export function TransportChat({
         />
 
         <Button
-          type="submit"
           size="icon"
           disabled={!inputText.trim()}
           className="h-10 w-10 shrink-0 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"

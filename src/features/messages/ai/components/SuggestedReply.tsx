@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { Lightbulb, Loader2, Sparkles } from "lucide-react-native";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -40,7 +40,6 @@ export function SuggestedReply({
 
         {onPrepare && (
           <Pressable
-            type="button"
             onPress={onPrepare}
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-xl bg-amber-500/90 px-3 py-2 text-xs font-medium text-black disabled:opacity-40"
@@ -56,7 +55,6 @@ export function SuggestedReply({
 
       {lastMessage ? (
         <Pressable
-          type="button"
           onPress={() => onSelect?.(lastMessage.text)}
           className="w-full rounded-xl border border-white/10 bg-black/10 p-3 text-left"
         >

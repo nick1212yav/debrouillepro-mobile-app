@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React, { useState } from "react";
 import { X, ArrowRight } from "lucide-react-native";
 import { BookingCalendar } from "../components/booking/BookingCalendar";
@@ -60,7 +60,6 @@ export const BookingSheet: React.FC<BookingSheetProps> = ({
           <BookingGuests guests={guests} onChange={setGuests} />
 
           <Pressable
-            type="submit"
             disabled={!dates.checkIn || !dates.checkOut}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
           >

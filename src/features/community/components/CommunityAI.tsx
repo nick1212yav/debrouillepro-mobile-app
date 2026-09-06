@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { useState } from "react";
 import { Brain, Sparkles, Loader2, Send } from "lucide-react-native";
 

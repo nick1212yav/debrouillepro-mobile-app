@@ -186,7 +186,6 @@ export function TransportForm({
               <FormLabel><Text>Nombre de places disponibles *</Text></FormLabel>
               <View className="flex items-center gap-4">
                 <Button
-                  type="button"
                   variant="outline"
                   size="icon"
                   className="w-10 h-10 rounded-xl"
@@ -198,7 +197,6 @@ export function TransportForm({
                   {field.value}
                 </Text>
                 <Button
-                  type="button"
                   variant="outline"
                   size="icon"
                   className="w-10 h-10 rounded-xl"
@@ -263,7 +261,6 @@ export function TransportForm({
 
         {/* Bouton de Soumission */}
         <Button
-          type="submit"
           className="w-full h-12 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold"
           disabled={isLoading}
         >

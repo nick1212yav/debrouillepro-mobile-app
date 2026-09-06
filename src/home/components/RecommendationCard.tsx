@@ -67,7 +67,6 @@ export function RecommendationCard({
 
         <View className="mt-4 flex items-center gap-2">
           <Pressable
-            type="button"
             onPress={onClick}
             className="flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 px-3 py-2.5 text-xs font-semibold text-white"
           >
@@ -75,7 +74,6 @@ export function RecommendationCard({
 
           {onAction && (
             <Pressable
-              type="button"
               onPress={() => onAction("save")}
               className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs text-gray-300"
               accessibilityLabel="Enregistrer"

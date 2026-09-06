@@ -1199,7 +1199,6 @@ function TrendingSection({
         <View className="gap-3">
           {trendingPubs.slice(0, 6).map((pub, i) => (
             <Pressable
-              type="button"
               key={pub._id}
               onPress={() => {
                 onTrackClick({
@@ -1291,7 +1290,6 @@ function TrendingSection({
           >
             {suggestedUsers.slice(0, 8).map((user, i) => (
               <Pressable
-                type="button"
                 key={user._id}
                 onPress={() => {
                   onTrackClick({
@@ -1418,7 +1416,6 @@ function BackendCardView({
 
   return (
     <Pressable
-      type="button"
       onPress={() => {
         const itemId = String(card.id);
         const itemType = card.kind;
@@ -1927,7 +1924,7 @@ export default function ExplorerPage({
 
       <View
         className="relative z-20 flex-shrink-0 px-4 sm:px-6 pt-5 pb-3"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", borderBottomStyle: "solid", backgroundColor: "rgba(2,6,23,0.72)" }}
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: "rgba(2,6,23,0.72)" }}
       >
         <View className="flex items-center gap-3">
           <Pressable

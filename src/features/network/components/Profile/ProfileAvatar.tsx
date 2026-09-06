@@ -1,4 +1,4 @@
-import { View, Image } from "react-native";
+import { Pressable, View, Image } from "react-native";
 // src/features/network/components/Profile/ProfileAvatar.tsx
 import { Check, Camera } from "lucide-react-native";
 import { cn } from "@/lib/utils";

@@ -78,7 +78,7 @@ export default function HebergementDetailPage() {
       <View className="h-full flex flex-col bg-[#020617]">
         <View className="flex-shrink-0 px-4 pt-12 pb-4">
           <Pressable
-            onPress={() => router(-1)}
+            onPress={() => router.back()}
             className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/5"
           >
             <ArrowLeft size={20} className="text-white" />
@@ -98,7 +98,7 @@ export default function HebergementDetailPage() {
           {error || "Logement introuvable"}
         </Text>
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="mt-4 px-6 py-2 rounded-xl bg-indigo-500 text-white"
         >
           <Text>Retour</Text></Pressable>
@@ -111,7 +111,7 @@ export default function HebergementDetailPage() {
       {/* Header flottant */}
       <View className="absolute top-0 left-0 right-0 z-20 px-4 pt-12 flex items-center justify-between">
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="w-10 h-10 rounded-xl flex items-center justify-center bg-black/50"
         >
           <ArrowLeft size={20} className="text-white" />
@@ -234,7 +234,7 @@ export default function HebergementDetailPage() {
           <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70">
             <View
               className="w-full max-w-lg rounded-t-[32px] p-6 text-white flex flex-col max-h-[85vh] overflow-y-auto"
-              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", borderTopStyle: "solid" }}
+              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", }}
             >
               <View className="flex items-center justify-between mb-4">
                 <Text className="text-lg font-bold">Réserver</Text>

@@ -954,7 +954,6 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
         <View className="mx-auto w-full max-w-6xl">
           <View className="flex items-center gap-3">
             <Pressable
-              type="button"
               onPress={onBack}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.06]"
             >
@@ -1006,7 +1005,6 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
               {search ? (
                 <Pressable
                   key="clear"
-                  type="button"
                   onPress={() => setSearch("")}
                   className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/[0.07]"
                 >
@@ -1277,7 +1275,6 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
                       return (
                         <Pressable
                           key={action.id}
-                          type="button"
                           onPress={() => handleTap(action)}
                           className="flex min-w-[105px] shrink-0 flex-col items-center rounded-2xl border p-3"
                           style={{ backgroundColor: `${action.color}10`, borderColor: `${action.color}24` }}

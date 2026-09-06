@@ -51,7 +51,6 @@ export function OpportunityCard({
 
         <View className="mt-4 flex gap-2">
           <Pressable
-            type="button"
             onPress={onClick}
             className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-3 py-2.5 text-xs font-bold text-white"
           >
@@ -59,7 +58,6 @@ export function OpportunityCard({
 
           {onAction && (
             <Pressable
-              type="button"
               onPress={() => onAction("save")}
               className="rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-gray-300"
             >

@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 import { Star, ShieldCheck, ChefHat, CalendarCheck } from "lucide-react-native";
 import type { ChefProfile as ProfileType } from "../../types/chef.types";
 

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { Download, FileText } from "lucide-react-native";
 
 interface ReceiptDownloadProps {

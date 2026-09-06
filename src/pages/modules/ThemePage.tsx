@@ -77,7 +77,7 @@ function LivePreview({
 
       <View
         className="relative flex items-center gap-2 px-3.5 py-3"
-        style={{ backgroundColor: `${p.hex}18`, borderBottomStyle: "solid" }}
+        style={{ backgroundColor: `${p.hex}18`, }}
       >
         <View
           className="w-7 h-7 rounded-xl flex items-center justify-center"
@@ -192,7 +192,6 @@ function AccentSwatch({
 }) {
   return (
     <Pressable
-      type="button"
       aria-pressed={isActive}
       onPress={onClick}
       className="relative flex flex-col items-center gap-2 p-3 rounded-2xl"
@@ -243,7 +242,6 @@ function ChoiceButton({
 }) {
   return (
     <Pressable
-      type="button"
       aria-pressed={active}
       onPress={onClick}
       className="flex flex-col items-center gap-2 p-4 rounded-2xl"
@@ -467,12 +465,11 @@ export default function ThemePage({ onBack }: ThemePageProps) {
 
               return (
                 <Pressable
-                  type="button"
                   key={key}
                   onPress={() => update("textSize", key)}
                   aria-pressed={active}
                   className="w-full flex items-center gap-3 px-4 py-3.5"
-                  style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", borderBottomStyle: "solid", backgroundColor: active ? `${accentHex}10` : "transparent" }}
+                  style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: active ? `${accentHex}10` : "transparent" }}
                 >
                   <View
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
@@ -542,7 +539,6 @@ export default function ThemePage({ onBack }: ThemePageProps) {
 
               return (
                 <Pressable
-                  type="button"
                   key={key}
                   onPress={() => update("density", key)}
                   aria-pressed={active}
@@ -618,7 +614,6 @@ export default function ThemePage({ onBack }: ThemePageProps) {
               >
                 <View className="pt-4">
                   <Pressable
-                    type="button"
                     onPress={() => update("highContrast", !prefs.highContrast)}
                     aria-pressed={prefs.highContrast}
                     className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl mb-3"
@@ -692,12 +687,11 @@ export default function ThemePage({ onBack }: ThemePageProps) {
 
                       return (
                         <Pressable
-                          type="button"
                           key={key}
                           onPress={() => update("colorBlindMode", key)}
                           aria-pressed={active}
                           className="w-full flex items-center gap-3 px-4 py-3"
-                          style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", borderBottomStyle: "solid", backgroundColor: active
+                          style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: active
                                                         ? `${accentHex}10`
                                                         : "transparent" }}
                         >

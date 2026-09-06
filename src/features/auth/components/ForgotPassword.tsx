@@ -57,7 +57,6 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
       </View>
 
       <Pressable
-        type="submit"
         disabled={loading}
         className="w-full py-3.5 rounded-2xl font-bold text-white disabled:opacity-60"
         style={{  }}
@@ -70,7 +69,6 @@ export function ForgotPassword({ onBack }: ForgotPasswordProps) {
       </Pressable>
 
       <Pressable
-        type="button"
         onPress={onBack}
         className="w-full text-center text-sm text-white/40"
       >

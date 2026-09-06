@@ -458,8 +458,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </div>
 
             <button
-              type="button"
-              onClick={composer.cancelReply}
+              onPress={composer.cancelReply}
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/30 transition hover:bg-white/10 hover:text-white"
               aria-label="Annuler la réponse"
             >
@@ -484,8 +483,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           </span>
 
           <button
-            type="button"
-            onClick={clearActiveTool}
+            onPress={clearActiveTool}
             className="ml-auto text-xs text-white/30 transition hover:text-white"
           >
             Annuler
@@ -526,8 +524,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </div>
 
             <button
-              type="button"
-              onClick={clearSelectedFiles}
+              onPress={clearSelectedFiles}
               className="rounded-lg px-2 py-1 text-[10px] text-white/30 transition hover:bg-white/10 hover:text-white"
             >
               Tout retirer
@@ -570,8 +567,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
                 </div>
 
                 <button
-                  type="button"
-                  onClick={() => removeSelectedFile(item.id)}
+                  onPress={() => removeSelectedFile(item.id)}
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white/70 opacity-0 backdrop-blur transition group-hover:opacity-100 hover:bg-red-500 hover:text-white"
                   aria-label={`Supprimer ${item.file.name}`}
                 >
@@ -606,8 +602,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </div>
 
             <button
-              type="button"
-              onClick={() => setShowAttachments(false)}
+              onPress={() => setShowAttachments(false)}
               className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/10 hover:text-white"
               aria-label="Fermer"
             >
@@ -617,8 +612,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
 
           <div className="grid grid-cols-2 gap-1">
             <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
+              onPress={() => cameraInputRef.current?.click()}
               className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.06]"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-lg transition group-hover:scale-105">
@@ -637,8 +631,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </button>
 
             <button
-              type="button"
-              onClick={() => galleryInputRef.current?.click()}
+              onPress={() => galleryInputRef.current?.click()}
               className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.06]"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/15 text-lg transition group-hover:scale-105">
@@ -657,8 +650,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </button>
 
             <button
-              type="button"
-              onClick={() => documentInputRef.current?.click()}
+              onPress={() => documentInputRef.current?.click()}
               className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.06]"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/15 text-lg transition group-hover:scale-105">
@@ -677,8 +669,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </button>
 
             <button
-              type="button"
-              onClick={() => {
+              onPress={() => {
                 void startVoice();
               }}
               disabled={voice.isRecording}
@@ -706,8 +697,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             {TOOL_ITEMS.map((tool) => (
               <button
                 key={tool.key}
-                type="button"
-                onClick={() => handleToolClick(tool.key)}
+                onPress={() => handleToolClick(tool.key)}
                 className="group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-white/[0.06]"
               >
                 <span
@@ -745,8 +735,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </div>
 
             <button
-              type="button"
-              onClick={() => setShowEmojiPicker(false)}
+              onPress={() => setShowEmojiPicker(false)}
               className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/10 hover:text-white"
               aria-label="Fermer"
             >
@@ -758,8 +747,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             {EMOJIS.map((emoji) => (
               <button
                 key={emoji}
-                type="button"
-                onClick={() => insertEmoji(emoji)}
+                onPress={() => insertEmoji(emoji)}
                 className="flex h-11 items-center justify-center rounded-xl text-xl transition hover:scale-110 hover:bg-white/[0.07] active:scale-95"
                 aria-label={`Ajouter ${emoji}`}
               >
@@ -811,8 +799,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </div>
 
             <button
-              type="button"
-              onClick={cancelVoice}
+              onPress={cancelVoice}
               className="flex h-9 w-9 items-center justify-center rounded-xl text-white/30 transition hover:bg-white/10 hover:text-white"
               aria-label="Annuler le vocal"
               title="Annuler"
@@ -821,8 +808,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </button>
 
             <button
-              type="button"
-              onClick={stopVoice}
+              onPress={stopVoice}
               className="flex h-9 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-black transition hover:bg-white/90"
             >
               <span>✓</span>
@@ -848,8 +834,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       >
         <div className="flex min-h-[48px] items-end gap-1">
           <button
-            type="button"
-            onClick={() => {
+            onPress={() => {
               setShowAttachments((current) => !current);
               setShowEmojiPicker(false);
             }}
@@ -887,8 +872,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           />
 
           <button
-            type="button"
-            onClick={() => {
+            onPress={() => {
               setShowEmojiPicker((current) => !current);
               setShowAttachments(false);
             }}
@@ -906,8 +890,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
 
           {!hasText && !hasFiles ? (
             <button
-              type="button"
-              onClick={() => {
+              onPress={() => {
                 if (voice.isRecording) {
                   stopVoice();
                 } else {
@@ -931,9 +914,8 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </button>
           ) : (
             <button
-              type="button"
               disabled={!canSend || isBusy}
-              onClick={() => {
+              onPress={() => {
                 void handleSend();
               }}
               className={[
@@ -982,8 +964,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
 
           {voice.recording && !voice.isRecording && (
             <button
-              type="button"
-              onClick={() => {
+              onPress={() => {
                 const recording = voice.recording;
 
                 if (!recording) {

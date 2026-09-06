@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 import { useState } from "react";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -78,7 +78,6 @@ export function CreateGroup({
 
           return (
             <Pressable
-              type="button"
               key={String(user._id)}
               onPress={() => toggleUser(user._id)}
               className={`flex w-full items-center gap-3 rounded-xl p-2 text-left ${
@@ -110,7 +109,6 @@ export function CreateGroup({
       {error && <Text className="text-sm text-red-400">{error}</Text>}
 
       <Pressable
-        type="button"
         disabled={isSubmitting || selectedUsers.length === 0}
         onPress={handleSubmit}
         className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50"

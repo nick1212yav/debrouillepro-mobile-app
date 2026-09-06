@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 // src/features/events/components/EventSponsors.tsx
 interface Sponsor {
   name: string;

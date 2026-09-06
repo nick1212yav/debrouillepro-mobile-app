@@ -1,4 +1,4 @@
-import { View, Text, Alert } from "react-native";
+import { Pressable, View, Text, Alert } from "react-native";
 import { useState, useEffect } from "react";
 import { Coins, Copy, RefreshCw, AlertTriangle } from "lucide-react-native";
 
@@ -81,7 +81,6 @@ export function CryptoPayment({
       </View>
 
       <Pressable
-        type="button"
         onPress={onVerify}
         disabled={isVerifying || timeLeft === 0}
         className="w-full py-4 rounded-xl bg-amber-500 disabled:bg-white/5 disabled:text-white/20 text-[#020617] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-amber-500/10"

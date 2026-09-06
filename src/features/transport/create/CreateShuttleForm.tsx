@@ -221,7 +221,6 @@ export function CreateShuttleForm({
         />
 
         <Button
-          type="submit"
           className="w-full h-11 rounded-xl bg-violet-600 text-white font-bold"
           disabled={isLoading}
         >

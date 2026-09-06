@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 // src/features/marketplace/components/ProductVideoReviews.tsx
 import { Play } from "lucide-react-native";
 

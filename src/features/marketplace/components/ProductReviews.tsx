@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 // src/features/marketplace/components/ProductReviews.tsx
 import { useState } from "react";
 import { Star, User, ThumbsUp } from "lucide-react-native";
@@ -106,7 +106,6 @@ export function ProductReviews({
             {[1, 2, 3, 4, 5].map((i) => (
               <Pressable
                 key={i}
-                type="button"
                 onPress={() => setRating(i)}
                 className=""
               >
@@ -129,7 +128,6 @@ export function ProductReviews({
            
            multiline textAlignVertical="top"/>
           <Pressable
-            type="submit"
             disabled={isSubmitting || rating === 0}
             className="px-4 py-2 bg-orange-500 text-white rounded-lg disabled:opacity-50"
           >

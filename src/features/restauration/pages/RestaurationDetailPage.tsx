@@ -155,7 +155,7 @@ export default function RestaurationDetailPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<string>("mobile_money");
 
-  const handleBack = useCallback(() => router(-1), [router]);
+  const handleBack = useCallback(() => router.back(), [router]);
 
   const handleToggleFav = useCallback(async () => {
     if (!restaurant) return;
@@ -318,7 +318,7 @@ export default function RestaurationDetailPage() {
           <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70">
             <View
               className="w-full max-w-lg rounded-t-[32px] p-6 text-white flex flex-col max-h-[85vh] overflow-y-auto no-scrollbar"
-              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", borderTopStyle: "solid" }}
+              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", }}
             >
               {confirmedBooking ? (
                 <ReservationConfirmation
@@ -363,7 +363,7 @@ export default function RestaurationDetailPage() {
           <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/75">
             <View
               className="w-full max-w-lg rounded-t-[32px] p-6 text-white flex flex-col max-h-[90vh] overflow-y-auto no-scrollbar"
-              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", borderTopStyle: "solid" }}
+              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", }}
             >
               <View className="flex items-center justify-between mb-4">
                 <View className="flex items-center gap-2 text-orange-500">

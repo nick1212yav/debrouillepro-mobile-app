@@ -140,7 +140,7 @@ export default function DecouvertePage({
       {/* Header */}
       <View
         className="flex-shrink-0 px-5 pt-14 pb-4"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", borderBottomStyle: "solid" }}
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", }}
       >
         <View className="flex items-center gap-3 mb-5">
           <Pressable
@@ -376,7 +376,7 @@ function TrendingSection({
 
           <View
             className="flex items-center gap-4 mt-3 pt-3"
-            style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)", borderTopStyle: "solid" }}
+            style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)", }}
           >
             <View className="flex items-center gap-1">
               <Heart size={11} style={{ color: "#EC4899" }} />

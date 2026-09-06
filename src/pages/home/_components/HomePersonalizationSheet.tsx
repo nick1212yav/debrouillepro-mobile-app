@@ -306,7 +306,6 @@ export default function HomePersonalizationSheet({
              ================================================================== */}
 
           <Pressable
-            type="button"
             accessibilityLabel="Fermer"
             onPress={onClose}
             className="fixed inset-0 z-[90] bg-black/70"
@@ -790,7 +789,6 @@ export default function HomePersonalizationSheet({
                 </Pressable>
 
                 <Pressable
-                  type="button"
                   onPress={save}
                   className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[17px] text-[10px] font-black text-white"
                   style={{  }}
@@ -935,7 +933,6 @@ function NotificationPreference({
 }) {
   return (
     <Pressable
-      type="button"
       onPress={onToggle}
       className="flex w-full items-center gap-3 rounded-[20px] p-3 text-left"
       style={{ backgroundColor: enabled ? "rgba(255,255,255,.04)" : "rgba(255,255,255,.02)", borderColor: "rgba(255,255,255,.045)", borderStyle: "solid" }}

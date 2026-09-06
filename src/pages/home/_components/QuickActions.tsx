@@ -339,7 +339,6 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
           </View>
 
           <Pressable
-            type="button"
             onPress={openCustomizer}
             className="group flex items-center gap-1.5 rounded-xl px-2.5 py-2"
             style={{ backgroundColor: "rgba(139,92,246,.07)", borderWidth: 1, borderColor: "rgba(139,92,246,.14)", borderStyle: "solid" }}
@@ -375,7 +374,6 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
                   return (
                     <Pressable
                       key={action.id}
-                      type="button"
                       onPress={() => handleNavigate(action.route, action.id)}
                       className="group relative flex min-w-0 flex-col items-center gap-1.5 outline-none"
                       accessibilityLabel={action.label}
@@ -383,7 +381,6 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
                       {/* Aura */}
 
                       <View
-                        accessibilityElementsHidden={true}
                         className="absolute top-0 h-11 w-11 rounded-2xl"
                         style={{ backgroundColor: action.color }}
                       />
@@ -424,7 +421,6 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
           </View>
         ) : (
           <Pressable
-            type="button"
             onPress={openCustomizer}
             className="flex w-full items-center gap-3 rounded-2xl p-4 text-left"
             style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.14)", borderStyle: "solid" }}
@@ -492,7 +488,7 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
 
               <View
                 className="relative flex flex-shrink-0 items-center justify-between px-5 py-4"
-                style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,.055)", borderBottomStyle: "solid" }}
+                style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,.055)", }}
               >
                 <View className="flex items-center gap-3">
                   <View
@@ -519,7 +515,6 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
                   {/* Reset */}
 
                   <Pressable
-                    type="button"
                     onPress={handleReset}
                     className="flex h-9 w-9 items-center justify-center rounded-xl"
                     style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
@@ -532,7 +527,6 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
                   {/* Close */}
 
                   <Pressable
-                    type="button"
                     onPress={closeCustomizer}
                     className="flex h-9 w-9 items-center justify-center rounded-xl"
                     style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
@@ -623,7 +617,6 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
                             </View>
 
                             <Pressable
-                              type="button"
                               onPointerDown={(event) => event.stopPropagation()}
                               onPress={(event) => {
                                 toggle(id);
@@ -707,7 +700,6 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
                     <AnimatePresence>
                       {searchQuery && (
                         <Pressable
-                          type="button"
                           onPress={() => setSearchQuery("")}
                           className=""
                           accessibilityLabel="Effacer"
@@ -756,7 +748,6 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
                         return (
                           <Pressable
                             key={action.id}
-                            type="button"
                             onPress={() => {
                               if (!disabled) {
                                 toggle(action.id);
@@ -835,7 +826,7 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
 
               <View
                 className="relative flex flex-shrink-0 items-center justify-center gap-2 px-5 py-3"
-                style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,.045)", borderTopStyle: "solid", backgroundColor: "rgba(0,0,0,.12)" }}
+                style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,.045)", backgroundColor: "rgba(0,0,0,.12)" }}
               >
                 <Sparkles size={10} className="text-violet-400/60" />
 

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import type { Id } from "@/convex/_generated/dataModel";
 
 interface MinimizedCallProps {
@@ -15,11 +15,10 @@ export function MinimizedCall({ type, onExpand, onEnd }: MinimizedCallProps) {
         {type === "video" ? "📹" : "📞"}
       </View>
 
-      <Pressable type="button" onPress={onExpand} className="text-sm font-medium">
+      <Pressable onPress={onExpand} className="text-sm font-medium">
         <Text>Appel en cours</Text></Pressable>
 
       <Pressable
-        type="button"
         onPress={onEnd}
         className="rounded-full bg-red-600 px-3 py-2 text-xs"
       >

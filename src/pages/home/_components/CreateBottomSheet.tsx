@@ -591,7 +591,6 @@ function CreateQuickActions({
         {options.map((opt, index) => (
           <Pressable
             key={opt.id}
-            type="button"
             onPress={() => onSelect(opt.id)}
             className="group relative overflow-hidden rounded-2xl p-3 text-left"
             style={{ borderStyle: "solid" }}
@@ -700,7 +699,6 @@ function CreateGroupedGrid({
           {items.map((opt, index) => (
             <Pressable
               key={opt.id}
-              type="button"
               onPress={() => onSelect(opt.id)}
               className="group relative overflow-hidden rounded-[20px] p-3.5 text-left"
               style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.075)", borderStyle: "solid" }}
@@ -2388,7 +2386,6 @@ export default function CreateBottomSheet({
                             <Text>L'assistant de création vous aidera à choisir le bon espace.</Text></Text>
 
                           <Pressable
-                            type="button"
                             disabled={!searchQuery.trim()}
                             onPress={() => {
                               const q = searchQuery.toLowerCase();
@@ -2422,7 +2419,6 @@ export default function CreateBottomSheet({
                         style={{ borderColor: "#8B5CF6", borderStyle: "solid" }}
                       >
                         <Pressable
-                          type="button"
                           onPress={handleBackToHub}
                           className="h-8 w-8 shrink-0 rounded-xl flex items-center justify-center bg-white/6"
                           accessibilityLabel="Retour au hub"
@@ -2453,7 +2449,6 @@ export default function CreateBottomSheet({
                         )}
 
                         <Pressable
-                          type="button"
                           onPress={handleClose}
                           className="h-8 w-8 shrink-0 rounded-xl flex items-center justify-center bg-white/5"
                           accessibilityLabel="Fermer"

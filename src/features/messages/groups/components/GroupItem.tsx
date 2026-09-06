@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 import type { GroupMember } from "../services/groups.service";
 
 interface GroupItemProps {
@@ -52,7 +52,6 @@ export function GroupItem({
 
   return (
     <Pressable
-      type="button"
       onPress={onClick}
       className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left"
     >

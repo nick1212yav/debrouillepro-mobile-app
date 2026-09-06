@@ -598,7 +598,6 @@ export function CreateTransportSheet({
                         )}
                       </View>
                       <Pressable
-                        type="button"
                         onPress={stopRecording}
                         className="px-2.5 py-1 rounded-lg bg-red-500 text-[8px] font-black uppercase text-white flex items-center gap-1"
                       >
@@ -607,7 +606,6 @@ export function CreateTransportSheet({
                     </View>
                   ) : (
                     <Pressable
-                      type="button"
                       onPress={startRecording}
                       className="w-full h-24 rounded-xl border border-dashed border-white/10 bg-white/[0.01] flex flex-col items-center justify-center gap-1"
                     >

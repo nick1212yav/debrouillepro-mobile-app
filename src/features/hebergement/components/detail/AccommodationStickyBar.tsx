@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 import { Calendar } from "lucide-react-native";
 
@@ -41,7 +41,6 @@ export const AccommodationStickyBar: React.FC<AccommodationStickyBarProps> = ({
 
       <Pressable
         onPress={onBook}
-        type="button"
         className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-extrabold shadow-xl shadow-indigo-500/10 flex items-center justify-center gap-2 grow sm:grow-0"
       >
         <Calendar size={14} />

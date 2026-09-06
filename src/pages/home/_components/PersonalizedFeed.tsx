@@ -285,7 +285,6 @@ function BookmarkButton({
 
   return (
     <Pressable
-      type="button"
       onPress={() => void handleClick()}
       disabled={!isAuthenticated || pending}
       className={cn(
@@ -327,7 +326,6 @@ function CommentsButton({
 }) {
   return (
     <Pressable
-      type="button"
       onPress={onClick}
       className={cn(
         "flex items-center gap-1.5 rounded-xl px-3 py-2",
@@ -372,7 +370,6 @@ function CategoryBar({
         return (
           <Pressable
             key={item.value}
-            type="button"
             accessibilityRole="tab"
             aria-selected={isActive}
             onPress={() => onChange(item.value)}
@@ -489,7 +486,6 @@ function EmptyFeed({
         </Text>
 
         <Pressable
-          type="button"
           onPress={onCreateOpen}
           className={cn(
             "inline-flex items-center gap-2 rounded-2xl",
@@ -543,7 +539,6 @@ function PaginationFooter({
     return (
       <View className="flex justify-center px-4 pb-5 pt-1">
         <Pressable
-          type="button"
           onPress={onLoadMore}
           className={cn(
             "flex items-center gap-2 rounded-2xl",

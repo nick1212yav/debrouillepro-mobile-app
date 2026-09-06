@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 interface EmptyConversationsProps {
   onNewConversation?: () => void;
 }
@@ -20,7 +20,6 @@ export function EmptyConversations({
 
       {onNewConversation && (
         <Pressable
-          type="button"
           onPress={onNewConversation}
           className="mt-5 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black"
         >

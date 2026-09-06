@@ -203,7 +203,6 @@ function CreateButton({ active, onClick, reduceMotion }: CreateButtonProps) {
       {/* --------------------------------------------------------------------- */}
 
       <View
-        accessibilityElementsHidden={true}
         className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-[22px]"
         style={{  }}
       />
@@ -213,7 +212,6 @@ function CreateButton({ active, onClick, reduceMotion }: CreateButtonProps) {
       {/* --------------------------------------------------------------------- */}
 
       <Pressable
-        type="button"
         onPress={onClick}
         accessibilityLabel={active ? "Fermer le menu de création" : "Créer"}
         aria-pressed={active}
@@ -227,7 +225,6 @@ function CreateButton({ active, onClick, reduceMotion }: CreateButtonProps) {
 
         {/* Active inner ring */}
         <Text
-          accessibilityElementsHidden={true}
           className="absolute inset-0 rounded-[21px] border border-white/20"
         />
 
@@ -239,7 +236,6 @@ function CreateButton({ active, onClick, reduceMotion }: CreateButtonProps) {
             size={29}
             strokeWidth={2.3}
             className="text-white"
-            accessibilityElementsHidden={true}
           />
         </View>
 
@@ -276,7 +272,6 @@ function TabItem({ tab, isActive, onClick, reduceMotion }: TabItemProps) {
 
   return (
     <Pressable
-      type="button"
       onPress={onClick}
       aria-current={isActive ? "page" : undefined}
       accessibilityLabel={tab.label}
@@ -301,7 +296,6 @@ function TabItem({ tab, isActive, onClick, reduceMotion }: TabItemProps) {
       <>
         {isActive && (
           <View
-            accessibilityElementsHidden={true}
             className="absolute left-1/2 top-2 h-7 w-10 -translate-x-1/2 rounded-full bg-violet-500/20"
           />
         )}
@@ -324,7 +318,6 @@ function TabItem({ tab, isActive, onClick, reduceMotion }: TabItemProps) {
                 ? "text-violet-300"
                 : "text-white/55 transition-colors duration-200 group-hover:text-white/80"
             }
-            accessibilityElementsHidden={true}
           />
         </View>
       </View>
@@ -346,7 +339,6 @@ function TabItem({ tab, isActive, onClick, reduceMotion }: TabItemProps) {
       <>
         {isActive && (
           <Text
-            accessibilityElementsHidden={true}
             className="absolute bottom-0.5 h-1 w-1 rounded-full bg-violet-300 shadow-[0_0_8px_rgba(196,181,253,0.9)]"
           />
         )}

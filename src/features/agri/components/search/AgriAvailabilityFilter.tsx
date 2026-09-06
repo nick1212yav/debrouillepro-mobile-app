@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/agri/components/search/AgriAvailabilityFilter.tsx
 import { Check } from "lucide-react-native";
 
@@ -40,7 +40,6 @@ export function AgriAvailabilityFilter({
           return (
             <Pressable
               key={item.id}
-              type="button"
               onPress={() => onToggleStatus(item.id)}
               className="flex items-center gap-3 p-3 rounded-2xl w-full text-left border border-white/5 bg-white/[0.02]"
             >

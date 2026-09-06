@@ -298,7 +298,6 @@ export default function SearchBar({
               ================================================== */}
 
           <View
-            accessibilityElementsHidden={true}
             className="absolute inset-x-8 top-0 h-px"
             style={{  }}
           />
@@ -357,7 +356,6 @@ export default function SearchBar({
             <>
               {query.length > 0 && (
                 <Pressable
-                  type="button"
                   onPress={clearSearch}
                   accessibilityLabel="Effacer la recherche"
                   className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl text-white/45"
@@ -371,7 +369,6 @@ export default function SearchBar({
 
             {voiceSupported && (
               <Pressable
-                type="button"
                 onPress={startListening}
                 disabled={disabled}
                 accessibilityLabel={
@@ -383,7 +380,6 @@ export default function SearchBar({
               >
                 {listening && (
                   <Text
-                    accessibilityElementsHidden={true}
                     className="absolute inset-0 rounded-xl border border-red-400/50"
                   />
                 )}
@@ -399,7 +395,6 @@ export default function SearchBar({
             {/* Search submit */}
 
             <Pressable
-              type="submit"
               disabled={disabled || query.trim().length === 0}
               accessibilityLabel="Lancer la recherche"
               className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl disabled:cursor-not-allowed disabled:opacity-35"

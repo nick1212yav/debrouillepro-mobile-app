@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 import { Users, Trash2 } from "lucide-react-native";
 import { PublicationBadge } from "./PublicationBadge";
 import type { Publication, PublicationType } from "../types";

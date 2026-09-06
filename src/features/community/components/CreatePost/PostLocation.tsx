@@ -1,5 +1,5 @@
 import { UIService } from "@/core/sdk/ui/UIService";
-import { View, TextInput } from "react-native";
+import { Pressable, View, TextInput } from "react-native";
 // src/features/community/components/CreatePost/PostLocation.tsx
 import { useState, useCallback } from "react";
 import { MapPin, Loader2, LocateFixed } from "lucide-react-native";
@@ -78,7 +78,6 @@ export function PostLocation({ location, onChange }: Props) {
           className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
         />
         <Pressable
-          type="button"
           onPress={detectLocation}
           disabled={locating}
           className="flex-shrink-0 disabled:opacity-40"

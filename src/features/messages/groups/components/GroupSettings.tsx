@@ -37,7 +37,6 @@ export function GroupSettings({ conversationId, onLeft }: GroupSettingsProps) {
   return (
     <View className="space-y-2">
       <Pressable
-        type="button"
         onPress={handleSync}
         className="w-full rounded-xl px-4 py-3 text-left text-sm text-white"
       >
@@ -45,7 +44,6 @@ export function GroupSettings({ conversationId, onLeft }: GroupSettingsProps) {
       </Pressable>
 
       <Pressable
-        type="button"
         onPress={handleLeave}
         className="w-full rounded-xl px-4 py-3 text-left text-sm text-red-400"
       >

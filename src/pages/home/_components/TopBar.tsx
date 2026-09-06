@@ -222,7 +222,6 @@ function TopBarInner({
           <Tooltip>
             <TooltipTrigger asChild>
               <Pressable
-                type="button"
                 onPress={onMenuOpen}
                 accessibilityLabel="Ouvrir le menu"
                 className={glassButtonClass}
@@ -231,7 +230,6 @@ function TopBarInner({
                   size={19}
                   strokeWidth={2.1}
                   className="text-white/90"
-                  accessibilityElementsHidden={true}
                 />
 
                 {/* tiny decorative indicator */}
@@ -262,7 +260,6 @@ function TopBarInner({
                   </Text>
 
                   <Text
-                    accessibilityElementsHidden={true}
                     className="text-base"
                   >
                     {greeting.emoji}
@@ -302,7 +299,6 @@ function TopBarInner({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Pressable
-                    type="button"
                     onPress={onRecompensesOpen}
                     accessibilityLabel="Ouvrir mes récompenses"
                     className={`${glassButtonClass} hidden sm:flex`}
@@ -311,7 +307,6 @@ function TopBarInner({
                       size={17}
                       strokeWidth={2}
                       className="text-violet-300"
-                      accessibilityElementsHidden={true}
                     />
 
                     <Text
@@ -333,7 +328,6 @@ function TopBarInner({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Pressable
-                  type="button"
                   onPress={onNotificationsOpen}
                   accessibilityLabel="Notifications"
                   className={`${glassButtonClass} group`}
@@ -342,7 +336,6 @@ function TopBarInner({
                     size={18}
                     strokeWidth={2}
                     className="text-white/90"
-                    accessibilityElementsHidden={true}
                   />
 
                   {/* Notification status glow */}
@@ -363,7 +356,6 @@ function TopBarInner({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Pressable
-                  type="button"
                   onPress={onProfileOpen}
                   accessibilityLabel="Ouvrir mon profil"
                   className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.06] p-[2px] shadow-[0_6px_22px_rgba(0,0,0,0.22)]"

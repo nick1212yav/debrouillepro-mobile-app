@@ -663,7 +663,6 @@ export default function AdvancedSearch({
       />
 
       <View
-        accessibilityElementsHidden={true}
         className="absolute -bottom-52 -right-40 h-[30rem] w-[30rem] rounded-full"
         style={{  }}
       />
@@ -675,7 +674,6 @@ export default function AdvancedSearch({
       <View className="relative z-10 flex flex-shrink-0 items-center gap-2.5 px-3 pb-3 pt-[max(.8rem,env(safe-area-inset-top))] sm:px-5">
         {/* BACK */}
         <Pressable
-          type="button"
           onPress={onClose}
           accessibilityLabel="Fermer la recherche"
           className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045] text-white/55"
@@ -716,7 +714,6 @@ export default function AdvancedSearch({
 
           {/* VOICE */}
           <Pressable
-            type="button"
             onPress={startVoiceSearch}
             accessibilityLabel="Recherche vocale"
             className="hidden h-7 w-7 items-center justify-center rounded-xl bg-white/[0.04] sm:flex"
@@ -748,7 +745,6 @@ export default function AdvancedSearch({
 
           {query && (
             <Pressable
-              type="button"
               onPress={clearSearch}
               accessibilityLabel="Effacer la recherche"
               className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-white/40"
@@ -760,7 +756,6 @@ export default function AdvancedSearch({
 
         {/* FILTER */}
         <Pressable
-          type="button"
           onPress={() => setShowFilters((value) => !value)}
           accessibilityLabel="Afficher les filtres"
           className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045]"
@@ -824,7 +819,6 @@ export default function AdvancedSearch({
           return (
             <Pressable
               key={tab}
-              type="button"
               onPress={() => setActiveTab(tab)}
               className="relative flex-shrink-0 rounded-full px-3.5 py-1.5 text-[10px] font-bold sm:text-xs"
               style={{ backgroundColor: active
@@ -861,7 +855,6 @@ export default function AdvancedSearch({
                   return (
                     <Pressable
                       key={value}
-                      type="button"
                       onPress={() => setTypeFilter(value)}
                       className="flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[9px] font-bold sm:text-[10px]"
                       style={{ backgroundColor: active
@@ -923,7 +916,6 @@ export default function AdvancedSearch({
                     {history.map((term, index) => (
                       <Pressable
                         key={`${term}-${index}`}
-                        type="button"
                         onPress={() => handleSuggestion(term)}
                         className="flex items-center gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.04] px-3 py-2 text-[10px] text-white/55"
                       >
@@ -984,7 +976,6 @@ export default function AdvancedSearch({
                       return (
                         <Pressable
                           key={tag}
-                          type="button"
                           onPress={() => {
                             setSelectedTrending(tag);
                             handleSuggestion(tag);
@@ -1036,7 +1027,6 @@ export default function AdvancedSearch({
                     return (
                       <Pressable
                         key={module.id}
-                        type="button"
                         onPress={() =>
                           handleModuleNavigation(module.page, module.title)
                         }
@@ -1205,7 +1195,6 @@ export default function AdvancedSearch({
                         return (
                           <Pressable
                             key={publication._id}
-                            type="button"
                             onPress={() => handleSearch(debouncedQuery)}
                             className="group flex w-full items-start gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left"
                           >
@@ -1316,7 +1305,6 @@ export default function AdvancedSearch({
                       .map((user, index) => (
                         <Pressable
                           key={user._id}
-                          type="button"
                           onPress={() => onViewProfile(user._id)}
                           className="group flex w-full items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left"
                         >
@@ -1398,7 +1386,6 @@ export default function AdvancedSearch({
                         return (
                           <Pressable
                             key={module.id}
-                            type="button"
                             onPress={() =>
                               handleModuleNavigation(module.page, module.title)
                             }

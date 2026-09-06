@@ -47,7 +47,6 @@ export const ReviewPhotos: React.FC<ReviewPhotosProps> = ({
 
             {onPhotosChange && (
               <Pressable
-                type="button"
                 onPress={() => handleDelete(i)}
                 className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white/80 flex items-center justify-center opacity-0"
               >

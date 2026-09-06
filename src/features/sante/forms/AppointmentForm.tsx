@@ -175,7 +175,6 @@ export function AppointmentForm({
       </View>
 
       <Pressable
-        type="submit"
         disabled={isLoading}
         className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-red-600 to-red-700 disabled:opacity-50"
       >

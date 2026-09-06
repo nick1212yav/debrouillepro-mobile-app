@@ -141,7 +141,6 @@ function AccordionItem({
           <Icon
             size={17}
             style={{ color: open ? accent : "rgba(255,255,255,0.45)" }}
-            accessibilityElementsHidden={true}
           />
         </View>
 
@@ -232,12 +231,12 @@ export default function TermsPage({ onBack }: TermsPageProps) {
           className="w-10 h-10 rounded-2xl flex items-center justify-center"
           style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
         >
-          <ArrowLeft size={18} className="text-white" accessibilityElementsHidden={true} />
+          <ArrowLeft size={18} className="text-white" />
         </Pressable>
 
         <View className="flex-1 min-w-0">
           <Text className="text-lg font-black text-white flex items-center gap-2 truncate">
-            <FileText size={17} style={{ color: hex }} accessibilityElementsHidden={true} />
+            <FileText size={17} style={{ color: hex }} />
             Conditions Générales
           </Text>
           <Text className="text-xs text-white/35 mt-0.5">
@@ -276,7 +275,7 @@ export default function TermsPage({ onBack }: TermsPageProps) {
               className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
               style={{  }}
             >
-              <Scale size={25} className="text-white" accessibilityElementsHidden={true} />
+              <Scale size={25} className="text-white" />
             </View>
 
             <View className="flex items-center gap-2 mb-2">

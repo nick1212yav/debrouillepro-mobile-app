@@ -74,7 +74,7 @@ export default function FavoritesPage({ onBack, onNavigate }: Props) {
       {/* Header */}
       <View
         className="flex-shrink-0 px-5 pt-14 pb-4 flex items-center justify-between"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}
       >
         <View className="flex items-center gap-3">
           <Pressable

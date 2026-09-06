@@ -64,10 +64,10 @@ export function UserAvatar({
     >
       {avatar ? (
         <Image
-          style={{ width: "100%", height: "100%", display: "block" }} source={{ uri: avatar }} accessibilityLabel={name ?? "Utilisateur"}
+          style={{ width: "100%", height: "100%", display: "flex" }} source={{ uri: avatar }} accessibilityLabel={name ?? "Utilisateur"}
         />
       ) : (
-        <Text accessibilityElementsHidden={true}>{initials}</Text>
+        <Text>{initials}</Text>
       )}
 
       {online && (

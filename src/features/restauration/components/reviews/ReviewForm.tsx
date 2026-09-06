@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import { useState } from "react";
 import { Star, Send } from "lucide-react-native";
 
@@ -31,7 +31,6 @@ export function ReviewForm({ onSubmit, isSubmitting }: ReviewFormProps) {
           {[1, 2, 3, 4, 5].map((star) => (
             <Pressable
               key={star}
-              type="button"
               onPress={() => setRating(star)}
               onMouseEnter={() => setHoverRating(star)}
               onMouseLeave={() => setHoverRating(null)}
@@ -66,7 +65,6 @@ export function ReviewForm({ onSubmit, isSubmitting }: ReviewFormProps) {
       </View>
 
       <Pressable
-        type="submit"
         disabled={isSubmitting || !comment.trim()}
         className="w-full py-4 rounded-xl bg-orange-500 disabled:bg-white/5 disabled:text-white/25 text-[#020617] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-orange-500/10"
       >

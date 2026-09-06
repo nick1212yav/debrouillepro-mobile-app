@@ -73,7 +73,6 @@ export function AiActions({
         return (
           <Pressable
             key={action.id}
-            type="button"
             disabled={disabled || loading}
             onPress={() => onAction(action.id)}
             className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-white/70 disabled:cursor-not-allowed disabled:opacity-40"

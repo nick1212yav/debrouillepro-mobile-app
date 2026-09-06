@@ -523,7 +523,6 @@ function StepLocation({ data, setData }: StepProps) {
     <View className="space-y-5">
       {/* Smart location */}
       <Pressable
-        type="button"
         onPress={() => void detect()}
         disabled={detecting}
         className="group relative w-full overflow-hidden rounded-3xl border border-blue-400/20 p-4 text-left"
@@ -630,7 +629,6 @@ function StepLocation({ data, setData }: StepProps) {
             return (
               <Pressable
                 key={country.code}
-                type="button"
                 onPress={() =>
                   setData({
                     country: country.name,
@@ -674,7 +672,6 @@ function StepRole({ data, setData }: StepProps) {
         return (
           <Pressable
             key={id}
-            type="button"
             onPress={() =>
               setData({
                 role: id,
@@ -781,7 +778,6 @@ function StepModules({ data, setData }: StepProps) {
             return (
               <Pressable
                 key={id}
-                type="button"
                 onPress={() => toggle(id)}
                 aria-pressed={selected}
                 className="relative flex min-h-[122px] flex-col items-start overflow-hidden rounded-3xl border p-4 text-left"
@@ -1308,7 +1304,6 @@ export default function OnboardingFlow({
 
       <View className="relative z-10 shrink-0 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
         <Pressable
-          type="button"
           onPress={step === STEP_COUNT - 1 ? () => void finish() : next}
           disabled={!canNext || loading}
           className="relative flex h-14 w-full items-center justify-center gap-2 overflow-hidden rounded-2xl text-sm font-black disabled:cursor-not-allowed"

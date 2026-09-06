@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/community/components/CommunityActions.tsx
 import { useState, useRef, useEffect } from "react";
 import {

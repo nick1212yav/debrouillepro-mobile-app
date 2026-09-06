@@ -93,7 +93,6 @@ export function TransportAIAssistant() {
           disabled={loading}
         />
         <Button
-          type="submit"
           size="icon"
           className="w-10 h-10 rounded-xl bg-violet-600"
           disabled={loading}

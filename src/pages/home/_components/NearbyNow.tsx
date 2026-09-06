@@ -827,7 +827,6 @@ export default function NearbyNow({ onNavigate }: NearbyNowProps) {
               return (
                 <Pressable
                   key={item.id}
-                  type="button"
                   onPress={() => {
                     Linking.openURL(String(buildMapUrl(item.lat, item.lng)));
                   }}
@@ -939,7 +938,6 @@ export default function NearbyNow({ onNavigate }: NearbyNowProps) {
               {visibleItems.length} <Text>lieu</Text>{visibleItems.length > 1 ? "x" : ""} <Text>trouvé</Text>{visibleItems.length > 1 ? "s" : ""} <Text>près de vous</Text></Text>
 
             <Pressable
-              type="button"
               onPress={() => {
                 /**
                  * Si une page Nearby dédiée existe déjà,

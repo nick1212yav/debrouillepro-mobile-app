@@ -57,7 +57,6 @@ export function TagsRenderer({
           className={`flex-1 bg-white/5 border ${error ? "border-red-400" : "border-white/10"} rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:border-purple-400 transition-colors disabled:opacity-50`}
          editable={!(disabled)}/>
         <Pressable
-          type="button"
           onPress={addTag}
           disabled={disabled || !input.trim()}
           className="px-4 py-2 bg-purple-600 disabled:opacity-50 rounded-lg text-white"

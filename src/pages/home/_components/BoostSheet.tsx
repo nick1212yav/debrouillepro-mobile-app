@@ -241,7 +241,6 @@ export default function BoostSheet({
               return (
                 <Pressable
                   key={tier.key}
-                  type="button"
                   onPress={() => {
                     if (!loading) {
                       setSelected(tier.key);
@@ -413,7 +412,6 @@ export default function BoostSheet({
           style={{ paddingBottom: "max(20px, env(safe-area-inset-bottom))" }}
         >
           <Pressable
-            type="button"
             onPress={() => void handleBoost()}
             disabled={loading || !publicationId}
             className={cn(

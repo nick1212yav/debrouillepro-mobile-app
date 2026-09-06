@@ -1,4 +1,4 @@
-import { View, TextInput, NativeSyntheticEvent, TextInputKeyPressEventData } from "react-native";
+import { Pressable, View, TextInput, NativeSyntheticEvent, TextInputKeyPressEventData } from "react-native";
 // src/features/community/components/CreatePost/PostEditor.tsx
 import { useState, useRef, useEffect } from "react";
 import { FileText } from "lucide-react-native";

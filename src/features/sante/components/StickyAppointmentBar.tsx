@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/sante/components/StickyAppointmentBar.tsx
 import { Phone, Video, MessageCircle, Calendar, Ambulance } from "lucide-react-native";
 

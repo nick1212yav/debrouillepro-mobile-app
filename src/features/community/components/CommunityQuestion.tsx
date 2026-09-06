@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import { useState } from "react";
 import { HelpCircle, Send, Loader2 } from "lucide-react-native";
 

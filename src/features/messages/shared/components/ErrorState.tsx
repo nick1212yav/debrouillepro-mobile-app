@@ -1,4 +1,4 @@
-import { View, ViewProps, PressableProps } from "react-native";
+import { Pressable, View, ViewProps, PressableProps } from "react-native";
 // src/features/messages/shared/components/ErrorState.tsx
 
 import type { ReactNode } from "react";
@@ -53,7 +53,6 @@ export function ErrorState({
 
       {onRetry && (
         <Pressable
-          type="button"
           onPress={onRetry}
           style={{ marginTop: 6, borderWidth: 0, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 16 }}
         >

@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 // src/features/sante/components/DoctorAIAssistant.tsx
 import { useState } from "react";
 import { Bot, Send, Loader2 } from "lucide-react-native";

@@ -1,4 +1,4 @@
-import { View, Text, Image, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { Pressable, View, Text, Image, ViewStyle, TextStyle, ImageStyle } from "react-native";
 // src/features/messages/immo/components/PropertyPreview.tsx
 
 import React from "react";
@@ -85,7 +85,6 @@ export function PropertyPreview({
 
   return (
     <Pressable
-      type="button"
       onPress={() => onPress(property)}
       style={buttonResetStyle}
     >
@@ -115,14 +114,14 @@ const buttonResetStyle: ViewStyle | TextStyle | ImageStyle = {
 const imageStyle: ViewStyle | TextStyle | ImageStyle = {
   width: "100%",
   height: 190,
-  display: "block",
+  display: "flex",
   objectFit: "cover",
 };
 
 const compactImageStyle: ViewStyle | TextStyle | ImageStyle = {
   width: "100%",
   height: 130,
-  display: "block",
+  display: "flex",
   objectFit: "cover",
 };
 

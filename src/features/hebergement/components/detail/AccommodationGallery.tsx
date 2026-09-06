@@ -78,7 +78,6 @@ export const AccommodationGallery: React.FC<AccommodationGalleryProps> = ({
           <Pressable
             key={img}
             onPress={() => setActiveIndex(i)}
-            type="button"
             className={`w-16 h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
               i === activeIndex
                 ? "border-indigo-500 scale-105"

@@ -28,7 +28,6 @@ export const AccommodationDescription: React.FC<
       {isLong && (
         <Pressable
           onPress={() => setIsExpanded(!isExpanded)}
-          type="button"
           className="self-start inline-flex items-center gap-1 text-xs font-semibold text-indigo-400 mt-1"
         >
           {isExpanded ? (

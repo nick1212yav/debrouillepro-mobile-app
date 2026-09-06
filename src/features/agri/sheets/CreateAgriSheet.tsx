@@ -388,7 +388,6 @@ export function CreateAgriSheet({
                 {/* Logistique Options */}
                 <View className="gap-3 pt-2">
                   <Pressable
-                    type="button"
                     onPress={() =>
                       handleFieldChange(
                         "pickupAvailable",
@@ -416,7 +415,6 @@ export function CreateAgriSheet({
                   </Pressable>
 
                   <Pressable
-                    type="button"
                     onPress={() =>
                       handleFieldChange(
                         "deliveryAvailable",
@@ -447,7 +445,6 @@ export function CreateAgriSheet({
 
                 {/* Bouton de soumission */}
                 <Pressable
-                  type="submit"
                   disabled={
                     loading ||
                     !form.title ||

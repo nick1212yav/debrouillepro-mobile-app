@@ -1,4 +1,4 @@
-import { View, Text, Linking } from "react-native";
+import { Pressable, View, Text, Linking } from "react-native";
 // src/features/sante/components/DoctorLocation.tsx
 import { MapPin, Building, Globe } from "lucide-react-native";
 

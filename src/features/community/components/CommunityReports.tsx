@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import { useState } from "react";
 import { Flag, X, Send, AlertCircle } from "lucide-react-native";
 

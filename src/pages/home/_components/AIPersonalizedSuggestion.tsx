@@ -110,13 +110,11 @@ export default function AIPersonalizedSuggestion({
       ───────────────────────────────────────── */}
 
       <View
-        accessibilityElementsHidden={true}
         className="absolute -right-20 -top-24 h-56 w-56 rounded-full"
         style={{  }}
       />
 
       <View
-        accessibilityElementsHidden={true}
         className="absolute -bottom-24 -left-16 h-48 w-48 rounded-full"
         style={{  }}
       />
@@ -163,7 +161,6 @@ export default function AIPersonalizedSuggestion({
           </View>
 
           <Pressable
-            type="button"
             onPress={onOpenStudio}
             accessibilityLabel="Personnaliser les suggestions IA"
             className="flex flex-shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-[9px] font-bold"
@@ -225,7 +222,6 @@ export default function AIPersonalizedSuggestion({
                 return (
                   <Pressable
                     key={`${moduleId}-${index}`}
-                    type="button"
                     onPress={() => onNavigate(moduleId)}
                     className="group relative flex min-w-0 items-center gap-2.5 overflow-hidden rounded-2xl p-2.5 text-left"
                     style={{ backgroundColor: `${color}0D`, borderStyle: "solid" }}
@@ -277,7 +273,7 @@ export default function AIPersonalizedSuggestion({
         {tags.length > 0 && (
           <View
             className="flex items-center gap-2 overflow-hidden px-4 py-3"
-            style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,.045)", borderTopStyle: "solid", backgroundColor: "rgba(0,0,0,.08)" }}
+            style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,.045)", backgroundColor: "rgba(0,0,0,.08)" }}
           >
             <Text className="flex-shrink-0 text-[8px] font-black uppercase tracking-[0.12em] text-white/18">
               Vos intérêts
@@ -299,7 +295,6 @@ export default function AIPersonalizedSuggestion({
             </View>
 
             <Pressable
-              type="button"
               onPress={onOpenStudio}
               accessibilityLabel="Modifier vos intérêts"
               className="ml-auto flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-white/25"
@@ -314,7 +309,6 @@ export default function AIPersonalizedSuggestion({
         ─────────────────────────────────────── */}
 
         <View
-          accessibilityElementsHidden={true}
           className="absolute bottom-0 left-0 h-px w-full"
           style={{  }}
         />

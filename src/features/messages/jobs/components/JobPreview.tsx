@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 // src/features/messages/jobs/components/JobPreview.tsx
 
 import type { Job } from "../services/jobs.service";
@@ -55,7 +55,7 @@ export function JobPreview({
       style={{ width: "100%", maxWidth: 520, borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "solid", borderRadius: 16, overflow: "hidden", backgroundColor: "#fff" }}
     >
       <View
-        style={{ display: "flex", gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: "#f1f5f9", borderBottomStyle: "solid" }}
+        style={{ display: "flex", gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: "#f1f5f9", }}
       >
         {job.companyLogo ? (
           <Image
@@ -161,7 +161,6 @@ export function JobPreview({
         >
           {onOpen && (
             <Pressable
-              type="button"
               onPress={() => onOpen(job)}
               style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: "#cbd5e1", borderStyle: "solid", backgroundColor: "#fff" }}
             >
@@ -170,7 +169,6 @@ export function JobPreview({
 
           {onApply && (
             <Pressable
-              type="button"
               disabled={applying}
               onPress={() => onApply(job)}
               style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: "#111827", opacity: applying ? 0.6 : 1 }}

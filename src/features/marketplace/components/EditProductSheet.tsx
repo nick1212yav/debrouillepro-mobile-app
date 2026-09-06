@@ -618,7 +618,6 @@ export function EditProductSheet({
               className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
             />
             <Pressable
-              type="button"
               onPress={detectLocation}
               disabled={locating}
               className="flex-shrink-0 disabled:opacity-40"

@@ -148,7 +148,6 @@ export function PublicationGallery({ images, alt = "", fit = "auto" }: Props) {
             {renderImage(src, i)}
             {i === 3 && remaining > 0 && (
               <Pressable
-                type="button"
                 className="absolute inset-0 flex items-center justify-center bg-black/60 text-2xl font-bold text-white"
                 onPress={(e) => {
                   setSelected(display[3]);
@@ -187,7 +186,6 @@ function ImageModal({
       onPress={onClose}
     >
       <Pressable
-        type="button"
         onPress={onClose}
         className="absolute right-5 top-5 z-10 rounded-full bg-white/10 px-4 py-2 text-xl text-white"
       >

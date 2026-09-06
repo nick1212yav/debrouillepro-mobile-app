@@ -67,7 +67,6 @@ export function PaymentComposer({
       />
 
       <Pressable
-        type="submit"
         disabled={isDisabled || !amount}
         style={buttonStyle}
       >

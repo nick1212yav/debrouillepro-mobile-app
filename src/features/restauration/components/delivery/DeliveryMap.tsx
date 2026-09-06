@@ -1,4 +1,4 @@
-import { View, Text, Image, Alert } from "react-native";
+import { Pressable, View, Text, Image, Alert } from "react-native";
 import { Compass, ShieldAlert } from "lucide-react-native";
 import type { GeoCoordinates } from "../../types/common.types";
 

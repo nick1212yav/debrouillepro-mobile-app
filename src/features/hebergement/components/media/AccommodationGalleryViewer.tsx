@@ -95,7 +95,6 @@ export const AccommodationGalleryViewer: React.FC<
 
           <View className="relative flex-1 flex items-center justify-center py-4">
             <Pressable
-              type="button"
               onPress={handlePrev}
               className="absolute left-2.5 w-10 h-10 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white"
             >
@@ -109,7 +108,6 @@ export const AccommodationGalleryViewer: React.FC<
              source={{ uri: list[index] }} accessibilityLabel={`${title} - image ${index + 1}`}/>
 
             <Pressable
-              type="button"
               onPress={handleNext}
               className="absolute right-2.5 w-10 h-10 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white"
             >

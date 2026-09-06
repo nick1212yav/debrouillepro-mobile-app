@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { CreditCard, Smartphone, Coins, DollarSign } from "lucide-react-native";
 import { PaymentGateway } from "../../types/enums";
 
@@ -52,7 +52,6 @@ export function PaymentMethods({
           return (
             <Pressable
               key={method.id}
-              type="button"
               onPress={() => onChange(method.id)}
               className="p-3.5 rounded-xl border flex items-center gap-3 text-left w-full"
               style={{ backgroundColor: isSelected

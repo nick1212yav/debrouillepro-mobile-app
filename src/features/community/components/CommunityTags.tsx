@@ -1,4 +1,4 @@
-import { View, Text, TextInput, NativeSyntheticEvent, TextInputKeyPressEventData } from "react-native";
+import { Pressable, View, Text, TextInput, NativeSyntheticEvent, TextInputKeyPressEventData } from "react-native";
 import { useState } from "react";
 import { Tag, Plus, X } from "lucide-react-native";
 

@@ -62,27 +62,27 @@ import CheckoutPage from "./pages/CheckoutPage";
 
 function CommunityPageWrapper() {
   const router = useRouter();
-  return <CommunityPage onBack={() => router(-1)} />;
+  return <CommunityPage onBack={() => router.back()} />;
 }
 
 function EvenementsPageWrapper() {
   const router = useRouter();
-  return <EvenementsPage onBack={() => router(-1)} />;
+  return <EvenementsPage onBack={() => router.back()} />;
 }
 
 function EvenementsProPageWrapper() {
   const router = useRouter();
-  return <EvenementsProPage onBack={() => router(-1)} />;
+  return <EvenementsProPage onBack={() => router.back()} />;
 }
 
 function MarketplacePageWrapper() {
   const router = useRouter();
-  return <MarketplacePage onBack={() => router(-1)} />;
+  return <MarketplacePage onBack={() => router.back()} />;
 }
 
 function MarketplaceProPageWrapper() {
   const router = useRouter();
-  return <MarketplaceProPage onBack={() => router(-1)} />;
+  return <MarketplaceProPage onBack={() => router.back()} />;
 }
 
 // Wrapper Santé
@@ -93,31 +93,31 @@ function SantePageWrapper() {
 // Wrapper Transport
 function TransportPageWrapper() {
   const router = useRouter();
-  return <TransportPage onBack={() => router(-1)} />;
+  return <TransportPage onBack={() => router.back()} />;
 }
 
 // Wrapper Restauration
 function RestaurationPageWrapper() {
   const router = useRouter();
-  return <RestaurationPage onBack={() => router(-1)} />;
+  return <RestaurationPage onBack={() => router.back()} />;
 }
 
 // Wrapper Hébergement
 function HebergementPageWrapper() {
   const router = useRouter();
-  return <HebergementPage onBack={() => router(-1)} />;
+  return <HebergementPage onBack={() => router.back()} />;
 }
 
 // Wrapper Agriculture
 function AgriPageWrapper() {
   const router = useRouter();
-  return <AgriPage onBack={() => router(-1)} />;
+  return <AgriPage onBack={() => router.back()} />;
 }
 
 function AgriDetailPageWrapper() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  return <AgriDetailPage productId={id as any} onBack={() => router(-1)} />;
+  return <AgriDetailPage productId={id as any} onBack={() => router.back()} />;
 }
 
 // Wrapper Network
@@ -125,7 +125,7 @@ function NetworkPageWrapper() {
   const router = useRouter();
   return (
     <NetworkPage
-      onBack={() => router(-1)}
+      onBack={() => router.back()}
       onViewProfile={(userId) => router.push(`/network/profile/${userId}`)}
     />
   );
@@ -135,7 +135,7 @@ function NetworkDetailPageWrapper() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   return (
-    <NetworkDetailPage publicationId={id as any} onBack={() => router(-1)} />
+    <NetworkDetailPage publicationId={id as any} onBack={() => router.back()} />
   );
 }
 
@@ -143,7 +143,7 @@ function NetworkProfilePageWrapper() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
   return (
-    <NetworkProfilePage userId={userId as any} onBack={() => router(-1)} />
+    <NetworkProfilePage userId={userId as any} onBack={() => router.back()} />
   );
 }
 

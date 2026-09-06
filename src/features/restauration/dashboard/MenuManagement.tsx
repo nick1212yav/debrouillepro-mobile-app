@@ -2,7 +2,7 @@ function NativePrompt(message: string): string | null {
   Alert.alert(message, "Saisie requise");
   return null;
 }
-import { View, Text, Alert } from "react-native";
+import { Pressable, View, Text, Alert } from "react-native";
 import type { MenuCategory, MenuItem } from "../types/menu.types";
 import { Power, Tag, DollarSign } from "lucide-react-native";
 

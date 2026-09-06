@@ -1,4 +1,4 @@
-import { View, Text, Linking } from "react-native";
+import { Pressable, View, Text, Linking } from "react-native";
 // src/features/messages/locations/components/LocationMessage.tsx
 
 import type { Id } from "../../../../../convex/_generated/dataModel";
@@ -161,7 +161,6 @@ export function LocationMessage({
           }}
         >
           <Pressable
-            type="button"
             onPress={openMap}
             style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", borderRadius: 10, backgroundColor: "#fff" }}
           >
@@ -169,7 +168,6 @@ export function LocationMessage({
 
           {live && active && onStopLive && (
             <Pressable
-              type="button"
               onPress={() => void onStopLive(message._id)}
               style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 0, borderRadius: 10, backgroundColor: "#fef2f2" }}
             >

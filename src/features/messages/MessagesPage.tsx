@@ -317,7 +317,6 @@ export default function MessagesPage({
                     stroke="currentColor"
                     strokeWidth="2"
                     className="h-5 w-5"
-                    accessibilityElementsHidden={true}
                   >
                     <path
                       strokeLinecap="round"
@@ -380,7 +379,6 @@ export default function MessagesPage({
                 stroke="currentColor"
                 strokeWidth="2"
                 className="h-5 w-5"
-                accessibilityElementsHidden={true}
               >
                 <path strokeLinecap="round" d="M12 5v14" />
                 <path strokeLinecap="round" d="M5 12h14" />
@@ -491,7 +489,6 @@ export default function MessagesPage({
                       stroke="currentColor"
                       strokeWidth="1.6"
                       className="h-8 w-8 text-primary"
-                      accessibilityElementsHidden={true}
                     >
                       <path
                         strokeLinecap="round"
@@ -557,7 +554,6 @@ export default function MessagesPage({
                     stroke="currentColor"
                     strokeWidth="2"
                     className="h-4 w-4"
-                    accessibilityElementsHidden={true}
                   >
                     <path strokeLinecap="round" d="M12 5v14" />
                     <path strokeLinecap="round" d="M5 12h14" />
@@ -655,7 +651,6 @@ export default function MessagesPage({
                   stroke="currentColor"
                   strokeWidth="2"
                   className="h-5 w-5"
-                  accessibilityElementsHidden={true}
                 >
                   <path strokeLinecap="round" d="M6 6l12 12" />
                   <path strokeLinecap="round" d="M18 6 6 18" />

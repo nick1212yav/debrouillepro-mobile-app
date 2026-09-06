@@ -950,7 +950,6 @@ export default function OnboardingScreen({
               </View>
 
               <Pressable
-                type="button"
                 onPress={goNext}
                 className="mt-10 flex w-full max-w-sm items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white"
                 style={{  }}
@@ -998,7 +997,6 @@ export default function OnboardingScreen({
 
               {/* Auto location */}
               <Pressable
-                type="button"
                 onPress={() => {
                   void locate().then((result) => {
                     if (!result?.countryCode) {
@@ -1081,7 +1079,6 @@ export default function OnboardingScreen({
                     return (
                       <Pressable
                         key={country.code}
-                        type="button"
                         onPress={() => handleCountrySelect(country)}
                         className="relative flex min-h-[62px] items-center gap-2 rounded-2xl border px-3 text-left"
                         style={{ backgroundColor: selected
@@ -1259,7 +1256,6 @@ export default function OnboardingScreen({
                     return (
                       <Pressable
                         key={module.id}
-                        type="button"
                         onPress={() => toggleModule(module.id)}
                         aria-pressed={selected}
                         className="relative flex min-h-[132px] flex-col items-start rounded-3xl border p-4 text-left"
@@ -1433,7 +1429,6 @@ export default function OnboardingScreen({
 
               <View className="mt-auto pb-6">
                 <Pressable
-                  type="button"
                   onPress={() => void handleComplete()}
                   disabled={saving}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-black text-white disabled:cursor-wait disabled:opacity-60"
@@ -1481,7 +1476,6 @@ function PrimaryButton({
 }) {
   return (
     <Pressable
-      type="button"
       onPress={onClick}
       disabled={disabled}
       className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-30"

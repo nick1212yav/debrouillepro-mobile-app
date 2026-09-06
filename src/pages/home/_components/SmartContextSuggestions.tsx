@@ -587,7 +587,6 @@ export default function SmartContextSuggestions({
               return (
                 <Pressable
                   key={suggestion.id}
-                  type="button"
                   onPress={() => onNavigate(suggestion.route)}
                   className="group relative flex w-full items-center gap-3 overflow-hidden rounded-[22px] p-3 text-left"
                   style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.065)", borderStyle: "solid" }}

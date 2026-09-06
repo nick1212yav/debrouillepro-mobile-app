@@ -1,4 +1,4 @@
-import { View, ViewProps, PressableProps } from "react-native";
+import { Pressable, View, ViewProps, PressableProps } from "react-native";
 // src/features/messages/shared/components/EmptyState.tsx
 
 import type { ReactNode } from "react";
@@ -54,7 +54,6 @@ export function EmptyState({
 
       {actionLabel && onAction && (
         <Pressable
-          type="button"
           onPress={onAction}
           style={{ marginTop: 6, borderWidth: 0, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 16 }}
         >

@@ -114,7 +114,7 @@ export default function AboutPage({ onBack }: AboutPageProps) {
           className="w-10 h-10 rounded-2xl flex items-center justify-center"
           style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
         >
-          <ArrowLeft size={18} accessibilityElementsHidden={true} />
+          <ArrowLeft size={18} />
         </Pressable>
 
         <View className="flex-1 min-w-0">
@@ -301,7 +301,6 @@ export default function AboutPage({ onBack }: AboutPageProps) {
                     size={19}
                     style={{ color }}
                     className="mb-3 relative"
-                    accessibilityElementsHidden={true}
                   />
                   <Text className="text-xl font-black relative">{value}</Text>
                   <Text className="text-[11px] text-white/40 mt-1 relative">
@@ -354,7 +353,7 @@ export default function AboutPage({ onBack }: AboutPageProps) {
                 <View
                   key={member.name}
                   className="flex items-center gap-3 px-4 py-3.5"
-                  style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.045)", borderBottomStyle: "solid" }}
+                  style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.045)", }}
                 >
                   <View
                     className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl shrink-0"
@@ -390,7 +389,7 @@ export default function AboutPage({ onBack }: AboutPageProps) {
                 <View
                   key={change.version}
                   className="flex items-start gap-3 px-4 py-4"
-                  style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.045)", borderBottomStyle: "solid" }}
+                  style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.045)", }}
                 >
                   <Text
                     className="text-xs font-black mt-0.5 shrink-0 min-w-[54px]"
@@ -441,7 +440,6 @@ export default function AboutPage({ onBack }: AboutPageProps) {
                   <Mail
                     size={17}
                     className="text-blue-400"
-                    accessibilityElementsHidden={true}
                   />
                 </View>
                 <View className="flex-1 min-w-0">
@@ -463,7 +461,7 @@ export default function AboutPage({ onBack }: AboutPageProps) {
                   className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
                   style={{ backgroundColor: `${hex}15` }}
                 >
-                  <Globe size={17} style={{ color: hex }} accessibilityElementsHidden={true} />
+                  <Globe size={17} style={{ color: hex }} />
                 </View>
                 <View className="flex-1 min-w-0">
                   <Text className="text-sm font-semibold text-white/85">

@@ -89,7 +89,6 @@ export function ModuleForm({
         ))}
 
         <Pressable
-          type="submit"
           disabled={isSubmitting || !methods.formState.isValid}
           className="w-full bg-purple-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
         >

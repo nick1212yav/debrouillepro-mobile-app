@@ -83,7 +83,7 @@ export default function SantePage() {
       >
         <View className="flex items-center gap-3 mb-4">
           <Pressable
-            onPress={() => router(-1)}
+            onPress={() => router.back()}
             className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
           >
             <ArrowLeft size={18} className="text-white" />

@@ -1,4 +1,4 @@
-import { View, Text, Alert, Linking } from "react-native";
+import { Pressable, View, Text, Alert, Linking } from "react-native";
 import { Share2, Clipboard, MessageCircle } from "lucide-react-native";
 
 interface SocialShareProps {

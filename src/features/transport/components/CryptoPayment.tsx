@@ -99,7 +99,6 @@ export function CryptoPayment({
             {/* Actions */}
             <View className="flex gap-3 pt-2">
               <Button
-                type="button"
                 variant="outline"
                 onPress={onCancel}
                 className="flex-1 h-11 rounded-xl"
@@ -107,7 +106,6 @@ export function CryptoPayment({
               >
                 <Text>Annuler</Text></Button>
               <Button
-                type="button"
                 onPress={handleVerifyTransaction}
                 disabled={verifying}
                 className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 font-bold text-white flex items-center justify-center gap-1.5 shadow-[0_4px_20px_rgba(139,92,246,0.3)]"

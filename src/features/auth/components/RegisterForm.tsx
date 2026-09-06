@@ -117,7 +117,6 @@ export function RegisterForm({ onLoginClick }: RegisterFormProps) {
            editable={!(loading)}/>
 
           <Pressable
-            type="button"
             onPress={() => setShowPassword((v) => !v)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-white/35"
           >
@@ -163,13 +162,11 @@ export function RegisterForm({ onLoginClick }: RegisterFormProps) {
         <Text>
           <Text>J'accepte les</Text>{" "}
           <Pressable
-            type="button"
             className="text-violet-400"
           >
             <Text>Conditions d'utilisation</Text></Pressable>{" "}
           <Text>et la</Text>{" "}
           <Pressable
-            type="button"
             className="text-violet-400"
           >
             <Text>Politique de confidentialité</Text></Pressable>
@@ -177,7 +174,6 @@ export function RegisterForm({ onLoginClick }: RegisterFormProps) {
       </View>
 
       <Pressable
-        type="submit"
         disabled={loading}
         className="w-full rounded-2xl py-3.5 font-bold text-white disabled:opacity-50"
         style={{  }}
@@ -192,7 +188,6 @@ export function RegisterForm({ onLoginClick }: RegisterFormProps) {
       <Text className="text-center text-sm text-white/40">
         <Text>Vous avez déjà un compte ?</Text>{" "}
         <Pressable
-          type="button"
           onPress={onLoginClick}
           className="font-semibold text-violet-400"
         >

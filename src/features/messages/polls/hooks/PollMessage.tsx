@@ -239,7 +239,6 @@ export function PollMessage({
         selectedOptions.length > 0 &&
         selectedOptions.some((id) => !currentUserVotes.includes(id)) && (
           <Pressable
-            type="button"
             onPress={submitVote}
             disabled={isVoting}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
@@ -254,7 +253,6 @@ export function PollMessage({
 
       {currentUserVotes.length > 0 && !closed && (
         <Pressable
-          type="button"
           onPress={handleRemoveVote}
           disabled={isVoting}
           className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-white/50 disabled:opacity-50"

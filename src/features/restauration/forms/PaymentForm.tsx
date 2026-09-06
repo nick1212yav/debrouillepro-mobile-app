@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import { useState } from "react";
 import {
   Smartphone,
@@ -194,7 +194,6 @@ export function PaymentForm({
               {(["USDT", "USDC", "BTC"] as const).map((curr) => (
                 <Pressable
                   key={curr}
-                  type="button"
                   onPress={() => setCryptoCurrency(curr)}
                   disabled={isSubmitting}
                   className={`flex-1 p-3 rounded-xl border text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -213,7 +212,6 @@ export function PaymentForm({
       )}
 
       <Pressable
-        type="submit"
         disabled={isSubmitting}
         className="w-full py-4 rounded-xl bg-orange-500 disabled:bg-white/5 disabled:text-white/20 text-[#020617] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-orange-500/10"
       >

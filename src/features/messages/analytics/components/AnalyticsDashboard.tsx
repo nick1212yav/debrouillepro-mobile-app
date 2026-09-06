@@ -136,7 +136,6 @@ export function AnalyticsDashboard({
               return (
                 <Pressable
                   key={value}
-                  type="button"
                   onPress={() => setMetric(value)}
                   className={[
                     "rounded-xl px-3 py-2 text-sm font-medium transition",

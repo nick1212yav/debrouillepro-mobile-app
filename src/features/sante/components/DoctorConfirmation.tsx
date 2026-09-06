@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/sante/components/DoctorConfirmation.tsx
 import { CheckCircle, Calendar, Clock, User, MapPin } from "lucide-react-native";
 

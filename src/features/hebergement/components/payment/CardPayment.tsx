@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import React, { useState } from "react";
 import { ArrowRight, Loader2, CreditCard } from "lucide-react-native";
 
@@ -93,7 +93,6 @@ export const CardPayment: React.FC<CardPaymentProps> = ({
       </View>
 
       <Pressable
-        type="submit"
         disabled={loading || !cardNumber || !expiry || !cvc}
         className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-45 disabled:pointer-events-none"
       >

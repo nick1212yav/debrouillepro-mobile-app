@@ -460,7 +460,6 @@ export default function HomeActivityPulse({
 
       {unreadCount > 0 && onMarkAllRead && (
         <Pressable
-          type="button"
           onPress={onMarkAllRead}
           className="mx-auto mt-2 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[7px] font-bold text-white/20"
         >
@@ -498,7 +497,6 @@ function ActivityRow({
 
   return (
     <Pressable
-      type="button"
       onPress={onClick}
       className="group relative flex w-full gap-3 px-3.5 py-3 text-left"
     >

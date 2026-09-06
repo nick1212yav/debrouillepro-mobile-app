@@ -42,7 +42,7 @@ export default function MedicalRecordPage() {
         </Text>
         <SignInButton />
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="text-white/40 text-sm"
         >
           <Text>← Retour</Text></Pressable>
@@ -64,7 +64,7 @@ export default function MedicalRecordPage() {
     >
       <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3">
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
         >
           <ArrowLeft size={20} className="text-white" />

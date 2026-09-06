@@ -1,5 +1,5 @@
 import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/marketplace/components/ProductCoupons.tsx
 import { Ticket, Copy } from "lucide-react-native";
 

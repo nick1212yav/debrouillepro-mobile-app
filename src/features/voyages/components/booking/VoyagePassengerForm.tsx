@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/voyages/components/booking/VoyagePassengerForm.tsx
 import { useState } from "react";
 import { User, Mail, Phone, MapPin, Loader2 } from "lucide-react-native";
@@ -148,7 +148,6 @@ export function VoyagePassengerForm({
       </View>
 
       <Pressable
-        type="submit"
         disabled={isLoading}
         className="w-full py-3 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-purple-500 disabled:opacity-50 flex items-center justify-center gap-2"
       >

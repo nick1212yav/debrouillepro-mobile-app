@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 import type { ReactNode } from "react";
 
@@ -60,7 +60,6 @@ export function SmartSection({
 
         {actionLabel && onAction && (
           <Pressable
-            type="button"
             onPress={onAction}
             className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-gray-300"
           >

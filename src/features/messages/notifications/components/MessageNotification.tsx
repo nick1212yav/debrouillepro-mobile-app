@@ -184,7 +184,6 @@ export function MessageNotification({
 
       {onRemove && (
         <Pressable
-          type="button"
           accessibilityLabel="Supprimer la notification"
           onPress={handleRemove}
           style={{ borderWidth: 0, backgroundColor: "transparent", padding: 4, opacity: 0.55 }}

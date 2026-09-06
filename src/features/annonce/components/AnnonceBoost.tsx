@@ -1,5 +1,5 @@
 import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { useState } from "react";
 import { Zap, TrendingUp, Clock, DollarSign, Loader2 } from "lucide-react-native";
 import { useMutation } from "convex/react";

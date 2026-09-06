@@ -9,7 +9,7 @@ export function DrawerFooter({ onLogout }: DrawerFooterProps) {
   return (
     <View
       className="px-5 pb-8 pt-3 flex-shrink-0 space-y-2"
-      style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", borderTopStyle: "solid" }}
+      style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", }}
     >
       <Pressable
         onPress={onLogout}

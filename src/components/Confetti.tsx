@@ -70,7 +70,6 @@ export default function Confetti({
         <View
           key="confetti-overlay"
           className="fixed inset-0 z-[100] overflow-hidden"
-          accessibilityElementsHidden={true}
         >
           {particles.current.map((p) => (
             <View

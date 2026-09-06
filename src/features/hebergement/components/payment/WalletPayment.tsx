@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React, { useState } from "react";
 import { ArrowRight, Loader2, Wallet } from "lucide-react-native";
 
@@ -52,7 +52,6 @@ export const WalletPayment: React.FC<WalletPaymentProps> = ({
       )}
 
       <Pressable
-        type="button"
         onPress={handleWalletPay}
         disabled={loading || !canAfford}
         className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-45 disabled:pointer-events-none"

@@ -83,7 +83,7 @@ export default function TransportDetailPage() {
         vehiclePlate={route.vehiclePlate}
         price={route.pricePerSeat}
         currency={route.currency}
-        onBack={() => router(-1)}
+        onBack={() => router.back()}
       />
 
       {/* Main Container Scrollable */}

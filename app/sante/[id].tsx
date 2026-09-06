@@ -204,7 +204,7 @@ export default function SanteDetailPage() {
           Ce médecin est introuvable ou son profil n'est pas encore configuré.
         </Text>
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-white/5 text-white/80"
         >
           <Text>Retourner au flux</Text></Pressable>
@@ -239,7 +239,7 @@ export default function SanteDetailPage() {
       {/* Header */}
       <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3">
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
         >
           <ArrowLeft size={20} className="text-white" />
@@ -426,7 +426,7 @@ function DoctorBookingModal({ doctor, slots, onClose, onConfirm }: any) {
   return (
     <>
       <View
-        onClick={onClose}
+        onPress={onClose}
         className="fixed inset-0 z-40 bg-black/70"
       />
       <View

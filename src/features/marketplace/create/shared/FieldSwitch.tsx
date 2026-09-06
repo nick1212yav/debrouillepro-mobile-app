@@ -21,7 +21,6 @@ export function FieldSwitch({
   return (
     <View className={`flex items-center gap-3 ${className}`}>
       <Pressable
-        type="button"
         onPress={() => !disabled && onChange(!checked)}
         disabled={disabled}
         className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${

@@ -206,7 +206,6 @@ export default function GlobalContextBar({
   return (
     <View className={`relative px-4 ${className}`}>
       <Pressable
-        type="button"
         onPress={() => setOpen((value) => !value)}
         aria-expanded={open}
         accessibilityLabel="Ouvrir le contexte régional"
@@ -385,7 +384,6 @@ export default function GlobalContextBar({
               {!coordinates && (
                 <View className="px-3 pb-2">
                   <Pressable
-                    type="button"
                     onPress={detectLocation}
                     disabled={loading || detectionState === "detecting"}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"

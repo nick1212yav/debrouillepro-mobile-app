@@ -124,11 +124,10 @@ export function ContactMessage({
 
       {/* ACTIONS */}
       <View
-        style={{ display: "grid", borderTopWidth: 1, borderTopColor: "#e2e8f0", borderTopStyle: "solid" }}
+        style={{ display: "grid", borderTopWidth: 1, borderTopColor: "#e2e8f0", }}
       >
         {onMessage && (
           <Pressable
-            type="button"
             onPress={() => onMessage(contact._id)}
             style={{ padding: 11, borderWidth: 0, backgroundColor: "#fff" }}
           >
@@ -137,9 +136,8 @@ export function ContactMessage({
 
         {onCall && contact.phone && (
           <Pressable
-            type="button"
             onPress={() => onCall(contact.phone)}
-            style={{ padding: 11, borderWidth: 0, borderLeftWidth: 1, borderLeftColor: "#e2e8f0", borderLeftStyle: "solid", backgroundColor: "#fff" }}
+            style={{ padding: 11, borderWidth: 0, borderLeftWidth: 1, borderLeftColor: "#e2e8f0", backgroundColor: "#fff" }}
           >
             <Text>📞 Appeler</Text></Pressable>
         )}

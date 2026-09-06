@@ -75,14 +75,14 @@ export default function ParrainagePage({ onBack }: ParrainagePageProps) {
   return (
     <View className="absolute inset-0 flex flex-col overflow-hidden" style={{ backgroundColor: "#07070f" }}>
       <AuthLoading>
-        <View className="flex items-center gap-3 px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+        <View className="flex items-center gap-3 px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
           <Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><ArrowLeft size={16} className="text-white/70" /></Pressable>
           <Skeleton className="h-8 w-40" />
         </View>
         <View className="px-4 pt-4 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}</View>
       </AuthLoading>
       <Unauthenticated>
-        <View className="flex items-center gap-3 px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+        <View className="flex items-center gap-3 px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
           <Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><ArrowLeft size={16} className="text-white/70" /></Pressable>
           <Text className="text-white font-black">Parrainage</Text>
         </View>
@@ -133,7 +133,7 @@ function ParrainageInner({ onBack }: ParrainagePageProps) {
   return (
     <>
       {/* Header */}
-      <View className="flex-shrink-0 px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+      <View className="flex-shrink-0 px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
         <View className="flex items-center gap-3">
           <Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
             <ArrowLeft size={16} className="text-white/70" />
@@ -153,7 +153,7 @@ function ParrainageInner({ onBack }: ParrainagePageProps) {
       <View className="flex-1 overflow-y-auto" style={{  }}>
         {/* Hero */}
         <View className="relative px-4 pt-5 pb-6 overflow-hidden"
-          style={{ borderBottomWidth: 1, borderBottomColor: "rgba(139,92,246,0.12)", borderBottomStyle: "solid" }}>
+          style={{ borderBottomWidth: 1, borderBottomColor: "rgba(139,92,246,0.12)", }}>
           <View className="absolute top-0 right-0 w-40 h-40 rounded-full"
             style={{  }} />
 
@@ -298,7 +298,7 @@ function ParrainageInner({ onBack }: ParrainagePageProps) {
                     };
                     const s = statusStyles[r.status] ?? statusStyles["pending"];
                     return (
-                      <View key={r._id} className="flex items-center gap-3 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", borderBottomStyle: "solid" }}>
+                      <View key={r._id} className="flex items-center gap-3 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", }}>
                         <Image className="w-9 h-9 rounded-full flex-shrink-0"  source={{ uri: `https://api.dicebear.com/7.x/thumbs/svg?seed=${r.referredId}` }} accessibilityLabel="avatar"/>
                         <View className="flex-1 min-w-0">
                           <Text className="text-sm font-bold text-white truncate">Filleul #{r._id.slice(-4)}</Text>
@@ -319,7 +319,7 @@ function ParrainageInner({ onBack }: ParrainagePageProps) {
                 {referrals.map((r) => {
                   const validated = r.status === "rewarded";
                   return (
-                    <View key={r._id} className="flex items-center gap-3 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", borderBottomStyle: "solid" }}>
+                    <View key={r._id} className="flex items-center gap-3 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", }}>
                       <View className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: validated ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)" }}>
                         {validated ? <Check size={14} className="text-green-400" /> : <Clock size={14} className="text-amber-400" />}

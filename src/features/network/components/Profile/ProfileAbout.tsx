@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 
 // src/features/network/components/Profile/ProfileAbout.tsx
 import { Sparkles, Edit3 } from "lucide-react-native";

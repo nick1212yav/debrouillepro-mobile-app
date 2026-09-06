@@ -661,7 +661,7 @@ function ReputationPageInner({ onBack }: { onBack: () => void }) {
                   { action: "Lancer un live",   xp: "+75 XP",   emoji: "📡" },
                 ].map((a, i) => (
                   <View key={i} className="flex items-center justify-between py-2"
-                    style={{ borderBottomWidth: 4, borderBottomColor: "rgba(255,255,255,0.05)", borderBottomStyle: "solid" }}>
+                    style={{ borderBottomWidth: 4, borderBottomColor: "rgba(255,255,255,0.05)", }}>
                     <Text className="text-xs text-white/60 flex items-center gap-2"><Text>{a.emoji}</Text>{a.action}</Text>
                     <Text className="text-xs font-bold text-yellow-400">{a.xp}</Text>
                   </View>

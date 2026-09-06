@@ -144,7 +144,6 @@ export function ContactSellerSheet({
                    multiline textAlignVertical="top"/>
                   {negotiationText.trim() && (
                     <Pressable
-                      type="button"
                       onPress={() => handleSendQuery(negotiationText)}
                       className="absolute right-3 bottom-3 w-7 h-7 rounded-xl flex items-center justify-center bg-green-500 text-black"
                     >

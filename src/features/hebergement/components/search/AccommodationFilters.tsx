@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 import { Filter, RotateCcw } from "lucide-react-native";
 import { AccommodationTypeFilter } from "./AccommodationTypeFilter";
@@ -36,7 +36,6 @@ export const AccommodationFilters: React.FC<AccommodationFiltersProps> = ({
           <Text>Filtres de recherche</Text>
         </Text>
         <Pressable
-          type="button"
           onPress={onReset}
           className="text-[10px] font-bold text-indigo-400 flex items-center gap-1"
         >

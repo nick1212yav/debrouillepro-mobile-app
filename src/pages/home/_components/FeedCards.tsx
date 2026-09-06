@@ -378,7 +378,6 @@ function ActionButton({
 }) {
   return (
     <Pressable
-      type="button"
       onPress={(event) => {
         onClick?.();
       }}
@@ -924,7 +923,6 @@ export function CommunityCard({
 
           {onReply && (
             <Pressable
-              type="button"
               onPress={(event) => {
                 onReply();
               }}
@@ -1514,7 +1512,6 @@ export function MediaCard2({
         <View className="mt-4 flex gap-2">
           {onPlay && (
             <Pressable
-              type="button"
               onPress={(event) => {
                 onPlay();
               }}
@@ -1578,7 +1575,6 @@ export function AIRecommendCard({
 }) {
   return (
     <Pressable
-      type="button"
       onPress={onClick}
       className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl p-3 text-left"
       style={{ borderStyle: "solid" }}
@@ -1838,7 +1834,6 @@ export function FeedCardEmpty({
 
       {actionLabel && onAction && (
         <Pressable
-          type="button"
           onPress={onAction}
           className="mt-5 rounded-2xl px-5 py-2.5 text-xs font-black text-white"
           style={{  }}

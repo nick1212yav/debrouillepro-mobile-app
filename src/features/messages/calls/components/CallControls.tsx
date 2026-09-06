@@ -20,7 +20,6 @@ export function CallControls({
   return (
     <View className="flex items-center justify-center gap-3">
       <Pressable
-        type="button"
         onPress={onToggleMute}
         className="rounded-full bg-white/10 px-4 py-3 text-sm text-white"
         accessibilityLabel={isMuted ? "Activer le microphone" : "Couper le microphone"}
@@ -30,7 +29,6 @@ export function CallControls({
 
       {isVideoCall && (
         <Pressable
-          type="button"
           onPress={onToggleCamera}
           className="rounded-full bg-white/10 px-4 py-3 text-sm text-white"
           accessibilityLabel={
@@ -42,7 +40,6 @@ export function CallControls({
       )}
 
       <Pressable
-        type="button"
         onPress={onEnd}
         className="rounded-full bg-red-600 px-5 py-3 text-sm font-medium text-white"
         accessibilityLabel="Terminer l'appel"

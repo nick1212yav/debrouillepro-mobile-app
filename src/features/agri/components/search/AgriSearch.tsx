@@ -23,7 +23,6 @@ export function AgriSearch({ value, onChange }: AgriSearchProps) {
       />
       {value && (
         <Pressable
-          type="button"
           onPress={() => onChange("")}
           className="absolute right-3 w-7 h-7 rounded-xl flex items-center justify-center bg-white/[0.04]"
         >

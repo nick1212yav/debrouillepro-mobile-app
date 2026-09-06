@@ -288,7 +288,6 @@ export function CreateMotoForm({
         />
 
         <Button
-          type="submit"
           className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base"
           disabled={isLoading}
         >

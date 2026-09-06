@@ -286,7 +286,6 @@ export function MedicalRecordForm({
         />
 
         <Pressable
-          type="submit"
           disabled={isLoading}
           className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-blue-500 to-blue-600 disabled:opacity-50 h-11"
         >

@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 // src/features/agri/components/search/AgriLocationFilter.tsx
 import { useState } from "react";
 import { MapPin, Check } from "lucide-react-native";
@@ -45,7 +45,6 @@ export function AgriLocationFilter({
       {/* Liste des territoires */}
       <View className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-none">
         <Pressable
-          type="button"
           onPress={() => onSelectLocation(null)}
           className={`flex items-center justify-between p-2.5 rounded-xl text-xs transition-colors ${
             selectedLocation === null
@@ -62,7 +61,6 @@ export function AgriLocationFilter({
           return (
             <Pressable
               key={zone}
-              type="button"
               onPress={() => onSelectLocation(isSelected ? null : zone)}
               className={`flex items-center justify-between p-2.5 rounded-xl text-xs transition-colors ${
                 isSelected

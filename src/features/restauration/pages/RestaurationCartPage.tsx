@@ -485,7 +485,6 @@ export default function RestaurationCartPage({
                 />
 
                 <Pressable
-                  type="button"
                   onPress={onNavigateHome}
                   className="w-full py-4 rounded-xl bg-orange-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-orange-500/10"
                 >

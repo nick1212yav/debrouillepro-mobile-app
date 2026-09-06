@@ -78,12 +78,12 @@ export function EventPreview({
          
           onPress={() => onOpen?.(event)}
           disabled={disabled}
-          style={{ display: "block", width: "100%", padding: 0, borderWidth: 0, backgroundColor: "transparent" }}
+          style={{ display: "flex", width: "100%", padding: 0, borderWidth: 0, backgroundColor: "transparent" }}
         >
           <Image
            
            
-            style={{ display: "block", width: "100%", height: 210 }}
+            style={{ display: "flex", width: "100%", height: 210 }}
            source={{ uri: event.coverImage }} accessibilityLabel={event.title}/>
         </Pressable>
       ) : null}
@@ -195,7 +195,6 @@ export function EventPreview({
         >
           {onRsvp && (
             <Pressable
-              type="button"
               disabled={disabled}
               onPress={() => void onRsvp("attending")}
               style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 0, borderRadius: 10, backgroundColor: event.isAttending ? "#dcfce7" : "#111827" }}
@@ -206,7 +205,6 @@ export function EventPreview({
 
           {onOpen && (
             <Pressable
-              type="button"
               disabled={disabled}
               onPress={() => onOpen(event)}
               style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: "#cbd5e1", borderStyle: "solid", borderRadius: 10, backgroundColor: "#ffffff" }}
@@ -226,7 +224,6 @@ export function EventPreview({
           >
             {onLike && (
               <Pressable
-                type="button"
                 disabled={disabled}
                 onPress={() => void onLike()}
                 accessibilityLabel="J'aime"
@@ -238,7 +235,6 @@ export function EventPreview({
 
             {onBookmark && (
               <Pressable
-                type="button"
                 disabled={disabled}
                 onPress={() => void onBookmark()}
                 accessibilityLabel="Enregistrer"
@@ -252,7 +248,7 @@ export function EventPreview({
 
         {event.authorName && (
           <View
-            style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 15, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#f1f5f9", borderTopStyle: "solid" }}
+            style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 15, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#f1f5f9", }}
           >
             {event.authorAvatar ? (
               <Image

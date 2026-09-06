@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import type {
   AnalyticsMetric,
   AnalyticsPeriod,
@@ -22,7 +22,6 @@ export function AnalyticsPeriod({
     <View className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <View className="flex rounded-xl border border-white/10 bg-white/[0.03] p-1">
         <Pressable
-          type="button"
           onPress={() => onPeriodChange("7d")}
           className={`rounded-lg px-3 py-1.5 text-xs ${
             period === "7d" ? "bg-white text-black" : "text-white/50"
@@ -31,7 +30,6 @@ export function AnalyticsPeriod({
           <Text>7 jours</Text></Pressable>
 
         <Pressable
-          type="button"
           onPress={() => onPeriodChange("30d")}
           className={`rounded-lg px-3 py-1.5 text-xs ${
             period === "30d" ? "bg-white text-black" : "text-white/50"

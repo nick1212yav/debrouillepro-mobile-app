@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import type { Message } from "../../chat/services/chat.service";
 
 interface PollMessageProps {
@@ -102,7 +102,6 @@ export function PollMessage({ message, own = false }: PollMessageProps) {
         </View>
 
         <Pressable
-          type="button"
           disabled
           className={[
             "w-full rounded-xl px-4 py-2.5 text-xs font-semibold",

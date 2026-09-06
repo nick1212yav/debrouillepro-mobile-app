@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 import { useState } from "react";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -57,7 +57,6 @@ export function NewConversation({ users, onCreated }: NewConversationProps) {
         {users.map((user) => (
           <Pressable
             key={String(user._id)}
-            type="button"
             disabled={isLoading}
             onPress={() => handleSelect(user._id)}
             className="flex w-full items-center gap-3 rounded-xl p-3 text-left disabled:opacity-50"

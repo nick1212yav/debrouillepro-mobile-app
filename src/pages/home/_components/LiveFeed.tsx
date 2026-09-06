@@ -189,12 +189,10 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
                 {activeType === "all" ? (
                   <Sparkles
                     className="h-4 w-4 text-violet-300"
-                    accessibilityElementsHidden={true}
                   />
                 ) : (
                   <LayoutGrid
                     className="h-4 w-4 text-violet-300"
-                    accessibilityElementsHidden={true}
                   />
                 )}
               </View>
@@ -219,12 +217,11 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
             </View>
 
             <Pressable
-              type="button"
               onPress={onCreateOpen}
               className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 text-[10px] font-bold text-violet-200"
               accessibilityLabel="Créer une publication"
             >
-              <Plus className="h-3.5 w-3.5" accessibilityElementsHidden={true} />
+              <Plus className="h-3.5 w-3.5" />
 
               <Text className="hidden xs:inline">Publier</Text>
             </Pressable>
@@ -362,7 +359,6 @@ interface FilterChipProps {
 function FilterChip({ label, active, color, onClick }: FilterChipProps) {
   return (
     <Pressable
-      type="button"
       accessibilityRole="tab"
       aria-selected={active}
       onPress={onClick}
@@ -482,7 +478,6 @@ function EmptyFeed({ activeType, onCreateOpen, onReset }: EmptyFeedProps) {
         <View className="relative mt-6 flex flex-col items-center justify-center gap-2 sm:flex-row">
           {isFiltered && (
             <Button
-              type="button"
               variant="outline"
               size="sm"
               onPress={onReset}
@@ -492,7 +487,6 @@ function EmptyFeed({ activeType, onCreateOpen, onReset }: EmptyFeedProps) {
           )}
 
           <Button
-            type="button"
             size="sm"
             onPress={onCreateOpen}
             className="h-10 rounded-xl bg-violet-600 px-4 text-xs font-bold text-white shadow-lg shadow-violet-600/20"
@@ -528,7 +522,6 @@ function FeedPagination({
     <View className="flex flex-col items-center gap-3 pb-6 pt-1">
       {canLoadMore && (
         <Pressable
-          type="button"
           onPress={onLoadMore}
           disabled={isLoadingMore}
           className="group flex h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-5 text-xs font-bold text-white/65 shadow-lg disabled:pointer-events-none disabled:opacity-50"

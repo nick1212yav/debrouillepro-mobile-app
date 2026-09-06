@@ -90,7 +90,7 @@ export function LocationPicker({
       >
         {/* HEADER */}
         <View
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: "#e5e7eb", borderBottomStyle: "solid" }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderBottomColor: "#e5e7eb", }}
         >
           <View>
             <Text
@@ -139,7 +139,7 @@ export function LocationPicker({
               <Pressable
                
                 onPress={getCurrentPosition}
-                style={{ display: "block", marginTop: 8, borderWidth: 0, backgroundColor: "transparent", padding: 0 }}
+                style={{ display: "flex", marginTop: 8, borderWidth: 0, backgroundColor: "transparent", padding: 0 }}
               >
                 <Text>Réessayer</Text></Pressable>
             </View>
@@ -216,14 +216,12 @@ export function LocationPicker({
                 style={{ display: "grid", gap: 8 }}
               >
                 <Pressable
-                  type="button"
                   onPress={() => openMap(currentPosition)}
                   style={{ paddingVertical: 11, paddingHorizontal: 12, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", borderRadius: 11, backgroundColor: "#fff" }}
                 >
                   <Text>🗺️ Voir la carte</Text></Pressable>
 
                 <Pressable
-                  type="button"
                   disabled={isSending || !conversationId}
                   onPress={() => void handleSend()}
                   style={{ paddingVertical: 11, paddingHorizontal: 12, borderWidth: 0, borderRadius: 11, backgroundColor: isSending || !conversationId ? "#cbd5e1" : "#111827" }}
@@ -235,7 +233,6 @@ export function LocationPicker({
               {/* LIVE */}
               {onStartLive && (
                 <Pressable
-                  type="button"
                   onPress={onStartLive}
                   style={{ width: "100%", marginTop: 9, paddingVertical: 11, paddingHorizontal: 12, borderWidth: 0, borderRadius: 11, backgroundColor: "#eff6ff" }}
                 >

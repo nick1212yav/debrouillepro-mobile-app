@@ -34,7 +34,6 @@ export function SearchFilters({ value, onChange }: SearchFiltersProps) {
       {filters.map((filter) => (
         <Pressable
           key={filter.value}
-          type="button"
           onPress={() => onChange(filter.value)}
           className={[
             "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition",

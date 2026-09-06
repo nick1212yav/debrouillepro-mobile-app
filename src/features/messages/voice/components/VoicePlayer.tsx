@@ -37,7 +37,6 @@ export function VoicePlayer({
   return (
     <View className="flex min-w-0 items-center gap-3">
       <Pressable
-        type="button"
         onPress={() => {
           void toggle();
         }}
@@ -48,7 +47,6 @@ export function VoicePlayer({
       </Pressable>
 
       <Pressable
-        type="button"
         onPress={() => {
           if (totalDuration <= 0) {
             return;

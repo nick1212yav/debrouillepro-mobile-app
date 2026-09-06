@@ -1979,7 +1979,6 @@ export default function SmartSearch({
                         {quickModules.map((module, index) => (
                           <Pressable
                             key={module.id}
-                            type="button"
                             onPress={() => handleSelect(module)}
                             className="group flex flex-col items-center gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3 text-center"
                           >
@@ -2078,7 +2077,6 @@ export default function SmartSearch({
                         {TRENDING.map((item, index) => (
                           <Pressable
                             key={item}
-                            type="button"
                             onPress={() => setQuery(item)}
                             className="flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/50"
                           >
@@ -2251,7 +2249,6 @@ function ResultRow({
 
   return (
     <Pressable
-      type="button"
       onPress={() => onSelect(result)}
       className={`group w-full cursor-pointer rounded-xl border border-white/[0.06] bg-white/[0.035] text-left transition-all hover:border-white/[0.13] hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70 ${compact ? "flex items-center gap-2.5 px-3 py-2.5" : "flex items-center gap-3 px-3.5 py-3"}`}
     >

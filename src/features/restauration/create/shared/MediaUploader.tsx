@@ -1,4 +1,4 @@
-import { View, Text, Image, TextInput } from "react-native";
+import { Pressable, View, Text, Image, TextInput } from "react-native";
 import { useState, useEffect } from "react";
 import { Upload, Trash, Image, AlertCircle } from "lucide-react-native";
 
@@ -49,7 +49,6 @@ export function MediaUploader({
         </View>
         {value.length > 0 && (
           <Pressable
-            type="button"
             onPress={() => onChange("")}
             className="w-11 h-11 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/15 flex items-center justify-center shrink-0"
           >

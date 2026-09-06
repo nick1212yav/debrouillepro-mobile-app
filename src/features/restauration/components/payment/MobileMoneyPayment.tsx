@@ -89,7 +89,6 @@ export function MobileMoneyPayment({
       </View>
 
       <Pressable
-        type="submit"
         disabled={isProcessing || !phone}
         className="w-full py-4 rounded-xl bg-emerald-500 disabled:bg-white/5 disabled:text-white/20 text-[#020617] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-emerald-500/10"
       >

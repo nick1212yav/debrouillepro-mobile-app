@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { Check, Languages, Loader2, Sparkles } from "lucide-react-native";
 import { useState } from "react";
 
@@ -92,7 +92,6 @@ export function TranslationPanel({
         </Picker>
 
         <Pressable
-          type="button"
           disabled={loading || !sourceText.trim()}
           onPress={() => onPrepare?.(language)}
           className="inline-flex h-10 items-center gap-2 rounded-xl bg-cyan-600 px-4 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"

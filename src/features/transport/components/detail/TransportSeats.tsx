@@ -1,5 +1,5 @@
 import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/transport/components/detail/TransportSeats.tsx
 import { useState } from "react";
 import { Users, Armchair } from "lucide-react-native";

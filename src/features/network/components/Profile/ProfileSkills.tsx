@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 
 // src/features/network/components/Profile/ProfileSkills.tsx
 import { Wrench, Plus, Edit3, Trash2, ThumbsUp } from "lucide-react-native";

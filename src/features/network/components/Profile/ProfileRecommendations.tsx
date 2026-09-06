@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 
 // src/features/network/components/Profile/ProfileRecommendations.tsx
 import { Star, User, ThumbsUp, MessageSquare } from "lucide-react-native";

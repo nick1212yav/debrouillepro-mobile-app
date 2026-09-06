@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 import { ModuleRegistry } from "../../../core/sdk/registry/ModuleRegistry";
 import { ActionRegistry } from "../../../core/sdk/registry/ActionRegistry";

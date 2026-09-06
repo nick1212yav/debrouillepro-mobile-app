@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { Calendar } from "lucide-react-native";
 
 interface ReservationCalendarProps {
@@ -37,7 +37,6 @@ export function ReservationCalendar({
           return (
             <Pressable
               key={day.isoString}
-              type="button"
               onPress={() => onChange(day.isoString)}
               className="flex-shrink-0 w-16 py-3 rounded-2xl border flex flex-col items-center gap-1"
               style={{ backgroundColor: isSelected

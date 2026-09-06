@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import { useState } from "react";
 import { Tag, ShieldCheck, AlertCircle } from "lucide-react-native";
 
@@ -53,7 +53,6 @@ export function MenuForm({ onSubmit, isSubmitting }: MenuFormProps) {
       </View>
 
       <Pressable
-        type="submit"
         disabled={isSubmitting || !categoryName.trim()}
         className="w-full py-3.5 rounded-xl bg-orange-500 disabled:bg-white/5 disabled:text-white/20 text-[#020617] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2"
       >

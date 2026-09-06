@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import React, { useState } from "react";
 import { Star, Image, Loader2, Check } from "lucide-react-native";
 
@@ -57,7 +57,6 @@ export const ReviewForm: React.FC<ReviewFormProps> = ({
           {[1, 2, 3, 4, 5].map((stars) => (
             <Pressable
               key={stars}
-              type="button"
               onPress={() => setRating(stars)}
               disabled={loading || success}
               className="p-0.5 disabled:pointer-events-none"
@@ -87,7 +86,6 @@ export const ReviewForm: React.FC<ReviewFormProps> = ({
 
       <View className="flex items-center justify-between gap-4">
         <Pressable
-          type="button"
           disabled={loading || success}
           className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/60 flex items-center gap-1.5 text-[10px] font-bold uppercase disabled:opacity-40"
         >
@@ -96,7 +94,6 @@ export const ReviewForm: React.FC<ReviewFormProps> = ({
         </Pressable>
 
         <Pressable
-          type="submit"
           disabled={loading || success || !text.trim()}
           className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-45 disabled:pointer-events-none"
         >

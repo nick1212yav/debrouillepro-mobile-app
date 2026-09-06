@@ -67,7 +67,6 @@ export default function SideDrawer({
 
           <Pressable
             onPress={onClose}
-            accessibilityElementsHidden={true}
             className="absolute inset-0 z-40"
             style={{ backgroundColor: "rgba(0,0,0,0.72)" }}
           />
@@ -81,7 +80,7 @@ export default function SideDrawer({
             aria-modal="true"
             accessibilityLabel="Menu DébrouillePro"
             className="absolute bottom-0 left-0 top-0 z-50 flex w-[78%] max-w-[380px] flex-col overflow-hidden"
-            style={{ borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.07)", borderRightStyle: "solid" }}
+            style={{ borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.07)", }}
           >
             {/* =================================================
                 HEADER

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { DollarSign, TrendingUp, Users, Award, Zap } from "lucide-react-native";
 
 interface Props {

@@ -63,7 +63,7 @@ export default function CheckoutPage() {
           Connectez-vous pour finaliser votre achat
         </Text>
         <SignInButton />
-        <Pressable onPress={() => router(-1)} className="text-white/40 text-sm">
+        <Pressable onPress={() => router.back()} className="text-white/40 text-sm">
           <Text>← Retour</Text></Pressable>
       </View>
     );
@@ -75,7 +75,7 @@ export default function CheckoutPage() {
         className="h-full flex flex-col items-center justify-center px-4"
         style={{  }}
       >
-        <Pressable onPress={() => router(-1)} className="self-start mb-4">
+        <Pressable onPress={() => router.back()} className="self-start mb-4">
           <ArrowLeft size={24} className="text-white/60" />
         </Pressable>
         <Text className="text-white/40">Produit introuvable</Text>
@@ -143,7 +143,7 @@ export default function CheckoutPage() {
       {/* Header */}
       <View className="flex items-center gap-3 mb-6">
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
         >
           <ArrowLeft size={20} className="text-white" />

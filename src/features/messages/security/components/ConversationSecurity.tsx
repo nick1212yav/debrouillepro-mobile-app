@@ -77,7 +77,6 @@ export function ConversationSecurity({
     <>
       <View style={containerStyle} accessibilityLabel="Sécurité de la conversation">
         <Pressable
-          type="button"
           onPress={() => setBlockDialogOpen(true)}
           style={buttonStyle}
         >
@@ -86,7 +85,6 @@ export function ConversationSecurity({
 
         {messageId && (
           <Pressable
-            type="button"
             onPress={() => setReportDialogOpen(true)}
             disabled={alreadyReported}
             style={{

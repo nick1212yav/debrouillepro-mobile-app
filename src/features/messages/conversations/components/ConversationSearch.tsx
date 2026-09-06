@@ -41,7 +41,6 @@ export function ConversationSearch({
         <View className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-black p-1 shadow-2xl">
           {results.map((conversation) => (
             <Pressable
-              type="button"
               key={String(conversation.conversationId)}
               onPress={() => onSelect(conversation)}
               className="w-full rounded-lg px-3 py-2 text-left"

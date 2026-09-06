@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import React from "react";
 import { Minus, Plus } from "lucide-react-native";
 
@@ -41,7 +41,6 @@ export const GuestCounter: React.FC<GuestCounterProps> = ({
       </View>
       <View className="flex items-center gap-4">
         <Pressable
-          type="button"
           onPress={handleDecrement}
           disabled={value <= min}
           className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 disabled:opacity-40 disabled:pointer-events-none"
@@ -52,7 +51,6 @@ export const GuestCounter: React.FC<GuestCounterProps> = ({
           {value}
         </Text>
         <Pressable
-          type="button"
           onPress={handleIncrement}
           disabled={value >= max}
           className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 disabled:opacity-40 disabled:pointer-events-none"

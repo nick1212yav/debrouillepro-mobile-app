@@ -554,7 +554,6 @@ export function CreateVoyageSheet({
           {/* ───────────────── STEP 1 ───────────────── */}
           {step === "details" && (
             <Pressable
-              type="button"
               onPress={() => setStep("amenities")}
               className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/20"
             >
@@ -567,14 +566,12 @@ export function CreateVoyageSheet({
           {step === "amenities" && (
             <View className="gap-3">
               <Pressable
-                type="button"
                 onPress={() => setStep("details")}
                 className="py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 font-semibold"
               >
                 <Text>← Retour</Text></Pressable>
 
               <Pressable
-                type="button"
                 onPress={() => setStep("summary")}
                 className="py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-semibold shadow-lg shadow-blue-500/20"
               >
@@ -586,7 +583,6 @@ export function CreateVoyageSheet({
           {step === "summary" && (
             <View className="gap-3">
               <Pressable
-                type="button"
                 onPress={() => setStep("amenities")}
                 disabled={loading}
                 className="py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white/70 font-semibold disabled:opacity-50"
@@ -594,7 +590,6 @@ export function CreateVoyageSheet({
                 <Text>← Retour</Text></Pressable>
 
               <Pressable
-                type="button"
                 onPress={handleSubmit}
                 disabled={loading}
                 className="py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2"

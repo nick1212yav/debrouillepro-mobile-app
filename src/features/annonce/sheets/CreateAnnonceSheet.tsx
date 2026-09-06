@@ -248,7 +248,6 @@ export function CreateAnnonceSheet({ isOpen, onClose, onSuccess }: Props) {
                      
                      editable={!(geocoding)}/>
                     <Pressable
-                      type="button"
                       onPress={handleGeolocate}
                       disabled={geocoding}
                       className="flex-shrink-0 disabled:opacity-40 text-xs font-medium px-2 py-1 rounded-lg"
@@ -263,7 +262,6 @@ export function CreateAnnonceSheet({ isOpen, onClose, onSuccess }: Props) {
                   </View>
                 </View>
                 <Pressable
-                  type="button"
                   onPress={detectUserLocation}
                   disabled={geocoding}
                   className="flex items-center gap-2 text-xs text-white/40"

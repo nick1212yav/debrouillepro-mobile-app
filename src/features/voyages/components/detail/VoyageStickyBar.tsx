@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 
 // src/features/voyages/components/detail/VoyageStickyBar.tsx
 import { ShoppingCart, Users, AlertCircle } from "lucide-react-native";

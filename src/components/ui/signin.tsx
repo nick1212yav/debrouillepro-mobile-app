@@ -1,5 +1,5 @@
 import { UIService } from "@/core/sdk/ui/UIService";
-import { GestureResponderEvent } from "react-native";
+import { Pressable, GestureResponderEvent } from "react-native";
 import { forwardRef, useCallback, useState } from "react";
 import { type VariantProps } from "class-variance-authority";
 import { Loader2, LogIn, LogOut } from "lucide-react-native";

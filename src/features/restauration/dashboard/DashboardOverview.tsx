@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { TrendingUp, ShoppingBag, Calendar, Star } from "lucide-react-native";
 
 interface DashboardOverviewProps {

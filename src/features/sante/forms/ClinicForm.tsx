@@ -258,7 +258,7 @@ export function ClinicForm({
           )}
         />
 
-        <Button type="submit" className="w-full h-11" disabled={isLoading}>
+        <Button className="w-full h-11" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {isLoading ? "Enregistrement..." : submitLabel}
         </Button>

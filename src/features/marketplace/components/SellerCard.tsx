@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 // src/features/marketplace/components/SellerCard.tsx
 import { Check, Star, MessageCircle } from "lucide-react-native";
 import { formatCompactNumber, formatDate } from "../utils/formatter";

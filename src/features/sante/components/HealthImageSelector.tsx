@@ -1,4 +1,4 @@
-import { View, Text, Image, TextInput } from "react-native";
+import { Pressable, View, Text, Image, TextInput } from "react-native";
 import React from "react";
 import { Image as ImageIcon, X } from "lucide-react-native";
 
@@ -75,7 +75,6 @@ export const HealthImageSelector: React.FC<HealthImageSelectorProps> = ({
                   className="w-full h-full object-cover"
                  source={{ uri: src }} accessibilityLabel={`Upload ${i + 1}`}/>
                 <Pressable
-                  type="button"
                   onPress={() => removeImage(i)}
                   className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/80 text-white flex items-center justify-center text-[10px] font-bold"
                 >

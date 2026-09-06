@@ -327,7 +327,6 @@ export function EditProfileSheet({
                       className="flex-1 rounded-2xl px-4 py-2.5 text-sm text-white placeholder:text-white/25 outline-none bg-white/5 border border-white/10"
                     />
                     <Pressable
-                      type="button"
                       onPress={handleAddInterest}
                       className="px-4 py-2.5 rounded-2xl text-sm font-semibold text-white bg-emerald-500/20 border border-emerald-500/30 animate-fadeIn"
                     >

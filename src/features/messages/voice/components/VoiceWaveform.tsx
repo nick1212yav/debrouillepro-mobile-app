@@ -14,7 +14,7 @@ export function VoiceWaveform({
   const safeProgress = Math.max(0, Math.min(1, progress));
 
   return (
-    <View className="flex h-8 flex-1 items-center gap-[2px]" accessibilityElementsHidden={true}>
+    <View className="flex h-8 flex-1 items-center gap-[2px]">
       {Array.from({
         length: bars,
       }).map((_, index) => {

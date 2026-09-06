@@ -70,7 +70,6 @@ export function MediaViewer({
 
       {onNext && (
         <Pressable
-          type="button"
           onPress={onNext}
           className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white"
           accessibilityLabel="Média suivant"

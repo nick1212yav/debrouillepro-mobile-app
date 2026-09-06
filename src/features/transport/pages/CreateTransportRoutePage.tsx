@@ -128,7 +128,7 @@ export default function CreateTransportRoutePage() {
         {/* Header simple */}
         <View className="flex items-center gap-3 pt-6">
           <Pressable
-            onPress={() => router(-1)}
+            onPress={() => router.back()}
             className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
           >
             <ArrowLeft size={18} />
@@ -180,7 +180,7 @@ export default function CreateTransportRoutePage() {
             <Text>S'enregistrer comme chauffeur</Text><ChevronRight size={14} />
           </Pressable>
           <Pressable
-            onPress={() => router(-1)}
+            onPress={() => router.back()}
             className="w-full py-4 rounded-2xl border border-white/5 bg-white/5 text-xs font-bold text-white/80"
           >
             <Text>Plus tard</Text></Pressable>
@@ -195,7 +195,7 @@ export default function CreateTransportRoutePage() {
       {/* Header */}
       <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3 border-b border-white/5 bg-[#070914]/40">
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
         >
           <ArrowLeft size={18} className="text-white" />
@@ -343,7 +343,6 @@ export default function CreateTransportRoutePage() {
         {/* Bouton de validation d'action flottant */}
         <View className="fixed bottom-0 left-0 right-0 p-4 bg-[#020412]/80 border-t border-white/5 z-20 max-w-md mx-auto">
           <Pressable
-            type="submit"
             disabled={loading}
             className="w-full py-4 rounded-2xl bg-violet-600 text-xs font-black text-white flex items-center justify-center gap-2 disabled:opacity-50"
           >

@@ -38,7 +38,6 @@ export function EventActions({
       {onRsvp && (
         <>
           <Pressable
-            type="button"
             disabled={disabled}
             onPress={() => void onRsvp("attending")}
             style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#cbd5e1", borderStyle: "solid", backgroundColor: currentRsvp === "attending" ? "#dcfce7" : "#ffffff" }}
@@ -47,7 +46,6 @@ export function EventActions({
           </Pressable>
 
           <Pressable
-            type="button"
             disabled={disabled}
             onPress={() => void onRsvp("interested")}
             style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#cbd5e1", borderStyle: "solid", backgroundColor: currentRsvp === "interested" ? "#fef3c7" : "#ffffff" }}
@@ -57,7 +55,6 @@ export function EventActions({
 
           {currentRsvp && (
             <Pressable
-              type="button"
               disabled={disabled}
               onPress={() => void onRsvp("not_going")}
               style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", backgroundColor: "#ffffff" }}
@@ -70,7 +67,6 @@ export function EventActions({
 
       {onLike && (
         <Pressable
-          type="button"
           disabled={disabled}
           onPress={() => void onLike()}
           accessibilityLabel="J'aime l'événement"
@@ -82,7 +78,6 @@ export function EventActions({
 
       {onBookmark && (
         <Pressable
-          type="button"
           disabled={disabled}
           onPress={() => void onBookmark()}
           accessibilityLabel="Enregistrer l'événement"

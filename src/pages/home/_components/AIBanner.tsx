@@ -26,13 +26,11 @@ export default function AIBanner({ onOpenAI, onOpenStudio }: AIBannerProps) {
       ========================================================== */}
 
       <View
-        accessibilityElementsHidden={true}
         className="absolute -right-20 -top-24 h-60 w-60 rounded-full"
         style={{  }}
       />
 
       <View
-        accessibilityElementsHidden={true}
         className="absolute -bottom-24 -left-16 h-52 w-52 rounded-full"
         style={{  }}
       />
@@ -134,14 +132,12 @@ export default function AIBanner({ onOpenAI, onOpenStudio }: AIBannerProps) {
         <View className="relative gap-2 px-4 pb-4">
           {/* CHAT IA */}
           <Pressable
-            type="button"
             onPress={onOpenAI}
             className="group relative flex items-center gap-3 overflow-hidden rounded-2xl p-3 text-left"
             style={{  }}
           >
             {/* Shine */}
             <View
-              accessibilityElementsHidden={true}
               className="absolute inset-y-0 -left-20 w-16 bg-white/20"
             />
 
@@ -165,7 +161,6 @@ export default function AIBanner({ onOpenAI, onOpenStudio }: AIBannerProps) {
           {/* IA STUDIO */}
           {hasStudio && (
             <Pressable
-              type="button"
               onPress={onOpenStudio}
               className="group relative flex items-center gap-3 overflow-hidden rounded-2xl p-3 text-left"
               style={{ backgroundColor: "rgba(245,158,11,.09)", borderWidth: 1, borderColor: "rgba(245,158,11,.20)", borderStyle: "solid" }}
@@ -230,7 +225,6 @@ export default function AIBanner({ onOpenAI, onOpenStudio }: AIBannerProps) {
         ======================================================== */}
 
         <View
-          accessibilityElementsHidden={true}
           className="absolute bottom-0 left-0 h-px w-full"
           style={{  }}
         />

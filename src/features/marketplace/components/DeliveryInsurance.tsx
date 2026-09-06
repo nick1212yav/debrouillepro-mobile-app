@@ -1,5 +1,5 @@
 import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/marketplace/components/DeliveryInsurance.tsx
 import { useState } from "react";
 import { Shield, Check } from "lucide-react-native";

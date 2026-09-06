@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 
 // src/features/events/components/TicketScanner.tsx
 import { useState } from "react";

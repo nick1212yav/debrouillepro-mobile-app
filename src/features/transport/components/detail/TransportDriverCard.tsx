@@ -1,5 +1,5 @@
 import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 import {
   Star,
   ShieldCheck,

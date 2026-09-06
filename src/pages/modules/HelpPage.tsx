@@ -95,7 +95,7 @@ export default function HelpPage({ onBack }: HelpPageProps) {
           <Pressable onPress={onBack} accessibilityLabel="Retour"
             className="w-10 h-10 rounded-2xl flex items-center justify-center"
             style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-            <ArrowLeft size={18} className="text-white" accessibilityElementsHidden={true} />
+            <ArrowLeft size={18} className="text-white" />
           </Pressable>
           <View>
             <Text className="text-lg font-bold text-white">Aide & Support</Text>
@@ -105,7 +105,7 @@ export default function HelpPage({ onBack }: HelpPageProps) {
 
         {/* Search */}
         <View className="relative">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" accessibilityElementsHidden={true} />
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30" />
           <TextInput
            
             placeholder="Rechercher une question…"
@@ -131,7 +131,7 @@ export default function HelpPage({ onBack }: HelpPageProps) {
             <Pressable key={label} onPress={action}
               className="flex flex-col items-center gap-2 p-4 rounded-2xl"
               style={{ backgroundColor: `${color}12`, borderStyle: "solid" }}>
-              <Icon size={20} style={{ color }} accessibilityElementsHidden={true} />
+              <Icon size={20} style={{ color }} />
               <Text className="text-xs font-semibold text-white/70 text-center leading-tight">{label}</Text>
             </Pressable>
           ))}
@@ -151,7 +151,7 @@ export default function HelpPage({ onBack }: HelpPageProps) {
                 className="flex items-center gap-3 px-4 py-3.5 w-full text-left border-b last:border-0"
                 style={{ borderColor: "rgba(255,255,255,0.04)" }}>
                 <View className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}18` }}>
-                  <Icon size={16} style={{ color }} accessibilityElementsHidden={true} />
+                  <Icon size={16} style={{ color }} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-sm font-semibold text-white/85">{label}</Text>
@@ -184,7 +184,7 @@ export default function HelpPage({ onBack }: HelpPageProps) {
         {/* FAQ items */}
         {filtered.length === 0 ? (
           <View className="text-center py-8">
-            <HelpCircle size={32} className="mx-auto mb-3 text-white/20" accessibilityElementsHidden={true} />
+            <HelpCircle size={32} className="mx-auto mb-3 text-white/20" />
             <Text className="text-sm text-white/40">Aucun résultat pour "{search}"</Text>
             <Text className="text-xs text-white/25 mt-1">Essaie des mots-clés différents ou contacte le support</Text>
           </View>

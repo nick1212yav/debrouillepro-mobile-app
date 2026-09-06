@@ -336,7 +336,6 @@ export function CreateNetworkSheet({
 
             <View className="pt-2 pb-8 space-y-3">
               <Pressable
-                type="button"
                 onPress={handleSubmit}
                 disabled={
                   loading || !form.title.trim() || !form.description.trim()
@@ -365,7 +364,6 @@ export function CreateNetworkSheet({
               </Pressable>
 
               <Pressable
-                type="button"
                 onPress={onClose}
                 disabled={loading}
                 className="w-full py-3 rounded-2xl text-sm font-semibold text-white/60 bg-white/5 border border-white/10 disabled:opacity-50"

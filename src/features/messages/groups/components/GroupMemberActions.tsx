@@ -38,7 +38,6 @@ export function GroupMemberActions({
 
   return (
     <Pressable
-      type="button"
       onPress={handleRemove}
       className="w-full rounded-xl bg-red-500/10 px-4 py-3 text-left text-sm text-red-400"
     >

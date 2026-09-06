@@ -1,4 +1,4 @@
-import { View, Text, Image, TextInput } from "react-native";
+import { Pressable, View, Text, Image, TextInput } from "react-native";
 import { useState } from "react";
 import { User, Shield, Crown, X, Search, Check, UserMinus } from "lucide-react-native";
 

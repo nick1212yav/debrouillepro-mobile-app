@@ -195,7 +195,6 @@ export function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
 
                   <View className="flex justify-between text-sm">
                     <Pressable
-                      type="button"
                       onPress={() => {
                         reset();
                         setPhone("");
@@ -205,7 +204,6 @@ export function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
                     >
                       <Text>← Modifier le numéro</Text></Pressable>
                     <Pressable
-                      type="button"
                       onPress={handleResendCode}
                       disabled={loading}
                       className="text-violet-400"

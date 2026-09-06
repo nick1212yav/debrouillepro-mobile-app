@@ -59,7 +59,6 @@ export function TagsInput({
           className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
         />
         <Pressable
-          type="button"
           onPress={addTag}
           disabled={!input.trim()}
           className="text-white/40 disabled:opacity-30"

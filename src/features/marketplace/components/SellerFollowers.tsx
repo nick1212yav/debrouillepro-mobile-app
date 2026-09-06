@@ -1,5 +1,5 @@
 import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/marketplace/components/SellerFollowers.tsx
 import { useState } from "react";
 import { UserPlus, UserCheck, Users } from "lucide-react-native";

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { Bot, Loader2, Sparkles } from "lucide-react-native";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -42,7 +42,6 @@ export function ConversationSummary({
 
         {onGenerate && (
           <Pressable
-            type="button"
             onPress={onGenerate}
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-40"

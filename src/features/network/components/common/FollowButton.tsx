@@ -56,7 +56,6 @@ export function FollowButton({
 
   return (
     <Pressable
-      type="button"
       onPress={() => void handleClick()}
       disabled={loading}
       className={cn(

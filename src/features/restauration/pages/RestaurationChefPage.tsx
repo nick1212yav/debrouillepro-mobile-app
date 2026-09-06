@@ -240,7 +240,7 @@ export default function RestaurationChefPage({
           <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70">
             <View
               className="w-full max-w-lg rounded-t-[32px] p-6 text-white flex flex-col max-h-[90vh] overflow-y-auto no-scrollbar"
-              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", borderTopStyle: "solid" }}
+              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", }}
             >
               {confirmedBooking ? (
                 /* ÉCRAN DE CONFIRMATION AVEC SÉQUESTRE COMPTABLE */
@@ -372,7 +372,6 @@ export default function RestaurationChefPage({
                   </View>
 
                   <Pressable
-                    type="submit"
                     disabled={isBooking || !bookingDate || !selectedMenu}
                     className="w-full py-4 rounded-xl bg-orange-500 disabled:bg-white/5 disabled:text-white/20 text-[#020617] font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-orange-500/10"
                   >

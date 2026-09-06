@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 import React from "react";
 import { ChevronRight, Star, MessageSquare } from "lucide-react-native";
 import { VerifiedBadge } from "../common/VerifiedBadge";
@@ -71,12 +71,10 @@ export const AccommodationHost: React.FC<AccommodationHostProps> = ({
 
         <View className="flex gap-2">
           <Pressable
-            type="button"
             className="flex-1 py-2.5 rounded-xl border border-white/10 text-white font-semibold text-xs"
           >
             <Text>Contacter l'hôte</Text></Pressable>
           <Pressable
-            type="button"
             className="flex-1 py-2.5 rounded-xl bg-white/5 text-white font-semibold text-xs flex items-center justify-center gap-1"
           >
             <Text><Text>Voir le profil</Text></Text>

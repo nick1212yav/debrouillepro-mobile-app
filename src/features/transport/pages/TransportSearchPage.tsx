@@ -162,7 +162,6 @@ export default function TransportSearchPage({
 
           {/* Bouton de recherche */}
           <Button
-            type="submit"
             className="w-full h-12 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black text-sm shadow-[0_4px_25px_rgba(139,92,246,0.3)] pt-1"
           >
             <Search size={16} className="mr-2" />

@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import React from "react";
 import { ArrowUpDown } from "lucide-react-native";
 
@@ -33,7 +33,6 @@ export const AccommodationSort: React.FC<AccommodationSortProps> = ({
         {SORT_OPTIONS.map((opt) => (
           <Pressable
             key={opt.value}
-            type="button"
             onPress={() => onOptionChange(opt.value as SortOption)}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer border ${
               selectedOption === opt.value

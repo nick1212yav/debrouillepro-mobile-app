@@ -161,7 +161,7 @@ export default function AnnoncesDetailPage() {
       >
         <View className="flex-shrink-0 px-4 pt-12 pb-3">
           <Pressable
-            onPress={() => router(-1)}
+            onPress={() => router.back()}
             className="w-10 h-10 rounded-2xl flex items-center justify-center"
             style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
           >
@@ -189,7 +189,7 @@ export default function AnnoncesDetailPage() {
        
       >
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="self-start ml-4 w-10 h-10 rounded-2xl flex items-center justify-center"
           style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
         >
@@ -282,7 +282,7 @@ export default function AnnoncesDetailPage() {
         isFavorited={isFavorited}
         onFavorite={toggleFavoriteHandler}
         onShare={handleShare}
-        onBack={() => router(-1)}
+        onBack={() => router.back()}
       />
 
       {/* Corps de la page */}

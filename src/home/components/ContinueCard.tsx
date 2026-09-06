@@ -97,7 +97,6 @@ export function ContinueCard({ item, onClick, onAction }: ContinueCardProps) {
       {onAction && (
         <View className="border-t border-white/5 px-4 py-3">
           <Pressable
-            type="button"
             onPress={() => onAction("continue")}
             className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-3 py-2.5 text-xs font-semibold text-white"
           >

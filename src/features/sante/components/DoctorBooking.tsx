@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { Pressable, View, Text, Image } from "react-native";
 // src/features/sante/components/DoctorBooking.tsx
 import { Calendar, Clock, Video, Activity } from "lucide-react-native";
 

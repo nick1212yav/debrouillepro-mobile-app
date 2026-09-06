@@ -480,7 +480,6 @@ function BriefItem({
 
   return (
     <Pressable
-      type="button"
       onPress={handleClick}
       className="group relative flex w-full items-center gap-3 overflow-hidden rounded-[22px] p-3 text-left"
       style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.055)", borderStyle: "solid" }}
@@ -786,7 +785,6 @@ export default function DailyBrief({
             <Text>Sélection personnalisée à partir de votre espace.</Text></Text>
 
           <Pressable
-            type="button"
             onPress={() => onNavigate("community")}
             className="flex shrink-0 items-center gap-1 text-[9px] font-bold text-indigo-200"
           >

@@ -65,7 +65,7 @@ export default function MediaPage({ onBack }: MediaPageProps) {
         style={{  }} />
 
       {/* Header */}
-      <View className="px-5 pt-12 pb-3 flex items-center justify-between" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+      <View className="px-5 pt-12 pb-3 flex items-center justify-between" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
         <View className="flex items-center gap-3">
           <Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
             <ArrowLeft size={18} className="text-white" />
@@ -250,7 +250,7 @@ function PodcastsTab() {
           </View>
           <>
             {playing === p.id && (
-              <View className="mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", borderTopStyle: "solid" }}>
+              <View className="mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", }}>
                 <View className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>
                   <View className="h-full rounded-full" style={{ backgroundColor: p.color }} />
                 </View>

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/marketplace/components/StickyPurchaseBar.tsx
 import { formatPrice } from "../utils/formatter";
 import type { Product } from "../types";

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { FileText, File, Download, ExternalLink } from "lucide-react-native";
 
 interface Document {

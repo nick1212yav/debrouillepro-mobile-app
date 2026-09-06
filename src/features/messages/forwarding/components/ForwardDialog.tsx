@@ -273,7 +273,6 @@ export function ForwardDialog({
           </Text>
 
           <Pressable
-            type="button"
             onPress={handleForward}
             disabled={isForwarding || selectedIds.length === 0}
             className="flex h-10 items-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"

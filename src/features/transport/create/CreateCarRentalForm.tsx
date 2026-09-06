@@ -320,7 +320,6 @@ export function CreateCarRentalForm({
         />
 
         <Button
-          type="submit"
           className="w-full h-12 rounded-xl bg-blue-600 text-white font-bold text-base"
           disabled={isLoading}
         >

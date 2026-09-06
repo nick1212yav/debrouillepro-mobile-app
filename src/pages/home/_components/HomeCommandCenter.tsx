@@ -726,7 +726,6 @@ function ModuleCommandGrid({
           return (
             <Pressable
               key={module.id}
-              type="button"
               onPress={() => onNavigate(meta.route)}
               className="group flex flex-col items-center gap-2 rounded-[20px] p-3"
               style={{ backgroundColor: "rgba(255,255,255,.035)", borderWidth: 1, borderColor: "rgba(255,255,255,.045)", borderStyle: "solid" }}
@@ -844,7 +843,6 @@ function DailyActions({
           return (
             <Pressable
               key={action.id}
-              type="button"
               onPress={() => onNavigate(action.route)}
               className="flex w-full items-center gap-3 rounded-[20px] p-3 text-left"
               style={{ backgroundColor: "rgba(255,255,255,.035)", borderWidth: 1, borderColor: "rgba(255,255,255,.045)", borderStyle: "solid" }}
@@ -913,7 +911,6 @@ function InsightStrip({
 
   return (
     <Pressable
-      type="button"
       onPress={() => onNavigate(meta?.route ?? top[0])}
       className="mx-5 mt-5 flex w-[calc(100%-40px)] items-center gap-3 rounded-[22px] p-3.5 text-left"
       style={{ borderWidth: 1, borderColor: "rgba(16,185,129,.12)", borderStyle: "solid" }}
@@ -1240,7 +1237,6 @@ export default function HomeCommandCenter({
                 return (
                   <Pressable
                     key={String(item._id ?? item.id ?? index)}
-                    type="button"
                     onPress={() => {
                       if (onOpenItem) {
                         onOpenItem(item);

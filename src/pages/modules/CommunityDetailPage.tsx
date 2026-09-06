@@ -230,7 +230,7 @@ export default function CommunityDetailPage() {
     try {
       await deletePost({ publicationId: post._id });
       UIService.openToast("Post supprimé", "success");
-      router(-1);
+      router.back();
     } catch (error) {
       UIService.openToast("Erreur lors de la suppression", "error");
     }
@@ -383,7 +383,7 @@ export default function CommunityDetailPage() {
         className="h-full flex flex-col items-center justify-center"
         style={{  }}
       >
-        <Pressable onPress={() => router(-1)} className="self-start ml-4 mb-4">
+        <Pressable onPress={() => router.back()} className="self-start ml-4 mb-4">
           <ArrowLeft size={24} className="text-white/60" />
         </Pressable>
         <Text className="text-white/40">Post introuvable</Text>
@@ -405,7 +405,7 @@ export default function CommunityDetailPage() {
         >
           <Text>Retour au rendu normal</Text></Pressable>
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="mt-6 ml-4 px-4 py-2 bg-white/10 rounded-xl"
         >
           <Text>← Retour</Text></Pressable>
@@ -658,7 +658,7 @@ export default function CommunityDetailPage() {
     >
       <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3 relative">
         <Pressable
-          onPress={() => router(-1)}
+          onPress={() => router.back()}
           className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
         >
           <ArrowLeft size={20} className="text-white" />

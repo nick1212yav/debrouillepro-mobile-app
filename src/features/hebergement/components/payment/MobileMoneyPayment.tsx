@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { Pressable, View, Text, TextInput } from "react-native";
 import React, { useState } from "react";
 import { ArrowRight, Loader2 } from "lucide-react-native";
 
@@ -48,7 +48,6 @@ export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
           {operatorsConfig.map((op) => (
             <Pressable
               key={op.id}
-              type="button"
               onPress={() => setOperator(op.id as Operator)}
               className={`py-2 rounded-lg text-[9px] font-black uppercase text-center border transition-all cursor-pointer ${
                 operator === op.id
@@ -84,7 +83,6 @@ export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
         <Text>va être envoyée sur votre mobile. Confirmez-la avec votre code secret.</Text></Text>
 
       <Pressable
-        type="submit"
         disabled={loading || !phone}
         className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-45 disabled:pointer-events-none"
       >

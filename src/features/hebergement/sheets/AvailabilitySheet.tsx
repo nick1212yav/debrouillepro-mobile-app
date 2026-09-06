@@ -67,7 +67,6 @@ export const AvailabilitySheet: React.FC<AvailabilitySheetProps> = ({
           </View>
 
           <Pressable
-            type="submit"
             disabled={checking}
             className="w-full py-3 rounded-xl bg-indigo-500 text-white text-xs font-bold disabled:opacity-50"
           >

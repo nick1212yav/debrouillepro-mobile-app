@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import type { OrderDetail } from "../types/order.types";
 import { OrderStatus } from "../types/enums";
 import { Check, Flame, Truck, AlertCircle } from "lucide-react-native";

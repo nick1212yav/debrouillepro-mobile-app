@@ -178,7 +178,6 @@ export function PinnedMessageItem({
       {/* Désépingler */}
       {onUnpin && (
         <Pressable
-          type="button"
           onPress={handleUnpin}
           disabled={isUnpinning}
           accessibilityLabel="Désépingler le message"

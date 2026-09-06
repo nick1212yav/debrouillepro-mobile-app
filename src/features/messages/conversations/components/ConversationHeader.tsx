@@ -23,7 +23,6 @@ export function ConversationHeader({
     <View className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
       {onBack && (
         <Pressable
-          type="button"
           onPress={onBack}
           className="flex h-9 w-9 items-center justify-center rounded-full"
           accessibilityLabel="Retour"
@@ -57,7 +56,6 @@ export function ConversationHeader({
 
       {onInfo && (
         <Pressable
-          type="button"
           onPress={onInfo}
           className="flex h-9 w-9 items-center justify-center rounded-full text-white/70"
           accessibilityLabel="Informations"

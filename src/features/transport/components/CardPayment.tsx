@@ -158,7 +158,6 @@ export function CardPayment({
             {/* Actions */}
             <View className="flex gap-3 pt-2">
               <Button
-                type="button"
                 variant="outline"
                 onPress={onCancel}
                 className="flex-1 h-11 rounded-xl"
@@ -166,7 +165,6 @@ export function CardPayment({
               >
                 <Text>Annuler</Text></Button>
               <Button
-                type="submit"
                 className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 font-bold text-white"
                 disabled={loading}
               >

@@ -20,7 +20,6 @@ export function MediaGallery({ items, onOpen }: MediaGalleryProps) {
 
         return (
           <Pressable
-            type="button"
             key={String(item.id)}
             onPress={() => onOpen?.(index)}
             className="relative aspect-square overflow-hidden bg-black/20"

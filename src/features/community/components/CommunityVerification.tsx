@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { Shield, CheckCircle, Clock, AlertCircle } from "lucide-react-native";
 
 interface Props {

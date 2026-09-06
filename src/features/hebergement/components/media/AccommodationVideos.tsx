@@ -56,7 +56,6 @@ export const AccommodationVideos: React.FC<AccommodationVideosProps> = ({
         <View className="absolute bottom-2 left-2 right-2 p-1.5 bg-black/60 rounded-lg border border-white/5 flex items-center justify-between opacity-0">
           <View className="flex items-center gap-2">
             <Pressable
-              type="button"
               onPress={() => setPlaying(!playing)}
               className="text-white"
             >
@@ -68,7 +67,6 @@ export const AccommodationVideos: React.FC<AccommodationVideosProps> = ({
           </View>
 
           <Pressable
-            type="button"
             onPress={() => setMuted(!muted)}
             className="text-white"
           >

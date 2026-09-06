@@ -98,14 +98,14 @@ export default function PremiumPage({ onBack }: PremiumPageProps) {
   return (
     <View className="h-full flex flex-col" style={{  }}>
       <AuthLoading>
-        <View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+        <View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
           <Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable>
           <Skeleton className="h-8 w-40" />
         </View>
         <View className="px-4 pt-4 space-y-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}</View>
       </AuthLoading>
       <Unauthenticated>
-        <View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+        <View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
           <Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable>
           <Text className="text-white font-black">Premium</Text>
         </View>
@@ -199,7 +199,7 @@ function PremiumInner({ onBack }: PremiumPageProps) {
         style={{  }} />
 
       {/* Header */}
-      <View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>
+      <View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>
         <Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
           <ArrowLeft size={18} className="text-white" />
         </Pressable>
@@ -320,8 +320,8 @@ function PremiumInner({ onBack }: PremiumPageProps) {
 
             {/* Comparison table */}
             <View className="mt-6 rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}>
-              <Text className="text-white font-bold text-sm px-4 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}>Comparaison détaillée</Text>
-              <View className="px-4 py-2" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", borderBottomStyle: "solid" }}>
+              <Text className="text-white font-bold text-sm px-4 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}>Comparaison détaillée</Text>
+              <View className="px-4 py-2" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)", }}>
                 <Text className="text-white/30 text-xs">Fonctionnalité</Text>
                 {PLANS.map((p) => <Text key={p.id} className="text-center text-xs font-bold" style={{ color: p.couleur }}>{p.nom}</Text>)}
               </View>

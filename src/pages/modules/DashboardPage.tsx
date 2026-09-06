@@ -463,7 +463,7 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
       {/* Header */}
       <View
         className="relative z-10 flex-shrink-0 px-5 pt-12 pb-4"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}
       >
         <View className="flex items-center gap-3 mb-4">
           <Pressable
@@ -524,7 +524,7 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
       {/* Tabs */}
       <View
         className="flex-shrink-0 flex gap-1 px-5 py-3 overflow-x-auto"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", borderBottomStyle: "solid" }}
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", }}
       >
         {(["activite", "modules", "badges", "analytics"] as const).map(
           (tab) => {

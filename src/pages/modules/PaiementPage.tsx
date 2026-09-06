@@ -196,7 +196,7 @@ function PaiementInner({ onBack }: { onBack: () => void }) {
               </View>
             </View>
           </View>
-          <View className="flex gap-2 mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.07)", borderTopStyle: "solid" }}>
+          <View className="flex gap-2 mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.07)", }}>
             <View className="flex-1 flex items-center gap-1.5">
               <View className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,0.2)" }}>
                 <TrendingUp size={12} style={{ color: "#10B981" }} />

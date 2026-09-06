@@ -296,7 +296,6 @@ export function PrescriptionForm({
       </View>
 
       <Pressable
-        type="submit"
         disabled={isLoading}
         className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-orange-600 to-orange-700 disabled:opacity-50 h-11 flex items-center justify-center"
       >

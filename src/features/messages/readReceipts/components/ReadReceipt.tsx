@@ -48,7 +48,6 @@ export function ReadReceipt({
   if (!isOwnMessage && status !== "read") {
     return (
       <Pressable
-        type="button"
         onPress={handleMarkAsRead}
         className={`text-xs text-white/40 transition hover:text-white/70 ${className}`}
         accessibilityLabel="Marquer comme lu"

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 // src/features/sante/components/DoctorSymptomChecker.tsx
 import { useState } from "react";
 import { Stethoscope, Search, Loader2 } from "lucide-react-native";

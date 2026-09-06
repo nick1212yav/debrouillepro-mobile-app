@@ -68,7 +68,7 @@ function SectionHeader({
     <Pressable
       onPress={onToggle}
       className="w-full flex items-center justify-between py-3 px-4 rounded-2xl"
-      style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", borderBottomStyle: "solid" }}
+      style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}
     >
       <View className="flex items-center gap-2.5">
         <Icon size={18} style={{ color }} />

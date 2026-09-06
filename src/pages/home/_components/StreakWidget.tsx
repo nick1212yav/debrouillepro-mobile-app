@@ -370,7 +370,6 @@ export default function StreakWidget() {
               {/* Claim */}
               {canClaim ? (
                 <Pressable
-                  type="button"
                   disabled={isClaiming}
                   onPress={handleClaim}
                   accessibilityLabel="Valider ma série et gagner de l'XP"
@@ -417,7 +416,6 @@ export default function StreakWidget() {
         {showModal && claimResult && (
           <>
             <Pressable
-              type="button"
               accessibilityLabel="Fermer"
               onPress={() => setShowModal(false)}
               className="fixed inset-0 z-[80]"
@@ -524,7 +522,6 @@ export default function StreakWidget() {
 
                 {/* Continue */}
                 <Pressable
-                  type="button"
                   onPress={() => setShowModal(false)}
                   className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 font-black text-white"
                   style={{  }}

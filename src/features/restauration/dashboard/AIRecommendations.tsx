@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Pressable, View, Text } from "react-native";
 import { Sparkles, ArrowRight, Lightbulb } from "lucide-react-native";
 
 interface AIRecommendation {

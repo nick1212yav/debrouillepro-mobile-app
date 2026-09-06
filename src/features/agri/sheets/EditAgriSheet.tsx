@@ -324,7 +324,6 @@ export function EditAgriSheet({
                 </View>
 
                 <Pressable
-                  type="submit"
                   disabled={loading}
                   className="w-full py-4 rounded-3xl font-black text-xs text-black bg-green-400 disabled:opacity-30 mt-4 flex items-center justify-center gap-2"
                 >

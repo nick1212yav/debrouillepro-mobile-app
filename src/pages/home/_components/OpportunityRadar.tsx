@@ -541,7 +541,7 @@ export default function OpportunityRadar({
 
               <Text
                 className="absolute inset-1 rounded-full"
-                style={{ borderTopWidth: 1, borderTopColor: "rgba(52,211,153,.7)", borderTopStyle: "solid", borderRightWidth: 1, borderRightColor: "transparent", borderRightStyle: "solid", borderBottomWidth: 1, borderBottomColor: "transparent", borderBottomStyle: "solid", borderLeftWidth: 1, borderLeftColor: "transparent", borderLeftStyle: "solid" }}
+                style={{ borderTopWidth: 1, borderTopColor: "rgba(52,211,153,.7)", borderRightWidth: 1, borderRightColor: "transparent", borderBottomWidth: 1, borderBottomColor: "transparent", borderLeftWidth: 1, borderLeftColor: "transparent", }}
               />
             </View>
 
@@ -586,7 +586,6 @@ export default function OpportunityRadar({
               return (
                 <Pressable
                   key={opportunity.id}
-                  type="button"
                   onPress={() => onNavigate(opportunity.route)}
                   className="group relative min-w-0 overflow-hidden rounded-[23px] p-3 text-left"
                   style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.065)", borderStyle: "solid" }}
@@ -761,7 +760,6 @@ export default function OpportunityRadar({
               <Text>Le radar évolue avec votre activité et votre flux.</Text></Text>
 
             <Pressable
-              type="button"
               onPress={() => onNavigate("explorer")}
               className="ml-auto flex shrink-0 items-center gap-1 text-[9px] font-bold text-emerald-300"
             >
