@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateTaxiForm.tsx
 import { useForm } from "react-hook-form";
@@ -93,13 +93,9 @@ export function CreateTaxiForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="driverName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="driverName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom complet du chauffeur *</Text></FormLabel>
+              <FormLabel>Nom complet du chauffeur *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Jean Mukendi"
@@ -109,15 +105,9 @@ export function CreateTaxiForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone direct *</Text></FormLabel>
+              <FormLabel>Téléphone direct *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: +243 890 000 000"
@@ -127,16 +117,9 @@ export function CreateTaxiForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="vehicleModel"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="vehicleModel" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Modèle du véhicule *</Text></FormLabel>
+                <FormLabel>Modèle du véhicule *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Toyota Corolla, 2011"
@@ -146,14 +129,9 @@ export function CreateTaxiForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="vehiclePlate"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="vehiclePlate" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Plaque d'immatriculation *</Text></FormLabel>
+                <FormLabel>Plaque d'immatriculation *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 5678AB01"
@@ -163,57 +141,39 @@ export function CreateTaxiForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="basePrice"
-            render={({ field }) => (
+            )} /></View><View className="gap-2"><FormField control={form.control} name="basePrice" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prise en charge *</Text></FormLabel>
+                <FormLabel>Prise en charge *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="pricePerKm"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="pricePerKm" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Tarif par km *</Text></FormLabel>
+                <FormLabel>Tarif par km *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -224,24 +184,16 @@ export function CreateTaxiForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                    <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="city"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="city" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Ville de service *</Text></FormLabel>
+                <FormLabel>Ville de service *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Kinshasa"
@@ -251,14 +203,9 @@ export function CreateTaxiForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="availability"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="availability" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Horaires de service</Text></FormLabel>
+                <FormLabel>Horaires de service</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Lun-Sam 07:00 - 20:00"
@@ -268,23 +215,14 @@ export function CreateTaxiForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <Button
-          className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+            )} /></View><Button  className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Enregistrement...</Text></>
+              Enregistrement...
+            </>
           ) : (
             "🚕 Enregistrer le profil de Taxi"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

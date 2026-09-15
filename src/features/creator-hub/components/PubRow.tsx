@@ -48,36 +48,10 @@ export function PubRow({ pub }: PubRowProps) {
   const color = TYPE_COLORS[pub.type] ?? "#8B5CF6";
   const icon = TYPE_ICONS[pub.type] ?? <FileText size={12} />;
   return (
-    <View
-      className="flex items-center gap-3 p-3 rounded-xl"
-      style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-    >
-      <View
-        className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `${color}22` }}
-      >
-        {icon}
-      </View>
-      <View className="flex-1 min-w-0">
-        <Text className="text-white text-sm font-semibold truncate">{pub.title}</Text>
-        <Text className="text-white/30 text-[10px]">
-          {format(new Date(pub.createdAt), "d MMM", { locale: fr })}
-        </Text>
-      </View>
-      <View className="flex items-center gap-3 flex-shrink-0">
-        <View className="flex items-center gap-1 text-white/40">
-          <Eye size={10} />
-          <Text className="text-[10px]">{fmt(pub.viewCount)}</Text>
-        </View>
-        <View className="flex items-center gap-1 text-white/40">
-          <Heart size={10} />
-          <Text className="text-[10px]">{fmt(pub.likeCount)}</Text>
-        </View>
-        <View className="flex items-center gap-1 text-white/40">
-          <MessageCircle size={10} />
-          <Text className="text-[10px]">{fmt(pub.commentCount)}</Text>
-        </View>
-      </View>
+    <View initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}>
+      <View className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}22`, color }}>{icon}</View>
+      <View className="flex-1 min-w-0"><Text className="text-white text-sm font-semibold truncate">{pub.title}</Text><Text className="text-white/30 text-[10px]">{format(new Date(pub.createdAt), "d MMM", { locale: fr })}</Text></View>
+      <View className="flex items-center gap-3 flex-shrink-0"><View className="flex items-center gap-1 text-white/40"><Eye size={10} /><Text className="text-[10px]">{fmt(pub.viewCount)}</Text></View><View className="flex items-center gap-1 text-white/40"><Heart size={10} /><Text className="text-[10px]">{fmt(pub.likeCount)}</Text></View><View className="flex items-center gap-1 text-white/40"><MessageCircle size={10} /><Text className="text-[10px]">{fmt(pub.commentCount)}</Text></View></View>
     </View>
   );
 }

@@ -1,47 +1,29 @@
-// src/pages/modules/LiveStoriesPage.tsx
-
+import { View, Pressable, Text, Image, TextInput } from "react-native";
+import { useState, useEffect, useRef } from "react";
 import {
-  Animated,
-  Image,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentType,
-} from "react";
-import {
-  ArrowLeft,
-  Radio,
-  Play,
-  Eye,
-  Heart,
-  Send,
-  Smile,
-  Mic,
-  MicOff,
-  Plus,
-  X,
-  Zap,
-  Clock,
+  ArrowLeft, Radio, Play, Eye, Heart, MessageCircle,
+  Send, Smile, Users, Mic, MicOff,
+  Plus, X,
+  Zap, Crown, Clock,
   ChevronRight,
 } from "lucide-react-native";
-import { useMutation, useQuery } from "convex/react";
-
+import { useQuery, useMutation } from "convex/react";
 import { useConvexAuth } from "@/lib/convex-auth-compat";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/convex/_generated/api.js";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
+type ChatMessage = {
+  id: string;
+  auteur: string;
+  avatar: string;
+  texte: string;
+  temps: number;
+  type: "chat" | "join" | "reaction";
+};
 
+// Type for a live stream from the backend
 type LiveStreamData = {
   _id: Id<"liveStreams">;
   _creationTime: number;
@@ -62,6 +44,7 @@ type LiveStreamData = {
   hostAvatar?: string;
 };
 
+// Type for active story groups from backend
 type StoryGroup = {
   author: {
     id: Id<"users">;
@@ -87,1245 +70,383 @@ type StoryGroup = {
   hasUnviewed: boolean;
 };
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+const FLOATING_EMOJIS = ["❤️", "🔥", "👏", "😂", "🚀", "💜", "⚡", "🎉"];
+
+// ── Floating Reaction ─────────────────────────────────────────────────────────
+function FloatingEmoji({ emoji, x }: { emoji: string; x: number }) {
+  return (
+    <View initial={{ opacity: 1, y: 0, scale: 1 }} animate={{ opacity: 0, y: -200, scale: 1.5 }} transition={{ duration: 2, ease: "easeOut" as const }} className="absolute bottom-24 text-3xl pointer-events-none z-50" style={{ left: `${x}%` }}>
+      {emoji}
+    </View>
+  );
+}
+
+// ── Helper: compute time elapsed ──────────────────────────────────────────────
+function timeAgo(isoOrMs: string | number): string {
+  const ms = typeof isoOrMs === "string" ? new Date(isoOrMs).getTime() : isoOrMs;
+  const diff = Date.now() - ms;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "maintenant";
+  if (minutes < 60) return `${minutes}min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}j`;
+}
+
+function formatDuration(startedAt?: string): string {
+  if (!startedAt) return "00:00";
+  const diff = Date.now() - new Date(startedAt).getTime();
+  const totalSec = Math.floor(diff / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// ── Extract story display data from mediaUrl encoding ─────────────────────────
+function getStoryBackground(mediaUrl: string): string {
+  if (mediaUrl.startsWith("data:slide/")) {
+    const parts = mediaUrl.replace("data:slide/", "").split("|");
+    return parts[0] ?? "linear-gradient(135deg,#667eea,#764ba2)";
+  }
+  if (mediaUrl.startsWith("data:text/")) {
+    const parts = mediaUrl.replace("data:text/", "").split("|");
+    return parts[0] ?? "#1a1a2e";
+  }
+  return "#1a1a2e";
+}
+
+function getStoryText(mediaUrl: string, caption?: string): string | undefined {
+  if (caption) return caption;
+  if (mediaUrl.startsWith("data:text/")) {
+    const parts = mediaUrl.replace("data:text/", "").split("|");
+    return parts[1];
+  }
+  return undefined;
+}
+
+// ── Story Viewer ──────────────────────────────────────────────────────────────
+function StoryCard({ story, authorName, authorAvatar, onClose }: {
+  story: StoryGroup["stories"][number];
+  authorName: string;
+  authorAvatar?: string;
+  onClose: () => void;
+}) {
+  const bg = getStoryBackground(story.mediaUrl);
+  const text = getStoryText(story.mediaUrl, story.caption);
+  const isImageUrl = story.mediaUrl.startsWith("http");
+
+  return (
+    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.9)" }}>
+      <View initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 30 }} className="relative w-full max-w-sm mx-4 rounded-3xl overflow-hidden" style={{ aspectRatio: "9/16", maxHeight: "80vh", backgroundColor: bg }}>
+        {/* Background image if URL */}
+        {isImageUrl && (
+          <Image className="absolute inset-0 w-full h-full object-cover" source={{ uri: story.mediaUrl }} accessibilityLabel="" />
+        )}
+        {/* Overlay gradient */}
+        <View className="absolute inset-0" style={{  }} />
+
+        {/* Top bar */}
+        <View className="absolute top-0 left-0 right-0 px-4 pt-4 flex items-center gap-3">{authorAvatar ? (
+            <Image className="w-8 h-8 rounded-xl object-cover border-2 border-white/30" source={{ uri: authorAvatar }} accessibilityLabel="" />
+          ) : (
+            <View className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black text-white bg-purple-600">{authorName[0]}</View>
+          )}<View className="flex-1"><Text className="text-xs font-bold text-white">{authorName}</Text><Text className="text-[10px] text-white/60 flex items-center gap-1"><Eye size={9} />{story.viewCount}· {timeAgo(story._creationTime)}</Text></View><Pressable onPress={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}><X size={16} className="text-white" /></Pressable></View>
+
+        {/* Text content */}
+        <View className="absolute inset-x-0 bottom-0 px-5 pb-6 pt-16">{text && (
+            <Text className="text-lg font-bold leading-snug mb-4 text-center text-white" style={{ textShadow: "0 2px 8px rgba(0,0,0,0.6)" }}>{text}</Text>
+          )}</View>
+      </View>
+    </View>
+  );
+}
+
+// ── Live Viewer ────────────────────────────────────────────────────────────────
+function LiveViewer({ stream, onClose }: { stream: LiveStreamData; onClose: () => void }) {
+  const { isAuthenticated } = useConvexAuth();
+  const sendMessageMut = useMutation(api.liveStreams.sendMessage);
+  const likeStreamMut = useMutation(api.liveStreams.likeStream);
+  const streamMessages = useQuery(
+    api.liveStreams.getStreamMessages,
+    isAuthenticated ? { streamId: stream._id } : "skip"
+  );
+
+  const [input, setInput] = useState("");
+  const [liked, setLiked] = useState(false);
+  const [likes, setLikes] = useState(stream.likeCount);
+  const [floating, setFloating] = useState<Array<{ id: string; emoji: string; x: number }>>([]);
+  const [muted, setMuted] = useState(false);
+  const msgRef = useRef<View>(null);
+
+  useEffect(() => {
+    msgRef.current?.scrollTo({ top: msgRef.current.scrollHeight, behavior: "smooth" });
+  }, [streamMessages]);
+
+  const addFloating = (emoji: string) => {
+    const id = `f-${Date.now()}-${Math.random()}`;
+    const x = 10 + Math.random() * 70;
+    setFloating((prev) => [...prev, { id, emoji, x }]);
+    setTimeout(() => setFloating((prev) => prev.filter((f) => f.id !== id)), 2200);
+  };
+
+  const handleLike = async () => {
+    setLiked(true);
+    setLikes((l) => l + 1);
+    addFloating("❤️");
+    try {
+      await likeStreamMut({ streamId: stream._id });
+    } catch { /* ignore */ }
+  };
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const text = input.trim();
+    setInput("");
+    try {
+      await sendMessageMut({ streamId: stream._id, text, type: "chat" });
+    } catch { /* ignore */ }
+  };
+
+  return (
+    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: "#000" }}>
+
+      {/* Background image */}
+      {stream.thumbnailUrl && (
+        <Image className="absolute inset-0 w-full h-full object-cover opacity-40" source={{ uri: stream.thumbnailUrl }} accessibilityLabel="" />
+      )}
+      <View className="absolute inset-0" style={{  }} />
+
+      {/* Floating reactions */}
+      <View className="absolute inset-0 overflow-hidden pointer-events-none"><View>{floating.map((f) => <FloatingEmoji key={f.id} emoji={f.emoji} x={f.x} />)}</View></View>
+
+      {/* Top bar */}
+      <View className="relative z-10 flex items-center gap-3 px-4 pt-6 pb-3"><Pressable onPress={onClose} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex items-center gap-2 flex-1">{stream.hostAvatar ? (
+            <Image className="w-9 h-9 rounded-xl object-cover border-2 border-red-500" source={{ uri: stream.hostAvatar }} accessibilityLabel={stream.hostName} />
+          ) : (
+            <View className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black text-white bg-red-500">{stream.hostName[0]}</View>
+          )}<View><Text className="text-sm font-bold text-white leading-tight">{stream.hostName}</Text><Text className="flex items-center gap-1 text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full w-fit" style={{  }}><Radio size={8} />LIVE
+            </Text></View></View>{}<View className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}><Eye size={12} className="text-white/80" /><Text className="text-xs font-bold text-white">{stream.viewerCount.toLocaleString()}</Text></View></View>
+
+      {/* Title + tags */}
+      <View className="relative z-10 px-4 mb-2"><Text className="text-sm font-bold text-white leading-snug">{stream.title}</Text><View className="flex gap-1.5 mt-1 flex-wrap">{stream.tags.map((t) => (
+            <Text key={t} className="px-2 py-0.5 rounded-full text-[10px] text-white/70" style={{ backgroundColor: "rgba(255,255,255,0.12)" }}>#{t}</Text>
+          ))}</View></View>
+
+      {/* Chat */}
+      <View ref={msgRef} className="relative z-10 flex-1 overflow-y-auto px-4 flex flex-col justify-end gap-1.5 pb-2" style={{  }}><View>{streamMessages?.map((msg) => (
+            <View key={msg._id} initial={{ opacity: 0, x: -10, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} transition={{ duration: 0.2 }} className={`flex items-start gap-2 ${msg.type === "system" ? "justify-center" : ""}`}>
+              {msg.type === "system" ? (
+                <Text className="text-[10px] text-white/40 px-3 py-1 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>{msg.text}</Text>
+              ) : (
+                <>
+                  {msg.userAvatar ? (
+                    <Image className="w-6 h-6 rounded-lg object-cover flex-shrink-0 mt-0.5" source={{ uri: msg.userAvatar }} accessibilityLabel={msg.userName} />
+                  ) : (
+                    <View className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white bg-purple-600 flex-shrink-0 mt-0.5">{msg.userName[0]}</View>
+                  )}
+                  <View className="max-w-[85%] px-3 py-1.5 rounded-2xl" style={{ backgroundColor: "rgba(0,0,0,0.55)" }}><Text className="text-[10px] font-bold text-purple-300 mb-0.5">{msg.userName}</Text><Text className="text-xs text-white/90 leading-snug">{msg.text}</Text></View>
+                </>
+              )}
+            </View>
+          ))}</View></View>
+
+      {/* Controls */}
+      <View className="relative z-10 px-4 pb-8 pt-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" }}>{}<View className="flex items-center gap-2 mb-3 overflow-x-auto" style={{  }}>{FLOATING_EMOJIS.map((e) => (
+            <Pressable key={e} onPress={() => addFloating(e)} className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 active:scale-90 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>{e}</Pressable>
+          ))}</View>{}<View className="flex items-center gap-2"><Pressable onPress={handleLike} className="w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition-transform" style={{ backgroundColor: liked ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.1)" }}><Heart size={18} className={liked ? "text-red-400 fill-red-400" : "text-white/60"} /></Pressable><View className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><TextInput value={input} onChangeText={(value) => setInput(value)} onKeyPress={(e) => { if (e.nativeEvent.key === "Enter") sendMessage(); }} placeholder="Commenter..." className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-white/40" /><Smile size={16} className="text-white/40" /></View><Pressable onPress={sendMessage} className="w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition-transform" style={{  }}><Send size={15} className="text-white" /></Pressable><Pressable onPress={() => setMuted(!muted)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>{muted ? <MicOff size={16} className="text-red-400" /> : <Mic size={16} className="text-white/60" />}</Pressable></View>{}<Text className="text-[10px] text-white/40 text-center mt-2">{likes.toLocaleString()}likes · {formatDuration(stream.startedAt)}en direct
+        </Text></View>
+    </View>
+  );
+}
+
+// ── Loading skeletons ─────────────────────────────────────────────────────────
+function LiveSkeleton() {
+  return (
+    <View className="flex flex-col gap-4">{Array.from({ length: 2 }).map((_, i) => (
+        <Skeleton key={i} className="w-full h-[200px] rounded-3xl" />
+      ))}</View>
+  );
+}
+
+function StoriesSkeleton() {
+  return (
+    <View className="gap-3">{Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="w-full rounded-2xl" style={{ aspectRatio: "9/14" }} />
+      ))}</View>
+  );
+}
+
+function ReplaysSkeleton() {
+  return (
+    <View className="flex flex-col gap-3">{Array.from({ length: 3 }).map((_, i) => (
+        <Skeleton key={i} className="w-full h-[100px] rounded-2xl" />
+      ))}</View>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 type Tab = "lives" | "stories" | "replays";
 
 interface LiveStoriesPageProps {
   onBack: () => void;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
-const FLOATING_EMOJIS = ["❤️", "🔥", "👏", "😂", "🚀", "💜", "⚡", "🎉"];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function timeAgo(isoOrMs: string | number): string {
-  const timestamp =
-    typeof isoOrMs === "string" ? new Date(isoOrMs).getTime() : isoOrMs;
-
-  const difference = Date.now() - timestamp;
-
-  if (!Number.isFinite(difference)) {
-    return "";
-  }
-
-  const minutes = Math.floor(difference / 60_000);
-
-  if (minutes < 1) {
-    return "maintenant";
-  }
-
-  if (minutes < 60) {
-    return `${minutes}min`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) {
-    return `${hours}h`;
-  }
-
-  return `${Math.floor(hours / 24)}j`;
-}
-
-function formatDuration(startedAt?: string): string {
-  if (!startedAt) {
-    return "00:00";
-  }
-
-  const start = new Date(startedAt).getTime();
-
-  if (!Number.isFinite(start)) {
-    return "00:00";
-  }
-
-  const difference = Math.max(0, Date.now() - start);
-  const totalSeconds = Math.floor(difference / 1000);
-
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(
-      2,
-      "0",
-    )}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-function getStoryBackground(mediaUrl: string): string {
-  if (mediaUrl.startsWith("data:slide/")) {
-    const parts = mediaUrl.replace("data:slide/", "").split("|");
-
-    return parts[0] ?? "#667eea";
-  }
-
-  if (mediaUrl.startsWith("data:text/")) {
-    const parts = mediaUrl.replace("data:text/", "").split("|");
-
-    return parts[0] ?? "#1a1a2e";
-  }
-
-  return "#1a1a2e";
-}
-
-function getStoryText(mediaUrl: string, caption?: string): string | undefined {
-  if (caption) {
-    return caption;
-  }
-
-  if (mediaUrl.startsWith("data:text/")) {
-    const parts = mediaUrl.replace("data:text/", "").split("|");
-
-    return parts[1];
-  }
-
-  return undefined;
-}
-
-function isRemoteImage(url?: string): url is string {
-  return Boolean(
-    url && (url.startsWith("https://") || url.startsWith("http://")),
-  );
-}
-
-function getInitial(name?: string): string {
-  return name?.trim().charAt(0).toUpperCase() || "?";
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Avatar
-// ─────────────────────────────────────────────────────────────────────────────
-
-function Avatar({
-  uri,
-  name,
-  size = 36,
-  borderColor,
-}: {
-  uri?: string;
-  name?: string;
-  size?: number;
-  borderColor?: string;
-}) {
-  if (isRemoteImage(uri)) {
-    return (
-      <Image
-        source={{ uri }}
-        className="rounded-xl"
-        style={{
-          width: size,
-          height: size,
-          borderWidth: borderColor ? 2 : 0,
-          borderColor,
-        }}
-      />
-    );
-  }
-
-  return (
-    <View
-      className="items-center justify-center rounded-xl bg-purple-600"
-      style={{
-        width: size,
-        height: size,
-        borderWidth: borderColor ? 2 : 0,
-        borderColor,
-      }}
-    >
-      <Text
-        className="font-black text-white"
-        style={{
-          fontSize: Math.max(9, size * 0.35),
-        }}
-      >
-        {getInitial(name)}
-      </Text>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Loading placeholder
-// ─────────────────────────────────────────────────────────────────────────────
-
-function Skeleton({
-  height,
-  className = "",
-}: {
-  height: number;
-  className?: string;
-}) {
-  const opacity = useRef(new Animated.Value(0.35)).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 0.75,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.35,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
-    animation.start();
-
-    return () => {
-      animation.stop();
-    };
-  }, [opacity]);
-
-  return (
-    <Animated.View
-      className={`w-full rounded-3xl bg-white/10 ${className}`}
-      style={{
-        height,
-        opacity,
-      }}
-    />
-  );
-}
-
-function LiveSkeleton() {
-  return (
-    <View className="gap-4">
-      {Array.from({ length: 2 }).map((_, index) => (
-        <Skeleton key={index} height={200} />
-      ))}
-    </View>
-  );
-}
-
-function StoriesSkeleton() {
-  return (
-    <View className="flex-row flex-wrap justify-between">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <View key={index} className="mb-3 w-[48%]">
-          <Skeleton height={230} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function ReplaysSkeleton() {
-  return (
-    <View className="gap-3">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <Skeleton key={index} height={100} />
-      ))}
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Floating emoji
-// ─────────────────────────────────────────────────────────────────────────────
-
-function FloatingEmoji({ emoji, x }: { emoji: string; x: number }) {
-  const translateY = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(1)).current;
-  const scale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const animation = Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: -200,
-        duration: 2000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 2000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scale, {
-        toValue: 1.5,
-        duration: 2000,
-        useNativeDriver: true,
-      }),
-    ]);
-
-    animation.start();
-
-    return () => {
-      animation.stop();
-    };
-  }, [opacity, scale, translateY]);
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      className="absolute bottom-24 z-50"
-      style={{
-        left: `${x}%`,
-        opacity,
-        transform: [{ translateY }, { scale }],
-      }}
-    >
-      <Text className="text-3xl">{emoji}</Text>
-    </Animated.View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Story viewer
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StoryCard({
-  story,
-  authorName,
-  authorAvatar,
-  onClose,
-}: {
-  story: StoryGroup["stories"][number];
-  authorName: string;
-  authorAvatar?: string;
-  onClose: () => void;
-}) {
-  const backgroundColor = getStoryBackground(story.mediaUrl);
-
-  const text = getStoryText(story.mediaUrl, story.caption);
-
-  const hasImage = isRemoteImage(story.mediaUrl);
-
-  return (
-    <View className="absolute inset-0 z-50 items-center justify-center bg-black">
-      <View
-        className="relative w-[92%] overflow-hidden rounded-3xl"
-        style={{
-          aspectRatio: 9 / 16,
-          maxHeight: "88%",
-          backgroundColor,
-        }}
-      >
-        {hasImage && (
-          <Image
-            source={{
-              uri: story.mediaUrl,
-            }}
-            resizeMode="cover"
-            className="absolute inset-0 h-full w-full"
-          />
-        )}
-
-        <View className="absolute inset-x-0 top-0 bg-black/40 px-4 pb-4 pt-5">
-          <View className="flex-row items-center">
-            <Avatar
-              uri={authorAvatar}
-              name={authorName}
-              size={34}
-              borderColor="rgba(255,255,255,0.4)"
-            />
-
-            <View className="ml-3 flex-1">
-              <Text numberOfLines={1} className="text-xs font-bold text-white">
-                {authorName}
-              </Text>
-
-              <View className="mt-1 flex-row items-center">
-                <Eye size={10} color="rgba(255,255,255,0.65)" />
-
-                <Text className="ml-1 text-[10px] text-white/70">
-                  {story.viewCount}
-                </Text>
-
-                <Text className="mx-1 text-[10px] text-white/60">·</Text>
-
-                <Text className="text-[10px] text-white/60">
-                  {timeAgo(story._creationTime)}
-                </Text>
-              </View>
-            </View>
-
-            <Pressable
-              onPress={onClose}
-              className="h-9 w-9 items-center justify-center rounded-full bg-black/50"
-              accessibilityRole="button"
-              accessibilityLabel="Fermer la story"
-            >
-              <X size={18} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </View>
-
-        {text && (
-          <View className="absolute inset-x-0 bottom-0 bg-black/50 px-5 pb-8 pt-10">
-            <Text className="text-center text-lg font-bold leading-6 text-white">
-              {text}
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Live viewer
-// ─────────────────────────────────────────────────────────────────────────────
-
-function LiveViewer({
-  stream,
-  onClose,
-}: {
-  stream: LiveStreamData;
-  onClose: () => void;
-}) {
-  const { isAuthenticated } = useConvexAuth();
-
-  const sendMessageMutation = useMutation(api.liveStreams.sendMessage);
-
-  const likeStreamMutation = useMutation(api.liveStreams.likeStream);
-
-  const streamMessages = useQuery(
-    api.liveStreams.getStreamMessages,
-    isAuthenticated
-      ? {
-          streamId: stream._id,
-        }
-      : "skip",
-  );
-
-  const chatScrollRef = useRef<ScrollView | null>(null);
-
-  const [input, setInput] = useState("");
-  const [liked, setLiked] = useState(false);
-  const [likes, setLikes] = useState(stream.likeCount);
-
-  const [floating, setFloating] = useState<
-    Array<{
-      id: string;
-      emoji: string;
-      x: number;
-    }>
-  >([]);
-
-  const [muted, setMuted] = useState(false);
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      chatScrollRef.current?.scrollToEnd({
-        animated: true,
-      });
-    });
-  }, [streamMessages]);
-
-  const addFloating = (emoji: string) => {
-    const id = `reaction-${Date.now()}-${Math.random()}`;
-
-    const x = 10 + Math.random() * 70;
-
-    setFloating((previous) => [
-      ...previous,
-      {
-        id,
-        emoji,
-        x,
-      },
-    ]);
-
-    setTimeout(() => {
-      setFloating((previous) => previous.filter((item) => item.id !== id));
-    }, 2200);
-  };
-
-  const handleLike = async () => {
-    if (liked) {
-      return;
-    }
-
-    setLiked(true);
-    setLikes((previous) => previous + 1);
-
-    addFloating("❤️");
-
-    try {
-      await likeStreamMutation({
-        streamId: stream._id,
-      });
-    } catch {
-      setLiked(false);
-      setLikes((previous) => Math.max(0, previous - 1));
-    }
-  };
-
-  const sendMessage = async () => {
-    const text = input.trim();
-
-    if (!text) {
-      return;
-    }
-
-    setInput("");
-
-    try {
-      await sendMessageMutation({
-        streamId: stream._id,
-        text,
-        type: "chat",
-      });
-    } catch {
-      setInput(text);
-    }
-  };
-
-  return (
-    <View className="absolute inset-0 z-50 bg-black">
-      {isRemoteImage(stream.thumbnailUrl) && (
-        <Image
-          source={{
-            uri: stream.thumbnailUrl,
-          }}
-          resizeMode="cover"
-          className="absolute inset-0 h-full w-full"
-          style={{
-            opacity: 0.4,
-          }}
-        />
-      )}
-
-      <View className="absolute inset-0 bg-black/40" />
-
-      <View
-        pointerEvents="none"
-        className="absolute inset-0 z-40 overflow-hidden"
-      >
-        {floating.map((reaction) => (
-          <FloatingEmoji
-            key={reaction.id}
-            emoji={reaction.emoji}
-            x={reaction.x}
-          />
-        ))}
-      </View>
-
-      <View className="relative z-10 flex-1">
-        {/* Header */}
-
-        <View className="flex-row items-center px-4 pb-3 pt-14">
-          <Pressable
-            onPress={onClose}
-            className="h-10 w-10 items-center justify-center rounded-xl bg-black/60"
-          >
-            <ArrowLeft size={20} color="#FFFFFF" />
-          </Pressable>
-
-          <View className="ml-3 flex-1 flex-row items-center">
-            <Avatar
-              uri={stream.hostAvatar}
-              name={stream.hostName}
-              size={38}
-              borderColor="#EF4444"
-            />
-
-            <View className="ml-2">
-              <Text numberOfLines={1} className="text-sm font-bold text-white">
-                {stream.hostName}
-              </Text>
-
-              <View className="mt-1 flex-row items-center self-start rounded-full bg-red-500 px-2 py-0.5">
-                <Radio size={8} color="#FFFFFF" />
-
-                <Text className="ml-1 text-[9px] font-black text-white">
-                  LIVE
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View className="flex-row items-center rounded-xl bg-black/60 px-3 py-2">
-            <Eye size={13} color="rgba(255,255,255,0.8)" />
-
-            <Text className="ml-1 text-xs font-bold text-white">
-              {stream.viewerCount.toLocaleString()}
-            </Text>
-          </View>
-        </View>
-
-        {/* Stream information */}
-
-        <View className="px-4 pb-2">
-          <Text numberOfLines={2} className="text-sm font-bold text-white">
-            {stream.title}
-          </Text>
-
-          {stream.tags.length > 0 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="mt-2"
-            >
-              {stream.tags.map((tag) => (
-                <View
-                  key={tag}
-                  className="mr-2 rounded-full bg-white/15 px-2 py-1"
-                >
-                  <Text className="text-[10px] text-white/80">#{tag}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-
-        {/* Chat */}
-
-        <ScrollView
-          ref={chatScrollRef}
-          className="flex-1 px-4"
-          contentContainerClassName="justify-end gap-2 py-3"
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => {
-            chatScrollRef.current?.scrollToEnd({
-              animated: true,
-            });
-          }}
-        >
-          {streamMessages?.map((message) => {
-            if (message.type === "system") {
-              return (
-                <View key={String(message._id)} className="items-center">
-                  <Text className="rounded-full bg-white/10 px-3 py-1 text-[10px] text-white/50">
-                    {message.text}
-                  </Text>
-                </View>
-              );
-            }
-
-            return (
-              <View key={String(message._id)} className="flex-row items-start">
-                <Avatar
-                  uri={message.userAvatar}
-                  name={message.userName}
-                  size={28}
-                />
-
-                <View className="ml-2 max-w-[82%] rounded-2xl bg-black/60 px-3 py-2">
-                  <Text className="mb-0.5 text-[10px] font-bold text-purple-300">
-                    {message.userName}
-                  </Text>
-
-                  <Text className="text-xs leading-5 text-white">
-                    {message.text}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-
-        {/* Controls */}
-
-        <View className="border-t border-white/10 bg-black/40 px-4 pb-8 pt-3">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            className="mb-3"
-          >
-            {FLOATING_EMOJIS.map((emoji) => (
-              <Pressable
-                key={emoji}
-                onPress={() => addFloating(emoji)}
-                className="mr-2 h-10 w-10 items-center justify-center rounded-xl bg-white/10"
-              >
-                <Text className="text-lg">{emoji}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          <View className="flex-row items-center">
-            <Pressable
-              onPress={() => void handleLike()}
-              className={`h-11 w-11 items-center justify-center rounded-xl ${
-                liked ? "bg-red-500/30" : "bg-white/10"
-              }`}
-            >
-              <Heart
-                size={19}
-                color={liked ? "#F87171" : "rgba(255,255,255,0.7)"}
-                fill={liked ? "#F87171" : "transparent"}
-              />
-            </Pressable>
-
-            <View className="ml-2 flex-1 flex-row items-center rounded-2xl bg-white/10 px-3">
-              <TextInput
-                value={input}
-                onChangeText={setInput}
-                onSubmitEditing={() => {
-                  void sendMessage();
-                }}
-                placeholder="Commenter..."
-                placeholderTextColor="rgba(255,255,255,0.4)"
-                returnKeyType="send"
-                className="flex-1 py-3 text-sm text-white"
-              />
-
-              <Smile size={17} color="rgba(255,255,255,0.4)" />
-            </View>
-
-            <Pressable
-              onPress={() => void sendMessage()}
-              className="ml-2 h-11 w-11 items-center justify-center rounded-xl bg-indigo-500"
-            >
-              <Send size={17} color="#FFFFFF" />
-            </Pressable>
-
-            <Pressable
-              onPress={() => setMuted((previous) => !previous)}
-              className="ml-2 h-11 w-11 items-center justify-center rounded-xl bg-white/10"
-            >
-              {muted ? (
-                <MicOff size={17} color="#F87171" />
-              ) : (
-                <Mic size={17} color="rgba(255,255,255,0.7)" />
-              )}
-            </Pressable>
-          </View>
-
-          <Text className="mt-2 text-center text-[10px] text-white/50">
-            {likes.toLocaleString()} likes · {formatDuration(stream.startedAt)}{" "}
-            en direct
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Page
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function LiveStoriesPage({ onBack }: LiveStoriesPageProps) {
   const { isAuthenticated } = useConvexAuth();
-
   const [tab, setTab] = useState<Tab>("lives");
-
   const [activeLive, setActiveLive] = useState<LiveStreamData | null>(null);
+  const [activeStoryGroup, setActiveStoryGroup] = useState<StoryGroup | null>(null);
+  const [activeStoryIdx, setActiveStoryIdx] = useState(0);
 
-  const [activeStoryGroup, setActiveStoryGroup] = useState<StoryGroup | null>(
-    null,
-  );
-
-  const [activeStoryIndex, setActiveStoryIndex] = useState(0);
-
+  // Backend queries
   const liveStreams = useQuery(
     api.liveStreams.listLiveStreams,
-    isAuthenticated
-      ? {
-          status: "live",
-        }
-      : "skip",
+    isAuthenticated ? { status: "live" } : "skip"
   );
-
   const endedStreams = useQuery(
     api.liveStreams.listLiveStreams,
-    isAuthenticated
-      ? {
-          status: "ended",
-        }
-      : "skip",
+    isAuthenticated ? { status: "ended" } : "skip"
   );
-
   const storyGroups = useQuery(
     api.stories.listActiveStories,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated ? {} : "skip"
   );
 
-  const isLiveLoading = isAuthenticated && liveStreams === undefined;
+  const isLiveLoading = liveStreams === undefined && isAuthenticated;
+  const isStoriesLoading = storyGroups === undefined && isAuthenticated;
+  const isReplaysLoading = endedStreams === undefined && isAuthenticated;
 
-  const isStoriesLoading = isAuthenticated && storyGroups === undefined;
+  const totalLive = liveStreams?.reduce((s, l) => s + l.viewerCount, 0) ?? 0;
 
-  const isReplaysLoading = isAuthenticated && endedStreams === undefined;
-
-  const totalLive = useMemo(
-    () =>
-      liveStreams?.reduce((total, live) => total + live.viewerCount, 0) ?? 0,
-    [liveStreams],
-  );
-
-  const tabs: Array<{
-    id: Tab;
-    label: string;
-    icon: ComponentType<{
-      size?: number;
-      color?: string;
-    }>;
-    color: string;
-  }> = [
-    {
-      id: "lives",
-      label: "En direct",
-      icon: Radio,
-      color: "#EF4444",
-    },
-    {
-      id: "stories",
-      label: "Stories",
-      icon: Zap,
-      color: "#8B5CF6",
-    },
-    {
-      id: "replays",
-      label: "Replays",
-      icon: Play,
-      color: "#3B82F6",
-    },
+  const TABS: { id: Tab; label: string; icon: React.ElementType; color: string }[] = [
+    { id: "lives", label: "En direct", icon: Radio, color: "#EF4444" },
+    { id: "stories", label: "Stories", icon: Zap, color: "#8B5CF6" },
+    { id: "replays", label: "Replays", icon: Play, color: "#3B82F6" },
   ];
 
   return (
-    <View className="relative h-full flex-1 overflow-hidden bg-slate-950">
-      {/* Header */}
-
-      <View className="px-5 pb-1 pt-12">
-        <View className="mb-5 flex-row items-center">
-          <Pressable
-            onPress={onBack}
-            className="h-10 w-10 items-center justify-center rounded-xl bg-white/10"
-            accessibilityRole="button"
-            accessibilityLabel="Retour"
-          >
-            <ArrowLeft size={20} color="#FFFFFF" />
-          </Pressable>
-
-          <View className="ml-3 flex-1">
-            <Text className="text-lg font-black text-white">
-              Live & Stories
-            </Text>
-
-            <Text className="mt-0.5 text-[11px] text-white/40">
-              {isAuthenticated
-                ? `${totalLive.toLocaleString()} spectateurs en direct`
-                : "Connectez-vous pour accéder"}
-            </Text>
-          </View>
-
-          <Pressable
-            className="flex-row items-center rounded-xl bg-red-500 px-3 py-2"
-            accessibilityRole="button"
-          >
-            <Radio size={13} color="#FFFFFF" />
-
-            <Text className="ml-1.5 text-xs font-bold text-white">
-              Lancer un Live
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Tabs */}
-
-        <View className="mb-3 flex-row gap-2">
-          {tabs.map((item) => {
-            const Icon = item.icon;
-            const active = tab === item.id;
-
+    <View className="relative h-full w-full flex flex-col overflow-hidden" style={{  }}>{}<View className="absolute top-0 right-0 w-56 h-56 rounded-full pointer-events-none" style={{  }} /><View className="absolute bottom-16 left-0 w-48 h-48 rounded-full pointer-events-none" style={{  }} />{}<View className="flex-shrink-0 px-5 pt-6 pb-0"><View className="flex items-center gap-3 mb-5"><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View><Text className="text-lg font-black text-white">Live & Stories</Text><Text className="text-[11px] text-white/40">{isAuthenticated ? `${totalLive.toLocaleString()} spectateurs en direct` : "Connectez-vous pour accéder"}</Text></View><Pressable whileTap={{ scale: 0.92 }} className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white" style={{  }}><Radio size={12} />Lancer un Live
+          </Pressable></View>{}<View className="flex gap-2 mb-4">{TABS.map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.id;
             return (
-              <Pressable
-                key={item.id}
-                onPress={() => setTab(item.id)}
-                className="flex-1 flex-row items-center justify-center rounded-xl py-3"
-                style={{
-                  backgroundColor: active
-                    ? `${item.color}22`
-                    : "rgba(255,255,255,0.05)",
-                  borderWidth: 1,
-                  borderColor: active ? `${item.color}66` : "transparent",
-                }}
-              >
-                <Icon
-                  size={14}
-                  color={active ? item.color : "rgba(255,255,255,0.45)"}
-                />
-
-                <Text
-                  className="ml-1.5 text-xs font-bold"
-                  style={{
-                    color: active ? item.color : "rgba(255,255,255,0.45)",
-                  }}
-                >
-                  {item.label}
-                </Text>
-              </Pressable>
+              <Pressable key={t.id} onPress={() => setTab(t.id)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all" style={{ backgroundColor: active ? `${t.color}22` : "rgba(255,255,255,0.05)", borderColor: "transparent", borderStyle: "solid" }}><Icon size={13} />{t.label}</Pressable>
             );
-          })}
-        </View>
-      </View>
+          })}</View></View>{}{!isAuthenticated && (
+        <View className="flex-1 flex items-center justify-center px-5"><View className="text-center"><Text className="text-white/60 text-sm mb-2">Connectez-vous pour voir les lives et stories</Text></View></View>
+      )}{}{isAuthenticated && (
+        <View className="flex-1 overflow-y-auto px-5 pb-8" style={{  }}><View>{}{tab === "lives" && (
+              <View key="lives" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col gap-4">
+                {isLiveLoading ? (
+                  <LiveSkeleton />
+                ) : liveStreams && liveStreams.length > 0 ? (
+                  liveStreams.map((live, i) => (
+                    <Pressable key={live._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} whileTap={{ scale: 0.97 }} onPress={() => setActiveLive(live)} className="relative w-full rounded-3xl overflow-hidden text-left" style={{ height: 200 }}>
+                      {live.thumbnailUrl ? (
+                        <Image className="absolute inset-0 w-full h-full object-cover" source={{ uri: live.thumbnailUrl }} accessibilityLabel={live.title} />
+                      ) : (
+                        <View className="absolute inset-0" style={{  }} />
+                      )}
+                      <View className="absolute inset-0" style={{  }} />
+                      {/* Pulsing LIVE badge */}
+                      <View className="absolute top-3 left-3 flex items-center gap-1.5"><Text animate={{ opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 1.2 }} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black text-white" style={{  }}><Radio size={9} />LIVE
+                        </Text><Text className="px-2 py-1 rounded-full text-[10px] text-white/80" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>{formatDuration(live.startedAt)}</Text></View>
+                      <View className="absolute bottom-3 left-3 right-3"><View className="flex items-center gap-2 mb-1.5">{live.hostAvatar ? (
+                            <Image className="w-7 h-7 rounded-xl object-cover border border-white/30" source={{ uri: live.hostAvatar }} accessibilityLabel={live.hostName} />
+                          ) : (
+                            <View className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black text-white bg-purple-600 border border-white/30">{live.hostName[0]}</View>
+                          )}<Text className="text-xs font-bold text-white">{live.hostName}</Text></View><Text className="text-sm font-bold text-white leading-snug">{live.title}</Text><View className="flex items-center gap-3 mt-1.5"><Text className="flex items-center gap-1 text-[11px] text-white/70"><Eye size={11} />{live.viewerCount.toLocaleString()}</Text><Text className="flex items-center gap-1 text-[11px] text-white/70"><Heart size={11} />{live.likeCount.toLocaleString()}</Text>{live.tags.map((t) => (
+                            <Text key={t} className="text-[10px] text-white/50">#{t}</Text>
+                          ))}</View></View>
+                    </Pressable>
+                  ))
+                ) : (
+                  <View className="text-center py-12"><Radio size={32} className="text-white/20 mx-auto mb-3" /><Text className="text-sm text-white/40">Aucun live en cours</Text><Text className="text-xs text-white/25 mt-1">Revenez plus tard ou lancez votre propre live</Text></View>
+                )}
 
-      {/* Not authenticated */}
-
-      {!isAuthenticated && (
-        <View className="flex-1 items-center justify-center px-8">
-          <Text className="text-center text-sm text-white/60">
-            Connectez-vous pour voir les lives et les stories.
-          </Text>
-        </View>
-      )}
-
-      {/* Content */}
-
-      {isAuthenticated && (
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="px-5 pb-10 pt-3"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* LIVES */}
-
-          {tab === "lives" && (
-            <View className="gap-4">
-              {isLiveLoading ? (
-                <LiveSkeleton />
-              ) : liveStreams && liveStreams.length > 0 ? (
-                liveStreams.map((live) => (
-                  <Pressable
-                    key={String(live._id)}
-                    onPress={() => setActiveLive(live as LiveStreamData)}
-                    className="relative h-[200px] overflow-hidden rounded-3xl bg-purple-950"
-                  >
-                    {isRemoteImage(live.thumbnailUrl) && (
-                      <Image
-                        source={{
-                          uri: live.thumbnailUrl,
-                        }}
-                        resizeMode="cover"
-                        className="absolute inset-0 h-full w-full"
-                      />
-                    )}
-
-                    <View className="absolute inset-0 bg-black/35" />
-
-                    <View className="absolute left-3 top-3 flex-row items-center">
-                      <View className="flex-row items-center rounded-full bg-red-500 px-3 py-1">
-                        <Radio size={10} color="#FFFFFF" />
-
-                        <Text className="ml-1 text-[10px] font-black text-white">
-                          LIVE
-                        </Text>
-                      </View>
-
-                      <View className="ml-2 rounded-full bg-black/60 px-2 py-1">
-                        <Text className="text-[10px] text-white">
-                          {formatDuration(live.startedAt)}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View className="absolute inset-x-3 bottom-3">
-                      <View className="mb-2 flex-row items-center">
-                        <Avatar
-                          uri={live.hostAvatar}
-                          name={live.hostName}
-                          size={30}
-                          borderColor="rgba(255,255,255,0.5)"
-                        />
-
-                        <Text className="ml-2 text-xs font-bold text-white">
-                          {live.hostName}
-                        </Text>
-                      </View>
-
-                      <Text
-                        numberOfLines={2}
-                        className="text-sm font-bold text-white"
-                      >
-                        {live.title}
-                      </Text>
-
-                      <View className="mt-2 flex-row items-center">
-                        <View className="mr-4 flex-row items-center">
-                          <Eye size={12} color="rgba(255,255,255,0.75)" />
-
-                          <Text className="ml-1 text-[11px] text-white/75">
-                            {live.viewerCount.toLocaleString()}
-                          </Text>
-                        </View>
-
-                        <View className="flex-row items-center">
-                          <Heart size={12} color="rgba(255,255,255,0.75)" />
-
-                          <Text className="ml-1 text-[11px] text-white/75">
-                            {live.likeCount.toLocaleString()}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </Pressable>
-                ))
-              ) : (
-                <View className="items-center py-12">
-                  <Radio size={34} color="rgba(255,255,255,0.2)" />
-
-                  <Text className="mt-3 text-sm text-white/40">
-                    Aucun live en cours
-                  </Text>
-
-                  <Text className="mt-1 text-center text-xs text-white/25">
-                    Revenez plus tard ou lancez votre propre live.
-                  </Text>
-                </View>
-              )}
-
-              <View className="mt-1 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <View className="flex-row items-center">
-                  <Clock size={15} color="#A78BFA" />
-
-                  <Text className="ml-2 text-sm font-bold text-white">
-                    Prochains lives
-                  </Text>
-                </View>
-
-                <Text className="py-4 text-center text-xs text-white/40">
-                  Aucun live programmé pour le moment.
-                </Text>
+                {/* Scheduled lives placeholder */}
+                <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-3"><Clock size={14} className="text-purple-400" /><Text className="text-sm font-bold text-white">Prochains lives</Text></View><Text className="text-xs text-white/40 text-center py-4">Aucun live programmé pour le moment</Text></View>
               </View>
-            </View>
-          )}
+            )}{}{tab === "stories" && (
+              <View key="stories" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+                {/* Create story CTA */}
+                <Pressable whileTap={{ scale: 0.97 }} className="w-full flex items-center gap-3 p-4 rounded-2xl mb-4" style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}>
+                  <View className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{  }}><Plus size={22} className="text-white" /></View>
+                  <View className="text-left"><Text className="text-sm font-bold text-white">Créer une story</Text><Text className="text-[11px] text-white/50">Photo, texte, sondage ou question</Text></View>
+                  <ChevronRight size={16} className="text-white/30 ml-auto" />
+                </Pressable>
 
-          {/* STORIES */}
+                {isStoriesLoading ? (
+                  <StoriesSkeleton />
+                ) : storyGroups && storyGroups.length > 0 ? (
+                  <View className="gap-3">{storyGroups.map((group, i) => {
+                      const firstStory = group.stories[0];
+                      if (!firstStory) return null;
+                      const bg = getStoryBackground(firstStory.mediaUrl);
+                      const text = getStoryText(firstStory.mediaUrl, firstStory.caption);
+                      const isImageUrl = firstStory.mediaUrl.startsWith("http");
 
-          {tab === "stories" && (
-            <View>
-              <Pressable
-                className="mb-4 flex-row items-center rounded-2xl border border-purple-500/30 bg-purple-500/10 p-4"
-                accessibilityRole="button"
-              >
-                <View className="h-12 w-12 items-center justify-center rounded-2xl bg-purple-600">
-                  <Plus size={23} color="#FFFFFF" />
-                </View>
+                      return (
+                        <Pressable key={group.author.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} whileTap={{ scale: 0.96 }} onPress={() => { setActiveStoryGroup(group); setActiveStoryIdx(0); }} className="relative rounded-2xl overflow-hidden text-left" style={{ aspectRatio: "9/14", backgroundColor: bg }}>
+                          {isImageUrl && <Image className="absolute inset-0 w-full h-full object-cover" source={{ uri: firstStory.mediaUrl }} accessibilityLabel="" />}
+                          <View className="absolute inset-0" style={{  }} />
 
-                <View className="ml-3 flex-1">
-                  <Text className="text-sm font-bold text-white">
-                    Créer une story
-                  </Text>
-
-                  <Text className="mt-1 text-[11px] text-white/50">
-                    Photo, texte, sondage ou question
-                  </Text>
-                </View>
-
-                <ChevronRight size={18} color="rgba(255,255,255,0.3)" />
-              </Pressable>
-
-              {isStoriesLoading ? (
-                <StoriesSkeleton />
-              ) : storyGroups && storyGroups.length > 0 ? (
-                <View className="flex-row flex-wrap justify-between">
-                  {storyGroups.map((group) => {
-                    const firstStory = group.stories[0];
-
-                    if (!firstStory) {
-                      return null;
-                    }
-
-                    const backgroundColor = getStoryBackground(
-                      firstStory.mediaUrl,
-                    );
-
-                    const storyText = getStoryText(
-                      firstStory.mediaUrl,
-                      firstStory.caption,
-                    );
-
-                    return (
-                      <Pressable
-                        key={String(group.author.id)}
-                        onPress={() => {
-                          setActiveStoryGroup(group as StoryGroup);
-                          setActiveStoryIndex(0);
-                        }}
-                        className="relative mb-3 w-[48%] overflow-hidden rounded-2xl"
-                        style={{
-                          aspectRatio: 9 / 14,
-                          backgroundColor,
-                        }}
-                      >
-                        {isRemoteImage(firstStory.mediaUrl) && (
-                          <Image
-                            source={{
-                              uri: firstStory.mediaUrl,
-                            }}
-                            resizeMode="cover"
-                            className="absolute inset-0 h-full w-full"
-                          />
-                        )}
-
-                        <View className="absolute inset-0 bg-black/20" />
-
-                        {group.hasUnviewed && (
-                          <View className="absolute left-2 top-2 h-2.5 w-2.5 rounded-full bg-purple-500" />
-                        )}
-
-                        <View className="absolute inset-x-0 bottom-0 bg-black/50 p-3">
-                          <View className="flex-row items-center">
-                            <Avatar
-                              uri={group.author.avatar}
-                              name={group.author.name}
-                              size={22}
-                            />
-
-                            <Text
-                              numberOfLines={1}
-                              className="ml-2 flex-1 text-[10px] font-bold text-white"
-                            >
-                              {group.author.name.split(" ")[0]}
-                            </Text>
-                          </View>
-
-                          {storyText && (
-                            <Text
-                              numberOfLines={2}
-                              className="mt-2 text-[10px] leading-4 text-white/80"
-                            >
-                              {storyText}
-                            </Text>
+                          {/* Unviewed indicator */}
+                          {group.hasUnviewed && (
+                            <View className="absolute top-2 left-2 w-2 h-2 rounded-full bg-purple-500" />
                           )}
 
-                          <View className="mt-2 flex-row items-center">
-                            <Eye size={10} color="rgba(255,255,255,0.5)" />
-
-                            <Text className="ml-1 text-[9px] text-white/60">
-                              {firstStory.viewCount}
-                            </Text>
-
-                            <Text className="ml-auto text-[9px] text-white/40">
-                              {timeAgo(firstStory._creationTime)}
-                            </Text>
-                          </View>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : (
-                <View className="items-center py-12">
-                  <Zap size={34} color="rgba(255,255,255,0.2)" />
-
-                  <Text className="mt-3 text-sm text-white/40">
-                    Aucune story active
-                  </Text>
-
-                  <Text className="mt-1 text-xs text-white/25">
-                    Les stories disparaissent après 24h.
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* REPLAYS */}
-
-          {tab === "replays" && (
-            <View className="gap-3">
-              {isReplaysLoading ? (
-                <ReplaysSkeleton />
-              ) : endedStreams && endedStreams.length > 0 ? (
-                endedStreams.map((replay) => (
-                  <Pressable
-                    key={String(replay._id)}
-                    onPress={() => setActiveLive(replay as LiveStreamData)}
-                    className="flex-row rounded-2xl border border-white/10 bg-white/5 p-3"
-                  >
-                    <View className="relative h-20 w-28 overflow-hidden rounded-xl bg-purple-950">
-                      {isRemoteImage(replay.thumbnailUrl) && (
-                        <Image
-                          source={{
-                            uri: replay.thumbnailUrl,
-                          }}
-                          resizeMode="cover"
-                          className="h-full w-full"
-                        />
-                      )}
-
-                      <View className="absolute inset-0 items-center justify-center bg-black/40">
-                        <View className="h-9 w-9 items-center justify-center rounded-full bg-white/20">
-                          <Play size={15} color="#FFFFFF" />
-                        </View>
-                      </View>
+                          <View className="absolute bottom-0 left-0 right-0 p-2.5"><View className="flex items-center gap-1.5 mb-1">{group.author.avatar ? (
+                                <Image className="w-5 h-5 rounded-md object-cover" source={{ uri: group.author.avatar }} accessibilityLabel="" />
+                              ) : (
+                                <View className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black text-white bg-purple-600">{group.author.name[0]}</View>
+                              )}<Text className="text-[10px] font-bold text-white truncate">{group.author.name.split(" ")[0]}</Text></View>{text && <Text className="text-[10px] text-white/80 leading-tight">{text}</Text>}<View className="flex items-center gap-1.5 mt-1"><Eye size={9} className="text-white/50" /><Text className="text-[9px] text-white/50">{firstStory.viewCount}</Text><Text className="text-[9px] text-white/30 ml-auto">{timeAgo(firstStory._creationTime)}</Text></View></View>
+                        </Pressable>
+                      );
+                    })}</View>
+                ) : (
+                  <View className="text-center py-12"><Zap size={32} className="text-white/20 mx-auto mb-3" /><Text className="text-sm text-white/40">Aucune story active</Text><Text className="text-xs text-white/25 mt-1">Les stories disparaissent après 24h</Text></View>
+                )}
+              </View>
+            )}{}{tab === "replays" && (
+              <View key="replays" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex flex-col gap-3">
+                {isReplaysLoading ? (
+                  <ReplaysSkeleton />
+                ) : endedStreams && endedStreams.length > 0 ? (
+                  endedStreams.map((r, i) => (
+                    <View key={r._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} className="relative w-full rounded-2xl overflow-hidden text-left flex gap-3 p-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
+                      <View className="relative w-28 h-20 rounded-xl overflow-hidden flex-shrink-0">{r.thumbnailUrl ? (
+                          <Image className="w-full h-full object-cover" source={{ uri: r.thumbnailUrl }} accessibilityLabel={r.title} />
+                        ) : (
+                          <View className="w-full h-full" style={{  }} />
+                        )}<View className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}><View className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.2)" }}><Play size={14} className="text-white ml-0.5" /></View></View>{r.startedAt && r.endedAt && (
+                          <Text className="absolute bottom-1 right-1 text-[9px] text-white font-bold px-1.5 py-0.5 rounded-md" style={{ backgroundColor: "rgba(0,0,0,0.7)" }}>{formatDuration(r.startedAt)}</Text>
+                        )}</View>
+                      <View className="flex-1 min-w-0"><Text className="text-sm font-bold text-white leading-snug">{r.title}</Text><View className="flex items-center gap-1.5 mt-1.5">{r.hostAvatar ? (
+                            <Image className="w-4 h-4 rounded-md object-cover" source={{ uri: r.hostAvatar }} accessibilityLabel="" />
+                          ) : (
+                            <View className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-bold text-white bg-purple-600">{r.hostName[0]}</View>
+                          )}<Text className="text-[10px] text-white/50">{r.hostName}</Text></View><View className="flex items-center gap-3 mt-1.5"><Text className="flex items-center gap-1 text-[10px] text-white/40"><Eye size={9} />{r.peakViewers.toLocaleString()}</Text><Text className="flex items-center gap-1 text-[10px] text-white/40"><Heart size={9} />{r.likeCount.toLocaleString()}</Text></View></View>
                     </View>
-
-                    <View className="ml-3 flex-1 justify-center">
-                      <Text
-                        numberOfLines={2}
-                        className="text-sm font-bold text-white"
-                      >
-                        {replay.title}
-                      </Text>
-
-                      <View className="mt-2 flex-row items-center">
-                        <Avatar
-                          uri={replay.hostAvatar}
-                          name={replay.hostName}
-                          size={18}
-                        />
-
-                        <Text className="ml-2 text-[10px] text-white/50">
-                          {replay.hostName}
-                        </Text>
-                      </View>
-
-                      <View className="mt-2 flex-row">
-                        <View className="mr-4 flex-row items-center">
-                          <Eye size={10} color="rgba(255,255,255,0.4)" />
-
-                          <Text className="ml-1 text-[10px] text-white/40">
-                            {replay.peakViewers.toLocaleString()}
-                          </Text>
-                        </View>
-
-                        <View className="flex-row items-center">
-                          <Heart size={10} color="rgba(255,255,255,0.4)" />
-
-                          <Text className="ml-1 text-[10px] text-white/40">
-                            {replay.likeCount.toLocaleString()}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </Pressable>
-                ))
-              ) : (
-                <View className="items-center py-12">
-                  <Play size={34} color="rgba(255,255,255,0.2)" />
-
-                  <Text className="mt-3 text-sm text-white/40">
-                    Aucun replay disponible
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-        </ScrollView>
-      )}
-
-      {/* Live overlay */}
-
-      {activeLive && (
-        <LiveViewer stream={activeLive} onClose={() => setActiveLive(null)} />
-      )}
-
-      {/* Story overlay */}
-
-      {activeStoryGroup && activeStoryGroup.stories[activeStoryIndex] && (
-        <StoryCard
-          story={activeStoryGroup.stories[activeStoryIndex]}
-          authorName={activeStoryGroup.author.name}
-          authorAvatar={activeStoryGroup.author.avatar}
-          onClose={() => setActiveStoryGroup(null)}
-        />
-      )}
-    </View>
+                  ))
+                ) : (
+                  <View className="text-center py-12">
+                    <Play size={32} className="text-white/20 mx-auto mb-3" />
+                    <Text className="text-sm text-white/40">Aucun replay disponible</Text>
+                  </View>
+                )}
+              </View>
+            )}</View></View>
+      )}{}<View>{activeLive && <LiveViewer stream={activeLive} onClose={() => setActiveLive(null)} />}</View>{}<View>{activeStoryGroup && activeStoryGroup.stories[activeStoryIdx] && (
+          <StoryCard
+            story={activeStoryGroup.stories[activeStoryIdx]}
+            authorName={activeStoryGroup.author.name}
+            authorAvatar={activeStoryGroup.author.avatar}
+            onClose={() => setActiveStoryGroup(null)}
+          />
+        )}</View></View>
   );
 }

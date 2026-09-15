@@ -59,58 +59,33 @@ export function TransportForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        {/* Départ et Arrivée */}
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="origin"
-            render={({ field }) => (
+      <View className="space-y-4">{}<View className="gap-4"><FormField control={form.control} name="origin" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Départ *</Text></FormLabel>
+                <FormLabel>Départ *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Gombe, Kinshasa" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="destination"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="destination" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Arrivée *</Text></FormLabel>
+                <FormLabel>Arrivée *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Lemba, Kinshasa" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        {/* Heure et Véhicule */}
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="departureTime"
-            render={({ field }) => (
+            )} /></View>{}<View className="gap-4"><FormField control={form.control} name="departureTime" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Heure de départ *</Text></FormLabel>
+                <FormLabel>Heure de départ *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: 14:30" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="vehicleType"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="vehicleType" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Type de véhicule *</Text></FormLabel>
+                <FormLabel>Type de véhicule *</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -122,41 +97,28 @@ export function TransportForm({
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="voiture">
-                      <Text>Voiture (Covoiturage)</Text></SelectItem>
-                    <SelectItem value="taxi"><Text>Taxi</Text></SelectItem>
-                    <SelectItem value="moto"><Text>Moto-Taxi</Text></SelectItem>
-                    <SelectItem value="minibus"><Text>Minibus</Text></SelectItem>
-                    <SelectItem value="bus"><Text>Bus</Text></SelectItem>
-                    <SelectItem value="camion"><Text>Camion (Fret)</Text></SelectItem>
+                      Voiture (Covoiturage)
+                    </SelectItem>
+                    <SelectItem value="taxi">Taxi</SelectItem>
+                    <SelectItem value="moto">Moto-Taxi</SelectItem>
+                    <SelectItem value="minibus">Minibus</SelectItem>
+                    <SelectItem value="bus">Bus</SelectItem>
+                    <SelectItem value="camion">Camion (Fret)</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        {/* Tarif et Devise */}
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="pricePerSeat"
-            render={({ field }) => (
+            )} /></View>{}<View className="gap-4"><FormField control={form.control} name="pricePerSeat" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Tarif par place *</Text></FormLabel>
+                <FormLabel>Tarif par place *</FormLabel>
                 <FormControl>
                   <Input type="number" placeholder="1500" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -167,25 +129,18 @@ export function TransportForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        {/* Compteur de Places */}
-        <FormField
-          control={form.control}
-          name="seats"
-          render={({ field }) => (
+            )} /></View>{}<FormField control={form.control} name="seats" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nombre de places disponibles *</Text></FormLabel>
+              <FormLabel>Nombre de places disponibles *</FormLabel>
               <View className="flex items-center gap-4">
                 <Button
+                  
                   variant="outline"
                   size="icon"
                   className="w-10 h-10 rounded-xl"
@@ -197,6 +152,7 @@ export function TransportForm({
                   {field.value}
                 </Text>
                 <Button
+                  
                   variant="outline"
                   size="icon"
                   className="w-10 h-10 rounded-xl"
@@ -207,47 +163,27 @@ export function TransportForm({
               </View>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Modèle et Plaque */}
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="vehicleModel"
-            render={({ field }) => (
+          )} />{}<View className="gap-4"><FormField control={form.control} name="vehicleModel" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Modèle du véhicule</Text></FormLabel>
+                <FormLabel>Modèle du véhicule</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Toyota Wish, 2014" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="vehiclePlate"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="vehiclePlate" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Plaque d'immatriculation</Text></FormLabel>
+                <FormLabel>Plaque d'immatriculation</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: 5678AB01" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        {/* Description / Remarques */}
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
+            )} /></View>{}<FormField control={form.control} name="description" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Remarques (Climatisation, bagages acceptés...)</Text></FormLabel>
+                Remarques (Climatisation, bagages acceptés...)
+              </FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Ex: Coffre libre pour valises moyennes. Climatisation opérationnelle."
@@ -256,18 +192,7 @@ export function TransportForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Bouton de Soumission */}
-        <Button
-          className="w-full h-12 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold"
-          disabled={isLoading}
-        >
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isLoading ? "Enregistrement..." : submitLabel}
-        </Button>
-      </View>
+          )} />{}<Button  className="w-full h-12 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isLoading ? "Enregistrement..." : submitLabel}</Button></View>
     </Form>
   );
 }

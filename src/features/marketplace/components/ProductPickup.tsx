@@ -69,27 +69,11 @@ export function ProductPickup({ onSelect, selectedId }: ProductPickupProps) {
   };
 
   return (
-    <View className="space-y-4">
-      {/* Titre et description */}
-      <View className="flex items-start justify-between">
-        <View>
-          <Text className="text-white font-medium">Points de retrait</Text>
-          <Text className="text-white/40 text-xs">
-            Choisissez un point pour récupérer votre produit
-          </Text>
-        </View>
-        {loading && (
+    <View className="space-y-4">{}<View className="flex items-start justify-between"><View><Text className="text-white font-medium">Points de retrait</Text><Text className="text-white/40 text-xs">Choisissez un point pour récupérer votre produit
+          </Text></View>{loading && (
           <Loader2 size={16} className="text-orange-400 animate-spin" />
-        )}
-      </View>
-
-      {/* Liste des points */}
-      <View className="space-y-2.5">
-        {MOCK_PICKUP_POINTS.map((point) => (
-          <Pressable
-            key={point.id}
-            onPress={() => point.available && handleSelect(point)}
-            className={`
+        )}</View>{}<View className="space-y-2.5">{MOCK_PICKUP_POINTS.map((point) => (
+          <View key={point.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} onPress={() => point.available && handleSelect(point)} className={`
               relative rounded-2xl p-4 cursor-pointer transition-all
               ${!point.available && "opacity-50 cursor-not-allowed"}
               ${
@@ -97,86 +81,39 @@ export function ProductPickup({ onSelect, selectedId }: ProductPickupProps) {
                   ? "bg-orange-500/20 border border-orange-500/40"
                   : "bg-white/5 border border-white/5 hover:bg-white/10"
               }
-            `}
-          >
-            <View className="flex items-start gap-3">
-              <View className="flex-1 min-w-0">
-                <View className="flex items-center gap-2">
-                  <Text className="text-white font-medium text-sm">
-                    {point.name}
-                  </Text>
-                  {point.available ? (
-                    <Text className="text-[10px] text-green-400 bg-green-500/20 px-2 py-0.5 rounded-full">
-                      Disponible
+            `}>
+            <View className="flex items-start gap-3"><View className="flex-1 min-w-0"><View className="flex items-center gap-2"><Text className="text-white font-medium text-sm">{point.name}</Text>{point.available ? (
+                    <Text className="text-[10px] text-green-400 bg-green-500/20 px-2 py-0.5 rounded-full">Disponible
                     </Text>
                   ) : (
-                    <Text className="text-[10px] text-red-400 bg-red-500/20 px-2 py-0.5 rounded-full">
-                      Indisponible
+                    <Text className="text-[10px] text-red-400 bg-red-500/20 px-2 py-0.5 rounded-full">Indisponible
                     </Text>
-                  )}
-                </View>
-                <View className="flex items-center gap-1.5 mt-1">
-                  <MapPin size={12} className="text-white/30 flex-shrink-0" />
-                  <Text className="text-white/60 text-xs truncate">
-                    {point.address}
-                  </Text>
-                </View>
-                <View className="flex items-center gap-3 mt-1.5 flex-wrap">
-                  <View className="flex items-center gap-1">
-                    <Clock size={10} className="text-white/30" />
-                    <Text className="text-white/40 text-[10px]">
-                      {point.openingHours}
-                    </Text>
-                  </View>
-                  <View className="flex items-center gap-1">
-                    <Navigation size={10} className="text-white/30" />
-                    <Text className="text-white/40 text-[10px]">
-                      {point.distance}
-                    </Text>
-                  </View>
-                  {point.phone && (
+                  )}</View><View className="flex items-center gap-1.5 mt-1"><MapPin size={12} className="text-white/30 flex-shrink-0" /><Text className="text-white/60 text-xs truncate">{point.address}</Text></View><View className="flex items-center gap-3 mt-1.5 flex-wrap"><View className="flex items-center gap-1"><Clock size={10} className="text-white/30" /><Text className="text-white/40 text-[10px]">{point.openingHours}</Text></View><View className="flex items-center gap-1"><Navigation size={10} className="text-white/30" /><Text className="text-white/40 text-[10px]">{point.distance}</Text></View>{point.phone && (
                     <View className="flex items-center gap-1">
                       <Phone size={10} className="text-white/30" />
                       <Text className="text-white/40 text-[10px]">
                         {point.phone}
                       </Text>
                     </View>
-                  )}
-                </View>
-              </View>
-              {selected === point.id && (
+                  )}</View></View>{selected === point.id && (
                 <CheckCircle
                   size={20}
                   className="text-orange-400 flex-shrink-0 mt-1"
                 />
-              )}
-            </View>
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Action pour localiser */}
-      <Pressable
-        onPress={() => {
+              )}</View>
+          </View>
+        ))}</View>{}<Pressable onPress={() => {
           setLoading(true);
           setTimeout(() => setLoading(false), 1000);
           // Simuler ouverture d'une carte / géolocalisation
-        }}
-        className="w-full py-2.5 rounded-xl bg-orange-500/20 text-orange-400 text-sm font-medium flex items-center justify-center gap-2"
-        disabled={loading}
-      >
-        {loading ? (
+        }} className="w-full py-2.5 rounded-xl bg-orange-500/20 text-orange-400 text-sm font-medium transition-colors flex items-center justify-center gap-2" disabled={loading}>{loading ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <>
             <Navigation size={14} />
-            <Text>Trouver un point près de moi</Text></>
-        )}
-      </Pressable>
-
-      {/* Indication sur la disponibilité */}
-      <Text className="text-white/30 text-[10px] text-center">
-        <Text>Les horaires peuvent varier selon les jours fériés</Text></Text>
-    </View>
+            Trouver un point près de moi
+          </>
+        )}</Pressable>{}<Text className="text-white/30 text-[10px] text-center">Les horaires peuvent varier selon les jours fériés
+      </Text></View>
   );
 }

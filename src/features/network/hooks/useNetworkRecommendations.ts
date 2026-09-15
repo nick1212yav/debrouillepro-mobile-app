@@ -1,9 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/hooks/useNetworkRecommendations.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 
 export interface NetworkRecommendation {
   _id: Id<"networkRecommendations">;
@@ -47,10 +46,10 @@ export function useNetworkRecommendations({
   ) => {
     try {
       const id = await addRecommendation({ receiverId: userId, ...data });
-      UIService.openToast("Recommandation envoyée", "success");
+      toast.success("Recommandation envoyée");
       return id;
     } catch {
-      UIService.openToast("Erreur lors de l'envoi", "error");
+      toast.error("Erreur lors de l'envoi");
       return null;
     }
   };
@@ -60,10 +59,10 @@ export function useNetworkRecommendations({
   ) => {
     try {
       await deleteRecommendation({ id: recommendationId });
-      UIService.openToast("Recommandation supprimée", "success");
+      toast.success("Recommandation supprimée");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
       return false;
     }
   };

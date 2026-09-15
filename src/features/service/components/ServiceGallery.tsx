@@ -72,56 +72,33 @@ export function ServiceGallery({ images, title }: Props) {
                 <Loader2 className="w-8 h-8 text-white/60 animate-spin" />
               </View>
             )}
-            <Image
-              key={currentImage || `img-${currentIndex}`}
-              className={`w-full h-full object-cover cursor-pointer transition-opacity duration-300 ${
+            <Image key={currentImage || `img-${currentIndex}`} className={`w-full h-full object-cover cursor-pointer transition-opacity duration-300 ${
                 isLoadingImg ? "opacity-0" : "opacity-100"
-              }`}
-              onPress={() => setIsFullscreen(true)}
-              onLoad={() => handleImageLoad(currentIndex)}
-              onError={() => handleImageError(currentIndex)} source={{ uri: currentImage }} accessibilityLabel={`${title} - ${currentIndex + 1}`}
-            />
+              }`} onPress={() => setIsFullscreen(true)} source={{ uri: currentImage }} accessibilityLabel={`${title} - ${currentIndex + 1}`} />
           </View>
         )}
 
         {validImages.length > 1 && (
           <>
-            <Pressable
-              onPress={goToPrevious}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center z-10"
-              accessibilityLabel="Image précédente"
-            >
+            <Pressable onPress={goToPrevious} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center transition-colors z-10" accessibilityLabel="Image précédente">
               <ChevronLeft size={18} />
             </Pressable>
-            <Pressable
-              onPress={goToNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center z-10"
-              accessibilityLabel="Image suivante"
-            >
+            <Pressable onPress={goToNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center transition-colors z-10" accessibilityLabel="Image suivante">
               <ChevronRight size={18} />
             </Pressable>
             <View className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
               {validImages.map((_, idx) => (
-                <Pressable
-                  key={idx}
-                  onPress={() => setCurrentIndex(idx)}
-                  className={`w-2 h-2 rounded-full transition-all ${
+                <Pressable key={idx} onPress={() => setCurrentIndex(idx)} className={`w-2 h-2 rounded-full transition-all ${
                     idx === currentIndex
                       ? "bg-white w-4"
                       : "bg-white/40 hover:bg-white/60"
-                  }`}
-                  accessibilityLabel={`Aller à l'image ${idx + 1}`}
-                />
+                  }`} accessibilityLabel={`Aller à l'image ${idx + 1}`} />
               ))}
             </View>
-            <View className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-full z-10">
+            <View className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full z-10">
               {currentIndex + 1} / {validImages.length}
             </View>
-            <Pressable
-              onPress={() => setIsFullscreen(true)}
-              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center z-10"
-              accessibilityLabel="Plein écran"
-            >
+            <Pressable onPress={() => setIsFullscreen(true)} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center transition-colors z-10" accessibilityLabel="Plein écran">
               <Maximize2 size={14} />
             </Pressable>
           </>
@@ -129,21 +106,12 @@ export function ServiceGallery({ images, title }: Props) {
       </View>
 
       {/* Modal plein écran */}
-      <>
+<View>
         {isFullscreen && (
           <>
-            <Pressable
-              onPress={() => setIsFullscreen(false)}
-              className="fixed inset-0 z-50 bg-black/95"
-            />
-            <View
-              className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
-            >
-              <Pressable
-                onPress={() => setIsFullscreen(false)}
-                className="absolute top-4 right-4 text-white/70 z-10"
-                accessibilityLabel="Fermer"
-              >
+            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setIsFullscreen(false)} className="fixed inset-0 z-50 bg-black/95" />
+            <View initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4">
+              <Pressable onPress={() => setIsFullscreen(false)} className="absolute top-4 right-4 text-white/70 z-10 transition-colors" accessibilityLabel="Fermer">
                 <X size={28} />
               </Pressable>
 
@@ -153,31 +121,19 @@ export function ServiceGallery({ images, title }: Props) {
                     <Text className="text-white/20 text-6xl">🖼️</Text>
                   </View>
                 ) : (
-                  <Image
-                    key={currentImage || `fullscreen-${currentIndex}`}
-                    className="w-full h-full object-contain"
-                    onError={() => handleImageError(currentIndex)} source={{ uri: currentImage }} accessibilityLabel={`${title} - ${currentIndex + 1}`}
-                  />
+                  <Image key={currentImage || `fullscreen-${currentIndex}`} className="w-full h-full object-contain" source={{ uri: currentImage }} accessibilityLabel={`${title} - ${currentIndex + 1}`} />
                 )}
               </View>
 
               {validImages.length > 1 && (
                 <View className="flex items-center gap-4 mt-4 z-10">
-                  <Pressable
-                    onPress={goToPrevious}
-                    className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"
-                    accessibilityLabel="Précédent"
-                  >
+                  <Pressable onPress={goToPrevious} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white transition-colors" accessibilityLabel="Précédent">
                     <ChevronLeft size={20} />
                   </Pressable>
                   <Text className="text-white/60 text-sm font-medium">
                     {currentIndex + 1} / {validImages.length}
                   </Text>
-                  <Pressable
-                    onPress={goToNext}
-                    className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"
-                    accessibilityLabel="Suivant"
-                  >
+                  <Pressable onPress={goToNext} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white transition-colors" accessibilityLabel="Suivant">
                     <ChevronRight size={20} />
                   </Pressable>
                 </View>
@@ -185,7 +141,7 @@ export function ServiceGallery({ images, title }: Props) {
             </View>
           </>
         )}
-      </>
+      </View>
     </>
   );
 }

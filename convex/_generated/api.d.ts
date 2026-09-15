@@ -61,6 +61,7 @@ import type * as health from "../health.js";
 import type * as hebergement from "../hebergement.js";
 import type * as home from "../home.js";
 import type * as homeAnalytics from "../homeAnalytics.js";
+import type * as homeBuilder from "../homeBuilder.js";
 import type * as homeContext from "../homeContext.js";
 import type * as homeIntelligence from "../homeIntelligence.js";
 import type * as homeRanking from "../homeRanking.js";
@@ -197,6 +198,7 @@ declare const fullApi: ApiFromModules<{
   hebergement: typeof hebergement;
   home: typeof home;
   homeAnalytics: typeof homeAnalytics;
+  homeBuilder: typeof homeBuilder;
   homeContext: typeof homeContext;
   homeIntelligence: typeof homeIntelligence;
   homeRanking: typeof homeRanking;

@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { Pressable } from "react-native";
 
 // src/features/network/components/common/FollowButton.tsx
@@ -7,6 +6,7 @@ import { UserPlus, UserCheck, Loader2 } from "lucide-react-native";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface FollowButtonProps {
@@ -41,9 +41,9 @@ export function FollowButton({
 
       setIsFollowing(result);
       onToggle?.(result);
-      UIService.openToast(result ? "Abonnement confirmé" : "Abonnement retiré", "success");
+      toast.success(result ? "Abonnement confirmé" : "Abonnement retiré");
     } catch {
-      UIService.openToast("Impossible de modifier l'abonnement", "error");
+      toast.error("Impossible de modifier l'abonnement");
     } finally {
       setLoading(false);
     }
@@ -55,23 +55,18 @@ export function FollowButton({
       : "px-5 py-2.5 text-sm rounded-2xl gap-2";
 
   return (
-    <Pressable
-      onPress={() => void handleClick()}
-      disabled={loading}
-      className={cn(
+    <Pressable onPress={() => void handleClick()} disabled={loading} className={cn(
         "flex items-center justify-center font-bold transition-all active:scale-95 cursor-pointer disabled:opacity-50",
         sizeClasses,
         isFollowing
           ? "bg-white/10 text-white/70 border border-white/10 hover:bg-white/15"
           : "text-white border-none",
         className,
-      )}
-      style={
+      )} style={
         isFollowing
           ? undefined
-          : {  }
-      }
-    >
+          : { boxShadow: "0 4px 16px rgba(99,102,241,0.35)" }
+      }>
       {loading ? (
         <Loader2 size={size === "sm" ? 14 : 16} className="animate-spin" />
       ) : isFollowing ? (

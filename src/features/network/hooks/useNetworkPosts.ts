@@ -1,9 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/hooks/useNetworkPosts.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 
 export interface NetworkPost {
   _id: Id<"publications">;
@@ -43,7 +42,7 @@ export function useNetworkPosts({ userId }: UseNetworkPostsOptions = {}) {
       // ✅ Correction : utilise l'argument 'publicationId' attendu par la mutation
       await likePost({ publicationId: postId });
     } catch {
-      UIService.openToast("Impossible de modifier le like", "error");
+      toast.error("Impossible de modifier le like");
     }
   };
 
@@ -51,10 +50,10 @@ export function useNetworkPosts({ userId }: UseNetworkPostsOptions = {}) {
     try {
       // ✅ Correction : utilise l'argument 'publicationId' attendu par la mutation
       await deletePost({ publicationId: postId });
-      UIService.openToast("Publication supprimée", "success");
+      toast.success("Publication supprimée");
       return true;
     } catch {
-      UIService.openToast("Impossible de supprimer la publication", "error");
+      toast.error("Impossible de supprimer la publication");
       return false;
     }
   };

@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { useState } from "react";
-import { useSearchParams } from "expo-router";
+import { useSearchParams } from "react-router-dom";
 import { AuthLayout } from "../components/AuthLayout";
 import { LoginForm } from "../components/LoginForm";
 import { RegisterForm } from "../components/RegisterForm";
@@ -46,10 +46,7 @@ export function AuthPage() {
               Utilisez le bouton "Continuer avec Téléphone" sur l'écran de
               connexion.
             </Text>
-            <Pressable
-              onPress={() => setMode("login")}
-              className="mt-4 text-violet-400"
-            >
+            <Pressable onPress={() => setMode("login")} className="mt-4 text-violet-400">
               ← Retour à la connexion
             </Pressable>
           </View>

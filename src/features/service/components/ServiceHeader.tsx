@@ -17,19 +17,11 @@ export function ServiceHeader({
 }) {
   return (
     <View className="flex items-center gap-3 px-4 pt-12 pb-3">
-      <Pressable
-        onPress={onBack}
-        className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-      >
+      <Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5">
         <ArrowLeft size={20} className="text-white" />
       </Pressable>
-      <Text className="text-white font-bold text-lg flex-1 truncate">
-        {provider.name}
-      </Text>
-      <Pressable
-        onPress={onFavorite}
-        className="p-2 rounded-xl bg-white/5"
-      >
+      <Text className="text-white font-bold text-lg flex-1 truncate">{provider.name}</Text>
+      <Pressable onPress={onFavorite} className="p-2 rounded-xl bg-white/5">
         <Heart
           size={18}
           className={
@@ -37,10 +29,7 @@ export function ServiceHeader({
           }
         />
       </Pressable>
-      <Pressable
-        onPress={onShare}
-        className="p-2 rounded-xl bg-white/5"
-      >
+      <Pressable onPress={onShare} className="p-2 rounded-xl bg-white/5">
         <Share2 size={18} className="text-white/60" />
       </Pressable>
     </View>

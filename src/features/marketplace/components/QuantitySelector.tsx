@@ -26,21 +26,13 @@ export function QuantitySelector({
 
   return (
     <View className="flex items-center gap-2">
-      <Pressable
-        onPress={handleDecrease}
-        disabled={quantity <= min}
-        className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 disabled:opacity-30"
-      >
+      <Pressable onPress={handleDecrease} disabled={quantity <= min} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 disabled:opacity-30 transition-colors">
         <Minus size={14} className="text-white" />
       </Pressable>
       <Text className="text-white font-bold text-sm w-8 text-center">
         {quantity}
       </Text>
-      <Pressable
-        onPress={handleIncrease}
-        disabled={quantity >= max}
-        className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 disabled:opacity-30"
-      >
+      <Pressable onPress={handleIncrease} disabled={quantity >= max} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 disabled:opacity-30 transition-colors">
         <Plus size={14} className="text-white" />
       </Pressable>
     </View>

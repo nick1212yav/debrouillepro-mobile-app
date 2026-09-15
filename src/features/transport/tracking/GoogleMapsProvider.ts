@@ -1,3 +1,5 @@
+import { View } from "react-native";
+
 // src/features/transport/tracking/GoogleMapsProvider.ts
 import type { Coordinates } from "../types";
 
@@ -14,14 +16,14 @@ export class GoogleMapsProvider {
     center: Coordinates,
     zoom = 13,
   ): void {
-    if (typeof undefined === "undefined" || !(undefined as any).google) {
+    if (typeof window === "undefined" || !(window as any).google) {
       console.warn(
         "L'API Google Maps n'est pas chargée globalement sur la fenêtre [2].",
       );
       return;
     }
 
-    const google = (undefined as any).google;
+    const google = (window as any).google;
 
     // Style de carte sombre haut de gamme (Stripe/Apple style) [2]
     const darkMapStyle = [
@@ -68,9 +70,9 @@ export class GoogleMapsProvider {
    * Dessiner le tracé d'itinéraire en surbrillance violette [2]
    */
   static drawRoute(path: Coordinates[]): void {
-    if (!this.map || typeof undefined === "undefined") return;
+    if (!this.map || typeof window === "undefined") return;
 
-    const google = (undefined as any).google;
+    const google = (window as any).google;
     if (!google) return;
 
     if (this.routePolyline) {
@@ -94,9 +96,9 @@ export class GoogleMapsProvider {
    * Mettre à jour la position d'un marqueur en direct [2]
    */
   static updateVehicleMarker(id: string, coords: Coordinates): void {
-    if (!this.map || typeof undefined === "undefined") return;
+    if (!this.map || typeof window === "undefined") return;
 
-    const google = (undefined as any).google;
+    const google = (window as any).google;
     if (!google) return;
 
     const latLng = new google.maps.LatLng(coords.lat, coords.lng);

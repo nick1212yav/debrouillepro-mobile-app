@@ -27,7 +27,7 @@ import type {
  */
 export function getConversationDisplayName(
   conversation: Conversation | null | undefined,
-  _currentUserId?: string | UserId,
+  currentUserId?: string,
   otherParticipant?: ConversationParticipant | null,
 ): string {
   if (!conversation) {
@@ -38,7 +38,7 @@ export function getConversationDisplayName(
     return conversation.groupName?.trim() || "Groupe";
   }
 
-  if (otherParticipant?.name?.trim()) {
+  if (otherParticipant?.name && otherParticipant.name.trim().length > 0) {
     return otherParticipant.name.trim();
   }
 
@@ -60,7 +60,7 @@ export function getConversationDisplayName(
  */
 export function getConversationAvatar(
   conversation: Conversation | null | undefined,
-  _currentUserId?: string | UserId,
+  currentUserId?: string,
   otherParticipant?: ConversationParticipant | null,
 ): string | null {
   if (!conversation) {
@@ -140,7 +140,7 @@ export function isConversationParticipant(
   }
 
   return conversation.participantIds.some(
-    (participantId) => String(participantId) === String(userId),
+    (participantId) => participantId === userId,
   );
 }
 
@@ -161,10 +161,8 @@ export function getOtherParticipantId(
     return null;
   }
 
-  const currentUserIdString = String(currentUserId);
-
   const otherParticipant = conversation.participantIds.find(
-    (participantId) => String(participantId) !== currentUserIdString,
+    (participantId) => participantId !== currentUserId,
   );
 
   return otherParticipant ?? null;
@@ -213,13 +211,7 @@ export function getUnreadCount(
   _conversation: Conversation | null | undefined,
   unreadCount?: number | null,
 ): number {
-  const value = Number(unreadCount ?? 0);
-
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  return Math.max(0, Math.floor(value));
+  return Math.max(0, Math.floor(unreadCount ?? 0));
 }
 
 export function hasUnreadMessages(
@@ -234,9 +226,7 @@ export function hasUnreadMessages(
 // ============================================================================
 
 export function formatUnreadCount(count: number | null | undefined): string {
-  const value = Number(count ?? 0);
-
-  const safeCount = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  const safeCount = Math.max(0, Math.floor(count ?? 0));
 
   if (safeCount === 0) {
     return "";
@@ -263,17 +253,11 @@ export function getLastMessagePreview(
 
   const text = conversation.lastMessageText.trim();
 
-  if (!text) {
-    return "";
-  }
-
-  const safeMaxLength = Math.max(1, Math.floor(maxLength));
-
-  if (text.length <= safeMaxLength) {
+  if (text.length <= maxLength) {
     return text;
   }
 
-  return `${text.slice(0, Math.max(0, safeMaxLength - 1)).trimEnd()}…`;
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
 // ============================================================================
@@ -318,23 +302,11 @@ export function getConversationId(
 // VIEW MODEL
 // ============================================================================
 
-export interface ConversationViewModel {
-  conversationId: ConversationId;
-  isGroup: boolean;
-  name: string;
-  avatar: string | null;
-  lastMessageText: string;
-  lastMessageSenderId?: UserId;
-  updatedAt?: string | null;
-  unreadCount: number;
-  otherParticipant: ConversationParticipant | null;
-}
-
 /**
  * Construit le modèle d'affichage utilisé par les composants.
  *
- * Les données qui ne sont pas stockées directement dans `conversations`
- * sont explicitement injectées via `options`.
+ * Les données qui ne sont pas stockées dans `conversations`
+ * sont explicitement injectées ici.
  */
 export function toConversationViewModel(
   conversation: Conversation,
@@ -343,14 +315,8 @@ export function toConversationViewModel(
     otherParticipant?: ConversationParticipant | null;
     unreadCount?: number | null;
   },
-): ConversationViewModel {
-  const otherParticipant = conversation.isGroup
-    ? null
-    : getOtherParticipant(
-        conversation,
-        options?.currentUserId,
-        options?.otherParticipant,
-      );
+) {
+  const otherParticipant = options?.otherParticipant ?? null;
 
   return {
     conversationId: conversation._id,

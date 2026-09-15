@@ -34,28 +34,12 @@ export function VoyagePolicies({ trip }: VoyagePoliciesProps) {
   ];
 
   return (
-    <View
-      className="rounded-3xl p-6 bg-white/5 border border-white/10"
-    >
-      <View className="flex items-center gap-2 mb-4">
-        <FileText size={16} className="text-indigo-400" />
-        <Text className="text-white font-bold text-base">Politiques</Text>
-      </View>
+    <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl p-6 bg-white/5 border border-white/10">
+      <View className="flex items-center gap-2 mb-4"><FileText size={16} className="text-indigo-400" /><Text className="text-white font-bold text-base">Politiques</Text></View>
 
-      <View className="gap-3">
-        {policies.map(({ icon: Icon, title, description }) => (
-          <View
-            key={title}
-            className="p-3 rounded-xl bg-white/5 border border-white/10"
-          >
-            <View className="flex items-center gap-2 mb-1">
-              <Icon size={14} className="text-indigo-400" />
-              <Text className="text-white font-semibold text-sm">{title}</Text>
-            </View>
-            <Text className="text-white/50 text-xs">{description}</Text>
-          </View>
-        ))}
-      </View>
+      <View className="gap-3">{policies.map(({ icon: Icon, title, description }) => (
+          <View key={title} className="p-3 rounded-xl bg-white/5 border border-white/10"><View className="flex items-center gap-2 mb-1"><Icon size={14} className="text-indigo-400" /><Text className="text-white font-semibold text-sm">{title}</Text></View><Text className="text-white/50 text-xs">{description}</Text></View>
+        ))}</View>
     </View>
   );
 }

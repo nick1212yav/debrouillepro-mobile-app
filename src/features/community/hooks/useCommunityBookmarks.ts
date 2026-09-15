@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityBookmarks.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import { adaptCommunityPost } from "../adapter";
 import type { CommunityPost } from "../types";
@@ -17,9 +16,9 @@ export function useCommunityBookmarks() {
   const addBookmark = async (publicationId: Id<"publications">) => {
     try {
       await toggleBookmark({ publicationId });
-      UIService.openToast("Ajouté aux favoris", "success");
+      toast.success("Ajouté aux favoris");
     } catch (error) {
-      UIService.openToast("Erreur lors de l'ajout aux favoris", "error");
+      toast.error("Erreur lors de l'ajout aux favoris");
       throw error;
     }
   };
@@ -27,9 +26,9 @@ export function useCommunityBookmarks() {
   const removeBookmark = async (publicationId: Id<"publications">) => {
     try {
       await toggleBookmark({ publicationId });
-      UIService.openToast("Retiré des favoris", "success");
+      toast.success("Retiré des favoris");
     } catch (error) {
-      UIService.openToast("Erreur lors du retrait des favoris", "error");
+      toast.error("Erreur lors du retrait des favoris");
       throw error;
     }
   };

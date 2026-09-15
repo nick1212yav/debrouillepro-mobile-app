@@ -47,11 +47,7 @@ export function ReadReceipt({
    */
   if (!isOwnMessage && status !== "read") {
     return (
-      <Pressable
-        onPress={handleMarkAsRead}
-        className={`text-xs text-white/40 transition hover:text-white/70 ${className}`}
-        accessibilityLabel="Marquer comme lu"
-      >
+      <Pressable onPress={handleMarkAsRead} className={`text-xs text-white/40 transition hover:text-white/70 ${className}`} accessibilityLabel="Marquer comme lu">
         Marquer comme lu
       </Pressable>
     );
@@ -71,22 +67,14 @@ export function ReadReceipt({
 
     if (status === "failed") {
       return (
-        <Text
-          className={`text-xs text-red-400 ${className}`}
-          title="Échec de l'envoi"
-          accessibilityLabel="Échec de l'envoi"
-        >
+        <Text className={`text-xs text-red-400 ${className}`} title="Échec de l'envoi" accessibilityLabel="Échec de l'envoi">
           !
         </Text>
       );
     }
 
     return (
-      <Text
-        className={`inline-flex items-center text-xs ${hasBeenRead ? "text-blue-400" : "text-white/40"} ${className}`}
-        title={hasBeenRead ? "Lu" : isDelivered ? "Délivré" : "Envoyé"}
-        accessibilityLabel={hasBeenRead ? "Lu" : isDelivered ? "Délivré" : "Envoyé"}
-      >
+      <Text className={`inline-flex items-center text-xs ${hasBeenRead ? "text-blue-400" : "text-white/40"} ${className}`} title={hasBeenRead ? "Lu" : isDelivered ? "Délivré" : "Envoyé"} accessibilityLabel={hasBeenRead ? "Lu" : isDelivered ? "Délivré" : "Envoyé"}>
         {isDelivered ? "✓✓" : "✓"}
       </Text>
     );

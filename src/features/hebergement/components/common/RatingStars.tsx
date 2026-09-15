@@ -20,9 +20,7 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
   const totalStars = 5;
 
   return (
-    <View className={`flex items-center gap-1.5 ${className}`}>
-      <View className="flex items-center">
-        {Array.from({ length: totalStars }).map((_, index) => {
+    <View className={`flex items-center gap-1.5 ${className}`}><View className="flex items-center">{Array.from({ length: totalStars }).map((_, index) => {
           if (index < fullStars) {
             return (
               <Star
@@ -48,16 +46,13 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
               />
             );
           }
-        })}
-      </View>
-      {showText && (
+        })}</View>{showText && (
         <View className="flex items-center gap-1 text-xs">
           <Text className="font-bold text-white">{rating.toFixed(1)}</Text>
           {count !== undefined && (
-            <Text className="text-white/40"><Text>(</Text>{count} <Text>avis)</Text></Text>
+            <Text className="text-white/40">({count} avis)</Text>
           )}
         </View>
-      )}
-    </View>
+      )}</View>
   );
 };

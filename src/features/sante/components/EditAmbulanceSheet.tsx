@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditAmbulanceSheet.tsx
@@ -13,6 +12,7 @@ import { AmbulanceForm } from "../forms/AmbulanceForm";
 import type { AmbulanceFormValues } from "../forms/AmbulanceForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface EditAmbulanceSheetProps {
   open: boolean;
@@ -37,7 +37,7 @@ export function EditAmbulanceSheet({
         id: ambulance._id,
         ...data,
       });
-      UIService.openToast("Service d'ambulance mis à jour !", "success");
+      toast.success("Service d'ambulance mis à jour !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -45,7 +45,7 @@ export function EditAmbulanceSheet({
         error instanceof Error
           ? error.message
           : "Erreur lors de la mise à jour";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

@@ -30,15 +30,11 @@ export function HealthBadges({ badges }: HealthBadgesProps) {
       {badges.map((badge) => {
         const Icon = iconMap[badge.icon] || Shield;
         return (
-          <Text
-            key={badge.id}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/5 border border-white/10 text-white/70"
-            style={
+          <Text key={badge.id} className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/5 border border-white/10 text-white/70" style={
               badge.color
                 ? { borderColor: badge.color, color: badge.color }
                 : {}
-            }
-          >
+            }>
             <Icon size={12} />
             {badge.label}
           </Text>

@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityEvents.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import { adaptCommunityEvent } from "../adapter";
 import type { CommunityEvent } from "../types";
@@ -23,12 +22,14 @@ export function useCommunityEvents() {
     attendEvent: async (eventId: Id<"events">) => {
       try {
         const result = await attendEvent({ eventId });
-        UIService.openToast(result.attending
+        toast.success(
+          result.attending
             ? "Vous participez à l'événement"
-            : "Vous ne participez plus", "success");
+            : "Vous ne participez plus",
+        );
         return result;
       } catch (error) {
-        UIService.openToast("Erreur lors de l'inscription", "error");
+        toast.error("Erreur lors de l'inscription");
         throw error;
       }
     },
@@ -63,10 +64,10 @@ export function useCommunityEvents() {
           tags: data.tags ?? [],
         };
         const eventId = await createEvent(payload);
-        UIService.openToast("Événement créé !", "success");
+        toast.success("Événement créé !");
         return eventId;
       } catch (error) {
-        UIService.openToast("Erreur lors de la création de l'événement", "error");
+        toast.error("Erreur lors de la création de l'événement");
         throw error;
       }
     },
@@ -105,19 +106,19 @@ export function useCommunityEvents() {
           tags: data.tags ?? [],
         };
         await updateEvent({ eventId, ...payload });
-        UIService.openToast("Événement mis à jour", "success");
+        toast.success("Événement mis à jour");
         return eventId;
       } catch (error) {
-        UIService.openToast("Erreur lors de la mise à jour", "error");
+        toast.error("Erreur lors de la mise à jour");
         throw error;
       }
     },
     deleteEvent: async (eventId: Id<"events">) => {
       try {
         await deleteEvent({ eventId });
-        UIService.openToast("Événement supprimé", "success");
+        toast.success("Événement supprimé");
       } catch (error) {
-        UIService.openToast("Erreur lors de la suppression", "error");
+        toast.error("Erreur lors de la suppression");
         throw error;
       }
     },

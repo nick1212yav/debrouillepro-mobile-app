@@ -48,77 +48,20 @@ export function FilterAgriSheet({
   };
 
   return (
-    <>
+<View>
       {isOpen && (
         <>
-          <Pressable
-            onPress={onClose}
-            className="fixed inset-0 z-40 bg-black/75"
-          />
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={onClose} className="fixed inset-0 z-40 bg-black/75 backdrop-blur-sm" />
 
-          <View
-            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[32px] border-t border-white/5 bg-gradient-to-b from-[#0a0f0b] to-[#040604] overflow-hidden"
-            style={{ maxHeight: "85vh" }}
-          >
-            <View className="flex justify-center pt-3 pb-1">
-              <View className="w-10 h-1 rounded-full bg-white/20" />
-            </View>
+          <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }} className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[32px] border-t border-white/5 bg-gradient-to-b from-[#0a0f0b] to-[#040604] overflow-hidden" style={{ maxHeight: "85vh" }}>
+            <View className="flex justify-center pt-3 pb-1"><View className="w-10 h-1 rounded-full bg-white/20" /></View>
 
-            <View
-              className="px-5 pb-8 overflow-y-auto space-y-5"
-              style={{ maxHeight: "79vh" }}
-            >
-              <View className="flex items-center justify-between py-2 border-b border-white/5">
-                <View className="flex items-center gap-2 text-white">
-                  <SlidersHorizontal size={14} className="text-green-400" />
-                  <Text className="font-bold text-sm">Filtres de recherche</Text>
-                </View>
-                <Pressable
-                 
-                  onPress={onClose}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/[0.04] border border-white/5 text-white/50"
-                >
-                  <X size={15} />
-                </Pressable>
-              </View>
-
-              {/* Filtre : Localisation/Territoire */}
-              <View className="space-y-2">
-                <Text className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
-                  Zone / Territoire
-                </Text>
-                <AgriLocationFilter
-                  selectedLocation={selectedLocation}
-                  onSelectLocation={onSelectLocation}
-                />
-              </View>
-
-              {/* Filtre : Prix & Devises */}
-              <AgriPriceFilter
-                currency={priceRange.currency}
-                minPrice={priceRange.min}
-                maxPrice={priceRange.max}
-                onChangePrice={handlePriceUpdate}
-              />
-
-              {/* Filtre : Stock & Disponibilité */}
-              <AgriAvailabilityFilter
-                status={selectedStatus}
-                onToggleStatus={handleToggleStatus}
-              />
-
-              {/* Actions de confirmation */}
-              <View className="pt-2">
-                <Pressable
-                  onPress={onClose}
-                  className="w-full py-4 rounded-3xl font-black text-xs text-black bg-green-400"
-                >
-                  <Text>Appliquer les filtres</Text></Pressable>
-              </View>
-            </View>
+            <View className="px-5 pb-8 overflow-y-auto space-y-5" style={{ maxHeight: "79vh" }}><View className="flex items-center justify-between py-2 border-b border-white/5"><View className="flex items-center gap-2 text-white"><SlidersHorizontal size={14} className="text-green-400" /><Text className="font-bold text-sm">Filtres de recherche</Text></View><Pressable onPress={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/[0.04] border border-white/5 text-white/50"><X size={15} /></Pressable></View>{}<View className="space-y-2"><Text className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Zone / Territoire
+                </Text><AgriLocationFilter selectedLocation={selectedLocation} onSelectLocation={onSelectLocation} /></View>{}<AgriPriceFilter currency={priceRange.currency} minPrice={priceRange.min} maxPrice={priceRange.max} onChangePrice={handlePriceUpdate} />{}<AgriAvailabilityFilter status={selectedStatus} onToggleStatus={handleToggleStatus} />{}<View className="pt-2"><Pressable whileTap={{ scale: 0.98 }} onPress={onClose} className="w-full py-4 rounded-3xl font-black text-xs text-black transition-all bg-green-400">Appliquer les filtres
+                </Pressable></View></View>
           </View>
         </>
       )}
-    </>
+    </View>
   );
 }

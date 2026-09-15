@@ -1,4 +1,5 @@
-import { View, Text, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { View, Text, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+
 // src/features/messages/payments/components/PaymentStatus.tsx
 
 import React from "react";
@@ -33,11 +34,7 @@ export function PaymentStatus({
 }: PaymentStatusProps) {
   if (error) {
     return (
-      <View style={errorContainerStyle}>
-        <strong><Text>Paiement impossible</Text></strong>
-
-        <Text>{error}</Text>
-      </View>
+      <View style={errorContainerStyle}><strong><Text>Paiement impossible</Text></strong><Text>{error}</Text></View>
     );
   }
 
@@ -46,29 +43,17 @@ export function PaymentStatus({
   }
 
   return (
-    <View style={containerStyle} data-status={status}>
-      <View style={iconStyle}>
-        {status === "succeeded"
+    <View style={containerStyle} data-status={status}><View style={iconStyle}>{status === "succeeded"
           ? "✓"
           : status === "failed"
             ? "!"
             : status === "cancelled"
               ? "×"
-              : "…"}
-      </View>
-
-      <View style={contentStyle}>
-        <strong>{STATUS_LABELS[status]}</strong>
-
-        {typeof amount === "number" && (
+              : "…"}</View><View style={contentStyle}><strong>{STATUS_LABELS[status]}</strong>{typeof amount === "number" && (
           <Text>
             {amount.toFixed(2)} {currency.toUpperCase()}
           </Text>
-        )}
-
-        {paymentId && <small><Text>Référence :</Text>{paymentId}</small>}
-      </View>
-    </View>
+        )}{paymentId && <small>Référence : {paymentId}</small>}</View></View>
   );
 }
 

@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditClinicSheet.tsx
@@ -13,6 +12,7 @@ import { ClinicForm } from "../forms/ClinicForm";
 import type { ClinicFormValues } from "../forms/ClinicForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface EditClinicSheetProps {
   open: boolean;
@@ -42,7 +42,7 @@ export function EditClinicSheet({
             .map((s) => s.trim())
             .filter(Boolean) || [],
       });
-      UIService.openToast("Clinique mise à jour !", "success");
+      toast.success("Clinique mise à jour !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -50,7 +50,7 @@ export function EditClinicSheet({
         error instanceof Error
           ? error.message
           : "Erreur lors de la mise à jour";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

@@ -1,16 +1,19 @@
 // src/pages/home/_components/StoryViewer.tsx
-
 import {
-  Animated,
-  Dimensions,
-  Image,
-  Modal,
-  PanResponder,
-  Pressable,
-  StyleSheet,
-  Text,
   View,
+  Text,
+  Pressable,
+  Image as RNImage,
+  Animated,
+  Easing,
+  StyleSheet,
+  Modal,
+  Platform,
+  Dimensions,
+  PanResponder,
+  type GestureResponderEvent,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
@@ -23,97 +26,73 @@ import {
   VolumeX,
   X,
 } from "lucide-react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useMutation } from "convex/react";
-
 import { api } from "@/convex/_generated/api.js";
+
+/* ============================================================
+ * TYPES
+ * ============================================================ */
 
 export interface StorySlide {
   id: string;
   type: "text" | "image" | "poll";
-
   bg: string;
-
   img?: string;
-
   text?: string;
-
   textColor?: string;
-
   authorName: string;
-
   authorAvatar?: string;
-
   authorGradient?: string;
-
   time: string;
-
   pollQuestion?: string;
-
   pollOptions?: string[];
 }
 
 export interface StoryGroup {
   id: string;
-
   authorName: string;
-
   authorAvatar?: string;
-
   authorGradient?: string;
-
   isOwn?: boolean;
-
   isLive?: boolean;
-
   seen: boolean;
-
   slides: StorySlide[];
 }
 
 interface StoryViewerProps {
   groups: StoryGroup[];
-
   initialGroupIndex: number;
-
   onClose: () => void;
-
   onMarkSeen?: (groupId: string) => void;
-
   onReaction?: (slideId: string, emoji: string) => void;
-
   reactions?: Record<string, string>;
-
   pollVotes?: Record<string, number>;
-
   onPollVote?: (slideId: string, optionIndex: number) => void;
 }
 
+/* ============================================================
+ * CONSTANTS
+ * ============================================================ */
+
 const STORY_DURATION = 5000;
-
-const PROGRESS_INTERVAL = 40;
-
-const SWIPE_THRESHOLD = 70;
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
 const REACTION_EMOJIS = ["❤️", "😍", "🔥", "😂", "😮", "👏"] as const;
+const isBrowser = typeof window !== "undefined";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const IS_DESKTOP_WEB = Platform.OS === "web" && SCREEN_WIDTH >= 768;
+
+/* ============================================================
+ * HELPERS
+ * ============================================================ */
 
 function clampIndex(value: number, length: number): number {
-  if (length <= 0) {
-    return 0;
-  }
-
+  if (length <= 0) return 0;
   return Math.min(Math.max(value, 0), length - 1);
 }
 
 function getInitials(name: string): string {
   const clean = name.trim();
-
-  if (!clean) {
-    return "?";
-  }
-
+  if (!clean) return "?";
   return clean
     .split(/\s+/)
     .slice(0, 2)
@@ -121,33 +100,243 @@ function getInitials(name: string): string {
     .join("");
 }
 
-function getDefaultGradient(): string[] {
-  return ["#8B5CF6", "#6366F1"];
+function getDefaultGradient(): string {
+  return "linear-gradient(135deg,#8B5CF6,#6366F1)";
 }
 
-function parseGradient(value?: string): string[] {
-  if (!value) {
-    return getDefaultGradient();
-  }
-
-  const colors = value.match(/#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)/g) ?? [];
-
-  if (colors.length >= 2) {
-    return colors.slice(0, 3);
-  }
-
-  return getDefaultGradient();
+/**
+ * Parse CSS linear-gradient string → colors array for expo LinearGradient.
+ * Returns null if invalid.
+ */
+function parseGradient(
+  input?: string,
+): readonly [string, string, ...string[]] | null {
+  if (!input) return null;
+  const match = input.match(/linear-gradient\(([^)]+)\)/i);
+  if (!match) return null;
+  const parts = match[1].split(",").map((s) => s.trim());
+  const colors = parts.filter((p) => /^#|^rgb/i.test(p));
+  if (colors.length < 2) return null;
+  return [colors[0], colors[1], ...colors.slice(2)] as unknown as [
+    string,
+    string,
+    ...string[],
+  ];
 }
 
-function getBackgroundColor(value?: string): string {
-  if (!value) {
-    return "#09091b";
-  }
+/* ============================================================
+ * BACKGROUND GRADIENT FALLBACK
+ * ============================================================ */
 
-  const match = value.match(/#[0-9a-fA-F]{3,8}/);
+const DEFAULT_BG_COLORS = ["#020617", "#09091B"] as const;
+const DEFAULT_TEXT_BG_COLORS = ["#0A0A1A", "#1A1A3E"] as const;
 
-  return match?.[0] ?? value;
+/* ============================================================
+ * PROGRESS BAR
+ * ============================================================ */
+
+function ProgressBars({
+  slides,
+  slideIdx,
+  progress,
+}: {
+  slides: StorySlide[];
+  slideIdx: number;
+  progress: number;
+}) {
+  return (
+    <View style={styles.progressRow}>
+      {slides.map((s, index) => {
+        const filled =
+          index < slideIdx ? 100 : index === slideIdx ? progress : 0;
+        return (
+          <View key={s.id} style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${filled}%` }]} />
+          </View>
+        );
+      })}
+    </View>
+  );
 }
+
+/* ============================================================
+ * REACTION FLOAT (burst)
+ * ============================================================ */
+
+function ReactionFloat({ emoji }: { emoji: string }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    anim.setValue(0);
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 1150,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [emoji, anim]);
+
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.7, 1],
+    outputRange: [1, 0.8, 0],
+  });
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -130],
+  });
+  const scale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.7, 1.9],
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.reactionFloat,
+        { opacity, transform: [{ translateY }, { scale }] },
+      ]}
+    >
+      <Text style={styles.reactionFloatText}>{emoji}</Text>
+    </Animated.View>
+  );
+}
+
+/* ============================================================
+ * PULSING PLAY BUTTON (paused overlay)
+ * ============================================================ */
+
+function PausedOverlay({ visible }: { visible: boolean }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  const halo = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: visible ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [visible, anim]);
+
+  useEffect(() => {
+    if (!visible) return;
+    halo.setValue(0);
+    Animated.loop(
+      Animated.timing(halo, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, [visible, halo]);
+
+  const scale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 1],
+  });
+
+  const haloScale = halo.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.6],
+  });
+  const haloOpacity = halo.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 0],
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[styles.pausedOverlay, { opacity: anim }]}
+    >
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <View style={styles.pausedCircle}>
+          <Animated.View
+            style={[
+              styles.pausedHalo,
+              { opacity: haloOpacity, transform: [{ scale: haloScale }] },
+            ]}
+          />
+          <Pause size={26} color="#fff" fill="#fff" strokeWidth={0} />
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/* ============================================================
+ * POLL OPTION
+ * ============================================================ */
+
+function PollOption({
+  option,
+  voted,
+  disabled,
+  onPress,
+}: {
+  option: string;
+  voted: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    if (disabled) return;
+    Animated.spring(scale, {
+      toValue: 0.985,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={option}
+        accessibilityState={{ selected: voted }}
+        style={[styles.pollOption, voted && styles.pollOptionVoted]}
+      >
+        {voted ? (
+          <LinearGradient
+            colors={["rgba(167,139,250,0.85)", "rgba(124,58,237,0.7)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
+        <View style={styles.pollOptionRow}>
+          <Text style={styles.pollOptionText} numberOfLines={2}>
+            {option}
+          </Text>
+          {voted ? (
+            <View style={styles.pollOptionCheck}>
+              <Check size={12} color="#fff" strokeWidth={3.5} />
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================
+ * MAIN COMPONENT
+ * ============================================================ */
 
 export default function StoryViewer({
   groups,
@@ -162,84 +351,71 @@ export default function StoryViewer({
   const [groupIdx, setGroupIdx] = useState(() =>
     clampIndex(initialGroupIndex, groups.length),
   );
-
   const [slideIdx, setSlideIdx] = useState(0);
-
   const [progress, setProgress] = useState(0);
-
   const [paused, setPaused] = useState(false);
-
   const [showReactions, setShowReactions] = useState(false);
-
   const [muted, setMuted] = useState(false);
+  const [reactionEmoji, setReactionEmoji] = useState<string | null>(null);
 
-  const [reactionAnim, setReactionAnim] = useState<string | null>(null);
-
-  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reactionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const elapsedRef = useRef(0);
-
   const startRef = useRef(0);
-
-  const reactionScale = useRef(new Animated.Value(0.7)).current;
-
-  const reactionTranslateY = useRef(new Animated.Value(0)).current;
-
-  const reactionOpacity = useRef(new Animated.Value(0)).current;
-
-  const imageScale = useRef(new Animated.Value(1.04)).current;
+  const elapsedRef = useRef(0);
 
   const markViewed = useMutation(api.stories.markViewed);
 
   const group = groups[groupIdx];
-
   const slide = group?.slides[slideIdx];
-
   const totalSlides = group?.slides.length ?? 0;
 
   const currentReaction = slide ? reactions[slide.id] : undefined;
-
   const selectedPollOption = slide ? pollVotes[slide.id] : undefined;
-
   const hasPollVote = selectedPollOption !== undefined;
 
   const isFirstSlide = groupIdx === 0 && slideIdx === 0;
-
   const isLastSlide =
     groupIdx === groups.length - 1 && slideIdx === totalSlides - 1;
 
-  const backgroundColor = useMemo(() => {
-    if (!slide) {
-      return "#09091b";
-    }
+  /* ───── slide entry animation ───── */
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const imageZoom = useRef(new Animated.Value(1.04)).current;
+  const reactionPanelAnim = useRef(new Animated.Value(0)).current;
 
-    if (slide.type === "image") {
-      return "#000000";
-    }
-
-    return getBackgroundColor(slide.bg);
-  }, [slide]);
-
-  const authorGradient = useMemo(
-    () => parseGradient(group?.authorGradient),
-    [group?.authorGradient],
-  );
-
+  /* ───── timer ───── */
   const clearTimer = useCallback(() => {
-    if (progressTimerRef.current) {
-      clearInterval(progressTimerRef.current);
-
-      progressTimerRef.current = null;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
   }, []);
 
+  useEffect(() => {
+    return () => {
+      clearTimer();
+      if (reactionTimeoutRef.current) {
+        clearTimeout(reactionTimeoutRef.current);
+      }
+    };
+  }, [clearTimer]);
+
+  /* ───── markViewed ───── */
+  useEffect(() => {
+    if (!slide?.id) return;
+
+    void markViewed({
+      storyId: slide.id as never,
+    }).catch((error) => {
+      console.error("[StoryViewer] markViewed failed", error);
+    });
+
+    onMarkSeen?.(group?.id ?? "");
+  }, [slide?.id, group?.id, markViewed, onMarkSeen]);
+
+  /* ───── navigation ───── */
   const goNextSlide = useCallback(() => {
     clearTimer();
-
     setProgress(0);
-
     elapsedRef.current = 0;
 
     if (!group) {
@@ -249,15 +425,12 @@ export default function StoryViewer({
 
     if (slideIdx < totalSlides - 1) {
       setSlideIdx((current) => current + 1);
-
       return;
     }
 
     if (groupIdx < groups.length - 1) {
       setGroupIdx((current) => current + 1);
-
       setSlideIdx(0);
-
       return;
     }
 
@@ -265,91 +438,72 @@ export default function StoryViewer({
   }, [
     clearTimer,
     group,
+    slideIdx,
+    totalSlides,
     groupIdx,
     groups.length,
     onClose,
-    slideIdx,
-    totalSlides,
   ]);
 
   const goPrevSlide = useCallback(() => {
     clearTimer();
-
     setProgress(0);
-
     elapsedRef.current = 0;
 
-    if (!group) {
-      return;
-    }
+    if (!group) return;
 
     if (slideIdx > 0) {
       setSlideIdx((current) => current - 1);
-
       return;
     }
 
     if (groupIdx > 0) {
       const previousGroupIndex = groupIdx - 1;
-
       const previousGroup = groups[previousGroupIndex];
-
       setGroupIdx(previousGroupIndex);
-
       setSlideIdx(Math.max(0, (previousGroup?.slides.length ?? 1) - 1));
     }
-  }, [clearTimer, group, groupIdx, groups, slideIdx]);
+  }, [clearTimer, group, slideIdx, groupIdx, groups]);
 
-  useEffect(() => {
-    setGroupIdx(clampIndex(initialGroupIndex, groups.length));
-
-    setSlideIdx(0);
-  }, [initialGroupIndex, groups.length]);
-
-  useEffect(() => {
-    return () => {
-      clearTimer();
-
-      if (reactionTimeoutRef.current) {
-        clearTimeout(reactionTimeoutRef.current);
-      }
-    };
-  }, [clearTimer]);
-
-  useEffect(() => {
-    if (!slide?.id) {
-      return;
-    }
-
-    void markViewed({
-      storyId: slide.id as never,
-    }).catch((error) => {
-      console.error("[StoryViewer] markViewed failed", error);
-    });
-
-    onMarkSeen?.(group?.id ?? "");
-  }, [group?.id, markViewed, onMarkSeen, slide?.id]);
-
+  /* ───── reset per slide ───── */
   useEffect(() => {
     setProgress(0);
-
     elapsedRef.current = 0;
-
     startRef.current = Date.now();
-
     setPaused(false);
-
     setShowReactions(false);
+  }, [groupIdx, slideIdx]);
 
-    imageScale.setValue(1.04);
-
-    Animated.timing(imageScale, {
+  /* ───── entry animation on slide change ───── */
+  useEffect(() => {
+    slideAnim.setValue(0);
+    Animated.timing(slideAnim, {
       toValue: 1,
-      duration: STORY_DURATION,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [groupIdx, slideIdx, imageScale]);
 
+    imageZoom.setValue(1.04);
+    Animated.timing(imageZoom, {
+      toValue: 1,
+      duration: STORY_DURATION,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }).start();
+  }, [groupIdx, slideIdx, slideAnim, imageZoom]);
+
+  /* ───── reaction panel animation ───── */
+  useEffect(() => {
+    Animated.spring(reactionPanelAnim, {
+      toValue: showReactions ? 1 : 0,
+      stiffness: 340,
+      damping: 26,
+      useNativeDriver: true,
+    }).start();
+  }, [showReactions, reactionPanelAnim]);
+
+  /* ───── auto progress ───── */
   useEffect(() => {
     if (!slide || paused) {
       clearTimer();
@@ -357,489 +511,542 @@ export default function StoryViewer({
     }
 
     startRef.current = Date.now() - elapsedRef.current;
-
     clearTimer();
 
-    progressTimerRef.current = setInterval(() => {
+    timerRef.current = setInterval(() => {
       const elapsed = Date.now() - startRef.current;
-
       elapsedRef.current = elapsed;
-
       const percentage = Math.min((elapsed / STORY_DURATION) * 100, 100);
-
       setProgress(percentage);
 
       if (percentage >= 100) {
         clearTimer();
-
         goNextSlide();
       }
-    }, PROGRESS_INTERVAL);
+    }, 40);
 
     return clearTimer;
-  }, [clearTimer, goNextSlide, paused, slide]);
+  }, [slide, paused, clearTimer, goNextSlide]);
 
+  /* ───── pause toggle ───── */
   const togglePause = useCallback(() => {
     setPaused((current) => !current);
-
     setShowReactions(false);
   }, []);
 
+  /* ───── reactions ───── */
   const handleReaction = useCallback(
     (emoji: string) => {
-      if (!slide) {
-        return;
-      }
-
+      if (!slide) return;
       onReaction?.(slide.id, emoji);
-
-      setReactionAnim(emoji);
-
+      setReactionEmoji(emoji);
       setShowReactions(false);
-
       setPaused(false);
 
       if (reactionTimeoutRef.current) {
         clearTimeout(reactionTimeoutRef.current);
       }
-
-      reactionScale.setValue(0.7);
-
-      reactionTranslateY.setValue(0);
-
-      reactionOpacity.setValue(1);
-
-      Animated.parallel([
-        Animated.timing(reactionScale, {
-          toValue: 1.9,
-          duration: 1150,
-          useNativeDriver: true,
-        }),
-
-        Animated.timing(reactionTranslateY, {
-          toValue: -130,
-          duration: 1150,
-          useNativeDriver: true,
-        }),
-
-        Animated.timing(reactionOpacity, {
-          toValue: 0,
-          duration: 1150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
       reactionTimeoutRef.current = setTimeout(() => {
-        setReactionAnim(null);
+        setReactionEmoji(null);
       }, 1200);
     },
-    [onReaction, reactionOpacity, reactionScale, reactionTranslateY, slide],
+    [slide, onReaction],
   );
 
+  /* ───── poll vote ───── */
   const handlePollVote = useCallback(
     (optionIndex: number) => {
-      if (!slide || slide.type !== "poll") {
-        return;
-      }
-
-      if (hasPollVote) {
-        return;
-      }
-
+      if (!slide || slide.type !== "poll") return;
+      if (hasPollVote) return;
       onPollVote?.(slide.id, optionIndex);
     },
-    [hasPollVote, onPollVote, slide],
+    [slide, hasPollVote, onPollVote],
   );
 
-  const handleStoryPress = useCallback(
-    (locationX: number) => {
-      if (locationX < SCREEN_WIDTH * 0.33) {
-        goPrevSlide();
-
-        return;
-      }
-
-      if (locationX > SCREEN_WIDTH * 0.66) {
-        goNextSlide();
-
-        return;
-      }
-
-      togglePause();
-    },
-    [goNextSlide, goPrevSlide, togglePause],
-  );
-
+  /* ───── touch handling (tap + swipe) ───── */
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          Math.abs(gestureState.dx) > 10,
-
-        onPanResponderGrant: () => {
+        onMoveShouldSetPanResponder: () => false,
+        onPanResponderGrant: (evt) => {
+          const { pageX, pageY } = evt.nativeEvent;
+          touchStartRef.current = {
+            x: pageX,
+            y: pageY,
+            time: Date.now(),
+          };
           setPaused(true);
         },
-
-        onPanResponderRelease: (_, gestureState) => {
-          const { dx, dy } = gestureState;
-
-          const isHorizontalSwipe =
-            Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.2;
-
-          if (isHorizontalSwipe) {
-            if (dx < 0) {
-              goNextSlide();
-            } else {
-              goPrevSlide();
-            }
-
+        onPanResponderRelease: (evt, gestureState) => {
+          const start = touchStartRef.current;
+          if (!start) {
+            setPaused(false);
             return;
           }
 
-          if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-            handleStoryPress(gestureState.x0);
+          const dx = gestureState.moveX - start.x;
+          const dy = gestureState.moveY - start.y;
+          const duration = Date.now() - start.time;
+
+          touchStartRef.current = null;
+
+          const isHorizontalSwipe =
+            Math.abs(dx) > 70 &&
+            Math.abs(dx) > Math.abs(dy) * 1.2 &&
+            duration < 700;
+
+          if (isHorizontalSwipe) {
+            if (dx < 0) goNextSlide();
+            else goPrevSlide();
+            return;
+          }
+
+          const isTap =
+            Math.abs(dx) < 12 && Math.abs(dy) < 12 && duration < 300;
+
+          if (isTap) {
+            const ratio = start.x / SCREEN_WIDTH;
+            if (ratio < 0.33) goPrevSlide();
+            else if (ratio > 0.66) goNextSlide();
+            else togglePause();
+            return;
           }
 
           setPaused(false);
         },
-
         onPanResponderTerminate: () => {
+          touchStartRef.current = null;
           setPaused(false);
         },
       }),
-    [goNextSlide, goPrevSlide, handleStoryPress],
+    [goNextSlide, goPrevSlide, togglePause],
   );
 
-  if (!group || !slide) {
-    return null;
-  }
+  const touchStartRef = useRef<{
+    x: number;
+    y: number;
+    time: number;
+  } | null>(null);
+
+  /* ───── keyboard shortcuts (web only) ───── */
+  useEffect(() => {
+    if (!isBrowser) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      switch (event.key) {
+        case "Escape":
+          onClose();
+          break;
+        case "ArrowRight":
+          event.preventDefault();
+          goNextSlide();
+          break;
+        case "ArrowLeft":
+          event.preventDefault();
+          goPrevSlide();
+          break;
+        case " ":
+          event.preventDefault();
+          togglePause();
+          break;
+        case "p":
+        case "P":
+          togglePause();
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, goNextSlide, goPrevSlide, togglePause]);
+
+  /* ───── render guard ───── */
+  if (!group || !slide) return null;
+
+  /* ───── derived ───── */
+  const authorGradientColors =
+    parseGradient(group.authorGradient ?? getDefaultGradient()) ??
+    (["#8B5CF6", "#6366F1"] as const);
+
+  const slideBgColors =
+    slide.type === "image"
+      ? (["#000", "#000"] as const)
+      : (parseGradient(slide.bg) ?? DEFAULT_BG_COLORS);
+
+  const slideEntryOpacity = slideAnim;
+  const slideEntryScale = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.985, 1],
+  });
+
+  const panelTranslateY = reactionPanelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [18, 0],
+  });
+  const panelScale = reactionPanelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.95, 1],
+  });
+  const panelOpacity = reactionPanelAnim;
+
+  /* ========================================================================
+   * RENDER
+   * ====================================================================== */
 
   return (
     <Modal
       visible
       transparent
       animationType="fade"
-      statusBarTranslucent
       onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <View
-        style={[
-          styles.root,
-          {
-            backgroundColor,
-          },
-        ]}
-      >
-        <View style={styles.storyContainer} {...panResponder.panHandlers}>
-          {/* IMAGE STORY */}
+      <View style={styles.root}>
+        {/* Full-screen dark backdrop */}
+        <View style={styles.backdrop} />
 
-          {slide.type === "image" && slide.img && (
-            <>
-              <Animated.Image
-                source={{
-                  uri: slide.img,
-                }}
-                resizeMode="cover"
-                style={[
-                  styles.storyImage,
-                  {
-                    transform: [
-                      {
-                        scale: imageScale,
-                      },
-                    ],
-                  },
-                ]}
-              />
+        {/* Container (mobile fullscreen / desktop card) */}
+        <View style={IS_DESKTOP_WEB ? styles.cardDesktop : styles.cardMobile}>
+          {/* PanResponder wrapper — captures taps & swipes */}
+          <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers} />
 
-              <LinearGradient
-                colors={[
-                  "rgba(0,0,0,0.58)",
-                  "rgba(0,0,0,0.04)",
-                  "rgba(0,0,0,0.05)",
-                  "rgba(0,0,0,0.76)",
-                ]}
-                locations={[0, 0.3, 0.55, 1]}
-                style={StyleSheet.absoluteFill}
-                pointerEvents="none"
-              />
-            </>
-          )}
+          {/* Main visual (below interactive controls) */}
+          <Animated.View
+            key={`${group.id}-${slide.id}`}
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                opacity: slideEntryOpacity,
+                transform: [{ scale: slideEntryScale }],
+              },
+            ]}
+          >
+            {/* Background gradient */}
+            <LinearGradient
+              colors={slideBgColors as unknown as [string, string, ...string[]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
 
-          {/* TEXT STORY */}
+            {/* Image slide */}
+            {slide.type === "image" && slide.img ? (
+              <>
+                <Animated.View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { transform: [{ scale: imageZoom }] },
+                  ]}
+                >
+                  <RNImage
+                    source={{ uri: slide.img }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                    accessibilityLabel={slide.text || "Story"}
+                  />
+                </Animated.View>
+                <LinearGradient
+                  colors={[
+                    "rgba(0,0,0,0.5)",
+                    "rgba(0,0,0,0)",
+                    "rgba(0,0,0,0)",
+                    "rgba(0,0,0,0.55)",
+                  ]}
+                  locations={[0, 0.3, 0.7, 1]}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </>
+            ) : null}
 
-          {slide.type === "text" && (
-            <View style={styles.textStory}>
-              <Text
-                style={[
-                  styles.storyText,
-                  {
-                    color: slide.textColor ?? "#FFFFFF",
-                  },
-                ]}
-              >
-                {slide.text}
-              </Text>
-            </View>
-          )}
+            {/* Text slide */}
+            {slide.type === "text" ? (
+              <View style={styles.textSlideWrap}>
+                <Text
+                  style={[
+                    styles.textSlideText,
+                    { color: slide.textColor ?? "#fff" },
+                  ]}
+                >
+                  {slide.text}
+                </Text>
+              </View>
+            ) : null}
+          </Animated.View>
 
-          {/* POLL STORY */}
-
-          {slide.type === "poll" && (
-            <View style={styles.pollContainer}>
-              <View style={styles.pollCard}>
-                <View style={styles.pollIcon}>
-                  <Text style={styles.pollEmoji}>📊</Text>
-                </View>
+          {/* Poll slide — interactive, so above the tap layer */}
+          {slide.type === "poll" ? (
+            <View style={styles.pollWrap} pointerEvents="box-none">
+              <Animated.View style={[styles.pollInner, { opacity: slideAnim }]}>
+                <LinearGradient
+                  colors={["rgba(255,255,255,0.14)", "rgba(255,255,255,0.06)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.pollIconWrap}
+                >
+                  <Text style={styles.pollIconText}>📊</Text>
+                </LinearGradient>
 
                 <Text style={styles.pollQuestion}>{slide.pollQuestion}</Text>
 
-                <View style={styles.pollOptions}>
-                  {(slide.pollOptions ?? []).map((option, index) => {
-                    const voted = selectedPollOption === index;
-
-                    return (
-                      <Pressable
-                        key={`${slide.id}-${index}`}
-                        disabled={hasPollVote}
-                        onPress={() => handlePollVote(index)}
-                        style={[
-                          styles.pollOption,
-                          voted && styles.pollOptionActive,
-                        ]}
-                      >
-                        <View style={styles.pollOptionRow}>
-                          <Text style={styles.pollOptionText}>{option}</Text>
-
-                          {voted && (
-                            <View style={styles.pollCheck}>
-                              <Check size={12} color="#FFFFFF" />
-                            </View>
-                          )}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
+                <View style={styles.pollOptionsList}>
+                  {(slide.pollOptions ?? []).map((option, index) => (
+                    <PollOption
+                      key={`${slide.id}-${index}`}
+                      option={option}
+                      voted={selectedPollOption === index}
+                      disabled={hasPollVote}
+                      onPress={() => handlePollVote(index)}
+                    />
+                  ))}
                 </View>
 
-                {hasPollVote && (
-                  <Text style={styles.pollVoteText}>
-                    Ton vote a été enregistré.
-                  </Text>
-                )}
-              </View>
-            </View>
-          )}
-
-          {/* PROGRESS */}
-
-          <View pointerEvents="none" style={styles.progressContainer}>
-            {group.slides.map((storySlide, index) => {
-              const width =
-                index < slideIdx
-                  ? "100%"
-                  : index === slideIdx
-                    ? `${progress}%`
-                    : "0%";
-
-              return (
-                <View key={storySlide.id} style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width,
-                      },
-                    ]}
-                  />
-                </View>
-              );
-            })}
-          </View>
-
-          {/* HEADER */}
-
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <LinearGradient
-                colors={authorGradient}
-                style={styles.avatarBorder}
-              >
-                {group.authorAvatar ? (
-                  <Image
-                    source={{
-                      uri: group.authorAvatar,
-                    }}
-                    style={styles.avatarImage}
-                  />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarInitials}>
-                      {getInitials(group.authorName)}
+                {hasPollVote ? (
+                  <Animated.View
+                    style={[styles.pollVoteHint, { opacity: slideAnim }]}
+                  >
+                    <Text style={styles.pollVoteHintText}>
+                      Ton vote a été enregistré.
                     </Text>
-                  </View>
-                )}
-              </LinearGradient>
-
-              <View style={styles.authorInfo}>
-                <View style={styles.authorRow}>
-                  <Text numberOfLines={1} style={styles.authorName}>
-                    {group.authorName}
-                  </Text>
-
-                  {group.isLive && (
-                    <View style={styles.liveBadge}>
-                      <Text style={styles.liveText}>LIVE</Text>
-                    </View>
-                  )}
-                </View>
-
-                <Text style={styles.timeText}>{slide.time}</Text>
-              </View>
+                  </Animated.View>
+                ) : null}
+              </Animated.View>
             </View>
+          ) : null}
 
-            <View style={styles.headerActions}>
-              <Pressable
-                onPress={() => setMuted((current) => !current)}
-                style={styles.iconButton}
-                accessibilityLabel={muted ? "Activer le son" : "Couper le son"}
-              >
-                {muted ? (
-                  <VolumeX size={16} color="rgba(255,255,255,0.8)" />
-                ) : (
-                  <Volume2 size={16} color="rgba(255,255,255,0.8)" />
-                )}
-              </Pressable>
+          {/* ═══════════ PROGRESS BARS ═══════════ */}
+          <View style={styles.progressWrap} pointerEvents="none">
+            <ProgressBars
+              slides={group.slides}
+              slideIdx={slideIdx}
+              progress={progress}
+            />
+          </View>
 
-              <Pressable
-                onPress={onClose}
-                style={styles.iconButton}
-                accessibilityLabel="Fermer la story"
-              >
-                <X size={18} color="#FFFFFF" />
-              </Pressable>
+          {/* ═══════════ HEADER ═══════════ */}
+          <View style={styles.header} pointerEvents="box-none">
+            <View style={styles.headerRow}>
+              <View style={styles.headerLeft}>
+                <LinearGradient
+                  colors={
+                    authorGradientColors as unknown as [
+                      string,
+                      string,
+                      ...string[],
+                    ]
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.avatarRing}
+                >
+                  <View style={styles.avatarInner}>
+                    {group.authorAvatar ? (
+                      <RNImage
+                        source={{ uri: group.authorAvatar }}
+                        style={styles.avatarImage}
+                        accessibilityLabel={group.authorName}
+                      />
+                    ) : (
+                      <LinearGradient
+                        colors={
+                          authorGradientColors as unknown as [
+                            string,
+                            string,
+                            ...string[],
+                          ]
+                        }
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.avatarInitialsWrap}
+                      >
+                        <Text style={styles.avatarInitialsText}>
+                          {getInitials(group.authorName)}
+                        </Text>
+                      </LinearGradient>
+                    )}
+                  </View>
+                </LinearGradient>
+
+                <View style={styles.headerInfo}>
+                  <View style={styles.headerNameRow}>
+                    <Text style={styles.headerName} numberOfLines={1}>
+                      {group.authorName}
+                    </Text>
+                    {group.isLive ? (
+                      <View style={styles.liveBadge}>
+                        <Text style={styles.liveBadgeText}>LIVE</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={styles.headerTime}>{slide.time}</Text>
+                </View>
+              </View>
+
+              <View style={styles.headerActions}>
+                <Pressable
+                  onPress={() => setMuted((c) => !c)}
+                  accessibilityLabel={
+                    muted ? "Activer le son" : "Couper le son"
+                  }
+                  hitSlop={6}
+                  style={({ pressed }) => [
+                    styles.headerIconBtn,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  {muted ? (
+                    <VolumeX size={16} color="rgba(255,255,255,0.85)" />
+                  ) : (
+                    <Volume2 size={16} color="rgba(255,255,255,0.85)" />
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={onClose}
+                  accessibilityLabel="Fermer la story"
+                  hitSlop={6}
+                  style={({ pressed }) => [
+                    styles.headerIconBtn,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <X size={18} color="#fff" />
+                </Pressable>
+              </View>
             </View>
           </View>
 
-          {/* PAUSE */}
+          {/* ═══════════ PAUSED OVERLAY ═══════════ */}
+          <PausedOverlay visible={paused && !showReactions} />
 
-          {paused && !showReactions && (
-            <View pointerEvents="none" style={styles.pauseOverlay}>
-              <View style={styles.pauseCircle}>
-                <Pause size={26} color="#FFFFFF" fill="#FFFFFF" />
-              </View>
-            </View>
-          )}
-
-          {/* DESKTOP / LARGE SCREEN NAVIGATION */}
-
-          {!isFirstSlide && (
+          {/* ═══════════ DESKTOP NAV ═══════════ */}
+          {IS_DESKTOP_WEB && !isFirstSlide ? (
             <Pressable
               onPress={goPrevSlide}
-              style={[styles.sideNavigation, styles.sideNavigationLeft]}
               accessibilityLabel="Story précédente"
-            >
-              <ChevronLeft size={20} color="#FFFFFF" />
-            </Pressable>
-          )}
-
-          {!isLastSlide && (
-            <Pressable
-              onPress={goNextSlide}
-              style={[styles.sideNavigation, styles.sideNavigationRight]}
-              accessibilityLabel="Story suivante"
-            >
-              <ChevronRight size={20} color="#FFFFFF" />
-            </Pressable>
-          )}
-
-          {/* REACTION ANIMATION */}
-
-          {reactionAnim && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.reactionAnimation,
-                {
-                  opacity: reactionOpacity,
-                  transform: [
-                    {
-                      scale: reactionScale,
-                    },
-                    {
-                      translateY: reactionTranslateY,
-                    },
-                  ],
-                },
+              style={({ pressed }) => [
+                styles.navBtnLeft,
+                pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
               ]}
             >
-              <Text style={styles.reactionAnimationText}>{reactionAnim}</Text>
-            </Animated.View>
-          )}
-
-          {/* REACTION PANEL */}
-
-          {showReactions && (
-            <View style={styles.reactionPanel}>
-              {REACTION_EMOJIS.map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  onPress={() => handleReaction(emoji)}
-                  style={styles.reactionButton}
-                  accessibilityLabel={`Réagir ${emoji}`}
-                >
-                  <Text style={styles.reactionEmoji}>{emoji}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-
-          {/* BOTTOM ACTIONS */}
-
-          <View style={styles.bottomActions}>
-            <Pressable
-              onPress={() => {
-                setPaused(true);
-
-                setShowReactions((current) => !current);
-              }}
-              style={styles.reactButton}
-            >
-              <Heart
-                size={15}
-                color={currentReaction ? "#F472B6" : "rgba(255,255,255,0.8)"}
-                fill={currentReaction ? "#F472B6" : "transparent"}
-              />
-
-              <Text style={styles.reactButtonText}>Réagir</Text>
+              <ChevronLeft size={20} color="#fff" strokeWidth={2.4} />
             </Pressable>
+          ) : null}
 
-            <View style={styles.bottomRight}>
-              {currentReaction && (
-                <View style={styles.currentReaction}>
+          {IS_DESKTOP_WEB && !isLastSlide ? (
+            <Pressable
+              onPress={goNextSlide}
+              accessibilityLabel="Story suivante"
+              style={({ pressed }) => [
+                styles.navBtnRight,
+                pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
+              ]}
+            >
+              <ChevronRight size={20} color="#fff" strokeWidth={2.4} />
+            </Pressable>
+          ) : null}
+
+          {/* ═══════════ REACTION FLOAT ═══════════ */}
+          {reactionEmoji ? (
+            <ReactionFloat
+              key={`${reactionEmoji}-${slide.id}`}
+              emoji={reactionEmoji}
+            />
+          ) : null}
+
+          {/* ═══════════ REACTION PANEL ═══════════ */}
+          <Animated.View
+            pointerEvents={showReactions ? "auto" : "none"}
+            style={[
+              styles.reactionPanel,
+              {
+                opacity: panelOpacity,
+                transform: [
+                  { translateY: panelTranslateY },
+                  { scale: panelScale },
+                ],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={["rgba(10,10,20,0.85)", "rgba(20,10,40,0.85)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.reactionPanelBorder} pointerEvents="none" />
+            {REACTION_EMOJIS.map((emoji) => (
+              <Pressable
+                key={emoji}
+                onPress={() => handleReaction(emoji)}
+                accessibilityLabel={`Réagir ${emoji}`}
+                style={({ pressed }) => [
+                  styles.reactionBtn,
+                  pressed && { transform: [{ scale: 0.85 }] },
+                ]}
+              >
+                <Text style={styles.reactionBtnText}>{emoji}</Text>
+              </Pressable>
+            ))}
+          </Animated.View>
+
+          {/* ═══════════ BOTTOM ACTIONS ═══════════ */}
+          <View style={styles.bottomActions} pointerEvents="box-none">
+            <View style={styles.bottomRow}>
+              <Pressable
+                onPress={() => {
+                  setPaused(true);
+                  setShowReactions((c) => !c);
+                }}
+                accessibilityLabel="Réagir"
+                style={({ pressed }) => [
+                  styles.reactBtn,
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Heart
+                  size={15}
+                  color={currentReaction ? "#F472B6" : "rgba(255,255,255,0.85)"}
+                  fill={currentReaction ? "#F472B6" : "transparent"}
+                  strokeWidth={2.4}
+                />
+                <Text style={styles.reactBtnText}>Réagir</Text>
+              </Pressable>
+
+              {currentReaction ? (
+                <View style={styles.currentReactionPill}>
                   <Text style={styles.currentReactionText}>
                     {currentReaction}
                   </Text>
                 </View>
-              )}
+              ) : null}
 
               <Pressable
                 onPress={togglePause}
-                style={styles.iconButton}
                 accessibilityLabel={
                   paused ? "Reprendre la story" : "Mettre la story en pause"
                 }
+                style={({ pressed }) => [
+                  styles.playPauseBtn,
+                  pressed && { opacity: 0.75 },
+                ]}
               >
                 {paused ? (
                   <Play
                     size={15}
-                    color="rgba(255,255,255,0.8)"
-                    fill="rgba(255,255,255,0.8)"
+                    color="rgba(255,255,255,0.9)"
+                    fill="rgba(255,255,255,0.9)"
+                    strokeWidth={0}
                   />
                 ) : (
-                  <Pause size={15} color="rgba(255,255,255,0.8)" />
+                  <Pause
+                    size={15}
+                    color="rgba(255,255,255,0.9)"
+                    fill="rgba(255,255,255,0.9)"
+                    strokeWidth={0}
+                  />
                 )}
               </Pressable>
             </View>
@@ -850,170 +1057,87 @@ export default function StoryViewer({
   );
 }
 
+/* ============================================================
+ * STYLES
+ * ============================================================ */
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#000000",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000",
   },
-
-  storyContainer: {
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
+  cardMobile: {
+    flex: 1,
     width: "100%",
-    height: "100%",
-    backgroundColor: "#000000",
+    backgroundColor: "#000",
     overflow: "hidden",
   },
-
-  storyImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: "100%",
-    height: "100%",
-  },
-
-  textStory: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-
-  storyText: {
-    maxWidth: 340,
-    textAlign: "center",
-    fontSize: 30,
-    fontWeight: "900",
-    lineHeight: 34,
-    letterSpacing: -0.5,
-  },
-
-  pollContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 28,
-  },
-
-  pollCard: {
-    width: "100%",
-    maxWidth: 350,
-  },
-
-  pollIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+  cardDesktop: {
+    width: 430,
+    maxWidth: "100%",
+    height: "92%",
+    maxHeight: 900,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-    backgroundColor: "rgba(255,255,255,0.10)",
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "center",
-    marginBottom: 12,
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "#000",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.75,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 20 },
+    elevation: 24,
   },
 
-  pollEmoji: {
-    fontSize: 22,
-  },
-
-  pollQuestion: {
-    marginBottom: 20,
-    textAlign: "center",
-    fontSize: 20,
-    fontWeight: "900",
-    lineHeight: 25,
-    color: "#FFFFFF",
-  },
-
-  pollOptions: {
-    gap: 10,
-  },
-
-  pollOption: {
-    width: "100%",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
-
-  pollOptionActive: {
-    backgroundColor: "rgba(139,92,246,0.72)",
-    borderColor: "rgba(167,139,250,0.8)",
-  },
-
-  pollOptionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-
-  pollOptionText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-
-  pollCheck: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.20)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  pollVoteText: {
-    marginTop: 16,
-    textAlign: "center",
-    fontSize: 11,
-    fontWeight: "500",
-    color: "rgba(255,255,255,0.45)",
-  },
-
-  progressContainer: {
+  /* ── Progress ───────────────────────────────────── */
+  progressWrap: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
+    paddingHorizontal: 12,
+    paddingTop: 12,
     zIndex: 40,
+  },
+  progressRow: {
     flexDirection: "row",
     gap: 6,
-    paddingHorizontal: 12,
-    paddingTop: 14,
   },
-
   progressTrack: {
-    flex: 1,
     height: 3,
-    borderRadius: 999,
-    overflow: "hidden",
+    flex: 1,
+    borderRadius: 2,
     backgroundColor: "rgba(255,255,255,0.25)",
+    overflow: "hidden",
   },
-
   progressFill: {
     height: "100%",
-    borderRadius: 999,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#fff",
+    borderRadius: 2,
   },
 
+  /* ── Header ─────────────────────────────────────── */
   header: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 40,
     zIndex: 30,
+  },
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 42,
+    gap: 12,
   },
-
   headerLeft: {
     flex: 1,
     minWidth: 0,
@@ -1021,223 +1145,340 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-
-  avatarBorder: {
-    width: 40,
-    height: 40,
-    padding: 2,
-    borderRadius: 20,
-    flexShrink: 0,
-  },
-
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 20,
-    backgroundColor: "#111827",
-  },
-
-  avatarFallback: {
-    flex: 1,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#6366F1",
-  },
-
-  avatarInitials: {
-    fontSize: 12,
-    fontWeight: "900",
-    color: "#FFFFFF",
-  },
-
-  authorInfo: {
+  headerInfo: {
     flex: 1,
     minWidth: 0,
   },
-
-  authorRow: {
+  headerNameRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-
-  authorName: {
+  headerName: {
     maxWidth: 180,
     fontSize: 12,
     fontWeight: "900",
-    color: "#FFFFFF",
+    color: "#fff",
+    letterSpacing: 0.1,
   },
-
+  headerTime: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.6)",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
   liveBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
     backgroundColor: "#EF4444",
   },
-
-  liveText: {
+  liveBadgeText: {
     fontSize: 8,
     fontWeight: "900",
-    letterSpacing: 0.7,
-    color: "#FFFFFF",
+    color: "#fff",
+    letterSpacing: 1.2,
   },
 
-  timeText: {
-    marginTop: 2,
-    fontSize: 10,
-    fontWeight: "500",
-    color: "rgba(255,255,255,0.55)",
-  },
-
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  iconButton: {
+  /* ── Avatar ─────────────────────────────────────── */
+  avatarRing: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(0,0,0,0.25)",
+    borderRadius: 20,
+    padding: 2,
+  },
+  avatarInner: {
+    flex: 1,
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "#000",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarInitialsWrap: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
+  avatarInitialsText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#fff",
+  },
 
-  pauseOverlay: {
+  /* ── Text slide ─────────────────────────────────── */
+  textSlideWrap: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 20,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  textSlideText: {
+    maxWidth: 340,
+    fontSize: 30,
+    fontWeight: "900",
+    lineHeight: 34,
+    textAlign: "center",
+    letterSpacing: -1,
   },
 
-  pauseCircle: {
+  /* ── Poll slide ─────────────────────────────────── */
+  pollWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  pollInner: {
+    width: "100%",
+    maxWidth: 350,
+  },
+  pollIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    alignSelf: "center",
+    marginBottom: 12,
+  },
+  pollIconText: {
+    fontSize: 20,
+  },
+  pollQuestion: {
+    marginBottom: 20,
+    fontSize: 20,
+    fontWeight: "900",
+    lineHeight: 24,
+    color: "#fff",
+    textAlign: "center",
+    letterSpacing: -0.5,
+  },
+  pollOptionsList: {
+    gap: 10,
+  },
+  pollOption: {
+    position: "relative",
+    width: "100%",
+    overflow: "hidden",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.4)",
+  },
+  pollOptionVoted: {
+    borderColor: "rgba(167,139,250,0.9)",
+  },
+  pollOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  pollOptionText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  pollOptionCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+  pollVoteHint: {
+    marginTop: 16,
+    alignItems: "center",
+  },
+  pollVoteHintText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.5)",
+    letterSpacing: 0.2,
+  },
+
+  /* ── Paused overlay ────────────────────────────── */
+  pausedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
+  },
+  pausedCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
-    backgroundColor: "rgba(0,0,0,0.40)",
-    alignItems: "center",
-    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  pausedHalo: {
+    position: "absolute",
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(167,139,250,0.4)",
   },
 
-  sideNavigation: {
+  /* ── Nav buttons (desktop) ─────────────────────── */
+  navBtnLeft: {
     position: "absolute",
+    left: 12,
     top: "50%",
-    zIndex: 40,
+    marginTop: -22,
     width: 44,
     height: 44,
-    marginTop: -22,
     borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(0,0,0,0.30)",
-    alignItems: "center",
-    justifyContent: "center",
+    borderColor: "rgba(255,255,255,0.12)",
+    zIndex: 40,
   },
-
-  sideNavigationLeft: {
-    left: 12,
-  },
-
-  sideNavigationRight: {
-    right: 12,
-  },
-
-  reactionAnimation: {
+  navBtnRight: {
     position: "absolute",
-    left: "50%",
-    bottom: 128,
-    zIndex: 50,
-    marginLeft: -30,
-    width: 60,
+    right: 12,
+    top: "50%",
+    marginTop: -22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    zIndex: 40,
   },
 
-  reactionAnimationText: {
-    fontSize: 50,
+  /* ── Reaction float ────────────────────────────── */
+  reactionFloat: {
+    position: "absolute",
+    bottom: 128,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 50,
+  },
+  reactionFloatText: {
+    fontSize: 48,
   },
 
+  /* ── Reaction panel ────────────────────────────── */
   reactionPanel: {
     position: "absolute",
-    left: 16,
     bottom: 88,
-    zIndex: 50,
+    left: 16,
     flexDirection: "row",
-    gap: 4,
+    gap: 6,
     padding: 8,
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(0,0,0,0.65)",
+    overflow: "hidden",
+    zIndex: 50,
   },
-
-  reactionButton: {
+  reactionPanelBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  reactionBtn: {
     width: 40,
     height: 40,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  reactionEmoji: {
-    fontSize: 22,
+  reactionBtnText: {
+    fontSize: 24,
   },
 
+  /* ── Bottom actions ────────────────────────────── */
   bottomActions: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    zIndex: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 34,
+    paddingBottom: 28,
+    zIndex: 40,
   },
-
-  bottomRight: {
+  bottomRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
   },
-
-  reactButton: {
+  reactBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.35)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(0,0,0,0.25)",
+    borderColor: "rgba(255,255,255,0.12)",
   },
-
-  reactButtonText: {
+  reactBtnText: {
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "rgba(255,255,255,0.85)",
+    letterSpacing: 0.1,
   },
-
-  currentReaction: {
+  currentReactionPill: {
     width: 40,
     height: 40,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(0,0,0,0.25)",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
   },
-
   currentReactionText: {
     fontSize: 20,
+  },
+  playPauseBtn: {
+    marginLeft: "auto",
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
   },
 });

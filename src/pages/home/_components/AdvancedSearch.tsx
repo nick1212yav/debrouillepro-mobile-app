@@ -1,5 +1,30 @@
-import { View, Pressable, Text, Image, TextInput } from "react-native";
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+// src/pages/home/_components/AdvancedSearch.tsx
+import {
+  View,
+  Pressable,
+  Text,
+  TextInput,
+  Image,
+  ScrollView,
+  Animated,
+  Easing,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+  type NativeSyntheticEvent,
+  type TextInputKeyPressEventData,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+  type ReactNode,
+  type ComponentType,
+} from "react";
 import {
   Search,
   X,
@@ -26,7 +51,6 @@ import {
   ShoppingBag,
   WalletCards,
   History,
-  Hash,
   Compass,
   Zap,
   Map,
@@ -34,24 +58,38 @@ import {
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.js";
-import { useDebounce } from "@/hooks/use-debounce";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useDebounce } from "@/hooks/use-debounce.ts";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 
 /* ============================================================================
- * STORAGE
+ * STORAGE HELPERS — 100% safe (RN + web)
  * ========================================================================== */
 
 const HISTORY_KEY = "adv_search_history";
 const MAX_HISTORY = 10;
 
-function getHistory(): string[] {
+/**
+ * Récupère un objet storage compatible (`localStorage`) depuis `globalThis`.
+ * Retourne `null` si absent / invalide → aucun crash sur RN.
+ */
+function getStorage(): Storage | null {
   try {
-    const raw = localStorage.getItem(HISTORY_KEY);
+    if (typeof globalThis === "undefined") return null;
+    const s = (globalThis as { localStorage?: Storage }).localStorage;
+    if (!s || typeof s.getItem !== "function") return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
 
+function getHistory(): string[] {
+  const storage = getStorage();
+  if (!storage) return [];
+  try {
+    const raw = storage.getItem(HISTORY_KEY);
     if (!raw) return [];
-
     const parsed = JSON.parse(raw);
-
     return Array.isArray(parsed)
       ? parsed.filter((item): item is string => typeof item === "string")
       : [];
@@ -61,22 +99,76 @@ function getHistory(): string[] {
 }
 
 function addToHistory(term: string) {
+  const storage = getStorage();
+  if (!storage) return;
   const normalized = term.trim();
-
   if (!normalized) return;
-
   const previous = getHistory().filter(
     (item) => item.toLowerCase() !== normalized.toLowerCase(),
   );
-
-  localStorage.setItem(
-    HISTORY_KEY,
-    JSON.stringify([normalized, ...previous].slice(0, MAX_HISTORY)),
-  );
+  try {
+    storage.setItem(
+      HISTORY_KEY,
+      JSON.stringify([normalized, ...previous].slice(0, MAX_HISTORY)),
+    );
+  } catch {
+    /* noop */
+  }
 }
 
 function clearHistory() {
-  localStorage.removeItem(HISTORY_KEY);
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(HISTORY_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
+/* ============================================================================
+ * WEB API GUARDS
+ * ========================================================================== */
+
+/** Vrai seulement si on peut réellement utiliser `window.addEventListener`. */
+function canUseWebKeyboard(): boolean {
+  if (Platform.OS !== "web") return false;
+  try {
+    if (typeof globalThis === "undefined") return false;
+    const w = (globalThis as { window?: Window }).window;
+    if (!w) return false;
+    if (
+      typeof (w as unknown as { addEventListener?: unknown })
+        .addEventListener !== "function"
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Retourne `window` si utilisable, sinon `null`. */
+function getWindowSafe(): (Window & typeof globalThis) | null {
+  try {
+    if (typeof globalThis === "undefined") return null;
+    const w = (globalThis as { window?: Window & typeof globalThis }).window;
+    return w ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Langue du device — safe sur RN. */
+function getSafeLanguage(): string {
+  try {
+    if (typeof globalThis === "undefined") return "fr-FR";
+    const nav = (globalThis as { navigator?: { language?: string } }).navigator;
+    return nav?.language ?? "fr-FR";
+  } catch {
+    return "fr-FR";
+  }
 }
 
 /* ============================================================================
@@ -84,62 +176,21 @@ function clearHistory() {
  * ========================================================================== */
 
 const TYPE_FILTERS = [
-  {
-    label: "Tout",
-    value: "",
-    icon: Compass,
-  },
-  {
-    label: "Immo",
-    value: "immo",
-    icon: Building2,
-  },
-  {
-    label: "Emploi",
-    value: "job",
-    icon: BriefcaseBusiness,
-  },
-  {
-    label: "Services",
-    value: "service",
-    icon: Zap,
-  },
-  {
-    label: "Événements",
-    value: "evenement",
-    icon: CalendarDays,
-  },
-  {
-    label: "Annonces",
-    value: "annonce",
-    icon: ShoppingBag,
-  },
-  {
-    label: "Agri",
-    value: "agri",
-    icon: Sprout,
-  },
-  {
-    label: "Santé",
-    value: "sante",
-    icon: HeartPulse,
-  },
-  {
-    label: "Transport",
-    value: "transport",
-    icon: Car,
-  },
+  { label: "Tout", value: "", icon: Compass },
+  { label: "Immo", value: "immo", icon: Building2 },
+  { label: "Emploi", value: "job", icon: BriefcaseBusiness },
+  { label: "Services", value: "service", icon: Zap },
+  { label: "Événements", value: "evenement", icon: CalendarDays },
+  { label: "Annonces", value: "annonce", icon: ShoppingBag },
+  { label: "Agri", value: "agri", icon: Sprout },
+  { label: "Santé", value: "sante", icon: HeartPulse },
+  { label: "Transport", value: "transport", icon: Car },
 ] as const;
 
 type FilterValue = (typeof TYPE_FILTERS)[number]["value"];
 
 const TABS = ["Tout", "Publications", "Personnes", "Modules"] as const;
-
 type TabType = (typeof TABS)[number];
-
-/* ============================================================================
- * COLORS / LABELS
- * ========================================================================== */
 
 const TYPE_COLORS: Record<string, string> = {
   immo: "#10B981",
@@ -173,17 +224,13 @@ const TYPE_LABELS: Record<string, string> = {
   ong: "ONG",
 };
 
-/* ============================================================================
- * MODULES
- * ========================================================================== */
-
 interface ModuleEntry {
   id: string;
   title: string;
   subtitle: string;
   page: string;
   category: string;
-  icon: typeof Layers;
+  icon: ComponentType<{ size?: number; color?: string }>;
   accent: string;
 }
 
@@ -370,10 +417,6 @@ const MODULES: ModuleEntry[] = [
   },
 ];
 
-/* ============================================================================
- * PROPS
- * ========================================================================== */
-
 interface AdvancedSearchProps {
   onClose: () => void;
   onNavigate: (page: string) => void;
@@ -381,7 +424,144 @@ interface AdvancedSearchProps {
 }
 
 /* ============================================================================
- * COMPONENT
+ * AMBIENT BACKGROUND
+ * ========================================================================== */
+
+function AmbientBackground() {
+  const { width: W, height: H } = useWindowDimensions();
+  const orbA = useRef(new Animated.Value(0)).current;
+  const orbB = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loopA = Animated.loop(
+      Animated.sequence([
+        Animated.timing(orbA, {
+          toValue: -40,
+          duration: 9000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(orbA, {
+          toValue: 0,
+          duration: 9000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const loopB = Animated.loop(
+      Animated.sequence([
+        Animated.timing(orbB, {
+          toValue: 50,
+          duration: 11000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(orbB, {
+          toValue: 0,
+          duration: 11000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loopA.start();
+    loopB.start();
+    return () => {
+      loopA.stop();
+      loopB.stop();
+    };
+  }, [orbA, orbB]);
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <LinearGradient
+        colors={["#07050F", "#0E0821", "#0A0518", "#120827"]}
+        locations={[0, 0.4, 0.75, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ flex: 1 }}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: Math.max(340, W * 0.85),
+            height: Math.max(340, W * 0.85),
+            top: -160,
+            left: -140,
+            backgroundColor: "rgba(99,102,241,0.42)",
+            transform: [{ translateY: orbA }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 320,
+            height: 320,
+            bottom: H * 0.1 - 160,
+            right: -120,
+            backgroundColor: "rgba(139,92,246,0.32)",
+            transform: [{ translateY: orbB }],
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+/* ============================================================================
+ * ENTRANCE WRAPPER
+ * ========================================================================== */
+
+function FadeUp({
+  delay = 0,
+  distance = 10,
+  children,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(anim, {
+      toValue: 1,
+      duration: 420,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => {
+      animation.stop();
+    };
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [
+          {
+            translateY: anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [distance, 0],
+            }),
+          },
+        ],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * MAIN
  * ========================================================================== */
 
 export default function AdvancedSearch({
@@ -389,26 +569,19 @@ export default function AdvancedSearch({
   onNavigate,
   onViewProfile,
 }: AdvancedSearchProps) {
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("Tout");
-
   const [typeFilter, setTypeFilter] = useState<FilterValue>("");
-
   const [history, setHistory] = useState<string[]>(getHistory);
-
   const [showFilters, setShowFilters] = useState(false);
-
   const [isListening, setIsListening] = useState(false);
-
   const [selectedTrending, setSelectedTrending] = useState<string | null>(null);
 
   const searchInputRef = useRef<TextInput>(null);
-
   const [debouncedQuery] = useDebounce(query, 350);
 
-  /* --------------------------------------------------------------------------
-   * BACKEND SEARCH
-   * ------------------------------------------------------------------------ */
+  /* ─────────── BACKEND ─────────── */
 
   const pubResults = useQuery(
     api.search.searchPublications,
@@ -416,9 +589,7 @@ export default function AdvancedSearch({
       ? {
           q: debouncedQuery,
           ...(typeFilter
-            ? {
-                type: typeFilter as Exclude<FilterValue, "">,
-              }
+            ? { type: typeFilter as Exclude<FilterValue, ""> }
             : {}),
         }
       : "skip",
@@ -426,26 +597,16 @@ export default function AdvancedSearch({
 
   const userResults = useQuery(
     api.search.searchUsers,
-    debouncedQuery.length >= 2
-      ? {
-          q: debouncedQuery,
-        }
-      : "skip",
+    debouncedQuery.length >= 2 ? { q: debouncedQuery } : "skip",
   );
 
   const trendingTags = useQuery(api.search.getTrendingTags, {});
 
-  /* --------------------------------------------------------------------------
-   * MODULE SEARCH
-   * ------------------------------------------------------------------------ */
+  /* ─────────── MODULE SEARCH ─────────── */
 
   const moduleResults = useMemo(() => {
-    if (debouncedQuery.length < 2) {
-      return [];
-    }
-
+    if (debouncedQuery.length < 2) return [];
     const normalized = debouncedQuery.toLowerCase();
-
     return MODULES.filter((module) =>
       [module.title, module.subtitle, module.category].some((value) =>
         value.toLowerCase().includes(normalized),
@@ -453,35 +614,24 @@ export default function AdvancedSearch({
     );
   }, [debouncedQuery]);
 
-  /* --------------------------------------------------------------------------
-   * STATE
-   * ------------------------------------------------------------------------ */
-
   const isSearching = debouncedQuery.length >= 2;
 
   const isLoading =
     isSearching && (pubResults === undefined || userResults === undefined);
 
   const publicationCount = pubResults?.length ?? 0;
-
   const peopleCount = userResults?.length ?? 0;
-
   const moduleCount = moduleResults.length;
-
   const totalResults = publicationCount + peopleCount + moduleCount;
 
   const activeFilterLabel =
-    TYPE_FILTERS.find((filter) => filter.value === typeFilter)?.label ?? "Tout";
+    TYPE_FILTERS.find((f) => f.value === typeFilter)?.label ?? "Tout";
 
-  /* --------------------------------------------------------------------------
-   * SEARCH ACTIONS
-   * ------------------------------------------------------------------------ */
+  /* ─────────── ACTIONS ─────────── */
 
   const handleSearch = useCallback((term: string) => {
     const normalized = term.trim();
-
     if (!normalized) return;
-
     addToHistory(normalized);
     setHistory(getHistory());
     setSelectedTrending(null);
@@ -512,118 +662,67 @@ export default function AdvancedSearch({
     setQuery("");
     setTypeFilter("");
     setSelectedTrending(null);
-
-    undefined;
+    setTimeout(() => searchInputRef.current?.focus(), 50);
   }, []);
 
-  /* --------------------------------------------------------------------------
-   * KEYBOARD SHORTCUT
-   * ------------------------------------------------------------------------ */
+  /* ─────────── WEB KEYBOARD SHORTCUTS (safe) ─────────── */
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        searchInputRef.current?.focus();
-      }
+    if (!canUseWebKeyboard()) return;
+    const w = getWindowSafe();
+    if (!w) return;
 
+    const handler = (event: KeyboardEvent) => {
+      if (!event || typeof event.key !== "string") return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault?.();
+        searchInputRef.current?.focus();
+        return;
+      }
       if (event.key === "Escape") {
-        if (query) {
-          clearSearch();
-        } else {
-          onClose();
-        }
+        if (query) clearSearch();
+        else onClose();
       }
     };
 
-    undefined;
-
+    w.addEventListener("keydown", handler as EventListener);
     return () => {
-      undefined;
+      w.removeEventListener("keydown", handler as EventListener);
     };
   }, [clearSearch, onClose, query]);
 
-  /* --------------------------------------------------------------------------
-   * VOICE SEARCH
-   * ------------------------------------------------------------------------ */
+  /* ─────────── VOICE SEARCH (safe) ─────────── */
 
   const startVoiceSearch = useCallback(() => {
-    const speechWindow = undefined as typeof undefined & {
-      SpeechRecognition?: new () => {
-        lang: string;
-        continuous: boolean;
-        interimResults: boolean;
-        onresult:
-          | ((event: {
-              results: {
-                [index: number]: {
-                  [index: number]: {
-                    transcript: string;
-                  };
-                };
-              };
-            }) => void)
-          | null;
-        onerror: (() => void) | null;
-        onend: (() => void) | null;
-        start: () => void;
-        stop: () => void;
-      };
-      webkitSpeechRecognition?: new () => {
-        lang: string;
-        continuous: boolean;
-        interimResults: boolean;
-        onresult:
-          | ((event: {
-              results: {
-                [index: number]: {
-                  [index: number]: {
-                    transcript: string;
-                  };
-                };
-              };
-            }) => void)
-          | null;
-        onerror: (() => void) | null;
-        onend: (() => void) | null;
-        start: () => void;
-        stop: () => void;
-      };
-    };
-
-    const Recognition =
-      speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-
-    if (!Recognition) {
-      return;
-    }
-
-    const recognition = new Recognition();
-
-    recognition.lang = "en" || "fr-FR";
-
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript ?? "";
-
-      if (transcript.trim()) {
-        setQuery(transcript.trim());
-        handleSearch(transcript);
-      }
-
-      setIsListening(false);
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
     try {
+      if (Platform.OS !== "web") return;
+      const w = getWindowSafe() as
+        | (Window & {
+            SpeechRecognition?: new () => any;
+            webkitSpeechRecognition?: new () => any;
+          })
+        | null;
+      if (!w) return;
+
+      const Recognition = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+      if (!Recognition) return;
+
+      const recognition = new Recognition();
+      recognition.lang = getSafeLanguage();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onresult = (event: any) => {
+        const transcript = event?.results?.[0]?.[0]?.transcript ?? "";
+        if (transcript.trim()) {
+          setQuery(transcript.trim());
+          handleSearch(transcript);
+        }
+        setIsListening(false);
+      };
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
+
       recognition.start();
       setIsListening(true);
     } catch {
@@ -631,348 +730,303 @@ export default function AdvancedSearch({
     }
   }, [handleSearch]);
 
-  /* --------------------------------------------------------------------------
-   * FOCUS
-   * ------------------------------------------------------------------------ */
+  /* ─────────── AUTOFOCUS ─────────── */
 
   useEffect(() => {
-    const timer = undefined;
-
-    return () => {
-      undefined;
-    };
+    const t = setTimeout(() => searchInputRef.current?.focus(), 300);
+    return () => clearTimeout(t);
   }, []);
 
-  /* ==========================================================================
+  /* ======================================================================
    * RENDER
-   * ======================================================================== */
+   * ==================================================================== */
+
+  const topPad = Math.max(insets.top, Platform.OS === "android" ? 24 : 44);
 
   return (
-    <View
-      className="fixed inset-0 z-50 flex flex-col overflow-hidden"
-      style={{  }}
-    >
-      {/* =====================================================================
-          AMBIENT BACKGROUND
-      ====================================================================== */}
+    <View style={styles.root}>
+      <AmbientBackground />
 
-      <View
-       
-        className="absolute -top-44 left-1/2 h-[34rem] w-[34rem] -translate-x-1/2 rounded-full"
-        style={{  }}
-      />
-
-      <View
-        className="absolute -bottom-52 -right-40 h-[30rem] w-[30rem] rounded-full"
-        style={{  }}
-      />
-
-      {/* =====================================================================
-          TOP HEADER
-      ====================================================================== */}
-
-      <View className="relative z-10 flex flex-shrink-0 items-center gap-2.5 px-3 pb-3 pt-[max(.8rem,env(safe-area-inset-top))] sm:px-5">
-        {/* BACK */}
+      {/* ───────── HEADER ───────── */}
+      <View style={[styles.header, { paddingTop: topPad + 8 }]}>
         <Pressable
           onPress={onClose}
           accessibilityLabel="Fermer la recherche"
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045] text-white/55"
+          hitSlop={10}
+          style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
         >
-          <ArrowLeft size={17} />
+          <ArrowLeft size={17} color="rgba(255,255,255,0.8)" />
         </Pressable>
 
-        {/* SEARCH BAR */}
-        <View
-          className="relative flex min-w-0 flex-1 items-center gap-2 rounded-[22px] border px-3.5 py-2.5"
-          style={{ backgroundColor: "rgba(255,255,255,.055)", borderColor: isSearching
-                        ? "rgba(99,102,241,.35)"
-                        : "rgba(255,255,255,.09)" }}
-        >
+        <View style={[styles.searchBar, isSearching && styles.searchBarActive]}>
           <Search
             size={17}
-            className={
-              isSearching
-                ? "flex-shrink-0 text-indigo-400"
-                : "flex-shrink-0 text-white/35"
-            }
+            color={isSearching ? "#A5B4FC" : "rgba(255,255,255,0.4)"}
           />
-
           <TextInput
             ref={searchInputRef}
             autoFocus
             value={query}
-            onChangeText={(text) => setQuery(text)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && query.trim()) {
+            onChangeText={setQuery}
+            onSubmitEditing={() => {
+              if (query.trim()) handleSearch(query);
+            }}
+            onKeyPress={(
+              e: NativeSyntheticEvent<TextInputKeyPressEventData>,
+            ) => {
+              if (e.nativeEvent.key === "Enter" && query.trim()) {
                 handleSearch(query);
               }
             }}
             placeholder="Rechercher dans DébrouillePro…"
-            className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/30 sm:text-sm"
+            placeholderTextColor="rgba(255,255,255,0.32)"
+            style={styles.searchInput}
             accessibilityLabel="Rechercher dans DébrouillePro"
+            returnKeyType="search"
           />
 
-          {/* VOICE */}
-          <Pressable
-            onPress={startVoiceSearch}
-            accessibilityLabel="Recherche vocale"
-            className="hidden h-7 w-7 items-center justify-center rounded-xl bg-white/[0.04] sm:flex"
-          >
-            <>
-              {isListening ? (
-                <Text
-                  key="listening"
-                >
-                  <Mic size={13} className="text-red-400" />
-                </Text>
-              ) : (
-                <Text
-                  key="idle"
-                >
-                  <Mic size={13} className="text-white/30" />
-                </Text>
-              )}
-            </>
-          </Pressable>
+          {Platform.OS === "web" ? (
+            <Pressable
+              onPress={startVoiceSearch}
+              accessibilityLabel="Recherche vocale"
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.micBtn,
+                isListening && styles.micBtnActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Mic
+                size={13}
+                color={isListening ? "#F87171" : "rgba(255,255,255,0.4)"}
+              />
+            </Pressable>
+          ) : null}
 
-          {/* SHORTCUT */}
-          {!query && (
-            <View className="hidden items-center gap-1 rounded-lg border border-white/[0.06] bg-white/[0.035] px-1.5 py-1 md:flex">
-              <Command size={9} className="text-white/20" />
-              <Text className="text-[8px] text-white/20">K</Text>
+          {!query && Platform.OS === "web" ? (
+            <View style={styles.kbd}>
+              <Command size={9} color="rgba(255,255,255,0.3)" />
+              <Text style={styles.kbdText}>K</Text>
             </View>
-          )}
+          ) : null}
 
-          {query && (
+          {query ? (
             <Pressable
               onPress={clearSearch}
               accessibilityLabel="Effacer la recherche"
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-white/40"
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.clearBtn,
+                pressed && styles.pressed,
+              ]}
             >
-              <X size={13} />
+              <X size={13} color="rgba(255,255,255,0.55)" />
             </Pressable>
-          )}
+          ) : null}
         </View>
 
-        {/* FILTER */}
         <Pressable
-          onPress={() => setShowFilters((value) => !value)}
+          onPress={() => setShowFilters((v) => !v)}
           accessibilityLabel="Afficher les filtres"
-          className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.045]"
+          hitSlop={10}
+          style={({ pressed }) => [
+            styles.iconBtn,
+            (showFilters || typeFilter) && styles.iconBtnActive,
+            pressed && styles.pressed,
+          ]}
         >
           <SlidersHorizontal
             size={16}
-            className={
-              showFilters || typeFilter ? "text-indigo-400" : "text-white/45"
+            color={
+              showFilters || typeFilter ? "#C4B5FD" : "rgba(255,255,255,0.6)"
             }
           />
-
-          {typeFilter && (
-            <Text className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-indigo-400 ring-2 ring-[#050719]" />
-          )}
+          {typeFilter ? <View style={styles.filterDot} /> : null}
         </Pressable>
       </View>
 
-      {/* =====================================================================
-          BRAND / HERO
-      ====================================================================== */}
-
-      <>
-        {!isSearching && (
-          <View
-            className="relative z-10 overflow-hidden"
-          >
-            <View className="px-5 pb-4 pt-1 sm:px-8">
-              <View className="mx-auto max-w-5xl">
-                <View className="flex items-center gap-2">
-                  <View
-                    className="flex h-8 w-8 items-center justify-center rounded-xl"
-                    style={{  }}
-                  >
-                    <Sparkles size={14} className="text-white" />
-                  </View>
-
-                  <View>
-                    <Text className="text-[9px] font-bold uppercase tracking-[0.2em] text-indigo-400/70">
-                      Recherche intelligente
-                    </Text>
-
-                    <Text className="text-[11px] text-white/30">
-                      Trouve ce dont tu as besoin.
-                    </Text>
-                  </View>
-                </View>
-              </View>
+      {/* ───────── BRAND HERO ───────── */}
+      {!isSearching ? (
+        <FadeUp delay={60}>
+          <View style={styles.brandHero}>
+            <LinearGradient
+              colors={["#A78BFA", "#6366F1"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.brandLogo}
+            >
+              <Sparkles size={14} color="#fff" />
+            </LinearGradient>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.brandEyebrow}>RECHERCHE INTELLIGENTE</Text>
+              <Text style={styles.brandSub}>Trouve ce dont tu as besoin.</Text>
             </View>
           </View>
-        )}
-      </>
+        </FadeUp>
+      ) : null}
 
-      {/* =====================================================================
-          TABS
-      ====================================================================== */}
-
-      <View className="relative z-10 flex flex-shrink-0 gap-1 overflow-x-auto px-4 pb-2 sm:px-5 no-scrollbar">
+      {/* ───────── TABS ───────── */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabsRow}
+      >
         {TABS.map((tab) => {
           const active = activeTab === tab;
-
           return (
             <Pressable
               key={tab}
               onPress={() => setActiveTab(tab)}
-              className="relative flex-shrink-0 rounded-full px-3.5 py-1.5 text-[10px] font-bold sm:text-xs"
-              style={{ backgroundColor: active
-                                ? "rgba(99,102,241,.18)"
-                                : "rgba(255,255,255,.035)", borderColor: "rgba(99,102,241,.28)", borderStyle: "solid" }}
+              style={({ pressed }) => [
+                styles.tab,
+                active && styles.tabActive,
+                pressed && styles.pressed,
+              ]}
             >
-              {tab}
-
-              {active && (
-                <Text
-                  className="absolute inset-x-3 -bottom-[3px] h-px rounded-full"
-                  style={{  }}
-                />
-              )}
+              <Text style={[styles.tabText, active && styles.tabTextActive]}>
+                {tab}
+              </Text>
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
-      {/* =====================================================================
-          TYPE FILTERS
-      ====================================================================== */}
+      {/* ───────── TYPE FILTERS ───────── */}
+      {(activeTab === "Tout" || activeTab === "Publications") &&
+      (isSearching || showFilters) ? (
+        <FadeUp>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersRow}
+          >
+            {TYPE_FILTERS.map(({ label, value, icon: Icon }) => {
+              const active = typeFilter === value;
+              return (
+                <Pressable
+                  key={value}
+                  onPress={() => setTypeFilter(value)}
+                  style={({ pressed }) => [
+                    styles.filterChip,
+                    active && styles.filterChipActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Icon
+                    size={11}
+                    color={active ? "#C4B5FD" : "rgba(255,255,255,0.5)"}
+                  />
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      active && { color: "#C4B5FD" },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </FadeUp>
+      ) : null}
 
-      <>
-        {(activeTab === "Tout" || activeTab === "Publications") &&
-          (isSearching || showFilters) && (
-            <View
-              className="relative z-10 overflow-hidden"
-            >
-              <View className="flex gap-1.5 overflow-x-auto px-4 pb-3 pt-1 sm:px-5 no-scrollbar">
-                {TYPE_FILTERS.map(({ label, value, icon: Icon }) => {
-                  const active = typeFilter === value;
-
-                  return (
-                    <Pressable
-                      key={value}
-                      onPress={() => setTypeFilter(value)}
-                      className="flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[9px] font-bold sm:text-[10px]"
-                      style={{ backgroundColor: active
-                                                ? "rgba(99,102,241,.2)"
-                                                : "rgba(255,255,255,.035)", borderColor: "rgba(99,102,241,.3)", borderStyle: "solid" }}
-                    >
-                      <Icon size={11} />
-                      {label}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-      </>
-
-      {/* =====================================================================
-          CONTENT
-      ====================================================================== */}
-
-      <View className="relative z-10 flex-1 overflow-y-auto px-4 pb-10 sm:px-5">
-        <View className="mx-auto max-w-5xl">
-          {/* =================================================================
-              IDLE STATE
-          ================================================================== */}
-
-          {!isSearching && (
-            <View
-              className="space-y-7 pt-2"
-            >
-              {/* RECENT */}
-              {history.length > 0 && (
+      {/* ───────── CONTENT ───────── */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.contentScroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ─── IDLE STATE ─── */}
+        {!isSearching ? (
+          <View style={{ gap: 28 }}>
+            {/* Recent */}
+            {history.length > 0 ? (
+              <FadeUp>
                 <View>
-                  <View className="mb-3 flex items-center justify-between">
-                    <View className="flex items-center gap-2">
-                      <View className="flex h-7 w-7 items-center justify-center rounded-xl bg-white/[0.05]">
-                        <History size={13} className="text-white/40" />
-                      </View>
-
-                      <View>
-                        <Text className="text-xs font-bold text-white/65">
-                          Recherches récentes
-                        </Text>
-                        <Text className="text-[9px] text-white/25">
-                          Reprends là où tu t'es arrêté
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Pressable
-                     
-                      onPress={handleClearHistory}
-                      className="text-[10px] font-medium text-white/25"
-                    >
-                      <Text>Effacer</Text></Pressable>
-                  </View>
-
-                  <View className="flex flex-wrap gap-2">
-                    {history.map((term, index) => (
-                      <Pressable
-                        key={`${term}-${index}`}
-                        onPress={() => handleSuggestion(term)}
-                        className="flex items-center gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.04] px-3 py-2 text-[10px] text-white/55"
-                      >
-                        <Clock size={10} className="text-white/25" />
-
-                        <Text className="max-w-[190px] truncate">{term}</Text>
-
-                        <ArrowUpRight size={10} className="text-white/20" />
+                  <SectionHeader
+                    icon={<History size={13} color="rgba(255,255,255,0.55)" />}
+                    title="Recherches récentes"
+                    subtitle="Reprends là où tu t'es arrêté"
+                    right={
+                      <Pressable onPress={handleClearHistory} hitSlop={8}>
+                        <Text style={styles.clearLink}>Effacer</Text>
                       </Pressable>
+                    }
+                  />
+                  <View style={styles.wrapRow}>
+                    {history.map((term, index) => (
+                      <FadeUp key={`${term}-${index}`} delay={index * 25}>
+                        <Pressable
+                          onPress={() => handleSuggestion(term)}
+                          style={({ pressed }) => [
+                            styles.historyChip,
+                            pressed && styles.pressed,
+                          ]}
+                        >
+                          <Clock size={10} color="rgba(255,255,255,0.4)" />
+                          <Text
+                            style={styles.historyChipText}
+                            numberOfLines={1}
+                          >
+                            {term}
+                          </Text>
+                          <ArrowUpRight
+                            size={10}
+                            color="rgba(255,255,255,0.35)"
+                          />
+                        </Pressable>
+                      </FadeUp>
                     ))}
                   </View>
                 </View>
-              )}
+              </FadeUp>
+            ) : null}
 
-              {/* TRENDING */}
+            {/* Trending */}
+            <FadeUp>
               <View>
-                <View className="mb-3 flex items-center gap-2">
-                  <View
-                    className="flex h-7 w-7 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: "rgba(249,115,22,.1)" }}
-                  >
-                    <Flame size={13} className="text-orange-400" />
-                  </View>
-
-                  <View>
-                    <Text className="text-xs font-bold text-white/65">Tendances</Text>
-
-                    <Text className="text-[9px] text-white/25">
-                      Ce que la communauté recherche
-                    </Text>
-                  </View>
-                </View>
+                <SectionHeader
+                  icon={
+                    <View
+                      style={[
+                        styles.sectionIconBg,
+                        { backgroundColor: "rgba(249,115,22,0.14)" },
+                      ]}
+                    >
+                      <Flame size={13} color="#FB923C" />
+                    </View>
+                  }
+                  title="Tendances"
+                  subtitle="Ce que la communauté recherche"
+                />
 
                 {trendingTags === undefined ? (
-                  <View className="flex flex-wrap gap-2">
-                    {Array.from({
-                      length: 7,
-                    }).map((_, index) => (
+                  <View style={styles.wrapRow}>
+                    {Array.from({ length: 7 }).map((_, i) => (
                       <Skeleton
-                        key={index}
-                        className="h-8 w-24 rounded-full bg-white/[0.05]"
+                        key={i}
+                        style={{
+                          height: 32,
+                          width: 96,
+                          borderRadius: 16,
+                          backgroundColor: "rgba(255,255,255,0.05)",
+                        }}
                       />
                     ))}
                   </View>
                 ) : trendingTags.length === 0 ? (
-                  <View className="rounded-2xl border border-white/[0.06] bg-white/[0.025] p-5 text-center">
-                    <TrendingUp size={18} className="mx-auto text-white/15" />
-
-                    <Text className="mt-2 text-xs text-white/25">
+                  <View style={styles.emptyCard}>
+                    <TrendingUp size={18} color="rgba(255,255,255,0.25)" />
+                    <Text style={styles.emptyCardText}>
                       Les tendances arrivent bientôt.
                     </Text>
                   </View>
                 ) : (
-                  <View className="flex flex-wrap gap-2">
+                  <View style={styles.wrapRow}>
                     {trendingTags.map(({ tag, count }) => {
                       const selected = selectedTrending === tag;
-
                       return (
                         <Pressable
                           key={tag}
@@ -980,559 +1034,1220 @@ export default function AdvancedSearch({
                             setSelectedTrending(tag);
                             handleSuggestion(tag);
                           }}
-                          className="flex items-center gap-1.5 rounded-2xl px-3 py-2 text-[10px] font-bold"
-                          style={{ backgroundColor: selected
-                                                        ? "rgba(99,102,241,.22)"
-                                                        : "rgba(99,102,241,.08)", borderWidth: 1, borderColor: "rgba(99,102,241,.18)", borderStyle: "solid" }}
+                          style={({ pressed }) => [
+                            styles.trendChip,
+                            selected && styles.trendChipActive,
+                            pressed && styles.pressed,
+                          ]}
                         >
-                          <TrendingUp size={10} />
-
-                          <Text>#{tag}</Text>
-
-                          <Text className="rounded-full bg-black/10 px-1.5 py-0.5 text-[8px] opacity-60">
-                            {count}
+                          <TrendingUp
+                            size={10}
+                            color={selected ? "#C4B5FD" : "#A5B4FC"}
+                          />
+                          <Text
+                            style={[
+                              styles.trendChipText,
+                              selected && { color: "#C4B5FD" },
+                            ]}
+                          >
+                            #{tag}
                           </Text>
+                          <View style={styles.trendCount}>
+                            <Text style={styles.trendCountText}>{count}</Text>
+                          </View>
                         </Pressable>
                       );
                     })}
                   </View>
                 )}
               </View>
+            </FadeUp>
 
-              {/* MODULE DISCOVERY */}
+            {/* Modules discovery */}
+            <FadeUp>
               <View>
-                <View className="mb-3 flex items-center gap-2">
-                  <View
-                    className="flex h-7 w-7 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: "rgba(99,102,241,.1)" }}
-                  >
-                    <Sparkles size={13} className="text-indigo-400" />
-                  </View>
-
-                  <View>
-                    <Text className="text-xs font-bold text-white/65">
-                      Explorer DébrouillePro
-                    </Text>
-
-                    <Text className="text-[9px] text-white/25">
-                      Accède directement à un module
-                    </Text>
-                  </View>
-                </View>
-
-                <View className="gap-2">
-                  {MODULES.slice(0, 8).map((module, index) => {
-                    const Icon = module.icon;
-
-                    return (
+                <SectionHeader
+                  icon={
+                    <View
+                      style={[
+                        styles.sectionIconBg,
+                        { backgroundColor: "rgba(99,102,241,0.14)" },
+                      ]}
+                    >
+                      <Sparkles size={13} color="#A5B4FC" />
+                    </View>
+                  }
+                  title="Explorer DébrouillePro"
+                  subtitle="Accède directement à un module"
+                />
+                <View style={{ gap: 8 }}>
+                  {MODULES.slice(0, 8).map((module, index) => (
+                    <FadeUp key={module.id} delay={index * 30}>
                       <Pressable
-                        key={module.id}
                         onPress={() =>
                           handleModuleNavigation(module.page, module.title)
                         }
-                        className="group flex items-center gap-2.5 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left"
+                        style={({ pressed }) => [
+                          styles.moduleRow,
+                          pressed && styles.pressed,
+                        ]}
                       >
                         <View
-                          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
-                          style={{ backgroundColor: `${module.accent}12`, borderStyle: "solid" }}
+                          style={[
+                            styles.moduleRowIcon,
+                            { backgroundColor: `${module.accent}1A` },
+                          ]}
                         >
-                          <Icon
-                            size={15}
-                            style={{
-                              color: module.accent,
-                            }}
-                          />
+                          <module.icon size={15} color={module.accent} />
                         </View>
-
-                        <View className="min-w-0 flex-1">
-                          <Text className="truncate text-[11px] font-bold text-white/75">
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.moduleRowTitle} numberOfLines={1}>
                             {module.title}
                           </Text>
-
-                          <Text className="truncate text-[9px] text-white/25">
+                          <Text style={styles.moduleRowSub} numberOfLines={1}>
                             {module.category}
                           </Text>
                         </View>
-
-                        <ChevronRight
-                          size={12}
-                          className="flex-shrink-0 text-white/15"
-                        />
+                        <ChevronRight size={12} color="rgba(255,255,255,0.3)" />
                       </Pressable>
-                    );
-                  })}
+                    </FadeUp>
+                  ))}
                 </View>
               </View>
+            </FadeUp>
 
-              {/* QUICK SEARCH IDEAS */}
-              <View>
-                <View className="rounded-3xl border border-indigo-400/[0.12] bg-indigo-500/[0.035] p-4">
-                  <View className="flex items-start gap-3">
-                    <View
-                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
-                      style={{  }}
-                    >
-                      <Zap size={15} className="text-white" />
-                    </View>
+            {/* Idle hero card */}
+            <FadeUp>
+              <View style={styles.heroCard}>
+                <LinearGradient
+                  colors={["rgba(99,102,241,0.38)", "rgba(139,92,246,0.15)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.heroCardGlow}
+                />
+                <View style={styles.heroCardIcon}>
+                  <Zap size={15} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.heroCardTitle}>
+                    Recherche sans limites
+                  </Text>
+                  <Text style={styles.heroCardText}>
+                    Publications, personnes, services, événements, logements,
+                    emplois et modules — tout DébrouillePro au même endroit.
+                  </Text>
+                </View>
+              </View>
+            </FadeUp>
+          </View>
+        ) : null}
 
-                    <View className="min-w-0">
-                      <Text className="text-xs font-black text-white">
-                        Recherche sans limites
-                      </Text>
-
-                      <Text className="mt-1 text-[10px] leading-relaxed text-white/30">
-                        Publications, personnes, services, événements,
-                        logements, emplois et modules — tout DébrouillePro au
-                        même endroit.
-                      </Text>
-                    </View>
+        {/* ─── LOADING ─── */}
+        {isSearching && isLoading ? (
+          <View style={{ gap: 12, paddingTop: 12 }}>
+            <View style={styles.loadingRow}>
+              <View style={styles.loadingDot} />
+              <Text style={styles.loadingText}>
+                Recherche dans DébrouillePro…
+              </Text>
+            </View>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <View key={i} style={styles.skeletonCard}>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <Skeleton
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 12,
+                      backgroundColor: "rgba(255,255,255,0.05)",
+                    }}
+                  />
+                  <View style={{ flex: 1, gap: 8 }}>
+                    <Skeleton
+                      style={{
+                        height: 12,
+                        width: "60%",
+                        borderRadius: 4,
+                        backgroundColor: "rgba(255,255,255,0.05)",
+                      }}
+                    />
+                    <Skeleton
+                      style={{
+                        height: 10,
+                        width: "80%",
+                        borderRadius: 4,
+                        backgroundColor: "rgba(255,255,255,0.04)",
+                      }}
+                    />
                   </View>
                 </View>
               </View>
-            </View>
-          )}
+            ))}
+          </View>
+        ) : null}
 
-          {/* =================================================================
-              LOADING
-          ================================================================== */}
-
-          {isSearching && isLoading && (
-            <View
-              className="space-y-3 pt-3"
-            >
-              <View className="mb-5 flex items-center gap-2">
-                <View className="h-2 w-2 animate-pulse rounded-full bg-indigo-400" />
-
-                <Text className="text-[10px] text-white/30">
-                  Recherche dans DébrouillePro…
+        {/* ─── RESULTS ─── */}
+        {isSearching && !isLoading ? (
+          <View style={{ gap: 28, paddingTop: 12 }}>
+            {/* Summary */}
+            <View style={styles.summary}>
+              <View>
+                <Text style={styles.summaryTitle}>Résultats</Text>
+                <Text style={styles.summarySub}>
+                  Pour{" "}
+                  <Text style={{ color: "rgba(255,255,255,0.65)" }}>
+                    “{debouncedQuery}”
+                  </Text>
                 </Text>
               </View>
-
-              {Array.from({
-                length: 6,
-              }).map((_, index) => (
-                <View
-                  key={index}
-                  className="rounded-2xl border border-white/[0.05] bg-white/[0.025] p-3"
-                >
-                  <View className="flex gap-3">
-                    <Skeleton className="h-10 w-10 flex-shrink-0 rounded-xl bg-white/[0.05]" />
-
-                    <View className="flex-1 space-y-2">
-                      <Skeleton className="h-3 w-2/3 bg-white/[0.05]" />
-                      <Skeleton className="h-2.5 w-4/5 bg-white/[0.04]" />
-                      <Skeleton className="h-2 w-1/3 bg-white/[0.03]" />
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* =================================================================
-              RESULTS
-          ================================================================== */}
-
-          {isSearching && !isLoading && (
-            <View
-              className="space-y-7 pt-3"
-            >
-              {/* RESULT SUMMARY */}
-              <View className="flex items-center justify-between">
-                <View>
-                  <Text className="text-sm font-bold text-white">Résultats</Text>
-
-                  <Text className="mt-0.5 text-[10px] text-white/25">
-                    Pour{" "}
-                    <Text className="text-white/45">“{debouncedQuery}”</Text>
-                  </Text>
-                </View>
-
-                <View className="flex items-center gap-2">
-                  {typeFilter && (
-                    <Text className="rounded-full border border-indigo-400/20 bg-indigo-500/10 px-2.5 py-1 text-[9px] font-bold text-indigo-300">
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {typeFilter ? (
+                  <View style={styles.summaryChipActive}>
+                    <Text style={styles.summaryChipActiveText}>
                       {activeFilterLabel}
                     </Text>
-                  )}
-
-                  <Text className="rounded-full border border-white/[0.07] bg-white/[0.035] px-2.5 py-1 text-[9px] font-bold text-white/30">
-                    {totalResults} résultat
-                    {totalResults !== 1 ? "s" : ""}
+                  </View>
+                ) : null}
+                <View style={styles.summaryChip}>
+                  <Text style={styles.summaryChipText}>
+                    {totalResults} résultat{totalResults !== 1 ? "s" : ""}
                   </Text>
                 </View>
               </View>
+            </View>
 
-              {/* ===========================================================
-                    PUBLICATIONS
-                ============================================================ */}
-
-              {(activeTab === "Tout" || activeTab === "Publications") && (
-                <View>
-                  {activeTab === "Tout" && (
-                    <SectionHeader
-                      icon={<FileText size={13} />}
-                      title="Publications"
-                      count={publicationCount}
-                    />
-                  )}
-
-                  {pubResults &&
-                    pubResults.length === 0 &&
-                    activeTab === "Publications" && (
-                      <EmptySection
-                        icon={<FileText size={20} />}
-                        text="Aucune publication trouvée."
-                      />
-                    )}
-
-                  <View className="space-y-2">
-                    {pubResults
-                      ?.slice(0, activeTab === "Tout" ? 4 : 30)
-                      .map((publication, index) => {
-                        const color =
-                          TYPE_COLORS[publication.type] ?? "#6366F1";
-
-                        return (
+            {/* Publications */}
+            {(activeTab === "Tout" || activeTab === "Publications") && (
+              <View>
+                {activeTab === "Tout" ? (
+                  <SectionHeader
+                    icon={<FileText size={13} color="rgba(255,255,255,0.55)" />}
+                    title="Publications"
+                    count={publicationCount}
+                  />
+                ) : null}
+                {pubResults &&
+                pubResults.length === 0 &&
+                activeTab === "Publications" ? (
+                  <EmptySection
+                    icon={<FileText size={20} color="rgba(255,255,255,0.25)" />}
+                    text="Aucune publication trouvée."
+                  />
+                ) : null}
+                <View style={{ gap: 8 }}>
+                  {pubResults
+                    ?.slice(0, activeTab === "Tout" ? 4 : 30)
+                    .map((publication, index) => {
+                      const color = TYPE_COLORS[publication.type] ?? "#6366F1";
+                      return (
+                        <FadeUp
+                          key={publication._id}
+                          delay={index * 30}
+                          distance={8}
+                        >
                           <Pressable
-                            key={publication._id}
                             onPress={() => handleSearch(debouncedQuery)}
-                            className="group flex w-full items-start gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left"
+                            style={({ pressed }) => [
+                              styles.resultCard,
+                              pressed && styles.pressed,
+                            ]}
                           >
                             <View
-                              className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl"
-                              style={{ backgroundColor: `${color}12`, borderStyle: "solid" }}
+                              style={[
+                                styles.resultIconWrap,
+                                { backgroundColor: `${color}1A` },
+                              ]}
                             >
-                              <FileText
-                                size={15}
-                                style={{
-                                  color,
-                                }}
-                              />
-
-                              <Text
-                                className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-2 ring-[#070817]"
-                                style={{ backgroundColor: color }}
+                              <FileText size={15} color={color} />
+                              <View
+                                style={[
+                                  styles.resultIconDot,
+                                  { backgroundColor: color },
+                                ]}
                               />
                             </View>
-
-                            <View className="min-w-0 flex-1">
-                              <View className="flex items-start justify-between gap-2">
-                                <Text className="truncate text-xs font-bold text-white/85 sm:text-sm">
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <View style={styles.resultTitleRow}>
+                                <Text
+                                  style={styles.resultTitle}
+                                  numberOfLines={1}
+                                >
                                   {publication.title}
                                 </Text>
-
-                                <Text
-                                  className="flex-shrink-0 rounded-full px-2 py-0.5 text-[8px] font-bold"
-                                  style={{ backgroundColor: `${color}12`, color, borderStyle: "solid" }}
+                                <View
+                                  style={[
+                                    styles.resultBadge,
+                                    { backgroundColor: `${color}1A` },
+                                  ]}
                                 >
-                                  {TYPE_LABELS[publication.type] ??
-                                    publication.type}
-                                </Text>
+                                  <Text
+                                    style={[styles.resultBadgeText, { color }]}
+                                  >
+                                    {TYPE_LABELS[publication.type] ??
+                                      publication.type}
+                                  </Text>
+                                </View>
                               </View>
-
-                              {publication.description && (
-                                <Text className="mt-1 truncate text-[10px] text-white/35 sm:text-xs">
+                              {publication.description ? (
+                                <Text
+                                  style={styles.resultDescription}
+                                  numberOfLines={1}
+                                >
                                   {publication.description}
                                 </Text>
-                              )}
-
-                              <View className="mt-1.5 flex items-center gap-3">
-                                {publication.location && (
-                                  <Text className="flex min-w-0 items-center gap-1 text-[9px] text-white/25">
-                                    <MapPin size={9} />
-
-                                    <Text className="truncate">
+                              ) : null}
+                              <View style={styles.resultMetaRow}>
+                                {publication.location ? (
+                                  <View style={styles.resultMeta}>
+                                    <MapPin
+                                      size={9}
+                                      color="rgba(255,255,255,0.4)"
+                                    />
+                                    <Text
+                                      style={styles.resultMetaText}
+                                      numberOfLines={1}
+                                    >
                                       {publication.location}
                                     </Text>
-                                  </Text>
-                                )}
-
-                                {publication.author?.name && (
-                                  <Text className="truncate text-[9px] text-white/20">
+                                  </View>
+                                ) : null}
+                                {publication.author?.name ? (
+                                  <Text style={styles.resultAuthor}>
                                     par {publication.author.name}
                                   </Text>
-                                )}
+                                ) : null}
                               </View>
                             </View>
-
                             <ArrowUpRight
                               size={13}
-                              className="mt-1 flex-shrink-0 text-white/15"
+                              color="rgba(255,255,255,0.3)"
                             />
                           </Pressable>
-                        );
-                      })}
-                  </View>
-
-                  {activeTab === "Tout" && publicationCount > 4 && (
-                    <Pressable
-                     
-                      onPress={() => setActiveTab("Publications")}
-                      className="mt-2 flex w-full items-center justify-center gap-1 rounded-2xl py-2.5 text-[10px] font-bold text-indigo-300/70"
-                    >
-                      <Text>Voir toutes les publications</Text><ChevronRight size={11} />
-                    </Pressable>
-                  )}
+                        </FadeUp>
+                      );
+                    })}
                 </View>
-              )}
+                {activeTab === "Tout" && publicationCount > 4 ? (
+                  <Pressable
+                    onPress={() => setActiveTab("Publications")}
+                    style={({ pressed }) => [
+                      styles.moreBtn,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={styles.moreBtnText}>
+                      Voir toutes les publications
+                    </Text>
+                    <ChevronRight size={11} color="#A5B4FC" />
+                  </Pressable>
+                ) : null}
+              </View>
+            )}
 
-              {/* ===========================================================
-                    PEOPLE
-                ============================================================ */}
-
-              {(activeTab === "Tout" || activeTab === "Personnes") && (
-                <View>
-                  {activeTab === "Tout" && (
-                    <SectionHeader
-                      icon={<User size={13} />}
-                      title="Personnes"
-                      count={peopleCount}
-                    />
-                  )}
-
-                  {userResults &&
-                    userResults.length === 0 &&
-                    activeTab === "Personnes" && (
-                      <EmptySection
-                        icon={<User size={20} />}
-                        text="Aucun utilisateur trouvé."
-                      />
-                    )}
-
-                  <View className="space-y-2">
-                    {userResults
-                      ?.slice(0, activeTab === "Tout" ? 4 : 20)
-                      .map((user, index) => (
+            {/* People */}
+            {(activeTab === "Tout" || activeTab === "Personnes") && (
+              <View>
+                {activeTab === "Tout" ? (
+                  <SectionHeader
+                    icon={<User size={13} color="rgba(255,255,255,0.55)" />}
+                    title="Personnes"
+                    count={peopleCount}
+                  />
+                ) : null}
+                {userResults &&
+                userResults.length === 0 &&
+                activeTab === "Personnes" ? (
+                  <EmptySection
+                    icon={<User size={20} color="rgba(255,255,255,0.25)" />}
+                    text="Aucun utilisateur trouvé."
+                  />
+                ) : null}
+                <View style={{ gap: 8 }}>
+                  {userResults
+                    ?.slice(0, activeTab === "Tout" ? 4 : 20)
+                    .map((user, index) => (
+                      <FadeUp key={user._id} delay={index * 30} distance={8}>
                         <Pressable
-                          key={user._id}
                           onPress={() => onViewProfile(user._id)}
-                          className="group flex w-full items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left"
+                          style={({ pressed }) => [
+                            styles.resultCard,
+                            pressed && styles.pressed,
+                          ]}
                         >
-                          <View className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full border border-white/[0.08] bg-indigo-500/10">
+                          <View style={styles.avatarWrap}>
                             {user.avatar ? (
                               <Image
-                               
-                               
-                                className="h-full w-full object-cover"
-                               source={{ uri: user.avatar }} accessibilityLabel={user.name ?? "Utilisateur"}/>
+                                source={{ uri: user.avatar }}
+                                style={styles.avatar}
+                                accessibilityLabel={user.name ?? "Utilisateur"}
+                              />
                             ) : (
-                              <View className="flex h-full w-full items-center justify-center">
-                                <User size={17} className="text-indigo-300" />
+                              <View style={styles.avatarFallback}>
+                                <User size={17} color="#A5B4FC" />
                               </View>
                             )}
-
-                            <Text className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#080919] bg-emerald-400" />
+                            <View style={styles.onlineDot} />
                           </View>
-
-                          <View className="min-w-0 flex-1">
-                            <Text className="truncate text-xs font-bold text-white/85 sm:text-sm">
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.resultTitle} numberOfLines={1}>
                               {user.name ?? "Utilisateur"}
                             </Text>
-
-                            {user.bio && (
-                              <Text className="mt-0.5 truncate text-[10px] text-white/30 sm:text-xs">
+                            {user.bio ? (
+                              <Text
+                                style={styles.resultDescription}
+                                numberOfLines={1}
+                              >
                                 {user.bio}
                               </Text>
-                            )}
-
-                            {user.city && (
-                              <Text className="mt-1 flex items-center gap-1 text-[9px] text-white/20">
-                                <MapPin size={9} />
-
-                                {user.city}
-                              </Text>
-                            )}
+                            ) : null}
+                            {user.city ? (
+                              <View
+                                style={[styles.resultMeta, { marginTop: 4 }]}
+                              >
+                                <MapPin
+                                  size={9}
+                                  color="rgba(255,255,255,0.4)"
+                                />
+                                <Text style={styles.resultMetaText}>
+                                  {user.city}
+                                </Text>
+                              </View>
+                            ) : null}
                           </View>
-
-                          <View className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-white/[0.035]">
-                            <ChevronRight
-                              size={13}
-                              className="text-white/20"
-                            />
-                          </View>
+                          <ChevronRight
+                            size={13}
+                            color="rgba(255,255,255,0.3)"
+                          />
                         </Pressable>
-                      ))}
-                  </View>
+                      </FadeUp>
+                    ))}
                 </View>
-              )}
+              </View>
+            )}
 
-              {/* ===========================================================
-                    MODULES
-                ============================================================ */}
-
-              {(activeTab === "Tout" || activeTab === "Modules") && (
-                <View>
-                  {activeTab === "Tout" && (
-                    <SectionHeader
-                      icon={<Layers size={13} />}
-                      title="Modules"
-                      count={moduleCount}
-                    />
-                  )}
-
-                  {moduleResults.length === 0 && activeTab === "Modules" && (
-                    <EmptySection
-                      icon={<Layers size={20} />}
-                      text="Aucun module trouvé."
-                    />
-                  )}
-
-                  <View className="gap-2">
-                    {moduleResults
-                      .slice(0, activeTab === "Tout" ? 4 : 30)
-                      .map((module, index) => {
-                        const Icon = module.icon;
-
-                        return (
-                          <Pressable
-                            key={module.id}
-                            onPress={() =>
-                              handleModuleNavigation(module.page, module.title)
-                            }
-                            className="group flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-3 text-left"
+            {/* Modules */}
+            {(activeTab === "Tout" || activeTab === "Modules") && (
+              <View>
+                {activeTab === "Tout" ? (
+                  <SectionHeader
+                    icon={<Layers size={13} color="rgba(255,255,255,0.55)" />}
+                    title="Modules"
+                    count={moduleCount}
+                  />
+                ) : null}
+                {moduleResults.length === 0 && activeTab === "Modules" ? (
+                  <EmptySection
+                    icon={<Layers size={20} color="rgba(255,255,255,0.25)" />}
+                    text="Aucun module trouvé."
+                  />
+                ) : null}
+                <View style={{ gap: 8 }}>
+                  {moduleResults
+                    .slice(0, activeTab === "Tout" ? 4 : 30)
+                    .map((module, index) => (
+                      <FadeUp key={module.id} delay={index * 30} distance={8}>
+                        <Pressable
+                          onPress={() =>
+                            handleModuleNavigation(module.page, module.title)
+                          }
+                          style={({ pressed }) => [
+                            styles.resultCard,
+                            pressed && styles.pressed,
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.resultIconWrap,
+                              { backgroundColor: `${module.accent}1A` },
+                            ]}
                           >
-                            <View
-                              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl"
-                              style={{ backgroundColor: `${module.accent}12`, borderStyle: "solid" }}
-                            >
-                              <Icon
-                                size={15}
-                                style={{
-                                  color: module.accent,
-                                }}
-                              />
-                            </View>
-
-                            <View className="min-w-0 flex-1">
-                              <Text className="truncate text-xs font-bold text-white/85">
-                                {module.title}
-                              </Text>
-
-                              <Text className="mt-0.5 truncate text-[10px] text-white/30">
-                                {module.subtitle}
-                              </Text>
-                            </View>
-
+                            <module.icon size={15} color={module.accent} />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.resultTitle} numberOfLines={1}>
+                              {module.title}
+                            </Text>
                             <Text
-                              className="hidden flex-shrink-0 rounded-full px-2 py-1 text-[8px] font-bold sm:block"
-                              style={{ backgroundColor: `${module.accent}0D`, color: `${module.accent}B8` }}
+                              style={styles.resultDescription}
+                              numberOfLines={1}
+                            >
+                              {module.subtitle}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.resultBadge,
+                              { backgroundColor: `${module.accent}14` },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.resultBadgeText,
+                                { color: `${module.accent}CC` },
+                              ]}
                             >
                               {module.category}
                             </Text>
-
-                            <ChevronRight
-                              size={13}
-                              className="flex-shrink-0 text-white/15"
-                            />
-                          </Pressable>
-                        );
-                      })}
-                  </View>
+                          </View>
+                        </Pressable>
+                      </FadeUp>
+                    ))}
                 </View>
-              )}
+              </View>
+            )}
 
-              {/* ===========================================================
-                    NO RESULTS
-                ============================================================ */}
-
-              {activeTab === "Tout" && totalResults === 0 && (
-                <View
-                  className="flex flex-col items-center rounded-[28px] border border-white/[0.07] bg-white/[0.025] px-6 py-14 text-center"
-                >
-                  <View
-                    className="flex h-16 w-16 items-center justify-center rounded-3xl"
-                    style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.12)", borderStyle: "solid" }}
+            {/* No results */}
+            {activeTab === "Tout" && totalResults === 0 ? (
+              <FadeUp>
+                <View style={styles.noResultsCard}>
+                  <LinearGradient
+                    colors={["rgba(139,92,246,0.16)", "rgba(99,102,241,0.06)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.noResultsIcon}
                   >
-                    <Search size={25} className="text-indigo-300/50" />
-                  </View>
-
-                  <Text className="mt-5 text-sm font-bold text-white/70">
-                    Aucun résultat
-                  </Text>
-
-                  <Text className="mt-1 max-w-sm text-[10px] leading-relaxed text-white/25">
+                    <Search size={25} color="#A5B4FC" />
+                  </LinearGradient>
+                  <Text style={styles.noResultsTitle}>Aucun résultat</Text>
+                  <Text style={styles.noResultsText}>
                     Rien ne correspond à{" "}
-                    <Text className="text-white/45">“{debouncedQuery}”</Text>.
-                    Essaie un autre mot-clé, une autre formulation ou explore
-                    les tendances.
+                    <Text style={{ color: "rgba(255,255,255,0.65)" }}>
+                      “{debouncedQuery}”
+                    </Text>
+                    . Essaie un autre mot-clé ou explore les tendances.
                   </Text>
-
-                  <View className="mt-5 flex flex-wrap justify-center gap-2">
+                  <View style={styles.wrapRow}>
                     {["logement", "emploi", "transport", "événement"].map(
-                      (suggestion) => (
+                      (s) => (
                         <Pressable
-                          key={suggestion}
-                         
-                          onPress={() => handleSuggestion(suggestion)}
-                          className="rounded-full border border-white/[0.07] bg-white/[0.04] px-3 py-1.5 text-[9px] font-medium text-white/35"
+                          key={s}
+                          onPress={() => handleSuggestion(s)}
+                          style={({ pressed }) => [
+                            styles.suggestChip,
+                            pressed && styles.pressed,
+                          ]}
                         >
-                          {suggestion}
+                          <Text style={styles.suggestChipText}>{s}</Text>
                         </Pressable>
                       ),
                     )}
                   </View>
                 </View>
-              )}
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* =====================================================================
-          BOTTOM GLOW
-      ====================================================================== */}
-
-      <View
-       
-        className="absolute bottom-0 left-0 right-0 z-20 h-px"
-        style={{  }}
-      />
+              </FadeUp>
+            ) : null}
+          </View>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
 
 /* ============================================================================
- * SECTION HEADER
+ * SUB-COMPONENTS
  * ========================================================================== */
 
 function SectionHeader({
   icon,
   title,
+  subtitle,
   count,
+  right,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
-  count: number;
+  subtitle?: string;
+  count?: number;
+  right?: ReactNode;
 }) {
   return (
-    <View className="mb-3 flex items-center justify-between">
-      <View className="flex items-center gap-2 text-white/45">
-        <View className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/[0.04]">
-          {icon}
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionHeaderLeft}>
+        <View style={styles.sectionIconBg}>{icon}</View>
+        <View>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          {subtitle ? (
+            <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+          ) : null}
         </View>
-
-        <Text className="text-[9px] font-black uppercase tracking-[0.16em]">
-          {title}
-        </Text>
       </View>
+      {count !== undefined ? (
+        <View style={styles.countBadge}>
+          <Text style={styles.countBadgeText}>{count}</Text>
+        </View>
+      ) : null}
+      {right}
+    </View>
+  );
+}
 
-      <Text className="rounded-full bg-white/[0.035] px-2 py-0.5 text-[8px] font-bold text-white/20">
-        {count}
-      </Text>
+function EmptySection({ icon, text }: { icon: ReactNode; text: string }) {
+  return (
+    <View style={styles.emptySection}>
+      {icon}
+      <Text style={styles.emptySectionText}>{text}</Text>
     </View>
   );
 }
 
 /* ============================================================================
- * EMPTY SECTION
+ * STYLES
  * ========================================================================== */
 
-function EmptySection({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <View className="flex flex-col items-center rounded-2xl border border-white/[0.05] bg-white/[0.02] py-8 text-center">
-      <View className="text-white/15">{icon}</View>
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#07050F",
+  },
 
-      <Text className="mt-2 text-[10px] text-white/25">{text}</Text>
-    </View>
-  );
-}
+  orb: {
+    position: "absolute",
+    borderRadius: 9999,
+  },
+
+  // Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    zIndex: 10,
+  },
+  iconBtn: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  iconBtnActive: {
+    borderColor: "rgba(99,102,241,0.45)",
+    backgroundColor: "rgba(99,102,241,0.14)",
+  },
+  filterDot: {
+    position: "absolute",
+    top: 7,
+    right: 7,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#A5B4FC",
+    borderWidth: 2,
+    borderColor: "#07050F",
+  },
+  pressed: { opacity: 0.75 },
+
+  // Search bar
+  searchBar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+  searchBarActive: {
+    borderColor: "rgba(99,102,241,0.5)",
+    backgroundColor: "rgba(99,102,241,0.08)",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.35,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    color: "#fff",
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  micBtn: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  micBtnActive: {
+    backgroundColor: "rgba(248,113,113,0.15)",
+  },
+  kbd: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  kbdText: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "700",
+  },
+  clearBtn: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  // Brand hero
+  brandHero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  brandLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  brandEyebrow: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 2,
+    color: "rgba(165,180,252,0.85)",
+  },
+  brandSub: {
+    marginTop: 2,
+    fontSize: 11.5,
+    color: "rgba(255,255,255,0.45)",
+  },
+
+  // Tabs
+  tabsRow: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    gap: 8,
+  },
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  tabActive: {
+    backgroundColor: "rgba(99,102,241,0.20)",
+    borderColor: "rgba(99,102,241,0.5)",
+  },
+  tabText: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.5)",
+    letterSpacing: 0.3,
+  },
+  tabTextActive: {
+    color: "#C4B5FD",
+  },
+
+  // Filters row
+  filtersRow: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    gap: 6,
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  filterChipActive: {
+    backgroundColor: "rgba(99,102,241,0.22)",
+    borderColor: "rgba(99,102,241,0.5)",
+  },
+  filterChipText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.6)",
+    letterSpacing: 0.2,
+  },
+
+  // Content scroll
+  contentScroll: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    paddingTop: 4,
+  },
+
+  // Section header
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  sectionHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  sectionIconBg: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  sectionTitle: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.85)",
+    letterSpacing: 0.2,
+  },
+  sectionSubtitle: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    marginTop: 1,
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  countBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.45)",
+  },
+  clearLink: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.4)",
+    letterSpacing: 0.2,
+  },
+
+  // Chips
+  wrapRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  historyChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  historyChipText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.7)",
+    maxWidth: 180,
+    fontWeight: "600",
+  },
+  trendChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: "rgba(99,102,241,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.22)",
+  },
+  trendChipActive: {
+    backgroundColor: "rgba(99,102,241,0.24)",
+    borderColor: "rgba(99,102,241,0.5)",
+  },
+  trendChipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#A5B4FC",
+  },
+  trendCount: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+  trendCountText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.55)",
+  },
+
+  emptyCard: {
+    padding: 20,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    alignItems: "center",
+    gap: 8,
+  },
+  emptyCardText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.4)",
+  },
+
+  // Module rows (idle)
+  moduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  moduleRowIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  moduleRowTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.88)",
+  },
+  moduleRowSub: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    marginTop: 2,
+  },
+
+  // Idle hero card
+  heroCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.22)",
+    backgroundColor: "rgba(99,102,241,0.05)",
+    overflow: "hidden",
+  },
+  heroCardGlow: {
+    position: "absolute",
+    top: -40,
+    right: -40,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+  },
+  heroCardIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#6366F1",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.6,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  heroCardTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+  heroCardText: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 16,
+    color: "rgba(255,255,255,0.55)",
+  },
+
+  // Loading
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  loadingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#A5B4FC",
+  },
+  loadingText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.45)",
+  },
+  skeletonCard: {
+    padding: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.02)",
+  },
+
+  // Result summary
+  summary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  summaryTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+  summarySub: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.45)",
+    marginTop: 2,
+  },
+  summaryChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  summaryChipText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.55)",
+  },
+  summaryChipActive: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(99,102,241,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.45)",
+  },
+  summaryChipActiveText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#C4B5FD",
+  },
+
+  // Result card
+  resultCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+  resultIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resultIconDot: {
+    position: "absolute",
+    bottom: -1,
+    right: -1,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    borderWidth: 2,
+    borderColor: "#07050F",
+  },
+  resultTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  resultTitle: {
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.92)",
+  },
+  resultBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  resultBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+  resultDescription: {
+    marginTop: 3,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.45)",
+  },
+  resultMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+    flexWrap: "wrap",
+  },
+  resultMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  resultMetaText: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.45)",
+  },
+  resultAuthor: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.35)",
+  },
+
+  // Avatar
+  avatarWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: "visible",
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  avatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(99,102,241,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.3)",
+  },
+  onlineDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: "#34D399",
+    borderWidth: 2,
+    borderColor: "#07050F",
+  },
+
+  // More button
+  moreBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  moreBtnText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#A5B4FC",
+  },
+
+  // Empty
+  emptySection: {
+    alignItems: "center",
+    paddingVertical: 32,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    gap: 8,
+  },
+  emptySectionText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.4)",
+  },
+
+  // No results
+  noResultsCard: {
+    padding: 28,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.025)",
+    alignItems: "center",
+    gap: 12,
+  },
+  noResultsIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.2)",
+  },
+  noResultsTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.88)",
+    letterSpacing: 0.2,
+  },
+  noResultsText: {
+    maxWidth: 320,
+    fontSize: 11,
+    lineHeight: 17,
+    color: "rgba(255,255,255,0.45)",
+    textAlign: "center",
+  },
+  suggestChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  suggestChipText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.6)",
+  },
+});

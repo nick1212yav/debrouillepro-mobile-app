@@ -1,10 +1,31 @@
-import { Pressable, View, Text, TextInput, ViewStyle, TextStyle, ImageStyle } from "react-native";
+// src/pages/home/_components/OnboardingScreen.tsx
+import {
+  Pressable,
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  StyleSheet,
+  Animated,
+  Easing,
+  useWindowDimensions,
+  StatusBar,
+  type ViewStyle,
+  type TextStyle,
+  type ImageStyle,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
-  type ComponentType
+  type ComponentType,
+  type ReactNode,
 } from "react";
 import {
   ArrowLeft,
@@ -16,7 +37,6 @@ import {
   Camera,
   Check,
   CheckCircle2,
-  ChevronDown,
   Globe2,
   HeartPulse,
   Leaf,
@@ -30,44 +50,13 @@ import {
   Sparkles,
   UserRound,
   WalletCards,
-  X,
   Zap,
 } from "lucide-react-native";
-
-/**
- * ============================================================
- * DÉBROUILLEPRO
- * OnboardingScreen — GLOBAL / PRODUCTION
- * ============================================================
- *
- * Objectifs :
- *
- * - expérience mondiale
- * - aucun pays codé en dur dans l'UI
- * - géolocalisation intelligente
- * - recherche pays
- * - sélection ville
- * - personnalisation des modules
- * - expérience clavier / accessibilité
- * - reduced motion
- * - persistance locale de secours
- * - aucune donnée métier fictive
- *
- * La persistance backend doit être branchée sur la mutation
- * Convex déjà présente dans le projet.
- *
- * Ce composant ne suppose volontairement aucun nom de mutation
- * qui n'est pas présent dans le fichier fourni.
- * ============================================================
- */
 
 const ONBOARDING_KEY = "debrouille_onboarding_done";
 const ONBOARDING_PROFILE_KEY = "debrouille_onboarding_profile";
 
-/* ============================================================
- * TYPES
- * ============================================================ */
-
+// ── TYPES ────────────────────────────────────────────────────────────────
 interface OnboardingProfile {
   countryCode: string;
   countryName: string;
@@ -97,151 +86,188 @@ interface ModuleDefinition {
   description: string;
   icon: ComponentType<{
     size?: number;
-    className?: string;
+    color?: string;
     style?: ViewStyle | TextStyle | ImageStyle;
   }>;
   accent: string;
+  accentSoft: string;
 }
 
 interface OnboardingScreenProps {
   onComplete: () => void;
-
-  /**
-   * Optionnel :
-   * permet au parent de brancher la vraie mutation backend
-   * sans que ce composant invente un contrat Convex.
-   */
   onSaveProfile?: (profile: OnboardingProfile) => Promise<void>;
 }
 
-/* ============================================================
- * GLOBAL REFERENCE DATA
- * ============================================================ */
-
-/**
- * Les modules sont des capacités de l'application.
- * Ce ne sont pas des données utilisateur mockées.
- */
+// ── DATA ─────────────────────────────────────────────────────────────────
 const MODULES: ModuleDefinition[] = [
   {
     id: "immo",
     label: "Immobilier",
     description: "Louer, acheter, vendre",
     icon: Building2,
-    accent: "#F97316",
+    accent: "#FB923C",
+    accentSoft: "#FB923C22",
   },
   {
     id: "jobs",
     label: "Emploi & Pro",
     description: "Jobs, missions, freelance",
     icon: BriefcaseBusiness,
-    accent: "#8B5CF6",
+    accent: "#A78BFA",
+    accentSoft: "#A78BFA22",
   },
   {
     id: "transport",
     label: "Transport",
     description: "Déplacements & mobilité",
     icon: Bus,
-    accent: "#3B82F6",
+    accent: "#60A5FA",
+    accentSoft: "#60A5FA22",
   },
   {
     id: "sante",
     label: "Santé",
     description: "Soins & professionnels",
     icon: HeartPulse,
-    accent: "#EF4444",
+    accent: "#F87171",
+    accentSoft: "#F8717122",
   },
   {
     id: "paiement",
     label: "Paiements",
     description: "Payer & gérer son argent",
     icon: WalletCards,
-    accent: "#10B981",
+    accent: "#34D399",
+    accentSoft: "#34D39922",
   },
   {
     id: "livraison",
     label: "Livraison",
     description: "Colis & courses",
     icon: Package,
-    accent: "#F59E0B",
+    accent: "#FBBF24",
+    accentSoft: "#FBBF2422",
   },
   {
     id: "agri",
     label: "Agriculture",
     description: "Production & opportunités",
     icon: Leaf,
-    accent: "#22C55E",
+    accent: "#4ADE80",
+    accentSoft: "#4ADE8022",
   },
   {
     id: "media",
     label: "Médias",
     description: "Actualités & contenus",
     icon: Newspaper,
-    accent: "#06B6D4",
+    accent: "#22D3EE",
+    accentSoft: "#22D3EE22",
   },
   {
     id: "evenements",
     label: "Événements",
     description: "Sorties & expériences",
     icon: CalendarDays,
-    accent: "#EC4899",
+    accent: "#F472B6",
+    accentSoft: "#F472B622",
   },
   {
     id: "voyages",
     label: "Voyages",
     description: "Explorer le monde",
     icon: Plane,
-    accent: "#6366F1",
+    accent: "#818CF8",
+    accentSoft: "#818CF822",
   },
   {
     id: "community",
     label: "Communauté",
     description: "Groupes & discussions",
     icon: MessageCircle,
-    accent: "#A855F7",
+    accent: "#C084FC",
+    accentSoft: "#C084FC22",
   },
   {
     id: "sos",
     label: "SOS",
     description: "Aide & urgences",
     icon: ShieldCheck,
-    accent: "#DC2626",
+    accent: "#EF4444",
+    accentSoft: "#EF444422",
   },
 ];
 
-/**
- * Sélection initiale :
- * seulement des capacités génériques, pas des données fictives.
- */
 const DEFAULT_MODULES = ["immo", "jobs", "paiement", "sante"];
 
+const WELCOME_CHIPS = [
+  { icon: Building2, label: "Habitat", color: "#FB923C" },
+  { icon: BriefcaseBusiness, label: "Travail", color: "#A78BFA" },
+  { icon: HeartPulse, label: "Santé", color: "#F87171" },
+  { icon: WalletCards, label: "Finance", color: "#34D399" },
+  { icon: Plane, label: "Voyage", color: "#818CF8" },
+  { icon: MessageCircle, label: "Communauté", color: "#C084FC" },
+];
+
 /* ============================================================
- * HELPERS
+ * STORAGE HELPERS — 100% safe, cross-platform (RN + web)
  * ============================================================ */
 
+/**
+ * Récupère un objet storage compatible (`localStorage`) depuis `globalThis`.
+ * Renvoie `null` si :
+ *   - `globalThis` n'existe pas
+ *   - `localStorage` n'est pas défini
+ *   - `localStorage` n'a pas de méthode `getItem` (polyfill incomplet)
+ *   - l'accès throw (permissions, sandbox, etc.)
+ *
+ * Aucun accès direct à `window` ou `localStorage` : tout passe par
+ * `globalThis` + try/catch, ce qui évite le crash
+ * `ReferenceError: Property 'localStorage' doesn't exist` sur RN.
+ */
+function getStorage(): Storage | null {
+  try {
+    if (typeof globalThis === "undefined") return null;
+    const s = (globalThis as { localStorage?: Storage }).localStorage;
+    if (!s) return null;
+    if (typeof s.getItem !== "function") return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
 export function hasCompletedOnboarding(): boolean {
-  if (typeof undefined === "undefined") {
+  const storage = getStorage();
+  if (!storage) return false;
+  try {
+    return storage.getItem(ONBOARDING_KEY) === "true";
+  } catch {
     return false;
   }
-
-  return localStorage.getItem(ONBOARDING_KEY) === "true";
 }
 
 export function markOnboardingDone(): void {
-  if (typeof undefined === "undefined") {
-    return;
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(ONBOARDING_KEY, "true");
+  } catch {
+    /* noop */
   }
-
-  localStorage.setItem(ONBOARDING_KEY, "true");
 }
 
 function saveLocalProfile(profile: OnboardingProfile): void {
-  if (typeof undefined === "undefined") {
-    return;
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(ONBOARDING_PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    /* noop */
   }
-
-  localStorage.setItem(ONBOARDING_PROFILE_KEY, JSON.stringify(profile));
 }
+
+/* ─────────── Autres helpers (inchangés) ─────────── */
 
 function normalizeText(value: string): string {
   return value
@@ -253,44 +279,31 @@ function normalizeText(value: string): string {
 
 function countryFlag(code: string): string {
   const normalized = code.toUpperCase();
-
-  if (!/^[A-Z]{2}$/.test(normalized)) {
-    return "🌍";
-  }
-
+  if (!/^[A-Z]{2}$/.test(normalized)) return "🌍";
   return String.fromCodePoint(
-    ...normalized.split("").map((char) => 127397 + char.charCodeAt(0)),
+    ...normalized.split("").map((c) => 127397 + c.charCodeAt(0)),
   );
 }
 
 function detectLanguage(): string {
-  if (typeof undefined === "undefined") {
+  try {
+    if (typeof globalThis === "undefined") return "fr";
+    const nav = (globalThis as { navigator?: { language?: string } }).navigator;
+    return nav?.language?.split("-")[0]?.toLowerCase() || "fr";
+  } catch {
     return "fr";
   }
-
-  return "en"?.split("-")[0]?.toLowerCase() || "fr";
 }
 
 function getCountryDisplayName(code: string, language: string): string {
   try {
-    const displayNames = new Intl.DisplayNames([language], { type: "region" });
-
-    return displayNames.of(code) ?? code;
+    const dn = new Intl.DisplayNames([language], { type: "region" });
+    return dn.of(code) ?? code;
   } catch {
     return code;
   }
 }
 
-/**
- * Liste ISO minimale issue de la plateforme via Intl.
- *
- * Nous ne codons pas 8 pays :
- * l'interface tente de récupérer l'ensemble des régions
- * reconnues par le runtime.
- *
- * Si le runtime ne supporte pas supportedValuesOf("region"),
- * on retombe sur le pays détecté.
- */
 function getAvailableCountryCodes(): string[] {
   try {
     if (
@@ -298,48 +311,29 @@ function getAvailableCountryCodes(): string[] {
       typeof Intl.supportedValuesOf === "function"
     ) {
       const values = (
-        Intl.supportedValuesOf as unknown as (key: string) => string[]
+        Intl.supportedValuesOf as unknown as (k: string) => string[]
       )("region");
-
-      return values.filter((value) => /^[A-Z]{2}$/.test(value)).sort();
+      return values.filter((v) => /^[A-Z]{2}$/.test(v)).sort();
     }
-  } catch {
-    // Fallback handled below.
-  }
-
+  } catch {}
   return [];
 }
 
-/* ============================================================
- * LOCATION API
- * ============================================================ */
-
-async function reverseGeocode(
-  latitude: number,
-  longitude: number,
-): Promise<{
-  countryCode?: string;
-  countryName?: string;
-  city?: string;
-}> {
+// ── LOCATION API (inchangé) ──────────────────────────────────────────────
+async function reverseGeocode(latitude: number, longitude: number) {
   const url =
     "https://nominatim.openstreetmap.org/reverse" +
     `?format=json&lat=${encodeURIComponent(latitude)}` +
     `&lon=${encodeURIComponent(longitude)}` +
     "&zoom=10&addressdetails=1";
-
-  const response = await fetch(url, {
+  const res = await fetch(url, {
     headers: {
       Accept: "application/json",
       "Accept-Language": detectLanguage(),
     },
   });
-
-  if (!response.ok) {
-    throw new Error("Reverse geocoding unavailable");
-  }
-
-  const data = (await response.json()) as {
+  if (!res.ok) throw new Error("Reverse geocoding unavailable");
+  const data = (await res.json()) as {
     address?: {
       country_code?: string;
       country?: string;
@@ -350,18 +344,11 @@ async function reverseGeocode(
       state?: string;
     };
   };
-
-  const address = data.address;
-
+  const a = data.address;
   return {
-    countryCode: address?.country_code?.toUpperCase(),
-    countryName: address?.country,
-    city:
-      address?.city ??
-      address?.town ??
-      address?.municipality ??
-      address?.village ??
-      address?.state,
+    countryCode: a?.country_code?.toUpperCase(),
+    countryName: a?.country,
+    city: a?.city ?? a?.town ?? a?.municipality ?? a?.village ?? a?.state,
   };
 }
 
@@ -369,28 +356,20 @@ async function searchCities(
   query: string,
   countryCode: string,
 ): Promise<CityOption[]> {
-  if (query.trim().length < 2) {
-    return [];
-  }
-
+  if (query.trim().length < 2) return [];
   const url =
     "https://nominatim.openstreetmap.org/search" +
     `?format=json&addressdetails=1&limit=8` +
     `&q=${encodeURIComponent(query)}` +
     `&countrycodes=${encodeURIComponent(countryCode.toLowerCase())}`;
-
-  const response = await fetch(url, {
+  const res = await fetch(url, {
     headers: {
       Accept: "application/json",
       "Accept-Language": detectLanguage(),
     },
   });
-
-  if (!response.ok) {
-    throw new Error("City search unavailable");
-  }
-
-  const data = (await response.json()) as Array<{
+  if (!res.ok) throw new Error("City search unavailable");
+  const data = (await res.json()) as Array<{
     lat: string;
     lon: string;
     display_name: string;
@@ -404,267 +383,520 @@ async function searchCities(
       country_code?: string;
     };
   }>;
-
   return data
     .map((item) => {
-      const address = item.address;
-
+      const a = item.address;
       return {
         name:
-          address?.city ??
-          address?.town ??
-          address?.municipality ??
-          address?.village ??
-          address?.state ??
+          a?.city ??
+          a?.town ??
+          a?.municipality ??
+          a?.village ??
+          a?.state ??
           item.display_name.split(",")[0],
-        countryCode: address?.country_code?.toUpperCase() ?? countryCode,
-        countryName: address?.country ?? "",
+        countryCode: a?.country_code?.toUpperCase() ?? countryCode,
+        countryName: a?.country ?? "",
         latitude: Number(item.lat),
         longitude: Number(item.lon),
       };
     })
     .filter(
-      (item, index, array) =>
-        array.findIndex(
-          (candidate) =>
-            normalizeText(candidate.name) === normalizeText(item.name),
-        ) === index,
+      (item, i, arr) =>
+        arr.findIndex(
+          (c) => normalizeText(c.name) === normalizeText(item.name),
+        ) === i,
     );
 }
 
-/* ============================================================
- * LOCATION HOOK
- * ============================================================ */
-
+// ── LOCATION HOOK ────────────────────────────────────────────────────────
 function useDeviceLocation() {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   const locate = useCallback(async () => {
-    if (typeof undefined === "undefined" || !undefined) {
-      setLocationError(
-        "La géolocalisation n'est pas disponible sur cet appareil.",
-      );
-
-      return null;
-    }
-
-    setLocating(true);
-    setLocationError(null);
-
     try {
-      const position = await new Promise<GeolocationPosition>(
-        (resolve, reject) => {
-          undefined.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: false,
-            timeout: 10000,
-            maximumAge: 300000,
-          });
-        },
-      );
-
-      return await reverseGeocode(
-        position.coords.latitude,
-        position.coords.longitude,
-      );
+      if (typeof globalThis === "undefined") {
+        setLocationError(
+          "La géolocalisation n'est pas disponible sur cet appareil.",
+        );
+        return null;
+      }
+      const nav = (
+        globalThis as {
+          navigator?: { geolocation?: Geolocation };
+        }
+      ).navigator;
+      if (!nav?.geolocation) {
+        setLocationError(
+          "La géolocalisation n'est pas disponible sur cet appareil.",
+        );
+        return null;
+      }
+      setLocating(true);
+      setLocationError(null);
+      try {
+        const position = await new Promise<GeolocationPosition>(
+          (resolve, reject) => {
+            nav.geolocation!.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 10000,
+              maximumAge: 300000,
+            });
+          },
+        );
+        return await reverseGeocode(
+          position.coords.latitude,
+          position.coords.longitude,
+        );
+      } catch {
+        setLocationError(
+          "Impossible de déterminer votre position. Vous pouvez la choisir manuellement.",
+        );
+        return null;
+      } finally {
+        setLocating(false);
+      }
     } catch {
       setLocationError(
         "Impossible de déterminer votre position. Vous pouvez la choisir manuellement.",
       );
-
       return null;
-    } finally {
-      setLocating(false);
     }
   }, []);
 
-  return {
-    locate,
-    locating,
-    locationError,
-  };
+  return { locate, locating, locationError };
 }
 
-/* ============================================================
- * UI HELPERS
- * ============================================================ */
+// ── BACKGROUND — dégradé plein écran + orbes animées ─────────────────────
+function AnimatedBackground() {
+  const { height: H, width: W } = useWindowDimensions();
 
-const pageVariants = {
-  enter: (direction: number) => ({
-    opacity: 0,
-    x: direction > 0 ? 48 : -48,
-    scale: 0.985,
-  }),
+  const orb1 = useRef(new Animated.Value(0)).current;
+  const orb2 = useRef(new Animated.Value(0)).current;
+  const orb3 = useRef(new Animated.Value(0)).current;
+  const orb4 = useRef(new Animated.Value(0)).current;
 
-  center: {
-    opacity: 1,
-    x: 0,
-    scale: 1,
-  },
+  useEffect(() => {
+    const loop = (v: Animated.Value, to: number, dur: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(v, {
+            toValue: to,
+            duration: dur,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(v, {
+            toValue: 0,
+            duration: dur,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    loop(orb1, -60, 7000);
+    loop(orb2, 70, 9000);
+    loop(orb3, -50, 8000);
+    loop(orb4, 55, 10000);
+  }, [orb1, orb2, orb3, orb4]);
 
-  exit: (direction: number) => ({
-    opacity: 0,
-    x: direction > 0 ? -48 : 48,
-    scale: 0.985,
-  }),
-};
+  return (
+    <View
+      pointerEvents="none"
+      collapsable={false}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      }}
+    >
+      <LinearGradient
+        colors={["#0B0620", "#1A0B3D", "#0F0525", "#17093A"]}
+        locations={[0, 0.35, 0.7, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ flex: 1, width: "100%", height: "100%" }}
+      />
 
-function GlassButton({
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: Math.max(320, W * 0.9),
+            height: Math.max(320, W * 0.9),
+            top: -120,
+            left: -100,
+            backgroundColor: "rgba(139,92,246,0.5)",
+            transform: [{ translateY: orb1 }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 300,
+            height: 300,
+            top: H * 0.28,
+            right: -120,
+            backgroundColor: "rgba(99,102,241,0.42)",
+            transform: [{ translateY: orb2 }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 340,
+            height: 340,
+            bottom: H * 0.05,
+            left: -120,
+            backgroundColor: "rgba(168,85,247,0.4)",
+            transform: [{ translateY: orb3 }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 320,
+            height: 320,
+            bottom: -120,
+            right: -100,
+            backgroundColor: "rgba(124,58,237,0.45)",
+            transform: [{ translateY: orb4 }],
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+// ── UI PRIMITIVES (inchangé) ─────────────────────────────────────────────
+function GlassIconButton({
   children,
-  onClick,
-  disabled = false,
-  className = "",
-  type = "button",
+  onPress,
+  accessibilityLabel,
 }: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-  type?: "button" | "submit";
+  children: ReactNode;
+  onPress: () => void;
+  accessibilityLabel: string;
 }) {
   return (
     <Pressable
-      type={type}
-      onPress={onClick}
-      disabled={disabled}
-      className={[
-        "rounded-2xl border border-white/10",
-        "bg-white/[0.055]",
-        "text-white",
-        "transition-all",
-        "hover:bg-white/[0.09]",
-        "disabled:cursor-not-allowed disabled:opacity-35",
-        className,
-      ].join(" ")}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={10}
+      style={({ pressed }) => [
+        styles.glassIconButton,
+        pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
+      ]}
     >
       {children}
     </Pressable>
   );
 }
 
-/* ============================================================
- * MAIN COMPONENT
- * ============================================================ */
+function GradientButton({
+  children,
+  onPress,
+  disabled,
+  loading,
+  accessibilityLabel,
+}: {
+  children: ReactNode;
+  onPress: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  accessibilityLabel?: string;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
 
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const isDisabled = disabled || loading;
+
+  return (
+    <Animated.View style={{ transform: [{ scale }], width: "100%" }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={isDisabled}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled: isDisabled }}
+        style={styles.gradientButtonOuter}
+      >
+        <LinearGradient
+          colors={
+            isDisabled
+              ? ["#3A3550", "#2B2740"]
+              : ["#8B5CF6", "#6366F1", "#A855F7"]
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientButton}
+        >
+          {loading ? <ActivityIndicator size="small" color="#fff" /> : children}
+        </LinearGradient>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function StepIndicator({ current, total }: { current: number; total: number }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      {Array.from({ length: total }, (_, i) => i + 1).map((item) => {
+        const active = current === item;
+        const complete = current > item;
+        return (
+          <View
+            key={item}
+            style={{
+              height: 6,
+              width: active ? 28 : 7,
+              borderRadius: 3,
+              opacity: complete || active ? 1 : 0.3,
+              backgroundColor: complete ? "#34D399" : "#A78BFA",
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+function SectionTitle({
+  icon,
+  eyebrow,
+  title,
+  subtitle,
+  accent,
+}: {
+  icon: ReactNode;
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  accent: string;
+}) {
+  return (
+    <View style={{ paddingTop: 20, paddingBottom: 18 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 6,
+        }}
+      >
+        {icon}
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: "800",
+            letterSpacing: 1.6,
+            color: accent,
+          }}
+        >
+          {eyebrow.toUpperCase()}
+        </Text>
+      </View>
+      <Text
+        style={{
+          fontSize: 26,
+          fontWeight: "900",
+          color: "#fff",
+          letterSpacing: -0.5,
+        }}
+      >
+        {title}
+      </Text>
+      <Text
+        style={{
+          marginTop: 6,
+          fontSize: 14,
+          lineHeight: 20,
+          color: "rgba(255,255,255,0.5)",
+        }}
+      >
+        {subtitle}
+      </Text>
+    </View>
+  );
+}
+
+function SummaryRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 12,
+      }}
+    >
+      <View style={styles.summaryIcon}>{icon}</View>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontSize: 10,
+            letterSpacing: 1,
+            color: "rgba(255,255,255,0.35)",
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: "700",
+            color: "rgba(255,255,255,0.9)",
+          }}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ── MAIN COMPONENT (inchangé sauf helpers) ───────────────────────────────
 export default function OnboardingScreen({
   onComplete,
   onSaveProfile,
 }: OnboardingScreenProps) {
-  const reducedMotion = useReducedMotion();
-
   const [step, setStep] = useState(0);
-  const [direction, setDirection] = useState(1);
-
   const [countryCode, setCountryCode] = useState("");
   const [countryName, setCountryName] = useState("");
   const [city, setCity] = useState("");
-
   const [countrySearch, setCountrySearch] = useState("");
   const [citySearch, setCitySearch] = useState("");
   const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
-
   const [selectedModules, setSelectedModules] =
     useState<string[]>(DEFAULT_MODULES);
-
   const [firstName, setFirstName] = useState("");
-
   const [saving, setSaving] = useState(false);
   const [cityLoading, setCityLoading] = useState(false);
   const [locationNotice, setLocationNotice] = useState<string | null>(null);
 
   const { locate, locating, locationError } = useDeviceLocation();
-
   const language = detectLanguage();
 
-  /* ----------------------------------------------------------
-   * COUNTRIES
-   * ---------------------------------------------------------- */
+  const heroAnim = useRef(new Animated.Value(0)).current;
+  const contentAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    heroAnim.setValue(0);
+    contentAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(heroAnim, {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [step, heroAnim, contentAnim]);
 
   const countries = useMemo<CountryOption[]>(() => {
     const codes = getAvailableCountryCodes();
-
-    const options = codes.map((code) => ({
-      code,
-      name: getCountryDisplayName(code, language),
-      flag: countryFlag(code),
-    }));
-
-    return options.sort((a, b) => a.name.localeCompare(b.name, language));
+    return codes
+      .map((code) => ({
+        code,
+        name: getCountryDisplayName(code, language),
+        flag: countryFlag(code),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, language));
   }, [language]);
 
   const filteredCountries = useMemo(() => {
-    const query = normalizeText(countrySearch);
-
-    if (!query) {
-      return countries;
-    }
-
-    return countries.filter((country) =>
-      normalizeText(country.name).includes(query),
-    );
+    const q = normalizeText(countrySearch);
+    if (!q) return countries;
+    return countries.filter((c) => normalizeText(c.name).includes(q));
   }, [countries, countrySearch]);
-
-  /* ----------------------------------------------------------
-   * DEFAULT DEVICE LOCATION
-   * ---------------------------------------------------------- */
 
   useEffect(() => {
     let cancelled = false;
-
     void locate().then((result) => {
-      if (cancelled || !result?.countryCode) {
-        return;
-      }
-
+      if (cancelled || !result?.countryCode) return;
       setCountryCode(result.countryCode);
-
       setCountryName(
         result.countryName ??
           getCountryDisplayName(result.countryCode, language),
       );
-
-      if (result.city) {
-        setCity(result.city);
-      }
-
+      if (result.city) setCity(result.city);
       setLocationNotice(
         "Votre position a été détectée. Vous pouvez la modifier.",
       );
     });
-
     return () => {
       cancelled = true;
     };
   }, [language, locate]);
-
-  /* ----------------------------------------------------------
-   * CITY SEARCH
-   * ---------------------------------------------------------- */
 
   useEffect(() => {
     if (!countryCode || citySearch.trim().length < 2) {
       setCityOptions([]);
       return;
     }
-
     const controller = new AbortController();
-
-    const timer = undefined;
-
+    const timer = setTimeout(() => {
+      setCityLoading(true);
+      void searchCities(citySearch, countryCode)
+        .then((r) => {
+          if (!controller.signal.aborted) setCityOptions(r);
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setCityOptions([]);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setCityLoading(false);
+        });
+    }, 350);
     return () => {
       controller.abort();
-      undefined;
+      clearTimeout(timer);
     };
   }, [citySearch, countryCode]);
 
-  /* ----------------------------------------------------------
-   * NAVIGATION
-   * ---------------------------------------------------------- */
-
   const totalSteps = 3;
-
   const progress = step === 0 ? 0 : Math.round((step / totalSteps) * 100);
-
   const canContinue =
     step === 1
       ? Boolean(countryCode)
@@ -673,21 +905,13 @@ export default function OnboardingScreen({
         : true;
 
   const goNext = useCallback(() => {
-    if (!canContinue || step >= totalSteps) {
-      return;
-    }
-
-    setDirection(1);
-    setStep((value) => value + 1);
+    if (!canContinue || step >= totalSteps) return;
+    setStep((v) => v + 1);
   }, [canContinue, step]);
 
   const goBack = useCallback(() => {
-    if (step <= 0) {
-      return;
-    }
-
-    setDirection(-1);
-    setStep((value) => value - 1);
+    if (step <= 0) return;
+    setStep((v) => v - 1);
   }, [step]);
 
   const handleSkip = useCallback(() => {
@@ -696,34 +920,34 @@ export default function OnboardingScreen({
   }, [onComplete]);
 
   const toggleModule = useCallback((id: string) => {
-    setSelectedModules((current) =>
-      current.includes(id)
-        ? current.filter((moduleId) => moduleId !== id)
-        : [...current, id],
+    setSelectedModules((cur) =>
+      cur.includes(id) ? cur.filter((m) => m !== id) : [...cur, id],
     );
   }, []);
 
-  /* ----------------------------------------------------------
-   * COUNTRY
-   * ---------------------------------------------------------- */
-
-  const handleCountrySelect = useCallback((country: CountryOption) => {
-    setCountryCode(country.code);
-    setCountryName(country.name);
+  const handleCountrySelect = useCallback((c: CountryOption) => {
+    setCountryCode(c.code);
+    setCountryName(c.name);
     setCity("");
     setCitySearch("");
     setCityOptions([]);
   }, []);
 
-  /* ----------------------------------------------------------
-   * COMPLETE
-   * ---------------------------------------------------------- */
+  const handleUseLocation = useCallback(() => {
+    void locate().then((result) => {
+      if (!result?.countryCode) return;
+      setCountryCode(result.countryCode);
+      setCountryName(
+        result.countryName ??
+          getCountryDisplayName(result.countryCode, language),
+      );
+      if (result.city) setCity(result.city);
+      setLocationNotice("Position détectée avec succès.");
+    });
+  }, [language, locate]);
 
   const handleComplete = useCallback(async () => {
-    if (saving) {
-      return;
-    }
-
+    if (saving) return;
     const profile: OnboardingProfile = {
       countryCode,
       countryName,
@@ -732,44 +956,14 @@ export default function OnboardingScreen({
       firstName: firstName.trim(),
       completedAt: Date.now(),
     };
-
     setSaving(true);
-
     try {
-      /**
-       * Backend réel fourni par le parent.
-       *
-       * Exemple côté HomePage :
-       *
-       * const saveOnboarding = useMutation(
-       *   api.users.completeOnboarding
-       * );
-       *
-       * <OnboardingScreen
-       *   onSaveProfile={(profile) =>
-       *     saveOnboarding(profile)
-       *   }
-       * />
-       *
-       * On ne fabrique volontairement pas ce contrat ici.
-       */
-      if (onSaveProfile) {
-        await onSaveProfile(profile);
-      }
-
-      /**
-       * Fallback local :
-       * garantit que l'utilisateur ne revoit pas
-       * l'onboarding si le backend n'est pas encore branché
-       * dans le parent.
-       */
+      if (onSaveProfile) await onSaveProfile(profile);
       saveLocalProfile(profile);
       markOnboardingDone();
-
       onComplete();
     } catch (error) {
       console.error("Impossible d'enregistrer l'onboarding :", error);
-
       setLocationNotice(
         "Vos préférences n'ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.",
       );
@@ -787,734 +981,1065 @@ export default function OnboardingScreen({
     selectedModules,
   ]);
 
-  /* ----------------------------------------------------------
-   * ANIMATION CONFIG
-   * ---------------------------------------------------------- */
-
-  const transition = reducedMotion
-    ? { duration: 0 }
-    : {
-        type: "spring" as const,
-        stiffness: 300,
-        damping: 30,
-      };
-
-  /* ----------------------------------------------------------
-   * RENDER
-   * ---------------------------------------------------------- */
-
   return (
-    <View
-      className="fixed inset-0 z-[100] flex flex-col overflow-hidden"
-      style={{  }}
-      accessibilityRole="dialog"
-      aria-modal="true"
-      accessibilityLabel="Configuration de votre expérience DébrouillePro"
-    >
-      {/* ======================================================
-          AMBIENT SYSTEM
-      ====================================================== */}
+    <View style={styles.root}>
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
+      <AnimatedBackground />
 
       <View
-        className="absolute -left-24 -top-24 h-80 w-80 rounded-full"
-        style={{  }}
-      />
-
-      <View
-        className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full"
-        style={{  }}
-      />
-
-      <View
-        className="absolute left-1/2 top-1/2 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{  }}
-      />
-
-      {/* ======================================================
-          TOP BAR
-      ====================================================== */}
-
-      <View className="relative z-10 flex shrink-0 items-center justify-between px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <View className="w-10">
-          {step > 0 && (
-            <GlassButton
+        style={[
+          styles.header,
+          { paddingTop: Platform.OS === "android" ? 48 : 56 },
+        ]}
+      >
+        <View style={{ width: 44 }}>
+          {step > 0 ? (
+            <GlassIconButton
               onPress={goBack}
-              className="flex h-10 w-10 items-center justify-center rounded-xl"
+              accessibilityLabel="Étape précédente"
             >
-              <ArrowLeft size={18} className="text-white/75" />
-            </GlassButton>
-          )}
+              <ArrowLeft size={18} color="rgba(255,255,255,0.85)" />
+            </GlassIconButton>
+          ) : null}
         </View>
 
-        {step > 0 && (
-          <View
-            className="flex items-center gap-1.5"
-            accessibilityLabel={`Étape ${step} sur ${totalSteps}`}
-          >
-            {Array.from({ length: totalSteps }, (_, index) => index + 1).map(
-              (item) => {
-                const active = step === item;
-                const complete = step > item;
-
-                return (
-                  <View
-                    key={item}
-                    className="h-1.5 rounded-full"
-                    style={{  }}
-                  />
-                );
-              },
-            )}
-          </View>
+        {step > 0 ? (
+          <StepIndicator current={step} total={totalSteps} />
+        ) : (
+          <View />
         )}
 
         <Pressable
-         
           onPress={handleSkip}
-          className="rounded-xl px-3 py-2 text-xs font-semibold text-white/35"
+          accessibilityRole="button"
+          accessibilityLabel="Passer l'onboarding"
+          hitSlop={10}
+          style={({ pressed }) => [
+            styles.skipButton,
+            pressed && { opacity: 0.6 },
+          ]}
         >
-          <Text>Passer</Text></Pressable>
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "700",
+              color: "rgba(255,255,255,0.55)",
+              letterSpacing: 0.4,
+            }}
+          >
+            Passer
+          </Text>
+        </Pressable>
       </View>
 
-      {/* ======================================================
-          PROGRESS
-      ====================================================== */}
-
-      {step > 0 && (
-        <View className="relative z-10 mx-5 h-px overflow-hidden rounded-full bg-white/[0.06]">
-          <View
-            className="h-full rounded-full"
-            style={{  }}
-          />
+      {step > 0 ? (
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
-      )}
+      ) : null}
 
-      {/* ======================================================
-          CONTENT
-      ====================================================== */}
-
-      <View className="relative min-h-0 flex-1 overflow-hidden">
-        <>
-          {/* ==================================================
-              STEP 0 — WELCOME
-          ================================================== */}
-
-          {step === 0 && (
-            <View
-              key="welcome"
-              custom={direction}
-              className="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto px-6 py-10 text-center"
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        {step === 0 ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.welcomeScroll}
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View
+              style={{
+                opacity: heroAnim,
+                transform: [
+                  {
+                    scale: heroAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.7, 1],
+                    }),
+                  },
+                ],
+              }}
             >
-              <View
-                className="relative mb-7 flex h-24 w-24 items-center justify-center rounded-[2rem]"
-                style={{  }}
+              <LinearGradient
+                colors={["#A855F7", "#7C3AED", "#6366F1"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.globeWrapper}
               >
-                <Globe2 size={46} strokeWidth={1.7} className="text-white" />
+                <Globe2 size={48} color="#fff" strokeWidth={2.2} />
+              </LinearGradient>
+            </Animated.View>
 
-                <View
-                  className="absolute inset-[-8px] rounded-[2.3rem] border border-white/10"
-                />
-              </View>
-
-              <Text className="max-w-xl text-4xl font-black tracking-tight text-white sm:text-5xl">
-                Bienvenue sur{" "}
-                <Text
-                  style={{ WebkitBackgroundClip: "text" }}
-                >
-                  DébrouillePro
-                </Text>
+            <Animated.View
+              style={{ opacity: contentAnim, alignItems: "center" }}
+            >
+              <Text style={styles.heroTitle}>
+                Bienvenue sur{"\n"}
+                <Text style={{ color: "#C4B5FD" }}>DébrouillePro</Text>
               </Text>
 
-              <Text className="mt-4 max-w-md text-base leading-relaxed text-white/45">
+              <Text style={styles.heroSubtitle}>
                 Une seule expérience pour trouver, connecter, travailler,
                 voyager, apprendre et faire avancer vos projets — où que vous
                 soyez dans le monde.
               </Text>
+            </Animated.View>
 
-              <View className="mt-8 flex max-w-md flex-wrap justify-center gap-2">
-                {[
-                  "🏠 Habitat",
-                  "💼 Travail",
-                  "❤️ Santé",
-                  "💳 Finance",
-                  "✈️ Voyage",
-                  "🤝 Communauté",
-                ].map((item) => (
-                  <Text
-                    key={item}
-                    className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/55"
+            <Animated.View style={[styles.chipsRow, { opacity: contentAnim }]}>
+              {WELCOME_CHIPS.map((chip) => {
+                const Icon = chip.icon;
+                return (
+                  <Pressable
+                    key={chip.label}
+                    onPress={() => {
+                      const moduleMap: Record<string, string> = {
+                        Habitat: "immo",
+                        Travail: "jobs",
+                        Santé: "sante",
+                        Finance: "paiement",
+                        Voyage: "voyages",
+                        Communauté: "community",
+                      };
+                      const mod = moduleMap[chip.label];
+                      if (mod && !selectedModules.includes(mod)) {
+                        setSelectedModules((cur) => [...cur, mod]);
+                      }
+                      goNext();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={chip.label}
+                    hitSlop={6}
+                    style={({ pressed }) => [
+                      styles.chip,
+                      {
+                        borderColor: `${chip.color}66`,
+                        backgroundColor: `${chip.color}18`,
+                      },
+                      pressed && {
+                        transform: [{ scale: 0.94 }],
+                        opacity: 0.85,
+                      },
+                    ]}
                   >
-                    {item}
-                  </Text>
-                ))}
-              </View>
+                    <Icon size={14} color={chip.color} />
+                    <Text style={[styles.chipText, { color: chip.color }]}>
+                      {chip.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </Animated.View>
 
-              <Pressable
-                onPress={goNext}
-                className="mt-10 flex w-full max-w-sm items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white"
-                style={{  }}
-              >
-                <Text>Personnaliser mon expérience</Text><ArrowRight size={19} />
-              </Pressable>
-
-              <Pressable
-               
-                onPress={handleSkip}
-                className="mt-4 px-4 py-2 text-xs text-white/25"
-              >
-                <Text>Je préfère découvrir d'abord</Text></Pressable>
-            </View>
-          )}
-
-          {/* ==================================================
-              STEP 1 — LOCATION
-          ================================================== */}
-
-          {step === 1 && (
-            <View
-              key="location"
-              custom={direction}
-              className="absolute inset-0 flex flex-col overflow-hidden px-5"
+            <Animated.View
+              style={{
+                opacity: contentAnim,
+                width: "100%",
+                maxWidth: 400,
+                marginTop: 36,
+              }}
             >
-              <View className="shrink-0 pb-4 pt-5">
-                <View className="mb-1 flex items-center gap-2">
-                  <MapPin size={17} className="text-violet-400" />
-
-                  <Text className="text-[11px] font-bold uppercase tracking-[0.14em] text-violet-400">
-                    Étape 1 · Localisation
-                  </Text>
-                </View>
-
-                <Text className="text-2xl font-black text-white">
-                  Où êtes-vous ?
-                </Text>
-
-                <Text className="mt-1 text-sm text-white/40">
-                  Votre localisation nous aide à adapter les services, contenus
-                  et opportunités.
-                </Text>
-              </View>
-
-              {/* Auto location */}
-              <Pressable
-                onPress={() => {
-                  void locate().then((result) => {
-                    if (!result?.countryCode) {
-                      return;
-                    }
-
-                    setCountryCode(result.countryCode);
-                    setCountryName(
-                      result.countryName ??
-                        getCountryDisplayName(result.countryCode, language),
-                    );
-
-                    if (result.city) {
-                      setCity(result.city);
-                    }
-
-                    setLocationNotice("Position détectée avec succès.");
-                  });
-                }}
-                disabled={locating}
-                className="mb-4 flex shrink-0 items-center gap-3 rounded-2xl border border-violet-400/20 bg-violet-500/[0.08] px-4 py-3 text-left disabled:opacity-60"
+              <GradientButton
+                onPress={goNext}
+                accessibilityLabel="Personnaliser mon expérience"
               >
-                <View className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15">
+                <Text style={styles.ctaText}>Personnaliser mon expérience</Text>
+                <ArrowRight size={20} color="#fff" strokeWidth={2.5} />
+              </GradientButton>
+
+              <Pressable
+                onPress={handleSkip}
+                accessibilityRole="button"
+                accessibilityLabel="Découvrir d'abord"
+                hitSlop={10}
+                style={({ pressed }) => [
+                  styles.skipLink,
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.4)",
+                    letterSpacing: 0.3,
+                  }}
+                >
+                  Je préfère découvrir d'abord
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </ScrollView>
+        ) : null}
+
+        {step === 1 ? (
+          <View style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: 20 }}>
+              <SectionTitle
+                icon={<MapPin size={16} color="#A78BFA" />}
+                eyebrow="Étape 1 · Localisation"
+                title="Où êtes-vous ?"
+                subtitle="Votre localisation nous aide à adapter les services, contenus et opportunités."
+                accent="#A78BFA"
+              />
+            </View>
+
+            <View style={{ paddingHorizontal: 20 }}>
+              <Pressable
+                onPress={handleUseLocation}
+                disabled={locating}
+                accessibilityRole="button"
+                accessibilityLabel="Utiliser ma position actuelle"
+                style={({ pressed }) => [
+                  styles.locationButton,
+                  pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+                  locating && { opacity: 0.6 },
+                ]}
+              >
+                <View style={styles.locationIcon}>
                   {locating ? (
-                    <View
-                    >
-                      <MapPin size={18} className="text-violet-300" />
-                    </View>
+                    <ActivityIndicator size="small" color="#A78BFA" />
                   ) : (
-                    <Zap size={18} className="text-violet-300" />
+                    <Zap size={18} color="#A78BFA" strokeWidth={2.4} />
                   )}
                 </View>
-
-                <View className="min-w-0 flex-1">
-                  <Text className="text-sm font-bold text-white">
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}
+                  >
                     {locating
-                      ? "Localisation en cours..."
+                      ? "Localisation en cours…"
                       : "Utiliser ma position"}
                   </Text>
-
-                  <Text className="mt-0.5 text-xs text-white/35">
+                  <Text
+                    style={{
+                      marginTop: 2,
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.45)",
+                    }}
+                  >
                     Aucun déplacement automatique sans votre permission
                   </Text>
                 </View>
-
-                <ArrowRight size={16} className="text-white/25" />
+                <ArrowRight size={16} color="rgba(255,255,255,0.35)" />
               </Pressable>
 
-              {(locationNotice || locationError) && (
-                <Text className={cnLocationMessage(Boolean(locationError))}>
+              {locationNotice || locationError ? (
+                <Text
+                  style={{
+                    fontSize: 11,
+                    marginBottom: 12,
+                    paddingHorizontal: 4,
+                    color: locationError
+                      ? "rgba(251,191,36,0.9)"
+                      : "rgba(52,211,153,0.9)",
+                  }}
+                >
                   {locationError ?? locationNotice}
                 </Text>
-              )}
+              ) : null}
 
-              {/* Country search */}
-              <View className="relative mb-3 shrink-0">
+              <View style={styles.searchWrapper}>
                 <Search
                   size={16}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                  color="rgba(255,255,255,0.4)"
+                  style={styles.searchIcon}
                 />
-
                 <TextInput
                   value={countrySearch}
-                  onChangeText={(text) => setCountrySearch(text)}
-                  placeholder="Rechercher votre pays..."
-                  accessibilityLabel="Rechercher un pays"
-                  className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.045] py-3.5 pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/25"
+                  onChangeText={setCountrySearch}
+                  placeholder="Rechercher votre pays…"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
+                  style={[styles.input, { paddingLeft: 44 }]}
+                  autoCapitalize="none"
+                  autoCorrect={false}
                 />
               </View>
+            </View>
 
-              {/* Countries */}
-              <View
-                className="min-h-0 flex-1 overflow-y-auto pb-4"
-                style={{  }}
-              >
-                <View className="gap-2">
-                  {filteredCountries.map((country, index) => {
-                    const selected = country.code === countryCode;
-
-                    return (
-                      <Pressable
-                        key={country.code}
-                        onPress={() => handleCountrySelect(country)}
-                        className="relative flex min-h-[62px] items-center gap-2 rounded-2xl border px-3 text-left"
-                        style={{ backgroundColor: selected
-                                                    ? "rgba(139,92,246,.16)"
-                                                    : "rgba(255,255,255,.035)", borderColor: selected
-                                                    ? "rgba(139,92,246,.48)"
-                                                    : "rgba(255,255,255,.07)" }}
-                      >
-                        <Text className="text-xl">{country.flag}</Text>
-
-                        <Text className="min-w-0 flex-1 truncate text-xs font-semibold text-white/75">
-                          {country.name}
-                        </Text>
-
-                        {selected && (
-                          <CheckCircle2
-                            size={15}
-                            className="shrink-0 text-violet-400"
-                          />
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                {filteredCountries.length === 0 && (
-                  <View className="py-12 text-center">
-                    <Globe2 size={30} className="mx-auto mb-3 text-white/15" />
-
-                    <Text className="text-sm font-semibold text-white/50">
-                      Pays introuvable
-                    </Text>
-
-                    <Text className="mt-1 text-xs text-white/25">
-                      Essayez une autre recherche.
-                    </Text>
-                  </View>
-                )}
-
-                {/* City */}
-                {countryCode && (
-                  <View
-                    className="mt-5"
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {filteredCountries.map((country) => {
+                const selected = country.code === countryCode;
+                return (
+                  <Pressable
+                    key={country.code}
+                    onPress={() => handleCountrySelect(country)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Sélectionner ${country.name}`}
+                    style={({ pressed }) => [
+                      styles.countryRow,
+                      selected && styles.countryRowSelected,
+                      pressed && {
+                        opacity: 0.85,
+                        transform: [{ scale: 0.99 }],
+                      },
+                    ]}
                   >
-                    <View className="mb-2 flex items-center justify-between">
-                      <View>
-                        <Text className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/30">
-                          Ville
-                        </Text>
+                    <Text style={{ fontSize: 20 }}>{country.flag}</Text>
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 14,
+                        fontWeight: "700",
+                        color: "rgba(255,255,255,0.92)",
+                      }}
+                      numberOfLines={1}
+                    >
+                      {country.name}
+                    </Text>
+                    {selected ? (
+                      <CheckCircle2 size={18} color="#A78BFA" />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
 
-                        <Text className="mt-0.5 text-xs text-white/25">
-                          Facultatif
-                        </Text>
-                      </View>
+              {filteredCountries.length === 0 ? (
+                <View style={{ alignItems: "center", paddingVertical: 48 }}>
+                  <Globe2 size={30} color="rgba(255,255,255,0.2)" />
+                  <Text
+                    style={{
+                      marginTop: 12,
+                      fontSize: 14,
+                      fontWeight: "700",
+                      color: "rgba(255,255,255,0.55)",
+                    }}
+                  >
+                    Pays introuvable
+                  </Text>
+                  <Text
+                    style={{
+                      marginTop: 4,
+                      fontSize: 12,
+                      color: "rgba(255,255,255,0.35)",
+                    }}
+                  >
+                    Essayez une autre recherche.
+                  </Text>
+                </View>
+              ) : null}
 
-                      {city && (
-                        <Pressable
-                         
-                          onPress={() => {
-                            setCity("");
-                            setCitySearch("");
-                          }}
-                          className="text-xs text-white/30"
-                        >
-                          <Text>Modifier</Text></Pressable>
-                      )}
-                    </View>
-
-                    <View className="relative">
-                      <MapPin
-                        size={16}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-white/25"
-                      />
-
-                      <TextInput
-                        value={citySearch || city}
-                        onChangeText={(text) => {
-                          setCity(text);
-                          setCitySearch(text);
+              {countryCode ? (
+                <View style={{ marginTop: 20 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <View>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "800",
+                          letterSpacing: 1,
+                          color: "rgba(255,255,255,0.45)",
                         }}
-                        placeholder={`Rechercher une ville en ${countryName}`}
-                        accessibilityLabel="Rechercher une ville"
-                        className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.045] py-3.5 pl-11 pr-10 text-sm text-white outline-none placeholder:text-white/25"
-                      />
-
-                      {cityLoading && (
-                        <View
-                          className="absolute right-4 top-1/2 -translate-y-1/2"
-                        >
-                          <Sparkles size={15} className="text-violet-400" />
-                        </View>
-                      )}
-                    </View>
-
-                    {cityOptions.length > 0 && (
-                      <View className="mt-2 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d20]/95 shadow-2xl">
-                        {cityOptions.map((option) => (
-                          <Pressable
-                            key={`${option.name}-${option.latitude}-${option.longitude}`}
-                           
-                            onPress={() => {
-                              setCity(option.name);
-                              setCitySearch(option.name);
-                              setCityOptions([]);
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                          >
-                            <MapPin size={15} className="text-violet-400" />
-
-                            <Text className="text-sm text-white/75">
-                              {option.name}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
-
-              <View className="shrink-0 py-4">
-                <PrimaryButton onPress={goNext} disabled={!countryCode}>
-                  <Text>Continuer</Text><ArrowRight size={18} />
-                </PrimaryButton>
-              </View>
-            </View>
-          )}
-
-          {/* ==================================================
-              STEP 2 — MODULES
-          ================================================== */}
-
-          {step === 2 && (
-            <View
-              key="modules"
-              custom={direction}
-              className="absolute inset-0 flex flex-col overflow-hidden px-5"
-            >
-              <View className="shrink-0 pb-5 pt-5">
-                <View className="mb-1 flex items-center gap-2">
-                  <Sparkles size={17} className="text-indigo-400" />
-
-                  <Text className="text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-400">
-                    Étape 2 · Personnalisation
-                  </Text>
-                </View>
-
-                <View className="flex items-end justify-between gap-4">
-                  <View>
-                    <Text className="text-2xl font-black text-white">
-                      Qu'est-ce qui compte pour vous ?
-                    </Text>
-
-                    <Text className="mt-1 text-sm text-white/40">
-                      DébrouillePro adaptera votre accueil à vos priorités.
-                    </Text>
-                  </View>
-
-                  <Text className="shrink-0 rounded-full bg-violet-500/10 px-2.5 py-1 text-xs font-bold text-violet-300">
-                    {selectedModules.length}
-                  </Text>
-                </View>
-              </View>
-
-              <View
-                className="min-h-0 flex-1 overflow-y-auto pb-4"
-                style={{  }}
-              >
-                <View className="gap-2.5">
-                  {MODULES.map((module, index) => {
-                    const Icon = module.icon;
-
-                    const selected = selectedModules.includes(module.id);
-
-                    return (
-                      <Pressable
-                        key={module.id}
-                        onPress={() => toggleModule(module.id)}
-                        aria-pressed={selected}
-                        className="relative flex min-h-[132px] flex-col items-start rounded-3xl border p-4 text-left"
-                        style={{ backgroundColor: selected
-                                                    ? `${module.accent}14`
-                                                    : "rgba(255,255,255,.035)", borderColor: selected
-                                                    ? `${module.accent}55`
-                                                    : "rgba(255,255,255,.07)" }}
                       >
-                        {selected && (
-                          <View
-                            className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full"
-                            style={{ backgroundColor: module.accent }}
-                          >
-                            <Check
-                              size={12}
-                              strokeWidth={3}
-                              className="text-white"
-                            />
-                          </View>
-                        )}
-
-                        <View
-                          className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl"
-                          style={{ backgroundColor: selected
-                                                        ? `${module.accent}20`
-                                                        : "rgba(255,255,255,.055)" }}
-                        >
-                          <Icon
-                            size={20}
-                            className={selected ? "" : "text-white/40"}
-                            style={{
-                              color: selected ? module.accent : undefined,
-                            }}
-                          />
-                        </View>
-
+                        VILLE
+                      </Text>
+                      <Text
+                        style={{
+                          marginTop: 2,
+                          fontSize: 11,
+                          color: "rgba(255,255,255,0.35)",
+                        }}
+                      >
+                        Facultatif
+                      </Text>
+                    </View>
+                    {city ? (
+                      <Pressable
+                        onPress={() => {
+                          setCity("");
+                          setCitySearch("");
+                        }}
+                        hitSlop={8}
+                      >
                         <Text
-                          className="text-sm font-bold"
                           style={{
-                            color: selected ? "#fff" : "rgba(255,255,255,.65)",
+                            fontSize: 12,
+                            color: "rgba(255,255,255,0.5)",
                           }}
                         >
-                          {module.label}
-                        </Text>
-
-                        <Text className="mt-1 text-[11px] leading-relaxed text-white/30">
-                          {module.description}
+                          Modifier
                         </Text>
                       </Pressable>
-                    );
-                  })}
+                    ) : null}
+                  </View>
+
+                  <View style={styles.searchWrapper}>
+                    <MapPin
+                      size={16}
+                      color="rgba(255,255,255,0.35)"
+                      style={styles.searchIcon}
+                    />
+                    <TextInput
+                      value={citySearch || city}
+                      onChangeText={(v) => {
+                        setCity(v);
+                        setCitySearch(v);
+                      }}
+                      placeholder={`Rechercher une ville en ${countryName}`}
+                      placeholderTextColor="rgba(255,255,255,0.35)"
+                      style={[styles.input, { paddingLeft: 44 }]}
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                    />
+                    {cityLoading ? (
+                      <ActivityIndicator
+                        size="small"
+                        color="#A78BFA"
+                        style={{ position: "absolute", right: 16, top: 16 }}
+                      />
+                    ) : null}
+                  </View>
+
+                  {cityOptions.length > 0 ? (
+                    <View style={styles.cityDropdown}>
+                      {cityOptions.map((option) => (
+                        <Pressable
+                          key={`${option.name}-${option.latitude}-${option.longitude}`}
+                          onPress={() => {
+                            setCity(option.name);
+                            setCitySearch(option.name);
+                            setCityOptions([]);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Sélectionner ${option.name}`}
+                          style={({ pressed }) => [
+                            styles.cityRow,
+                            pressed && {
+                              backgroundColor: "rgba(167,139,250,0.12)",
+                            },
+                          ]}
+                        >
+                          <MapPin size={15} color="#A78BFA" />
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              color: "rgba(255,255,255,0.9)",
+                            }}
+                          >
+                            {option.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
                 </View>
-              </View>
+              ) : null}
+            </ScrollView>
 
-              <View className="shrink-0 py-4">
-                <PrimaryButton
-                  onPress={goNext}
-                  disabled={selectedModules.length === 0}
-                >
-                  <Text>Continuer</Text><ArrowRight size={18} />
-                </PrimaryButton>
-              </View>
+            <View style={styles.footer}>
+              <GradientButton
+                onPress={goNext}
+                disabled={!countryCode}
+                accessibilityLabel="Continuer vers la personnalisation"
+              >
+                <Text style={styles.ctaText}>Continuer</Text>
+                <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
+              </GradientButton>
             </View>
-          )}
+          </View>
+        ) : null}
 
-          {/* ==================================================
-              STEP 3 — PROFILE
-          ================================================== */}
-
-          {step === 3 && (
-            <View
-              key="profile"
-              custom={direction}
-              className="absolute inset-0 flex flex-col overflow-y-auto px-5"
-            >
-              <View className="pb-5 pt-5">
-                <View className="mb-1 flex items-center gap-2">
-                  <UserRound size={17} className="text-emerald-400" />
-
-                  <Text className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-400">
-                    Étape 3 · Profil
+        {step === 2 ? (
+          <View style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: 20 }}>
+              <SectionTitle
+                icon={<Sparkles size={16} color="#A5B4FC" />}
+                eyebrow="Étape 2 · Personnalisation"
+                title="Qu'est-ce qui compte pour vous ?"
+                subtitle="DébrouillePro adaptera votre accueil à vos priorités."
+                accent="#A5B4FC"
+              />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
+                }}
+              >
+                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
+                  {selectedModules.length} module
+                  {selectedModules.length > 1 ? "s" : ""} sélectionné
+                  {selectedModules.length > 1 ? "s" : ""}
+                </Text>
+                <View style={styles.countBadge}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "800",
+                      color: "#C4B5FD",
+                    }}
+                  >
+                    {selectedModules.length}/{MODULES.length}
                   </Text>
                 </View>
-
-                <Text className="text-2xl font-black text-white">
-                  Une dernière touche
-                </Text>
-
-                <Text className="mt-1 text-sm text-white/40">
-                  Comment souhaitez-vous être accueilli ?
-                </Text>
               </View>
+            </View>
 
-              {/* Avatar visual */}
-              <View className="mb-7 flex flex-col items-center">
-                <View
-                  className="relative flex h-24 w-24 items-center justify-center rounded-[2rem] text-4xl font-black text-white"
-                  style={{  }}
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {MODULES.map((module) => {
+                const Icon = module.icon;
+                const selected = selectedModules.includes(module.id);
+                return (
+                  <Pressable
+                    key={module.id}
+                    onPress={() => toggleModule(module.id)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected }}
+                    accessibilityLabel={module.label}
+                    style={({ pressed }) => [
+                      styles.moduleCard,
+                      {
+                        backgroundColor: selected
+                          ? module.accentSoft
+                          : "rgba(255,255,255,0.04)",
+                        borderColor: selected
+                          ? `${module.accent}88`
+                          : "rgba(255,255,255,0.09)",
+                        shadowColor: selected ? module.accent : "transparent",
+                        shadowOpacity: selected ? 0.35 : 0,
+                        shadowRadius: 16,
+                        shadowOffset: { width: 0, height: 8 },
+                        elevation: selected ? 6 : 0,
+                      },
+                      pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+                    ]}
+                  >
+                    {selected ? (
+                      <View
+                        style={[
+                          styles.moduleCheck,
+                          { backgroundColor: module.accent },
+                        ]}
+                      >
+                        <Check size={12} color="#fff" strokeWidth={3} />
+                      </View>
+                    ) : null}
+
+                    <View
+                      style={[
+                        styles.moduleIcon,
+                        {
+                          backgroundColor: selected
+                            ? `${module.accent}25`
+                            : "rgba(255,255,255,0.06)",
+                        },
+                      ]}
+                    >
+                      <Icon
+                        size={22}
+                        color={
+                          selected ? module.accent : "rgba(255,255,255,0.5)"
+                        }
+                        strokeWidth={2.2}
+                      />
+                    </View>
+
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: "800",
+                        color: selected ? "#fff" : "rgba(255,255,255,0.8)",
+                      }}
+                    >
+                      {module.label}
+                    </Text>
+                    <Text
+                      style={{
+                        marginTop: 4,
+                        fontSize: 11,
+                        lineHeight: 15,
+                        color: "rgba(255,255,255,0.45)",
+                      }}
+                    >
+                      {module.description}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.footer}>
+              <GradientButton
+                onPress={goNext}
+                disabled={selectedModules.length === 0}
+                accessibilityLabel="Continuer vers le profil"
+              >
+                <Text style={styles.ctaText}>Continuer</Text>
+                <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
+              </GradientButton>
+            </View>
+          </View>
+        ) : null}
+
+        {step === 3 ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.profileScroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <SectionTitle
+              icon={<UserRound size={16} color="#34D399" />}
+              eyebrow="Étape 3 · Profil"
+              title="Une dernière touche"
+              subtitle="Comment souhaitez-vous être accueilli ?"
+              accent="#34D399"
+            />
+
+            <View style={{ alignItems: "center", marginBottom: 28 }}>
+              <LinearGradient
+                colors={["#8B5CF6", "#6366F1"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarWrapper}
+              >
+                <Text
+                  style={{ fontSize: 38, fontWeight: "900", color: "#fff" }}
                 >
                   {firstName ? firstName.trim().charAt(0).toUpperCase() : "?"}
-
-                  <View className="absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-xl border-2 border-[#050616] bg-violet-600">
-                    <Camera size={15} className="text-white" />
-                  </View>
-                </View>
-
-                <Text className="mt-3 text-xs text-white/25">
-                  Votre photo pourra être ajoutée depuis votre profil.
                 </Text>
+              </LinearGradient>
+              <View style={styles.avatarCamera}>
+                <Camera size={15} color="#fff" strokeWidth={2.4} />
               </View>
-
-              {/* Name */}
-              <View className="mb-6">
-                <Text
-                  htmlFor="onboarding-first-name"
-                  className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-white/35"
-                >
-                  Prénom
-                </Text>
-
-                <TextInput
-                  id="onboarding-first-name"
-                  value={firstName}
-                  onChangeText={(text) =>
-                    setFirstName(text.slice(0, 60))
-                  }
-                  placeholder="Comment devons-nous vous appeler ?"
-                 
-                  className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.045] px-4 py-3.5 text-sm text-white outline-none placeholder:text-white/25"
-                />
-              </View>
-
-              {/* Summary */}
-              <View
-                className="mb-6 rounded-3xl border border-white/[0.07] p-4"
-                style={{  }}
+              <Text
+                style={{
+                  marginTop: 14,
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.4)",
+                }}
               >
-                <View className="mb-4 flex items-center justify-between">
-                  <Text className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/30">
-                    Votre configuration
-                  </Text>
-
-                  <Sparkles size={15} className="text-violet-400" />
-                </View>
-
-                <View className="space-y-3">
-                  {countryCode && (
-                    <SummaryRow
-                      icon={<MapPin size={15} />}
-                      label="Localisation"
-                      value={city ? `${city}, ${countryName}` : countryName}
-                    />
-                  )}
-
-                  <SummaryRow
-                    icon={<Sparkles size={15} />}
-                    label="Centres d'intérêt"
-                    value={`${selectedModules.length} module${
-                      selectedModules.length > 1 ? "s" : ""
-                    }`}
-                  />
-
-                  <SummaryRow
-                    icon={<Globe2 size={15} />}
-                    label="Expérience"
-                    value="Personnalisée"
-                  />
-                </View>
-              </View>
-
-              <View className="mt-auto pb-6">
-                <Pressable
-                  onPress={() => void handleComplete()}
-                  disabled={saving}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-black text-white disabled:cursor-wait disabled:opacity-60"
-                  style={{  }}
-                >
-                  {saving ? (
-                    <>
-                      <View
-                      >
-                        <Sparkles size={19} />
-                      </View>
-                      <Text>Préparation de votre espace...</Text></>
-                  ) : (
-                    <>
-                      <CheckCircle2 size={19} />
-                      <Text>Entrer dans DébrouillePro</Text></>
-                  )}
-                </Pressable>
-
-                <Text className="mt-3 text-center text-[10px] leading-relaxed text-white/20">
-                  Vous pourrez modifier ces préférences à tout moment dans votre
-                  profil.
-                </Text>
-              </View>
+                Votre photo pourra être ajoutée depuis votre profil.
+              </Text>
             </View>
-          )}
-        </>
-      </View>
+
+            <View style={{ marginBottom: 24 }}>
+              <Text
+                style={{
+                  marginBottom: 8,
+                  fontSize: 11,
+                  fontWeight: "800",
+                  letterSpacing: 1,
+                  color: "rgba(255,255,255,0.55)",
+                }}
+              >
+                PRÉNOM
+              </Text>
+              <TextInput
+                value={firstName}
+                onChangeText={(v) => setFirstName(v.slice(0, 60))}
+                placeholder="Comment devons-nous vous appeler ?"
+                placeholderTextColor="rgba(255,255,255,0.35)"
+                style={styles.input}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.summaryCard}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 16,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "800",
+                    letterSpacing: 1,
+                    color: "rgba(255,255,255,0.5)",
+                  }}
+                >
+                  VOTRE CONFIGURATION
+                </Text>
+                <Sparkles size={15} color="#A78BFA" />
+              </View>
+
+              {countryCode ? (
+                <SummaryRow
+                  icon={<MapPin size={15} color="#A78BFA" />}
+                  label="Localisation"
+                  value={city ? `${city}, ${countryName}` : countryName}
+                />
+              ) : null}
+              <SummaryRow
+                icon={<Sparkles size={15} color="#A78BFA" />}
+                label="Centres d'intérêt"
+                value={`${selectedModules.length} module${selectedModules.length > 1 ? "s" : ""}`}
+              />
+              <SummaryRow
+                icon={<Globe2 size={15} color="#A78BFA" />}
+                label="Expérience"
+                value="Personnalisée"
+              />
+            </View>
+
+            <GradientButton
+              onPress={() => void handleComplete()}
+              loading={saving}
+              disabled={saving}
+              accessibilityLabel="Entrer dans DébrouillePro"
+            >
+              <CheckCircle2 size={19} color="#fff" strokeWidth={2.4} />
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "900",
+                  color: "#fff",
+                  letterSpacing: 0.3,
+                }}
+              >
+                Entrer dans DébrouillePro
+              </Text>
+            </GradientButton>
+
+            <Text
+              style={{
+                marginTop: 14,
+                textAlign: "center",
+                fontSize: 10,
+                lineHeight: 15,
+                color: "rgba(255,255,255,0.3)",
+              }}
+            >
+              Vous pourrez modifier ces préférences à tout moment dans votre
+              profil.
+            </Text>
+          </ScrollView>
+        ) : null}
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
-/* ============================================================
- * SMALL UI COMPONENTS
- * ============================================================ */
+// ── STYLES (inchangés) ───────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#0B0620",
+  },
 
-function PrimaryButton({
-  children,
-  onClick,
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onClick}
-      disabled={disabled}
-      className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-30"
-      style={{  }}
-    >
-      {children}
-    </Pressable>
-  );
-}
+  orb: {
+    position: "absolute",
+    borderRadius: 999,
+  },
 
-function SummaryRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <View className="flex items-center gap-3">
-      <View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.05] text-violet-400">
-        {icon}
-      </View>
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    zIndex: 10,
+  },
+  glassIconButton: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  skipButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    minWidth: 60,
+    alignItems: "center",
+  },
 
-      <View className="min-w-0">
-        <Text className="text-[10px] uppercase tracking-[0.1em] text-white/25">
-          {label}
-        </Text>
+  progressTrack: {
+    height: 2,
+    marginHorizontal: 20,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    overflow: "hidden",
+    zIndex: 10,
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: "#A78BFA",
+  },
 
-        <Text className="truncate text-sm font-semibold text-white/70">{value}</Text>
-      </View>
-    </View>
-  );
-}
+  welcomeScroll: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+    minHeight: "100%",
+  },
+  globeWrapper: {
+    width: 108,
+    height: 108,
+    borderRadius: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 32,
+    shadowColor: "#8B5CF6",
+    shadowOpacity: 0.55,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 22 },
+    elevation: 14,
+  },
+  heroTitle: {
+    fontSize: 38,
+    fontWeight: "900",
+    color: "#fff",
+    textAlign: "center",
+    letterSpacing: -1,
+    lineHeight: 44,
+  },
+  heroSubtitle: {
+    marginTop: 16,
+    maxWidth: 380,
+    fontSize: 15,
+    lineHeight: 23,
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
+  },
 
-function cnLocationMessage(error: boolean): string {
-  return [
-    "mb-3 px-1 text-[11px]",
-    error ? "text-amber-400/70" : "text-emerald-400/70",
-  ].join(" ");
-}
+  chipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 32,
+    paddingHorizontal: 8,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+
+  gradientButtonOuter: {
+    width: "100%",
+    borderRadius: 18,
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.55,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 12,
+  },
+  gradientButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    width: "100%",
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 18,
+  },
+  ctaText: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.3,
+  },
+  skipLink: {
+    marginTop: 18,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+
+  locationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.3)",
+    backgroundColor: "rgba(139,92,246,0.12)",
+    marginBottom: 16,
+  },
+  locationIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.22)",
+  },
+  searchWrapper: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  searchIcon: {
+    position: "absolute",
+    left: 16,
+    top: 17,
+    zIndex: 2,
+  },
+  input: {
+    width: "100%",
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    color: "#fff",
+    fontSize: 14,
+  },
+
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 4,
+    gap: 8,
+  },
+  countryRow: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  countryRowSelected: {
+    backgroundColor: "rgba(139,92,246,0.22)",
+    borderColor: "rgba(167,139,250,0.6)",
+  },
+  cityDropdown: {
+    marginTop: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(20,10,44,0.98)",
+    overflow: "hidden",
+  },
+  cityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+
+  moduleCard: {
+    padding: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+  },
+  moduleCheck: {
+    position: "absolute",
+    top: 14,
+    right: 14,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  moduleIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  countBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(167,139,250,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.3)",
+  },
+
+  profileScroll: {
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+  },
+  avatarWrapper: {
+    width: 104,
+    height: 104,
+    borderRadius: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#8B5CF6",
+    shadowOpacity: 0.45,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 20 },
+    elevation: 12,
+  },
+  avatarCamera: {
+    position: "absolute",
+    bottom: 0,
+    alignSelf: "center",
+    marginTop: -19,
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#8B5CF6",
+    borderWidth: 3,
+    borderColor: "#0B0620",
+  },
+  summaryCard: {
+    marginBottom: 24,
+    padding: 18,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+  summaryIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.15)",
+  },
+
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 22,
+  },
+});

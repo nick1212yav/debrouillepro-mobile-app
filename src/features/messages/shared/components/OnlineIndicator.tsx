@@ -1,19 +1,13 @@
+import { Text, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+
 // src/features/messages/shared/components/OnlineIndicator.tsx
 
-import {
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import type { HTMLAttributes } from "react";
 
-export interface OnlineIndicatorProps {
+export interface OnlineIndicatorProps extends HTMLAttributes<Text> {
   online?: boolean;
   size?: "sm" | "md" | "lg";
   showLabel?: boolean;
-  className?: string;
-  style?: StyleProp<ViewStyle>;
 }
 
 const SIZES = {
@@ -26,54 +20,26 @@ export function OnlineIndicator({
   online = false,
   size = "md",
   showLabel = false,
-  className,
+  className = "",
   style,
+  ...props
 }: OnlineIndicatorProps) {
   const indicatorSize = SIZES[size];
-  const label = online ? "En ligne" : "Hors ligne";
 
-  return (
-    <View
-      className={className}
-      style={[styles.container, style]}
-      accessibilityRole="text"
-      accessibilityLabel={label}
-    >
-      <View
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-        style={[
-          styles.indicator,
-          {
-            width: indicatorSize,
-            height: indicatorSize,
-            minWidth: indicatorSize,
-            borderRadius: indicatorSize / 2,
-            backgroundColor: online ? "#22c55e" : "#9ca3af",
-          },
-        ]}
-      />
-
-      {showLabel ? <Text style={styles.label}>{label}</Text> : null}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
+  const indicatorStyle: ViewStyle | TextStyle | ImageStyle = {
+    display: "inline-flex",
     alignItems: "center",
     gap: 6,
-  },
+    ...style,
+  };
 
-  indicator: {
-    flexShrink: 0,
-  },
+  return (
+    <Text {...props} className={className} style={indicatorStyle} accessibilityLabel={online ? "En ligne" : "Hors ligne"}>
+      <Text accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" style={{ width: indicatorSize, height: indicatorSize, minWidth: indicatorSize, borderRadius: 50, backgroundColor: online ? "#22c55e" : "#9ca3af", display: "inline-block" }} />
 
-  label: {
-    fontSize: 12,
-    color: "#FFFFFF",
-  },
-});
+      {showLabel && <Text>{online ? "En ligne" : "Hors ligne"}</Text>}
+    </Text>
+  );
+}
 
 export default OnlineIndicator;

@@ -1,6 +1,6 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Text, Pressable } from "react-native";
 import { useState, useEffect, useMemo } from "react";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   LayoutDashboard,
@@ -142,7 +142,7 @@ export default function RestaurationDashboardPage({
         setMenuCategories(restaurant.menu);
       }
     } catch {
-      UIService.openToast("Échec de synchronisation des données d'administration.", "error");
+      toast.error("Échec de synchronisation des données d'administration.");
     } finally {
       setLoading(false);
     }
@@ -233,9 +233,11 @@ export default function RestaurationDashboardPage({
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
       );
-      UIService.openToast(`Statut de la commande mis à jour : ${status.toUpperCase().replace("_", " ")}`, "success");
+      toast.success(
+        `Statut de la commande mis à jour : ${status.toUpperCase().replace("_", " ")}`,
+      );
     } else {
-      UIService.openToast("Erreur technique lors de l'ajustement du statut.", "error");
+      toast.error("Erreur technique lors de l'ajustement du statut.");
     }
   };
 
@@ -259,7 +261,7 @@ export default function RestaurationDashboardPage({
         return cat;
       }),
     );
-    UIService.openToast(`Statut de disponibilité mis à jour pour '${itemName}'`, "success");
+    toast.success(`Statut de disponibilité mis à jour pour '${itemName}'`);
   };
 
   const handleUpdateItemPrice = (
@@ -280,7 +282,9 @@ export default function RestaurationDashboardPage({
         return cat;
       }),
     );
-    UIService.openToast(`Nouveau prix de ${newPrice.toLocaleString()} FCFA configuré pour '${itemName}'`, "success");
+    toast.success(
+      `Nouveau prix de ${newPrice.toLocaleString()} FCFA configuré pour '${itemName}'`,
+    );
   };
 
   const handleUpdateStock = (name: string, delta: number) => {
@@ -309,49 +313,26 @@ export default function RestaurationDashboardPage({
       isActive: true,
     };
     setEmployees((prev) => [...prev, newEmp]);
-    UIService.openToast(`Fiche de poste créée pour ${name}`, "success");
+    toast.success(`Fiche de poste créée pour ${name}`);
   };
 
   const handleRemoveEmployee = (id: string) => {
     setEmployees((prev) => prev.filter((emp) => emp.id !== id));
-    UIService.openToast("Collaborateur retiré de l'effectif actif.", "success");
+    toast.success("Collaborateur retiré de l'effectif actif.");
   };
 
   if (loading) {
     return (
-      <View className="h-full flex items-center justify-center text-white/50 text-xs gap-2">
-        <RefreshCw size={14} className="animate-spin" />
-        <Text>Synchronisation de la console restaurateur...</Text>
-      </View>
+      <View className="h-full flex items-center justify-center text-white/50 text-xs gap-2"><RefreshCw size={14} className="animate-spin" /><Text>Synchronisation de la console restaurateur...</Text></View>
     );
   }
 
   return (
-    <View className="h-full w-full flex flex-col relative text-white bg-[#020617]">
-      <View className="flex-shrink-0 px-4 pt-12 pb-3 bg-slate-950/60 border-b border-white/[0.04] flex items-center gap-3">
-        <Pressable
-          onPress={
-            activeSection !== "overview"
+    <View className="h-full w-full flex flex-col relative text-white bg-[#020617]"><View className="flex-shrink-0 px-4 pt-12 pb-3 bg-slate-950/60 border-b border-white/[0.04] backdrop-blur-md flex items-center gap-3"><Pressable onPress={activeSection !== "overview"
               ? () => setActiveSection("overview")
-              : onBack
-          }
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-        >
-          <ArrowLeft size={18} />
-        </Pressable>
-        <View className="flex-1 text-left">
-          <Text className="block text-[8px] text-orange-400 uppercase font-black">
-            Administration Établissement
-          </Text>
-          <Text className="text-sm font-black text-white/95 leading-none mt-1">
-            Console Professionnelle
-          </Text>
-        </View>
-      </View>
-
-      <View className="flex-shrink-0 px-4 py-3 bg-[#0a0f29]/30 border-b border-white/[0.04] flex gap-2 overflow-x-auto no-scrollbar">
-        {[
+              : onBack} className="w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ArrowLeft size={18} /></Pressable><View className="flex-1 text-left"><Text className="block text-[8px] text-orange-400 uppercase font-black">Administration Établissement
+          </Text><Text className="text-sm font-black text-white/95 leading-none mt-1">Console Professionnelle
+          </Text></View></View><View className="flex-shrink-0 px-4 py-3 bg-[#0a0f29]/30 border-b border-white/[0.04] flex gap-2 overflow-x-auto no-scrollbar">{[
           { id: "overview" as const, label: "Synthèse", icon: LayoutDashboard },
           {
             id: "orders" as const,
@@ -366,30 +347,14 @@ export default function RestaurationDashboardPage({
           const isSelected = activeSection === section.id;
           const Icon = section.icon;
           return (
-            <Pressable
-              key={section.id}
-              onPress={() => setActiveSection(section.id)}
-              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border"
-              style={{ backgroundColor: isSelected
-                                ? "rgba(249,115,22,0.2)"
-                                : "rgba(255,255,255,0.02)", borderColor: isSelected
-                                ? "rgba(249,115,22,0.3)"
-                                : "transparent" }}
-            >
-              <Icon size={12} />
-              {section.label}
-            </Pressable>
+            <Pressable key={section.id} onPress={() => setActiveSection(section.id)} className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition-all" style={{ backgroundColor: isSelected
+                              ? "rgba(249,115,22,0.2)"
+                              : "rgba(255,255,255,0.02)", borderColor: isSelected
+                              ? "rgba(249,115,22,0.3)"
+                              : "transparent" }}><Icon size={12} />{section.label}</Pressable>
           );
-        })}
-      </View>
-
-      <View className="flex-1 overflow-y-auto px-4 py-4 space-y-4 no-scrollbar">
-        <>
-          {activeSection === "overview" && (
-            <View
-              key="sec_overview"
-              className="space-y-4"
-            >
+        })}</View><View className="flex-1 overflow-y-auto px-4 py-4 space-y-4 no-scrollbar"><View>{activeSection === "overview" && (
+            <View key="sec_overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
               <DashboardOverview
                 metrics={statsMetrics}
                 onNavigateToSection={(target) =>
@@ -408,50 +373,36 @@ export default function RestaurationDashboardPage({
               <AIRecommendations
                 recommendations={aiOpportunities}
                 onApplyRecommendation={(id) => {
-                  UIService.openToast(`Recommandation d'optimisation N°${id} appliquée à votre carte !`, "success");
+                  toast.success(
+                    `Recommandation d'optimisation N°${id} appliquée à votre carte !`,
+                  );
                 }}
               />
             </View>
-          )}
-
-          {activeSection === "orders" && (
-            <View
-              key="sec_orders"
-            >
+          )}{activeSection === "orders" && (
+            <View key="sec_orders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <OrderManagement
                 orders={orders}
                 onUpdateOrderStatus={handleOrderStatusUpdate}
               />
             </View>
-          )}
-
-          {activeSection === "menu" && menuCategories.length > 0 && (
-            <View
-              key="sec_menu"
-            >
+          )}{activeSection === "menu" && menuCategories.length > 0 && (
+            <View key="sec_menu" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <MenuManagement
                 menu={menuCategories}
                 onToggleItemAvailability={handleToggleItemAvailability}
                 onUpdateItemPrice={handleUpdateItemPrice}
               />
             </View>
-          )}
-
-          {activeSection === "inventory" && (
-            <View
-              key="sec_inventory"
-            >
+          )}{activeSection === "inventory" && (
+            <View key="sec_inventory" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <InventoryManagement
                 items={inventory}
                 onUpdateStock={handleUpdateStock}
               />
             </View>
-          )}
-
-          {activeSection === "employees" && (
-            <View
-              key="sec_employees"
-            >
+          )}{activeSection === "employees" && (
+            <View key="sec_employees" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <EmployeeManagement
                 employees={employees}
                 onToggleStatus={handleToggleEmployeeStatus}
@@ -459,21 +410,14 @@ export default function RestaurationDashboardPage({
                 onRemoveEmployee={handleRemoveEmployee}
               />
             </View>
-          )}
-
-          {activeSection === "analytics" && (
-            <View
-              key="sec_analytics"
-            >
+          )}{activeSection === "analytics" && (
+            <View key="sec_analytics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <AnalyticsDashboard
                 bcgMatrix={bcgMatrixResult}
                 conversionRate={18.4}
                 averageBasket={6800}
               />
             </View>
-          )}
-        </>
-      </View>
-    </View>
+          )}</View></View></View>
   );
 }

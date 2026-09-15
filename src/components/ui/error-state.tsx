@@ -1,35 +1,27 @@
-import { View } from "react-native";
+import { View, ViewProps } from "react-native";
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { AlertCircleIcon } from "lucide-react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
-function ErrorState({ className, ...props }: React.ComponentProps<typeof View>) {
+function ErrorState({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="error-state"
-      className={cn(
+    <View data-slot="error-state" className={cn(
         "flex min-w-0 flex-1 flex-col items-center justify-center gap-6 rounded-lg border-2 border-dashed border-destructive/50 p-6 text-center text-balance md:p-12",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
 function ErrorStateHeader({
   className,
   ...props
-}: React.ComponentProps<typeof View>) {
+}: ViewProps) {
   return (
-    <View
-      data-slot="error-state-header"
-      className={cn(
+    <View data-slot="error-state-header" className={cn(
         "flex max-w-sm flex-col items-center gap-2 text-center",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
@@ -54,58 +46,41 @@ function ErrorStateMedia({
   variant = "default",
   children,
   ...props
-}: React.ComponentProps<typeof View> & VariantProps<typeof errorStateMediaVariants>) {
+}: ViewProps & VariantProps<typeof errorStateMediaVariants>) {
   return (
-    <View
-      data-slot="error-state-media"
-      data-variant={variant}
-      className={cn(errorStateMediaVariants({ variant, className }))}
-      {...props}
-    >
+    <View data-slot="error-state-media" data-variant={variant} className={cn(errorStateMediaVariants({ variant, className }))} {...props}>
       {children ?? <AlertCircleIcon />}
     </View>
   );
 }
 
-function ErrorStateTitle({ className, ...props }: React.ComponentProps<typeof View>) {
+function ErrorStateTitle({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="error-state-title"
-      className={cn("text-lg font-medium tracking-tight", className)}
-      {...props}
-    />
+    <View data-slot="error-state-title" className={cn("text-lg font-medium tracking-tight", className)} {...props} />
   );
 }
 
 function ErrorStateDescription({
   className,
   ...props
-}: React.ComponentProps<typeof View>) {
+}: ViewProps) {
   return (
-    <View
-      data-slot="error-state-description"
-      className={cn(
+    <View data-slot="error-state-description" className={cn(
         "text-muted-foreground [&>a:hover]:text-primary text-sm/relaxed [&>a]:underline [&>a]:underline-offset-4",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
 function ErrorStateContent({
   className,
   ...props
-}: React.ComponentProps<typeof View>) {
+}: ViewProps) {
   return (
-    <View
-      data-slot="error-state-content"
-      className={cn(
+    <View data-slot="error-state-content" className={cn(
         "flex w-full max-w-sm min-w-0 flex-col items-center gap-4 text-sm text-balance",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 

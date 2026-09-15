@@ -1,9 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/events/hooks/useEventReviews.ts
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 export function useEventReviews(eventId: string) {
   const [reviews, setReviews] = useState<any[]>([]);
@@ -12,7 +11,7 @@ export function useEventReviews(eventId: string) {
   // const likeReviewMutation = useMutation(api.events.likeReview);
 
   const addReview = async (rating: number, comment: string) => {
-    UIService.openToast("Fonctionnalité à venir", "info");
+    toast.info("Fonctionnalité à venir");
     // try {
     //   const review = await addReviewMutation({ eventId, rating, comment });
     //   setReviews((prev) => [...prev, review]);
@@ -24,7 +23,7 @@ export function useEventReviews(eventId: string) {
   };
 
   const likeReview = async (reviewId: string) => {
-    UIService.openToast("Fonctionnalité à venir", "info");
+    toast.info("Fonctionnalité à venir");
     // try {
     //   await likeReviewMutation({ reviewId });
     //   setReviews((prev) =>

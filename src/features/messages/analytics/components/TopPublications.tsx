@@ -13,8 +13,7 @@ export function TopPublications({ publications }: TopPublicationsProps) {
   return (
     <View className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <View className="mb-4">
-        <Text className="text-sm font-semibold text-white">
-          Publications les plus performantes
+        <Text className="text-sm font-semibold text-white">Publications les plus performantes
         </Text>
 
         <Text className="mt-1 text-xs text-white/30">
@@ -29,18 +28,13 @@ export function TopPublications({ publications }: TopPublicationsProps) {
       ) : (
         <View className="space-y-2">
           {sorted.map((publication, index) => (
-            <View
-              key={publication._id}
-              className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3"
-            >
+            <View key={publication._id} className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3">
               <Text className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-xs font-semibold text-white/50">
                 {index + 1}
               </Text>
 
               <View className="min-w-0 flex-1">
-                <Text className="truncate text-sm font-medium text-white">
-                  {publication.title}
-                </Text>
+                <Text className="truncate text-sm font-medium text-white">{publication.title}</Text>
 
                 <Text className="mt-1 text-[10px] uppercase tracking-wide text-white/30">
                   {publication.type}

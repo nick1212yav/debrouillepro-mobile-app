@@ -1,4 +1,4 @@
-import { View, Pressable } from "react-native";
+import { View } from "react-native";
 import type { ReactNode } from "react";
 type TransitionVariant = "slide-up" | "slide-left" | "fade" | "scale";
 
@@ -54,9 +54,7 @@ export default function PageTransition({
   const v = VARIANTS[variant];
   const transition = variant === "scale" ? SPRING_TRANSITION : TRANSITION;
   return (
-    <View
-      className={className}
-    >
+    <View className={className} initial={v.initial} animate={v.animate} exit={v.exit} transition={transition}>
       {children}
     </View>
   );
@@ -72,9 +70,10 @@ export function StaggerContainer({
   className?: string;
 }) {
   return (
-    <View
-      className={className}
-    >
+    <View className={className} initial="hidden" animate="visible" variants={{
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
+      }}>
       {children}
     </View>
   );
@@ -88,9 +87,14 @@ export function StaggerItem({
   className?: string;
 }) {
   return (
-    <View
-      className={className}
-    >
+    <View className={className} variants={{
+        hidden: { opacity: 0, y: 18 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          transition: { duration: 0.32, ease: [0.25, 0.46, 0.45, 0.94] as const },
+        },
+      }}>
       {children}
     </View>
   );
@@ -108,11 +112,8 @@ export function PressMotion({
   onClick?: () => void;
 }) {
   return (
-    <Pressable
-      className={className}
-      onPress={onClick}
-    >
+    <View className={className} whileTap={{ scale: 0.93 }} whileHover={{ scale: 1.03 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} onPress={onClick}>
       {children}
-    </Pressable>
+    </View>
   );
 }

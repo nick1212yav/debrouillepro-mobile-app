@@ -26,26 +26,8 @@ export function PropertyNeighborhood({ city }: Props) {
   ];
 
   return (
-    <View className="bg-white/5 rounded-2xl p-4">
-      <Text className="text-sm font-medium text-white/70 mb-3">
-        Quartier {city}
-      </Text>
-      <View className="gap-3">
-        {scores.map((item) => (
-          <View key={item.label} className="flex items-center justify-between">
-            <View className="flex items-center gap-1.5">
-              <item.icon size={12} style={{ color: item.color }} />
-              <Text className="text-xs text-white/50">{item.label}</Text>
-            </View>
-            <View className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <View
-                className="h-full rounded-full"
-                style={{ width: `${item.value}%`, backgroundColor: item.color }}
-              />
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
+    <View className="bg-white/5 rounded-2xl p-4"><Text className="text-sm font-medium text-white/70 mb-3">Quartier {city}</Text><View className="gap-3">{scores.map((item) => (
+          <View key={item.label} className="flex items-center justify-between"><View className="flex items-center gap-1.5"><item.icon size={12} style={{  }} /><Text className="text-xs text-white/50">{item.label}</Text></View><View className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden"><View className="h-full rounded-full" style={{ width: `${item.value}%`, backgroundColor: item.color }} /></View></View>
+        ))}</View></View>
   );
 }

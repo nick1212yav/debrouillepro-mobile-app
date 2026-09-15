@@ -1,7 +1,7 @@
-import { useRouter } from "expo-router";
 import { View, Pressable, Image, Text, GestureResponderEvent } from "react-native";
 
 // src/features/sante/components/SanteCard.tsx
+import { useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import {
   MapPin,
@@ -66,7 +66,7 @@ export function SanteCard({
   isLiked = false,
   isBookmarked = false,
 }: Props) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const meta = parseMeta(publication.meta);
   const [isHovered, setIsHovered] = useState(false);
   const [liked, setLiked] = useState(isLiked);
@@ -123,35 +123,41 @@ export function SanteCard({
   // Gestionnaires
   const handleCardClick = useCallback(() => {
     const professionalId = meta.professionalId || meta.id || publication._id;
-    router.push(`/sante/${professionalId}`);
-  }, [meta.professionalId, meta.id, router, publication._id]);
+    navigate(`/sante/${professionalId}`);
+  }, [meta.professionalId, meta.id, navigate, publication._id]);
 
   const handleLike = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     setLiked(!liked);
     onLike?.();
   };
 
   const handleBookmark = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     setBookmarked(!bookmarked);
     onBookmark?.();
   };
 
   const handleShare = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     onShare?.();
   };
 
   const handleComment = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     onComment?.();
   };
 
   const handleContact = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     const professionalId = meta.professionalId || meta.id || publication._id;
-    router.push(`/sante/${professionalId}?tab=contact`);
+    navigate(`/sante/${professionalId}?tab=contact`);
   };
 
   const handleBook = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     const professionalId = meta.professionalId || meta.id || publication._id;
-    router.push(`/sante/${professionalId}?tab=booking`);
+    navigate(`/sante/${professionalId}?tab=booking`);
   };
 
   const renderStatusBadges = () => {
@@ -190,233 +196,65 @@ export function SanteCard({
   const statusBadges = renderStatusBadges();
 
   return (
-    <Pressable
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-      onPress={handleCardClick}
-      className="relative rounded-3xl overflow-hidden"
-      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", transform: isHovered ? "scale(1.015)" : "scale(1)" }}
-    >
+    <View initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{
+        delay: 0.05 + index * 0.04,
+        type: "spring",
+        damping: 20,
+        stiffness: 300,
+      }} onHoverStart={() => setIsHovered(true)} onHoverEnd={() => setIsHovered(false)} onPress={handleCardClick} className="relative rounded-3xl overflow-hidden transition-all duration-300" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", boxShadow: isHovered
+                ? `0 20px 60px rgba(0,0,0,0.3), 0 0 40px ${color}15`
+                : "0 4px 20px rgba(0,0,0,0.1)", transform: isHovered ? [{ scale: 1.015 }] : [{ scale: 1 }] }}>
       {/* Glow effect */}
-      <View
-        className="absolute inset-0 opacity-0"
-        style={{ opacity: isHovered ? 1 : 0 }}
-      />
+      <View className="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-500" style={{ opacity: isHovered ? 1 : 0 }} />
 
       {/* Image */}
-      <View className="relative h-48 overflow-hidden bg-black/20">
-        {publication.images && publication.images.length > 0 ? (
-          <Image
-            src={publication.images[0]}
-            alt={name}
-            className="w-full h-full object-cover"
-            style={{
-              transform: isHovered ? "scale(1.05)" : "scale(1)"
-            }}
-            loading="lazy"
-          />
+      <View className="relative h-48 overflow-hidden bg-black/20">{publication.images && publication.images.length > 0 ? (
+          <Image src={publication.images[0]} alt={name} className="w-full h-full object-cover" style={{ transform: isHovered ? [{ scale: 1.05 }] : [{ scale: 1 }] }}  />
         ) : (
-          <View
-            className="w-full h-full flex items-center justify-center"
-            style={{ backgroundColor: `${color}22` }}
-          >
-            <User size={48} className="opacity-30" style={{ color }} />
-          </View>
-        )}
-
-        {/* Gradient overlay */}
-        <View
-          className="absolute inset-0"
-          style={{  }}
-        />
-
-        {/* Badge vérifié */}
-        {verified && (
-          <View className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/90 text-white border border-emerald-400/30">
-            <ShieldCheck size={12} />
-            <Text>Vérifié</Text></View>
-        )}
-
-        {/* Spécialité sur l'image */}
-        <View
-          className="absolute top-3 right-3 px-2.5 py-1 rounded-xl text-[10px] font-bold"
-          style={{ backgroundColor: `${color}cc` }}
-        >
-          {specialty}
-        </View>
-
-        {/* Tarif */}
-        {fees && (
-          <View className="absolute bottom-3 left-3">
-            <Text
-              className="px-3 py-1.5 rounded-xl text-sm font-bold"
-              style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#FCD34D", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-            >
-              {fees} {currency}
-            </Text>
-          </View>
-        )}
-
-        {/* Expérience */}
-        {experience && (
-          <View className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-white/80 bg-black/30">
-            <Award size={12} />
-            {experience} <Text>d'exp.</Text></View>
-        )}
-      </View>
+          <View className="w-full h-full flex items-center justify-center" style={{ backgroundColor: `${color}22` }}><User size={48} className="opacity-30" style={{ color }} /></View>
+        )}{}<View className="absolute inset-0" style={{  }} />{}{verified && (
+          <View className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold backdrop-blur-sm bg-emerald-500/90 text-white border border-emerald-400/30"><ShieldCheck size={12} /><Text>Vérifié</Text></View>
+        )}{}<View className="absolute top-3 right-3 px-2.5 py-1 rounded-xl text-[10px] font-bold backdrop-blur-sm" style={{ backgroundColor: `${color}cc`, boxShadow: `0 4px 12px ${color}40` }}>{specialty}</View>{}{fees && (
+          <View className="absolute bottom-3 left-3"><Text className="px-3 py-1.5 rounded-xl text-sm font-bold backdrop-blur-md" style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#FCD34D", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>{fees}{currency}</Text></View>
+        )}{}{experience && (
+          <View className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm text-white/80 bg-black/30"><Award size={12} />{experience}<Text>d'exp.</Text></View>
+        )}</View>
 
       {/* Contenu */}
-      <View className="p-4 space-y-3">
-        <View className="flex items-start justify-between gap-3">
-          <View className="flex-1 min-w-0">
-            <View className="flex items-center gap-2 mb-0.5">
-              <Text
-                className="text-[10px] font-bold uppercase tracking-wider"
-                style={{ color }}
-              >
-                Santé
+      <View className="p-4 space-y-3"><View className="flex items-start justify-between gap-3"><View className="flex-1 min-w-0"><View className="flex items-center gap-2 mb-0.5"><Text className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>Santé
+              </Text><Text className="text-white/20">·</Text><Text className="text-[9px] text-white/30">{timeAgo}</Text></View><Text className="text-white font-bold text-base leading-tight">{name}</Text></View></View>{location && (
+          <View className="flex items-center gap-1.5 text-xs text-white/50"><MapPin size={12} className="text-white/30" /><Text className="truncate">{location}</Text></View>
+        )}{}<View className="flex items-center gap-2 flex-wrap"><View className="flex items-center gap-1"><Star size={14} className="text-yellow-400 fill-yellow-400" /><Text className="text-white font-bold text-sm">{rating.toFixed(1)}</Text>{reviewCount > 0 && (
+              <Text className="text-white/40 text-xs">({reviewCount}avis)
               </Text>
-              <Text className="text-white/20">·</Text>
-              <Text className="text-[9px] text-white/30">{timeAgo}</Text>
-            </View>
-            <Text className="text-white font-bold text-base leading-tight">
-              {name}
-            </Text>
-          </View>
-        </View>
-
-        {location && (
-          <View className="flex items-center gap-1.5 text-xs text-white/50">
-            <MapPin size={12} className="text-white/30" />
-            <Text className="truncate">{location}</Text>
-          </View>
-        )}
-
-        {/* Note et langues */}
-        <View className="flex items-center gap-2 flex-wrap">
-          <View className="flex items-center gap-1">
-            <Star size={14} className="text-yellow-400 fill-yellow-400" />
-            <Text className="text-white font-bold text-sm">
-              {rating.toFixed(1)}
-            </Text>
-            {reviewCount > 0 && (
-              <Text className="text-white/40 text-xs">
-                ({reviewCount} avis)
-              </Text>
-            )}
-          </View>
-          {languagesArray.length > 0 && (
+            )}</View>{languagesArray.length > 0 && (
             <>
               <Text className="text-white/20">|</Text>
-              <Text className="text-[10px] text-white/40">
-                {languagesArray.slice(0, 3).join(", ")}
-              </Text>
+              <Text className="text-[10px] text-white/40">{languagesArray.slice(0, 3).join(", ")}</Text>
             </>
-          )}
-        </View>
-
-        {/* Badges de statut */}
-        {statusBadges.length > 0 && (
-          <View className="flex flex-wrap gap-2">
-            {statusBadges.map((badge) => (
-              <Text
-                key={badge.label}
-                className="px-2.5 py-0.5 rounded-full text-[10px] font-medium"
-                style={{ backgroundColor: badge.bg, color: badge.color, borderStyle: "solid" }}
-              >
-                {badge.label}
-              </Text>
-            ))}
-          </View>
-        )}
-
-        {/* Assurances */}
-        {insurancesArray.length > 0 && (
-          <View className="flex flex-wrap gap-1.5">
-            {insurancesArray.slice(0, 3).map((ins: string) => (
-              <Text
-                key={ins}
-                className="px-2 py-0.5 rounded-full text-[9px] font-medium"
-                style={{ backgroundColor: `${color}15`, color: color, borderStyle: "solid" }}
-              >
-                {ins}
-              </Text>
-            ))}
-            {insurancesArray.length > 3 && (
-              <Text className="text-[9px] text-white/30">
-                +{insurancesArray.length - 3}
-              </Text>
-            )}
-          </View>
-        )}
-      </View>
+          )}</View>{}{statusBadges.length > 0 && (
+          <View className="flex flex-wrap gap-2">{statusBadges.map((badge) => (
+              <Text key={badge.label} className="px-2.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: badge.bg, color: badge.color, borderStyle: "solid" }}>{badge.label}</Text>
+            ))}</View>
+        )}{}{insurancesArray.length > 0 && (
+          <View className="flex flex-wrap gap-1.5">{insurancesArray.slice(0, 3).map((ins: string) => (
+              <Text key={ins} className="px-2 py-0.5 rounded-full text-[9px] font-medium" style={{ backgroundColor: `${color}15`, color: color, borderStyle: "solid" }}>{ins}</Text>
+            ))}{insurancesArray.length > 3 && (
+              <Text className="text-[9px] text-white/30">+{insurancesArray.length - 3}</Text>
+            )}</View>
+        )}</View>
 
       {/* Actions */}
-      <View className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between flex-wrap gap-2">
-        <View className="flex items-center gap-1">
-          <Pressable
-            onPress={handleLike}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+      <View className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between flex-wrap gap-2"><View className="flex items-center gap-1"><Pressable whileTap={{ scale: 0.85 }} onPress={handleLike} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
               liked
                 ? "text-rose-400 bg-rose-500/10"
                 : "text-white/40 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <Heart size={14} className={liked ? "fill-rose-400" : ""} />
-            <Text>{publication.likeCount || 0}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleComment}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40"
-          >
-            <MessageCircle size={14} />
-            <Text>{publication.commentCount || 0}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleShare}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40"
-          >
-            <Share2 size={14} />
-          </Pressable>
-
-          <Pressable
-            onPress={handleBookmark}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+            }`}><Heart size={14} className={liked ? "fill-rose-400" : ""} /><Text>{publication.likeCount || 0}</Text></Pressable><Pressable whileTap={{ scale: 0.85 }} onPress={handleComment} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40 transition-all"><MessageCircle size={14} /><Text>{publication.commentCount || 0}</Text></Pressable><Pressable whileTap={{ scale: 0.85 }} onPress={handleShare} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40 transition-all"><Share2 size={14} /></Pressable><Pressable whileTap={{ scale: 0.85 }} onPress={handleBookmark} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
               bookmarked
                 ? "text-amber-400 bg-amber-500/10"
                 : "text-white/40 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <Bookmark
-              size={14}
-              className={bookmarked ? "fill-amber-400" : ""}
-            />
-          </Pressable>
-        </View>
-
-        <View className="flex items-center gap-1.5">
-          <Pressable
-            onPress={handleContact}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white bg-blue-500/80"
-          >
-            <Phone size={12} />
-            <Text><Text>Contacter</Text></Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleBook}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white"
-            style={{  }}
-          >
-            <CalendarDays size={12} />
-            <Text><Text>Rendez-vous</Text></Text>
-            <ChevronRight size={12} className="opacity-60" />
-          </Pressable>
-        </View>
-      </View>
-    </Pressable>
+            }`}><Bookmark size={14} className={bookmarked ? "fill-amber-400" : ""} /></Pressable></View><View className="flex items-center gap-1.5"><Pressable whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onPress={handleContact} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white bg-blue-500/80 transition-all"><Phone size={12} /><Text>Contacter</Text></Pressable><Pressable whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onPress={handleBook} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all" style={{ boxShadow: `0 4px 12px ${color}40` }}><CalendarDays size={12} /><Text>Rendez-vous</Text><ChevronRight size={12} className="opacity-60" /></Pressable></View></View>
+    </View>
   );
 }
 

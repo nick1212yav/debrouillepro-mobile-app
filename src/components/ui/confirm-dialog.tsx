@@ -1,7 +1,7 @@
-import { Text, View, Pressable } from "react-native";
+import { Text, View } from "react-native";
 import { AlertTriangle, Trash2, AlertCircle, Info } from "lucide-react-native";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button.tsx";
+import { cn } from "@/lib/utils.ts";
 
 type ConfirmVariant = "danger" | "warning" | "info";
 
@@ -62,33 +62,23 @@ export default function ConfirmDialog({
   const Icon = config.icon;
 
   return (
-    <>
+<View>
       {open && (
         <>
           {/* Backdrop */}
-          <Pressable
-            key="backdrop"
-            className="fixed inset-0 z-50 bg-black/60"
-            onPress={onCancel}
-          />
+          <View key="backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onPress={onCancel} />
 
           {/* Dialog */}
-          <View
-            key="dialog"
-            className={cn(
+          <View key="dialog" initial={{ opacity: 0, scale: 0.88, y: 24 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, y: 16 }} transition={{ type: "spring", stiffness: 420, damping: 32 }} className={cn(
               "fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-sm -translate-x-1/2 -translate-y-1/2",
               "rounded-2xl p-6 shadow-2xl ring-1",
               config.ringColor,
-            )}
-            style={{ backgroundColor: "rgba(14, 14, 28, 0.96)" }}
-          >
+            )} style={{ backgroundColor: "rgba(14, 14, 28, 0.96)" }}>
             {/* Icon */}
-            <View
-              className={cn(
+            <View initial={{ scale: 0, rotate: -12 }} animate={{ scale: 1, rotate: 0 }} transition={{ delay: 0.06, type: "spring", stiffness: 500, damping: 28 }} className={cn(
                 "mx-auto mb-4 w-14 h-14 rounded-2xl flex items-center justify-center",
                 config.iconBg,
-              )}
-            >
+              )}>
               <Icon size={26} className={config.iconColor} />
             </View>
 
@@ -126,7 +116,7 @@ export default function ConfirmDialog({
           </View>
         </>
       )}
-    </>
+    </View>
   );
 }
 

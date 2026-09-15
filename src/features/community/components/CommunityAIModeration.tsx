@@ -1,4 +1,4 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Pressable, Text } from "react-native";
 import { useState } from "react";
 import { Shield, CheckCircle, AlertCircle, Loader2 } from "lucide-react-native";
 
@@ -31,49 +31,29 @@ export function CommunityAIModeration({ content, onModerate }: Props) {
 
   if (result) {
     return (
-      <View
-        className={`p-3 rounded-xl ${
+      <View className={`p-3 rounded-xl ${
           result.isSafe
             ? "bg-green-500/10 border-green-500/20"
             : "bg-red-500/10 border-red-500/20"
-        } border`}
-      >
-        <View className="flex items-center gap-2">
-          {result.isSafe ? (
+        } border`}><View className="flex items-center gap-2">{result.isSafe ? (
             <CheckCircle size={16} className="text-green-400" />
           ) : (
             <AlertCircle size={16} className="text-red-400" />
-          )}
-          <Text
-            className={`text-sm font-medium ${result.isSafe ? "text-green-400" : "text-red-400"}`}
-          >
-            {result.isSafe ? "Contenu sûr" : "Alerte de sécurité"}
-          </Text>
-          <Text className="text-xs text-white/30 ml-auto">
-            <Text>Score:</Text>{Math.round(result.score * 100)}<Text>%</Text></Text>
-        </View>
-        {result.flags.length > 0 && (
+          )}<Text className={`text-sm font-medium ${result.isSafe ? "text-green-400" : "text-red-400"}`}>{result.isSafe ? "Contenu sûr" : "Alerte de sécurité"}</Text><Text className="text-xs text-white/30 ml-auto">Score: {Math.round(result.score * 100)}%
+          </Text></View>{result.flags.length > 0 && (
           <View className="flex flex-wrap gap-1 mt-2">
             {result.flags.map((flag) => (
-              <Text
-                key={flag}
-                className="text-[10px] text-red-400/70 bg-red-500/10 px-2 py-0.5 rounded-full"
-              >
+              <Text key={flag} className="text-[10px] text-red-400/70 bg-red-500/10 px-2 py-0.5 rounded-full">
                 {flag}
               </Text>
             ))}
           </View>
-        )}
-      </View>
+        )}</View>
     );
   }
 
   return (
-    <Pressable
-      onPress={handleModerate}
-      disabled={isLoading || !content.trim()}
-      className="flex items-center gap-1.5 text-xs font-medium text-white/40 disabled:opacity-30"
-    >
+    <Pressable onPress={handleModerate} disabled={isLoading || !content.trim()} className="flex items-center gap-1.5 text-xs font-medium text-white/40 transition-colors disabled:opacity-30">
       {isLoading ? (
         <Loader2 size={12} className="animate-spin" />
       ) : (

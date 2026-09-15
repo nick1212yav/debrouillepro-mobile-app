@@ -1,11 +1,22 @@
-import { View, Pressable, Text } from "react-native";
-import { useMemo } from "react";
+// src/pages/home/_components/TabBar.tsx
+import {
+  View,
+  Pressable,
+  Text,
+  Animated,
+  Easing,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Compass, Home, MessageCircle, Plus, Zap } from "lucide-react-native";
 import type { LucideIcon } from "lucide-react-native";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 interface TabDefinition {
   id: string;
@@ -20,52 +31,435 @@ interface TabBarProps {
   hidden?: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Configuration
-// ─────────────────────────────────────────────────────────────────────────────
-
 const BASE_TABS: TabDefinition[] = [
-  {
-    id: "home",
-    label: "Accueil",
-    icon: Home,
-  },
-  {
-    id: "explorer",
-    label: "Explorer",
-    icon: Compass,
-  },
-  {
-    id: "actions",
-    label: "Actions",
-    icon: Zap,
-  },
-  {
-    id: "messages",
-    label: "Messages",
-    icon: MessageCircle,
-  },
+  { id: "home", label: "Accueil", icon: Home },
+  { id: "explorer", label: "Explorer", icon: Compass },
+  { id: "actions", label: "Actions", icon: Zap },
+  { id: "messages", label: "Messages", icon: MessageCircle },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main component
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * ANIMATED BADGE
+ * ========================================================================== */
+
+function AnimatedBadge({ value }: { value: number }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    anim.setValue(0);
+    Animated.spring(anim, {
+      toValue: 1,
+      stiffness: 420,
+      damping: 18,
+      useNativeDriver: true,
+    }).start();
+  }, [value, anim]);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  const scale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+  const glowScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.15],
+  });
+  const glowOpacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.75],
+  });
+
+  return (
+    <Animated.View style={[styles.badgeWrap, { transform: [{ scale }] }]}>
+      <Animated.View
+        style={[
+          styles.badgeGlow,
+          { opacity: glowOpacity, transform: [{ scale: glowScale }] },
+        ]}
+      />
+      <LinearGradient
+        colors={["#FB7185", "#F43F5E", "#E11D48"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.badgeGradient}
+      >
+        <Text style={styles.badgeText}>
+          {value > 99 ? "99+" : String(value)}
+        </Text>
+      </LinearGradient>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * ACTIVE DOT
+ * ========================================================================== */
+
+function ActiveDot() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1400,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1400,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.4],
+  });
+  const opacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.7],
+  });
+
+  return (
+    <Animated.View
+      style={[styles.activeDot, { transform: [{ scale }], opacity }]}
+    />
+  );
+}
+
+/* ============================================================================
+ * TAB ITEM
+ * ========================================================================== */
+
+function TabItem({
+  tab,
+  isActive,
+  onPress,
+}: {
+  tab: TabDefinition;
+  isActive: boolean;
+  onPress: () => void;
+}) {
+  const Icon = tab.icon;
+  const scale = useRef(new Animated.Value(1)).current;
+  const activeAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(activeAnim, {
+      toValue: isActive ? 1 : 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [isActive, activeAnim]);
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const activeBgOpacity = activeAnim;
+  const activeBorderOpacity = activeAnim;
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        accessibilityLabel={tab.label}
+        accessibilityState={{ selected: isActive }}
+        style={styles.tabItem}
+      >
+        {/* Active background */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.tabActiveBg,
+            {
+              opacity: activeBgOpacity,
+              transform: [
+                {
+                  scale: activeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.85, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={["rgba(139,92,246,0.2)", "rgba(167,139,250,0.08)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Animated.View
+            style={[styles.tabActiveBorder, { opacity: activeBorderOpacity }]}
+            pointerEvents="none"
+          />
+        </Animated.View>
+
+        {/* Icon */}
+        <View style={styles.tabIconWrap}>
+          <Icon
+            size={20}
+            color={isActive ? "#C4B5FD" : "rgba(255,255,255,0.55)"}
+            strokeWidth={isActive ? 2.45 : 1.85}
+          />
+        </View>
+
+        {/* Label */}
+        <Text
+          style={[
+            styles.tabLabel,
+            {
+              color: isActive ? "rgb(196,181,253)" : "rgba(255,255,255,0.42)",
+              fontWeight: isActive ? "800" : "600",
+            },
+          ]}
+        >
+          {tab.label}
+        </Text>
+
+        {/* Active dot */}
+        {isActive ? <ActiveDot /> : null}
+
+        {/* Badge */}
+        {typeof tab.badge === "number" && tab.badge > 0 ? (
+          <AnimatedBadge value={tab.badge} />
+        ) : null}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * CREATE BUTTON
+ * ========================================================================== */
+
+function CreateButton({
+  active,
+  onPress,
+}: {
+  active: boolean;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const glow = useRef(new Animated.Value(0)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
+  const shine = useRef(new Animated.Value(0)).current;
+
+  /* Pulsing glow */
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glow, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [glow]);
+
+  /* Rotate when active */
+  useEffect(() => {
+    Animated.timing(rotate, {
+      toValue: active ? 1 : 0,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [active, rotate]);
+
+  /* Shine sweep */
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shine, {
+          toValue: 1,
+          duration: 2800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1600),
+        Animated.timing(shine, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [shine]);
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.92,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const glowScale = glow.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.15],
+  });
+  const glowOpacity = glow.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 0.7],
+  });
+
+  const rotation = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "45deg"],
+  });
+
+  const shineTranslateX = shine.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-100, 200],
+  });
+
+  return (
+    <View style={styles.createWrap}>
+      {/* Ambient glow */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.createGlow,
+          {
+            opacity: glowOpacity,
+            transform: [{ scale: glowScale }],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={[
+            "rgba(139,92,246,0.5)",
+            "rgba(139,92,246,0.2)",
+            "rgba(139,92,246,0)",
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+
+      {/* Button */}
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          onPress={onPress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          accessibilityLabel={active ? "Fermer le menu de création" : "Créer"}
+          accessibilityState={{ selected: active }}
+          style={styles.createBtnOuter}
+        >
+          <LinearGradient
+            colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.createBtnGradient}
+          >
+            {/* Glass shine */}
+            <View style={styles.createBtnShine} pointerEvents="none" />
+
+            {/* Shine sweep */}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.createBtnSweep,
+                {
+                  transform: [
+                    { translateX: shineTranslateX },
+                    { skewX: "-20deg" },
+                  ],
+                },
+              ]}
+            />
+
+            {/* Active ring */}
+            {active ? (
+              <View style={styles.createBtnActiveRing} pointerEvents="none" />
+            ) : null}
+
+            {/* Icon */}
+            <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+              <Plus size={29} color="#FFFFFF" strokeWidth={2.4} />
+            </Animated.View>
+          </LinearGradient>
+        </Pressable>
+      </Animated.View>
+
+      {/* Label */}
+      <Text style={[styles.createLabel, { opacity: active ? 1 : 0.5 }]}>
+        Créer
+      </Text>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * MAIN TAB BAR
+ * ========================================================================== */
 
 export default function TabBar({
   active,
   onChange,
   hidden = false,
 }: TabBarProps) {
-  const reduceMotion = useReducedMotion();
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
 
-  /**
-   * --------------------------------------------------------------------------
-   * Backend-ready notification state
-   * --------------------------------------------------------------------------
-   *
-   * Pour l'instant, nous ne fabriquons pas de compteur.
-   * Il pourra être remplacé directement par la query Convex Messages.
-   */
   const msgUnread = 0;
 
   const tabs = useMemo<TabDefinition[]>(
@@ -77,284 +471,376 @@ export default function TabBar({
     [msgUnread],
   );
 
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: hidden ? 0 : 1,
+      stiffness: 320,
+      damping: 28,
+      useNativeDriver: true,
+    }).start();
+  }, [hidden, slideAnim]);
+
+  if (hidden) return null;
+
+  const maxWidth = Math.min(SCREEN_WIDTH - 16, 640);
+
+  const translateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [120, 0],
+  });
+  const opacity = slideAnim;
+
   return (
-    <>
-      {!hidden && (
-        <View
-          key="main-tabbar"
-          accessibilityLabel="Navigation principale"
-          className="fixed inset-x-0 bottom-0 z-40 px-2 sm:px-4"
-          style={{
-            paddingBottom: "max(env(safe-area-inset-bottom), 8px)",
-          }}
-        >
-          {/* ================================================================= */}
-          {/* Outer floating shell                                              */}
-          {/* ================================================================= */}
+    <Animated.View
+      pointerEvents="box-none"
+      style={[
+        styles.root,
+        {
+          opacity,
+          transform: [{ translateY }],
+        },
+      ]}
+      accessibilityLabel="Navigation principale"
+    >
+      <View style={[styles.inner, { maxWidth }]}>
+        {/* Outer glow */}
+        <View style={styles.outerGlow} pointerEvents="none">
+          <LinearGradient
+            colors={[
+              "rgba(139,92,246,0)",
+              "rgba(139,92,246,0.18)",
+              "rgba(139,92,246,0)",
+            ]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1 }}
+          />
+        </View>
 
-          <View className="relative mx-auto max-w-2xl">
-            {/* ----------------------------------------------------------------- */}
-            {/* Ambient glow                                                      */}
-            {/* ----------------------------------------------------------------- */}
+        {/* Shell */}
+        <View style={styles.shell}>
+          {/* Base gradient */}
+          <LinearGradient
+            colors={[
+              "rgba(12,8,30,0.95)",
+              "rgba(5,7,20,0.92)",
+              "rgba(8,5,24,0.95)",
+            ]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
 
-            <View
-             
-              className="absolute -inset-x-10 bottom-0 h-28 rounded-[40px] opacity-70"
-              style={{  }}
+          {/* Border ring */}
+          <View style={styles.shellBorder} pointerEvents="none" />
+
+          {/* Top hairline */}
+          <View style={styles.topHairline} pointerEvents="none">
+            <LinearGradient
+              colors={[
+                "rgba(255,255,255,0)",
+                "rgba(255,255,255,0.2)",
+                "rgba(255,255,255,0)",
+              ]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={{ flex: 1 }}
+            />
+          </View>
+
+          {/* Content */}
+          <View style={styles.contentRow}>
+            {/* Left tabs */}
+            <View style={styles.tabsGroup}>
+              {tabs.slice(0, 2).map((tab) => (
+                <TabItem
+                  key={tab.id}
+                  tab={tab}
+                  isActive={active === tab.id}
+                  onPress={() => onChange(tab.id)}
+                />
+              ))}
+            </View>
+
+            {/* Center create */}
+            <CreateButton
+              active={active === "create"}
+              onPress={() => onChange("create")}
             />
 
-            {/* ----------------------------------------------------------------- */}
-            {/* Glass container                                                    */}
-            {/* ----------------------------------------------------------------- */}
-
-            <View
-              className="relative overflow-visible rounded-[30px] border border-white/[0.08] bg-[#050714]/88 shadow-[0_-8px_40px_rgba(0,0,0,0.30),0_12px_45px_rgba(0,0,0,0.25)]"
-              style={{  }}
-            >
-              {/* Top glass highlight */}
-              <View
-               
-                className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.18] to-transparent"
-              />
-
-              {/* Inner ambient violet glow */}
-              <View
-               
-                className="absolute left-1/2 top-0 h-16 w-72 -translate-x-1/2 rounded-full opacity-40"
-                style={{  }}
-              />
-
-              {/* =============================================================== */}
-              {/* Navigation row                                                   */}
-              {/* =============================================================== */}
-
-              <View className="relative flex h-[70px] items-end justify-between px-2 pb-1 sm:h-[74px] sm:px-3">
-                {/* ============================================================= */}
-                {/* Left navigation                                                 */}
-                {/* ============================================================= */}
-
-                <View className="flex min-w-0 flex-1 items-center justify-around">
-                  {tabs.slice(0, 2).map((tab) => (
-                    <TabItem
-                      key={tab.id}
-                      tab={tab}
-                      isActive={active === tab.id}
-                      onPress={() => onChange(tab.id)}
-                      reduceMotion={Boolean(reduceMotion)}
-                    />
-                  ))}
-                </View>
-
-                {/* ============================================================= */}
-                {/* CENTER CREATE ACTION                                            */}
-                {/* ============================================================= */}
-
-                <CreateButton
-                  active={active === "create"}
-                  onPress={() => onChange("create")}
-                  reduceMotion={Boolean(reduceMotion)}
+            {/* Right tabs */}
+            <View style={styles.tabsGroup}>
+              {tabs.slice(2).map((tab) => (
+                <TabItem
+                  key={tab.id}
+                  tab={tab}
+                  isActive={active === tab.id}
+                  onPress={() => onChange(tab.id)}
                 />
-
-                {/* ============================================================= */}
-                {/* Right navigation                                                */}
-                {/* ============================================================= */}
-
-                <View className="flex min-w-0 flex-1 items-center justify-around">
-                  {tabs.slice(2).map((tab) => (
-                    <TabItem
-                      key={tab.id}
-                      tab={tab}
-                      isActive={active === tab.id}
-                      onPress={() => onChange(tab.id)}
-                      reduceMotion={Boolean(reduceMotion)}
-                    />
-                  ))}
-                </View>
-              </View>
-
-              {/* Bottom subtle accent */}
-              <View
-               
-                className="absolute bottom-0 left-1/2 h-px w-20 -translate-x-1/2 bg-gradient-to-r from-transparent via-violet-400/25 to-transparent"
-              />
+              ))}
             </View>
           </View>
-        </View>
-      )}
-    </>
-  );
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Create button
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface CreateButtonProps {
-  active: boolean;
-  onClick: () => void;
-  reduceMotion: boolean;
-}
-
-function CreateButton({ active, onClick, reduceMotion }: CreateButtonProps) {
-  return (
-    <View className="relative flex w-[82px] shrink-0 justify-center">
-      {/* --------------------------------------------------------------------- */}
-      {/* Outer ambient glow                                                    */}
-      {/* --------------------------------------------------------------------- */}
-
-      <View
-        className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-[22px]"
-        style={{  }}
-      />
-
-      {/* --------------------------------------------------------------------- */}
-      {/* Button                                                                */}
-      {/* --------------------------------------------------------------------- */}
-
-      <Pressable
-        onPress={onClick}
-        accessibilityLabel={active ? "Fermer le menu de création" : "Créer"}
-        aria-pressed={active}
-        className="group relative -top-5 flex h-[58px] w-[58px] items-center justify-center rounded-[21px] border border-white/[0.16] bg-gradient-to-br from-violet-500 via-indigo-500 to-indigo-600 shadow-[0_10px_35px_rgba(99,102,241,0.48),0_0_0_1px_rgba(255,255,255,0.06)] outline-none sm:h-[62px] sm:w-[62px]"
-      >
-        {/* Glass shine */}
-        <Text
-         
-          className="absolute inset-[1px] rounded-[20px] bg-gradient-to-b from-white/[0.18] via-transparent to-transparent opacity-80"
-        />
-
-        {/* Active inner ring */}
-        <Text
-          className="absolute inset-0 rounded-[21px] border border-white/20"
-        />
-
-        {/* Icon */}
-        <View
-          className="relative z-10"
-        >
-          <Plus
-            size={29}
-            strokeWidth={2.3}
-            className="text-white"
-          />
-        </View>
-
-        {/* Tiny top highlight */}
-        <Text
-         
-          className="absolute left-1/2 top-[6px] h-1 w-8 -translate-x-1/2 rounded-full bg-white/25"
-        />
-      </Pressable>
-
-      {/* Label */}
-      <Text
-        className="absolute -bottom-[1px] left-1/2 -translate-x-1/2 text-[9px] font-bold tracking-wide text-violet-300"
-      >
-        Créer
-      </Text>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tab item
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface TabItemProps {
-  tab: TabDefinition;
-  isActive: boolean;
-  onClick: () => void;
-  reduceMotion: boolean;
-}
-
-function TabItem({ tab, isActive, onClick, reduceMotion }: TabItemProps) {
-  const Icon = tab.icon;
-
-  return (
-    <Pressable
-      onPress={onClick}
-      aria-current={isActive ? "page" : undefined}
-      accessibilityLabel={tab.label}
-      className="group relative flex h-[62px] w-[70px] flex-col items-center justify-center rounded-2xl outline-none sm:w-[78px]"
-    >
-      {/* ===================================================================== */}
-      {/* Active background                                                     */}
-      {/* ===================================================================== */}
-
-      <>
-        {isActive && (
-          <View
-            className="absolute inset-x-2 top-1 h-[39px] rounded-2xl border border-violet-400/[0.18] bg-violet-500/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-          />
-        )}
-      </>
-
-      {/* ===================================================================== */}
-      {/* Active glow                                                            */}
-      {/* ===================================================================== */}
-
-      <>
-        {isActive && (
-          <View
-            className="absolute left-1/2 top-2 h-7 w-10 -translate-x-1/2 rounded-full bg-violet-500/20"
-          />
-        )}
-      </>
-
-      {/* ===================================================================== */}
-      {/* Icon                                                                   */}
-      {/* ===================================================================== */}
-
-      <View
-        className="relative z-10 flex h-7 w-8 items-center justify-center"
-      >
-        <View
-        >
-          <Icon
-            size={20}
-            strokeWidth={isActive ? 2.45 : 1.85}
-            className={
-              isActive
-                ? "text-violet-300"
-                : "text-white/55 transition-colors duration-200 group-hover:text-white/80"
-            }
-          />
+          {/* Bottom hairline */}
+          <View style={styles.bottomHairline} pointerEvents="none">
+            <LinearGradient
+              colors={[
+                "rgba(167,139,250,0)",
+                "rgba(167,139,250,0.5)",
+                "rgba(167,139,250,0)",
+              ]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={{ flex: 1 }}
+            />
+          </View>
         </View>
       </View>
-
-      {/* ===================================================================== */}
-      {/* Label                                                                  */}
-      {/* ===================================================================== */}
-
-      <Text
-        className="relative z-10 mt-1 text-[9px] font-semibold tracking-[0.01em] sm:text-[10px]"
-      >
-        {tab.label}
-      </Text>
-
-      {/* ===================================================================== */}
-      {/* Active dot                                                             */}
-      {/* ===================================================================== */}
-
-      <>
-        {isActive && (
-          <Text
-            className="absolute bottom-0.5 h-1 w-1 rounded-full bg-violet-300 shadow-[0_0_8px_rgba(196,181,253,0.9)]"
-          />
-        )}
-      </>
-
-      {/* ===================================================================== */}
-      {/* Notification badge                                                    */}
-      {/* ===================================================================== */}
-
-      {typeof tab.badge === "number" && tab.badge > 0 && (
-        <Text
-          className="absolute right-[5px] top-[2px] z-20 flex h-[17px] min-w-[17px] items-center justify-center rounded-full border border-[#080b1d] bg-gradient-to-br from-red-400 to-rose-600 px-1 text-[8px] font-black leading-none text-white shadow-[0_3px_10px_rgba(244,63,94,0.38)]"
-        >
-          {tab.badge > 99 ? "99+" : tab.badge}
-        </Text>
-      )}
-    </Pressable>
+    </Animated.View>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  /* ── Root ────────────────────────────────────────── */
+  root: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 40,
+    paddingHorizontal: 8,
+    paddingBottom: Platform.OS === "android" ? 12 : 20,
+  },
+  inner: {
+    width: "100%",
+    alignSelf: "center",
+    position: "relative",
+  },
+
+  /* ── Outer glow ──────────────────────────────────── */
+  outerGlow: {
+    position: "absolute",
+    left: -16,
+    right: -16,
+    bottom: -8,
+    height: 120,
+    borderRadius: 40,
+    overflow: "hidden",
+    opacity: 0.9,
+  },
+
+  /* ── Shell ───────────────────────────────────────── */
+  shell: {
+    borderRadius: 30,
+    overflow: "visible",
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 14,
+  },
+  shellBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  topHairline: {
+    position: "absolute",
+    top: 0,
+    left: 20,
+    right: 20,
+    height: 1,
+  },
+  bottomHairline: {
+    position: "absolute",
+    bottom: 0,
+    left: "50%",
+    marginLeft: -40,
+    width: 80,
+    height: 1,
+  },
+
+  /* ── Content row ─────────────────────────────────── */
+  contentRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    paddingHorizontal: 8,
+    paddingBottom: 4,
+    height: 70,
+  },
+  tabsGroup: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+
+  /* ── Tab item ────────────────────────────────────── */
+  tabItem: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 62,
+    width: 70,
+  },
+  tabActiveBg: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    top: 4,
+    height: 39,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  tabActiveBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.22)",
+  },
+  tabIconWrap: {
+    height: 28,
+    width: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  tabLabel: {
+    marginTop: 4,
+    fontSize: 9,
+    letterSpacing: 0.2,
+    zIndex: 10,
+  },
+
+  /* ── Active dot ──────────────────────────────────── */
+  activeDot: {
+    position: "absolute",
+    bottom: 2,
+    height: 4,
+    width: 4,
+    borderRadius: 2,
+    backgroundColor: "#C4B5FD",
+    shadowColor: "#C4B5FD",
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
+  /* ── Badge ───────────────────────────────────────── */
+  badgeWrap: {
+    position: "absolute",
+    right: 5,
+    top: 2,
+    height: 18,
+    minWidth: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
+  },
+  badgeGlow: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderRadius: 9,
+    backgroundColor: "#F43F5E",
+  },
+  badgeGradient: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#080B1D",
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.1,
+    lineHeight: 11,
+  },
+
+  /* ── Create button ───────────────────────────────── */
+  createWrap: {
+    position: "relative",
+    width: 82,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  createGlow: {
+    position: "absolute",
+    top: -8,
+    left: "50%",
+    marginLeft: -36,
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    overflow: "hidden",
+  },
+  createBtnOuter: {
+    marginTop: -20,
+    height: 58,
+    width: 58,
+    borderRadius: 21,
+    overflow: "hidden",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+  createBtnGradient: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 21,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  createBtnShine: {
+    position: "absolute",
+    top: 1,
+    left: 1,
+    right: 1,
+    bottom: 1,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  createBtnSweep: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 60,
+    backgroundColor: "rgba(255,255,255,0.28)",
+    opacity: 0.75,
+  },
+  createBtnActiveRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 21,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.4)",
+  },
+  createLabel: {
+    position: "absolute",
+    bottom: -2,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    color: "#C4B5FD",
+  },
+});

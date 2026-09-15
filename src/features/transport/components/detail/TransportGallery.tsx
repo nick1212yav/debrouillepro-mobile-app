@@ -55,6 +55,7 @@ export function TransportGallery({ customImages }: TransportGalleryProps) {
   const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
 
   const handlePrev = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     if (activeImageIndex !== null) {
       setActiveImageIndex((prev) =>
         prev !== null && prev > 0 ? prev - 1 : images.length - 1,
@@ -63,6 +64,7 @@ export function TransportGallery({ customImages }: TransportGalleryProps) {
   };
 
   const handleNext = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     if (activeImageIndex !== null) {
       setActiveImageIndex((prev) =>
         prev !== null && prev < images.length - 1 ? prev + 1 : 0,
@@ -71,54 +73,13 @@ export function TransportGallery({ customImages }: TransportGalleryProps) {
   };
 
   return (
-    <View className="space-y-3">
-      {/* En-tête de section */}
-      <View className="flex items-center justify-between">
-        <Text className="text-xs font-black text-white/40 uppercase tracking-widest flex items-center gap-1.5">
-          <Wind size={12} className="text-violet-400" />
-          Inspection du véhicule
-        </Text>
-        <Text className="text-[11px] text-violet-400 font-medium">
-          Photos certifiées DébrouillePro
-        </Text>
-      </View>
-
-      {/* Grille Asymétrique Premium */}
-      <View className="gap-2 h-48">
-        {/* Image Principale (Grande) */}
-        <Pressable
-          onPress={() => setActiveImageIndex(0)}
-          className="relative rounded-2xl overflow-hidden border border-white/5"
-        >
-          <Image
-           
-           
-            className="w-full h-full object-cover"
-           source={{ uri: images[0].url }} accessibilityLabel={images[0].label}/>
-          <View className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-          <View className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/40 border border-white/5">
-            {images[0].icon}
-            <Text className="text-[10px] font-bold text-white">
-              {images[0].label}
-            </Text>
-          </View>
-        </Pressable>
-
-        {/* Colonne des vignettes de droite */}
-        <View className="flex flex-col gap-2">
-          {images.slice(1, 4).map((img, index) => (
-            <Pressable
-              key={img.label}
-              onPress={() => setActiveImageIndex(index + 1)}
-              className="relative flex-1 rounded-xl overflow-hidden border border-white/5"
-            >
-              <Image
-               
-               
-                className="w-full h-full object-cover"
-               source={{ uri: img.url }} accessibilityLabel={img.label}/>
+    <View className="space-y-3">{}<View className="flex items-center justify-between"><Text className="text-xs font-black text-white/40 uppercase tracking-widest flex items-center gap-1.5"><Wind size={12} className="text-violet-400" />Inspection du véhicule
+        </Text><Text className="text-[11px] text-violet-400 font-medium">Photos certifiées DébrouillePro
+        </Text></View>{}<View className="gap-2 h-48">{}<View whileHover={{ scale: 0.99 }} onPress={() => setActiveImageIndex(0)} className="relative rounded-2xl overflow-hidden border border-white/5"><Image className="w-full h-full object-cover" source={{ uri: images[0].url }} accessibilityLabel={images[0].label} /><View className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" /><View className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md border border-white/5">{images[0].icon}<Text className="text-[10px] font-bold text-white">{images[0].label}</Text></View></View>{}<View className="flex flex-col gap-2">{images.slice(1, 4).map((img, index) => (
+            <View key={img.label} whileHover={{ scale: 0.98 }} onPress={() => setActiveImageIndex(index + 1)} className="relative flex-1 rounded-xl overflow-hidden border border-white/5">
+              <Image className="w-full h-full object-cover" source={{ uri: img.url }} accessibilityLabel={img.label} />
               <View className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-              <View className="absolute bottom-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/50 border border-white/5">
+              <View className="absolute bottom-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-sm border border-white/5">
                 {img.icon}
                 <Text className="text-[9px] font-bold text-white tracking-tight truncate max-w-[80px]">
                   {img.label}
@@ -127,33 +88,21 @@ export function TransportGallery({ customImages }: TransportGalleryProps) {
 
               {/* Indicateur de photos supplémentaires sur la dernière image */}
               {index === 2 && images.length > 4 && (
-                <View className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                <View className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[2px]">
                   <Text className="text-xs font-black text-white">
-                    <Text>+</Text>{images.length - 4}
+                    +{images.length - 4}
                   </Text>
                 </View>
               )}
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Lightbox Plein Écran */}
-      <>
-        {activeImageIndex !== null && (
-          <Pressable
-            onPress={() => setActiveImageIndex(null)}
-            className="fixed inset-0 z-50 flex flex-col bg-black/95 justify-between py-12 px-4"
-          >
+            </View>
+          ))}</View></View>{}<View>{activeImageIndex !== null && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setActiveImageIndex(null)} className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-md justify-between py-12 px-4">
             {/* Header Lightbox */}
             <View className="flex justify-between items-center w-full max-w-md mx-auto z-10">
               <Text className="text-xs font-bold text-white/50">
-                {activeImageIndex + 1} <Text>/</Text>{images.length}
+                {activeImageIndex + 1} / {images.length}
               </Text>
-              <Pressable
-                onPress={() => setActiveImageIndex(null)}
-                className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
-              >
+              <Pressable onPress={() => setActiveImageIndex(null)} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center transition-colors">
                 <X size={18} className="text-white" />
               </Pressable>
             </View>
@@ -161,25 +110,14 @@ export function TransportGallery({ customImages }: TransportGalleryProps) {
             {/* Zone Centrale Image */}
             <View className="relative flex items-center justify-center w-full max-w-xl mx-auto h-[50vh]">
               {/* Bouton Gauche */}
-              <Pressable
-                onPress={handlePrev}
-                className="absolute left-2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center z-10"
-              >
+              <Pressable onPress={handlePrev} className="absolute left-2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center transition-colors z-10">
                 <ChevronLeft size={20} className="text-white" />
               </Pressable>
 
-              <Image
-                key={activeImageIndex}
-                src={images[activeImageIndex].url}
-                alt={images[activeImageIndex].label}
-                className="max-h-full max-w-full rounded-2xl object-contain border border-white/5"
-              />
+              <Image key={activeImageIndex} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} transition={{ type: "spring", stiffness: 300, damping: 25 }} src={images[activeImageIndex].url} alt={images[activeImageIndex].label} className="max-h-full max-w-full rounded-2xl object-contain border border-white/5" />
 
               {/* Bouton Droite */}
-              <Pressable
-                onPress={handleNext}
-                className="absolute right-2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center z-10"
-              >
+              <Pressable onPress={handleNext} className="absolute right-2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center transition-colors z-10">
                 <ChevronRight size={20} className="text-white" />
               </Pressable>
             </View>
@@ -191,11 +129,10 @@ export function TransportGallery({ customImages }: TransportGalleryProps) {
                 {images[activeImageIndex].label}
               </Text>
               <Text className="text-xs text-white/40 mt-1">
-                <Text>État vérifié par nos équipes le mois dernier</Text></Text>
+                État vérifié par nos équipes le mois dernier
+              </Text>
             </View>
-          </Pressable>
-        )}
-      </>
-    </View>
+          </View>
+        )}</View></View>
   );
 }

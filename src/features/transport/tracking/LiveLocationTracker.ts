@@ -18,7 +18,7 @@ export class LiveLocationTracker {
     onLocationUpdate: LocationCallback,
     onError: (err: GeolocationPositionError) => void,
   ): boolean {
-    if (typeof undefined === "undefined" || !("geolocation" in undefined)) {
+    if (typeof window === "undefined" || !("geolocation" in navigator)) {
       console.warn(
         "La géolocalisation matérielle n'est pas disponible sur cet appareil [2].",
       );
@@ -36,7 +36,7 @@ export class LiveLocationTracker {
       maximumAge: 0,
     };
 
-    this.watchId = undefined.watchPosition(
+    this.watchId = navigator.geolocation.watchPosition(
       (position) => {
         onLocationUpdate({
           coords: {
@@ -63,8 +63,8 @@ export class LiveLocationTracker {
    * Arrêter l'écoute du capteur GPS matériel pour économiser la batterie du mobile [2]
    */
   static stopTracking(): void {
-    if (typeof undefined !== "undefined" && this.watchId !== null) {
-      undefined.clearWatch(this.watchId);
+    if (typeof window !== "undefined" && this.watchId !== null) {
+      navigator.geolocation.clearWatch(this.watchId);
       this.watchId = null;
     }
   }

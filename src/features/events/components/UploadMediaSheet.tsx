@@ -1,322 +1,373 @@
 // src/features/events/components/UploadMediaSheet.tsx
-
-import { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  Image,
+  Image as RNImage,
   Modal,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import {
   X,
   Upload,
   Image as ImageIcon,
-  Video,
-  Mic,
+  Video as VideoIcon,
   XCircle,
-  Loader2,
 } from "lucide-react-native";
-import * as ImagePicker from "expo-image-picker";
 
-export type UploadMediaType = "image" | "video" | "audio";
-
-export interface UploadMediaFile {
+// ── Types ─────────────────────────────────────────────────────────────────
+export interface SelectedAsset {
   uri: string;
-  name: string;
-  type: UploadMediaType;
-  mimeType?: string | null;
-  size?: number | null;
+  mimeType?: string;
+  fileName?: string | null;
+  fileSize?: number;
+  type: "image" | "video";
+  width?: number;
+  height?: number;
+  duration?: number;
 }
 
 interface Props {
   onClose: () => void;
-  onUpload: (files: UploadMediaFile[]) => Promise<string[]>;
+  onUpload: (assets: SelectedAsset[]) => Promise<string[]>;
+  /** Types acceptés. Défaut : images + vidéos. */
+  mediaTypes?: "images" | "videos" | "all";
 }
 
-export function UploadMediaSheet({ onClose, onUpload }: Props) {
-  const [files, setFiles] = useState<UploadMediaFile[]>([]);
+export function UploadMediaSheet({
+  onClose,
+  onUpload,
+  mediaTypes = "all",
+}: Props) {
+  const [assets, setAssets] = useState<SelectedAsset[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleSelectMedia = async () => {
-    if (isUploading) {
-      return;
-    }
-
-    try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permission.granted) {
-        Alert.alert(
-          "Autorisation requise",
-          "L'accès à votre galerie est nécessaire pour sélectionner des médias.",
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
-        allowsMultipleSelection: true,
-        allowsEditing: false,
-        quality: 0.9,
-        exif: false,
-      });
-
-      if (result.canceled || result.assets.length === 0) {
-        return;
-      }
-
-      const selectedFiles: UploadMediaFile[] = result.assets.map(
-        (asset, index) => {
-          const mediaType: UploadMediaType =
-            asset.type === "video" ? "video" : "image";
-
-          return {
-            uri: asset.uri,
-            name: asset.fileName ?? `media-${Date.now()}-${index}`,
-            type: mediaType,
-            mimeType: asset.mimeType,
-            size: asset.fileSize,
-          };
-        },
+  // ── Sélection ───────────────────────────────────────────────────────────
+  const pickMedia = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission refusée",
+        "Autorisez l'accès à votre galerie pour ajouter des médias.",
       );
-
-      setFiles((previousFiles) => [...previousFiles, ...selectedFiles]);
-    } catch (error) {
-      console.error("Erreur lors de la sélection des médias:", error);
-
-      Alert.alert("Erreur", "Impossible de sélectionner les fichiers.");
-    }
-  };
-
-  const removeFile = (index: number) => {
-    if (isUploading) {
       return;
     }
 
-    setFiles((previousFiles) =>
-      previousFiles.filter((_, currentIndex) => currentIndex !== index),
-    );
-  };
+    const pickerMediaTypes =
+      mediaTypes === "images"
+        ? ImagePicker.MediaTypeOptions.Images
+        : mediaTypes === "videos"
+          ? ImagePicker.MediaTypeOptions.Videos
+          : ImagePicker.MediaTypeOptions.All;
 
-  const handleUpload = async () => {
-    if (files.length === 0) {
-      Alert.alert("Aucun fichier", "Sélectionnez au moins un fichier.");
-      return;
-    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: pickerMediaTypes,
+      allowsMultipleSelection: true,
+      quality: 0.85,
+    });
 
-    if (isUploading) {
+    if (result.canceled || !result.assets?.length) return;
+
+    const newAssets: SelectedAsset[] = result.assets.map((a) => ({
+      uri: a.uri,
+      mimeType: a.mimeType,
+      fileName: a.fileName,
+      fileSize: a.fileSize,
+      type: a.type === "video" ? "video" : "image",
+      width: a.width,
+      height: a.height,
+      duration: a.duration ?? undefined,
+    }));
+
+    setAssets((prev) => [...prev, ...newAssets]);
+  }, [mediaTypes]);
+
+  // ── Suppression ─────────────────────────────────────────────────────────
+  const removeAsset = useCallback((index: number) => {
+    setAssets((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // ── Upload ──────────────────────────────────────────────────────────────
+  const handleUpload = useCallback(async () => {
+    if (assets.length === 0) {
+      Alert.alert("Erreur", "Sélectionnez des fichiers");
       return;
     }
 
     setIsUploading(true);
-
     try {
-      const urls = await onUpload(files);
-
-      Alert.alert(
-        "Upload terminé",
-        `${urls.length} fichier(s) uploadé(s) avec succès.`,
-      );
-
-      setFiles([]);
+      const urls = await onUpload(assets);
+      Alert.alert("Succès", `${urls.length} fichier(s) uploadé(s)`);
       onClose();
-    } catch (error) {
-      console.error("Erreur lors de l'upload:", error);
-
-      Alert.alert("Erreur", "Une erreur est survenue lors de l'upload.");
+    } catch (err) {
+      console.error("Upload error:", err);
+      Alert.alert("Erreur", "Erreur lors de l'upload");
     } finally {
       setIsUploading(false);
     }
-  };
-
-  const renderMediaIcon = (file: UploadMediaFile) => {
-    switch (file.type) {
-      case "video":
-        return (
-          <View className="h-full w-full items-center justify-center bg-black/40">
-            <Video size={30} color="rgba(255,255,255,0.7)" />
-
-            <Text className="mt-2 text-xs text-white/70">Vidéo</Text>
-          </View>
-        );
-
-      case "audio":
-        return (
-          <View className="h-full w-full items-center justify-center bg-black/40">
-            <Mic size={30} color="rgba(255,255,255,0.7)" />
-
-            <Text className="mt-2 text-xs text-white/70">Audio</Text>
-          </View>
-        );
-
-      case "image":
-      default:
-        return (
-          <Image
-            source={{
-              uri: file.uri,
-            }}
-            className="h-full w-full"
-            resizeMode="cover"
-            accessibilityLabel={file.name || "Aperçu du média"}
-          />
-        );
-    }
-  };
-
-  const handleClose = () => {
-    if (isUploading) {
-      return;
-    }
-
-    setFiles([]);
-    onClose();
-  };
+  }, [assets, onClose, onUpload]);
 
   return (
     <Modal
       visible
       transparent
       animationType="fade"
+      onRequestClose={onClose}
       statusBarTranslucent
-      onRequestClose={handleClose}
     >
-      <View className="flex-1 items-center justify-center bg-black/70 px-4">
+      <View style={styles.overlay}>
+        {/* Backdrop */}
         <Pressable
-          className="absolute inset-0"
-          onPress={handleClose}
-          disabled={isUploading}
-          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.backdrop}
           accessibilityLabel="Fermer"
         />
 
-        <View className="max-h-[90%] w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#160A2A]">
-          <View className="flex-row items-center justify-between border-b border-white/10 px-5 py-4">
-            <Text className="text-lg font-bold text-white">
-              Ajouter des médias
-            </Text>
+        {/* Sheet */}
+        <View style={styles.sheetWrapper}>
+          <View style={styles.sheet}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Ajouter des médias</Text>
+              <Pressable
+                onPress={onClose}
+                style={styles.closeButton}
+                hitSlop={6}
+                accessibilityLabel="Fermer"
+              >
+                <X size={18} color="rgba(255,255,255,0.6)" />
+              </Pressable>
+            </View>
 
+            {/* Zone de sélection */}
             <Pressable
-              onPress={handleClose}
-              disabled={isUploading}
-              accessibilityRole="button"
-              accessibilityLabel="Fermer"
-              className="h-9 w-9 items-center justify-center rounded-xl bg-white/5"
-              style={{
-                opacity: isUploading ? 0.5 : 1,
-              }}
-            >
-              <X size={18} color="rgba(255,255,255,0.7)" />
-            </Pressable>
-          </View>
-
-          <ScrollView
-            contentContainerClassName="p-5"
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Pressable
-              onPress={handleSelectMedia}
-              disabled={isUploading}
-              accessibilityRole="button"
+              onPress={pickMedia}
+              style={({ pressed }) => [
+                styles.dropZone,
+                pressed && styles.dropZonePressed,
+              ]}
               accessibilityLabel="Sélectionner des médias"
-              className="items-center justify-center rounded-2xl border-2 border-dashed border-white/10 px-6 py-8"
-              style={{
-                opacity: isUploading ? 0.5 : 1,
-              }}
             >
-              {isUploading ? (
-                <>
-                  <Loader2 size={32} color="rgba(255,255,255,0.5)" />
-
-                  <Text className="mt-3 text-sm text-white/50">
-                    Préparation...
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Upload size={32} color="rgba(255,255,255,0.25)" />
-
-                  <Text className="mt-3 text-sm text-white/50">
-                    Touchez pour sélectionner
-                  </Text>
-
-                  <Text className="mt-1 text-xs text-white/30">
-                    Images et vidéos
-                  </Text>
-                </>
-              )}
+              <Upload size={32} color="rgba(255,255,255,0.2)" />
+              <Text style={styles.dropZoneTitle}>
+                Appuyez pour sélectionner
+              </Text>
+              <Text style={styles.dropZoneSubtitle}>Images, vidéos, audio</Text>
             </Pressable>
 
-            {files.length > 0 && (
-              <View className="mt-4 flex-row flex-wrap gap-2">
-                {files.map((file, index) => (
-                  <View
-                    key={`${file.uri}-${index}`}
-                    className="relative h-24 w-[31%] overflow-hidden rounded-xl bg-white/5"
-                  >
-                    {renderMediaIcon(file)}
+            {/* Aperçu */}
+            {assets.length > 0 && (
+              <ScrollView
+                style={styles.previewScroll}
+                contentContainerStyle={styles.previewContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {assets.map((asset, i) => (
+                  <View key={`${asset.uri}-${i}`} style={styles.previewItem}>
+                    {asset.type === "video" ? (
+                      <View style={[styles.previewImage, styles.previewVideo]}>
+                        <VideoIcon size={28} color="rgba(255,255,255,0.6)" />
+                      </View>
+                    ) : (
+                      <RNImage
+                        source={{ uri: asset.uri }}
+                        style={styles.previewImage}
+                        resizeMode="cover"
+                      />
+                    )}
 
                     <Pressable
-                      onPress={() => removeFile(index)}
-                      disabled={isUploading}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Supprimer ${file.name}`}
-                      className="absolute right-1 top-1 h-7 w-7 items-center justify-center rounded-full bg-black/70"
+                      onPress={() => removeAsset(i)}
+                      style={styles.removeButton}
+                      hitSlop={6}
+                      accessibilityLabel="Supprimer"
                     >
-                      <XCircle size={15} color="#FFFFFF" />
+                      <XCircle size={12} color="rgba(255,255,255,0.8)" />
                     </Pressable>
+
+                    {/* Badge type */}
+                    <View style={styles.typeBadge}>
+                      {asset.type === "video" ? (
+                        <VideoIcon size={10} color="#FFFFFF" />
+                      ) : (
+                        <ImageIcon size={10} color="#FFFFFF" />
+                      )}
+                    </View>
                   </View>
                 ))}
-              </View>
+              </ScrollView>
             )}
 
-            {files.length > 0 && (
-              <View className="mt-4 rounded-xl bg-white/5 px-4 py-3">
-                <View className="flex-row items-center gap-2">
-                  <ImageIcon size={15} color="rgba(255,255,255,0.5)" />
-
-                  <Text className="text-xs text-white/50">
-                    {files.length} fichier
-                    {files.length > 1 ? "s" : ""} sélectionné
-                    {files.length > 1 ? "s" : ""}
-                  </Text>
-                </View>
-              </View>
-            )}
-
+            {/* Bouton upload */}
             <Pressable
               onPress={handleUpload}
-              disabled={isUploading || files.length === 0}
-              accessibilityRole="button"
-              accessibilityLabel="Uploader les fichiers"
-              className="mt-5 w-full items-center justify-center rounded-2xl bg-[#8B5CF6] py-4"
-              style={{
-                opacity: isUploading || files.length === 0 ? 0.4 : 1,
-              }}
+              disabled={isUploading || assets.length === 0}
+              style={({ pressed }) => [
+                styles.uploadButton,
+                (isUploading || assets.length === 0) && styles.disabled,
+                pressed && styles.pressed,
+              ]}
             >
               {isUploading ? (
-                <View className="flex-row items-center gap-2">
-                  <Loader2 size={16} color="#FFFFFF" />
-
-                  <Text className="text-sm font-bold text-white">
-                    Upload en cours...
-                  </Text>
-                </View>
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text className="text-sm font-bold text-white">
-                  Uploader {files.length} fichier
-                  {files.length > 1 ? "s" : ""}
+                <Text style={styles.uploadButtonText}>
+                  {`Uploader ${assets.length} fichier(s)`}
                 </Text>
               )}
             </Pressable>
-          </ScrollView>
+          </View>
         </View>
       </View>
     </Modal>
   );
 }
+
+// ── Styles ────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  sheetWrapper: {
+    width: "100%",
+    alignItems: "center",
+  },
+  sheet: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 24,
+    backgroundColor: "#0a0f0b",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    padding: 20,
+    gap: 16,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerTitle: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 18,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  // Drop zone
+  dropZone: {
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "rgba(255,255,255,0.1)",
+    borderRadius: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    gap: 6,
+  },
+  dropZonePressed: {
+    borderColor: "rgba(139,92,246,0.4)",
+    backgroundColor: "rgba(139,92,246,0.05)",
+  },
+  dropZoneTitle: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 14,
+    marginTop: 4,
+  },
+  dropZoneSubtitle: {
+    color: "rgba(255,255,255,0.2)",
+    fontSize: 12,
+  },
+
+  // Preview
+  previewScroll: {
+    maxHeight: 220,
+  },
+  previewContent: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  previewItem: {
+    position: "relative",
+    width: 96,
+    height: 96,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  previewVideo: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  removeButton: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.7)",
+  },
+  typeBadge: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+
+  // Upload button
+  uploadButton: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#8B5CF6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uploadButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+  // États
+  disabled: {
+    opacity: 0.4,
+  },
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+});

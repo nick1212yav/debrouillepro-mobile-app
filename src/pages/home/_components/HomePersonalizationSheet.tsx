@@ -1,11 +1,31 @@
-import { View, Pressable, Text } from "react-native";
+// src/pages/home/_components/HomePersonalizationSheet.tsx
+import {
+  View,
+  Pressable,
+  Text,
+  ScrollView,
+  Animated,
+  Easing,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   Bell,
   Check,
-  ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Eye,
   EyeOff,
-  GripVertical,
   Heart,
   Layers3,
   MapPin,
@@ -18,7 +38,6 @@ import {
   X,
   Zap,
 } from "lucide-react-native";
-import { useMemo, useState } from "react";
 
 /* ============================================================================
  * TYPES
@@ -37,7 +56,6 @@ export interface HomePersonalizationPreferences {
   favoriteModules: string[];
   hiddenSections: string[];
   customSectionOrder: string[];
-
   notificationPreferences: {
     newRecommendations: boolean;
     nearbyAlerts: boolean;
@@ -47,15 +65,10 @@ export interface HomePersonalizationPreferences {
 
 interface HomePersonalizationSheetProps {
   open: boolean;
-
   onClose: () => void;
-
   modules: HomeModulePreference[];
-
   preferences?: Partial<HomePersonalizationPreferences>;
-
   onSave?: (preferences: HomePersonalizationPreferences) => void;
-
   onReset?: () => void;
 }
 
@@ -63,77 +76,20 @@ interface HomePersonalizationSheetProps {
  * MODULE VISUALS
  * ========================================================================== */
 
-const MODULE_VISUALS: Record<
-  string,
-  {
-    color: string;
-    emoji: string;
-  }
-> = {
-  jobs: {
-    color: "#8B5CF6",
-    emoji: "💼",
-  },
-
-  immo: {
-    color: "#F97316",
-    emoji: "🏠",
-  },
-
-  evenements: {
-    color: "#EC4899",
-    emoji: "🎉",
-  },
-
-  events: {
-    color: "#EC4899",
-    emoji: "🎉",
-  },
-
-  pay: {
-    color: "#10B981",
-    emoji: "💳",
-  },
-
-  education: {
-    color: "#06B6D4",
-    emoji: "🎓",
-  },
-
-  live: {
-    color: "#EF4444",
-    emoji: "🔴",
-  },
-
-  community: {
-    color: "#A855F7",
-    emoji: "👥",
-  },
-
-  transport: {
-    color: "#3B82F6",
-    emoji: "🚗",
-  },
-
-  sante: {
-    color: "#22C55E",
-    emoji: "❤️",
-  },
-
-  voyages: {
-    color: "#6366F1",
-    emoji: "✈️",
-  },
-
-  boutique: {
-    color: "#EC4899",
-    emoji: "🛍️",
-  },
-
-  agri: {
-    color: "#84CC16",
-    emoji: "🌱",
-  },
+const MODULE_VISUALS: Record<string, { color: string; emoji: string }> = {
+  jobs: { color: "#A78BFA", emoji: "💼" },
+  immo: { color: "#FB923C", emoji: "🏠" },
+  evenements: { color: "#F472B6", emoji: "🎉" },
+  events: { color: "#F472B6", emoji: "🎉" },
+  pay: { color: "#34D399", emoji: "💳" },
+  education: { color: "#22D3EE", emoji: "🎓" },
+  live: { color: "#F87171", emoji: "🔴" },
+  community: { color: "#C084FC", emoji: "👥" },
+  transport: { color: "#60A5FA", emoji: "🚗" },
+  sante: { color: "#4ADE80", emoji: "❤️" },
+  voyages: { color: "#818CF8", emoji: "✈️" },
+  boutique: { color: "#F472B6", emoji: "🛍️" },
+  agri: { color: "#A3E635", emoji: "🌱" },
 };
 
 const DEFAULT_PREFERENCES: HomePersonalizationPreferences = {
@@ -154,7 +110,7 @@ const DEFAULT_PREFERENCES: HomePersonalizationPreferences = {
 function visualFor(id: string) {
   return (
     MODULE_VISUALS[id.toLowerCase()] ?? {
-      color: "#6366F1",
+      color: "#818CF8",
       emoji: "✨",
     }
   );
@@ -166,17 +122,524 @@ function normalizePreferences(
   return {
     favoriteModules:
       value?.favoriteModules ?? DEFAULT_PREFERENCES.favoriteModules,
-
     hiddenSections: value?.hiddenSections ?? DEFAULT_PREFERENCES.hiddenSections,
-
     customSectionOrder:
       value?.customSectionOrder ?? DEFAULT_PREFERENCES.customSectionOrder,
-
     notificationPreferences: {
       ...DEFAULT_PREFERENCES.notificationPreferences,
       ...(value?.notificationPreferences ?? {}),
     },
   };
+}
+
+/* ============================================================================
+ * FADE UP
+ * ========================================================================== */
+
+function FadeUp({
+  delay = 0,
+  distance = 12,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: any;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 420,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * MINI STAT
+ * ========================================================================== */
+
+function MiniStat({
+  Icon,
+  value,
+  label,
+  color,
+  delay,
+}: {
+  Icon: typeof Layers3;
+  value: number;
+  label: string;
+  color: string;
+  delay: number;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 380,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.miniStatWrap,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [8, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.miniStat}>
+        <LinearGradient
+          colors={[`${color}22`, "rgba(255,255,255,0)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          style={[
+            styles.miniStatIcon,
+            {
+              backgroundColor: `${color}22`,
+              borderColor: `${color}55`,
+            },
+          ]}
+        >
+          <Icon size={11} color={color} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.miniStatValue}>{value}</Text>
+          <Text style={styles.miniStatLabel} numberOfLines={1}>
+            {label}
+          </Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * TAB BUTTON
+ * ========================================================================== */
+
+function TabButton({
+  active,
+  Icon,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  Icon: typeof Layers3;
+  label: string;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={[styles.tabBtnWrap, { transform: [{ scale }] }]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={styles.tabBtn}
+      >
+        {active ? (
+          <LinearGradient
+            colors={["#A78BFA", "#6366F1"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.tabBtnActiveGradient}
+          />
+        ) : null}
+        <Icon size={11} color={active ? "#fff" : "rgba(255,255,255,0.55)"} />
+        <Text style={[styles.tabBtnText, active && { color: "#fff" }]}>
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * SECTION TITLE
+ * ========================================================================== */
+
+function SectionTitle({
+  Icon,
+  title,
+  subtitle,
+}: {
+  Icon: typeof Layers3;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <View style={styles.sectionTitleRow}>
+      <View style={styles.sectionTitleIcon}>
+        <Icon size={12} color="#A5B4FC" />
+      </View>
+      <View>
+        <Text style={styles.sectionTitleText}>{title}</Text>
+        {subtitle ? (
+          <Text style={styles.sectionTitleSub}>{subtitle}</Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * NOTIFICATION PREFERENCE
+ * ========================================================================== */
+
+function NotificationPreference({
+  Icon,
+  color,
+  title,
+  description,
+  enabled,
+  onToggle,
+}: {
+  Icon: typeof Bell;
+  color: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const toggleAnim = useRef(new Animated.Value(enabled ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(toggleAnim, {
+      toValue: enabled ? 1 : 0,
+      useNativeDriver: false,
+      speed: 30,
+      bounciness: 8,
+    }).start();
+  }, [enabled, toggleAnim]);
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.985,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const bgColor = toggleAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.08)", color],
+  });
+
+  const knobX = toggleAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 16],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ scale }], marginBottom: 8 }}>
+      <Pressable
+        onPress={onToggle}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={[
+          styles.notifRow,
+          {
+            backgroundColor: enabled
+              ? "rgba(255,255,255,0.05)"
+              : "rgba(255,255,255,0.025)",
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.notifIcon,
+            { backgroundColor: `${color}22`, borderColor: `${color}55` },
+          ]}
+        >
+          <Icon size={14} color={color} />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.notifTitle}>{title}</Text>
+          <Text style={styles.notifDesc}>{description}</Text>
+        </View>
+
+        <Animated.View
+          style={[styles.toggleTrack, { backgroundColor: bgColor }]}
+        >
+          <Animated.View
+            style={[styles.toggleKnob, { transform: [{ translateX: knobX }] }]}
+          />
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * MODULE ROW (with up/down reorder)
+ * ========================================================================== */
+
+function ModuleRow({
+  module,
+  index,
+  total,
+  favorite,
+  hidden,
+  onToggleFavorite,
+  onToggleVisibility,
+  onMoveUp,
+  onMoveDown,
+}: {
+  module: HomeModulePreference;
+  index: number;
+  total: number;
+  favorite: boolean;
+  hidden: boolean;
+  onToggleFavorite: () => void;
+  onToggleVisibility: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  const visual = visualFor(module.id);
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(hidden ? 0.55 : 1)).current;
+
+  useEffect(() => {
+    Animated.timing(opacityAnim, {
+      toValue: hidden ? 0.55 : 1,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [hidden, opacityAnim]);
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.99,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const canMoveUp = index > 0;
+  const canMoveDown = index < total - 1;
+
+  return (
+    <FadeUp delay={index * 40} distance={10}>
+      <Animated.View
+        style={[
+          {
+            transform: [{ scale }],
+            opacity: opacityAnim,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.moduleRow,
+            {
+              backgroundColor: hidden
+                ? "rgba(255,255,255,0.02)"
+                : "rgba(255,255,255,0.04)",
+            },
+          ]}
+        >
+          {/* Position */}
+          <View style={styles.modulePosition}>
+            <Text style={styles.modulePositionText}>
+              {String(index + 1).padStart(2, "0")}
+            </Text>
+          </View>
+
+          {/* Icon */}
+          <View
+            style={[
+              styles.moduleIconWrap,
+              {
+                backgroundColor: `${visual.color}22`,
+                borderColor: `${visual.color}55`,
+              },
+            ]}
+          >
+            <Text style={{ fontSize: 18 }}>{visual.emoji}</Text>
+          </View>
+
+          {/* Info */}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={styles.moduleTitleRow}>
+              <Text style={styles.moduleTitle} numberOfLines={1}>
+                {module.label}
+              </Text>
+              {favorite ? (
+                <Star size={9} color={visual.color} fill={visual.color} />
+              ) : null}
+            </View>
+            <Text style={styles.moduleSub}>
+              {hidden ? "Masqué de votre Home" : "Visible dans votre Home"}
+            </Text>
+          </View>
+
+          {/* Favorite toggle */}
+          <Pressable
+            onPress={onToggleFavorite}
+            accessibilityLabel={
+              favorite ? "Retirer des favoris" : "Ajouter aux favoris"
+            }
+            hitSlop={6}
+            style={({ pressed }) => [
+              styles.moduleIconBtn,
+              {
+                backgroundColor: favorite
+                  ? `${visual.color}22`
+                  : "rgba(255,255,255,0.04)",
+                borderColor: favorite
+                  ? `${visual.color}55`
+                  : "rgba(255,255,255,0.08)",
+              },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Star
+              size={13}
+              color={favorite ? visual.color : "rgba(255,255,255,0.5)"}
+              fill={favorite ? visual.color : "transparent"}
+            />
+          </Pressable>
+
+          {/* Visibility toggle */}
+          <Pressable
+            onPress={onToggleVisibility}
+            accessibilityLabel={hidden ? "Afficher" : "Masquer"}
+            hitSlop={6}
+            style={({ pressed }) => [
+              styles.moduleIconBtn,
+              pressed && styles.pressed,
+            ]}
+          >
+            {hidden ? (
+              <EyeOff size={13} color="rgba(255,255,255,0.5)" />
+            ) : (
+              <Eye size={13} color="rgba(255,255,255,0.65)" />
+            )}
+          </Pressable>
+
+          {/* Reorder buttons (up/down) */}
+          <View style={styles.reorderCol}>
+            <Pressable
+              onPress={onMoveUp}
+              disabled={!canMoveUp}
+              accessibilityLabel="Monter"
+              hitSlop={4}
+              style={[
+                styles.reorderBtn,
+                !canMoveUp && styles.reorderBtnDisabled,
+              ]}
+            >
+              <ChevronUp
+                size={11}
+                color={
+                  canMoveUp
+                    ? "rgba(255,255,255,0.65)"
+                    : "rgba(255,255,255,0.15)"
+                }
+                strokeWidth={2.8}
+              />
+            </Pressable>
+            <Pressable
+              onPress={onMoveDown}
+              disabled={!canMoveDown}
+              accessibilityLabel="Descendre"
+              hitSlop={4}
+              style={[
+                styles.reorderBtn,
+                !canMoveDown && styles.reorderBtnDisabled,
+              ]}
+            >
+              <ChevronDown
+                size={11}
+                color={
+                  canMoveDown
+                    ? "rgba(255,255,255,0.65)"
+                    : "rgba(255,255,255,0.15)"
+                }
+                strokeWidth={2.8}
+              />
+            </Pressable>
+          </View>
+        </View>
+      </Animated.View>
+    </FadeUp>
+  );
 }
 
 /* ============================================================================
@@ -191,6 +654,8 @@ export default function HomePersonalizationSheet({
   onSave,
   onReset,
 }: HomePersonalizationSheetProps) {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+
   const initial = useMemo(
     () => normalizePreferences(preferences),
     [preferences],
@@ -208,9 +673,7 @@ export default function HomePersonalizationSheet({
 
   const [localOrder, setLocalOrder] = useState<string[]>(() => {
     const preferred = initial.customSectionOrder;
-
     const existing = modules.map((module) => module.id);
-
     return [
       ...preferred.filter((id) => existing.includes(id)),
       ...existing.filter((id) => !preferred.includes(id)),
@@ -222,749 +685,1140 @@ export default function HomePersonalizationSheet({
   );
 
   const [saved, setSaved] = useState(false);
+  const [mounted, setMounted] = useState(open);
 
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const tabAnim = useRef(new Animated.Value(0)).current;
+
+  /* ─── mount / unmount ─── */
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      backdropAnim.setValue(0);
+      slideAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 1,
+          duration: 240,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 380,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 260,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start(() => setMounted(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  /* ─── tab content slide ─── */
+  useEffect(() => {
+    tabAnim.setValue(0);
+    Animated.timing(tabAnim, {
+      toValue: 1,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [activeTab, tabAnim]);
+
+  /* ─── sync external preferences when opening ─── */
+  useEffect(() => {
+    if (!open) return;
+    const norm = normalizePreferences(preferences);
+    setLocalFavorites(norm.favoriteModules);
+    setLocalHidden(norm.hiddenSections);
+    const existing = modules.map((m) => m.id);
+    const preferred = norm.customSectionOrder;
+    setLocalOrder([
+      ...preferred.filter((id) => existing.includes(id)),
+      ...existing.filter((id) => !preferred.includes(id)),
+    ]);
+    setLocalNotifications(norm.notificationPreferences);
+    setSaved(false);
+    setActiveTab("home");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  /* ─── derived ─── */
   const orderedModules = useMemo(() => {
-    const map = new Map(modules.map((module) => [module.id, module]));
-
+    const map = new Map(modules.map((m) => [m.id, m]));
     return localOrder
       .map((id) => map.get(id))
-      .filter((module): module is HomeModulePreference => Boolean(module));
+      .filter((m): m is HomeModulePreference => Boolean(m));
   }, [localOrder, modules]);
 
   const visibleCount = modules.length - localHidden.length;
-
   const favoriteCount = localFavorites.length;
 
-  /* --------------------------------------------------------------------------
-   * ACTIONS
-   * ------------------------------------------------------------------------ */
-
-  const toggleFavorite = (moduleId: string) => {
+  /* ─── actions ─── */
+  const toggleFavorite = useCallback((moduleId: string) => {
     setSaved(false);
-
-    setLocalFavorites((current) =>
-      current.includes(moduleId)
-        ? current.filter((id) => id !== moduleId)
-        : [...current, moduleId],
+    setLocalFavorites((cur) =>
+      cur.includes(moduleId)
+        ? cur.filter((id) => id !== moduleId)
+        : [...cur, moduleId],
     );
-  };
+  }, []);
 
-  const toggleVisibility = (moduleId: string) => {
+  const toggleVisibility = useCallback((moduleId: string) => {
     setSaved(false);
-
-    setLocalHidden((current) =>
-      current.includes(moduleId)
-        ? current.filter((id) => id !== moduleId)
-        : [...current, moduleId],
+    setLocalHidden((cur) =>
+      cur.includes(moduleId)
+        ? cur.filter((id) => id !== moduleId)
+        : [...cur, moduleId],
     );
-  };
+  }, []);
 
-  const save = () => {
+  const moveModule = useCallback((index: number, direction: -1 | 1) => {
+    setSaved(false);
+    setLocalOrder((cur) => {
+      const next = [...cur];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return next;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }, []);
+
+  const save = useCallback(() => {
     const next: HomePersonalizationPreferences = {
       favoriteModules: localFavorites,
-
       hiddenSections: localHidden,
-
       customSectionOrder: localOrder,
-
       notificationPreferences: localNotifications,
     };
-
     onSave?.(next);
-
     setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  }, [localFavorites, localHidden, localOrder, localNotifications, onSave]);
 
-    undefined;
-  };
-
-  const reset = () => {
-    const fallback = modules.map((module) => module.id);
-
+  const reset = useCallback(() => {
+    const fallback = modules.map((m) => m.id);
     setLocalFavorites([]);
-
     setLocalHidden([]);
-
     setLocalOrder(fallback);
-
     setLocalNotifications(DEFAULT_PREFERENCES.notificationPreferences);
-
     setSaved(false);
-
     onReset?.();
-  };
+  }, [modules, onReset]);
 
-  /* --------------------------------------------------------------------------
+  const handleClose = useCallback(() => {
+    if (!saved) onClose();
+    else onClose();
+  }, [onClose, saved]);
+
+  if (!mounted) return null;
+
+  const translateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_HEIGHT, 0],
+  });
+
+  const tabOpacity = tabAnim;
+  const tabTranslateX = tabAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [activeTab === "home" ? -12 : 12, 0],
+  });
+
+  /* ========================================================================
    * RENDER
-   * ------------------------------------------------------------------------ */
+   * ====================================================================== */
 
   return (
-    <>
-      {open && (
-        <>
-          {/* ==================================================================
-              BACKDROP
-             ================================================================== */}
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {/* ───── BACKDROP ───── */}
+      <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
+        <Pressable
+          onPress={handleClose}
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel="Fermer"
+        />
+      </Animated.View>
 
-          <Pressable
-            accessibilityLabel="Fermer"
-            onPress={onClose}
-            className="fixed inset-0 z-[90] bg-black/70"
+      {/* ───── SHEET ───── */}
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            maxHeight: SCREEN_HEIGHT * 0.94,
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={["#0C0A1F", "#0A0818", "#070512"]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* Top ambient glow */}
+        <View style={styles.topGlowWrap} pointerEvents="none">
+          <LinearGradient
+            colors={["rgba(139,92,246,0.35)", "rgba(139,92,246,0)"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={{ flex: 1, borderRadius: 999 }}
           />
+        </View>
 
-          {/* ==================================================================
-              SHEET
-             ================================================================== */}
+        {/* Top light line */}
+        <View style={styles.topLine} pointerEvents="none" />
 
-          <View
-            className="fixed inset-x-0 bottom-0 z-[100] mx-auto flex max-h-[94vh] w-full max-w-[720px] flex-col overflow-hidden rounded-t-[34px]"
-            style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.09)", borderStyle: "solid" }}
-          >
-            {/* ================================================================
-                TOP GLOW
-               ================================================================ */}
+        {/* Border ring */}
+        <View style={styles.borderRing} pointerEvents="none" />
 
-            <View
-              className="absolute -top-32 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full"
-              style={{  }}
-            />
+        {/* ───── HANDLE ───── */}
+        <View style={styles.handleWrap}>
+          <View style={styles.handleBar} />
+        </View>
 
-            {/* ================================================================
-                HANDLE
-               ================================================================ */}
-
-            <View className="relative flex justify-center pt-3">
-              <View
-                className="h-1 w-10 rounded-full"
-                style={{ backgroundColor: "rgba(255,255,255,.16)" }}
-              />
-            </View>
-
-            {/* ================================================================
-                HEADER
-               ================================================================ */}
-
-            <View className="relative px-5 pb-3 pt-4">
-              <View className="flex items-center gap-3">
-                <View
-                  className="flex h-11 w-11 items-center justify-center rounded-[16px]"
-                  style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.2)", borderStyle: "solid" }}
-                >
-                  <Sparkles size={19} className="text-indigo-300" />
-                </View>
-
-                <View className="min-w-0 flex-1">
-                  <Text className="text-[9px] font-black uppercase tracking-[.18em] text-indigo-300/70">
-                    Ma Home
-                  </Text>
-
-                  <Text className="mt-0.5 text-[18px] font-black tracking-[-.035em] text-white">
-                    Personnaliser
-                  </Text>
-                </View>
-
-                <Pressable
-                 
-                  onPress={onClose}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40"
-                  style={{ backgroundColor: "rgba(255,255,255,.05)", borderWidth: 1, borderColor: "rgba(255,255,255,.06)", borderStyle: "solid" }}
-                >
-                  <X size={15} />
-                </Pressable>
-              </View>
-
-              {/* --------------------------------------------------------------
-                  SUMMARY
-                 ------------------------------------------------------------ */}
-
-              <View className="mt-4 gap-2">
-                <MiniStat
-                  icon={Layers3}
-                  value={visibleCount}
-                  label="visibles"
-                  color="#6366F1"
-                />
-
-                <MiniStat
-                  icon={Heart}
-                  value={favoriteCount}
-                  label="favoris"
-                  color="#EC4899"
-                />
-
-                <MiniStat
-                  icon={Zap}
-                  value={localNotifications.opportunities ? 3 : 2}
-                  label="alertes"
-                  color="#F59E0B"
-                />
-              </View>
-            </View>
-
-            {/* ================================================================
-                TABS
-               ================================================================ */}
-
-            <View className="relative px-5 pb-3">
-              <View
-                className="flex rounded-2xl p-1"
-                style={{ backgroundColor: "rgba(255,255,255,.035)", borderWidth: 1, borderColor: "rgba(255,255,255,.055)", borderStyle: "solid" }}
-              >
-                <TabButton
-                  active={activeTab === "home"}
-                  icon={Layers3}
-                  label="Ma Home"
-                  onPress={() => setActiveTab("home")}
-                />
-
-                <TabButton
-                  active={activeTab === "notifications"}
-                  icon={Bell}
-                  label="Alertes"
-                  onPress={() => setActiveTab("notifications")}
-                />
-              </View>
-            </View>
-
-            {/* ================================================================
-                CONTENT
-               ================================================================ */}
-
-            <View
-              className="relative min-h-0 flex-1 overflow-y-auto px-5 pb-28"
-              style={{  }}
+        {/* ───── HEADER ───── */}
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <LinearGradient
+              colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.headerIcon}
             >
-              <AnimatePresence mode="wait">
-                {activeTab === "home" ? (
-                  <View
-                    key="home"
-                  >
-                    {/* ========================================================
-                        PERSONALIZATION HERO
-                       ====================================================== */}
+              <Sparkles size={19} color="#fff" />
+            </LinearGradient>
 
-                    <View
-                      className="mb-5 overflow-hidden rounded-[24px] p-4"
-                      style={{ borderWidth: 1, borderColor: "rgba(99,102,241,.12)", borderStyle: "solid" }}
-                    >
-                      <View className="flex gap-3">
-                        <View
-                          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
-                          style={{ backgroundColor: "rgba(99,102,241,.13)" }}
-                        >
-                          <Target size={14} className="text-indigo-300" />
-                        </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.headerEyebrow}>MA HOME</Text>
+              <Text style={styles.headerTitle}>Personnaliser</Text>
+            </View>
 
-                        <View>
-                          <Text className="text-[10px] font-black text-white/80">
-                            Construisez votre Home idéale
-                          </Text>
+            <Pressable
+              onPress={handleClose}
+              hitSlop={8}
+              accessibilityLabel="Fermer"
+              style={({ pressed }) => [
+                styles.closeBtn,
+                pressed && styles.pressed,
+              ]}
+            >
+              <X size={15} color="rgba(255,255,255,0.75)" />
+            </Pressable>
+          </View>
 
-                          <Text className="mt-1 text-[8px] leading-relaxed text-white/30">
-                            Placez vos univers préférés en premier, masquez ce
-                            qui ne vous intéresse pas et laissez DébrouillePro
-                            adapter votre expérience.
-                          </Text>
-                        </View>
-                      </View>
+          {/* Stats */}
+          <View style={styles.statsRow}>
+            <MiniStat
+              Icon={Layers3}
+              value={visibleCount}
+              label="visibles"
+              color="#818CF8"
+              delay={80}
+            />
+            <MiniStat
+              Icon={Heart}
+              value={favoriteCount}
+              label="favoris"
+              color="#F472B6"
+              delay={140}
+            />
+            <MiniStat
+              Icon={Zap}
+              value={localNotifications.opportunities ? 3 : 2}
+              label="alertes"
+              color="#FBBF24"
+              delay={200}
+            />
+          </View>
+        </View>
+
+        {/* ───── TABS ───── */}
+        <View style={styles.tabsWrap}>
+          <View style={styles.tabsContainer}>
+            <TabButton
+              active={activeTab === "home"}
+              Icon={Layers3}
+              label="Ma Home"
+              onPress={() => setActiveTab("home")}
+            />
+            <TabButton
+              active={activeTab === "notifications"}
+              Icon={Bell}
+              label="Alertes"
+              onPress={() => setActiveTab("notifications")}
+            />
+          </View>
+        </View>
+
+        {/* ───── CONTENT ───── */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.contentScroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Animated.View
+            style={{
+              opacity: tabOpacity,
+              transform: [{ translateX: tabTranslateX }],
+            }}
+          >
+            {activeTab === "home" ? (
+              <View>
+                {/* Personalization hero */}
+                <View style={styles.heroCard}>
+                  <LinearGradient
+                    colors={[
+                      "rgba(99,102,241,0.16)",
+                      "rgba(15,7,32,0.6)",
+                      "rgba(10,6,24,0.85)",
+                    ]}
+                    locations={[0, 0.55, 1]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={styles.heroBorder} pointerEvents="none" />
+
+                  <View style={styles.heroRow}>
+                    <View style={styles.heroIcon}>
+                      <Target size={14} color="#A5B4FC" />
                     </View>
-
-                    {/* ========================================================
-                        MODULES
-                       ====================================================== */}
-
-                    <View>
-                      <SectionTitle
-                        icon={Layers3}
-                        title="Vos univers"
-                        subtitle="Glissez pour réorganiser"
-                      />
-
-                      <View className="mt-3 space-y-2">
-                        <Reorder.Group
-                          axis="y"
-                          values={orderedModules}
-                          onReorder={(next) => {
-                            setSaved(false);
-
-                            setLocalOrder(next.map((module) => module.id));
-                          }}
-                        >
-                          {orderedModules.map((module, index) => {
-                            const visual = visualFor(module.id);
-
-                            const favorite = localFavorites.includes(module.id);
-
-                            const hidden = localHidden.includes(module.id);
-
-                            return (
-                              <Reorder.Item
-                                key={module.id}
-                                value={module}
-                                className="relative"
-                              >
-                                <View
-                                  className="group flex items-center gap-2 rounded-[20px] p-2.5"
-                                  style={{ backgroundColor: hidden
-                                                                        ? "rgba(255,255,255,.018)"
-                                                                        : "rgba(255,255,255,.04)", borderColor: "rgba(255,255,255,.045)", borderStyle: "solid", opacity: hidden ? 0.55 : 1 }}
-                                >
-                                  {/* POSITION */}
-
-                                  <View className="flex w-5 shrink-0 justify-center">
-                                    <Text className="text-[8px] font-black text-white/15">
-                                      {String(index + 1).padStart(2, "0")}
-                                    </Text>
-                                  </View>
-
-                                  {/* ICON */}
-
-                                  <View
-                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] text-lg"
-                                    style={{ backgroundColor: `${visual.color}12`, borderStyle: "solid" }}
-                                  >
-                                    {visual.emoji}
-                                  </View>
-
-                                  {/* INFO */}
-
-                                  <View className="min-w-0 flex-1">
-                                    <View className="flex items-center gap-1.5">
-                                      <Text className="truncate text-[10px] font-black text-white/75">
-                                        {module.label}
-                                      </Text>
-
-                                      {favorite && (
-                                        <Star
-                                          size={9}
-                                          fill={visual.color}
-                                          style={{
-                                            color: visual.color,
-                                          }}
-                                        />
-                                      )}
-                                    </View>
-
-                                    <Text className="mt-0.5 text-[7px] text-white/25">
-                                      {hidden
-                                        ? "Masqué de votre Home"
-                                        : "Visible dans votre Home"}
-                                    </Text>
-                                  </View>
-
-                                  {/* FAVORITE */}
-
-                                  <Pressable
-                                   
-                                    onPress={() => toggleFavorite(module.id)}
-                                    className="flex h-8 w-8 items-center justify-center rounded-xl"
-                                    style={{ backgroundColor: favorite
-                                                                            ? `${visual.color}14`
-                                                                            : "rgba(255,255,255,.025)" }}
-                                    accessibilityLabel={
-                                      favorite
-                                        ? "Retirer des favoris"
-                                        : "Ajouter aux favoris"
-                                    }
-                                  >
-                                    <Star
-                                      size={13}
-                                      fill={
-                                        favorite ? visual.color : "transparent"
-                                      }
-                                      style={{
-                                        color: favorite
-                                          ? visual.color
-                                          : "rgba(255,255,255,.22)",
-                                      }}
-                                    />
-                                  </Pressable>
-
-                                  {/* VISIBILITY */}
-
-                                  <Pressable
-                                   
-                                    onPress={() => toggleVisibility(module.id)}
-                                    className="flex h-8 w-8 items-center justify-center rounded-xl text-white/25"
-                                    style={{ backgroundColor: "rgba(255,255,255,.025)" }}
-                                    accessibilityLabel={hidden ? "Afficher" : "Masquer"}
-                                  >
-                                    {hidden ? (
-                                      <EyeOff size={13} />
-                                    ) : (
-                                      <Eye size={13} />
-                                    )}
-                                  </Pressable>
-
-                                  {/* DRAG */}
-
-                                  <View className="flex h-8 w-6 items-center justify-center text-white/15">
-                                    <GripVertical size={14} />
-                                  </View>
-                                </View>
-                              </Reorder.Item>
-                            );
-                          })}
-                        </Reorder.Group>
-                      </View>
-                    </View>
-
-                    {/* ========================================================
-                        FAVORITES EXPLAINER
-                       ====================================================== */}
-
-                    <View
-                      className="mt-5 flex items-center gap-3 rounded-[20px] p-3"
-                      style={{ backgroundColor: "rgba(236,72,153,.045)", borderWidth: 1, borderColor: "rgba(236,72,153,.09)", borderStyle: "solid" }}
-                    >
-                      <Heart size={13} className="shrink-0 text-pink-300" />
-
-                      <Text className="text-[8px] leading-relaxed text-white/30">
-                        Vos favoris influencent également les recommandations.
-                        Ton moteur de feed leur attribue déjà davantage de
-                        poids.
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.heroTitle}>
+                        Construisez votre Home idéale
+                      </Text>
+                      <Text style={styles.heroSub}>
+                        Placez vos univers préférés en premier, masquez ce qui
+                        ne vous intéresse pas et laissez DébrouillePro adapter
+                        votre expérience.
                       </Text>
                     </View>
                   </View>
-                ) : (
-                  <View
-                    key="notifications"
-                  >
-                    {/* ========================================================
-                        NOTIFICATION HERO
-                       ====================================================== */}
+                </View>
 
-                    <View
-                      className="mb-5 rounded-[24px] p-4"
-                      style={{ borderWidth: 1, borderColor: "rgba(245,158,11,.12)", borderStyle: "solid" }}
-                    >
-                      <View className="flex gap-3">
-                        <View
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                          style={{ backgroundColor: "rgba(245,158,11,.12)" }}
-                        >
-                          <Bell size={15} className="text-amber-300" />
+                {/* Modules */}
+                <View style={{ marginBottom: 20 }}>
+                  <SectionTitle
+                    Icon={Layers3}
+                    title="Vos univers"
+                    subtitle="Utilisez ↑↓ pour réorganiser"
+                  />
+                  <View style={{ marginTop: 12 }}>
+                    {orderedModules.map((module, index) => (
+                      <ModuleRow
+                        key={module.id}
+                        module={module}
+                        index={index}
+                        total={orderedModules.length}
+                        favorite={localFavorites.includes(module.id)}
+                        hidden={localHidden.includes(module.id)}
+                        onToggleFavorite={() => toggleFavorite(module.id)}
+                        onToggleVisibility={() => toggleVisibility(module.id)}
+                        onMoveUp={() => moveModule(index, -1)}
+                        onMoveDown={() => moveModule(index, 1)}
+                      />
+                    ))}
+                  </View>
+                </View>
+
+                {/* Favorites explainer */}
+                <View style={styles.explainerCard}>
+                  <LinearGradient
+                    colors={["rgba(244,114,182,0.14)", "rgba(255,255,255,0)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={styles.explainerBorder} pointerEvents="none" />
+                  <Heart size={13} color="#F9A8D4" />
+                  <Text style={styles.explainerText}>
+                    Vos favoris influencent également les recommandations. Le
+                    moteur de feed leur attribue déjà davantage de poids.
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View>
+                {/* Notifications hero */}
+                <View style={styles.notifHeroCard}>
+                  <LinearGradient
+                    colors={["rgba(245,158,11,0.16)", "rgba(255,255,255,0)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={styles.notifHeroBorder} pointerEvents="none" />
+
+                  <View style={styles.heroRow}>
+                    <View style={styles.notifHeroIcon}>
+                      <Bell size={15} color="#FBBF24" />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.heroTitle}>
+                        Seulement ce qui compte
+                      </Text>
+                      <Text style={styles.heroSub}>
+                        Choisissez les signaux que DébrouillePro doit surveiller
+                        pour vous.
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Notification toggles */}
+                <View style={{ marginBottom: 20 }}>
+                  <NotificationPreference
+                    Icon={Sparkles}
+                    color="#A78BFA"
+                    title="Nouvelles recommandations"
+                    description="Les nouveautés susceptibles de vous intéresser."
+                    enabled={localNotifications.newRecommendations}
+                    onToggle={() => {
+                      setSaved(false);
+                      setLocalNotifications((c) => ({
+                        ...c,
+                        newRecommendations: !c.newRecommendations,
+                      }));
+                    }}
+                  />
+                  <NotificationPreference
+                    Icon={MapPin}
+                    color="#22D3EE"
+                    title="À proximité"
+                    description="Les nouveautés et opportunités autour de vous."
+                    enabled={localNotifications.nearbyAlerts}
+                    onToggle={() => {
+                      setSaved(false);
+                      setLocalNotifications((c) => ({
+                        ...c,
+                        nearbyAlerts: !c.nearbyAlerts,
+                      }));
+                    }}
+                  />
+                  <NotificationPreference
+                    Icon={TrendingUp}
+                    color="#34D399"
+                    title="Opportunités"
+                    description="Jobs, immobilier, événements et occasions pertinentes."
+                    enabled={localNotifications.opportunities}
+                    onToggle={() => {
+                      setSaved(false);
+                      setLocalNotifications((c) => ({
+                        ...c,
+                        opportunities: !c.opportunities,
+                      }));
+                    }}
+                  />
+                </View>
+
+                {/* Smart mode */}
+                <View style={styles.smartCard}>
+                  <LinearGradient
+                    colors={["rgba(139,92,246,0.14)", "rgba(255,255,255,0)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={styles.smartBorder} pointerEvents="none" />
+
+                  <View style={styles.smartRow}>
+                    <View style={styles.smartIcon}>
+                      <Sparkles size={15} color="#A5B4FC" />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={styles.smartHeaderRow}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.smartTitle}>
+                            Home intelligente
+                          </Text>
+                          <Text style={styles.smartSub}>
+                            DébrouillePro adapte progressivement votre Home à
+                            vos usages.
+                          </Text>
                         </View>
-
-                        <View>
-                          <Text className="text-[10px] font-black text-white/80">
-                            Seulement ce qui compte
-                          </Text>
-
-                          <Text className="mt-1 text-[8px] leading-relaxed text-white/30">
-                            Choisissez les signaux que DébrouillePro doit
-                            surveiller pour vous.
-                          </Text>
+                        <View style={styles.smartBadge}>
+                          <Text style={styles.smartBadgeText}>IA</Text>
                         </View>
                       </View>
-                    </View>
 
-                    {/* ========================================================
-                        ALERT OPTIONS
-                       ====================================================== */}
-
-                    <View className="space-y-2">
-                      <NotificationPreference
-                        icon={Sparkles}
-                        color="#8B5CF6"
-                        title="Nouvelles recommandations"
-                        description="Les nouveautés susceptibles de vous intéresser."
-                        enabled={localNotifications.newRecommendations}
-                        onToggle={() => {
-                          setSaved(false);
-
-                          setLocalNotifications((current) => ({
-                            ...current,
-                            newRecommendations: !current.newRecommendations,
-                          }));
-                        }}
-                      />
-
-                      <NotificationPreference
-                        icon={MapPin}
-                        color="#06B6D4"
-                        title="À proximité"
-                        description="Les nouveautés et opportunités autour de vous."
-                        enabled={localNotifications.nearbyAlerts}
-                        onToggle={() => {
-                          setSaved(false);
-
-                          setLocalNotifications((current) => ({
-                            ...current,
-                            nearbyAlerts: !current.nearbyAlerts,
-                          }));
-                        }}
-                      />
-
-                      <NotificationPreference
-                        icon={TrendingUp}
-                        color="#10B981"
-                        title="Opportunités"
-                        description="Jobs, immobilier, événements et occasions pertinentes."
-                        enabled={localNotifications.opportunities}
-                        onToggle={() => {
-                          setSaved(false);
-
-                          setLocalNotifications((current) => ({
-                            ...current,
-                            opportunities: !current.opportunities,
-                          }));
-                        }}
-                      />
-                    </View>
-
-                    {/* ========================================================
-                        SMART MODE
-                       ====================================================== */}
-
-                    <View
-                      className="mt-5 rounded-[24px] p-4"
-                      style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.1)", borderStyle: "solid" }}
-                    >
-                      <View className="flex items-start gap-3">
-                        <View
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                          style={{ backgroundColor: "rgba(99,102,241,.12)" }}
-                        >
-                          <Sparkles size={15} className="text-indigo-300" />
+                      <View style={styles.smartProgressRow}>
+                        <View style={styles.smartProgressTrack}>
+                          <LinearGradient
+                            colors={["#A78BFA", "#6366F1"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.smartProgressFill}
+                          />
                         </View>
-
-                        <View className="flex-1">
-                          <View className="flex items-center justify-between gap-3">
-                            <View>
-                              <Text className="text-[10px] font-black text-white/75">
-                                Home intelligente
-                              </Text>
-
-                              <Text className="mt-1 text-[8px] leading-relaxed text-white/25">
-                                DébrouillePro adapte progressivement votre Home
-                                à vos usages.
-                              </Text>
-                            </View>
-
-                            <Text
-                              className="rounded-full px-2 py-1 text-[7px] font-black uppercase tracking-wider"
-                              style={{ backgroundColor: "rgba(99,102,241,.13)", color: "#A5B4FC" }}
-                            >
-                              IA
-                            </Text>
-                          </View>
-
-                          <View className="mt-3 flex items-center gap-2">
-                            <View className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[.05]">
-                              <View
-                                className="h-full rounded-full"
-                                style={{  }}
-                              />
-                            </View>
-
-                            <Text className="text-[7px] font-bold text-white/25">
-                              76%
-                            </Text>
-                          </View>
-                        </View>
+                        <Text style={styles.smartProgressText}>76%</Text>
                       </View>
                     </View>
                   </View>
-                )}
-              </AnimatePresence>
-            </View>
-
-            {/* ================================================================
-                FOOTER ACTION BAR
-               ================================================================ */}
-
-            <View
-              className="absolute inset-x-0 bottom-0 z-20 p-4"
-              style={{  }}
-            >
-              <View className="flex gap-2">
-                <Pressable
-                 
-                  onPress={reset}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[17px] text-white/35"
-                  style={{ backgroundColor: "rgba(255,255,255,.05)", borderWidth: 1, borderColor: "rgba(255,255,255,.06)", borderStyle: "solid" }}
-                  accessibilityLabel="Réinitialiser"
-                >
-                  <RotateCcw size={15} />
-                </Pressable>
-
-                <Pressable
-                  onPress={save}
-                  className="flex h-12 flex-1 items-center justify-center gap-2 rounded-[17px] text-[10px] font-black text-white"
-                  style={{  }}
-                >
-                  <AnimatePresence mode="wait">
-                    {saved ? (
-                      <Text
-                        key="saved"
-                        className="flex items-center gap-2"
-                      >
-                        <Check size={14} />
-                        <Text>Préférences enregistrées</Text></Text>
-                    ) : (
-                      <Text
-                        key="save"
-                        className="flex items-center gap-2"
-                      >
-                        <Save size={14} />
-                        <Text>Enregistrer ma Home</Text></Text>
-                    )}
-                  </AnimatePresence>
-                </Pressable>
+                </View>
               </View>
-            </View>
+            )}
+          </Animated.View>
+        </ScrollView>
+
+        {/* ───── FOOTER ───── */}
+        <View
+          style={[
+            styles.footer,
+            {
+              paddingBottom: Platform.OS === "android" ? 20 : Math.max(20, 30),
+            },
+          ]}
+        >
+          <View style={styles.footerRow}>
+            <Pressable
+              onPress={reset}
+              accessibilityLabel="Réinitialiser"
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.resetBtn,
+                pressed && styles.pressed,
+              ]}
+            >
+              <RotateCcw size={15} color="rgba(255,255,255,0.7)" />
+            </Pressable>
+
+            <Pressable
+              onPress={save}
+              accessibilityRole="button"
+              accessibilityLabel={
+                saved ? "Préférences enregistrées" : "Enregistrer ma Home"
+              }
+              style={({ pressed }) => [
+                styles.saveBtnOuter,
+                pressed && styles.pressed,
+              ]}
+            >
+              <LinearGradient
+                colors={
+                  saved
+                    ? ["#34D399", "#10B981", "#059669"]
+                    : ["#A78BFA", "#7C3AED", "#6366F1"]
+                }
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.saveBtnGradient}
+              >
+                {saved ? (
+                  <>
+                    <Check size={14} color="#fff" strokeWidth={3} />
+                    <Text style={styles.saveBtnText}>
+                      Préférences enregistrées
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Save size={14} color="#fff" />
+                    <Text style={styles.saveBtnText}>Enregistrer ma Home</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </Pressable>
           </View>
-        </>
-      )}
-    </>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
 /* ============================================================================
- * SMALL COMPONENTS
+ * STYLES
  * ========================================================================== */
 
-function MiniStat({
-  icon: Icon,
-  value,
-  label,
-  color,
-}: {
-  icon: typeof Layers3;
-  value: number;
-  label: string;
-  color: string;
-}) {
-  return (
-    <View
-      className="flex items-center gap-2 rounded-[16px] p-2.5"
-      style={{ backgroundColor: "rgba(255,255,255,.035)", borderWidth: 1, borderColor: "rgba(255,255,255,.045)", borderStyle: "solid" }}
-    >
-      <Icon
-        size={11}
-        style={{
-          color,
-        }}
-      />
+const styles = StyleSheet.create({
+  pressed: { opacity: 0.85 },
 
-      <View>
-        <Text className="text-[10px] font-black text-white/70">{value}</Text>
+  // ── Backdrop
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.72)",
+  },
 
-        <Text className="text-[7px] text-white/20">{label}</Text>
-      </View>
-    </View>
-  );
-}
+  // ── Sheet
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    overflow: "hidden",
+    backgroundColor: "#0A0818",
+    shadowColor: "#000",
+    shadowOpacity: 0.8,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: -20 },
+    elevation: 28,
+  },
+  topGlowWrap: {
+    position: "absolute",
+    top: -100,
+    left: "25%",
+    right: "25%",
+    height: 180,
+    opacity: 0.9,
+  },
+  topLine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "rgba(167,139,250,0.4)",
+  },
+  borderRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.16)",
+  },
 
-function TabButton({
-  active,
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  icon: typeof Layers3;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <Pressable
-     
-      onPress={onClick}
-      className="relative flex h-9 flex-1 items-center justify-center gap-2 rounded-xl text-[9px] font-bold"
-      style={{  }}
-    >
-      {active && (
-        <View
-          className="absolute inset-0 rounded-xl"
-          style={{ backgroundColor: "rgba(255,255,255,.07)", borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-        />
-      )}
+  // ── Handle
+  handleWrap: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  handleBar: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
 
-      <Text className="relative z-10 flex items-center gap-2">
-        <Icon size={11} />
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
+  // ── Header
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.7,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  headerEyebrow: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.8,
+    color: "rgba(165,180,252,0.85)",
+  },
+  headerTitle: {
+    marginTop: 3,
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.6,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
 
-function SectionTitle({
-  icon: Icon,
-  title,
-  subtitle,
-}: {
-  icon: typeof Layers3;
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <View className="flex items-center gap-2">
-      <View
-        className="flex h-7 w-7 items-center justify-center rounded-lg"
-        style={{ backgroundColor: "rgba(99,102,241,.08)" }}
-      >
-        <Icon size={12} className="text-indigo-300" />
-      </View>
+  // ── Stats row
+  statsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+  },
+  miniStatWrap: {
+    flex: 1,
+  },
+  miniStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    overflow: "hidden",
+  },
+  miniStatIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  miniStatValue: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.9)",
+    letterSpacing: -0.2,
+  },
+  miniStatLabel: {
+    marginTop: 2,
+    fontSize: 9,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "600",
+  },
 
-      <View>
-        <Text className="text-[10px] font-black text-white/75">{title}</Text>
+  // ── Tabs
+  tabsWrap: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  tabsContainer: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    gap: 4,
+  },
+  tabBtnWrap: {
+    flex: 1,
+  },
+  tabBtn: {
+    height: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  tabBtnActiveGradient: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
+  },
+  tabBtnText: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: 0.2,
+  },
 
-        {subtitle && <Text className="text-[7px] text-white/20">{subtitle}</Text>}
-      </View>
-    </View>
-  );
-}
+  // ── Content
+  contentScroll: {
+    paddingHorizontal: 20,
+    paddingBottom: 120,
+    paddingTop: 8,
+  },
 
-function NotificationPreference({
-  icon: Icon,
-  color,
-  title,
-  description,
-  enabled,
-  onToggle,
-}: {
-  icon: typeof Bell;
-  color: string;
-  title: string;
-  description: string;
-  enabled: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onToggle}
-      className="flex w-full items-center gap-3 rounded-[20px] p-3 text-left"
-      style={{ backgroundColor: enabled ? "rgba(255,255,255,.04)" : "rgba(255,255,255,.02)", borderColor: "rgba(255,255,255,.045)", borderStyle: "solid" }}
-    >
-      <View
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px]"
-        style={{ backgroundColor: `${color}12` }}
-      >
-        <Icon
-          size={14}
-          style={{
-            color,
-          }}
-        />
-      </View>
+  // ── Hero cards
+  heroCard: {
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 20,
+    overflow: "hidden",
+    backgroundColor: "rgba(12,10,28,0.6)",
+  },
+  heroBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.2)",
+  },
+  heroRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  heroIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(99,102,241,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.35)",
+  },
+  heroTitle: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.9)",
+    letterSpacing: -0.2,
+  },
+  heroSub: {
+    marginTop: 5,
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "500",
+  },
 
-      <View className="min-w-0 flex-1">
-        <Text className="text-[10px] font-black text-white/70">{title}</Text>
+  // ── Section title
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  sectionTitleIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(99,102,241,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.25)",
+  },
+  sectionTitleText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.9)",
+    letterSpacing: -0.2,
+  },
+  sectionTitleSub: {
+    marginTop: 2,
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
 
-        <Text className="mt-1 text-[7px] leading-relaxed text-white/25">
-          {description}
-        </Text>
-      </View>
+  // ── Module row
+  moduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    marginBottom: 8,
+  },
+  modulePosition: {
+    width: 22,
+    alignItems: "center",
+  },
+  modulePositionText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.3)",
+    letterSpacing: 0.5,
+  },
+  moduleIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  moduleTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  moduleTitle: {
+    fontSize: 11.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.9)",
+    letterSpacing: -0.2,
+  },
+  moduleSub: {
+    marginTop: 3,
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  moduleIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
 
-      <View
-        className="relative h-6 w-10 shrink-0 rounded-full p-0.5"
-        style={{ backgroundColor: enabled ? color : "rgba(255,255,255,.08)" }}
-      >
-        <View
-          className="h-5 w-5 rounded-full bg-white shadow-md"
-        />
-      </View>
-    </Pressable>
-  );
-}
+  // ── Reorder
+  reorderCol: {
+    width: 22,
+    gap: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reorderBtn: {
+    width: 20,
+    height: 18,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  reorderBtnDisabled: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+  },
+
+  // ── Explainer
+  explainerCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 14,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "rgba(244,114,182,0.06)",
+  },
+  explainerBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(244,114,182,0.16)",
+  },
+  explainerText: {
+    flex: 1,
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: "rgba(255,255,255,0.55)",
+    fontWeight: "500",
+  },
+
+  // ── Notification hero
+  notifHeroCard: {
+    borderRadius: 24,
+    padding: 16,
+    marginBottom: 20,
+    overflow: "hidden",
+    backgroundColor: "rgba(12,10,28,0.6)",
+  },
+  notifHeroBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.2)",
+  },
+  notifHeroIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(245,158,11,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.35)",
+  },
+
+  // ── Notification row
+  notifRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  notifIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  notifTitle: {
+    fontSize: 11.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.85)",
+    letterSpacing: -0.2,
+  },
+  notifDesc: {
+    marginTop: 3,
+    fontSize: 9.5,
+    lineHeight: 14,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  toggleTrack: {
+    width: 40,
+    height: 24,
+    borderRadius: 12,
+    padding: 2,
+    justifyContent: "center",
+  },
+  toggleKnob: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  // ── Smart card
+  smartCard: {
+    borderRadius: 24,
+    padding: 16,
+    overflow: "hidden",
+    backgroundColor: "rgba(12,10,28,0.6)",
+  },
+  smartBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.18)",
+  },
+  smartRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  smartIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(99,102,241,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.35)",
+  },
+  smartHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  smartTitle: {
+    fontSize: 11.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.85)",
+    letterSpacing: -0.2,
+  },
+  smartSub: {
+    marginTop: 3,
+    fontSize: 9.5,
+    lineHeight: 14,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  smartBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(99,102,241,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.35)",
+  },
+  smartBadgeText: {
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1,
+    color: "#A5B4FC",
+  },
+  smartProgressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 12,
+  },
+  smartProgressTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    overflow: "hidden",
+  },
+  smartProgressFill: {
+    width: "76%",
+    height: "100%",
+    borderRadius: 3,
+  },
+  smartProgressText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.45)",
+  },
+
+  // ── Footer
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(10,8,24,0.85)",
+  },
+  footerRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  resetBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  saveBtnOuter: {
+    flex: 1,
+    borderRadius: 17,
+    overflow: "hidden",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
+  },
+  saveBtnGradient: {
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: 17,
+  },
+  saveBtnText: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+});

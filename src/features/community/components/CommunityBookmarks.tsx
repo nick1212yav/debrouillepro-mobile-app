@@ -32,19 +32,14 @@ export function CommunityBookmarks({
   const { icon, text, gap } = sizes[size];
 
   return (
-    <Pressable
-      onPress={handleClick}
-      className={`flex items-center ${gap} transition-all active:scale-90 cursor-pointer`}
-    >
+    <Pressable onPress={handleClick} className={`flex items-center ${gap} transition-all active:scale-90 cursor-pointer`}>
       <Bookmark
         size={icon}
         className={`transition-all duration-200 ${
           isBookmarked ? "fill-amber-400 text-amber-400" : "text-white/40"
         } ${isAnimating ? "scale-110" : "scale-100"}`}
       />
-      <Text
-        className={`${text} ${isBookmarked ? "text-amber-400" : "text-white/40"}`}
-      >
+      <Text className={`${text} ${isBookmarked ? "text-amber-400" : "text-white/40"}`}>
         {count > 0 ? count : ""}
       </Text>
     </Pressable>

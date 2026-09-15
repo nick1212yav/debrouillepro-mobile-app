@@ -1,4 +1,4 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 
@@ -19,26 +19,18 @@ export function AnnonceDescription({ description, maxLength = 400 }: Props) {
       : description;
 
   return (
-    <View className="space-y-2">
-      <Text className="text-sm font-medium text-white/50">Description</Text>
-      <View className="text-white/80 text-sm leading-relaxed">
-        {displayText}
-      </View>
-
-      {shouldTruncate && (
-        <Pressable
-          onPress={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-1 text-xs text-orange-400"
-        >
+    <View className="space-y-2"><Text className="text-sm font-medium text-white/50">Description</Text><View className="text-white/80 text-sm leading-relaxed">{displayText}</View>{shouldTruncate && (
+        <Pressable onPress={() => setIsExpanded(!isExpanded)} className="flex items-center gap-1 text-xs text-orange-400 transition-colors">
           {isExpanded ? (
             <>
-              <ChevronUp size={14} /> <Text>Voir moins</Text></>
+              <ChevronUp size={14} /> Voir moins
+            </>
           ) : (
             <>
-              <ChevronDown size={14} /> <Text>Voir plus</Text></>
+              <ChevronDown size={14} /> Voir plus
+            </>
           )}
         </Pressable>
-      )}
-    </View>
+      )}</View>
   );
 }

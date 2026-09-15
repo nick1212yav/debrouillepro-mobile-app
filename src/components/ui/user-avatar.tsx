@@ -1,7 +1,7 @@
 import { View, Text, Image } from "react-native";
-import type { CurrentUser } from "@/hooks/use-current-user";
-import { getInitials } from "@/hooks/use-current-user";
-import { cn } from "@/lib/utils";
+import type { CurrentUser } from "@/hooks/use-current-user.ts";
+import { getInitials } from "@/hooks/use-current-user.ts";
+import { cn } from "@/lib/utils.ts";
 
 interface UserAvatarProps {
   user: CurrentUser | null | undefined;
@@ -27,7 +27,12 @@ function pickGradient(id: string): string {
   return GRADIENT_COLORS[Math.abs(hash) % GRADIENT_COLORS.length];
 }
 
-export default function UserAvatar({ user, size = "w-10 h-10", className, showOnline }: UserAvatarProps) {
+export default function UserAvatar({
+  user,
+  size = "w-10 h-10",
+  className,
+  showOnline,
+}: UserAvatarProps) {
   const initials = getInitials(user);
   const gradient = pickGradient(user?._id ?? "default");
 
@@ -35,21 +40,25 @@ export default function UserAvatar({ user, size = "w-10 h-10", className, showOn
     <View className={cn("relative flex-shrink-0", size, className)}>
       {user?.avatar ? (
         <Image
-          className={cn("w-full h-full rounded-2xl object-cover")} source={{ uri: user.avatar }} accessibilityLabel={initials}
+          className="w-full h-full rounded-2xl"
+          source={{ uri: user.avatar }}
+          accessibilityLabel={initials}
         />
       ) : (
         <View
           className={cn(
-            "w-full h-full rounded-2xl flex items-center justify-center font-black text-white",
+            "w-full h-full rounded-2xl items-center justify-center",
             `bg-gradient-to-br ${gradient}`,
           )}
-          style={{  }}
         >
-          {initials}
+          {/* ✅ Texte dans <Text>, taille contrôlée par className */}
+          <Text className="text-base font-black text-white">{initials}</Text>
         </View>
       )}
+
+      {/* ✅ Pastille = View, pas Text */}
       {showOnline && (
-        <Text className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-400 border-2 border-background" />
+        <View className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-400 border-2 border-background" />
       )}
     </View>
   );

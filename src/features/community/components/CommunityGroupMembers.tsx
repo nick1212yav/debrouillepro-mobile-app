@@ -1,4 +1,4 @@
-import { Pressable, View, Text, Image, TextInput } from "react-native";
+import { View, Text, TextInput, Image, Pressable } from "react-native";
 import { useState } from "react";
 import { User, Shield, Crown, X, Search, Check, UserMinus } from "lucide-react-native";
 
@@ -85,32 +85,9 @@ export function CommunityGroupMembers({
   };
 
   return (
-    <View className="space-y-3">
-      <View className="flex items-center justify-between">
-        <Text className="text-sm font-medium text-white/50">
-          Membres ({members.length})
-        </Text>
-      </View>
-
-      {/* Recherche */}
-      <View className="relative">
-        <Search
-          size={14}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
-        />
-        <TextInput
-          value={search}
-          onChangeText={(text) => setSearch(text)}
-          placeholder="Rechercher un membre..."
-          className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none placeholder:text-white/30"
-        />
-      </View>
-
-      {/* Liste */}
-      <View className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-        {filteredMembers.length === 0 ? (
-          <Text className="text-white/30 text-sm text-center py-4">
-            Aucun membre trouvé
+    <View className="space-y-3"><View className="flex items-center justify-between"><Text className="text-sm font-medium text-white/50">Membres ({members.length})
+        </Text></View>{}<View className="relative"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" /><TextInput value={search} onChangeText={(value) => setSearch(value)} placeholder="Rechercher un membre..." className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none focus:border-purple-400 transition-colors placeholder:text-white/30" /></View>{}<View className="space-y-1.5 max-h-64 overflow-y-auto pr-1">{filteredMembers.length === 0 ? (
+          <Text className="text-white/30 text-sm text-center py-4">Aucun membre trouvé
           </Text>
         ) : (
           filteredMembers.map((member) => {
@@ -119,61 +96,24 @@ export function CommunityGroupMembers({
             const isCurrentUser = member.id === currentUserId;
 
             return (
-              <View
-                key={member.id}
-                className="flex items-center gap-3 p-2 rounded-xl"
-              >
+              <View key={member.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 p-2 rounded-xl transition-colors">
                 {member.avatar ? (
-                  <Image
-                   
-                   
-                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                   source={{ uri: member.avatar }} accessibilityLabel={member.name}/>
+                  <Image className="w-8 h-8 rounded-full object-cover flex-shrink-0" source={{ uri: member.avatar }} accessibilityLabel={member.name} />
                 ) : (
-                  <View className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/20 flex-shrink-0">
-                    <User size={14} className="text-purple-400" />
-                  </View>
+                  <View className="w-8 h-8 rounded-full flex items-center justify-center bg-purple-500/20 flex-shrink-0"><User size={14} className="text-purple-400" /></View>
                 )}
-                <View className="flex-1 min-w-0">
-                  <View className="flex items-center gap-1.5">
-                    <Text className="text-white/80 text-sm font-medium truncate">
-                      {member.name}
-                    </Text>
-                    {member.isOnline && (
+                <View className="flex-1 min-w-0"><View className="flex items-center gap-1.5"><Text className="text-white/80 text-sm font-medium truncate">{member.name}</Text>{member.isOnline && (
                       <Text className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                    )}
-                    <Icon
-                      size={12}
-                      style={{ color }}
-                      className="flex-shrink-0"
-                    />
-                    <Text className="text-[10px]" style={{ color }}>
-                      {ROLE_LABELS[member.role]}
-                    </Text>
-                  </View>
-                  <Text className="text-white/20 text-[10px]">
-                    <Text>Rejoint le</Text>{formatDate(member.joinedAt)}
-                  </Text>
-                </View>
+                    )}<Icon size={12} style={{ color }} className="flex-shrink-0" /><Text className="text-[10px]" style={{ color }}>{ROLE_LABELS[member.role]}</Text></View><Text className="text-white/20 text-[10px]">Rejoint le {formatDate(member.joinedAt)}</Text></View>
 
                 {isAdmin && !isCurrentUser && (
                   <View className="flex items-center gap-1">
                     {member.role !== "admin" && (
-                      <Pressable
-                        onPress={() => handlePromote(member.id)}
-                        disabled={isLoading}
-                        className="p-1.5 rounded-lg text-purple-400"
-                        title="Promouvoir admin"
-                      >
+                      <Pressable onPress={() => handlePromote(member.id)} disabled={isLoading} className="p-1.5 rounded-lg text-purple-400 transition-colors" title="Promouvoir admin">
                         <Crown size={14} />
                       </Pressable>
                     )}
-                    <Pressable
-                      onPress={() => handleRemove(member.id)}
-                      disabled={isLoading}
-                      className="p-1.5 rounded-lg text-red-400"
-                      title="Retirer le membre"
-                    >
+                    <Pressable onPress={() => handleRemove(member.id)} disabled={isLoading} className="p-1.5 rounded-lg text-red-400 transition-colors" title="Retirer le membre">
                       <UserMinus size={14} />
                     </Pressable>
                   </View>
@@ -181,8 +121,6 @@ export function CommunityGroupMembers({
               </View>
             );
           })
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }

@@ -1,5 +1,14 @@
+// src/features/immo/components/PropertyOwner.tsx
+import React from "react";
+import {
+  Image,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useRouter } from "expo-router";
-import { View, Text, Pressable, Image, Linking } from "react-native";
 import {
   User,
   Star,
@@ -12,32 +21,33 @@ import {
 } from "lucide-react-native";
 
 interface Props {
-  /** Nom du propriétaire */
   ownerName?: string;
-  /** URL de l'avatar */
   ownerAvatar?: string;
-  /** Numéro de téléphone (format international recommandé) */
   ownerPhone?: string;
-  /** ID de l'utilisateur (pour naviguer vers son profil et ouvrir la messagerie) */
   ownerId?: string;
-  /** Timestamp de création de l'annonce */
   createdAt: number;
-  /** Note moyenne (sur 5) */
   rating?: number;
-  /** Nombre d'avis */
   reviewCount?: number;
-  /** Callback personnalisé pour le contact (remplace les actions par défaut) */
   onContact?: (method: "call" | "whatsapp" | "sms") => void;
-  /** Callback personnalisé pour le message (remplace la navigation par défaut) */
   onContactMessage?: () => void;
 }
 
-/**
- * Composant Propriétaire
- * - Affiche les informations du propriétaire
- * - Actions : appel, WhatsApp, SMS, voir le profil, contacter (messagerie)
- * - Design cohérent avec le thème du module
- */
+function timeAgo(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor(diff / 3600000);
+  const minutes = Math.floor(diff / 60000);
+
+  if (minutes < 1) return "À l'instant";
+  if (minutes < 60) return `Il y a ${minutes} min`;
+  if (hours < 24) return `Il y a ${hours} h`;
+  if (days === 0) return "Aujourd'hui";
+  if (days === 1) return "Hier";
+  if (days < 7) return `Il y a ${days} jours`;
+  if (days < 30) return `Il y a ${Math.floor(days / 7)} semaines`;
+  return `Il y a ${Math.floor(days / 30)} mois`;
+}
+
 export function PropertyOwner({
   ownerName,
   ownerAvatar,
@@ -49,35 +59,18 @@ export function PropertyOwner({
   onContact,
   onContactMessage,
 }: Props) {
+  // ✅ expo-router remplace react-router-dom
   const router = useRouter();
 
   if (!ownerName) return null;
 
-  // Calcul du temps écoulé
-  const timeAgo = (timestamp: number) => {
-    const diff = Date.now() - timestamp;
-    const days = Math.floor(diff / 86400000);
-    const hours = Math.floor(diff / 3600000);
-    const minutes = Math.floor(diff / 60000);
-
-    if (minutes < 1) return "À l'instant";
-    if (minutes < 60) return `Il y a ${minutes} min`;
-    if (hours < 24) return `Il y a ${hours} h`;
-    if (days === 0) return "Aujourd'hui";
-    if (days === 1) return "Hier";
-    if (days < 7) return `Il y a ${days} jours`;
-    if (days < 30) return `Il y a ${Math.floor(days / 7)} semaines`;
-    return `Il y a ${Math.floor(days / 30)} mois`;
-  };
-
-  // Actions de contact (téléphone, WhatsApp, SMS)
   const handleCall = () => {
     if (onContact) {
       onContact("call");
       return;
     }
     if (ownerPhone) {
-      undefined.href = `tel:${ownerPhone}`;
+      void Linking.openURL(`tel:${ownerPhone}`);
     }
   };
 
@@ -88,7 +81,7 @@ export function PropertyOwner({
     }
     if (ownerPhone) {
       const cleanPhone = ownerPhone.replace(/\D/g, "");
-      Linking.openURL(String(`https://wa.me/${cleanPhone}`));
+      void Linking.openURL(`https://wa.me/${cleanPhone}`);
     }
   };
 
@@ -98,18 +91,21 @@ export function PropertyOwner({
       return;
     }
     if (ownerPhone) {
-      undefined.href = `sms:${ownerPhone}`;
+      void Linking.openURL(`sms:${ownerPhone}`);
     }
   };
 
-  // Action "Contacter" → ouvre la messagerie vers le propriétaire
   const handleContactMessage = () => {
     if (onContactMessage) {
       onContactMessage();
       return;
     }
     if (ownerId) {
-      router.push(`/messages/new?userId=${ownerId}`);
+      // ✅ expo-router : push avec params
+      router.push({
+        pathname: "/messages/new",
+        params: { userId: ownerId },
+      });
     }
   };
 
@@ -122,103 +118,231 @@ export function PropertyOwner({
   const displayName = ownerName || "Propriétaire";
 
   return (
-    <View className="bg-white/5 rounded-2xl p-4 space-y-3">
-      <Text className="text-[10px] text-white/40 uppercase tracking-wider">
-        Propriétaire
-      </Text>
+    <View style={styles.container}>
+      <Text style={styles.sectionLabel}>Propriétaire</Text>
 
-      {/* Info principale */}
-      <View className="flex items-center gap-3">
+      {/* Row : avatar + infos */}
+      <View style={styles.headerRow}>
         {ownerAvatar ? (
           <Image
-           
-           
-            className="w-12 h-12 rounded-full object-cover border-2 border-white/10"
-           source={{ uri: ownerAvatar }} accessibilityLabel={displayName}/>
+            source={{ uri: ownerAvatar }}
+            style={styles.avatar}
+            accessibilityLabel={displayName}
+          />
         ) : (
-          <View className="w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-orange-500/30 to-orange-600/10">
-            <User size={20} className="text-orange-400" />
+          <View style={[styles.avatar, styles.avatarPlaceholder]}>
+            <User size={20} color="#FB923C" />
           </View>
         )}
 
-        <View className="flex-1 min-w-0">
-          <View className="flex items-center gap-2">
-            <Text className="text-white font-medium truncate">{displayName}</Text>
+        <View style={styles.infoColumn}>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {displayName}
+            </Text>
             {ownerId && (
-              <Pressable
-                onPress={handleViewProfile}
-                className="text-white/30"
-               
-              >
-                <ExternalLink size={14} />
+              <Pressable onPress={handleViewProfile} hitSlop={6}>
+                <ExternalLink size={14} color="rgba(255,255,255,0.3)" />
               </Pressable>
             )}
           </View>
 
-          <View className="flex items-center gap-2 text-xs text-white/40 flex-wrap">
-            <Text className="flex items-center gap-1">
-              <Star size={12} className="fill-yellow-400 text-yellow-400" />
-              {rating.toFixed(1)}
-            </Text>
-            <Text>·</Text>
-            <Text>{reviewCount} avis</Text>
-            <Text>·</Text>
-            <Text className="flex items-center gap-1">
-              <Clock size={10} />
-              {timeAgo(createdAt)}
-            </Text>
+          {/* ✅ Rangée d'infos : icônes et textes dans des View, pas dans Text */}
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <Star size={12} color="#FACC15" fill="#FACC15" />
+              <Text style={styles.metaText}>{rating.toFixed(1)}</Text>
+            </View>
+            <Text style={styles.metaSeparator}>·</Text>
+            <Text style={styles.metaText}>{reviewCount} avis</Text>
+            <Text style={styles.metaSeparator}>·</Text>
+            <View style={styles.metaItem}>
+              <Clock size={10} color="rgba(255,255,255,0.4)" />
+              <Text style={styles.metaText}>{timeAgo(createdAt)}</Text>
+            </View>
           </View>
         </View>
       </View>
 
       {/* Actions */}
-      <View className="flex flex-wrap gap-2 pt-1">
-        {/* Bouton Contacter (messagerie) - s'affiche si ownerId est présent */}
+      <View style={styles.actionsRow}>
         {ownerId && (
           <Pressable
             onPress={handleContactMessage}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium"
-            style={{ backgroundColor: "rgba(59,130,246,0.15)", borderWidth: 1, borderColor: "rgba(59,130,246,0.15)", borderStyle: "solid" }}
+            style={({ pressed }) => [
+              styles.actionButton,
+              styles.actionBlue,
+              pressed && styles.actionPressed,
+            ]}
           >
-            <Mail size={14} />
-            <Text>Contacter</Text></Pressable>
+            <Mail size={14} color="#60A5FA" />
+            <Text style={[styles.actionText, { color: "#60A5FA" }]}>
+              Contacter
+            </Text>
+          </Pressable>
         )}
 
-        {/* Appel - s'affiche si un numéro est disponible */}
         {ownerPhone && (
           <>
             <Pressable
               onPress={handleCall}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium"
-              style={{ backgroundColor: "rgba(16,185,129,0.15)", borderWidth: 1, borderColor: "rgba(16,185,129,0.15)", borderStyle: "solid" }}
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.actionGreen,
+                pressed && styles.actionPressed,
+              ]}
             >
-              <Phone size={14} />
-              <Text>Appeler</Text></Pressable>
+              <Phone size={14} color="#34D399" />
+              <Text style={[styles.actionText, { color: "#34D399" }]}>
+                Appeler
+              </Text>
+            </Pressable>
 
             <Pressable
               onPress={handleWhatsApp}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium"
-              style={{ backgroundColor: "rgba(37,211,102,0.15)", borderWidth: 1, borderColor: "rgba(37,211,102,0.15)", borderStyle: "solid" }}
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.actionWhatsApp,
+                pressed && styles.actionPressed,
+              ]}
             >
-              <MessageCircle size={14} />
-              <Text>WhatsApp</Text></Pressable>
+              <MessageCircle size={14} color="#25D366" />
+              <Text style={[styles.actionText, { color: "#25D366" }]}>
+                WhatsApp
+              </Text>
+            </Pressable>
 
             <Pressable
               onPress={handleSMS}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium"
-              style={{ backgroundColor: "rgba(59,130,246,0.15)", borderWidth: 1, borderColor: "rgba(59,130,246,0.15)", borderStyle: "solid" }}
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.actionBlue,
+                pressed && styles.actionPressed,
+              ]}
             >
-              <MessageSquare size={14} />
-              <Text>SMS</Text></Pressable>
+              <MessageSquare size={14} color="#60A5FA" />
+              <Text style={[styles.actionText, { color: "#60A5FA" }]}>SMS</Text>
+            </Pressable>
           </>
         )}
 
-        {/* Message si ni ownerId ni ownerPhone */}
         {!ownerId && !ownerPhone && (
-          <View className="text-xs text-white/30 italic text-center w-full py-1">
-            <Text>Contact non disponible</Text></View>
+          <Text style={styles.noContactText}>Contact non disponible</Text>
         )}
       </View>
     </View>
   );
 }
+
+// ── Styles ────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+  },
+  sectionLabel: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  avatarPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(251,146,60,0.2)",
+  },
+  infoColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  name: {
+    color: "#FFFFFF",
+    fontWeight: "500",
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 4,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  metaText: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+  },
+  metaSeparator: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingTop: 4,
+  },
+  actionButton: {
+    flex: 1,
+    minWidth: 100,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  actionPressed: {
+    transform: [{ scale: 0.95 }],
+    opacity: 0.8,
+  },
+  actionBlue: {
+    backgroundColor: "rgba(59,130,246,0.15)",
+    borderColor: "rgba(59,130,246,0.15)",
+  },
+  actionGreen: {
+    backgroundColor: "rgba(16,185,129,0.15)",
+    borderColor: "rgba(16,185,129,0.15)",
+  },
+  actionWhatsApp: {
+    backgroundColor: "rgba(37,211,102,0.15)",
+    borderColor: "rgba(37,211,102,0.15)",
+  },
+  actionText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  noContactText: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 12,
+    fontStyle: "italic",
+    textAlign: "center",
+    width: "100%",
+    paddingVertical: 4,
+  },
+});

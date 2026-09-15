@@ -1,10 +1,12 @@
-import { View, Text, Pressable, Image, TextInput } from "react-native";
+import { View, Text, Pressable, TextInput, Image } from "react-native";
+
 // src/features/community/components/CreatePost/PostGiphyPicker.tsx
 import { useState, useEffect } from "react";
 import { Search, Loader2 } from "lucide-react-native";
 
 // Utilisez une variable d'environnement pour la clé API
-const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY || "VOTRE_CLE_API";
+const GIPHY_API_KEY =
+  process.env.EXPO_PUBLIC_GIPHY_API_KEY || "j1DaE8pW9SZbYqntnUitlziYdsOcpXMn";
 
 interface Props {
   onSelect: (gifUrl: string) => void;
@@ -66,7 +68,8 @@ export function PostGiphyPicker({ onSelect }: Props) {
           onPress={() => setError(null)}
           className="mt-2 text-xs text-purple-400 underline"
         >
-          <Text>Réessayer</Text></Pressable>
+          <Text>Réessayer</Text>
+        </Pressable>
       </View>
     );
   }
@@ -77,7 +80,7 @@ export function PostGiphyPicker({ onSelect }: Props) {
         <Search size={14} className="text-white/40" />
         <TextInput
           value={query}
-          onChangeText={(text) => setQuery(text)}
+          onChangeText={(value) => setQuery(value)}
           placeholder="Rechercher un GIF..."
           className="flex-1 bg-transparent text-white text-sm outline-none"
         />
@@ -88,16 +91,21 @@ export function PostGiphyPicker({ onSelect }: Props) {
         </View>
       ) : results.length === 0 ? (
         <Text className="text-white/40 text-xs text-center py-4">
-          <Text>Aucun GIF trouvé</Text></Text>
+          Aucun GIF trouvé
+        </Text>
       ) : (
         <View className="gap-2 max-h-48 overflow-y-auto">
           {results.map((url, index) => (
             <Pressable
               key={`${url}-${index}`}
               onPress={() => onSelect(url)}
-              className="rounded-lg overflow-hidden"
+              className="rounded-lg overflow-hidden transition-transform"
             >
-              <Image className="w-full h-16 object-cover"  source={{ uri: url }} accessibilityLabel="gif"/>
+              <Image
+                className="w-full h-16 object-cover"
+                source={{ uri: url }}
+                accessibilityLabel="gif"
+              />
             </Pressable>
           ))}
         </View>

@@ -36,7 +36,7 @@ async function bootstrap() {
     modules: [jobManifest, immoManifest],
   });
 
-  createRoot(undefined("root")!).render(<App />);
+  createRoot(document.getElementById("root")!).render(<App />);
 }
 
 bootstrap();

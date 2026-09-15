@@ -1,5 +1,5 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { useState } from "react";
+import { toast } from "sonner";
 import { sendPasswordReset } from "../services/firebase/auth.service";
 
 export function useForgotPassword() {
@@ -13,10 +13,12 @@ export function useForgotPassword() {
       await sendPasswordReset(email);
       setLastEmail(email);
       setSent(true);
-      UIService.openToast("Un email de réinitialisation a été envoyé", "success");
+      toast.success("Un email de réinitialisation a été envoyé");
       return true;
     } catch (error) {
-      UIService.openToast(error instanceof Error ? error.message : "Erreur lors de l'envoi", "error");
+      toast.error(
+        error instanceof Error ? error.message : "Erreur lors de l'envoi",
+      );
       return false;
     } finally {
       setLoading(false);

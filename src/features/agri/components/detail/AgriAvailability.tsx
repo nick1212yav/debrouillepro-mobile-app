@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/agri/components/detail/AgriAvailability.tsx
 import type { AgriProduct } from "../../types/product.types";
 import { CalendarDays, ShieldAlert } from "lucide-react-native";
@@ -38,32 +39,15 @@ export function AgriAvailability({ product }: AgriAvailabilityProps) {
     statusConfig.available;
 
   return (
-    <View className="rounded-[24px] p-4 bg-white/[0.02] border border-white/5 space-y-4">
-      <View className="flex justify-between items-center gap-2">
-        <View className="flex flex-col">
-          <Text className="text-[10px] text-white/30 uppercase tracking-wider">
-            Quantité disponible
-          </Text>
-          <Text className="text-white font-bold text-base leading-none mt-1">
-            {product.quantity.available.toLocaleString("fr-FR")}{" "}
-            {product.quantity.unit}s
-          </Text>
-        </View>
-        <View
-          className={`px-3 py-1.5 rounded-2xl text-[10px] font-bold border ${activeStatus.color}`}
-        >
-          {activeStatus.label}
-        </View>
-      </View>
-
-      {/* ✅ Vérification sécurisée de l'existence des métadonnées optionnelles d'agriculture */}
-      {(product.availability?.harvestDate || product.availability?.season) && (
+    <View className="rounded-[24px] p-4 bg-white/[0.02] border border-white/5 space-y-4"><View className="flex justify-between items-center gap-2"><View className="flex flex-col"><Text className="text-[10px] text-white/30 uppercase tracking-wider">Quantité disponible
+          </Text><Text className="text-white font-bold text-base leading-none mt-1">{product.quantity.available.toLocaleString("fr-FR")}{" "}{product.quantity.unit}s
+          </Text></View><View className={`px-3 py-1.5 rounded-2xl text-[10px] font-bold border ${activeStatus.color}`}>{activeStatus.label}</View></View>{}{(product.availability?.harvestDate || product.availability?.season) && (
         <View className="gap-3 pt-3 border-t border-white/5 text-[10px]">
           {product.availability?.harvestDate && (
             <View className="flex items-center gap-2 text-white/50">
               <CalendarDays size={12} className="text-white/30 flex-shrink-0" />
               <Text>
-                <Text>Récolte :</Text>{" "}
+                Récolte :{" "}
                 <strong className="text-white/80">
                   {product.availability.harvestDate}
                 </strong>
@@ -74,7 +58,7 @@ export function AgriAvailability({ product }: AgriAvailabilityProps) {
             <View className="flex items-center gap-2 text-white/50">
               <ShieldAlert size={12} className="text-white/30 flex-shrink-0" />
               <Text>
-                <Text>Saison :</Text>{" "}
+                Saison :{" "}
                 <strong className="text-white/80">
                   {product.availability.season}
                 </strong>
@@ -82,7 +66,6 @@ export function AgriAvailability({ product }: AgriAvailabilityProps) {
             </View>
           )}
         </View>
-      )}
-    </View>
+      )}</View>
   );
 }

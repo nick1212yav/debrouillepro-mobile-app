@@ -58,31 +58,25 @@ export function NetworkTabs({
   counts = {},
 }: NetworkTabsProps) {
   return (
-    <View className="flex items-center gap-2 overflow-x-auto px-4 pb-2 border-b border-white/5 scrollbar-none flex-shrink-0">
+    <View className="flex items-center gap-2 overflow-x-auto px-4 pb-2 border-b border-white/5 flex-shrink-0">
       {TABS.map((tab) => {
         const isActive = activeTab === tab.id;
         const count = tab.countKey ? (counts[tab.countKey] ?? 0) : 0;
 
         return (
-          <Pressable
-            key={tab.id}
-            onPress={() => onChange(tab.id)}
-            className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[11px] font-bold transition-all border flex-shrink-0 ${
+          <Pressable key={tab.id} whileTap={{ scale: 0.95 }} onPress={() => onChange(tab.id)} className={`flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[11px] font-bold transition-all border flex-shrink-0 ${
               isActive
                 ? "bg-indigo-600/10 border-indigo-500/30 text-indigo-400"
                 : "bg-white/[0.02] border-white/5 text-white/50 hover:text-white/80"
-            }`}
-          >
+            }`}>
             <Text>{tab.icon}</Text>
             <Text>{tab.label}</Text>
             {tab.countKey && count > 0 && (
-              <Text
-                className={`flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[8px] font-black leading-none ${
+              <Text className={`flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[8px] font-black leading-none ${
                   isActive
                     ? "bg-indigo-500 text-white"
                     : "bg-white/10 text-white/70"
-                }`}
-              >
+                }`}>
                 {count}
               </Text>
             )}

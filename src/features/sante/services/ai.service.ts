@@ -1,4 +1,5 @@
 // src/features/sante/services/ai.service.ts
+import { toast } from "sonner";
 
 export class AIService {
   async ask(question: string) {

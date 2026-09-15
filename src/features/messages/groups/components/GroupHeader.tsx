@@ -18,11 +18,7 @@ export function GroupHeader({
   return (
     <View className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
       {onBack && (
-        <Pressable
-          onPress={onBack}
-          className="flex h-9 w-9 items-center justify-center rounded-full"
-          accessibilityLabel="Retour"
-        >
+        <Pressable onPress={onBack} className="flex h-9 w-9 items-center justify-center rounded-full" accessibilityLabel="Retour">
           ←
         </Pressable>
       )}

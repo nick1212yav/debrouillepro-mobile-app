@@ -27,17 +27,9 @@ export function CommunityImage({ src, alt, className = "", onClick }: Props) {
           <Text className="text-white/20 text-4xl">🖼️</Text>
         </View>
       ) : (
-        <Image
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
+        <Image className={`w-full h-full object-cover transition-opacity duration-300 ${
             isLoading ? "opacity-0" : "opacity-100"
-          } ${onClick ? "cursor-pointer" : ""}`}
-          onLoad={() => setIsLoading(false)}
-          onError={() => {
-            setIsLoading(false);
-            setHasError(true);
-          }}
-          onPress={onClick} source={{ uri: src }} accessibilityLabel={alt}
-        />
+          } ${onClick ? "cursor-pointer" : ""}`} onPress={onClick} source={{ uri: src }} accessibilityLabel={alt} />
       )}
     </View>
   );

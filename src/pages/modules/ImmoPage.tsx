@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Text, Pressable, TextInput } from "react-native";
 import {
   ArrowLeft,
@@ -18,8 +17,9 @@ import {
   Unauthenticated,
   AuthLoading,
 } from "@/lib/convex-auth-compat";
-import { Skeleton } from "@/components/ui/skeleton";
-import { SignInButton } from "@/components/ui/signin";
+import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
 
 // ✅ Imports du nouveau module immobilier
 import type { Property } from "@/features/immo";
@@ -28,15 +28,7 @@ import { PropertyCard } from "@/features/immo";
 // Placeholder pour CreatePropertySheet (à implémenter plus tard)
 function CreatePropertySheetPlaceholder({ onClose }: { onClose: () => void }) {
   return (
-    <View className="p-4 text-white">
-      <Text className="font-bold text-lg mb-2">Publier un bien</Text>
-      <Text className="text-white/50 text-sm">Formulaire de création à venir.</Text>
-      <Pressable
-        onPress={onClose}
-        className="mt-4 px-4 py-2 bg-white/10 rounded-xl text-white"
-      >
-        <Text>Fermer</Text></Pressable>
-    </View>
+    <View className="p-4 text-white"><Text className="font-bold text-lg mb-2">Publier un bien</Text><Text className="text-white/50 text-sm">Formulaire de création à venir.</Text><Pressable onPress={onClose} className="mt-4 px-4 py-2 bg-white/10 rounded-xl text-white transition-colors"><Text>Fermer</Text></Pressable></View>
   );
 }
 
@@ -66,92 +58,19 @@ function ImmoContent({ onBack }: { onBack: () => void }) {
   const displayedItems = search.length > 2 ? (searchResults ?? []) : results;
 
   return (
-    <View
-      className="h-full flex flex-col"
-      style={{  }}
-    >
-      <View
-        className="px-5 pt-5 pb-3 flex-shrink-0"
-      >
-        <View className="flex items-center gap-3 mb-4">
-          <Pressable
-            onPress={onBack}
-            className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-          >
-            <ArrowLeft size={18} className="text-white" />
-          </Pressable>
-          <View>
-            <Text className="text-xl font-bold text-white">Immobilier</Text>
-            <Text className="text-xs" style={{ color: "#F97316" }}>
-              Louer · Acheter · Visiter
-            </Text>
-          </View>
-          <Pressable
-            onPress={() => setShowCreate(true)}
-            className="ml-auto w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: "rgba(249,115,22,0.15)", borderWidth: 1, borderColor: "rgba(249,115,22,0.3)", borderStyle: "solid" }}
-          >
-            <Plus size={16} style={{ color: "#F97316" }} />
-          </Pressable>
-        </View>
-        <View
-          className="flex items-center gap-2 px-4 py-3 rounded-2xl"
-          style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          <Search size={16} className="text-white/40" />
-          <TextInput
-            value={search}
-            onChangeText={(text) => setSearch(text)}
-            placeholder="Rechercher un logement…"
-            className="flex-1 bg-transparent text-white placeholder:text-white/35 text-sm outline-none"
-          />
-        </View>
-        <View
-          className="flex gap-2 mt-3 overflow-x-auto pb-1"
-          style={{  }}
-        >
-          {filters.map((f) => (
-            <Pressable
-              key={f}
-              onPress={() => setActiveFilter(f)}
-              className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold"
-              style={
-                activeFilter === f
+    <View className="h-full flex flex-col" style={{  }}><View initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="px-5 pt-5 pb-3 flex-shrink-0"><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View><Text className="text-xl font-bold text-white">Immobilier</Text><Text className="text-xs" style={{ color: "#F97316" }}>Louer · Acheter · Visiter
+            </Text></View><Pressable onPress={() => setShowCreate(true)} className="ml-auto w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(249,115,22,0.15)", borderWidth: 1, borderColor: "rgba(249,115,22,0.3)", borderStyle: "solid" }}><Plus size={16} style={{  }} /></Pressable></View><View className="flex items-center gap-2 px-4 py-3 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={16} className="text-white/40" /><TextInput value={search} onChangeText={(value) => setSearch(value)} placeholder="Rechercher un logement…" className="flex-1 bg-transparent text-white placeholder:text-white/35 text-sm outline-none" /></View><View className="flex gap-2 mt-3 overflow-x-auto pb-1" style={{  }}>{filters.map((f) => (
+            <Pressable key={f} onPress={() => setActiveFilter(f)} className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all" style={activeFilter === f
                   ? {  }
-                  : { backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }
-              }
-            >
-              {f}
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View
-        className="flex-1 overflow-y-auto px-5 pb-6 flex flex-col gap-4"
-        style={{  }}
-      >
-        {status === "LoadingFirstPage" &&
+                  : { backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>{f}</Pressable>
+          ))}</View></View><View className="flex-1 overflow-y-auto px-5 pb-6 flex flex-col gap-4" style={{  }}>{status === "LoadingFirstPage" &&
           Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-64 w-full rounded-3xl" />
-          ))}
-        {displayedItems.length === 0 && status !== "LoadingFirstPage" && (
-          <View className="flex flex-col items-center justify-center py-16 gap-3">
-            <Home size={40} className="text-white/15" />
-            <Text className="text-white/40 text-sm">
-              Aucune annonce pour le moment
-            </Text>
-            <Pressable
-              onPress={() => setShowCreate(true)}
-              className="px-5 py-2.5 rounded-2xl text-sm font-bold text-white"
-              style={{  }}
-            >
-              <Text>Publier la première annonce</Text></Pressable>
-          </View>
-        )}
-        {(displayedItems as Property[]).map((item, i) => (
-          <View key={item._id}>
+          ))}{displayedItems.length === 0 && status !== "LoadingFirstPage" && (
+          <View className="flex flex-col items-center justify-center py-16 gap-3"><Home size={40} className="text-white/15" /><Text className="text-white/40 text-sm">Aucune annonce pour le moment
+            </Text><Pressable onPress={() => setShowCreate(true)} className="px-5 py-2.5 rounded-2xl text-sm font-bold text-white" style={{  }}><Text>Publier la première annonce</Text></Pressable></View>
+        )}{(displayedItems as Property[]).map((item, i) => (
+          <View key={item._id} transition={{ delay: 0.05 + i * 0.05 }}>
             <PropertyCard
               publication={item as any}
               index={i}
@@ -161,93 +80,27 @@ function ImmoContent({ onBack }: { onBack: () => void }) {
               onBookmark={() => {}}
             />
           </View>
-        ))}
-        {status === "CanLoadMore" && (
-          <Pressable
-            onPress={() => loadMore(10)}
-            className="w-full py-3 rounded-2xl text-sm text-white/50"
-            style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-          >
-            <Text>Charger plus</Text></Pressable>
-        )}
-      </View>
-
-      <>
-        {selectedItem && (
+        ))}{status === "CanLoadMore" && (
+          <Pressable onPress={() => loadMore(10)} className="w-full py-3 rounded-2xl text-sm text-white/50" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text>Charger plus</Text></Pressable>
+        )}</View><View>{selectedItem && (
           <>
-            <Pressable
-              onPress={() => setSelectedItem(null)}
-              className="fixed inset-0 z-40"
-              style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-            />
-            <View
-              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl flex flex-col"
-              style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", maxHeight: "80vh" }}
-            >
-              <View className="flex justify-center pt-3 flex-shrink-0">
-                <View className="w-10 h-1 rounded-full bg-white/20" />
-              </View>
-              <View className="flex items-center justify-between px-5 py-3 flex-shrink-0">
-                <View>
-                  <Text className="text-white font-black text-lg">
-                    {selectedItem.title}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => setSelectedItem(null)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-                >
-                  <X size={15} className="text-white/60" />
-                </Pressable>
-              </View>
-              <View
-                className="flex-1 overflow-y-auto px-5 pb-8"
-                style={{  }}
-              >
-                <Text
-                  className="font-black text-lg mb-2"
-                  style={{ color: "#F97316" }}
-                >
-                  {selectedItem.price.toLocaleString()} {selectedItem.currency}
-                  {selectedItem.transactionType === "location" ? "/mois" : ""}
-                </Text>
-                <Text className="text-white/50 text-sm mb-4">
-                  {selectedItem.description || "Aucune description disponible."}
-                </Text>
-                {selectedItem.amenities &&
+            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setSelectedItem(null)} className="fixed inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} />
+            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl flex flex-col" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", maxHeight: "80vh" }}>
+              <View className="flex justify-center pt-3 flex-shrink-0"><View className="w-10 h-1 rounded-full bg-white/20" /></View>
+              <View className="flex items-center justify-between px-5 py-3 flex-shrink-0"><View><Text className="text-white font-black text-lg">{selectedItem.title}</Text></View><Pressable onPress={() => setSelectedItem(null)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><X size={15} className="text-white/60" /></Pressable></View>
+              <View className="flex-1 overflow-y-auto px-5 pb-8" style={{  }}><Text className="font-black text-lg mb-2" style={{ color: "#F97316" }}>{selectedItem.price.toLocaleString()}{selectedItem.currency}{selectedItem.transactionType === "location" ? "/mois" : ""}</Text><Text className="text-white/50 text-sm mb-4">{selectedItem.description || "Aucune description disponible."}</Text>{selectedItem.amenities &&
                   selectedItem.amenities.length > 0 && (
-                    <View className="flex flex-wrap gap-2 mb-4">
-                      {selectedItem.amenities.map((a) => (
-                        <Text
-                          key={a}
-                          className="px-3 py-1 rounded-full text-xs text-white/50"
-                          style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-                        >
-                          {a}
-                        </Text>
-                      ))}
-                    </View>
-                  )}
-                <View className="flex gap-2">
-                  <Pressable
-                    onPress={() => UIService.openToast("Appel en cours…", "info")}
-                    className="flex-1 py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2"
-                    style={{ backgroundColor: "rgba(16,185,129,0.2)" }}
-                  >
-                    <Phone size={14} /> <Text>Appeler le propriétaire</Text></Pressable>
-                </View>
-              </View>
+                    <View className="flex flex-wrap gap-2 mb-4">{selectedItem.amenities.map((a) => (
+                        <Text key={a} className="px-3 py-1 rounded-full text-xs text-white/50" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>{a}</Text>
+                      ))}</View>
+                  )}<View className="flex gap-2"><Pressable onPress={() => toast.info("Appel en cours…")} className="flex-1 py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2" style={{ backgroundColor: "rgba(16,185,129,0.2)" }}><Phone size={14} /><Text>Appeler le propriétaire</Text></Pressable></View></View>
             </View>
           </>
-        )}
-        {showCreate && (
+        )}{showCreate && (
           <CreatePropertySheetPlaceholder
             onClose={() => setShowCreate(false)}
           />
-        )}
-      </>
-    </View>
+        )}</View></View>
   );
 }
 
@@ -259,27 +112,13 @@ export default function ImmoPage({ onBack }: ImmoPageProps) {
   return (
     <>
       <AuthLoading>
-        <View
-          className="h-full flex items-center justify-center"
-          style={{  }}
-        >
-          <View className="flex flex-col gap-3">
-            {Array.from({ length: 3 }).map((_, i) => (
+        <View className="h-full flex items-center justify-center" style={{  }}><View className="flex flex-col gap-3">{Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-64 w-80 rounded-3xl" />
-            ))}
-          </View>
-        </View>
+            ))}</View></View>
       </AuthLoading>
       <Unauthenticated>
-        <View
-          className="h-full flex flex-col items-center justify-center gap-4 px-6"
-          style={{  }}
-        >
-          <Pressable
-            onPress={onBack}
-            className="self-start w-10 h-10 rounded-2xl flex items-center justify-center mb-4"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-          >
+        <View className="h-full flex flex-col items-center justify-center gap-4 px-6" style={{  }}>
+          <Pressable onPress={onBack} className="self-start w-10 h-10 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
             <ArrowLeft size={18} className="text-white" />
           </Pressable>
           <Building size={48} className="text-white/20" />

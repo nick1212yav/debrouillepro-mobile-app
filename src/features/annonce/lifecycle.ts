@@ -1,6 +1,6 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useAnnonceLifecycle() {
@@ -13,10 +13,10 @@ export function useAnnonceLifecycle() {
   const handleCreate = async (data: any) => {
     try {
       const result = await create(data);
-      UIService.openToast("Annonce créée avec succès !", "success");
+      toast.success("Annonce créée avec succès !");
       return result;
     } catch (error) {
-      UIService.openToast("Erreur lors de la création", "error");
+      toast.error("Erreur lors de la création");
       throw error; // ✅ corrigé
     }
   };
@@ -24,9 +24,9 @@ export function useAnnonceLifecycle() {
   const handleUpdate = async (id: string, data: any) => {
     try {
       await update({ publicationId: id as Id<"publications">, ...data });
-      UIService.openToast("Annonce mise à jour", "success");
+      toast.success("Annonce mise à jour");
     } catch (error) {
-      UIService.openToast("Erreur lors de la mise à jour", "error");
+      toast.error("Erreur lors de la mise à jour");
       throw error; // ✅ corrigé
     }
   };
@@ -35,9 +35,9 @@ export function useAnnonceLifecycle() {
     try {
       // ✅ corrigé : publicationId au lieu de id
       await remove({ publicationId: id as Id<"publications"> });
-      UIService.openToast("Annonce supprimée", "success");
+      toast.success("Annonce supprimée");
     } catch (error) {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
       throw error; // ✅ corrigé
     }
   };

@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreateMedicalRecordSheet.tsx
@@ -13,6 +12,7 @@ import { MedicalRecordForm } from "../forms/MedicalRecordForm";
 import type { MedicalRecordFormValues } from "../forms/MedicalRecordForm";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface CreateMedicalRecordSheetProps {
@@ -51,13 +51,13 @@ export function CreateMedicalRecordSheet({
             .filter(Boolean) || [],
         // attachments non géré pour l'instant
       });
-      UIService.openToast("Enregistrement médical créé !", "success");
+      toast.success("Enregistrement médical créé !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erreur lors de la création";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

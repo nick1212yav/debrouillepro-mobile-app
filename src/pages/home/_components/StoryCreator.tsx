@@ -1,9 +1,15 @@
 // src/pages/home/_components/StoryCreator.tsx
-
-import { useCallback, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
-  Image,
+  Alert,
+  Image as RNImage,
   Modal,
   Pressable,
   ScrollView,
@@ -11,9 +17,14 @@ import {
   Text,
   TextInput,
   View,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
 import {
   BarChart3,
   Check,
@@ -30,32 +41,40 @@ import {
 } from "lucide-react-native";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { toast } from "sonner";
-import type { StorySlide } from "./StoryViewer.tsx";
+
+import type { StorySlide } from "./StoryViewer";
+
+/* ============================================================
+ * CONSTANTS
+ * ============================================================ */
 
 const TEXT_GRADIENTS = [
-  ["#667eea", "#764ba2"],
-  ["#f093fb", "#f5576c"],
-  ["#4facfe", "#00f2fe"],
-  ["#43e97b", "#38f9d7"],
-  ["#fa709a", "#fee140"],
-  ["#a18cd1", "#fbc2eb"],
-  ["#ffecd2", "#fcb69f"],
-  ["#0a0a1a", "#1a1a3e"],
+  { key: "purple", colors: ["#667EEA", "#764BA2"], solid: "#667EEA" },
+  { key: "pink", colors: ["#F093FB", "#F5576C"], solid: "#F093FB" },
+  { key: "cyan", colors: ["#4FACFE", "#00F2FE"], solid: "#4FACFE" },
+  { key: "green", colors: ["#43E97B", "#38F9D7"], solid: "#43E97B" },
+  { key: "peach", colors: ["#FA709A", "#FEE140"], solid: "#FA709A" },
+  { key: "violet", colors: ["#A18CD1", "#FBC2EB"], solid: "#A18CD1" },
+  { key: "sand", colors: ["#FFECD2", "#FCB69F"], solid: "#FFECD2" },
+  { key: "dark", colors: ["#0A0A1A", "#1A1A3E"], solid: "#0A0A1A" },
 ] as const;
 
 const TEXT_COLORS = [
-  "#ffffff",
-  "#ffe566",
-  "#ff6b6b",
-  "#69ff94",
-  "#69b8ff",
-  "#e879f9",
+  "#FFFFFF",
+  "#FFE566",
+  "#FF6B6B",
+  "#69FF94",
+  "#69B8FF",
+  "#E879F9",
 ];
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
 type StepType = "pick" | "text" | "image" | "poll";
+
+/* ============================================================
+ * TYPES
+ * ============================================================ */
 
 interface StoryCreatorProps {
   onClose: () => void;
@@ -71,8 +90,9 @@ interface CreationType {
   type: Exclude<StepType, "pick">;
   label: string;
   description: string;
-  icon: typeof Type;
-  colors: readonly [string, string];
+  icon: React.ComponentType<{ size?: number; color?: string }>;
+  color: string;
+  gradient: readonly [string, string];
 }
 
 const CREATION_TYPES: CreationType[] = [
@@ -81,875 +101,160 @@ const CREATION_TYPES: CreationType[] = [
     label: "Story texte",
     description: "Une idée, une annonce ou un message.",
     icon: Type,
-    colors: ["#8B5CF6", "#6366F1"],
+    color: "#A78BFA",
+    gradient: ["#A78BFA", "#7C3AED"],
   },
   {
     type: "image",
     label: "Photo",
     description: "Partagez un moment depuis votre appareil.",
     icon: ImageIcon,
-    colors: ["#3B82F6", "#06B6D4"],
+    color: "#60A5FA",
+    gradient: ["#60A5FA", "#3B82F6"],
   },
   {
     type: "poll",
     label: "Sondage",
     description: "Faites participer votre communauté.",
     icon: BarChart3,
-    colors: ["#EC4899", "#8B5CF6"],
+    color: "#F472B6",
+    gradient: ["#F472B6", "#EC4899"],
   },
 ];
 
-export default function StoryCreator({
-  onClose,
-  onPublish,
-}: StoryCreatorProps) {
-  const [step, setStep] = useState<StepType>("pick");
-
-  const [text, setText] = useState("");
-  const [textColor, setTextColor] = useState("#ffffff");
-  const [backgroundIndex, setBackgroundIndex] = useState(0);
-
-  const [imgStorageId, setImgStorageId] = useState("");
-  const [imgPreviewUrl, setImgPreviewUrl] = useState("");
-  const [imgCaption, setImgCaption] = useState("");
-
-  const [pollQ, setPollQ] = useState("");
-  const [pollOpts, setPollOpts] = useState(["", ""]);
-
-  const [uploading, setUploading] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-
-  const generateUploadUrl = useMutation(api.stories.generateStoryUploadUrl);
-
-  const createStory = useMutation(api.stories.createStory);
-
-  const backgroundColors = TEXT_GRADIENTS[backgroundIndex];
-
-  const validPollOptions = useMemo(
-    () => pollOpts.map((option) => option.trim()).filter(Boolean),
-    [pollOpts],
-  );
-
-  const canPublish = useMemo(() => {
-    if (publishing || uploading) {
-      return false;
-    }
-
-    if (step === "text") {
-      return text.trim().length > 0;
-    }
-
-    if (step === "image") {
-      return imgStorageId.length > 0;
-    }
-
-    if (step === "poll") {
-      return pollQ.trim().length > 0 && validPollOptions.length >= 2;
-    }
-
-    return false;
-  }, [
-    publishing,
-    uploading,
-    step,
-    text,
-    imgStorageId,
-    pollQ,
-    validPollOptions,
-  ]);
-
-  const requestGalleryPermission = useCallback(async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      toast.error("Autorisez l'accès à votre galerie pour choisir une photo.");
-
-      return false;
-    }
-
-    return true;
-  }, []);
-
-  const validateImage = useCallback(
-    (asset: ImagePicker.ImagePickerAsset): boolean => {
-      const mimeType = asset.mimeType ?? "";
-
-      if (mimeType && !mimeType.startsWith("image/")) {
-        toast.error("Veuillez sélectionner une image valide.");
-
-        return false;
-      }
-
-      if (
-        typeof asset.fileSize === "number" &&
-        asset.fileSize > MAX_IMAGE_SIZE
-      ) {
-        toast.error("L'image est trop volumineuse. Maximum : 10 Mo.");
-
-        return false;
-      }
-
-      return true;
-    },
-    [],
-  );
-
-  const uploadImage = useCallback(
-    async (asset: ImagePicker.ImagePickerAsset) => {
-      if (!validateImage(asset)) {
-        return;
-      }
-
-      setUploading(true);
-
-      try {
-        setImgPreviewUrl(asset.uri);
-        setImgStorageId("");
-
-        const uploadUrl = await generateUploadUrl();
-
-        const fileResponse = await fetch(asset.uri);
-
-        if (!fileResponse.ok) {
-          throw new Error("Impossible de lire l'image sélectionnée.");
-        }
-
-        const blob = await fileResponse.blob();
-
-        const response = await fetch(uploadUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": asset.mimeType ?? blob.type ?? "image/jpeg",
-          },
-          body: blob,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.status}`);
-        }
-
-        const result = (await response.json()) as {
-          storageId?: string;
-        };
-
-        if (!result.storageId) {
-          throw new Error("Convex n'a pas retourné de storageId.");
-        }
-
-        setImgStorageId(result.storageId);
-
-        toast.success("Photo prête à publier.");
-      } catch (error) {
-        console.error("[StoryCreator] image upload error", error);
-
-        setImgStorageId("");
-        setImgPreviewUrl("");
-
-        toast.error("Impossible d'envoyer cette photo.");
-      } finally {
-        setUploading(false);
-      }
-    },
-    [generateUploadUrl, validateImage],
-  );
-
-  const pickImage = useCallback(async () => {
-    if (uploading || publishing) {
-      return;
-    }
-
-    const granted = await requestGalleryPermission();
-
-    if (!granted) {
-      return;
-    }
-
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 1,
-        selectionLimit: 1,
-      });
-
-      if (result.canceled) {
-        return;
-      }
-
-      const asset = result.assets?.[0];
-
-      if (!asset) {
-        return;
-      }
-
-      await uploadImage(asset);
-    } catch (error) {
-      console.error("[StoryCreator] image picker error", error);
-
-      toast.error("Impossible d'ouvrir votre galerie.");
-    }
-  }, [publishing, requestGalleryPermission, uploadImage, uploading]);
-
-  const removeImage = useCallback(() => {
-    setImgStorageId("");
-    setImgPreviewUrl("");
-    setImgCaption("");
-  }, []);
-
-  const addPollOption = useCallback(() => {
-    setPollOpts((current) => {
-      if (current.length >= 4) {
-        return current;
-      }
-
-      return [...current, ""];
-    });
-  }, []);
-
-  const updatePollOption = useCallback((index: number, value: string) => {
-    setPollOpts((current) =>
-      current.map((option, optionIndex) =>
-        optionIndex === index ? value : option,
-      ),
-    );
-  }, []);
-
-  const removePollOption = useCallback((index: number) => {
-    setPollOpts((current) => {
-      if (current.length <= 2) {
-        return current;
-      }
-
-      return current.filter((_, optionIndex) => optionIndex !== index);
-    });
-  }, []);
-
-  const resetCreator = useCallback(() => {
-    setStep("pick");
-
-    setText("");
-    setTextColor("#ffffff");
-    setBackgroundIndex(0);
-
-    removeImage();
-
-    setPollQ("");
-    setPollOpts(["", ""]);
-
-    setPublishing(false);
-    setUploading(false);
-  }, [removeImage]);
-
-  const publish = useCallback(async () => {
-    if (!canPublish) {
-      return;
-    }
-
-    setPublishing(true);
-
-    try {
-      if (step === "text") {
-        const cleanText = text.trim();
-
-        const gradientValue = backgroundColors.join(",");
-
-        await createStory({
-          mediaUrl: `data:text/${gradientValue}|${cleanText}|${textColor}`,
-          mediaType: "image",
-          caption: cleanText,
-        });
-
-        onPublish({
-          type: "text",
-          bg: gradientValue,
-          text: cleanText,
-          textColor,
-        });
-
-        toast.success("Story publiée.");
-
-        resetCreator();
-
-        return;
-      }
-
-      if (step === "image") {
-        if (!imgStorageId) {
-          toast.error("Ajoutez une photo avant de publier.");
-
-          return;
-        }
-
-        await createStory({
-          mediaUrl: imgStorageId,
-          mediaType: "image",
-          caption: imgCaption.trim() || undefined,
-        });
-
-        onPublish({
-          type: "image",
-          bg: "#000",
-          img: imgStorageId,
-          text: imgCaption.trim() || undefined,
-        });
-
-        toast.success("Story publiée.");
-
-        resetCreator();
-
-        return;
-      }
-
-      if (step === "poll") {
-        const question = pollQ.trim();
-
-        if (!question || validPollOptions.length < 2) {
-          toast.error(
-            "Un sondage doit contenir une question et au moins deux options.",
-          );
-
-          return;
-        }
-
-        await createStory({
-          mediaUrl: `poll:${question}`,
-          mediaType: "image",
-          caption: question,
-        });
-
-        onPublish({
-          type: "poll",
-          bg: TEXT_GRADIENTS[7].join(","),
-          pollQuestion: question,
-          pollOptions: validPollOptions,
-        });
-
-        toast.success("Sondage publié.");
-
-        resetCreator();
-      }
-    } catch (error) {
-      console.error("[StoryCreator] publication error", error);
-
-      toast.error("La publication a échoué.");
-    } finally {
-      setPublishing(false);
-    }
-  }, [
-    backgroundColors,
-    canPublish,
-    createStory,
-    imgCaption,
-    imgStorageId,
-    onPublish,
-    pollQ,
-    resetCreator,
-    step,
-    text,
-    textColor,
-    validPollOptions,
-  ]);
-
-  const handleClose = useCallback(() => {
-    if (uploading || publishing) {
-      return;
-    }
-
-    onClose();
-  }, [onClose, publishing, uploading]);
-
-  const goBack = useCallback(() => {
-    if (uploading || publishing) {
-      return;
-    }
-
-    if (step !== "pick") {
-      setStep("pick");
-      return;
-    }
-
-    handleClose();
-  }, [handleClose, publishing, step, uploading]);
+/* ============================================================
+ * ANIMATION HELPERS
+ * ============================================================ */
+
+function FadeUp({
+  delay = 0,
+  distance = 12,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: React.ReactNode;
+  style?: any;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 460,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
 
   return (
-    <Modal
-      transparent
-      visible
-      animationType="fade"
-      onRequestClose={handleClose}
-      statusBarTranslucent
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
     >
-      <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <View style={styles.headerRow}>
-              <Pressable
-                onPress={goBack}
-                disabled={uploading || publishing}
-                style={[
-                  styles.headerButton,
-                  uploading || publishing ? styles.disabled : null,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={step === "pick" ? "Fermer" : "Retour"}
-              >
-                {step === "pick" ? (
-                  <X size={18} color="#ffffff" />
-                ) : (
-                  <ChevronLeft size={20} color="#ffffff" />
-                )}
-              </Pressable>
-
-              <View style={styles.headerTitle}>
-                <View style={styles.titleRow}>
-                  <Sparkles size={15} color="#a78bfa" />
-
-                  <Text style={styles.title}>Créer une story</Text>
-                </View>
-
-                <Text style={styles.subtitle}>Partagez ce qui compte.</Text>
-              </View>
-
-              <View style={styles.headerRight}>
-                {step !== "pick" && (
-                  <Text style={styles.stepLabel}>
-                    {step === "text"
-                      ? "Texte"
-                      : step === "image"
-                        ? "Photo"
-                        : "Sondage"}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.progressRow}>
-              <View
-                style={[
-                  styles.progressTrack,
-                  step === "pick" ? styles.progressActive : null,
-                ]}
-              >
-                {step === "pick" && (
-                  <LinearGradient
-                    colors={["#6366F1", "#A855F7"]}
-                    style={styles.progressFill}
-                  />
-                )}
-              </View>
-
-              <View
-                style={[
-                  styles.progressTrack,
-                  step !== "pick" ? styles.progressActive : null,
-                ]}
-              >
-                {step !== "pick" && (
-                  <LinearGradient
-                    colors={["#6366F1", "#A855F7"]}
-                    style={styles.progressFill}
-                  />
-                )}
-              </View>
-            </View>
-          </View>
-
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {step === "pick" && (
-              <View>
-                <View style={styles.intro}>
-                  <View style={styles.introIcon}>
-                    <Zap size={24} color="#a78bfa" />
-                  </View>
-
-                  <Text style={styles.introTitle}>
-                    Qu'avez-vous envie de partager ?
-                  </Text>
-
-                  <Text style={styles.introDescription}>
-                    Créez quelque chose qui attire l'attention, raconte une
-                    histoire et fait participer votre communauté.
-                  </Text>
-                </View>
-
-                <View style={styles.creationList}>
-                  {CREATION_TYPES.map((option) => {
-                    const Icon = option.icon;
-
-                    return (
-                      <Pressable
-                        key={option.type}
-                        onPress={() => setStep(option.type)}
-                        style={styles.creationCard}
-                      >
-                        <LinearGradient
-                          colors={option.colors}
-                          style={styles.creationIcon}
-                        >
-                          <Icon size={20} color="#ffffff" />
-                        </LinearGradient>
-
-                        <View style={styles.creationText}>
-                          <Text style={styles.creationTitle}>
-                            {option.label}
-                          </Text>
-
-                          <Text style={styles.creationDescription}>
-                            {option.description}
-                          </Text>
-                        </View>
-
-                        <View style={styles.arrowBox}>
-                          <ChevronRight
-                            size={17}
-                            color="rgba(255,255,255,0.45)"
-                          />
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {step === "text" && (
-              <View style={styles.section}>
-                <LinearGradient
-                  colors={backgroundColors}
-                  style={styles.storyPreview}
-                >
-                  <View style={styles.textPreviewCenter}>
-                    <Text
-                      style={[
-                        styles.storyText,
-                        {
-                          color: textColor,
-                        },
-                      ]}
-                    >
-                      {text || "Votre idée mérite d'être vue."}
-                    </Text>
-                  </View>
-
-                  <View style={styles.previewFooter}>
-                    <Text style={styles.previewFooterText}>
-                      APERÇU DE VOTRE STORY
-                    </Text>
-                  </View>
-                </LinearGradient>
-
-                <FieldLabel>Votre message</FieldLabel>
-
-                <TextInput
-                  value={text}
-                  onChangeText={setText}
-                  maxLength={500}
-                  multiline
-                  numberOfLines={4}
-                  placeholder="Écrivez quelque chose qui mérite d'être partagé…"
-                  placeholderTextColor="rgba(255,255,255,0.22)"
-                  style={[styles.input, styles.textArea]}
-                />
-
-                <Text style={styles.counter}>{text.length}/500</Text>
-
-                <FieldLabel>Style</FieldLabel>
-
-                <View style={styles.gradientGrid}>
-                  {TEXT_GRADIENTS.map((colors, index) => (
-                    <Pressable
-                      key={index}
-                      onPress={() => setBackgroundIndex(index)}
-                      style={[
-                        styles.colorButton,
-                        backgroundIndex === index ? styles.selectedColor : null,
-                      ]}
-                    >
-                      <LinearGradient colors={colors} style={styles.colorFill}>
-                        {backgroundIndex === index && (
-                          <Check size={14} color="#ffffff" />
-                        )}
-                      </LinearGradient>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <FieldLabel>Couleur du texte</FieldLabel>
-
-                <View style={styles.textColorRow}>
-                  {TEXT_COLORS.map((color) => (
-                    <Pressable
-                      key={color}
-                      onPress={() => setTextColor(color)}
-                      style={[
-                        styles.textColorButton,
-                        {
-                          backgroundColor: color,
-                        },
-                        textColor === color ? styles.selectedTextColor : null,
-                      ]}
-                    >
-                      {textColor === color && (
-                        <Check
-                          size={12}
-                          color={color === "#ffffff" ? "#000000" : "#ffffff"}
-                        />
-                      )}
-                    </Pressable>
-                  ))}
-                </View>
-
-                <PublishButton
-                  disabled={!canPublish}
-                  loading={publishing}
-                  onPress={publish}
-                  label="Publier la story"
-                  colors={["#8B5CF6", "#6366F1"]}
-                />
-              </View>
-            )}
-
-            {step === "image" && (
-              <View style={styles.section}>
-                <View style={styles.imagePreview}>
-                  {imgPreviewUrl ? (
-                    <>
-                      <Image
-                        source={{
-                          uri: imgPreviewUrl,
-                        }}
-                        style={styles.previewImage}
-                        resizeMode="cover"
-                      />
-
-                      <LinearGradient
-                        colors={["transparent", "rgba(0,0,0,0.85)"]}
-                        style={styles.imageCaptionOverlay}
-                      >
-                        <Text style={styles.imageCaption}>
-                          {imgCaption || "Votre story"}
-                        </Text>
-                      </LinearGradient>
-
-                      <Pressable
-                        onPress={removeImage}
-                        disabled={uploading || publishing}
-                        style={styles.removeImageButton}
-                      >
-                        <X size={17} color="#ffffff" />
-                      </Pressable>
-                    </>
-                  ) : (
-                    <Pressable
-                      onPress={() => void pickImage()}
-                      style={styles.emptyImageArea}
-                    >
-                      <View style={styles.imagePickerIcon}>
-                        {uploading ? (
-                          <ActivityIndicator color="#60a5fa" />
-                        ) : (
-                          <ImagePlus size={27} color="#60a5fa" />
-                        )}
-                      </View>
-
-                      <Text style={styles.emptyImageTitle}>
-                        {uploading ? "Envoi sécurisé…" : "Ajouter une photo"}
-                      </Text>
-
-                      <Text style={styles.emptyImageDescription}>
-                        JPG, PNG, WEBP · 10 Mo max.
-                      </Text>
-                    </Pressable>
-                  )}
-
-                  {uploading && (
-                    <View style={styles.uploadOverlay}>
-                      <View style={styles.uploadStatus}>
-                        <ActivityIndicator size="small" color="#60a5fa" />
-
-                        <Text style={styles.uploadStatusText}>
-                          Envoi en cours…
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-
-                <Pressable
-                  disabled={uploading || publishing}
-                  onPress={() => void pickImage()}
-                  style={[
-                    styles.galleryButton,
-                    uploading || publishing ? styles.disabled : null,
-                  ]}
-                >
-                  <View style={styles.galleryIcon}>
-                    {uploading ? (
-                      <ActivityIndicator size="small" color="#60a5fa" />
-                    ) : (
-                      <Upload size={18} color="#60a5fa" />
-                    )}
-                  </View>
-
-                  <View
-                    style={{
-                      flex: 1,
-                    }}
-                  >
-                    <Text style={styles.galleryTitle}>
-                      {imgPreviewUrl
-                        ? "Changer la photo"
-                        : "Choisir depuis l'appareil"}
-                    </Text>
-
-                    <Text style={styles.galleryDescription}>
-                      Votre fichier est envoyé vers le stockage de
-                      l'application.
-                    </Text>
-                  </View>
-
-                  <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
-                </Pressable>
-
-                <FieldLabel>Légende</FieldLabel>
-
-                <TextInput
-                  value={imgCaption}
-                  onChangeText={setImgCaption}
-                  maxLength={180}
-                  placeholder="Ajoutez un contexte à votre photo…"
-                  placeholderTextColor="rgba(255,255,255,0.22)"
-                  style={styles.input}
-                />
-
-                <PublishButton
-                  disabled={!canPublish}
-                  loading={publishing}
-                  onPress={publish}
-                  label="Publier la photo"
-                  colors={["#3B82F6", "#06B6D4"]}
-                />
-              </View>
-            )}
-
-            {step === "poll" && (
-              <View style={styles.section}>
-                <LinearGradient
-                  colors={TEXT_GRADIENTS[7]}
-                  style={styles.pollPreview}
-                >
-                  <View style={styles.pollIcon}>
-                    <BarChart3 size={25} color="#ffffff" />
-                  </View>
-
-                  <Text style={styles.pollQuestionPreview}>
-                    {pollQ || "Votre question apparaîtra ici"}
-                  </Text>
-
-                  <View style={styles.pollPreviewOptions}>
-                    {validPollOptions.length > 0 ? (
-                      validPollOptions.map((option, index) => (
-                        <View
-                          key={`${option}-${index}`}
-                          style={styles.pollPreviewOption}
-                        >
-                          <Text style={styles.pollPreviewOptionText}>
-                            {option}
-                          </Text>
-                        </View>
-                      ))
-                    ) : (
-                      <View style={styles.pollEmpty}>
-                        <Text style={styles.pollEmptyText}>
-                          Ajoutez vos options
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </LinearGradient>
-
-                <FieldLabel>Question</FieldLabel>
-
-                <TextInput
-                  value={pollQ}
-                  onChangeText={setPollQ}
-                  maxLength={180}
-                  placeholder="Posez une question à votre communauté…"
-                  placeholderTextColor="rgba(255,255,255,0.22)"
-                  style={styles.input}
-                />
-
-                <View style={styles.optionsHeader}>
-                  <FieldLabel>Options</FieldLabel>
-
-                  <Text style={styles.optionsCount}>
-                    {validPollOptions.length}
-                    /4
-                  </Text>
-                </View>
-
-                <View style={styles.optionsList}>
-                  {pollOpts.map((option, index) => (
-                    <View key={index} style={styles.optionRow}>
-                      <View style={styles.optionNumber}>
-                        <Text style={styles.optionNumberText}>{index + 1}</Text>
-                      </View>
-
-                      <TextInput
-                        value={option}
-                        onChangeText={(value) => updatePollOption(index, value)}
-                        maxLength={80}
-                        placeholder={`Option ${index + 1}`}
-                        placeholderTextColor="rgba(255,255,255,0.22)"
-                        style={[styles.input, styles.optionInput]}
-                      />
-
-                      {pollOpts.length > 2 && (
-                        <Pressable
-                          onPress={() => removePollOption(index)}
-                          style={styles.deleteOption}
-                        >
-                          <X size={16} color="#f87171" />
-                        </Pressable>
-                      )}
-                    </View>
-                  ))}
-                </View>
-
-                {pollOpts.length < 4 && (
-                  <Pressable onPress={addPollOption} style={styles.addOption}>
-                    <Plus size={15} color="#f472b6" />
-
-                    <Text style={styles.addOptionText}>Ajouter une option</Text>
-                  </Pressable>
-                )}
-
-                <PublishButton
-                  disabled={!canPublish}
-                  loading={publishing}
-                  onPress={publish}
-                  label="Publier le sondage"
-                  colors={["#EC4899", "#8B5CF6"]}
-                />
-              </View>
-            )}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+      {children}
+    </Animated.View>
   );
 }
 
-function FieldLabel({ children }: { children: string }) {
-  return <Text style={styles.fieldLabel}>{children}</Text>;
+/* ============================================================
+ * ANIMATED PROGRESS BAR
+ * ============================================================ */
+
+function AnimatedProgress({ value }: { value: number }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: Math.min(1, Math.max(0, value)),
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [value, anim]);
+
+  const width = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
+
+  const isHigh = value > 0.9;
+
+  return (
+    <View style={styles.progressTrack}>
+      <Animated.View
+        style={[
+          styles.progressFill,
+          {
+            width,
+            backgroundColor: isHigh ? "#FB7185" : "#A78BFA",
+            shadowColor: isHigh ? "#FB7185" : "#A78BFA",
+          },
+        ]}
+      />
+    </View>
+  );
 }
+
+/* ============================================================
+ * PULSING SPARKLE
+ * ============================================================ */
+
+function PulsingSparkle({ size = 15 }: { size?: number }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.15],
+  });
+  const opacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 1],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ scale }], opacity }}>
+      <Sparkles size={size} color="#C4B5FD" strokeWidth={2.4} />
+    </Animated.View>
+  );
+}
+
+/* ============================================================
+ * PUBLISH BUTTON (with shine sweep)
+ * ============================================================ */
 
 function PublishButton({
   disabled,
@@ -964,637 +269,1608 @@ function PublishButton({
   label: string;
   colors: readonly [string, string];
 }) {
-  return (
-    <Pressable
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.publishButtonWrapper,
-        disabled ? styles.disabled : null,
-        pressed && !disabled ? styles.pressed : null,
-      ]}
-    >
-      <LinearGradient colors={colors} style={styles.publishButton}>
-        {loading ? (
-          <ActivityIndicator size="small" color="#ffffff" />
-        ) : (
-          <Sparkles size={16} color="#ffffff" />
-        )}
+  const scale = useRef(new Animated.Value(1)).current;
+  const shine = useRef(new Animated.Value(0)).current;
 
-        <Text style={styles.publishButtonText}>
-          {loading ? "Publication en cours…" : label}
-        </Text>
-      </LinearGradient>
-    </Pressable>
+  useEffect(() => {
+    if (!disabled && !loading) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shine, {
+            toValue: 1,
+            duration: 2200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.delay(1800),
+          Animated.timing(shine, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    } else {
+      shine.setValue(0);
+    }
+  }, [disabled, loading, shine]);
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const shineTranslateX = shine.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-140, 460],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        disabled={disabled}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={[styles.publishOuter, disabled && styles.publishOuterDisabled]}
+      >
+        <LinearGradient
+          colors={
+            disabled
+              ? ["#232132", "#181625"]
+              : [colors[0], colors[1], colors[0]]
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.publishGradient}
+        >
+          {!disabled && !loading ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.publishShine,
+                {
+                  transform: [
+                    { translateX: shineTranslateX },
+                    { skewX: "-20deg" },
+                  ],
+                },
+              ]}
+            />
+          ) : null}
+
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Sparkles
+              size={15}
+              color={disabled ? "rgba(255,255,255,0.4)" : "#fff"}
+              strokeWidth={2.4}
+            />
+          )}
+          <Text
+            style={[
+              styles.publishText,
+              disabled && { color: "rgba(255,255,255,0.4)" },
+            ]}
+          >
+            {loading ? "Publication en cours…" : label}
+          </Text>
+        </LinearGradient>
+      </Pressable>
+    </Animated.View>
   );
 }
 
+/* ============================================================
+ * MAIN COMPONENT
+ * ============================================================ */
+
+export default function StoryCreator({
+  onClose,
+  onPublish,
+}: StoryCreatorProps) {
+  const [step, setStep] = useState<StepType>("pick");
+
+  const [text, setText] = useState("");
+  const [textColor, setTextColor] = useState("#FFFFFF");
+  const [bgIndex, setBgIndex] = useState(0);
+
+  const [imgStorageId, setImgStorageId] = useState("");
+  const [imgPreviewUrl, setImgPreviewUrl] = useState("");
+  const [imgCaption, setImgCaption] = useState("");
+
+  const [pollQ, setPollQ] = useState("");
+  const [pollOpts, setPollOpts] = useState(["", ""]);
+
+  const [uploading, setUploading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  const generateUploadUrl = useMutation(api.stories.generateStoryUploadUrl);
+  const createStory = useMutation(api.stories.createStory);
+
+  const bg = TEXT_GRADIENTS[bgIndex];
+
+  const validPollOptions = useMemo(
+    () => pollOpts.map((o) => o.trim()).filter(Boolean),
+    [pollOpts],
+  );
+
+  const canPublish = useMemo(() => {
+    if (uploading || publishing) return false;
+    if (step === "text") return text.trim().length > 0;
+    if (step === "image") return imgStorageId.length > 0;
+    if (step === "poll")
+      return pollQ.trim().length > 0 && validPollOptions.length >= 2;
+    return false;
+  }, [
+    uploading,
+    publishing,
+    step,
+    text,
+    imgStorageId,
+    pollQ,
+    validPollOptions,
+  ]);
+
+  /* ───── image picker ───── */
+  const pickImage = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission refusée", "Autorisez l'accès à votre galerie.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.85,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+
+    if (asset.fileSize && asset.fileSize > MAX_IMAGE_SIZE) {
+      Alert.alert("Erreur", "Image trop volumineuse. Maximum 10 Mo.");
+      return;
+    }
+
+    setImgPreviewUrl(asset.uri);
+    setImgStorageId("");
+    setUploading(true);
+
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const blob = await (await fetch(asset.uri)).blob();
+      const mimeType = asset.mimeType ?? "image/jpeg";
+
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": mimeType },
+        body: blob,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status}`);
+      }
+
+      const resultData = (await response.json()) as { storageId?: string };
+      if (!resultData.storageId) throw new Error("Storage ID manquant.");
+
+      setImgStorageId(resultData.storageId);
+      Alert.alert("Succès", "Photo prête.");
+    } catch (error) {
+      console.error("[StoryCreator] upload error", error);
+      setImgStorageId("");
+      setImgPreviewUrl("");
+      Alert.alert("Erreur", "Impossible d'envoyer la photo.");
+    } finally {
+      setUploading(false);
+    }
+  }, [generateUploadUrl]);
+
+  const removeImage = useCallback(() => {
+    setImgStorageId("");
+    setImgPreviewUrl("");
+    setImgCaption("");
+  }, []);
+
+  /* ───── poll helpers ───── */
+  const addPollOption = useCallback(() => {
+    setPollOpts((current) =>
+      current.length >= 4 ? current : [...current, ""],
+    );
+  }, []);
+
+  const updatePollOption = useCallback((index: number, value: string) => {
+    setPollOpts((current) =>
+      current.map((opt, i) => (i === index ? value : opt)),
+    );
+  }, []);
+
+  const removePollOption = useCallback((index: number) => {
+    setPollOpts((current) => {
+      if (current.length <= 2) return current;
+      return current.filter((_, i) => i !== index);
+    });
+  }, []);
+
+  /* ───── reset ───── */
+  const resetCreator = useCallback(() => {
+    setStep("pick");
+    setText("");
+    setTextColor("#FFFFFF");
+    setBgIndex(0);
+    removeImage();
+    setPollQ("");
+    setPollOpts(["", ""]);
+    setPublishing(false);
+  }, [removeImage]);
+
+  /* ───── publish ───── */
+  const publish = useCallback(async () => {
+    if (!canPublish) return;
+    setPublishing(true);
+
+    try {
+      if (step === "text") {
+        const cleanText = text.trim();
+        await createStory({
+          mediaUrl: `data:text/${bg.key}|${cleanText}|${textColor}`,
+          mediaType: "image",
+          caption: cleanText,
+        });
+        onPublish({
+          type: "text",
+          bg: bg.solid,
+          text: cleanText,
+          textColor,
+        });
+        Alert.alert("Succès", "Story publiée.");
+        resetCreator();
+        return;
+      }
+
+      if (step === "image") {
+        if (!imgStorageId) {
+          Alert.alert("Erreur", "Ajoutez une photo avant de publier.");
+          return;
+        }
+        await createStory({
+          mediaUrl: imgStorageId,
+          mediaType: "image",
+          caption: imgCaption.trim() || undefined,
+        });
+        onPublish({
+          type: "image",
+          bg: "#000",
+          img: imgStorageId,
+          text: imgCaption.trim() || undefined,
+        });
+        Alert.alert("Succès", "Story publiée.");
+        resetCreator();
+        return;
+      }
+
+      if (step === "poll") {
+        const question = pollQ.trim();
+        if (!question || validPollOptions.length < 2) {
+          Alert.alert(
+            "Erreur",
+            "Ajoutez une question et au moins deux options.",
+          );
+          return;
+        }
+        await createStory({
+          mediaUrl: `poll:${question}`,
+          mediaType: "image",
+          caption: question,
+        });
+        onPublish({
+          type: "poll",
+          bg: TEXT_GRADIENTS[7].solid,
+          pollQuestion: question,
+          pollOptions: validPollOptions,
+        });
+        Alert.alert("Succès", "Sondage publié.");
+        resetCreator();
+      }
+    } catch (error) {
+      console.error("[StoryCreator] publication error", error);
+      Alert.alert("Erreur", "La publication a échoué.");
+    } finally {
+      setPublishing(false);
+    }
+  }, [
+    canPublish,
+    step,
+    text,
+    bg,
+    textColor,
+    imgStorageId,
+    imgCaption,
+    pollQ,
+    validPollOptions,
+    createStory,
+    onPublish,
+    resetCreator,
+  ]);
+
+  /* ───── close/back ───── */
+  const handleClose = useCallback(() => {
+    if (uploading || publishing) return;
+    onClose();
+  }, [uploading, publishing, onClose]);
+
+  const handleBack = useCallback(() => {
+    if (step !== "pick") {
+      setStep("pick");
+      return;
+    }
+    handleClose();
+  }, [step, handleClose]);
+
+  /* ========================================================================
+   * RENDER
+   * ====================================================================== */
+
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="slide"
+      onRequestClose={handleClose}
+      statusBarTranslucent
+    >
+      <View style={styles.overlay}>
+        <Pressable onPress={handleClose} style={styles.backdrop} />
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.kavWrapper}
+        >
+          <View style={styles.sheet}>
+            {/* Base gradient background */}
+            <LinearGradient
+              colors={["#0C0A1F", "#08061A", "#050513"]}
+              locations={[0, 0.5, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+
+            {/* Ambient orbs */}
+            <View style={styles.orbTop} pointerEvents="none" />
+            <View style={styles.orbBottom} pointerEvents="none" />
+
+            {/* Border ring */}
+            <View style={styles.sheetBorder} pointerEvents="none" />
+
+            {/* Handle */}
+            <View style={styles.handleWrap}>
+              <View style={styles.handleBar} />
+            </View>
+
+            {/* ───── HEADER ───── */}
+            <View style={styles.header}>
+              <View style={styles.headerRow}>
+                <Pressable
+                  disabled={uploading || publishing}
+                  onPress={handleBack}
+                  hitSlop={6}
+                  style={({ pressed }) => [
+                    styles.iconBtn,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  {step === "pick" ? (
+                    <X size={18} color="rgba(255,255,255,0.85)" />
+                  ) : (
+                    <ChevronLeft size={18} color="rgba(255,255,255,0.85)" />
+                  )}
+                </Pressable>
+
+                <View style={styles.headerCenter}>
+                  <View style={styles.headerTitleRow}>
+                    <PulsingSparkle size={15} />
+                    <Text style={styles.headerTitle}>Créer une story</Text>
+                  </View>
+                  <Text style={styles.headerSubtitle}>
+                    Partagez ce qui compte.
+                  </Text>
+                </View>
+
+                <View style={styles.headerRight}>
+                  {step !== "pick" ? (
+                    <View style={styles.stepBadge}>
+                      <Text style={styles.stepBadgeText}>
+                        {step === "text"
+                          ? "TEXTE"
+                          : step === "image"
+                            ? "PHOTO"
+                            : "SONDAGE"}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+
+            {/* ───── CONTENT ───── */}
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {/* ══════════ STEP: PICK ══════════ */}
+              {step === "pick" ? (
+                <View>
+                  <FadeUp>
+                    <View style={styles.pickHeader}>
+                      <LinearGradient
+                        colors={[
+                          "rgba(167,139,250,0.32)",
+                          "rgba(99,102,241,0.08)",
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.zapCircle}
+                      >
+                        <Zap size={24} color="#C4B5FD" strokeWidth={2.4} />
+                      </LinearGradient>
+                      <Text style={styles.pickTitle}>
+                        Qu'avez-vous envie de partager ?
+                      </Text>
+                      <Text style={styles.pickSubtitle}>
+                        Créez quelque chose qui attire l'attention, raconte une
+                        histoire et fait participer votre communauté.
+                      </Text>
+                    </View>
+                  </FadeUp>
+
+                  <View style={styles.creationTypesList}>
+                    {CREATION_TYPES.map((option, index) => {
+                      const Icon = option.icon;
+                      return (
+                        <FadeUp
+                          key={option.type}
+                          delay={120 + index * 80}
+                          distance={14}
+                        >
+                          <Pressable
+                            onPress={() => setStep(option.type)}
+                            style={({ pressed }) => [
+                              styles.creationCard,
+                              pressed && styles.pressed,
+                            ]}
+                          >
+                            <LinearGradient
+                              colors={[
+                                `${option.color}14`,
+                                "rgba(255,255,255,0)",
+                              ]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={StyleSheet.absoluteFill}
+                            />
+
+                            <LinearGradient
+                              colors={option.gradient}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={styles.creationIconWrap}
+                            >
+                              <Icon size={20} color="#fff" strokeWidth={2.2} />
+                            </LinearGradient>
+
+                            <View style={styles.creationTextColumn}>
+                              <Text style={styles.creationLabel}>
+                                {option.label}
+                              </Text>
+                              <Text style={styles.creationDescription}>
+                                {option.description}
+                              </Text>
+                            </View>
+
+                            <View
+                              style={[
+                                styles.chevronCircle,
+                                { backgroundColor: `${option.color}22` },
+                              ]}
+                            >
+                              <ChevronRight
+                                size={16}
+                                color={option.color}
+                                strokeWidth={2.4}
+                              />
+                            </View>
+                          </Pressable>
+                        </FadeUp>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
+              {/* ══════════ STEP: TEXT ══════════ */}
+              {step === "text" ? (
+                <View style={styles.stepContent}>
+                  {/* Preview */}
+                  <FadeUp distance={10}>
+                    <View style={styles.storyPreviewWrapper}>
+                      <LinearGradient
+                        colors={bg.colors as unknown as [string, string]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.storyPreview}
+                      >
+                        <View style={styles.storyPreviewInner}>
+                          <Text
+                            style={[
+                              styles.storyPreviewText,
+                              { color: textColor },
+                            ]}
+                            numberOfLines={8}
+                          >
+                            {text || "Votre idée mérite d'être vue."}
+                          </Text>
+                        </View>
+                      </LinearGradient>
+                    </View>
+                  </FadeUp>
+
+                  {/* Input */}
+                  <FadeUp delay={80}>
+                    <View>
+                      <Text style={styles.fieldLabel}>Votre message</Text>
+                      <TextInput
+                        value={text}
+                        onChangeText={setText}
+                        maxLength={500}
+                        autoFocus
+                        placeholder="Écrivez quelque chose qui mérite d'être partagé…"
+                        placeholderTextColor="rgba(255,255,255,0.2)"
+                        multiline
+                        textAlignVertical="top"
+                        style={[styles.input, styles.textArea]}
+                      />
+                      <View style={styles.counterRow}>
+                        <AnimatedProgress value={text.length / 500} />
+                        <Text
+                          style={[
+                            styles.counterText,
+                            text.length > 450 && { color: "#FB7185" },
+                          ]}
+                        >
+                          {text.length}/500
+                        </Text>
+                      </View>
+                    </View>
+                  </FadeUp>
+
+                  {/* Background picker */}
+                  <FadeUp delay={140}>
+                    <View>
+                      <Text style={styles.fieldLabel}>Ambiance</Text>
+                      <View style={styles.swatchesRow}>
+                        {TEXT_GRADIENTS.map((gradient, index) => {
+                          const selected = bgIndex === index;
+                          return (
+                            <Pressable
+                              key={gradient.key}
+                              onPress={() => setBgIndex(index)}
+                              style={styles.swatchOuter}
+                            >
+                              <LinearGradient
+                                colors={
+                                  gradient.colors as unknown as [string, string]
+                                }
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={[
+                                  styles.swatch,
+                                  selected && styles.swatchSelected,
+                                ]}
+                              >
+                                {selected ? (
+                                  <View style={styles.swatchCheck}>
+                                    <Check
+                                      size={13}
+                                      color="#fff"
+                                      strokeWidth={3.5}
+                                    />
+                                  </View>
+                                ) : null}
+                              </LinearGradient>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </FadeUp>
+
+                  {/* Text color picker */}
+                  <FadeUp delay={200}>
+                    <View>
+                      <Text style={styles.fieldLabel}>Couleur du texte</Text>
+                      <View style={styles.swatchesRow}>
+                        {TEXT_COLORS.map((color) => {
+                          const selected = textColor === color;
+                          return (
+                            <Pressable
+                              key={color}
+                              onPress={() => setTextColor(color)}
+                              style={[
+                                styles.colorSwatch,
+                                { backgroundColor: color },
+                                selected && styles.swatchSelected,
+                              ]}
+                            >
+                              {selected ? (
+                                <Check
+                                  size={11}
+                                  color={color === "#FFFFFF" ? "#000" : "#fff"}
+                                  strokeWidth={3.5}
+                                />
+                              ) : null}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </FadeUp>
+
+                  <FadeUp delay={260}>
+                    <PublishButton
+                      disabled={!canPublish}
+                      loading={publishing}
+                      onPress={publish}
+                      label="Publier la story"
+                      colors={["#A78BFA", "#7C3AED"]}
+                    />
+                  </FadeUp>
+                </View>
+              ) : null}
+
+              {/* ══════════ STEP: IMAGE ══════════ */}
+              {step === "image" ? (
+                <View style={styles.stepContent}>
+                  <FadeUp distance={10}>
+                    <View style={styles.storyPreviewWrapper}>
+                      <View style={styles.storyPreview}>
+                        {imgPreviewUrl ? (
+                          <>
+                            <RNImage
+                              source={{ uri: imgPreviewUrl }}
+                              style={styles.previewImage}
+                              resizeMode="cover"
+                            />
+                            <LinearGradient
+                              colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.7)"]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 0, y: 1 }}
+                              style={styles.imageOverlay}
+                              pointerEvents="none"
+                            />
+                            <View style={styles.imageOverlayContent}>
+                              <Text style={styles.imageOverlayText}>
+                                {imgCaption || "Votre story"}
+                              </Text>
+                            </View>
+                            <Pressable
+                              onPress={removeImage}
+                              disabled={uploading || publishing}
+                              hitSlop={6}
+                              style={({ pressed }) => [
+                                styles.removeImageButton,
+                                pressed && { opacity: 0.75 },
+                              ]}
+                            >
+                              <X size={16} color="#fff" />
+                            </Pressable>
+
+                            {uploading ? (
+                              <View style={styles.uploadingOverlay}>
+                                <ActivityIndicator size="small" color="#fff" />
+                              </View>
+                            ) : null}
+                          </>
+                        ) : (
+                          <Pressable
+                            onPress={pickImage}
+                            style={styles.dropZone}
+                          >
+                            <LinearGradient
+                              colors={[
+                                "rgba(96,165,250,0.24)",
+                                "rgba(59,130,246,0.08)",
+                              ]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={styles.dropZoneIcon}
+                            >
+                              {uploading ? (
+                                <ActivityIndicator
+                                  size="small"
+                                  color="#93C5FD"
+                                />
+                              ) : (
+                                <ImagePlus size={25} color="#93C5FD" />
+                              )}
+                            </LinearGradient>
+                            <Text style={styles.dropZoneTitle}>
+                              {uploading
+                                ? "Envoi sécurisé…"
+                                : "Ajouter une photo"}
+                            </Text>
+                            <Text style={styles.dropZoneSubtitle}>
+                              JPG, PNG, WEBP · 10 Mo max.
+                            </Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    </View>
+                  </FadeUp>
+
+                  <FadeUp delay={80}>
+                    <Pressable
+                      disabled={uploading || publishing}
+                      onPress={pickImage}
+                      style={({ pressed }) => [
+                        styles.chooseButton,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={[
+                          "rgba(59,130,246,0.14)",
+                          "rgba(59,130,246,0.04)",
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      <LinearGradient
+                        colors={["#60A5FA", "#3B82F6"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.chooseButtonIcon}
+                      >
+                        {uploading ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Upload size={18} color="#fff" strokeWidth={2.4} />
+                        )}
+                      </LinearGradient>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.chooseButtonTitle}>
+                          {imgPreviewUrl
+                            ? "Changer la photo"
+                            : "Choisir depuis l'appareil"}
+                        </Text>
+                        <Text style={styles.chooseButtonSubtitle}>
+                          Votre fichier est envoyé vers Convex Storage.
+                        </Text>
+                      </View>
+                      <ChevronRight size={15} color="rgba(255,255,255,0.35)" />
+                    </Pressable>
+                  </FadeUp>
+
+                  <FadeUp delay={140}>
+                    <View>
+                      <Text style={styles.fieldLabel}>Légende</Text>
+                      <TextInput
+                        value={imgCaption}
+                        onChangeText={setImgCaption}
+                        maxLength={180}
+                        placeholder="Ajoutez un contexte à votre photo…"
+                        placeholderTextColor="rgba(255,255,255,0.2)"
+                        style={styles.input}
+                      />
+                    </View>
+                  </FadeUp>
+
+                  <FadeUp delay={200}>
+                    <PublishButton
+                      disabled={!canPublish}
+                      loading={publishing}
+                      onPress={publish}
+                      label="Publier la photo"
+                      colors={["#60A5FA", "#3B82F6"]}
+                    />
+                  </FadeUp>
+                </View>
+              ) : null}
+
+              {/* ══════════ STEP: POLL ══════════ */}
+              {step === "poll" ? (
+                <View style={styles.stepContent}>
+                  <FadeUp distance={10}>
+                    <View style={styles.storyPreviewWrapper}>
+                      <LinearGradient
+                        colors={["#0A0A1A", "#1A1A3E"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.storyPreview, styles.pollPreview]}
+                      >
+                        <LinearGradient
+                          colors={[
+                            "rgba(244,114,182,0.32)",
+                            "rgba(236,72,153,0.08)",
+                          ]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.pollPreviewIcon}
+                        >
+                          <BarChart3
+                            size={24}
+                            color="#F9A8D4"
+                            strokeWidth={2.4}
+                          />
+                        </LinearGradient>
+
+                        <Text style={styles.pollPreviewQuestion}>
+                          {pollQ || "Votre question apparaîtra ici"}
+                        </Text>
+
+                        {validPollOptions.length > 0 ? (
+                          validPollOptions.map((opt) => (
+                            <View key={opt} style={styles.pollPreviewOption}>
+                              <LinearGradient
+                                colors={[
+                                  "rgba(244,114,182,0.18)",
+                                  "rgba(236,72,153,0.08)",
+                                ]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={StyleSheet.absoluteFill}
+                              />
+                              <Text style={styles.pollPreviewOptionText}>
+                                {opt}
+                              </Text>
+                            </View>
+                          ))
+                        ) : (
+                          <View style={styles.pollPreviewEmpty}>
+                            <Text style={styles.pollPreviewEmptyText}>
+                              Ajoutez vos options
+                            </Text>
+                          </View>
+                        )}
+                      </LinearGradient>
+                    </View>
+                  </FadeUp>
+
+                  <FadeUp delay={80}>
+                    <View>
+                      <Text style={styles.fieldLabel}>Question</Text>
+                      <TextInput
+                        value={pollQ}
+                        onChangeText={setPollQ}
+                        maxLength={180}
+                        placeholder="Posez une question à votre communauté…"
+                        placeholderTextColor="rgba(255,255,255,0.2)"
+                        style={styles.input}
+                      />
+                    </View>
+                  </FadeUp>
+
+                  <FadeUp delay={140}>
+                    <View>
+                      <View style={styles.pollOptionsHeader}>
+                        <Text style={styles.fieldLabel}>Options</Text>
+                        <View style={styles.pollCountBadge}>
+                          <Text style={styles.pollCountText}>
+                            {validPollOptions.length}/4
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={{ gap: 10 }}>
+                        {pollOpts.map((opt, index) => (
+                          <FadeUp key={index} delay={index * 40} distance={8}>
+                            <View style={styles.pollOptionRow}>
+                              <LinearGradient
+                                colors={[
+                                  "rgba(244,114,182,0.24)",
+                                  "rgba(236,72,153,0.08)",
+                                ]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.pollOptionNumber}
+                              >
+                                <Text style={styles.pollOptionNumberText}>
+                                  {index + 1}
+                                </Text>
+                              </LinearGradient>
+                              <TextInput
+                                value={opt}
+                                onChangeText={(v) => updatePollOption(index, v)}
+                                maxLength={80}
+                                placeholder={`Option ${index + 1}`}
+                                placeholderTextColor="rgba(255,255,255,0.2)"
+                                style={[styles.input, { flex: 1 }]}
+                              />
+                              {pollOpts.length > 2 ? (
+                                <Pressable
+                                  onPress={() => removePollOption(index)}
+                                  hitSlop={6}
+                                  style={({ pressed }) => [
+                                    styles.pollRemoveButton,
+                                    pressed && { opacity: 0.7 },
+                                  ]}
+                                >
+                                  <X size={15} color="rgba(255,255,255,0.4)" />
+                                </Pressable>
+                              ) : null}
+                            </View>
+                          </FadeUp>
+                        ))}
+                      </View>
+
+                      {pollOpts.length < 4 ? (
+                        <Pressable
+                          onPress={addPollOption}
+                          style={({ pressed }) => [
+                            styles.addOptionButton,
+                            pressed && { opacity: 0.75 },
+                          ]}
+                        >
+                          <View style={styles.addOptionIcon}>
+                            <Plus size={14} color="#F472B6" strokeWidth={2.6} />
+                          </View>
+                          <Text style={styles.addOptionText}>
+                            Ajouter une option
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </FadeUp>
+
+                  <FadeUp delay={220}>
+                    <PublishButton
+                      disabled={!canPublish}
+                      loading={publishing}
+                      onPress={publish}
+                      label="Publier le sondage"
+                      colors={["#F472B6", "#EC4899"]}
+                    />
+                  </FadeUp>
+                </View>
+              ) : null}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+/* ============================================================
+ * STYLES
+ * ============================================================ */
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+
 const styles = StyleSheet.create({
+  /* ── Overlay ────────────────────────────────────── */
   overlay: {
     flex: 1,
     justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.78)",
   },
+  kavWrapper: {
+    width: "100%",
+    alignItems: "center",
+  },
 
+  /* ── Sheet ──────────────────────────────────────── */
   sheet: {
     width: "100%",
+    maxWidth: 560,
     maxHeight: "94%",
-    overflow: "hidden",
+    backgroundColor: "#08061A",
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    backgroundColor: "#080914",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.75,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: -20 },
+    elevation: 28,
+  },
+  sheetBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(139,92,246,0.18)",
+  },
+  orbTop: {
+    position: "absolute",
+    top: -120,
+    left: "15%",
+    right: "15%",
+    height: 200,
+    borderRadius: 9999,
+    backgroundColor: "rgba(139,92,246,0.22)",
+  },
+  orbBottom: {
+    position: "absolute",
+    bottom: -160,
+    right: -100,
+    width: 220,
+    height: 220,
+    borderRadius: 9999,
+    backgroundColor: "rgba(99,102,241,0.14)",
+  },
+  handleWrap: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  handleBar: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
 
+  /* ── Header ─────────────────────────────────────── */
   header: {
     paddingHorizontal: 20,
-    paddingTop: 18,
+    paddingTop: 6,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.07)",
+    borderBottomColor: "rgba(255,255,255,0.06)",
   },
-
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-
-  headerButton: {
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+  },
+  headerSubtitle: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10.5,
+    marginTop: 3,
+    fontWeight: "500",
+  },
+  headerRight: {
+    width: 44,
+    alignItems: "flex-end",
+  },
+  stepBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "rgba(167,139,250,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.32)",
+  },
+  stepBadgeText: {
+    color: "#C4B5FD",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  iconBtn: {
     width: 40,
     height: 40,
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
+  pressed: { opacity: 0.75, transform: [{ scale: 0.96 }] },
 
-  headerTitle: {
-    flex: 1,
+  /* ── Content ────────────────────────────────────── */
+  scroll: { flex: 1 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  stepContent: { gap: 22 },
+
+  /* ── Pick step ──────────────────────────────────── */
+  pickHeader: {
     alignItems: "center",
+    marginBottom: 12,
+    gap: 8,
   },
-
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
-
-  title: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-
-  subtitle: {
-    marginTop: 3,
-    color: "rgba(255,255,255,0.38)",
-    fontSize: 10,
-  },
-
-  headerRight: {
-    width: 40,
-    alignItems: "center",
-  },
-
-  stepLabel: {
-    color: "rgba(255,255,255,0.32)",
-    fontSize: 9,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-
-  progressRow: {
-    flexDirection: "row",
-    gap: 6,
-    marginTop: 16,
-  },
-
-  progressTrack: {
-    flex: 1,
-    height: 4,
-    overflow: "hidden",
-    borderRadius: 99,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-
-  progressActive: {
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-
-  progressFill: {
-    flex: 1,
-    borderRadius: 99,
-  },
-
-  content: {
-    flex: 1,
-  },
-
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-
-  intro: {
-    alignItems: "center",
-    marginBottom: 26,
-  },
-
-  introIcon: {
+  zapCircle: {
     width: 56,
     height: 56,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
-    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(167,139,250,0.35)",
+    marginBottom: 8,
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
   },
-
-  introTitle: {
-    color: "#ffffff",
+  pickTitle: {
+    color: "#fff",
     fontSize: 20,
     fontWeight: "900",
     textAlign: "center",
+    letterSpacing: -0.5,
   },
-
-  introDescription: {
-    maxWidth: 330,
-    marginTop: 10,
-    color: "rgba(255,255,255,0.42)",
-    fontSize: 12,
-    lineHeight: 19,
+  pickSubtitle: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 12.5,
+    lineHeight: 18,
     textAlign: "center",
+    maxWidth: 320,
+    fontWeight: "500",
   },
-
-  creationList: {
-    gap: 12,
-  },
-
+  creationTypesList: { gap: 12 },
   creationCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    padding: 16,
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.035)",
+    padding: 14,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.09)",
+    overflow: "hidden",
   },
-
-  creationIcon: {
+  creationIconWrap: {
     width: 48,
     height: 48,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
   },
-
-  creationText: {
-    flex: 1,
-  },
-
-  creationTitle: {
-    color: "#ffffff",
+  creationTextColumn: { flex: 1, minWidth: 0 },
+  creationLabel: {
+    color: "#fff",
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "900",
+    letterSpacing: -0.2,
   },
-
   creationDescription: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 11.5,
     marginTop: 4,
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 11,
     lineHeight: 16,
+    fontWeight: "500",
   },
-
-  arrowBox: {
+  chevronCircle: {
     width: 36,
     height: 36,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
   },
 
-  section: {
-    gap: 14,
+  /* ── Story preview ──────────────────────────────── */
+  storyPreviewWrapper: {
+    alignItems: "center",
   },
-
   storyPreview: {
-    alignSelf: "center",
-    width: "100%",
+    width: SCREEN_WIDTH * 0.62,
     maxWidth: 280,
     aspectRatio: 9 / 14,
-    overflow: "hidden",
     borderRadius: 30,
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.14)",
+    shadowColor: "#000",
+    shadowOpacity: 0.65,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 14,
   },
-
-  textPreviewCenter: {
+  storyPreviewInner: {
     flex: 1,
-    paddingHorizontal: 26,
     alignItems: "center",
     justifyContent: "center",
+    padding: 26,
   },
-
-  storyText: {
-    fontSize: 25,
+  storyPreviewText: {
+    fontSize: 24,
     fontWeight: "900",
     textAlign: "center",
-    lineHeight: 31,
+    lineHeight: 30,
+    letterSpacing: -0.6,
   },
-
-  previewFooter: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.15)",
-  },
-
-  previewFooterText: {
-    color: "rgba(255,255,255,0.45)",
-    fontSize: 8,
-    fontWeight: "700",
-    letterSpacing: 1.4,
-    textAlign: "center",
-  },
-
-  fieldLabel: {
-    marginTop: 5,
-    color: "rgba(255,255,255,0.42)",
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-
-  input: {
-    minHeight: 48,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderRadius: 16,
-    color: "#ffffff",
-    fontSize: 14,
-    backgroundColor: "rgba(255,255,255,0.045)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-
-  textArea: {
-    minHeight: 110,
-    textAlignVertical: "top",
-  },
-
-  counter: {
-    marginTop: -8,
-    color: "rgba(255,255,255,0.25)",
-    fontSize: 10,
-    textAlign: "right",
-  },
-
-  gradientGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-
-  colorButton: {
-    width: 38,
-    height: 38,
-    padding: 2,
-    borderRadius: 13,
-  },
-
-  selectedColor: {
-    borderWidth: 2,
-    borderColor: "#ffffff",
-  },
-
-  colorFill: {
-    flex: 1,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  textColorRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-
-  textColorButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  selectedTextColor: {
-    borderWidth: 2,
-    borderColor: "#ffffff",
-  },
-
-  imagePreview: {
-    alignSelf: "center",
-    width: "100%",
-    maxWidth: 280,
-    aspectRatio: 9 / 14,
-    overflow: "hidden",
-    borderRadius: 30,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-
   previewImage: {
     width: "100%",
     height: "100%",
   },
-
-  imageCaptionOverlay: {
+  imageOverlay: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 18,
-    paddingTop: 70,
+    height: "50%",
   },
-
-  imageCaption: {
-    color: "#ffffff",
+  imageOverlayContent: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 20,
+  },
+  imageOverlayText: {
+    color: "#fff",
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "800",
+    letterSpacing: -0.2,
   },
-
   removeImageButton: {
     position: "absolute",
     top: 12,
     right: 12,
-    width: 38,
-    height: 38,
-    borderRadius: 13,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.55)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.18)",
   },
-
-  emptyImageArea: {
+  uploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dropZone: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
+    gap: 14,
   },
-
-  imagePickerIcon: {
+  dropZoneIcon: {
     width: 64,
     height: 64,
-    marginBottom: 15,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(59,130,246,0.1)",
     borderWidth: 1,
-    borderColor: "rgba(96,165,250,0.2)",
+    borderColor: "rgba(96,165,250,0.35)",
   },
-
-  emptyImageTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "800",
+  dropZoneTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: -0.2,
   },
-
-  emptyImageDescription: {
-    marginTop: 6,
-    color: "rgba(255,255,255,0.35)",
+  dropZoneSubtitle: {
+    color: "rgba(255,255,255,0.4)",
     fontSize: 11,
+    fontWeight: "500",
   },
 
-  uploadOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.42)",
+  /* ── Fields ─────────────────────────────────────── */
+  fieldLabel: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    marginBottom: 10,
   },
-
-  uploadStatus: {
+  input: {
+    width: "100%",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  textArea: {
+    minHeight: 100,
+  },
+  counterRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 8,
+  },
+  counterText: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 2,
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
+  /* ── Swatches ───────────────────────────────────── */
+  swatchesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.72)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+  },
+  swatchOuter: {
+    padding: 0,
+  },
+  swatch: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  swatchSelected: {
+    borderWidth: 2.5,
+    borderColor: "#fff",
+  },
+  swatchCheck: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  colorSwatch: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
   },
 
-  uploadStatusText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  galleryButton: {
+  /* ── Choose button ──────────────────────────────── */
+  chooseButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     padding: 14,
     borderRadius: 16,
-    backgroundColor: "rgba(59,130,246,0.07)",
     borderWidth: 1,
-    borderColor: "rgba(96,165,250,0.18)",
+    borderColor: "rgba(96,165,250,0.28)",
+    overflow: "hidden",
   },
-
-  galleryIcon: {
+  chooseButtonIcon: {
     width: 40,
     height: 40,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(59,130,246,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
-
-  galleryTitle: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "800",
+  chooseButtonTitle: {
+    color: "#fff",
+    fontSize: 12.5,
+    fontWeight: "900",
+    letterSpacing: -0.2,
   },
-
-  galleryDescription: {
+  chooseButtonSubtitle: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10.5,
     marginTop: 3,
-    color: "rgba(255,255,255,0.35)",
-    fontSize: 10,
-    lineHeight: 14,
+    fontWeight: "500",
   },
 
+  /* ── Poll preview ───────────────────────────────── */
   pollPreview: {
-    alignSelf: "center",
-    width: "100%",
-    maxWidth: 280,
-    aspectRatio: 9 / 14,
     padding: 24,
     justifyContent: "center",
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
   },
-
-  pollIcon: {
-    alignSelf: "center",
+  pollPreviewIcon: {
     width: 56,
     height: 56,
-    marginBottom: 22,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(244,114,182,0.35)",
+    alignSelf: "center",
+    marginBottom: 20,
+    shadowColor: "#EC4899",
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
   },
-
-  pollQuestionPreview: {
-    marginBottom: 22,
-    color: "#ffffff",
-    fontSize: 19,
+  pollPreviewQuestion: {
+    color: "#fff",
+    fontSize: 17,
     fontWeight: "900",
-    lineHeight: 25,
     textAlign: "center",
+    marginBottom: 20,
+    letterSpacing: -0.4,
+    lineHeight: 22,
   },
-
-  pollPreviewOptions: {
-    gap: 8,
-  },
-
   pollPreviewOption: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(244,114,182,0.35)",
+    marginBottom: 8,
+    overflow: "hidden",
   },
-
   pollPreviewOptionText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
+    color: "#fff",
+    fontSize: 12.5,
+    fontWeight: "800",
+    letterSpacing: -0.1,
   },
-
-  pollEmpty: {
-    paddingVertical: 20,
-    borderRadius: 16,
+  pollPreviewEmpty: {
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(255,255,255,0.2)",
   },
-
-  pollEmptyText: {
-    color: "rgba(255,255,255,0.32)",
-    fontSize: 10,
+  pollPreviewEmptyText: {
+    color: "rgba(255,255,255,0.35)",
+    fontSize: 10.5,
     textAlign: "center",
+    fontWeight: "600",
   },
 
-  optionsHeader: {
+  /* ── Poll fields ────────────────────────────────── */
+  pollOptionsHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: 10,
   },
-
-  optionsCount: {
-    color: "rgba(255,255,255,0.28)",
+  pollCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: "rgba(244,114,182,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(244,114,182,0.32)",
+  },
+  pollCountText: {
+    color: "#F9A8D4",
     fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.4,
   },
-
-  optionsList: {
-    gap: 10,
-  },
-
-  optionRow: {
+  pollOptionRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-
-  optionNumber: {
-    width: 42,
-    height: 42,
+  pollOptionNumber: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(244,114,182,0.32)",
+  },
+  pollOptionNumberText: {
+    color: "#F9A8D4",
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+  pollRemoveButton: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
   },
-
-  optionNumberText: {
-    color: "rgba(255,255,255,0.35)",
+  addOptionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 14,
+    paddingVertical: 6,
+  },
+  addOptionIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(244,114,182,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(244,114,182,0.32)",
+  },
+  addOptionText: {
+    color: "#F9A8D4",
     fontSize: 12,
     fontWeight: "800",
+    letterSpacing: 0.1,
   },
 
-  optionInput: {
-    flex: 1,
-    minHeight: 44,
-  },
-
-  deleteOption: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  addOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-  },
-
-  addOptionText: {
-    color: "#f472b6",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  publishButtonWrapper: {
-    marginTop: 10,
+  /* ── Publish button ─────────────────────────────── */
+  publishOuter: {
+    borderRadius: 18,
     overflow: "hidden",
-    borderRadius: 16,
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 10,
   },
-
-  publishButton: {
-    minHeight: 52,
+  publishOuterDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  publishGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
-    borderRadius: 16,
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 18,
+    overflow: "hidden",
   },
-
-  publishButtonText: {
-    color: "#ffffff",
+  publishShine: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 80,
+    backgroundColor: "rgba(255,255,255,0.24)",
+    opacity: 0.7,
+  },
+  publishText: {
+    color: "#fff",
     fontSize: 14,
     fontWeight: "900",
-  },
-
-  disabled: {
-    opacity: 0.4,
-  },
-
-  pressed: {
-    opacity: 0.86,
+    letterSpacing: 0.2,
   },
 });

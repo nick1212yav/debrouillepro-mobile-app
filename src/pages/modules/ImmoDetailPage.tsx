@@ -1,25 +1,12 @@
-// src/pages/modules/ImmoDetailPage.tsx
-
-import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { useEffect, useState } from "react";
-import { ArrowLeft, Bookmark, CalendarDays, Phone } from "lucide-react-native";
-import { useMutation, useQuery } from "convex/react";
-
+import { View, Text, Pressable, Linking } from "react-native";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react-native";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Navigation : React Navigation
-import { useNavigation, useRoute } from "@react-navigation/native";
-
-// Composants du module immobilier
+// Composants du module immobilier (versions finales)
 import {
   PropertyGallery,
   PropertyVideos,
@@ -39,13 +26,9 @@ import {
   PropertyVirtualTour,
   PropertyFloorPlan,
 } from "@/features/immo/components";
-
 import type { Property } from "@/features/immo/types";
 
-// -----------------------------------------------------------------------------
-// Labels
-// -----------------------------------------------------------------------------
-
+// Labels et couleurs
 const TYPE_LABELS: Record<string, string> = {
   appartement: "Appartement",
   maison: "Maison",
@@ -76,687 +59,140 @@ const STATUS_COLORS: Record<string, string> = {
   archived: "#6B7280",
 };
 
-// -----------------------------------------------------------------------------
-// Page
-// -----------------------------------------------------------------------------
-
 export default function ImmoDetailPage() {
-  const navigation = useNavigation<any>();
-  const route = useRoute<any>();
-
-  const propertyId =
-    route.params?.id ?? route.params?.propertyId ?? route.params?.property?._id;
-
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
 
-  const property = useQuery(
-    api.realestate.getProperty,
-    propertyId
-      ? {
-          id: propertyId as any,
-        }
-      : "skip",
-  ) as Property | null | undefined;
+  const property = useQuery(api.realestate.getProperty, { id: id as any }) as
+    | Property
+    | null
+    | undefined;
 
   const trackView = useMutation(api.realestate.trackPropertyView);
 
-  // ---------------------------------------------------------------------------
   // Tracking de la vue
-  // ---------------------------------------------------------------------------
-
   useEffect(() => {
-    if (!property?._id) {
-      return;
+    if (property?._id) {
+      trackView({ propertyId: property._id }).catch((error) => {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("Erreur de tracking :", error);
+        }
+      });
     }
-
-    void trackView({
-      propertyId: property._id,
-    }).catch((error) => {
-      if (__DEV__) {
-        console.warn("Erreur de tracking de la propriété :", error);
-      }
-    });
   }, [property?._id, trackView]);
 
-  // ---------------------------------------------------------------------------
-  // ID invalide
-  // ---------------------------------------------------------------------------
-
-  if (!propertyId) {
-    return (
-      <View style={styles.centeredScreen}>
-        <Text style={styles.emptyText}>ID du bien invalide</Text>
-
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={styles.backTextButton}
-        >
-          <Text style={styles.backText}>Retour</Text>
-        </Pressable>
-      </View>
-    );
+  // Logs de débogage
+  if (property && process.env.NODE_ENV === "development") {
+    console.log("🔍 ImmoDetailPage - property.images:", property.images);
+    console.log("🔍 ImmoDetailPage - property:", property);
   }
 
-  // ---------------------------------------------------------------------------
-  // Chargement
-  // ---------------------------------------------------------------------------
+  // Gestion des états de chargement
+  if (!id) {
+    return (
+      <View className="h-full flex items-center justify-center" style={{  }}><Text className="text-white/50">ID invalide</Text></View>
+    );
+  }
 
   if (property === undefined) {
     return (
-      <View style={styles.screen}>
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={styles.iconButton}
-            accessibilityRole="button"
-            accessibilityLabel="Retour"
-          >
-            <ArrowLeft size={20} color="#FFFFFF" />
-          </Pressable>
-        </View>
-
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F97316" />
-
-          <Text style={styles.loadingText}>
-            Chargement du bien immobilier...
-          </Text>
-        </View>
-      </View>
+      <View className="h-full flex flex-col" style={{  }}><View className="flex-shrink-0 px-5 pt-5 pb-3"><Pressable onPress={() => navigate(-1)} className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable></View><View className="flex-1 px-5 pb-6 space-y-4"><Skeleton className="h-64 w-full rounded-2xl" /><Skeleton className="h-12 w-3/4 rounded-2xl" /><Skeleton className="h-6 w-1/2 rounded-2xl" /><Skeleton className="h-40 w-full rounded-2xl" /><View className="gap-3"><Skeleton className="h-20 rounded-2xl" /><Skeleton className="h-20 rounded-2xl" /><Skeleton className="h-20 rounded-2xl" /></View></View></View>
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Bien introuvable
-  // ---------------------------------------------------------------------------
 
   if (!property) {
     return (
-      <View style={styles.centeredScreen}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={[styles.iconButton, styles.notFoundBackButton]}
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-        >
-          <ArrowLeft size={20} color="#FFFFFF" />
-        </Pressable>
-
-        <Text style={styles.emptyText}>Bien introuvable</Text>
-      </View>
+      <View className="h-full flex flex-col items-center justify-center gap-3" style={{  }}><Pressable onPress={() => navigate(-1)} className="self-start ml-5 w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="text-white/40"><Text>Bien introuvable</Text></View></View>
     );
   }
 
-  // ---------------------------------------------------------------------------
   // Extraction des données
-  // ---------------------------------------------------------------------------
-
-  const statusColor = STATUS_COLORS[property.status] ?? "#6B7280";
-
+  const statusColor = STATUS_COLORS[property.status] || "#6B7280";
   const transactionLabel =
-    TRANSACTION_LABELS[property.transactionType] ?? property.transactionType;
+    TRANSACTION_LABELS[property.transactionType] || property.transactionType;
 
-  const allImages = property.images ?? [];
-  const allVideos = property.videos ?? [];
-  const amenities = property.amenities ?? [];
-
+  const allImages = property.images || [];
+  const allVideos = property.videos || [];
+  const amenities = property.amenities || [];
   const ownerName = property.ownerName;
   const ownerAvatar = property.ownerAvatar;
-
+  // ✅ Récupérer le téléphone : on utilise property.phone ou property.ownerPhone
+  // On transforme null en undefined pour correspondre au type attendu par PropertyOwner
   const phone = property.phone ?? property.ownerPhone ?? undefined;
-
-  const ownerId = (property as any).ownerId;
-
-  const city = property.city ?? "";
-  const neighborhood = property.neighborhood ?? null;
-  const address = property.address ?? null;
-
+  const ownerId = (property as any).ownerId; // si disponible
+  const city = property.city || "";
+  const neighborhood = property.neighborhood || null;
+  const address = property.address || null;
   const latitude = property.latitude ?? undefined;
   const longitude = property.longitude ?? undefined;
-
   const createdAt = property._creationTime;
-
   const price = property.price;
-  const currency = property.currency ?? "USD";
-
+  const currency = property.currency || "USD";
   const type = property.type;
-
   const surface = property.surface ?? null;
   const rooms = property.rooms ?? null;
   const bathrooms = property.bathrooms ?? null;
-
-  const description = property.description ?? "";
-
+  const description = property.description || "";
   const virtualTourUrl = property.virtualTourUrl;
-
   const floorPlanUrl = property.floorPlanUrl;
+  const tour360Images = property.tour360Images || [];
 
-  const tour360Images = property.tour360Images ?? [];
-
-  // ---------------------------------------------------------------------------
-  // Actions
-  // ---------------------------------------------------------------------------
-
-  const handleCall = async () => {
-    if (!phone) {
-      Alert.alert(
-        "Téléphone indisponible",
-        "Aucun numéro de téléphone n'est disponible pour ce bien.",
-      );
-
-      return;
-    }
-
-    const url = `tel:${phone}`;
-
-    try {
-      const supported = await Linking.canOpenURL(url);
-
-      if (!supported) {
-        Alert.alert(
-          "Appel indisponible",
-          "Votre appareil ne peut pas ouvrir l'application téléphonique.",
-        );
-
-        return;
-      }
-
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert("Erreur", "Impossible de démarrer l'appel.");
-    }
-  };
-
-  const handleVisit = () => {
-    navigation.navigate("PropertyVisitScheduler", {
-      propertyId: property._id,
-    });
-  };
-
-  const handleBookmark = () => {
-    setIsBookmarked((previous) => !previous);
-  };
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  const shareTitle = property.title;
 
   return (
-    <View style={styles.screen}>
-      {/* --------------------------------------------------------------------- */}
-      {/* Header */}
-      {/* --------------------------------------------------------------------- */}
-
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={styles.iconButton}
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-        >
-          <ArrowLeft size={20} color="#FFFFFF" />
-        </Pressable>
-
-        <Text numberOfLines={1} style={styles.headerTitle}>
-          {property.title}
-        </Text>
-      </View>
-
-      {/* --------------------------------------------------------------------- */}
-      {/* Contenu */}
-      {/* --------------------------------------------------------------------- */}
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Galerie */}
-        <View style={styles.galleryContainer}>
-          <PropertyGallery images={allImages} title={property.title} />
-
-          <View
-            style={[
-              styles.statusBadge,
-              {
-                backgroundColor: `${statusColor}25`,
-                borderColor: `${statusColor}50`,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusText,
-                {
-                  color: statusColor,
-                },
-              ]}
-            >
-              {STATUS_LABELS[property.status] ?? property.status}
-            </Text>
-          </View>
-
-          <View style={styles.galleryActions}>
-            <PropertyFavorite
-              propertyId={property._id}
-              isFavorited={isLiked}
-              onToggle={setIsLiked}
-            />
-
-            <Pressable
-              onPress={handleBookmark}
-              style={styles.bookmarkButton}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isBookmarked ? "Retirer des favoris" : "Ajouter aux favoris"
-              }
-            >
-              <Bookmark
-                size={18}
-                color={isBookmarked ? "#FBBF24" : "#FFFFFF"}
-                fill={isBookmarked ? "#FBBF24" : "transparent"}
-              />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Vidéos */}
-        {allVideos.length > 0 && (
-          <PropertyVideos videos={allVideos} title={property.title} />
-        )}
-
-        {/* Titre */}
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>{property.title}</Text>
-
-          <View style={styles.metadataRow}>
-            <Text style={styles.metadataText}>
-              {TYPE_LABELS[property.type] ?? property.type}
-            </Text>
-
-            <Text style={styles.metadataSeparator}>·</Text>
-
-            <Text style={styles.transactionText}>{transactionLabel}</Text>
-
-            {property.neighborhood ? (
-              <>
-                <Text style={styles.metadataSeparator}>·</Text>
-
-                <Text style={styles.metadataText}>{property.neighborhood}</Text>
-              </>
-            ) : null}
-          </View>
-        </View>
-
-        {/* Prix */}
-        <View style={styles.priceContainer}>
-          <Text style={styles.price}>
-            {Number(price).toLocaleString()} {currency}
-            {property.transactionType === "location" ? "/mois" : ""}
-          </Text>
-        </View>
-
-        {/* Description */}
-        <PropertyDescription description={description} maxLength={600} />
-
-        {/* Caractéristiques */}
-        <PropertyFeatures
-          type={type}
-          surface={surface}
-          rooms={rooms}
-          bathrooms={bathrooms}
-          amenities={amenities}
-        />
-
-        {/* Localisation */}
-        <PropertyLocation
-          city={city}
-          neighborhood={neighborhood}
-          address={address}
-        />
-
-        {/* Carte */}
-        <PropertyMap
-          city={city}
-          address={address ?? undefined}
-          latitude={latitude}
-          longitude={longitude}
-        />
-
-        {/* Quartier */}
-        <PropertyNeighborhood city={city} />
-
-        {/* À proximité */}
-        <PropertyNearby city={city} />
-
-        {/* Propriétaire */}
-        <PropertyOwner
-          ownerName={ownerName}
-          ownerAvatar={ownerAvatar}
-          ownerPhone={phone}
-          ownerId={ownerId}
-          createdAt={createdAt}
-          rating={4.8}
-          reviewCount={24}
-        />
-
-        {/* Planification de visite */}
-        <PropertyVisitScheduler propertyId={property._id} />
-
-        {/* Historique */}
-        <PropertyHistory
-          price={price}
-          currency={currency}
-          createdAt={createdAt}
-          priceHistory={[
-            {
-              date: createdAt - 86400000 * 30,
-              price: price * 0.95,
-            },
-            {
-              date: createdAt - 86400000 * 60,
-              price: price * 0.97,
-            },
-          ]}
-        />
-
-        {/* Visites virtuelles */}
-        {(virtualTourUrl || tour360Images.length > 0 || floorPlanUrl) && (
-          <View style={styles.virtualTours}>
-            {virtualTourUrl ? (
+    <View className="h-full flex flex-col" style={{  }}>{}<View className="flex-shrink-0 px-5 pt-5 pb-3 flex items-center gap-3"><Pressable onPress={() => navigate(-1)} className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><Text className="text-white font-bold text-lg flex-1 truncate">{property.title}</Text></View>{}<View className="flex-1 overflow-y-auto px-5 pb-8 space-y-5"><View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">{}<View className="relative"><PropertyGallery images={allImages} title={property.title} /><View className="absolute top-3 left-3 z-10"><Text className="px-3 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: `${statusColor}25`, color: statusColor, borderStyle: "solid" }}>{STATUS_LABELS[property.status] || property.status}</Text></View><View className="absolute top-3 right-3 z-10 flex gap-2"><PropertyFavorite propertyId={property._id} isFavorited={isLiked} onToggle={setIsLiked} /><Pressable onPress={() => setIsBookmarked(!isBookmarked)} className="w-8 h-8 rounded-full bg-black/50 backdrop-blur flex items-center justify-center transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={isBookmarked ? "#FBBF24" : "none"} stroke={isBookmarked ? "#FBBF24" : "white"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg></Pressable></View></View>{}<PropertyVideos videos={allVideos} title={property.title} />{}<View><Text className="text-xl font-bold text-white">{property.title}</Text><View className="flex items-center gap-2 mt-1 flex-wrap"><Text className="text-xs text-white/40">{TYPE_LABELS[property.type] || property.type}</Text><Text className="text-xs text-white/20">·</Text><Text className="text-xs text-orange-400">{transactionLabel}</Text>{property.neighborhood && (
+                <>
+                  <Text className="text-xs text-white/20">·</Text>
+                  <Text className="text-xs text-white/40">
+                    {property.neighborhood}
+                  </Text>
+                </>
+              )}</View></View>{}<View><Text className="text-2xl font-black text-white">{price.toLocaleString()}{currency}{property.transactionType === "location" ? "/mois" : ""}</Text></View>{}<PropertyDescription description={description} maxLength={600} />{}<PropertyFeatures type={type} surface={surface} rooms={rooms} bathrooms={bathrooms} amenities={amenities} />{}<PropertyLocation city={city} neighborhood={neighborhood} address={address} />{}<PropertyMap city={city} address={address || undefined} latitude={latitude} longitude={longitude} />{}<PropertyNeighborhood city={city} />{}<PropertyNearby city={city} />{}<PropertyOwner ownerName={ownerName} ownerAvatar={ownerAvatar} ownerPhone={phone} ownerId={ownerId} createdAt={createdAt} rating={4.8} reviewCount={24} />{}<PropertyVisitScheduler propertyId={property._id} />{}<PropertyHistory price={price} currency={currency} createdAt={createdAt} priceHistory={[
+              { date: createdAt - 86400000 * 30, price: price * 0.95 },
+              { date: createdAt - 86400000 * 60, price: price * 0.97 },
+            ]} />{}<View className="flex flex-wrap gap-2">{virtualTourUrl && (
               <Property360Viewer url={virtualTourUrl} title="Visite 360°" />
-            ) : null}
-
-            {tour360Images.length > 0 ? (
+            )}{tour360Images.length > 0 && (
               <PropertyVirtualTour
                 url={tour360Images[0]}
                 title="Visite virtuelle"
               />
-            ) : null}
-
-            {floorPlanUrl ? (
+            )}{floorPlanUrl && (
               <PropertyFloorPlan floorPlanUrl={floorPlanUrl} title="Plan" />
-            ) : null}
-          </View>
-        )}
-
-        {/* Avis */}
-        <PropertyReviews
-          reviews={[
-            {
-              id: "1",
-              reviewerName: "Jean K.",
-              rating: 5,
-              comment: "Très beau bien, conforme à l'annonce.",
-              date: new Date().toISOString(),
-            },
-            {
-              id: "2",
-              reviewerName: "Marie L.",
-              rating: 4,
-              comment: "Bon emplacement, propriétaire réactif.",
-              date: new Date(Date.now() - 86400000 * 2).toISOString(),
-            },
-          ]}
-        />
-
-        {/* Partage */}
-        <View style={styles.shareSection}>
-          <PropertyShare
-            title={property.title}
-            url={`property:${String(property._id)}`}
-          />
-        </View>
-
-        {/* ------------------------------------------------------------------- */}
-        {/* Actions rapides */}
-        {/* ------------------------------------------------------------------- */}
-
-        <View style={styles.quickActions}>
-          <Pressable
-            onPress={() => void handleCall()}
-            style={[styles.quickActionButton, styles.callButton]}
-          >
-            <Phone size={17} color="#34D399" />
-
-            <Text style={styles.callButtonText}>Appeler</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleVisit}
-            style={[styles.quickActionButton, styles.visitButton]}
-          >
-            <CalendarDays size={17} color="#FFFFFF" />
-
-            <Text style={styles.visitButtonText}>Visiter</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
-    </View>
+            )}</View>{}<PropertyReviews reviews={[
+              {
+                id: "1",
+                reviewerName: "Jean K.",
+                rating: 5,
+                comment: "Très beau bien, conforme à l'annonce.",
+                date: new Date().toISOString(),
+              },
+              {
+                id: "2",
+                reviewerName: "Marie L.",
+                rating: 4,
+                comment: "Bon emplacement, propriétaire réactif.",
+                date: new Date(Date.now() - 86400000 * 2).toISOString(),
+              },
+            ]} />{}<View className="pt-2 border-t border-white/5"><PropertyShare url={shareUrl} title={shareTitle} /></View>{}<View className="flex flex-wrap gap-2"><Pressable onPress={() => {
+                if (phone) {
+                  Linking.openURL(`tel:${phone}`);
+                }
+              }} className="flex-1 py-3 rounded-2xl font-medium text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform" style={{ backgroundColor: "rgba(16,185,129,0.2)", borderWidth: 1, borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>Appeler
+            </Pressable><Pressable onPress={() => {
+                const scheduler = document.querySelector(
+                  "[data-visit-scheduler]",
+                ) as View;
+                if (scheduler) {
+                  scheduler.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                  });
+                }
+              }} className="flex-1 py-3 rounded-2xl font-medium text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform text-white" style={{  }}><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>Visiter
+            </Pressable></View></View></View></View>
   );
 }
-
-// -----------------------------------------------------------------------------
-// Styles
-// -----------------------------------------------------------------------------
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#020617",
-  },
-
-  centeredScreen: {
-    flex: 1,
-    backgroundColor: "#020617",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
-  },
-
-  headerTitle: {
-    flex: 1,
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-
-  iconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-
-  notFoundBackButton: {
-    position: "absolute",
-    top: 24,
-    left: 20,
-  },
-
-  scrollView: {
-    flex: 1,
-  },
-
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-    gap: 20,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 14,
-  },
-
-  loadingText: {
-    color: "rgba(255,255,255,0.45)",
-    fontSize: 14,
-  },
-
-  emptyText: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 15,
-  },
-
-  backTextButton: {
-    marginTop: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-
-  backText: {
-    color: "#F97316",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  galleryContainer: {
-    position: "relative",
-  },
-
-  statusBadge: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-
-  statusText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  galleryActions: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-
-  bookmarkButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  titleSection: {
-    gap: 6,
-  },
-
-  title: {
-    color: "#FFFFFF",
-    fontSize: 23,
-    fontWeight: "700",
-  },
-
-  metadataRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  metadataText: {
-    color: "rgba(255,255,255,0.45)",
-    fontSize: 13,
-  },
-
-  metadataSeparator: {
-    color: "rgba(255,255,255,0.2)",
-    fontSize: 13,
-  },
-
-  transactionText: {
-    color: "#FB923C",
-    fontSize: 13,
-    fontWeight: "500",
-  },
-
-  priceContainer: {
-    marginTop: -8,
-  },
-
-  price: {
-    color: "#FFFFFF",
-    fontSize: 27,
-    fontWeight: "900",
-  },
-
-  virtualTours: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-
-  shareSection: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.06)",
-  },
-
-  quickActions: {
-    flexDirection: "row",
-    gap: 12,
-  },
-
-  quickActionButton: {
-    flex: 1,
-    minHeight: 52,
-    borderRadius: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-
-  callButton: {
-    backgroundColor: "rgba(16,185,129,0.18)",
-    borderWidth: 1,
-    borderColor: "rgba(16,185,129,0.25)",
-  },
-
-  callButtonText: {
-    color: "#34D399",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  visitButton: {
-    backgroundColor: "#F97316",
-  },
-
-  visitButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  bottomSpacer: {
-    height: 24,
-  },
-});

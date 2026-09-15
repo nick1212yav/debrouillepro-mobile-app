@@ -1,5 +1,6 @@
 import { View } from "react-native";
 import type { ReactNode } from "react";
+import { Navigate } from "react-router-dom";
 import { useFirebaseUser } from "../hooks/useFirebaseUser";
 
 interface AuthGuardProps {

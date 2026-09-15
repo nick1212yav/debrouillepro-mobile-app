@@ -1,8 +1,8 @@
-import { View } from "react-native";
+import { View, ViewProps } from "react-native";
 import * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
-import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils.ts";
+import { buttonVariants } from "@/components/ui/button.tsx";
 
 function AlertDialog({
   ...props
@@ -69,29 +69,21 @@ function AlertDialogContent({
 function AlertDialogHeader({
   className,
   ...props
-}: React.ComponentProps<typeof View>) {
+}: ViewProps) {
   return (
-    <View
-      data-slot="alert-dialog-header"
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
-      {...props}
-    />
+    <View data-slot="alert-dialog-header" className={cn("flex flex-col gap-2 text-center sm:text-left", className)} {...props} />
   );
 }
 
 function AlertDialogFooter({
   className,
   ...props
-}: React.ComponentProps<typeof View>) {
+}: ViewProps) {
   return (
-    <View
-      data-slot="alert-dialog-footer"
-      className={cn(
+    <View data-slot="alert-dialog-footer" className={cn(
         "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 

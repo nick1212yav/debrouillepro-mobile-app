@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateTruckForm.tsx
 import { useForm } from "react-hook-form";
@@ -61,84 +61,49 @@ export function CreateTruckForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="companyName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="companyName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom de l'entreprise ou du transporteur *</Text></FormLabel>
+              <FormLabel>Nom de l'entreprise ou du transporteur *</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: Congo Logistique SARL" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone d'exploitation *</Text></FormLabel>
+              <FormLabel>Téléphone d'exploitation *</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: +243 890 000 000" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="truckModel"
-            render={({ field }) => (
+          )} /><View className="gap-2"><FormField control={form.control} name="truckModel" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Modèle du camion *</Text></FormLabel>
+                <FormLabel>Modèle du camion *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Mercedes Axor" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="capacityTons"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="capacityTons" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Capacité (tonnes)</Text></FormLabel>
+                <FormLabel>Capacité (tonnes)</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="licensePlate"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="licensePlate" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Plaque d'immatriculation *</Text></FormLabel>
+                <FormLabel>Plaque d'immatriculation *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: 1234AB02" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="cargoType"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="cargoType" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Type de fret principal *</Text></FormLabel>
+                <FormLabel>Type de fret principal *</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -158,43 +123,25 @@ export function CreateTruckForm({
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="basePrice"
-            render={({ field }) => (
+            )} /></View><View className="gap-2"><FormField control={form.control} name="basePrice" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Forfait de base *</Text></FormLabel>
+                <FormLabel>Forfait de base *</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="pricePerKm"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="pricePerKm" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Tarif par km *</Text></FormLabel>
+                <FormLabel>Tarif par km *</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -205,22 +152,15 @@ export function CreateTruckForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="operatingArea"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="operatingArea" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Zone de couverture de service *</Text></FormLabel>
+              <FormLabel>Zone de couverture de service *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Kinshasa-Kongo Central, National"
@@ -229,16 +169,8 @@ export function CreateTruckForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-11 rounded-xl bg-violet-600 text-white font-bold"
-          disabled={isLoading}
-        >
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          <Text>Enregistrer le service de Fret [2]</Text></Button>
-      </View>
+          )} /><Button  className="w-full h-11 rounded-xl bg-violet-600 text-white font-bold" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer le service de Fret [2]
+        </Button></View>
     </Form>
   );
 }

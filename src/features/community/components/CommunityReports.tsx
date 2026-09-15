@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { Pressable, View, Text, TextInput } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
 import { useState } from "react";
 import { Flag, X, Send, AlertCircle } from "lucide-react-native";
 
@@ -37,45 +37,15 @@ export function CommunityReports({ onReport, onClose }: Props) {
   };
 
   return (
-    <View
-      className="p-4 rounded-2xl bg-[#0D1117] border border-white/10 max-w-sm w-full"
-    >
-      <View className="flex items-center justify-between mb-4">
-        <View className="flex items-center gap-2">
-          <Flag size={16} className="text-red-400" />
-          <Text className="text-white font-bold text-base">Signaler</Text>
-        </View>
-        <Pressable
-          onPress={onClose}
-          className="text-white/40"
-        >
-          <X size={16} />
-        </Pressable>
-      </View>
+    <View initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="p-4 rounded-2xl bg-[#0D1117] border border-white/10 max-w-sm w-full">
+      <View className="flex items-center justify-between mb-4"><View className="flex items-center gap-2"><Flag size={16} className="text-red-400" /><Text className="text-white font-bold text-base">Signaler</Text></View><Pressable onPress={onClose} className="text-white/40 transition-colors"><X size={16} /></Pressable></View>
 
       <View className="space-y-3">
-        <Picker
-         
-          onValueChange={(val) => setReason(val)}
-          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none"
-         selectedValue={reason}>
-          <Picker.Item label="Motif du signalement" value="" />
-          {REPORT_REASONS.map((r) => (
-            <Picker.Item label={`${r}`} value={r} />
-          ))}
-        </Picker>
-        <TextInput
-          value={details}
-          onChangeText={(text) => setDetails(text)}
-          placeholder="Détails supplémentaires (optionnel)"
-         
-          className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none placeholder:text-white/30"
-         multiline textAlignVertical="top"/>
-        <Pressable
-          onPress={handleSubmit}
-          disabled={!reason || isSubmitting}
-          className="w-full py-2.5 rounded-xl text-white font-medium bg-red-500 disabled:opacity-50 flex items-center justify-center gap-2"
-        >
+        <Picker onValueChange={(value) => setReason(value)} className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none focus:border-red-400 transition-colors" selectedValue={reason}><Picker.Item label="Motif du signalement" value="" />{REPORT_REASONS.map((r) => (
+            <Picker.Item label={r} value={r} />
+          ))}</Picker>
+        <TextInput value={details} onChangeText={(value) => setDetails(value)} placeholder="Détails supplémentaires (optionnel)" className="w-full px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none focus:border-red-400 transition-colors placeholder:text-white/30" multiline textAlignVertical="top" />
+        <Pressable onPress={handleSubmit} disabled={!reason || isSubmitting} className="w-full py-2.5 rounded-xl text-white font-medium bg-red-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
           {isSubmitting ? (
             "Envoi..."
           ) : (

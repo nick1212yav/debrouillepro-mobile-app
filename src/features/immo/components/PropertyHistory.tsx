@@ -26,30 +26,12 @@ export function PropertyHistory({
   const hasHistory = priceHistory && priceHistory.length > 0;
 
   return (
-    <View className="bg-white/5 rounded-2xl p-4">
-      <Text className="text-sm font-medium text-white/70 mb-2">Historique</Text>
-      <View className="space-y-2">
-        <View className="flex justify-between text-sm">
-          <Text className="text-white/40">Prix actuel</Text>
-          <Text className="text-white font-bold">
-            {price.toLocaleString()} {currency}
-          </Text>
-        </View>
-        <View className="flex justify-between text-sm">
-          <Text className="text-white/40"><Text>Publié le</Text></Text>
-          <Text className="text-white/60">
-            {new Date(createdAt).toLocaleDateString()}
-          </Text>
-        </View>
-        {hasHistory && (
+    <View className="bg-white/5 rounded-2xl p-4"><Text className="text-sm font-medium text-white/70 mb-2">Historique</Text><View className="space-y-2"><View className="flex justify-between text-sm"><Text className="text-white/40">Prix actuel</Text><Text className="text-white font-bold">{price.toLocaleString()}{currency}</Text></View><View className="flex justify-between text-sm"><Text className="text-white/40">Publié le</Text><Text className="text-white/60">{new Date(createdAt).toLocaleDateString()}</Text></View>{hasHistory && (
           <>
             <View className="border-t border-white/5 pt-2 mt-2">
-              <Text className="text-xs text-white/40"><Text>Évolution des prix</Text></Text>
+              <Text className="text-xs text-white/40">Évolution des prix</Text>
               {priceHistory.slice(0, 5).map((item, idx) => (
-                <View
-                  key={idx}
-                  className="flex justify-between text-xs text-white/50 py-1 border-b border-white/5 last:border-0"
-                >
+                <View key={idx} className="flex justify-between text-xs text-white/50 py-1 border-b border-white/5 last:border-0">
                   <Text>{new Date(item.date).toLocaleDateString()}</Text>
                   <Text className="flex items-center gap-1">
                     {item.price >
@@ -65,8 +47,6 @@ export function PropertyHistory({
               ))}
             </View>
           </>
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }

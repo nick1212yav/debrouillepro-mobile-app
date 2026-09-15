@@ -1,27 +1,29 @@
-// src/features/community/sheets/StorySheet.tsx
+import { View, Text, Pressable, Image, TextInput, NativeSyntheticEvent, TextInputChangeEventData } from "react-native";
 
-import { useState } from "react";
-import {
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import {
-  X,
-  Upload,
-  Loader2,
-  Video,
-  Image as ImageIcon,
-} from "lucide-react-native";
-import * as ImagePicker from "expo-image-picker";
+// src/features/community/sheets/StorySheet.tsx
+import { useState, useRef } from "react";
+import { X, Upload, Loader2 } from "lucide-react-native";
+import { toast } from "sonner";
 import { useCommunityStories } from "../hooks/useCommunityStories";
 
-type StoryMediaType = "image" | "video";
+// Validation locale simplifiée (remplace @/lib/file-utils)
+function validateFile(
+  file: File,
+  options: { maxSize: number; allowedTypes: string[] },
+): boolean {
+  if (file.size > options.maxSize) return false;
+  const isValidType = options.allowedTypes.some((type) => {
+    if (type.endsWith("/*")) {
+      const prefix = type.replace("/*", "");
+      return file.type.startsWith(prefix);
+    }
+    return file.type === type;
+  });
+  return isValidType;
+}
+
+// Pas de compression pour l'instant (simulation)
+// const compressImage = (file: File) => file; // placeholder
 
 interface Props {
   isOpen: boolean;
@@ -29,126 +31,49 @@ interface Props {
   onSuccess?: () => void;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-function showMessage(title: string, message: string) {
-  Alert.alert(title, message);
-}
-
 export function StorySheet({ isOpen, onClose, onSuccess }: Props) {
   const { createStory } = useCommunityStories();
-
-  const [mediaType, setMediaType] = useState<StoryMediaType>("image");
-
+  const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-
   const [caption, setCaption] = useState("");
-
   const [isUploading, setIsUploading] = useState(false);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<TextInput>(null);
 
-  const resetForm = () => {
-    setMediaUrl(null);
-    setMediaType("image");
-    setCaption("");
-    setIsUploading(false);
-    setIsSubmitting(false);
-  };
+  const handleFileSelect = async (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleClose = () => {
-    if (isUploading || isSubmitting) {
+    const valid = validateFile(file, {
+      maxSize: 10 * 1024 * 1024,
+      allowedTypes: ["image/*", "video/*"],
+    });
+    if (!valid) {
+      toast.error("Fichier invalide (taille max 10MB)");
       return;
     }
 
-    resetForm();
-    onClose();
-  };
-
-  const handleMediaSelect = async () => {
-    if (isUploading || isSubmitting) {
-      return;
-    }
-
+    setIsUploading(true);
     try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permission.granted) {
-        showMessage(
-          "Autorisation requise",
-          "L'accès à votre galerie est nécessaire pour ajouter une image ou une vidéo.",
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
-        allowsEditing: false,
-        quality: 0.9,
-        exif: false,
-      });
-
-      if (result.canceled || result.assets.length === 0) {
-        return;
-      }
-
-      const asset = result.assets[0];
-
-      if (
-        asset.fileSize !== null &&
-        asset.fileSize !== undefined &&
-        asset.fileSize > MAX_FILE_SIZE
-      ) {
-        showMessage(
-          "Fichier trop volumineux",
-          "La taille maximale autorisée est de 10 MB.",
-        );
-        return;
-      }
-
-      setIsUploading(true);
-
-      const nextMediaType: StoryMediaType =
-        asset.type === "video" ? "video" : "image";
-
-      setMediaUrl(asset.uri);
-      setMediaType(nextMediaType);
-
-      showMessage("Fichier chargé", "Votre média est prêt à être publié.");
-    } catch (error) {
-      console.error("Erreur lors de la sélection du média:", error);
-
-      showMessage("Erreur", "Impossible de charger ce fichier.");
+      // Simuler l'upload (ici, on crée une URL locale)
+      const url = URL.createObjectURL(file);
+      setMediaUrl(url);
+      setMediaType(file.type.startsWith("video") ? "video" : "image");
+      toast.success("Fichier chargé");
+    } catch {
+      toast.error("Erreur lors du chargement");
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleRemoveMedia = () => {
-    if (isUploading || isSubmitting) {
-      return;
-    }
-
-    setMediaUrl(null);
-    setMediaType("image");
-  };
-
   const handleSubmit = async () => {
     if (!mediaUrl) {
-      showMessage(
-        "Média requis",
-        "Veuillez sélectionner une image ou une vidéo.",
-      );
-      return;
-    }
-
-    if (isUploading || isSubmitting) {
+      toast.error("Veuillez sélectionner un fichier");
       return;
     }
 
     setIsSubmitting(true);
-
     try {
       await createStory({
         mediaUrl,
@@ -156,199 +81,66 @@ export function StorySheet({ isOpen, onClose, onSuccess }: Props) {
         caption: caption.trim() || undefined,
         duration: mediaType === "video" ? 15 : 5,
       });
-
-      showMessage("Story publiée", "Votre story a été publiée avec succès.");
-
-      resetForm();
+      toast.success("Story publiée !");
       onClose();
       onSuccess?.();
-    } catch (error) {
-      console.error("Erreur publication story:", error);
-
-      showMessage("Erreur", "Impossible de publier la story.");
+      setMediaUrl(null);
+      setCaption("");
+    } catch {
+      toast.error("Erreur lors de la publication de la story");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isBusy = isUploading || isSubmitting;
+  if (!isOpen) return null;
 
   return (
-    <Modal
-      visible={isOpen}
-      transparent
-      animationType="slide"
-      onRequestClose={handleClose}
-      statusBarTranslucent
-    >
-      <View className="flex-1 justify-end bg-black/70">
-        <Pressable
-          className="absolute inset-0"
-          onPress={handleClose}
-          disabled={isBusy}
-          accessibilityRole="button"
-          accessibilityLabel="Fermer la story"
-        />
+<View>
+      <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={(e) => e.target === e.currentTarget && onClose()}>
+        <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="w-full max-w-lg rounded-t-3xl overflow-hidden" style={{ backgroundColor: "rgba(15,15,30,0.98)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", maxHeight: "90vh" }}>
+          <View className="flex items-center justify-between px-5 py-4 border-b border-white/10"><Text className="text-white font-bold text-lg">Nouvelle story</Text><Pressable onPress={onClose} className="p-1 rounded-full"><X size={20} className="text-white/50" /></Pressable></View>
 
-        <View className="max-h-[90%] w-full overflow-hidden rounded-t-3xl border border-white/10 bg-[#0F0F1E]">
-          <View className="flex-row items-center justify-between border-b border-white/10 px-5 py-4">
-            <Text className="text-lg font-bold text-white">Nouvelle story</Text>
-
-            <Pressable
-              onPress={handleClose}
-              disabled={isBusy}
-              accessibilityRole="button"
-              accessibilityLabel="Fermer"
-              className="h-9 w-9 items-center justify-center rounded-full"
-              style={{
-                opacity: isBusy ? 0.5 : 1,
-              }}
-            >
-              <X size={20} color="rgba(255,255,255,0.6)" />
-            </Pressable>
-          </View>
-
-          <ScrollView
-            className="flex-grow"
-            contentContainerClassName="gap-4 px-5 pb-5 pt-4"
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <Pressable
-              onPress={handleMediaSelect}
-              disabled={isBusy}
-              accessibilityRole="button"
-              accessibilityLabel="Importer une image ou une vidéo"
-              className="relative aspect-[9/16] w-full items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-white/20 bg-white/5"
-              style={{
-                opacity: isBusy ? 0.6 : 1,
-              }}
-            >
-              {mediaUrl ? (
+          <View className="flex-1 overflow-y-auto px-5 pb-5 flex flex-col gap-4" style={{  }}><View className="relative rounded-2xl overflow-hidden aspect-[9/16] bg-white/5 flex items-center justify-center border-2 border-dashed border-white/20 transition-colors" onPress={() => fileInputRef.current?.click()}>{mediaUrl ? (
                 <>
                   {mediaType === "image" ? (
-                    <Image
-                      source={{
-                        uri: mediaUrl,
-                      }}
-                      className="h-full w-full"
-                      resizeMode="cover"
-                      accessibilityLabel="Aperçu de la story"
-                    />
+                    <Image className="w-full h-full object-cover" source={{ uri: mediaUrl }} accessibilityLabel="Story" />
                   ) : (
-                    <View className="h-full w-full items-center justify-center bg-black/30">
-                      <Video size={56} color="rgba(255,255,255,0.8)" />
-
-                      <Text className="mt-3 text-sm font-medium text-white">
-                        Vidéo sélectionnée
-                      </Text>
-
-                      <Text className="mt-1 text-center text-xs text-white/50">
-                        La vidéo sera disponible dans votre story après
-                        publication.
-                      </Text>
-                    </View>
+                    <video
+                      src={mediaUrl}
+                      className="w-full h-full object-cover"
+                      controls={false}
+                    />
                   )}
-
-                  <Pressable
-                    onPress={handleRemoveMedia}
-                    disabled={isBusy}
-                    accessibilityRole="button"
-                    accessibilityLabel="Supprimer le média"
-                    className="absolute right-3 top-3 h-9 w-9 items-center justify-center rounded-full bg-black/60"
-                  >
-                    <X size={16} color="#FFFFFF" />
+                  <Pressable onPress={(e) => {
+                      setMediaUrl(null);
+                    }} className="absolute top-2 right-2 p-1 bg-black/50 rounded-full">
+                    <X size={16} className="text-white" />
                   </Pressable>
                 </>
               ) : (
-                <View className="items-center px-6">
+                <View className="flex flex-col items-center gap-2 text-white/40">
                   {isUploading ? (
-                    <>
-                      <Loader2 size={32} color="rgba(255,255,255,0.7)" />
-
-                      <Text className="mt-3 text-sm text-white/60">
-                        Chargement...
-                      </Text>
-                    </>
+                    <Loader2 className="w-8 h-8 animate-spin" />
                   ) : (
                     <>
-                      <Upload size={32} color="rgba(255,255,255,0.5)" />
-
-                      <Text className="mt-3 text-sm text-white/60">
-                        Touchez pour importer
-                      </Text>
-
-                      <Text className="mt-1 text-xs text-white/40">
-                        Image ou vidéo
-                      </Text>
-
-                      <Text className="mt-1 text-xs text-white/30">
-                        Taille maximale : 10 MB
-                      </Text>
+                      <Upload size={32} />
+                      <Text className="text-sm">Touchez pour importer</Text>
+                      <Text className="text-xs">(image ou vidéo)</Text>
                     </>
                   )}
                 </View>
-              )}
-            </Pressable>
+              )}<TextInput ref={fileInputRef} className="hidden" onChangeText={handleFileSelect} /></View><TextInput value={caption} onChangeText={(value) => setCaption(value)} placeholder="Légende (optionnelle)" className="w-full bg-transparent text-white/80 placeholder:text-white/25 text-sm outline-none leading-relaxed" multiline textAlignVertical="top" /></View>
 
-            {mediaUrl && (
-              <View className="flex-row items-center gap-2 rounded-xl bg-white/5 px-3 py-2">
-                {mediaType === "image" ? (
-                  <ImageIcon size={16} color="rgba(255,255,255,0.6)" />
-                ) : (
-                  <Video size={16} color="rgba(255,255,255,0.6)" />
-                )}
-
-                <Text className="text-xs text-white/60">
-                  {mediaType === "image"
-                    ? "Image sélectionnée"
-                    : "Vidéo sélectionnée"}
-                </Text>
-              </View>
-            )}
-
-            <TextInput
-              value={caption}
-              onChangeText={setCaption}
-              placeholder="Légende (optionnelle)"
-              placeholderTextColor="rgba(255,255,255,0.25)"
-              editable={!isBusy}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              className="min-h-[90px] w-full rounded-xl bg-white/5 px-4 py-3 text-sm leading-relaxed text-white"
-              accessibilityLabel="Légende de la story"
-            />
-          </ScrollView>
-
-          <View className="px-5 pb-5 pt-2">
-            <Pressable
-              onPress={handleSubmit}
-              disabled={!mediaUrl || isBusy}
-              accessibilityRole="button"
-              accessibilityLabel="Publier la story"
-              className="w-full items-center justify-center rounded-2xl bg-[#7C3AED] py-4"
-              style={{
-                opacity: !mediaUrl || isBusy ? 0.4 : 1,
-              }}
-            >
-              {isSubmitting ? (
-                <View className="flex-row items-center gap-2">
-                  <Loader2 size={16} color="#FFFFFF" />
-
-                  <Text className="text-sm font-bold text-white">
-                    Publication...
-                  </Text>
-                </View>
-              ) : (
-                <Text className="text-sm font-bold text-white">
-                  Publier la story
-                </Text>
-              )}
+          <View className="px-5 pb-5">
+            <Pressable onPress={handleSubmit} disabled={!mediaUrl || isSubmitting || isUploading} className="w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-98 disabled:opacity-40" style={{  }}>
+              <Text className="text-white">
+                {isSubmitting ? "Publication..." : "Publier la story"}
+              </Text>
             </Pressable>
           </View>
         </View>
       </View>
-    </Modal>
+    </View>
   );
 }

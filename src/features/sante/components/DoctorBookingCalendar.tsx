@@ -1,4 +1,5 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Pressable, Text } from "react-native";
+
 // src/features/sante/components/DoctorBookingCalendar.tsx
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
@@ -48,53 +49,25 @@ export function DoctorBookingCalendar({
   });
 
   return (
-    <View className="p-4 rounded-2xl bg-white/5 border border-white/10">
-      <View className="flex items-center justify-between mb-4">
-        <Pressable
-          onPress={() => changeMonth(-1)}
-          className="p-1 rounded-lg"
-        >
-          <ChevronLeft size={16} className="text-white/60" />
-        </Pressable>
-        <Text className="text-white font-medium text-sm capitalize">
-          {monthName}
-        </Text>
-        <Pressable
-          onPress={() => changeMonth(1)}
-          className="p-1 rounded-lg"
-        >
-          <ChevronRight size={16} className="text-white/60" />
-        </Pressable>
-      </View>
-
-      <View className="gap-1 text-center">
-        {["L", "M", "M", "J", "V", "S", "D"].map((day) => (
+    <View className="p-4 rounded-2xl bg-white/5 border border-white/10"><View className="flex items-center justify-between mb-4"><Pressable onPress={() => changeMonth(-1)} className="p-1 rounded-lg transition-colors"><ChevronLeft size={16} className="text-white/60" /></Pressable><Text className="text-white font-medium text-sm capitalize">{monthName}</Text><Pressable onPress={() => changeMonth(1)} className="p-1 rounded-lg transition-colors"><ChevronRight size={16} className="text-white/60" /></Pressable></View><View className="gap-1 text-center">{["L", "M", "M", "J", "V", "S", "D"].map((day) => (
           <View key={day} className="text-[10px] text-white/30 font-medium py-1">
             {day}
           </View>
-        ))}
-        {getDaysInMonth(currentMonth).map((date) => {
+        ))}{getDaysInMonth(currentMonth).map((date) => {
           const available = isAvailable(date);
           const selected = isSelected(date);
           const isToday = date.toDateString() === new Date().toDateString();
           return (
-            <Pressable
-              key={date.toISOString()}
-              onPress={() => available && onSelectDate(date)}
-              disabled={!available}
-              className={`
+            <Pressable key={date.toISOString()} onPress={() => available && onSelectDate(date)} disabled={!available} className={`
                 py-2 text-xs font-medium rounded-lg transition-colors
                 ${selected ? "bg-red-500 text-white" : ""}
                 ${available && !selected ? "hover:bg-white/10 text-white/70" : ""}
                 ${!available ? "text-white/20 cursor-not-allowed" : ""}
                 ${isToday && !selected ? "border border-red-500/30" : ""}
-              `}
-            >
+              `}>
               {date.getDate()}
             </Pressable>
           );
-        })}
-      </View>
-    </View>
+        })}</View></View>
   );
 }

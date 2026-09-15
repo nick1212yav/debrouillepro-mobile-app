@@ -1,18 +1,13 @@
-import { View, Text } from "react-native";
+import { View, Text, TextProps, ViewProps } from "react-native";
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
-import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils.ts";
+import { Separator } from "@/components/ui/separator.tsx";
 
-function ItemGroup({ className, ...props }: React.ComponentProps<typeof View>) {
+function ItemGroup({ className, ...props }: ViewProps) {
   return (
-    <View
-      accessibilityRole="list"
-      data-slot="item-group"
-      className={cn("group/item-group flex flex-col", className)}
-      {...props}
-    />
+    <View accessibilityRole="list" data-slot="item-group" className={cn("group/item-group flex flex-col", className)} {...props} />
   );
 }
 
@@ -57,7 +52,7 @@ function Item({
   size = "default",
   asChild = false,
   ...props
-}: React.ComponentProps<typeof View> &
+}: ViewProps &
   VariantProps<typeof itemVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "div";
   return (
@@ -92,90 +87,61 @@ function ItemMedia({
   className,
   variant = "default",
   ...props
-}: React.ComponentProps<typeof View> & VariantProps<typeof itemMediaVariants>) {
+}: ViewProps & VariantProps<typeof itemMediaVariants>) {
   return (
-    <View
-      data-slot="item-media"
-      data-variant={variant}
-      className={cn(itemMediaVariants({ variant, className }))}
-      {...props}
-    />
+    <View data-slot="item-media" data-variant={variant} className={cn(itemMediaVariants({ variant, className }))} {...props} />
   );
 }
 
-function ItemContent({ className, ...props }: React.ComponentProps<typeof View>) {
+function ItemContent({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="item-content"
-      className={cn(
+    <View data-slot="item-content" className={cn(
         "flex flex-1 flex-col gap-1 [&+[data-slot=item-content]]:flex-none",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function ItemTitle({ className, ...props }: React.ComponentProps<typeof View>) {
+function ItemTitle({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="item-title"
-      className={cn(
+    <View data-slot="item-title" className={cn(
         "flex w-fit items-center gap-2 text-sm leading-snug font-medium",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function ItemDescription({ className, ...props }: React.ComponentProps<typeof Text>) {
+function ItemDescription({ className, ...props }: TextProps) {
   return (
-    <Text
-      data-slot="item-description"
-      className={cn(
+    <Text data-slot="item-description" className={cn(
         "text-muted-foreground line-clamp-2 text-sm leading-normal font-normal text-balance",
         "[&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function ItemActions({ className, ...props }: React.ComponentProps<typeof View>) {
+function ItemActions({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="item-actions"
-      className={cn("flex items-center gap-2", className)}
-      {...props}
-    />
+    <View data-slot="item-actions" className={cn("flex items-center gap-2", className)} {...props} />
   );
 }
 
-function ItemHeader({ className, ...props }: React.ComponentProps<typeof View>) {
+function ItemHeader({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="item-header"
-      className={cn(
+    <View data-slot="item-header" className={cn(
         "flex basis-full items-center justify-between gap-2",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function ItemFooter({ className, ...props }: React.ComponentProps<typeof View>) {
+function ItemFooter({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="item-footer"
-      className={cn(
+    <View data-slot="item-footer" className={cn(
         "flex basis-full items-center justify-between gap-2",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 

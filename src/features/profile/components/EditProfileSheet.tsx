@@ -1,35 +1,19 @@
+import { View, Text, Pressable, TextInput, NativeSyntheticEvent, TextInputChangeEventData } from "react-native";
+
 // src/features/profile/components/EditProfileSheet.tsx
 
-import { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { Camera, Save, X } from "lucide-react-native";
+import { useState, useEffect, useRef } from "react";
+import { X, Save, Camera } from "lucide-react-native";
+import { toast } from "sonner";
 import { useMutation } from "convex/react";
-
-import { api } from "@/convex/_generated/api";
-import { useCurrentUser, getDisplayName } from "@/hooks/use-current-user";
+import { api } from "@/convex/_generated/api.js";
+import { useCurrentUser, getDisplayName } from "@/hooks/use-current-user.ts";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
-import UserAvatar from "@/components/ui/user-avatar";
+import UserAvatar from "@/components/ui/user-avatar.tsx";
 
 interface EditProfileSheetProps {
   onClose: () => void;
   accentHex: string;
-}
-
-function showError(message: string) {
-  Alert.alert("Erreur", message);
-}
-
-function showSuccess(message: string) {
-  Alert.alert("Succès", message);
 }
 
 export function EditProfileSheet({
@@ -38,379 +22,119 @@ export function EditProfileSheet({
 }: EditProfileSheetProps) {
   const user = useCurrentUser();
   const { user: firebaseUser } = useFirebaseAuth();
-
-  const email = firebaseUser?.email ?? undefined;
-
+  const email = firebaseUser?.email;
   const updateProfile = useMutation(api.users.updateProfile);
   const generateUploadUrl = useMutation(api.users.generateUserAvatarUploadUrl);
-
   const [name, setName] = useState(user?.name ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
-
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  /*
-   * Prévu pour le branchement du picker natif.
-   *
-   * Sur React Native, <input type="file"> et useRef<HTMLInputElement>
-   * ne sont pas disponibles. La sélection d'image doit passer par
-   * expo-image-picker.
-   */
-  const isMountedRef = useRef(true);
+  const fileInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    isMountedRef.current = true;
-
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!user) {
-      return;
+    if (user) {
+      setName(user.name ?? "");
+      setBio(user.bio ?? "");
     }
+  }, [user?._id]);
 
-    setName(user.name ?? "");
-    setBio(user.bio ?? "");
-  }, [user?._id, user?.name, user?.bio]);
-
-  const handleAvatarPress = async () => {
-    if (uploading) {
-      return;
-    }
-
-    Alert.alert(
-      "Modifier la photo",
-      "La sélection native de photo sera branchée avec expo-image-picker.",
-      [
-        {
-          text: "Annuler",
-          style: "cancel",
-        },
-        {
-          text: "Compris",
-          style: "default",
-        },
-      ],
-    );
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
   };
 
-  /*
-   * Cette fonction est prête pour recevoir un URI natif provenant de
-   * expo-image-picker ou expo-document-picker.
-   *
-   * Elle conserve le flux Convex existant :
-   *
-   * 1. generate upload URL
-   * 2. POST du fichier vers Convex Storage
-   * 3. récupération du storageId
-   * 4. updateProfile
-   */
-  const uploadAvatar = async (
-    uri: string,
-    mimeType = "image/jpeg",
-  ): Promise<void> => {
+  const handleFileChange = async (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     if (!email) {
-      showError("Utilisateur non connecté");
+      toast.error("Utilisateur non connecté");
+      return;
+    }
+
+    // Validation simple du type de fichier
+    if (!file.type.startsWith("image/")) {
+      toast.error("Veuillez sélectionner un fichier image");
       return;
     }
 
     setUploading(true);
+    const toastId = toast.loading("Téléversement de l'image...");
 
     try {
+      // 1. Obtenir l'URL de téléversement sécurisée
       const uploadUrl = await generateUploadUrl();
 
-      const response = await fetch(uri);
-
-      if (!response.ok) {
-        throw new Error("Impossible de lire l'image sélectionnée");
-      }
-
-      const blob = await response.blob();
-
-      const uploadResponse = await fetch(uploadUrl, {
+      // 2. Envoyer le fichier image à cette URL
+      const result = await fetch(uploadUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": mimeType,
-        },
-        body: blob,
+        headers: { "Content-Type": file.type },
+        body: file,
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error("Erreur lors du téléversement");
-      }
+      if (!result.ok) throw new Error("Erreur de téléversement");
 
-      const result = (await uploadResponse.json()) as {
-        storageId?: string;
-      };
+      // 3. Récupérer le storageId généré par Convex
+      const { storageId } = await result.json();
 
-      if (!result.storageId) {
-        throw new Error(
-          "Le serveur n'a pas retourné d'identifiant de stockage",
-        );
-      }
-
+      // 4. Mettre à jour l'avatar de l'utilisateur avec ce storageId
       await updateProfile({
         email,
-        storageId: result.storageId,
+        storageId,
       });
 
-      if (isMountedRef.current) {
-        showSuccess("Photo de profil mise à jour !");
-      }
+      toast.success("Photo de profil mise à jour !", { id: toastId });
     } catch (error) {
-      console.error(
-        "[EditProfileSheet] Impossible de téléverser l'image:",
-        error,
-      );
-
-      if (isMountedRef.current) {
-        showError("Impossible de téléverser l'image");
-      }
+      console.error(error);
+      toast.error("Impossible de téléverser l'image", { id: toastId });
     } finally {
-      if (isMountedRef.current) {
-        setUploading(false);
-      }
+      setUploading(false);
     }
   };
 
   const handleSave = async () => {
-    const normalizedName = name.trim();
-    const normalizedBio = bio.trim();
-
-    if (!normalizedName) {
-      showError("Le nom ne peut pas être vide");
+    if (!name.trim()) {
+      toast.error("Le nom ne peut pas être vide");
       return;
     }
-
     if (!email) {
-      showError("Utilisateur non connecté");
+      toast.error("Utilisateur non connecté");
       return;
     }
-
-    if (saving || uploading) {
-      return;
-    }
-
     setSaving(true);
-
     try {
       await updateProfile({
         email,
-        name: normalizedName,
-        bio: normalizedBio,
+        name: name.trim(),
+        bio: bio.trim(),
       });
-
-      if (!isMountedRef.current) {
-        return;
-      }
-
-      showSuccess("Profil mis à jour !");
+      toast.success("Profil mis à jour !");
       onClose();
-    } catch (error) {
-      console.error("[EditProfileSheet] Erreur lors de la mise à jour:", error);
-
-      if (isMountedRef.current) {
-        showError("Erreur lors de la mise à jour du profil");
-      }
+    } catch {
+      toast.error("Erreur lors de la mise à jour");
     } finally {
-      if (isMountedRef.current) {
-        setSaving(false);
-      }
+      setSaving(false);
     }
   };
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <View className="flex-1 justify-end bg-black/75">
-        {/* Overlay */}
-        <Pressable
-          className="absolute inset-0"
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Fermer la modification du profil"
-        />
+    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} onPress={(e) => e.target === e.currentTarget && onClose()}>
+      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="w-full rounded-t-3xl flex flex-col" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+        <View className="flex justify-center pt-3 pb-1"><View className="w-10 h-1 rounded-full bg-white/20" /></View>
 
-        {/* Bottom Sheet */}
-        <View
-          className="w-full overflow-hidden rounded-t-[32px] border border-white/10 bg-[#0A0A1A]"
-          style={{
-            maxHeight: "92%",
-          }}
-        >
-          {/* Handle */}
-          <View className="items-center pb-1 pt-3">
-            <View className="h-1 w-10 rounded-full bg-white/20" />
-          </View>
+        <View className="flex items-center justify-between px-5 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}><Text className="text-white font-black text-lg">Modifier le profil</Text><Pressable onPress={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><X size={15} className="text-white/60" /></Pressable></View>
 
-          {/* Header */}
-          <View className="flex-row items-center justify-between border-b border-white/[0.06] px-5 py-3">
-            <Text className="text-lg font-black text-white">
-              Modifier le profil
-            </Text>
-
-            <Pressable
-              onPress={onClose}
-              disabled={saving || uploading}
-              className="h-9 w-9 items-center justify-center rounded-xl bg-white/[0.08] active:bg-white/[0.15] disabled:opacity-50"
-              accessibilityRole="button"
-              accessibilityLabel="Fermer"
-            >
-              <X size={17} color="rgba(255,255,255,0.65)" />
-            </Pressable>
-          </View>
-
-          <View className="gap-5 px-5 py-5">
-            {/* ======================================================== */}
-            {/* AVATAR                                                   */}
-            {/* ======================================================== */}
-
-            <View className="flex-row items-center gap-4">
-              <Pressable
-                onPress={() => {
-                  void handleAvatarPress();
-                }}
-                disabled={uploading || saving}
-                className="relative h-16 w-16 overflow-hidden rounded-full"
-                accessibilityRole="button"
-                accessibilityLabel="Modifier la photo de profil"
-              >
-                <UserAvatar user={user} size="w-16 h-16" />
-
-                <View className="absolute inset-0 items-center justify-center bg-black/45">
-                  {uploading ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <Camera size={19} color="#FFFFFF" />
-                  )}
-                </View>
-              </Pressable>
-
-              <View className="min-w-0 flex-1">
-                <Text
-                  numberOfLines={1}
-                  className="text-sm font-bold text-white"
-                >
-                  {getDisplayName(user)}
-                </Text>
-
-                <Text className="mt-1 text-xs text-white/40">
-                  Appuyez sur la photo pour la remplacer
-                </Text>
-              </View>
-            </View>
-
-            {/* ======================================================== */}
-            {/* NAME                                                     */}
-            {/* ======================================================== */}
-
-            <View>
-              <Text className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">
-                Nom affiché
-              </Text>
-
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="Votre nom"
-                placeholderTextColor="rgba(255,255,255,0.28)"
-                maxLength={60}
-                editable={!saving && !uploading}
-                className="rounded-2xl border border-white/[0.12] bg-white/[0.07] px-4 py-3 text-sm text-white"
-                style={{
-                  color: "#FFFFFF",
-                }}
-              />
-
-              <Text className="mt-1.5 text-right text-[10px] text-white/25">
-                {name.length}/60
-              </Text>
-            </View>
-
-            {/* ======================================================== */}
-            {/* BIO                                                      */}
-            {/* ======================================================== */}
-
-            <View>
-              <Text className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">
-                Bio
-              </Text>
-
-              <TextInput
-                value={bio}
-                onChangeText={setBio}
-                placeholder="Parlez de vous en quelques mots..."
-                placeholderTextColor="rgba(255,255,255,0.28)"
-                maxLength={160}
-                multiline
-                textAlignVertical="top"
-                editable={!saving && !uploading}
-                className="min-h-[100px] rounded-2xl border border-white/[0.12] bg-white/[0.07] px-4 py-3 text-sm text-white"
-                style={{
-                  color: "#FFFFFF",
-                }}
-              />
-
-              <Text className="mt-1.5 text-right text-xs text-white/25">
-                {bio.length}/160
-              </Text>
-            </View>
-
-            {/* ======================================================== */}
-            {/* SAVE                                                      */}
-            {/* ======================================================== */}
-
-            <Pressable
-              onPress={() => {
-                void handleSave();
-              }}
-              disabled={saving || uploading}
-              className="mt-1 flex-row items-center justify-center gap-2 rounded-2xl py-4 active:opacity-85 disabled:opacity-50"
-              style={{
-                backgroundColor: accentHex,
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Enregistrer le profil"
-            >
-              {saving ? (
-                <>
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-
-                  <Text className="text-sm font-bold text-white">
-                    Enregistrement...
-                  </Text>
-                </>
-              ) : uploading ? (
-                <>
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-
-                  <Text className="text-sm font-bold text-white">
-                    Téléversement...
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Save size={17} color="#FFFFFF" />
-
-                  <Text className="text-sm font-bold text-white">
-                    Enregistrer
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </View>
-        </View>
+        <View className="px-5 py-5 flex flex-col gap-4">{}<View className="flex items-center gap-4"><View onPress={handleAvatarClick} className="relative group rounded-full overflow-hidden" style={{ opacity: uploading ? 0.6 : 1 }}><UserAvatar user={user} size="w-16 h-16" /><View className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 transition-opacity"><Camera size={18} className="text-white" /></View></View><TextInput ref={fileInputRef} onChangeText={handleFileChange} className="hidden" /><View><Text className="text-sm font-bold text-white">{getDisplayName(user)}</Text><Text className="text-xs text-white/40 mt-0.5">Cliquez sur la photo pour la remplacer
+              </Text></View></View><View><Text className="text-xs font-bold text-white/50 uppercase tracking-wider mb-1.5 block">Nom affiché
+            </Text><TextInput value={name} onChangeText={(value) => setName(value)} placeholder="Votre nom" maxLength={60} className="w-full px-4 py-3 rounded-2xl text-sm text-white outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid" }} /></View><View><Text className="text-xs font-bold text-white/50 uppercase tracking-wider mb-1.5 block">Bio
+            </Text><TextInput value={bio} onChangeText={(value) => setBio(value)} placeholder="Parlez de vous en quelques mots..." maxLength={160} className="w-full px-4 py-3 rounded-2xl text-sm text-white outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid" }} multiline textAlignVertical="top" /><Text className="text-xs text-white/25 text-right mt-1">{bio.length}/160
+            </Text></View><Pressable onPress={() => void handleSave()} disabled={saving || uploading} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold active:scale-95 transition-all disabled:opacity-50" style={{  }}>{saving ? (
+              "Enregistrement..."
+            ) : (
+              <>
+                <Save size={15} /> Enregistrer
+              </>
+            )}</Pressable></View>
       </View>
-    </Modal>
+    </View>
   );
 }
-
-export default EditProfileSheet;

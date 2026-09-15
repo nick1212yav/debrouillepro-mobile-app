@@ -1,3 +1,5 @@
+// src/home/hooks/useHome.ts
+
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 
@@ -17,19 +19,50 @@ import { MODULE_REGISTRY } from "@/config/modules/moduleRegistry";
  *
  * Hook principal de la Home.
  *
- * Sources backend :
+ * Source backend :
  *   convex/home.ts
- *   convex/homeIntelligence.ts
+ *
+ * IMPORTANT — ÉTAT TEMPORAIRE :
+ *
+ * La Home n'utilise plus `api.home.getHomeScreenData` ici.
+ *
+ * On utilise directement :
+ *
+ *   api.home.getHomeData
+ *
+ * afin d'éviter de demander le gros bloc `intelligence`
+ * (~1.45–1.46 MB) qui semble provoquer un payload Convex
+ * trop lourd et/ou des lenteurs.
+ *
+ * Le contrat public de `useHome()` est conservé :
+ *
+ *   data
+ *   intelligence
+ *   rawIntelligence
+ *   state
+ *   feed
+ *   items
+ *   sections
+ *   recommendations
+ *   modules
+ *   preferences
+ *   isLoading
+ *   loading
+ *   error
+ *   refresh
+ *   refreshKey
+ *
+ * `intelligence` vaudra simplement `null` tant que la source
+ * lourde est désactivée.
  *
  * Responsabilités :
  * - récupérer les données Home depuis Convex
- * - récupérer l'intelligence Home
  * - normaliser les préférences
  * - exposer le feed
  * - exposer les modules
  * - exposer les sections si elles existent
  * - exposer les recommandations si elles existent
- * - exposer l'intelligence Home
+ * - exposer l'intelligence Home si elle est réactivée
  * - exposer loading / error
  * - fournir un refresh logique
  *
@@ -69,7 +102,7 @@ const DEFAULT_PREFERENCES: HomePreferences = {
  * ============================================================
  *
  * Le backend expose déjà cette structure via
- * api.homeIntelligence.getHomeIntelligence.
+ * api.home.getHomeScreenData.
  *
  * On garde volontairement les sous-objets souples ici :
  * les composants spécialisés pourront ensuite préciser
@@ -156,12 +189,37 @@ interface HomeDataShape {
     favoriteModules?: string[];
   };
 
+  /**
+   * Ancienne structure éventuellement utilisée par certains
+   * consommateurs historiques.
+   *
+   * Le backend actuel retourne désormais principalement :
+   *
+   *   moduleIds
+   *   moduleOrder
+   *
+   * On conserve donc cette propriété pour compatibilité
+   * sans en dépendre pour la logique principale.
+   */
   modules?: Array<{
     id?: string;
     label?: string;
     shortLabel?: string;
     icon?: string;
     route?: string;
+    priority?: number;
+  }>;
+
+  /**
+   * Identifiants des modules disponibles sur Home.
+   */
+  moduleIds?: string[];
+
+  /**
+   * Ordre des modules calculé par le backend.
+   */
+  moduleOrder?: Array<{
+    id?: string;
     priority?: number;
   }>;
 
@@ -299,16 +357,69 @@ function extractRecommendations(data: unknown): RecommendationItem[] {
  *
  * Priorité :
  *
- * 1. modules réellement renvoyés par Convex
- * 2. registry frontend en fallback
+ * 1. moduleIds réellement renvoyés par Convex
+ * 2. moduleOrder renvoyé par Convex
+ * 3. ancienne propriété modules si disponible
+ * 4. registry frontend en fallback
  *
- * Cela évite que la Home affiche des modules désactivés
- * par le backend.
+ * Le backend HomeData actuel expose :
+ *
+ *   moduleIds
+ *   moduleOrder
+ *
+ * et non :
+ *
+ *   modules
+ *
+ * Il est donc important de ne pas considérer `home.modules`
+ * comme la source principale.
  * ============================================================
  */
 
 function extractModules(data: unknown): ModuleId[] {
   const home = asHomeData(data);
+
+  /**
+   * ----------------------------------------------------------
+   * 1. MODULE IDS BACKEND
+   * ----------------------------------------------------------
+   */
+
+  if (Array.isArray(home?.moduleIds)) {
+    const backendModuleIds = home.moduleIds.filter(
+      (id): id is ModuleId => typeof id === "string" && id in MODULE_REGISTRY,
+    );
+
+    if (backendModuleIds.length > 0) {
+      return backendModuleIds;
+    }
+  }
+
+  /**
+   * ----------------------------------------------------------
+   * 2. MODULE ORDER BACKEND
+   * ----------------------------------------------------------
+   */
+
+  if (Array.isArray(home?.moduleOrder)) {
+    const orderedModuleIds = home.moduleOrder
+      .map((module) => module?.id)
+      .filter(
+        (id): id is ModuleId => typeof id === "string" && id in MODULE_REGISTRY,
+      );
+
+    if (orderedModuleIds.length > 0) {
+      return orderedModuleIds;
+    }
+  }
+
+  /**
+   * ----------------------------------------------------------
+   * 3. ANCIENNE STRUCTURE BACKEND
+   * ----------------------------------------------------------
+   *
+   * Compatibilité avec d'éventuelles données historiques.
+   */
 
   if (Array.isArray(home?.modules)) {
     const backendModules = home.modules
@@ -321,6 +432,12 @@ function extractModules(data: unknown): ModuleId[] {
       return backendModules;
     }
   }
+
+  /**
+   * ----------------------------------------------------------
+   * 4. FRONTEND REGISTRY FALLBACK
+   * ----------------------------------------------------------
+   */
 
   return Object.values(MODULE_REGISTRY)
     .filter((module) => module.enabled && module.home.enabled)
@@ -445,14 +562,18 @@ function normalizeIntelligence(value: unknown): HomeIntelligence | null {
       items: Array.isArray(opportunityRadar.items)
         ? opportunityRadar.items
         : [],
+
       count:
         typeof opportunityRadar.count === "number" ? opportunityRadar.count : 0,
+
       top: opportunityRadar.top ?? null,
     },
 
     nearbyNow: {
       items: Array.isArray(nearbyNow.items) ? nearbyNow.items : [],
+
       count: typeof nearbyNow.count === "number" ? nearbyNow.count : 0,
+
       top: nearbyNow.top ?? null,
     },
 
@@ -462,6 +583,7 @@ function normalizeIntelligence(value: unknown): HomeIntelligence | null {
       actions: Array.isArray(commandCenter.actions)
         ? commandCenter.actions
         : [],
+
       primary: commandCenter.primary ?? null,
     },
 
@@ -522,6 +644,11 @@ export function useHome() {
    * ----------------------------------------------------------
    * REFRESH KEY
    * ----------------------------------------------------------
+   *
+   * Compteur de refresh logique.
+   *
+   * Peut être utilisé par un consommateur (ex: PullToRefresh)
+   * comme `key` sur un composant pour forcer un remount.
    */
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -531,44 +658,38 @@ export function useHome() {
    * CONVEX — HOME DATA
    * ----------------------------------------------------------
    *
-   * Convex est réactif :
-   * les changements backend provoquent automatiquement
-   * une nouvelle valeur de homeData.
+   * Souscription temporairement allégée.
+   *
+   * On utilise directement `api.home.getHomeData` au lieu de
+   * `api.home.getHomeScreenData` afin d'éviter de demander
+   * le gros bloc `intelligence` (~1.45–1.46 MB).
+   *
+   * IMPORTANT :
+   * Ce n'est pas un simple masquage côté React.
+   * La query lourde n'est plus appelée par useHome().
    */
-
   const homeData = useQuery(api.home.getHomeData, {});
 
   /**
    * ----------------------------------------------------------
-   * CONVEX — HOME INTELLIGENCE
+   * HOME INTELLIGENCE — TEMPORAIREMENT DÉSACTIVÉE
    * ----------------------------------------------------------
    *
-   * Agrégateur central de l'intelligence Home.
+   * On conserve le contrat de useHome() pour ne pas casser
+   * HomePage et les consommateurs de `intelligence`.
    *
-   * Il fournit notamment :
-   * - SmartContextSuggestions
-   * - OpportunityRadar
-   * - NearbyNow
-   * - DailyBrief
-   * - HomeCommandCenter
-   * - HomePersonalization
-   * - HomeActivityPulse
-   * - metrics
-   * - meta
+   * Ils recevront simplement `intelligence: null`.
    */
-
-  const rawIntelligence = useQuery(
-    api.homeIntelligence.getHomeIntelligence,
-    {},
-  );
+  const rawIntelligence: HomeIntelligence | undefined = undefined;
 
   /**
    * ----------------------------------------------------------
    * LOADING
    * ----------------------------------------------------------
+   *
+   * Une seule source signifie un seul état de chargement.
    */
-
-  const isLoading = homeData === undefined || rawIntelligence === undefined;
+  const isLoading = homeData === undefined;
 
   /**
    * ----------------------------------------------------------
@@ -658,7 +779,11 @@ export function useHome() {
    *
    * Le refresh est volontairement logique.
    *
-   * Convex reste la source réactive.
+   * Convex reste la source réactive :
+   * il n'y a pas besoin de forcer un refetch réseau.
+   *
+   * `refresh()` sert donc à notifier un consommateur
+   * (ex: PullToRefresh) de relancer ses effets locaux.
    */
 
   const refresh = useCallback(() => {
@@ -673,12 +798,12 @@ export function useHome() {
 
   return {
     /**
-     * Données brutes provenant de Convex.
+     * Données Home provenant de Convex.
      */
     data: homeData,
 
     /**
-     * Intelligence Home provenant de Convex.
+     * Intelligence Home provenant de la même réponse Convex.
      */
     intelligence,
 

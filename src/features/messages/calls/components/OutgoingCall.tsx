@@ -17,9 +17,7 @@ export function OutgoingCall({
   return (
     <View className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl bg-zinc-950 p-8 text-white">
       {recipientAvatar ? (
-        <Image
-          className="h-24 w-24 rounded-full object-cover" source={{ uri: recipientAvatar }} accessibilityLabel={recipientName}
-        />
+        <Image className="h-24 w-24 rounded-full object-cover" source={{ uri: recipientAvatar }} accessibilityLabel={recipientName} />
       ) : (
         <View className="flex h-24 w-24 items-center justify-center rounded-full bg-white/10 text-3xl">
           {call.type === "video" ? "📹" : "📞"}
@@ -32,10 +30,7 @@ export function OutgoingCall({
         Appel {call.type === "video" ? "vidéo" : "audio"} en cours...
       </Text>
 
-      <Pressable
-        onPress={onCancel}
-        className="mt-8 rounded-full bg-red-600 px-6 py-3 font-medium"
-      >
+      <Pressable onPress={onCancel} className="mt-8 rounded-full bg-red-600 px-6 py-3 font-medium">
         Annuler
       </Pressable>
     </View>

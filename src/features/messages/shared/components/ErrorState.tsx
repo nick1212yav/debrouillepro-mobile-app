@@ -1,4 +1,5 @@
-import { Pressable, View, ViewProps, PressableProps } from "react-native";
+import { View, Pressable, PressableProps, ViewProps } from "react-native";
+
 // src/features/messages/shared/components/ErrorState.tsx
 
 import type { ReactNode } from "react";
@@ -24,42 +25,27 @@ export function ErrorState({
   ...props
 }: ErrorStateProps) {
   return (
-    <View
-      {...props}
-      className={className}
-      accessibilityRole="alert"
-      style={{ minHeight: 180, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24 }}
-    >
-      <View
-       
-        style={{ marginBottom: 4 }}
-      >
-        {icon}
-      </View>
-
-      <View
-        style={{  }}
-      >
-        {title}
-      </View>
-
-      {message && (
-        <View
-          style={{ maxWidth: 480, opacity: 0.75 }}
-        >
+    <View {...props} className={className} accessibilityRole="alert" style={{ minHeight: 180, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24, textAlign: "center" }}><View accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" style={{
+          fontSize: 30,
+          lineHeight: 1,
+          marginBottom: 4,
+        }}>{icon}</View><View style={{
+          fontSize: 16,
+          fontWeight: 600,
+        }}>{title}</View>{message && (
+        <View style={{
+            maxWidth: 480,
+            fontSize: 14,
+            lineHeight: 1.5,
+            opacity: 0.75,
+          }}>
           {message}
         </View>
-      )}
-
-      {onRetry && (
-        <Pressable
-          onPress={onRetry}
-          style={{ marginTop: 6, borderWidth: 0, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 16 }}
-        >
+      )}{onRetry && (
+        <Pressable onPress={onRetry} style={{ marginTop: 6, borderWidth: 0, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 16, fontWeight: 600 }}>
           {retryLabel}
         </Pressable>
-      )}
-    </View>
+      )}</View>
   );
 }
 

@@ -1,7 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useAnnonceFavorite(
@@ -21,10 +21,10 @@ export function useAnnonceFavorite(
         publicationId: annonceId as Id<"publications">,
       });
       setIsFavorited(favorited);
-      UIService.openToast(favorited ? "Ajouté aux favoris ❤️" : "Retiré des favoris", "success");
+      toast.success(favorited ? "Ajouté aux favoris ❤️" : "Retiré des favoris");
       return favorited;
     } catch (error) {
-      UIService.openToast("Erreur lors de l'opération", "error");
+      toast.error("Erreur lors de l'opération");
       throw error;
     } finally {
       setLoading(false);

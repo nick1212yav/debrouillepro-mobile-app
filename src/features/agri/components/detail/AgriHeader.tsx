@@ -17,32 +17,6 @@ export function AgriHeader({
   onShare,
 }: AgriHeaderProps) {
   return (
-    <View className="w-full flex items-center justify-between p-4 z-20">
-      <Pressable
-        onPress={onBack}
-        className="w-10 h-10 rounded-2xl bg-black/40 flex items-center justify-center border border-white/5"
-      >
-        <ArrowLeft size={18} className="text-white" />
-      </Pressable>
-
-      <View className="flex items-center gap-2.5">
-        <Pressable
-          onPress={onToggleFavorite}
-          className="w-10 h-10 rounded-2xl bg-black/40 flex items-center justify-center border border-white/5"
-        >
-          <Heart
-            size={18}
-            className={isFavorite ? "fill-red-500 text-red-500" : "text-white"}
-          />
-        </Pressable>
-
-        <Pressable
-          onPress={onShare}
-          className="w-10 h-10 rounded-2xl bg-black/40 flex items-center justify-center border border-white/5"
-        >
-          <Share2 size={18} className="text-white" />
-        </Pressable>
-      </View>
-    </View>
+    <View className="w-full flex items-center justify-between p-4 z-20"><Pressable whileTap={{ scale: 0.9 }} onPress={onBack} className="w-10 h-10 rounded-2xl bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/5 active:bg-black/60 transition-all"><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex items-center gap-2.5"><Pressable whileTap={{ scale: 0.9 }} onPress={onToggleFavorite} className="w-10 h-10 rounded-2xl bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/5 active:bg-black/60 transition-all"><Heart size={18} className={isFavorite ? "fill-red-500 text-red-500" : "text-white"} /></Pressable><Pressable whileTap={{ scale: 0.9 }} onPress={onShare} className="w-10 h-10 rounded-2xl bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/5 active:bg-black/60 transition-all"><Share2 size={18} className="text-white" /></Pressable></View></View>
   );
 }

@@ -1,5 +1,6 @@
 import { View, Pressable, Text } from "react-native";
 import { useState, useMemo } from "react";
+import { motion } from "motion/react";
 import {
   AreaChart,
   Area,
@@ -357,9 +358,7 @@ function getWeeklySummary() {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Text className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-3">
-      {children}
-    </Text>
+    <Text className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-3">{children}</Text>
   );
 }
 
@@ -371,12 +370,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <View
-      className={`rounded-3xl p-4 ${className}`}
-      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-    >
-      {children}
-    </View>
+    <View className={`rounded-3xl p-4 ${className}`} style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>{children}</View>
   );
 }
 
@@ -392,13 +386,7 @@ function ActivityTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <View
-      className="rounded-xl px-3 py-2 text-xs"
-      style={{ backgroundColor: "rgba(10,10,26,0.95)", borderWidth: 1, borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}
-    >
-      <Text className="text-white/50 mb-0.5">{label}</Text>
-      <Text className="text-purple-400 font-bold">{payload[0].value} pts</Text>
-    </View>
+    <View className="rounded-xl px-3 py-2 text-xs" style={{ backgroundColor: "rgba(10,10,26,0.95)", borderWidth: 1, borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}><Text className="text-white/50 mb-0.5">{label}</Text><Text className="text-purple-400 font-bold">{payload[0].value}pts</Text></View>
   );
 }
 
@@ -413,15 +401,8 @@ function BarTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <View
-      className="rounded-xl px-3 py-2 text-xs"
-      style={{ backgroundColor: "rgba(10,10,26,0.95)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderStyle: "solid" }}
-    >
-      <Text className="text-white/50 mb-0.5">{label}</Text>
-      <Text className="font-bold" style={{ color: payload[0].fill }}>
-        {payload[0].value} fois
-      </Text>
-    </View>
+    <View className="rounded-xl px-3 py-2 text-xs" style={{ backgroundColor: "rgba(10,10,26,0.95)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderStyle: "solid" }}><Text className="text-white/50 mb-0.5">{label}</Text><Text className="font-bold" style={{ color: payload[0].fill }}>{payload[0].value}fois
+      </Text></View>
   );
 }
 
@@ -446,87 +427,10 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
     liveStats?.badgeCount ?? BADGES.filter((b) => b.unlocked).length;
 
   return (
-    <View
-      className="h-full flex flex-col overflow-hidden"
-      style={{  }}
-    >
-      {/* Ambient glows */}
-      <View
-        className="absolute top-0 right-0 w-64 h-64 rounded-full"
-        style={{  }}
-      />
-      <View
-        className="absolute bottom-32 left-0 w-48 h-48 rounded-full"
-        style={{  }}
-      />
-
-      {/* Header */}
-      <View
-        className="relative z-10 flex-shrink-0 px-5 pt-12 pb-4"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}
-      >
-        <View className="flex items-center gap-3 mb-4">
-          <Pressable
-            onPress={onBack}
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-          >
-            <ArrowLeft size={20} className="text-white" />
-          </Pressable>
-          <View className="flex-1">
-            <Text className="text-xl font-black text-white tracking-tight">
-              Tableau de Bord
-            </Text>
-            <Text className="text-white/40 text-xs">Semaine du 2–8 juin 2025</Text>
-          </View>
-          <View
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-            style={{ backgroundColor: "rgba(139,92,246,0.2)", borderWidth: 1, borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}
-          >
-            <Sparkles size={12} className="text-purple-400" />
-            <Text className="text-xs font-black text-purple-400">
-              Niv. {xpLevel}
-            </Text>
-          </View>
-        </View>
-
-        {/* XP bar */}
-        <View
-          className="rounded-2xl p-3"
-          style={{ backgroundColor: "rgba(139,92,246,0.1)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}
-        >
-          <View className="flex items-center justify-between mb-2">
-            <View className="flex items-center gap-2">
-              <Trophy size={14} className="text-yellow-400" />
-              <Text className="text-xs font-bold text-white">
-                Niveau {xpLevel} — Expert Débrouille
-              </Text>
-            </View>
-            <Text className="text-xs text-white/50">
-              {xpCurrent.toLocaleString()} / {xpNext.toLocaleString()} XP
-            </Text>
-          </View>
-          <View
-            className="h-2 rounded-full overflow-hidden"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-          >
-            <View
-              className="h-full rounded-full"
-              style={{  }}
-            />
-          </View>
-          <Text className="text-[10px] text-white/30 mt-1.5">
-            {xpNext - xpCurrent} XP pour atteindre le niveau {xpLevel + 1}
-          </Text>
-        </View>
-      </View>
-
-      {/* Tabs */}
-      <View
-        className="flex-shrink-0 flex gap-1 px-5 py-3 overflow-x-auto"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", }}
-      >
-        {(["activite", "modules", "badges", "analytics"] as const).map(
+    <View className="h-full flex flex-col overflow-hidden" style={{  }}>{}<View className="absolute top-0 right-0 w-64 h-64 pointer-events-none rounded-full" style={{  }} /><View className="absolute bottom-32 left-0 w-48 h-48 pointer-events-none rounded-full" style={{  }} />{}<View initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 flex-shrink-0 px-5 pt-12 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ArrowLeft size={20} className="text-white" /></Pressable><View className="flex-1"><Text className="text-xl font-black text-white tracking-tight">Tableau de Bord
+            </Text><Text className="text-white/40 text-xs">Semaine du 2–8 juin 2025</Text></View><View className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ backgroundColor: "rgba(139,92,246,0.2)", borderWidth: 1, borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}><Sparkles size={12} className="text-purple-400" /><Text className="text-xs font-black text-purple-400">Niv. {xpLevel}</Text></View></View>{}<View className="rounded-2xl p-3" style={{ backgroundColor: "rgba(139,92,246,0.1)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}><View className="flex items-center justify-between mb-2"><View className="flex items-center gap-2"><Trophy size={14} className="text-yellow-400" /><Text className="text-xs font-bold text-white">Niveau {xpLevel}— Expert Débrouille
+              </Text></View><Text className="text-xs text-white/50">{xpCurrent.toLocaleString()}/ {xpNext.toLocaleString()}XP
+            </Text></View><View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><View initial={{ width: 0 }} animate={{ width: `${xpPercent}%` }} transition={{ delay: 0.4, duration: 1, ease: "easeOut" }} className="h-full rounded-full" style={{  }} /></View><Text className="text-[10px] text-white/30 mt-1.5">{xpNext - xpCurrent}XP pour atteindre le niveau {xpLevel + 1}</Text></View></View>{}<View className="flex-shrink-0 flex gap-1 px-5 py-3 overflow-x-auto" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" }}>{(["activite", "modules", "badges", "analytics"] as const).map(
           (tab) => {
             const labels = {
               activite: "Activité",
@@ -543,60 +447,18 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
             const Icon = icons[tab];
             const isActive = activeTab === tab;
             return (
-              <Pressable
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                className="flex-shrink-0 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold"
-                style={{ backgroundColor: isActive
-                                    ? "rgba(139,92,246,0.25)"
-                                    : "transparent", borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}
-              >
+              <Pressable key={tab} whileTap={{ scale: 0.93 }} onPress={() => setActiveTab(tab)} className="flex-shrink-0 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all" style={{ backgroundColor: isActive
+                                  ? "rgba(139,92,246,0.25)"
+                                  : "transparent", borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}>
                 <Icon size={13} />
                 {labels[tab]}
               </Pressable>
             );
           },
-        )}
-      </View>
-
-      {/* Content */}
-      <View
-        className="flex-1 overflow-y-auto px-5 py-4 pb-8"
-        style={{  }}
-      >
-        {/* ── ACTIVITÉ tab ── */}
-        {activeTab === "activite" && (
-          <View
-            className="flex flex-col gap-4"
-          >
+        )}</View>{}<View className="flex-1 overflow-y-auto px-5 py-4 pb-8" style={{  }}>{}{activeTab === "activite" && (
+          <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4">
             {/* Score hebdo radial + total */}
-            <View className="gap-3">
-              {/* Radial score */}
-              <Card className="flex flex-col items-center justify-center py-3">
-                <ResponsiveContainer width="100%" height={100}>
-                  <RadialBarChart
-                    cx="50%"
-                    cy="50%"
-                    innerRadius="65%"
-                    outerRadius="90%"
-                    startAngle={220}
-                    endAngle={-40}
-                    data={radialData}
-                  >
-                    <RadialBar
-                      dataKey="value"
-                      background={{ fill: "rgba(255,255,255,0.06)" }}
-                      cornerRadius={8}
-                    />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <Text className="text-2xl font-black text-white -mt-2">78</Text>
-                <Text className="text-[10px] text-white/40">Score hebdo</Text>
-              </Card>
-
-              {/* Quick stats */}
-              <View className="flex flex-col gap-2">
-                {[
+            <View className="gap-3">{}<Card className="flex flex-col items-center justify-center py-3"><ResponsiveContainer width="100%" height={100}><RadialBarChart cx="50%" cy="50%" innerRadius="65%" outerRadius="90%" startAngle={220} endAngle={-40} data={radialData}><RadialBar dataKey="value" background={{ fill: "rgba(255,255,255,0.06)" }} cornerRadius={8} /></RadialBarChart></ResponsiveContainer><Text className="text-2xl font-black text-white -mt-2">78</Text><Text className="text-[10px] text-white/40">Score hebdo</Text></Card>{}<View className="flex flex-col gap-2">{[
                   {
                     label: "Actions totales",
                     value: "66",
@@ -618,33 +480,13 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
                 ].map((s) => {
                   const Icon = s.icon;
                   return (
-                    <View
-                      key={s.label}
-                      className="flex items-center gap-2.5 rounded-2xl px-3 py-2.5"
-                      style={{ backgroundColor: `${s.color}12`, borderStyle: "solid" }}
-                    >
-                      <Icon
-                        size={14}
-                        style={{ color: s.color }}
-                        className="flex-shrink-0"
-                      />
-                      <View className="min-w-0">
-                        <Text className="text-white font-black text-sm leading-none">
-                          {s.value}
-                        </Text>
-                        <Text className="text-white/40 text-[9px] mt-0.5 truncate">
-                          {s.label}
-                        </Text>
-                      </View>
-                    </View>
+                    <View key={s.label} className="flex items-center gap-2.5 rounded-2xl px-3 py-2.5" style={{ backgroundColor: `${s.color}12`, borderStyle: "solid" }}><Icon size={14} style={{  }} className="flex-shrink-0" /><View className="min-w-0"><Text className="text-white font-black text-sm leading-none">{s.value}</Text><Text className="text-white/40 text-[9px] mt-0.5 truncate">{s.label}</Text></View></View>
                   );
-                })}
-              </View>
-            </View>
+                })}</View></View>
 
             {/* Area chart – weekly score */}
             <Card>
-              <SectionTitle><Text>Score d'activité — 7 jours</Text></SectionTitle>
+              <SectionTitle>Score d'activité — 7 jours</SectionTitle>
               <ResponsiveContainer width="100%" height={130}>
                 <AreaChart
                   data={weeklyActivity}
@@ -688,38 +530,21 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
 
             {/* Weekly summary */}
             <Card>
-              <SectionTitle><Text>Ce que tu as accompli cette semaine</Text></SectionTitle>
-              <View className="flex flex-col gap-2">
-                {weekSummary.map((item, i) => (
-                  <View
-                    key={item.label}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-2xl"
-                    style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
-                  >
-                    <Text className="text-lg w-7 text-center flex-shrink-0">
-                      {item.icon}
-                    </Text>
-                    <Text className="flex-1 text-sm text-white/70">
-                      {item.label}
-                    </Text>
-                    <Text className="font-black text-white text-sm">
-                      {item.value}
-                    </Text>
+              <SectionTitle>Ce que tu as accompli cette semaine</SectionTitle>
+              <View className="flex flex-col gap-2">{weekSummary.map((item, i) => (
+                  <View key={item.label} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="flex items-center gap-3 px-3 py-2.5 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.03)" }}>
+                    <Text className="text-lg w-7 text-center flex-shrink-0">{item.icon}</Text>
+                    <Text className="flex-1 text-sm text-white/70">{item.label}</Text>
+                    <Text className="font-black text-white text-sm">{item.value}</Text>
                     <ChevronRight size={13} className="text-white/20" />
                   </View>
-                ))}
-              </View>
+                ))}</View>
             </Card>
           </View>
-        )}
-
-        {/* ── MODULES tab ── */}
-        {activeTab === "modules" && (
-          <View
-            className="flex flex-col gap-4"
-          >
+        )}{}{activeTab === "modules" && (
+          <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4">
             <Card>
-              <SectionTitle><Text>Utilisation par module (7 jours)</Text></SectionTitle>
+              <SectionTitle>Utilisation par module (7 jours)</SectionTitle>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart
                   data={moduleStats}
@@ -756,59 +581,32 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
 
             {/* Module list with progress bars */}
             <Card>
-              <SectionTitle><Text>Détail par module</Text></SectionTitle>
-              <View className="flex flex-col gap-3">
-                {moduleStats
+              <SectionTitle>Détail par module</SectionTitle>
+              <View className="flex flex-col gap-3">{moduleStats
                   .sort((a, b) => b.uses - a.uses)
                   .map((mod, i) => {
                     const Icon = mod.icon;
                     const maxUses = moduleStats[0].uses;
                     return (
-                      <View
-                        key={mod.name}
-                        className="flex items-center gap-3"
-                      >
-                        <View
-                          className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: `${mod.color}18`, borderStyle: "solid" }}
-                        >
-                          <Icon size={14} style={{ color: mod.color }} />
-                        </View>
-                        <View className="flex-1 min-w-0">
-                          <View className="flex items-center justify-between mb-1">
-                            <Text className="text-xs font-semibold text-white/75 truncate">
-                              {mod.name}
-                            </Text>
-                            <Text className="text-xs font-black text-white/60 ml-2 flex-shrink-0">
-                              {mod.uses}×
-                            </Text>
-                          </View>
-                          <View
-                            className="h-1.5 rounded-full overflow-hidden"
-                            style={{ backgroundColor: "rgba(255,255,255,0.07)" }}
-                          >
-                            <View
-                              className="h-full rounded-full"
-                              style={{ backgroundColor: mod.color }}
-                            />
-                          </View>
-                        </View>
+                      <View key={mod.name} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-center gap-3">
+                        <View className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${mod.color}18`, borderStyle: "solid" }}><Icon size={14} style={{  }} /></View>
+                        <View className="flex-1 min-w-0"><View className="flex items-center justify-between mb-1"><Text className="text-xs font-semibold text-white/75 truncate">{mod.name}</Text><Text className="text-xs font-black text-white/60 ml-2 flex-shrink-0">{mod.uses}×
+                            </Text></View><View className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><View initial={{ width: 0 }} animate={{
+                                width: `${(mod.uses / maxUses) * 100}%`,
+                              }} transition={{
+                                delay: 0.2 + i * 0.04,
+                                duration: 0.7,
+                                ease: "easeOut",
+                              }} className="h-full rounded-full" style={{ backgroundColor: mod.color }} /></View></View>
                       </View>
                     );
-                  })}
-              </View>
+                  })}</View>
             </Card>
           </View>
-        )}
-
-        {/* ── BADGES tab ── */}
-        {activeTab === "badges" && (
-          <View
-            className="flex flex-col gap-4"
-          >
+        )}{}{activeTab === "badges" && (
+          <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4">
             {/* Summary */}
-            <View className="gap-3">
-              {[
+            <View className="gap-3">{[
                 { label: "Débloqués", value: badgeCount, color: "#10B981" },
                 {
                   label: "Verrouillés",
@@ -821,166 +619,71 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
                   color: "#8B5CF6",
                 },
               ].map((s) => (
-                <View
-                  key={s.label}
-                  className="rounded-2xl p-3 text-center"
-                  style={{ backgroundColor: `${s.color}12`, borderStyle: "solid" }}
-                >
-                  <Text className="text-xl font-black text-white">{s.value}</Text>
-                  <Text className="text-[10px] text-white/40 mt-0.5">{s.label}</Text>
-                </View>
-              ))}
-            </View>
+                <View key={s.label} className="rounded-2xl p-3 text-center" style={{ backgroundColor: `${s.color}12`, borderStyle: "solid" }}><Text className="text-xl font-black text-white">{s.value}</Text><Text className="text-[10px] text-white/40 mt-0.5">{s.label}</Text></View>
+              ))}</View>
 
             {/* Unlocked badges */}
-            <View>
-              <SectionTitle>
-                <Text>Badges débloqués (</Text>{BADGES.filter((b) => b.unlocked).length}<Text>)</Text></SectionTitle>
-              <View className="gap-3">
-                {BADGES.filter((b) => b.unlocked).map((badge, i) => (
-                  <View
-                    key={badge.id}
-                    className="rounded-3xl p-4 flex flex-col items-center gap-2 text-center"
-                    style={{ backgroundColor: `${badge.color}10`, borderStyle: "solid" }}
-                  >
+            <View><SectionTitle>Badges débloqués ({BADGES.filter((b) => b.unlocked).length})
+              </SectionTitle><View className="gap-3">{BADGES.filter((b) => b.unlocked).map((badge, i) => (
+                  <View key={badge.id} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{
+                      delay: i * 0.07,
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 25,
+                    }} className="rounded-3xl p-4 flex flex-col items-center gap-2 text-center" style={{ backgroundColor: `${badge.color}10`, borderStyle: "solid" }}>
                     <Text className="text-3xl">{badge.icon}</Text>
-                    <View>
-                      <Text className="text-xs font-bold text-white">
-                        {badge.label}
-                      </Text>
-                      <Text className="text-[10px] text-white/40 mt-0.5">
-                        {badge.desc}
-                      </Text>
-                    </View>
+                    <View><Text className="text-xs font-bold text-white">{badge.label}</Text><Text className="text-[10px] text-white/40 mt-0.5">{badge.desc}</Text></View>
                     {badge.date && (
-                      <Text
-                        className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: `${badge.color}20`, color: badge.color }}
-                      >
-                        {badge.date}
-                      </Text>
+                      <Text className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${badge.color}20`, color: badge.color }}>{badge.date}</Text>
                     )}
                   </View>
-                ))}
-              </View>
-            </View>
+                ))}</View></View>
 
             {/* Locked badges */}
-            <View>
-              <SectionTitle>
-                <Text>À débloquer (</Text>{BADGES.filter((b) => !b.unlocked).length}<Text>)</Text></SectionTitle>
-              <View className="gap-3">
-                {BADGES.filter((b) => !b.unlocked).map((badge, i) => (
-                  <View
-                    key={badge.id}
-                    className="rounded-3xl p-4 flex flex-col items-center gap-2 text-center opacity-40"
-                    style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-                  >
-                    <Text className="text-3xl">{badge.icon}</Text>
-                    <View>
-                      <Text className="text-xs font-bold text-white/60">
-                        {badge.label}
-                      </Text>
-                      <Text className="text-[10px] text-white/30 mt-0.5">
-                        {badge.desc}
-                      </Text>
-                    </View>
-                    <Text
-                      className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)" }}
-                    >
-                      Verrouillé
+            <View><SectionTitle>À débloquer ({BADGES.filter((b) => !b.unlocked).length})
+              </SectionTitle><View className="gap-3">{BADGES.filter((b) => !b.unlocked).map((badge, i) => (
+                  <View key={badge.id} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 + i * 0.07 }} className="rounded-3xl p-4 flex flex-col items-center gap-2 text-center opacity-40" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+                    <Text className="text-3xl grayscale">{badge.icon}</Text>
+                    <View><Text className="text-xs font-bold text-white/60">{badge.label}</Text><Text className="text-[10px] text-white/30 mt-0.5">{badge.desc}</Text></View>
+                    <Text className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)" }}>Verrouillé
                     </Text>
                   </View>
-                ))}
-              </View>
-            </View>
+                ))}</View></View>
           </View>
-        )}
-        {/* ── ANALYTICS tab ── */}
-        {activeTab === "analytics" && (
-          <View
-            className="flex flex-col gap-4"
-          >
+        )}{}{activeTab === "analytics" && (
+          <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4">
             {/* Streak tracker */}
             <Card>
-              <View className="flex items-center justify-between mb-3">
-                <SectionTitle><Text>Streak d'utilisation</Text></SectionTitle>
-                <View
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-                  style={{ backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.3)", borderStyle: "solid" }}
-                >
-                  <Flame size={14} className="text-red-400" />
-                  <Text className="text-sm font-black text-red-400">
-                    {STREAK} jours
-                  </Text>
-                </View>
-              </View>
-              <View className="flex items-end gap-1.5 mb-2">
-                {[3, 5, 2, 7, 4, 6, STREAK].map((v, i) => (
-                  <View
-                    key={i}
-                    className="flex-1 flex flex-col items-center gap-1"
-                  >
-                    <View
-                      className="w-full rounded-t-md"
-                      style={{ height: `${v * 8}px`, backgroundColor: i === 6 ? "#EF4444" : "rgba(239,68,68,0.35)" }}
-                    />
-                    <Text className="text-[9px] text-white/30">
-                      {["S-6", "S-5", "S-4", "S-3", "S-2", "S-1", "Auj"][i]}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-              <Text className="text-xs text-white/40 mt-1">
-                🔥 Record personnel :{" "}
-                <Text className="text-white/70 font-semibold">21 jours</Text>
-              </Text>
+              <View className="flex items-center justify-between mb-3"><SectionTitle>Streak d'utilisation</SectionTitle><View animate={{ scale: [1, 1.15, 1] }} transition={{
+                    repeat: Infinity,
+                    duration: 2,
+                    ease: "easeInOut",
+                  }} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.3)", borderStyle: "solid" }}><Flame size={14} className="text-red-400" /><Text className="text-sm font-black text-red-400">{STREAK}jours
+                  </Text></View></View>
+              <View className="flex items-end gap-1.5 mb-2">{[3, 5, 2, 7, 4, 6, STREAK].map((v, i) => (
+                  <View key={i} className="flex-1 flex flex-col items-center gap-1"><View className="w-full rounded-t-md transition-all" style={{ height: `${v * 8}px`, backgroundColor: i === 6 ? "#EF4444" : "rgba(239,68,68,0.35)" }} /><Text className="text-[9px] text-white/30">{["S-6", "S-5", "S-4", "S-3", "S-2", "S-1", "Auj"][i]}</Text></View>
+                ))}</View>
+              <Text className="text-xs text-white/40 mt-1">🔥 Record personnel :{" "}<Text className="text-white/70 font-semibold">21 jours</Text></Text>
             </Card>
 
             {/* Activity heatmap – GitHub style */}
             <Card>
-              <SectionTitle><Text>Heatmap d'activité — 4 semaines</Text></SectionTitle>
-              <View
-                className="gap-1"
-                style={{  }}
-              >
-                {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
-                  <View
-                    key={i}
-                    className="text-center text-[9px] text-white/25 pb-1"
-                  >
-                    {d}
-                  </View>
-                ))}
-                {heatmapData.map((cell, i) => (
-                  <View
-                    key={cell.date}
-                    title={`${cell.date}: niveau ${cell.level}`}
-                    className="aspect-square rounded-sm"
-                    style={{ backgroundColor: HEATMAP_COLORS[cell.level] }}
-                  />
-                ))}
-              </View>
-              <View className="flex items-center gap-1 mt-2 justify-end">
-                <Text className="text-[9px] text-white/25">Moins</Text>
-                {HEATMAP_COLORS.map((c, i) => (
-                  <View
-                    key={i}
-                    className="w-2.5 h-2.5 rounded-sm"
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-                <Text className="text-[9px] text-white/25">Plus</Text>
-              </View>
+              <SectionTitle>Heatmap d'activité — 4 semaines</SectionTitle>
+              <View className="gap-1" style={{  }}>{["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
+                  <View key={i} className="text-center text-[9px] text-white/25 pb-1">{d}</View>
+                ))}{heatmapData.map((cell, i) => (
+                  <View key={cell.date} initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.012 }} title={`${cell.date}: niveau ${cell.level}`} className="aspect-square rounded-sm" style={{ backgroundColor: HEATMAP_COLORS[cell.level] }} />
+                ))}</View>
+              <View className="flex items-center gap-1 mt-2 justify-end"><Text className="text-[9px] text-white/25">Moins</Text>{HEATMAP_COLORS.map((c, i) => (
+                  <View key={i} className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: c }} />
+                ))}<Text className="text-[9px] text-white/25">Plus</Text></View>
             </Card>
 
             {/* Top modules podium */}
             <Card>
-              <SectionTitle><Text>Modules les plus utilisés</Text></SectionTitle>
+              <SectionTitle>Modules les plus utilisés</SectionTitle>
               {/* Podium */}
-              <View className="flex items-end justify-center gap-3 mb-4">
-                {moduleStats
+              <View className="flex items-end justify-center gap-3 mb-4">{moduleStats
                   .sort((a, b) => b.uses - a.uses)
                   .slice(0, 3)
                   .map((mod, i) => {
@@ -988,27 +691,10 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
                     const medals = ["🥇", "🥈", "🥉"];
                     const Icon = mod.icon;
                     return (
-                      <View
-                        key={mod.name}
-                        className="flex flex-col items-center gap-1"
-                      >
-                        <Text className="text-lg">{medals[i]}</Text>
-                        <View
-                          className="w-16 flex flex-col items-center justify-end rounded-t-xl px-1"
-                          style={{ height: `${heights[i]}px`, backgroundColor: `${mod.color}25`, borderStyle: "solid" }}
-                        >
-                          <Icon size={16} style={{ color: mod.color }} />
-                          <Text className="text-[9px] text-white/60 mt-1">
-                            {mod.uses}×
-                          </Text>
-                        </View>
-                        <Text className="text-[10px] text-white/60 text-center w-16 truncate">
-                          {mod.name}
-                        </Text>
-                      </View>
+                      <View key={mod.name} className="flex flex-col items-center gap-1"><Text className="text-lg">{medals[i]}</Text><View className="w-16 flex flex-col items-center justify-end rounded-t-xl px-1" style={{ height: `${heights[i]}px`, backgroundColor: `${mod.color}25`, borderStyle: "solid" }}><Icon size={16} style={{  }} /><Text className="text-[9px] text-white/60 mt-1">{mod.uses}×
+                          </Text></View><Text className="text-[10px] text-white/60 text-center w-16 truncate">{mod.name}</Text></View>
                     );
-                  })}
-              </View>
+                  })}</View>
               {/* Horizontal bars */}
               {moduleStats
                 .sort((a, b) => b.uses - a.uses)
@@ -1017,129 +703,56 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
                   const max = moduleStats[0].uses;
                   const Icon = mod.icon;
                   return (
-                    <View
-                      key={mod.name}
-                      className="flex items-center gap-2 mb-2"
-                    >
-                      <View
-                        className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${mod.color}18` }}
-                      >
-                        <Icon size={11} style={{ color: mod.color }} />
-                      </View>
-                      <Text className="text-xs text-white/60 w-20 flex-shrink-0 truncate">
-                        {mod.name}
-                      </Text>
-                      <View
-                        className="flex-1 h-1.5 rounded-full overflow-hidden"
-                        style={{ backgroundColor: "rgba(255,255,255,0.07)" }}
-                      >
-                        <View
-                          className="h-full rounded-full"
-                          style={{ backgroundColor: mod.color }}
-                        />
-                      </View>
-                      <Text className="text-xs font-bold text-white/50 w-6 text-right flex-shrink-0">
-                        {mod.uses}
-                      </Text>
-                    </View>
+                    <View key={mod.name} className="flex items-center gap-2 mb-2"><View className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${mod.color}18` }}><Icon size={11} style={{  }} /></View><Text className="text-xs text-white/60 w-20 flex-shrink-0 truncate">{mod.name}</Text><View className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><View initial={{ width: 0 }} animate={{ width: `${(mod.uses / max) * 100}%` }} transition={{
+                            delay: 0.2 + i * 0.07,
+                            duration: 0.7,
+                            ease: "easeOut",
+                          }} className="h-full rounded-full" style={{ backgroundColor: mod.color }} /></View><Text className="text-xs font-bold text-white/50 w-6 text-right flex-shrink-0">{mod.uses}</Text></View>
                   );
                 })}
             </Card>
 
             {/* Weekly summary */}
             <Card>
-              <SectionTitle><Text>Cette semaine vous avez…</Text></SectionTitle>
-              <View className="flex flex-col gap-2">
-                {weeklySummary.map((item, i) => {
+              <SectionTitle>Cette semaine vous avez…</SectionTitle>
+              <View className="flex flex-col gap-2">{weeklySummary.map((item, i) => {
                   const Icon = item.icon;
                   return (
-                    <View
-                      key={item.label}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-2xl"
-                      style={{ backgroundColor: `${item.color}0d` }}
-                    >
-                      <View
-                        className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${item.color}18` }}
-                      >
-                        <Icon size={14} style={{ color: item.color }} />
-                      </View>
-                      <Text className="flex-1 text-sm text-white/70">
-                        {item.label}
-                      </Text>
-                      <Text className="font-black text-white text-sm">
-                        {item.value}
-                      </Text>
+                    <View key={item.label} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }} className="flex items-center gap-3 px-3 py-2.5 rounded-2xl" style={{ backgroundColor: `${item.color}0d` }}>
+                      <View className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${item.color}18` }}><Icon size={14} style={{  }} /></View>
+                      <Text className="flex-1 text-sm text-white/70">{item.label}</Text>
+                      <Text className="font-black text-white text-sm">{item.value}</Text>
                     </View>
                   );
-                })}
-              </View>
+                })}</View>
             </Card>
 
             {/* Financial health score */}
             <Card>
-              <SectionTitle><Text>Score de santé financière</Text></SectionTitle>
-              <View className="flex items-center gap-4">
-                {/* Circle score */}
-                <View className="relative w-20 h-20 flex-shrink-0">
-                  <svg viewBox="0 0 80 80" className="w-full h-full -rotate-90">
-                    <circle
-                      cx="40"
-                      cy="40"
-                      r="32"
-                      fill="none"
-                      stroke="rgba(255,255,255,0.07)"
-                      strokeWidth="8"
-                    />
-                    <motion.circle
-                      cx="40"
-                      cy="40"
-                      r="32"
-                      fill="none"
-                      stroke={budgetHealth.color}
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      strokeDasharray={`${2 * Math.PI * 32}`}
-                    />
-                  </svg>
-                  <View className="absolute inset-0 flex flex-col items-center justify-center">
-                    <Text className="text-lg font-black text-white">
-                      {budgetHealth.score}
-                    </Text>
-                    <Text className="text-[8px] text-white/40">/100</Text>
-                  </View>
-                </View>
-                <View className="flex-1">
-                  <View className="flex items-center gap-2 mb-1">
-                    {budgetHealth.score >= 70 ? (
+              <SectionTitle>Score de santé financière</SectionTitle>
+              <View className="flex items-center gap-4">{}<View className="relative w-20 h-20 flex-shrink-0"><svg viewBox="0 0 80 80" className="w-full h-full -rotate-90"><circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8" /><motion.circle cx="40" cy="40" r="32" fill="none" stroke={budgetHealth.color} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${2 * Math.PI * 32}`} initial={{ strokeDashoffset: 2 * Math.PI * 32 }} animate={{
+                        strokeDashoffset:
+                          2 * Math.PI * 32 * (1 - budgetHealth.score / 100),
+                      }} transition={{
+                        duration: 1.2,
+                        delay: 0.3,
+                        ease: "easeOut",
+                      }} /></svg><View className="absolute inset-0 flex flex-col items-center justify-center"><Text className="text-lg font-black text-white">{budgetHealth.score}</Text><Text className="text-[8px] text-white/40">/100</Text></View></View><View className="flex-1"><View className="flex items-center gap-2 mb-1">{budgetHealth.score >= 70 ? (
                       <CheckCircle
                         size={16}
-                        style={{ color: budgetHealth.color }}
+                        style={{  }}
                       />
                     ) : budgetHealth.score >= 50 ? (
                       <AlertCircle
                         size={16}
-                        style={{ color: budgetHealth.color }}
+                        style={{  }}
                       />
                     ) : (
                       <TrendingDown
                         size={16}
-                        style={{ color: budgetHealth.color }}
+                        style={{  }}
                       />
-                    )}
-                    <Text
-                      className="font-bold text-sm"
-                      style={{ color: budgetHealth.color }}
-                    >
-                      {budgetHealth.label}
-                    </Text>
-                  </View>
-                  <Text className="text-xs text-white/50 mb-2">
-                    {budgetHealth.detail}
-                  </Text>
-                  <View className="flex flex-col gap-1">
-                    {[
+                    )}<Text className="font-bold text-sm" style={{ color: budgetHealth.color }}>{budgetHealth.label}</Text></View><Text className="text-xs text-white/50 mb-2">{budgetHealth.detail}</Text><View className="flex flex-col gap-1">{[
                       {
                         label: "Dépenses vs budget",
                         ok: budgetHealth.score > 60,
@@ -1150,10 +763,7 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
                         ok: budgetHealth.score > 50,
                       },
                     ].map((tip) => (
-                      <View
-                        key={tip.label}
-                        className="flex items-center gap-1.5"
-                      >
+                      <View key={tip.label} className="flex items-center gap-1.5">
                         {tip.ok ? (
                           <CheckCircle
                             size={11}
@@ -1169,15 +779,12 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
                           {tip.label}
                         </Text>
                       </View>
-                    ))}
-                  </View>
-                </View>
-              </View>
+                    ))}</View></View></View>
             </Card>
 
             {/* Module trend */}
             <Card>
-              <SectionTitle><Text>Tendance d'utilisation — 4 semaines</Text></SectionTitle>
+              <SectionTitle>Tendance d'utilisation — 4 semaines</SectionTitle>
               <ResponsiveContainer width="100%" height={140}>
                 <AreaChart
                   data={moduleTrendData}
@@ -1266,18 +873,13 @@ export default function DashboardPage({ onBack }: { onBack: () => void }) {
                   { label: "Immo", color: "#F97316" },
                 ].map((l) => (
                   <View key={l.label} className="flex items-center gap-1">
-                    <View
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: l.color }}
-                    />
+                    <View className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
                     <Text className="text-[10px] text-white/40">{l.label}</Text>
                   </View>
                 ))}
               </View>
             </Card>
           </View>
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }

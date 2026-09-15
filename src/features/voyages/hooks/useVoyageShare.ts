@@ -1,7 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/voyages/hooks/useVoyageShare.ts
 import { useCallback } from "react";
+import { toast } from "sonner";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 interface ShareOptions {
   title: string;
@@ -16,18 +16,18 @@ export function useVoyageShare() {
   const share = useCallback(async (options: ShareOptions) => {
     const { title, text, url } = options;
 
-    if (undefined) {
+    if (navigator.share) {
       try {
-        await undefined;
+        await navigator.share({ title, text, url });
       } catch {
         // L'utilisateur a annulé
       }
     } else {
       try {
-        await undefined.writeText(`${text}\n${url}`);
-        UIService.openToast("Lien copié dans le presse-papier", "success");
+        await Clipboard.setString(`${text}\n${url}`);
+        toast.success("Lien copié dans le presse-papier");
       } catch {
-        UIService.openToast("Impossible de partager ce voyage", "error");
+        toast.error("Impossible de partager ce voyage");
       }
     }
   }, []);

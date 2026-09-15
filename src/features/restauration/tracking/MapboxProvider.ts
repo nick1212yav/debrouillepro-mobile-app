@@ -1,3 +1,4 @@
+import { View } from "react-native";
 import type { GeoCoordinates } from "../types/common.types";
 
 export class MapboxProvider {
@@ -13,7 +14,7 @@ export class MapboxProvider {
     accessToken: string,
     zoom: number = 13,
   ): void {
-    const mapboxgl = (undefined as any).mapboxgl;
+    const mapboxgl = (window as any).mapboxgl;
     if (!mapboxgl) {
       console.warn("[MapboxProvider] Le script Mapbox GL JS est manquant.");
       return;
@@ -76,14 +77,14 @@ export class MapboxProvider {
    * Déplace le curseur du livreur sur la carte
    */
   public updateCourierMarker(position: GeoCoordinates): void {
-    const mapboxgl = (undefined as any).mapboxgl;
+    const mapboxgl = (window as any).mapboxgl;
     if (!this.mapInstance || !mapboxgl) return;
 
     if (this.courierMarker) {
       this.courierMarker.setLngLat([position.lng, position.lat]);
     } else {
       // Construction d'un élément d'icône personnalisé
-      const el = undefined("div");
+      const el = document.createElement("div");
       el.className = "courier-marker";
       el.style.width = "14px";
       el.style.height = "14px";

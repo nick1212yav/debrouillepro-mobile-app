@@ -1,5 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/services/network.service.ts
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -10,6 +8,7 @@ import type {
   NetworkActivity,
   NetworkSearchFilters,
 } from "../types/network.types";
+import { toast } from "sonner";
 
 /**
  * Service principal pour les opérations réseau.
@@ -73,10 +72,10 @@ export class NetworkService {
   ): Promise<boolean> {
     try {
       const result = await toggleFollowFn({ targetUserId });
-      UIService.openToast(result ? "Abonnement confirmé" : "Abonnement retiré", "success");
+      toast.success(result ? "Abonnement confirmé" : "Abonnement retiré");
       return result;
     } catch {
-      UIService.openToast("Impossible de modifier l'abonnement", "error");
+      toast.error("Impossible de modifier l'abonnement");
       return false;
     }
   }
@@ -107,10 +106,10 @@ export class NetworkService {
   ): Promise<boolean> {
     try {
       await reportFn({ contentId, type, reason });
-      UIService.openToast("Signalement envoyé", "success");
+      toast.success("Signalement envoyé");
       return true;
     } catch {
-      UIService.openToast("Erreur lors du signalement", "error");
+      toast.error("Erreur lors du signalement");
       return false;
     }
   }
@@ -121,10 +120,10 @@ export class NetworkService {
   static async blockUser(userId: Id<"users">, blockFn: any): Promise<boolean> {
     try {
       await blockFn({ userId });
-      UIService.openToast("Utilisateur bloqué", "success");
+      toast.success("Utilisateur bloqué");
       return true;
     } catch {
-      UIService.openToast("Erreur lors du blocage", "error");
+      toast.error("Erreur lors du blocage");
       return false;
     }
   }

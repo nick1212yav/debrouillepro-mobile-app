@@ -1,5 +1,4 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Pressable, Text, Image } from "react-native";
 import {
   ArrowLeft, Heart, Trash2, Building2, Briefcase,
   Bus, HeartPulse, Wallet, Users, Package, Leaf, Newspaper,
@@ -8,11 +7,13 @@ import {
 import { useQuery, useMutation } from "convex/react";
 import { useConvexAuth } from "@/lib/convex-auth-compat";
 import { api } from "@/convex/_generated/api.js";
-import type { Id } from "@/convex/_generated/dataModel.d";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Skeleton } from "@/components/ui/skeleton";
-import { SignInButton } from "@/components/ui/signin";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
+import { toast } from "sonner";
+
 // ── Module metadata for display ──────────────────────────────────────────────
 const MODULE_META: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   immo:          { icon: Building2,  color: "#F97316", label: "Immobilier" },
@@ -61,45 +62,13 @@ export default function FavoritesPage({ onBack, onNavigate }: Props) {
   const { isAuthenticated, isLoading } = useConvexAuth();
 
   return (
-    <View
-      className="relative h-full w-full overflow-hidden flex flex-col"
-      style={{  }}
-    >
-      {/* Ambient glows */}
-      <View className="absolute top-0 right-0 w-64 h-64 rounded-full"
-        style={{  }} />
-      <View className="absolute bottom-20 left-0 w-48 h-48 rounded-full"
-        style={{  }} />
-
-      {/* Header */}
-      <View
-        className="flex-shrink-0 px-5 pt-14 pb-4 flex items-center justify-between"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}
-      >
-        <View className="flex items-center gap-3">
-          <Pressable
-            onPress={onBack}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-          >
-            <ArrowLeft size={17} className="text-white/80" />
-          </Pressable>
-          <View>
-            <Text className="text-lg font-black text-white tracking-tight">Favoris</Text>
-            <Text className="text-[11px] text-white/40">Vos publications sauvegardées</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Auth-aware content */}
-      {isLoading ? (
+    <View className="relative h-full w-full overflow-hidden flex flex-col" style={{  }}>{}<View className="absolute top-0 right-0 w-64 h-64 rounded-full pointer-events-none" style={{  }} /><View className="absolute bottom-20 left-0 w-48 h-48 rounded-full pointer-events-none" style={{  }} />{}<View className="flex-shrink-0 px-5 pt-14 pb-4 flex items-center justify-between" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}><View className="flex items-center gap-3"><Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center active:scale-90 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><ArrowLeft size={17} className="text-white/80" /></Pressable><View><Text className="text-lg font-black text-white tracking-tight">Favoris</Text><Text className="text-[11px] text-white/40">Vos publications sauvegardées</Text></View></View></View>{}{isLoading ? (
         <LoadingState />
       ) : !isAuthenticated ? (
         <UnauthenticatedState />
       ) : (
         <FavoritesContent onNavigate={onNavigate} />
-      )}
-    </View>
+      )}</View>
   );
 }
 
@@ -129,9 +98,9 @@ function FavoritesContent({ onNavigate }: { onNavigate: (page: string) => void }
   const handleRemove = async (publicationId: Id<"publications">) => {
     try {
       await toggleBookmark({ publicationId });
-      UIService.openToast("Favori retiré", "success");
+      toast.success("Favori retiré");
     } catch {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
     }
   };
 
@@ -149,44 +118,19 @@ function FavoritesContent({ onNavigate }: { onNavigate: (page: string) => void }
   const modules = Object.keys(grouped);
 
   return (
-    <View className="flex-1 overflow-y-auto pb-8" style={{  }}>
-      {favorites.length === 0 ? (
+    <View className="flex-1 overflow-y-auto pb-8" style={{  }}>{favorites.length === 0 ? (
         <EmptyState />
       ) : (
-        <View className="px-5 pt-4 flex flex-col gap-6">
-          {/* Count header */}
-          <View className="flex items-center justify-between">
-            <Text className="text-[11px] text-white/40">
-              {favorites.length} élément{favorites.length !== 1 ? "s" : ""} sauvegardé{favorites.length !== 1 ? "s" : ""}
-            </Text>
-          </View>
-
-          {modules.map((mod, mi) => {
+        <View className="px-5 pt-4 flex flex-col gap-6">{}<View className="flex items-center justify-between"><Text className="text-[11px] text-white/40">{favorites.length}élément{favorites.length !== 1 ? "s" : ""}sauvegardé{favorites.length !== 1 ? "s" : ""}</Text></View>{modules.map((mod, mi) => {
             const meta = MODULE_META[mod] ?? { icon: Star, color: "#9CA3AF", label: mod };
             const Icon = meta.icon;
             return (
-              <View
-                key={mod}
-              >
+              <View key={mod} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: mi * 0.06 }}>
                 {/* Section header */}
-                <View className="flex items-center gap-2 mb-3">
-                  <View className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: `${meta.color}20` }}>
-                    <Icon size={14} style={{ color: meta.color }} />
-                  </View>
-                  <Text className="text-xs font-bold text-white/60 uppercase tracking-widest">{meta.label}</Text>
-                  <Text
-                    className="ml-auto px-2 py-0.5 rounded-full text-[9px] font-bold text-white"
-                    style={{ backgroundColor: `${meta.color}25`, color: meta.color }}
-                  >
-                    {grouped[mod].length}
-                  </Text>
-                </View>
+                <View className="flex items-center gap-2 mb-3"><View className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${meta.color}20` }}><Icon size={14} style={{  }} /></View><Text className="text-xs font-bold text-white/60 uppercase tracking-widest">{meta.label}</Text><Text className="ml-auto px-2 py-0.5 rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: `${meta.color}25`, color: meta.color }}>{grouped[mod].length}</Text></View>
 
                 {/* Cards */}
-                <View className="flex flex-col gap-2">
-                  <>
-                    {grouped[mod].map((fav) => (
+                <View className="flex flex-col gap-2"><View>{grouped[mod].map((fav) => (
                       <FavCard
                         key={fav.bookmarkId}
                         fav={fav}
@@ -194,15 +138,11 @@ function FavoritesContent({ onNavigate }: { onNavigate: (page: string) => void }
                         onOpen={() => onNavigate(fav.module)}
                         onRemove={() => handleRemove(fav.publicationId)}
                       />
-                    ))}
-                  </>
-                </View>
+                    ))}</View></View>
               </View>
             );
-          })}
-        </View>
-      )}
-    </View>
+          })}</View>
+      )}</View>
   );
 }
 
@@ -218,62 +158,36 @@ function FavCard({
   const ago = formatDistanceToNow(new Date(fav.savedAt), { addSuffix: true, locale: fr });
 
   return (
-    <Pressable
-      onPress={onOpen}
-      className="flex items-center gap-3 p-3 rounded-2xl"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-    >
+    <View layout exit={{ opacity: 0, x: -40, height: 0, marginBottom: 0 }} transition={{ duration: 0.25 }} onPress={onOpen} className="flex items-center gap-3 p-3 rounded-2xl active:scale-[0.98] transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
       {/* Thumbnail or placeholder */}
       {fav.image ? (
-        <Image className="w-14 h-14 rounded-xl object-cover flex-shrink-0"  source={{ uri: fav.image }} accessibilityLabel={fav.title}/>
+        <Image className="w-14 h-14 rounded-xl object-cover flex-shrink-0" source={{ uri: fav.image }} accessibilityLabel={fav.title} />
       ) : (
-        <View className="w-14 h-14 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl"
-          style={{ backgroundColor: `${moduleColor}15` }}>
-          <Heart size={20} style={{ color: moduleColor }} />
-        </View>
+        <View className="w-14 h-14 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl" style={{ backgroundColor: `${moduleColor}15` }}><Heart size={20} style={{  }} /></View>
       )}
 
       {/* Text */}
-      <View className="flex-1 min-w-0">
-        <Text className="text-sm font-bold text-white truncate">{fav.title}</Text>
-        {fav.subtitle && (
+      <View className="flex-1 min-w-0"><Text className="text-sm font-bold text-white truncate">{fav.title}</Text>{fav.subtitle && (
           <Text className="text-xs text-white/45 truncate mt-0.5">{fav.subtitle}</Text>
-        )}
-        <View className="flex items-center gap-2 mt-1">
-          {fav.badge && (
-            <Text
-              className="px-2 py-0.5 rounded-full text-[9px] font-bold"
-              style={{ backgroundColor: `${fav.badgeColor ?? moduleColor}20`, color: fav.badgeColor ?? moduleColor }}
-            >
+        )}<View className="flex items-center gap-2 mt-1">{fav.badge && (
+            <Text className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: `${fav.badgeColor ?? moduleColor}20`, color: fav.badgeColor ?? moduleColor }}>
               {fav.badge}
             </Text>
-          )}
-          <Text className="text-[10px] text-white/25">{ago}</Text>
-        </View>
-      </View>
+          )}<Text className="text-[10px] text-white/25">{ago}</Text></View></View>
 
       {/* Remove */}
-      <Pressable
-        onPress={(e) => { onRemove(); }}
-        className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.15)", borderStyle: "solid" }}
-      >
+      <Pressable onPress={(e) => { onRemove(); }} className="w-8 h-8 rounded-xl flex items-center justify-center active:scale-90 flex-shrink-0" style={{ backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.15)", borderStyle: "solid" }}>
         <Trash2 size={13} className="text-red-400" />
       </Pressable>
-    </Pressable>
+    </View>
   );
 }
 
 // ── Empty State ──────────────────────────────────────────────────────────────
 function EmptyState() {
   return (
-    <View
-      className="flex flex-col items-center justify-center pt-24 px-8 text-center"
-    >
-      <View
-        className="w-20 h-20 rounded-3xl flex items-center justify-center mb-5"
-        style={{ backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.2)", borderStyle: "solid" }}
-      >
+    <View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center pt-24 px-8 text-center">
+      <View className="w-20 h-20 rounded-3xl flex items-center justify-center mb-5" style={{ backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.2)", borderStyle: "solid" }}>
         <Heart size={32} className="text-red-400" />
       </View>
       <Text className="text-xl font-black text-white mb-2">Aucun favori</Text>
@@ -287,13 +201,8 @@ function EmptyState() {
 // ── Unauthenticated State ────────────────────────────────────────────────────
 function UnauthenticatedState() {
   return (
-    <View
-      className="flex flex-col items-center justify-center pt-24 px-8 text-center gap-4"
-    >
-      <View
-        className="w-16 h-16 rounded-3xl flex items-center justify-center"
-        style={{ backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.2)", borderStyle: "solid" }}
-      >
+    <View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center pt-24 px-8 text-center gap-4">
+      <View className="w-16 h-16 rounded-3xl flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.1)", borderWidth: 1, borderColor: "rgba(239,68,68,0.2)", borderStyle: "solid" }}>
         <LogIn size={28} className="text-red-400" />
       </View>
       <Text className="text-white/50 text-sm font-medium">Connectez-vous pour voir vos favoris</Text>

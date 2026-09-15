@@ -15,7 +15,7 @@ function VideoTile({
   muted?: boolean;
   label: string;
 }) {
-  const videoRef = useRef<Video>(null);
+  const videoRef = useRef<View>(null);
 
   useEffect(() => {
     if (!videoRef.current) {
@@ -34,7 +34,7 @@ function VideoTile({
   return (
     <View className="relative min-h-[180px] overflow-hidden rounded-2xl bg-black">
       {stream ? (
-        <View
+        <video
           ref={videoRef}
           autoPlay
           playsInline

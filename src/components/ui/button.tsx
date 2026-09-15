@@ -1,61 +1,161 @@
-import { Pressable } from "react-native";
+// src/components/ui/button.tsx
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
-import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+import {
+  Pressable,
+  PressableProps,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextStyle,
+  View,
+  ViewStyle,
+} from "react-native";
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive cursor-pointer",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
-        outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  },
-);
+// ── Types ──────────────────────────────────────────────────────────────────
+export type ButtonVariant =
+  | "default"
+  | "destructive"
+  | "outline"
+  | "secondary"
+  | "ghost"
+  | "link";
 
-function Button({
-  className,
-  variant,
-  size,
-  asChild = false,
-  ...props
-}: React.ComponentProps<typeof Pressable> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-  }) {
-  const Comp = asChild ? Slot : "button";
+export type ButtonSize =
+  | "default"
+  | "sm"
+  | "lg"
+  | "icon"
+  | "icon-sm"
+  | "icon-lg";
 
-  return (
-    <Comp
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  );
+export interface ButtonVariantsOptions {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  style?: StyleProp<ViewStyle>;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
-export { Button, buttonVariants };
+export interface ButtonProps extends PressableProps {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** Conservé pour compatibilité API (ignoré en RN). */
+  className?: string;
+  /** Clone l'unique enfant en lui passant onPress. */
+  asChild?: boolean;
+  children?: React.ReactNode;
+}
+
+// ── Base styles ────────────────────────────────────────────────────────────
+const CONTAINER_BASE: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  borderRadius: 8,
+};
+
+const VARIANT_STYLES: Record<ButtonVariant, ViewStyle> = {
+  default: { backgroundColor: "#8B5CF6" },
+  destructive: { backgroundColor: "#DC2626" },
+  outline: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  secondary: { backgroundColor: "rgba(255,255,255,0.1)" },
+  ghost: { backgroundColor: "transparent" },
+  link: { backgroundColor: "transparent" },
+};
+
+const SIZE_STYLES: Record<ButtonSize, ViewStyle> = {
+  default: { height: 36, paddingHorizontal: 16 },
+  sm: { height: 32, paddingHorizontal: 12 },
+  lg: { height: 40, paddingHorizontal: 24 },
+  icon: { height: 36, width: 36, paddingHorizontal: 0 },
+  "icon-sm": { height: 32, width: 32, paddingHorizontal: 0 },
+  "icon-lg": { height: 40, width: 40, paddingHorizontal: 0 },
+};
+
+const TEXT_VARIANT_STYLES: Record<ButtonVariant, TextStyle> = {
+  default: { color: "#FFFFFF", fontWeight: "600" },
+  destructive: { color: "#FFFFFF", fontWeight: "600" },
+  outline: { color: "#FFFFFF", fontWeight: "600" },
+  secondary: { color: "#FFFFFF", fontWeight: "600" },
+  ghost: { color: "#FFFFFF", fontWeight: "600" },
+  link: {
+    color: "#A78BFA",
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+};
+
+const TEXT_SIZE_STYLES: Record<ButtonSize, TextStyle> = {
+  default: { fontSize: 14 },
+  sm: { fontSize: 12 },
+  lg: { fontSize: 15 },
+  icon: { fontSize: 14 },
+  "icon-sm": { fontSize: 12 },
+  "icon-lg": { fontSize: 14 },
+};
+
+// ── Helpers exportés (compat avec l'API shadcn) ────────────────────────────
+export function buttonVariants(options: ButtonVariantsOptions = {}): ViewStyle {
+  const variant: ButtonVariant = options.variant ?? "default";
+  const size: ButtonSize = options.size ?? "default";
+
+  return StyleSheet.flatten([
+    CONTAINER_BASE,
+    VARIANT_STYLES[variant],
+    SIZE_STYLES[size],
+    options.style,
+  ]) as ViewStyle;
+}
+
+// ── Composant (forwardRef pour compat shadcn) ─────────────────────────────
+export const Button = React.forwardRef<View, ButtonProps>(function Button(
+  {
+    variant = "default",
+    size = "default",
+    className: _className,
+    asChild = false,
+    style,
+    children,
+    ...props
+  },
+  ref,
+) {
+  const containerStyle = buttonVariants({ variant, size, style });
+
+  const textStyle: TextStyle = {
+    ...TEXT_VARIANT_STYLES[variant],
+    ...TEXT_SIZE_STYLES[size],
+  };
+
+  // `asChild` : clone l'unique enfant et lui transmet onPress + styles
+  if (asChild && React.isValidElement(children)) {
+    const child = children as React.ReactElement<any>;
+    return React.cloneElement(child, {
+      onPress: (event: any) => {
+        child.props?.onPress?.(event);
+        props.onPress?.(event);
+      },
+      style: StyleSheet.flatten([containerStyle, child.props?.style]),
+    });
+  }
+
+  return (
+    <Pressable
+      ref={ref}
+      accessibilityRole="button"
+      style={({ pressed }) => [containerStyle, pressed && { opacity: 0.7 }]}
+      {...props}
+    >
+      {typeof children === "string" || typeof children === "number" ? (
+        <Text style={textStyle}>{children}</Text>
+      ) : (
+        children
+      )}
+    </Pressable>
+  );
+});
+
+export default Button;

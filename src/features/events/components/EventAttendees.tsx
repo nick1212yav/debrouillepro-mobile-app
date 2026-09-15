@@ -1,7 +1,8 @@
-import { Link } from "expo-router";
-import { View, Text, Image } from "react-native";
 // src/features/events/components/EventAttendees.tsx
-import { Users, CheckCircle, Clock } from "lucide-react-native";
+import React from "react";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { CheckCircle } from "lucide-react-native";
 import type { Event } from "../types";
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function EventAttendees({ event }: Props) {
+  const router = useRouter();
   const attendees = event.attendees || [];
 
   if (attendees.length === 0) {
@@ -19,43 +21,109 @@ export function EventAttendees({ event }: Props) {
   const remaining = attendees.length - displayCount;
 
   return (
-    <View className="space-y-3">
-      <Text className="text-xs text-white/40 font-semibold uppercase tracking-wider">
-        Participants ({attendees.length})
-      </Text>
-      <View className="flex flex-wrap gap-2">
+    <View style={styles.container}>
+      <Text style={styles.sectionLabel}>Participants ({attendees.length})</Text>
+
+      <View style={styles.attendeesRow}>
         {attendees.slice(0, displayCount).map((attendee) => (
-          <Link
+          <Pressable
             key={attendee.userId}
-            href={`/profile/${attendee.userId}`}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5"
+            onPress={() => router.push(`/profile/${attendee.userId}`)}
+            style={({ pressed }) => [
+              styles.attendeeChip,
+              pressed && styles.pressed,
+            ]}
           >
             {attendee.avatar ? (
               <Image
-               
-               
-                className="w-6 h-6 rounded-full object-cover"
-               source={{ uri: attendee.avatar }} accessibilityLabel={attendee.name}/>
+                source={{ uri: attendee.avatar }}
+                style={styles.avatar}
+                accessibilityLabel={attendee.name}
+              />
             ) : (
-              <View className="w-6 h-6 rounded-full flex items-center justify-center bg-purple-500/20 text-[10px] font-bold text-purple-400">
-                {attendee.name.charAt(0).toUpperCase()}
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={styles.avatarInitial}>
+                  {attendee.name.charAt(0).toUpperCase()}
+                </Text>
               </View>
             )}
-            <Text className="text-white/70 text-xs">{attendee.name}</Text>
+
+            <Text style={styles.name}>{attendee.name}</Text>
+
             {attendee.status === "attending" && (
-              <CheckCircle size={10} className="text-green-400" />
+              <CheckCircle size={10} color="#4ADE80" />
             )}
-          </Link>
+          </Pressable>
         ))}
+
         {remaining > 0 && (
-          <View
-            className="flex items-center px-3 py-1.5 rounded-full text-xs text-white/40"
-            style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
-          >
-            <Text>+</Text>{remaining}
+          <View style={styles.remainingChip}>
+            <Text style={styles.remainingText}>+{remaining}</Text>
           </View>
         )}
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    gap: 12,
+  },
+  sectionLabel: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  attendeesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  attendeeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.97 }],
+  },
+  avatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  avatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.2)",
+  },
+  avatarInitial: {
+    color: "#A78BFA",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  name: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+  },
+  remainingChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  remainingText: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+  },
+});

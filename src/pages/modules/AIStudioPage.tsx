@@ -1,211 +1,583 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { Picker } from "@react-native-picker/picker";
-import { View, Pressable, Image, Text, TextInput } from "react-native";
-import { useState, useEffect } from "react";
+// src/pages/modules/AIStudioPage.tsx
 import {
-  ArrowLeft, Sparkles, FileText, Tag, Languages, ShieldCheck,
-  User2, Image, Copy, Check, RefreshCw, ChevronDown, Wand2,
-  Zap, Star, Clock, Loader2,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  Image as RNImage,
+} from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  Clock,
+  Copy,
+  FileText,
+  Image as ImageIcon,
+  Languages,
+  Loader2,
+  Scan,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Tag,
+  User2,
+  Wand2,
+  Zap,
 } from "lucide-react-native";
-import { useAction, useQuery, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useConvexAuth } from "@/lib/convex-auth-compat";
 import { api } from "@/convex/_generated/api.js";
-import { cn } from "@/lib/utils";
+import { showToast as toast } from "@/lib/toast";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════════════════════
+   TYPES
+   ════════════════════════════════════════════════════════════════════════════ */
 
-type TabId = "generate" | "tags" | "translate" | "moderate" | "personalize" | "image";
+type TabId =
+  | "generate"
+  | "tags"
+  | "translate"
+  | "moderate"
+  | "personalize"
+  | "image";
 
 interface Tab {
   id: TabId;
   label: string;
+  short: string;
   icon: React.ElementType;
   color: string;
+  tagline: string;
 }
 
-// ─── Constants ─────────────────────────────────────────────────────────────────
+interface Props {
+  onBack: () => void;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const T = {
+  bg: "#07070C",
+  card: "rgba(255,255,255,0.045)",
+  cardUp: "rgba(255,255,255,0.075)",
+  border: "rgba(255,255,255,0.08)",
+  borderUp: "rgba(255,255,255,0.14)",
+  text: "#FFFFFF",
+  dim: "rgba(255,255,255,0.58)",
+  faint: "rgba(255,255,255,0.32)",
+  ghost: "rgba(255,255,255,0.16)",
+  primary: "#8B5CF6",
+} as const;
 
 const TABS: Tab[] = [
-  { id: "generate",    label: "Générer",     icon: FileText,    color: "#8B5CF6" },
-  { id: "tags",        label: "Tags auto",   icon: Tag,         color: "#F59E0B" },
-  { id: "translate",   label: "Traduire",    icon: Languages,   color: "#3B82F6" },
-  { id: "moderate",    label: "Modérer",     icon: ShieldCheck, color: "#10B981" },
-  { id: "personalize", label: "Perso.",      icon: User2,       color: "#EC4899" },
-  { id: "image",       label: "Analyser img",icon: Image,       color: "#F97316" },
+  {
+    id: "generate",
+    label: "Générer du contenu",
+    short: "Générer",
+    icon: Wand2,
+    color: "#8B5CF6",
+    tagline: "Posts, annonces, offres — en 3 secondes",
+  },
+  {
+    id: "tags",
+    label: "Tags automatiques",
+    short: "Tags",
+    icon: Tag,
+    color: "#F59E0B",
+    tagline: "Extrait les meilleurs mots-clés",
+  },
+  {
+    id: "translate",
+    label: "Traduction intelligente",
+    short: "Traduire",
+    icon: Languages,
+    color: "#3B82F6",
+    tagline: "9 langues, contexte préservé",
+  },
+  {
+    id: "moderate",
+    label: "Modération de contenu",
+    short: "Modérer",
+    icon: ShieldCheck,
+    color: "#10B981",
+    tagline: "Détecte spam, haine et contenus risqués",
+  },
+  {
+    id: "personalize",
+    label: "Personnalisation",
+    short: "Perso.",
+    icon: Star,
+    color: "#EC4899",
+    tagline: "Recommandations sur mesure",
+  },
+  {
+    id: "image",
+    label: "Analyse d'image",
+    short: "Image",
+    icon: ImageIcon,
+    color: "#F97316",
+    tagline: "Description, OCR, vérification",
+  },
 ];
 
 const LANGUAGES = [
-  { code: "fr", label: "Français" },
-  { code: "en", label: "English" },
-  { code: "lingala", label: "Lingala" },
-  { code: "swahili", label: "Swahili" },
-  { code: "hausa", label: "Hausa" },
-  { code: "yoruba", label: "Yoruba" },
-  { code: "es", label: "Español" },
-  { code: "pt", label: "Português" },
-  { code: "ar", label: "العربية" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "lingala", label: "Lingala", flag: "🇨🇩" },
+  { code: "swahili", label: "Swahili", flag: "🇹🇿" },
+  { code: "hausa", label: "Hausa", flag: "🇳🇬" },
+  { code: "yoruba", label: "Yoruba", flag: "🇳🇬" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "pt", label: "Português", flag: "🇵🇹" },
+  { code: "ar", label: "العربية", flag: "🇸🇦" },
 ];
 
 const CONTENT_TYPES = [
-  { value: "post",                 label: "Publication réseau social" },
-  { value: "job_description",      label: "Offre d'emploi" },
+  { value: "post", label: "Post réseau social" },
+  { value: "job_description", label: "Offre d'emploi" },
   { value: "property_description", label: "Annonce immobilière" },
-  { value: "product_description",  label: "Description de produit" },
-  { value: "event_description",    label: "Description d'événement" },
-  { value: "bio",                  label: "Biographie professionnelle" },
-];
+  { value: "product_description", label: "Description produit" },
+  { value: "event_description", label: "Description d'événement" },
+  { value: "bio", label: "Biographie pro" },
+] as const;
 
 const TONES = [
-  { value: "casual",      label: "Décontracté" },
-  { value: "formel",      label: "Formel" },
-  { value: "persuasif",   label: "Persuasif" },
-  { value: "informatif",  label: "Informatif" },
-];
+  { value: "casual", label: "Décontracté" },
+  { value: "formel", label: "Formel" },
+  { value: "persuasif", label: "Persuasif" },
+  { value: "informatif", label: "Informatif" },
+] as const;
 
-// ─── Sub-components ─────────────────────────────────────────────────────────────
+const IMAGE_TASKS = [
+  { value: "describe", label: "Décrire", icon: Sparkles },
+  { value: "extract_text", label: "OCR", icon: FileText },
+  { value: "property_info", label: "Immobilier", icon: Scan },
+  { value: "product_info", label: "Produit", icon: Tag },
+  { value: "id_verify", label: "Pièce d'identité", icon: ShieldCheck },
+] as const;
 
-function ResultBox({ text, onCopy }: { text: string; onCopy: () => void }) {
+const WIDTH = Dimensions.get("window").width;
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PRIMITIVES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function Skeleton({
+  style,
+}: {
+  style?: React.ComponentProps<typeof Animated.View>["style"];
+}) {
+  const opacity = useRef(new Animated.Value(0.28)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.65,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.28,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
   return (
+    <Animated.View
+      style={[
+        {
+          backgroundColor: "rgba(255,255,255,0.06)",
+          borderRadius: 12,
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+}
+
+/* ─── Chips (remplace Picker) ──────────────────────────────────────────── */
+
+function ChipRow<T extends string>({
+  options,
+  value,
+  onChange,
+  color,
+  scrollable = true,
+}: {
+  options: readonly { value: T; label: string; flag?: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  color: string;
+  scrollable?: boolean;
+}) {
+  const content = (
     <View
-      className="mt-4 relative rounded-2xl p-4"
-      style={{ backgroundColor: "rgba(139,92,246,0.08)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}
+      style={{
+        flexDirection: "row",
+        gap: 7,
+        flexWrap: scrollable ? "nowrap" : "wrap",
+      }}
     >
-      <Text className="text-sm text-white/85 leading-relaxed pr-8">{text}</Text>
-      <Pressable
-        onPress={onCopy}
-        className="absolute top-3 right-3 w-7 h-7 rounded-xl flex items-center justify-center"
-       
-      >
-        <Copy size={13} className="text-white/40" />
-      </Pressable>
-    </View>
-  );
-}
-
-function TagList({ tags }: { tags: string[] }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <View className="mt-4">
-      <View className="flex flex-wrap gap-2">
-        {tags.map(tag => (
-          <Text key={tag}
-            className="px-3 py-1.5 rounded-full text-xs font-semibold"
-            style={{ backgroundColor: "rgba(245,158,11,0.15)", color: "#FCD34D", borderWidth: 1, borderColor: "rgba(245,158,11,0.25)", borderStyle: "solid" }}
+      {options.map((opt) => {
+        const active = opt.value === value;
+        return (
+          <Pressable
+            key={opt.value}
+            onPress={() => onChange(opt.value)}
+            style={({ pressed }) => [
+              styles.chip,
+              {
+                backgroundColor: active
+                  ? alpha(color, 0.16)
+                  : "rgba(255,255,255,0.04)",
+                borderColor: active ? alpha(color, 0.4) : T.border,
+                opacity: pressed ? 0.8 : 1,
+                transform: [{ scale: pressed ? 0.96 : 1 }],
+              },
+            ]}
           >
-            #{tag}
-          </Text>
-        ))}
-      </View>
-      <Pressable
-        onPress={() => { void undefined.writeText(tags.map(t => `#${t}`).join(" ")); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-        className="mt-3 flex items-center gap-1.5 text-xs text-white/40"
-      >
-        {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
-        {copied ? "Copié !" : "Copier tous les tags"}
-      </Pressable>
+            {opt.flag && <Text style={{ fontSize: 12 }}>{opt.flag}</Text>}
+            <Text
+              style={{
+                color: active ? color : T.dim,
+                fontSize: 12,
+                fontWeight: active ? "800" : "600",
+              }}
+            >
+              {opt.label}
+            </Text>
+            {active && <Check size={11} color={color} />}
+          </Pressable>
+        );
+      })}
     </View>
+  );
+
+  if (scrollable) {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingRight: 8 }}
+      >
+        {content}
+      </ScrollView>
+    );
+  }
+  return content;
+}
+
+/* ─── Copy Button ──────────────────────────────────────────────────────── */
+
+function CopyIconButton({
+  text,
+  label = "Copier",
+}: {
+  text: string;
+  label?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const copy = () => {
+    Clipboard.setString(text);
+    setCopied(true);
+    Animated.sequence([
+      Animated.timing(scale, {
+        toValue: 1.15,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 4,
+      }),
+    ]).start();
+    toast.success("Copié !");
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  return (
+    <Pressable
+      onPress={copy}
+      hitSlop={10}
+      style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
+    >
+      <Animated.View style={{ transform: [{ scale }] }}>
+        {copied ? (
+          <Check size={13} color="#4ADE80" />
+        ) : (
+          <Copy size={13} color={T.faint} />
+        )}
+      </Animated.View>
+      <Text
+        style={{
+          color: copied ? "#4ADE80" : T.faint,
+          fontSize: 10.5,
+          fontWeight: "700",
+        }}
+      >
+        {copied ? "Copié" : label}
+      </Text>
+    </Pressable>
   );
 }
 
-// ─── Tab Panels ────────────────────────────────────────────────────────────────
+/* ─── Result Box ───────────────────────────────────────────────────────── */
+
+function ResultBox({
+  text,
+  color,
+  label,
+}: {
+  text: string;
+  color: string;
+  label?: string;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.resultBox,
+        {
+          borderColor: alpha(color, 0.32),
+          backgroundColor: alpha(color, 0.07),
+          opacity,
+        },
+      ]}
+    >
+      <View style={styles.resultHead}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Sparkles size={11} color={color} />
+          <Text
+            style={{
+              color,
+              fontSize: 10.5,
+              fontWeight: "900",
+              letterSpacing: 0.5,
+            }}
+          >
+            {label ?? "RÉSULTAT"}
+          </Text>
+        </View>
+        <CopyIconButton text={text} />
+      </View>
+      <Text
+        selectable
+        style={{
+          color: "rgba(255,255,255,0.9)",
+          fontSize: 13.5,
+          lineHeight: 20.5,
+          marginTop: 10,
+        }}
+      >
+        {text}
+      </Text>
+    </Animated.View>
+  );
+}
+
+/* ─── Primary Button ───────────────────────────────────────────────────── */
+
+function PrimaryButton({
+  label,
+  loadingLabel,
+  onPress,
+  loading,
+  disabled,
+  color,
+  icon: Icon,
+}: {
+  label: string;
+  loadingLabel: string;
+  onPress: () => void;
+  loading: boolean;
+  disabled?: boolean;
+  color: string;
+  icon: React.ElementType;
+}) {
+  const { width } = Dimensions.get("window");
+  const scale = useRef(new Animated.Value(1)).current;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={loading || disabled}
+      onPressIn={() =>
+        Animated.spring(scale, {
+          toValue: 0.97,
+          useNativeDriver: true,
+          speed: 30,
+        }).start()
+      }
+      onPressOut={() =>
+        Animated.spring(scale, {
+          toValue: 1,
+          useNativeDriver: true,
+          speed: 30,
+        }).start()
+      }
+      style={{ transform: [{ scale }] }}
+    >
+      <View
+        style={[
+          styles.primaryBtn,
+          {
+            backgroundColor: color,
+            opacity: loading || disabled ? 0.5 : 1,
+            shadowColor: color,
+          },
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Icon size={16} color="#fff" />
+        )}
+        <Text style={styles.primaryBtnText}>
+          {loading ? loadingLabel : label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+/* ─── Labels ───────────────────────────────────────────────────────────── */
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <Text style={styles.fieldLabel}>{children}</Text>;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PANELS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── GENERATE ─────────────────────────────────────────────────────────── */
 
 function GeneratePanel() {
   const generateContent = useAction(api.ai.generateContent);
-  const [contentType, setContentType] = useState<"post" | "job_description" | "property_description" | "product_description" | "event_description" | "bio">("post");
+  const [contentType, setContentType] =
+    useState<(typeof CONTENT_TYPES)[number]["value"]>("post");
   const [topic, setTopic] = useState("");
-  const [tone, setTone] = useState<"formel" | "casual" | "persuasif" | "informatif">("casual");
-  const [maxWords, setMaxWords] = useState(150);
+  const [tone, setTone] = useState<(typeof TONES)[number]["value"]>("casual");
+  const [maxWords, setMaxWords] = useState("150");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
   const run = async () => {
-    if (!topic.trim()) { UIService.openToast("Saisis un sujet", "error"); return; }
+    if (!topic.trim()) return toast.error("Saisis un sujet");
     setLoading(true);
     try {
-      const { content } = await generateContent({ type: contentType, topic, tone, maxWords });
+      const { content } = await generateContent({
+        type: contentType,
+        topic: topic.trim(),
+        tone,
+        maxWords: Number(maxWords) || 150,
+      });
       setResult(content);
-    } catch { UIService.openToast("Erreur de génération", "error"); }
-    finally { setLoading(false); }
-  };
-
-  const copyResult = () => {
-    void undefined.writeText(result);
-    UIService.openToast("Copié dans le presse-papier !", "success");
+    } catch {
+      toast.error("Erreur de génération");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <View className="flex flex-col gap-4">
+    <View style={{ gap: 16 }}>
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Type de contenu</Text>
-        <View className="relative">
-          <Picker
-           
-            onValueChange={val => setContentType(val as typeof contentType)}
-            className="w-full rounded-xl px-4 py-3 text-sm text-white pr-10"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-           selectedValue={contentType}>
-            {CONTENT_TYPES.map(t => <Picker.Item label={`${t.label}`} value={t.value} />)}
-          </Picker>
-          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40" />
-        </View>
+        <FieldLabel>Type de contenu</FieldLabel>
+        <ChipRow
+          options={CONTENT_TYPES}
+          value={contentType}
+          onChange={setContentType}
+          color="#8B5CF6"
+        />
       </View>
 
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Sujet / mots-clés</Text>
+        <FieldLabel>Sujet / mots-clés</FieldLabel>
         <TextInput
           value={topic}
-          onChangeText={text => setTopic(text)}
-          placeholder="Ex: appartement 3 pièces à Kinshasa, vue sur le fleuve, calme..."
-         
-          className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-         multiline textAlignVertical="top"/>
+          onChangeText={setTopic}
+          placeholder="Ex. Appartement 3 pièces à Kinshasa, vue fleuve, calme…"
+          placeholderTextColor={T.faint}
+          style={[styles.input, styles.inputMulti]}
+          multiline
+          textAlignVertical="top"
+        />
+        <Text style={styles.hint}>
+          {topic.trim().length} caractère{topic.trim().length !== 1 ? "s" : ""}
+        </Text>
       </View>
 
-      <View className="flex gap-3">
-        <View className="flex-1">
-          <Text className="text-xs text-white/50 mb-1.5 block">Ton</Text>
-          <View className="relative">
-            <Picker
-             
-              onValueChange={val => setTone(val as typeof tone)}
-              className="w-full rounded-xl px-3 py-2.5 text-sm text-white"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-             selectedValue={tone}>
-              {TONES.map(t => <Picker.Item label={`${t.label}`} value={t.value} />)}
-            </Picker>
-            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40" />
-          </View>
-        </View>
-        <View className="flex-1">
-          <Text className="text-xs text-white/50 mb-1.5 block">Nb. mots (max)</Text>
-          <TextInput
-           
-            value={maxWords}
-            onChangeText={text => setMaxWords(Number(text))}
-            min={50}
-            max={500}
-            step={50}
-            className="w-full rounded-xl px-3 py-2.5 text-sm text-white outline-none"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-           keyboardType="numeric"/>
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <FieldLabel>Ton</FieldLabel>
+          <ChipRow
+            options={TONES}
+            value={tone}
+            onChange={setTone}
+            color="#8B5CF6"
+          />
         </View>
       </View>
 
-      <Pressable
-        onPress={() => { void run(); }}
-        disabled={loading}
-        className="flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-        style={{ opacity: loading ? 0.7 : 1 }}
-      >
-        {loading ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
-        {loading ? "Génération en cours…" : "Générer le contenu"}
-      </Pressable>
+      <View>
+        <FieldLabel>Nombre de mots (max)</FieldLabel>
+        <TextInput
+          value={maxWords}
+          onChangeText={setMaxWords}
+          keyboardType="numeric"
+          placeholder="150"
+          placeholderTextColor={T.faint}
+          style={styles.input}
+        />
+      </View>
 
-      {result && <ResultBox text={result} onCopy={copyResult} />}
+      <PrimaryButton
+        label="Générer le contenu"
+        loadingLabel="Génération en cours…"
+        onPress={run}
+        loading={loading}
+        disabled={!topic.trim()}
+        color="#8B5CF6"
+        icon={Wand2}
+      />
+
+      {result ? <ResultBox text={result} color="#8B5CF6" /> : null}
     </View>
   );
 }
+
+/* ─── TAGS ─────────────────────────────────────────────────────────────── */
 
 function TagsPanel() {
   const suggestTags = useAction(api.ai.suggestTags);
@@ -215,247 +587,406 @@ function TagsPanel() {
   const [loading, setLoading] = useState(false);
 
   const run = async () => {
-    if (!content.trim()) { UIService.openToast("Saisis du contenu", "error"); return; }
+    if (!content.trim()) return toast.error("Saisis du contenu");
     setLoading(true);
     try {
-      const res = await suggestTags({ content, category: category || undefined });
+      const res = await suggestTags({
+        content: content.trim(),
+        category: category.trim() || undefined,
+      });
       setTags(res.tags);
-    } catch { UIService.openToast("Erreur de suggestion", "error"); }
-    finally { setLoading(false); }
+    } catch {
+      toast.error("Erreur de suggestion");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyAll = () => {
+    Clipboard.setString(tags.map((t) => `#${t}`).join(" "));
+    toast.success("Tous les tags copiés");
   };
 
   return (
-    <View className="flex flex-col gap-4">
+    <View style={{ gap: 16 }}>
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Contenu à analyser</Text>
+        <FieldLabel>Contenu à analyser</FieldLabel>
         <TextInput
           value={content}
-          onChangeText={text => setContent(text)}
-          placeholder="Colle ton texte ici pour obtenir des suggestions de tags automatiques..."
-         
-          className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-         multiline textAlignVertical="top"/>
-      </View>
-      <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Catégorie (optionnel)</Text>
-        <TextInput
-         
-          value={category}
-          onChangeText={text => setCategory(text)}
-          placeholder="immobilier, emploi, événement..."
-          className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/25 outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
+          onChangeText={setContent}
+          placeholder="Colle ton texte ici…"
+          placeholderTextColor={T.faint}
+          style={[styles.input, styles.inputMulti]}
+          multiline
+          textAlignVertical="top"
         />
       </View>
-      <Pressable
-        onPress={() => { void run(); }}
-        disabled={loading}
-        className="flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-        style={{ opacity: loading ? 0.7 : 1 }}
-      >
-        {loading ? <Loader2 size={16} className="animate-spin" /> : <Tag size={16} />}
-        {loading ? "Analyse en cours…" : "Suggérer des tags"}
-      </Pressable>
-      {tags.length > 0 && <TagList tags={tags} />}
+
+      <View>
+        <FieldLabel>Catégorie (optionnel)</FieldLabel>
+        <TextInput
+          value={category}
+          onChangeText={setCategory}
+          placeholder="immobilier, emploi, événement…"
+          placeholderTextColor={T.faint}
+          style={styles.input}
+        />
+      </View>
+
+      <PrimaryButton
+        label="Suggérer des tags"
+        loadingLabel="Analyse…"
+        onPress={run}
+        loading={loading}
+        disabled={!content.trim()}
+        color="#F59E0B"
+        icon={Tag}
+      />
+
+      {tags.length > 0 && (
+        <View style={styles.tagResultCard}>
+          <View style={styles.tagResultHead}>
+            <Text style={styles.tagResultTitle}>
+              {tags.length} tag{tags.length > 1 ? "s" : ""} suggéré
+              {tags.length > 1 ? "s" : ""}
+            </Text>
+            <Pressable onPress={copyAll} hitSlop={8}>
+              <Text
+                style={{ color: "#FCD34D", fontSize: 11, fontWeight: "800" }}
+              >
+                Tout copier
+              </Text>
+            </Pressable>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 7,
+              marginTop: 12,
+            }}
+          >
+            {tags.map((tag) => (
+              <View key={tag} style={styles.tagPill}>
+                <Text style={styles.tagPillText}>#{tag}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
+
+/* ─── TRANSLATE ────────────────────────────────────────────────────────── */
 
 function TranslatePanel() {
   const translateText = useAction(api.ai.translateText);
   const [text, setText] = useState("");
   const [targetLang, setTargetLang] = useState("en");
-  const [result, setResult] = useState<{ translated: string; detectedLanguage: string } | null>(null);
+  const [result, setResult] = useState<{
+    translated: string;
+    detectedLanguage: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const run = async () => {
-    if (!text.trim()) { UIService.openToast("Saisis du texte", "error"); return; }
+    if (!text.trim()) return toast.error("Saisis du texte");
     setLoading(true);
     try {
-      const res = await translateText({ text, targetLanguage: targetLang });
+      const res = await translateText({
+        text: text.trim(),
+        targetLanguage: targetLang,
+      });
       setResult(res);
-    } catch { UIService.openToast("Erreur de traduction", "error"); }
-    finally { setLoading(false); }
-  };
-
-  const copyResult = () => {
-    if (!result) return;
-    void undefined.writeText(result.translated);
-    UIService.openToast("Traduction copiée !", "success");
+    } catch {
+      toast.error("Erreur de traduction");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <View className="flex flex-col gap-4">
+    <View style={{ gap: 16 }}>
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Texte source</Text>
+        <FieldLabel>Texte source</FieldLabel>
         <TextInput
           value={text}
-          onChangeText={text => setText(text)}
-          placeholder="Saisis le texte à traduire..."
-         
-          className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-         multiline textAlignVertical="top"/>
+          onChangeText={setText}
+          placeholder="Saisis le texte à traduire…"
+          placeholderTextColor={T.faint}
+          style={[styles.input, styles.inputMulti]}
+          multiline
+          textAlignVertical="top"
+        />
       </View>
+
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Langue cible</Text>
-        <View className="relative">
-          <Picker
-           
-            onValueChange={val => setTargetLang(val)}
-            className="w-full rounded-xl px-4 py-3 text-sm text-white"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-           selectedValue={targetLang}>
-            {LANGUAGES.map(l => <Picker.Item label={`${l.label}`} value={l.code} />)}
-          </Picker>
-          <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40" />
-        </View>
+        <FieldLabel>Langue cible</FieldLabel>
+        <ChipRow
+          options={LANGUAGES}
+          value={targetLang}
+          onChange={setTargetLang}
+          color="#3B82F6"
+        />
       </View>
-      <Pressable
-        onPress={() => { void run(); }}
-        disabled={loading}
-        className="flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-        style={{ opacity: loading ? 0.7 : 1 }}
-      >
-        {loading ? <Loader2 size={16} className="animate-spin" /> : <Languages size={16} />}
-        {loading ? "Traduction en cours…" : "Traduire"}
-      </Pressable>
+
+      <PrimaryButton
+        label="Traduire"
+        loadingLabel="Traduction…"
+        onPress={run}
+        loading={loading}
+        disabled={!text.trim()}
+        color="#3B82F6"
+        icon={Languages}
+      />
+
       {result && (
-        <View className="mt-1">
-          <View className="flex items-center gap-2 mb-2">
-            <Text className="text-[10px] px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: "rgba(59,130,246,0.15)", color: "#93C5FD", borderWidth: 1, borderColor: "rgba(59,130,246,0.2)", borderStyle: "solid" }}>
-              Langue détectée : {result.detectedLanguage}
+        <View style={{ gap: 10 }}>
+          <View style={styles.detectedBadge}>
+            <Text style={styles.detectedBadgeText}>
+              Détecté : {result.detectedLanguage}
+            </Text>
+            <ChevronRight size={11} color="#93C5FD" />
+            <Text style={styles.detectedBadgeText}>
+              {LANGUAGES.find((l) => l.code === targetLang)?.label ??
+                targetLang}
             </Text>
           </View>
-          <ResultBox text={result.translated} onCopy={copyResult} />
+          <ResultBox
+            text={result.translated}
+            color="#3B82F6"
+            label="TRADUCTION"
+          />
         </View>
       )}
     </View>
   );
 }
+
+/* ─── MODERATE ─────────────────────────────────────────────────────────── */
+
+const SEVERITY = {
+  none: { color: "#10B981", label: "Aucune" },
+  low: { color: "#F59E0B", label: "Faible" },
+  medium: { color: "#F97316", label: "Moyen" },
+  high: { color: "#EF4444", label: "Élevé" },
+} as const;
+
+const CONTEXTS = [
+  { value: "post", label: "Publication" },
+  { value: "comment", label: "Commentaire" },
+  { value: "bio", label: "Bio" },
+] as const;
 
 function ModeratePanel() {
   const moderateText = useAction(api.ai.moderateText);
   const [text, setText] = useState("");
-  const [context, setContext] = useState("post");
-  const [result, setResult] = useState<{ safe: boolean; reason: string; severity: string; categories: string[] } | null>(null);
+  const [context, setContext] =
+    useState<(typeof CONTEXTS)[number]["value"]>("post");
+  const [result, setResult] = useState<{
+    safe: boolean;
+    reason: string;
+    severity: string;
+    categories: string[];
+  } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const run = async () => {
-    if (!text.trim()) { UIService.openToast("Saisis du contenu", "error"); return; }
+    if (!text.trim()) return toast.error("Saisis du contenu");
     setLoading(true);
     try {
-      const res = await moderateText({ text, context });
+      const res = await moderateText({ text: text.trim(), context });
       setResult(res);
-    } catch { UIService.openToast("Erreur de modération", "error"); }
-    finally { setLoading(false); }
+    } catch {
+      toast.error("Erreur de modération");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const severityColor: Record<string, string> = {
-    none: "#10B981", low: "#F59E0B", medium: "#F97316", high: "#EF4444",
-  };
-  const severityLabel: Record<string, string> = {
-    none: "Aucune", low: "Faible", medium: "Moyen", high: "Élevé",
-  };
+  const sev = result
+    ? (SEVERITY[result.severity as keyof typeof SEVERITY] ?? SEVERITY.none)
+    : SEVERITY.none;
 
   return (
-    <View className="flex flex-col gap-4">
+    <View style={{ gap: 16 }}>
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Contenu à analyser</Text>
+        <FieldLabel>Contenu à analyser</FieldLabel>
         <TextInput
           value={text}
-          onChangeText={text => setText(text)}
-          placeholder="Colle le texte que tu veux modérer..."
-         
-          className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-         multiline textAlignVertical="top"/>
+          onChangeText={setText}
+          placeholder="Colle le texte à modérer…"
+          placeholderTextColor={T.faint}
+          style={[styles.input, styles.inputMulti]}
+          multiline
+          textAlignVertical="top"
+        />
       </View>
+
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Contexte</Text>
-        <View className="flex gap-2 flex-wrap">
-          {["post", "comment", "bio"].map(c => (
-            <Pressable key={c} onPress={() => setContext(c)}
-              className={cn("px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all",
-                context === c ? "text-white" : "text-white/40")}
-              style={context === c
-                ? { backgroundColor: "rgba(16,185,129,0.2)", borderWidth: 1, borderColor: "rgba(16,185,129,0.4)", borderStyle: "solid" }
-                : { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }
-              }
-            >
-              {c === "post" ? "Publication" : c === "comment" ? "Commentaire" : "Bio"}
-            </Pressable>
-          ))}
-        </View>
+        <FieldLabel>Contexte</FieldLabel>
+        <ChipRow
+          options={CONTEXTS}
+          value={context}
+          onChange={setContext}
+          color="#10B981"
+          scrollable={false}
+        />
       </View>
-      <Pressable
-        onPress={() => { void run(); }}
-        disabled={loading}
-        className="flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-        style={{ opacity: loading ? 0.7 : 1 }}
-      >
-        {loading ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-        {loading ? "Analyse en cours…" : "Analyser le contenu"}
-      </Pressable>
+
+      <PrimaryButton
+        label="Analyser le contenu"
+        loadingLabel="Analyse…"
+        onPress={run}
+        loading={loading}
+        disabled={!text.trim()}
+        color="#10B981"
+        icon={ShieldCheck}
+      />
+
       {result && (
-        <View
-          className="mt-1 rounded-2xl p-4"
-          style={{ backgroundColor: result.safe ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)", borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}>
-          <View className="flex items-center gap-3 mb-3">
-            <View className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: result.safe ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)" }}>
-              {result.safe
-                ? <Check size={18} style={{ color: "#10B981" }} />
-                : <ShieldCheck size={18} style={{ color: "#EF4444" }} />
-              }
+        <Animated.View
+          style={[
+            styles.modCard,
+            {
+              backgroundColor: result.safe
+                ? alpha("#10B981", 0.07)
+                : alpha("#EF4444", 0.07),
+              borderColor: result.safe
+                ? alpha("#10B981", 0.28)
+                : alpha("#EF4444", 0.28),
+            },
+          ]}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View
+              style={[
+                styles.modIcon,
+                {
+                  backgroundColor: result.safe
+                    ? alpha("#10B981", 0.16)
+                    : alpha("#EF4444", 0.16),
+                },
+              ]}
+            >
+              {result.safe ? (
+                <Check size={19} color="#34D399" />
+              ) : (
+                <AlertCircle size={19} color="#F87171" />
+              )}
             </View>
-            <View>
-              <Text className="text-sm font-bold" style={{ color: result.safe ? "#34D399" : "#F87171" }}>
-                {result.safe ? "Contenu conforme" : "Contenu potentiellement problématique"}
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: result.safe ? "#34D399" : "#F87171",
+                  fontSize: 14.5,
+                  fontWeight: "800",
+                }}
+              >
+                {result.safe ? "Contenu conforme" : "Contenu à risque"}
               </Text>
-              <Text className="text-xs text-white/40">
-                Sévérité : <Text style={{ color: severityColor[result.severity] ?? "#fff" }}>{severityLabel[result.severity] ?? result.severity}</Text>
-              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 4,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: sev.color,
+                  }}
+                />
+                <Text
+                  style={{ color: T.dim, fontSize: 11.5, fontWeight: "600" }}
+                >
+                  Sévérité :{" "}
+                  <Text style={{ color: sev.color, fontWeight: "800" }}>
+                    {sev.label}
+                  </Text>
+                </Text>
+              </View>
             </View>
           </View>
-          {result.reason && <Text className="text-xs text-white/60 mb-2">{result.reason}</Text>}
+
+          {!!result.reason && (
+            <Text style={styles.modReason}>{result.reason}</Text>
+          )}
+
           {result.categories.length > 0 && (
-            <View className="flex flex-wrap gap-1.5">
-              {result.categories.map(c => (
-                <Text key={c} className="text-[10px] px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#FCA5A5", borderWidth: 1, borderColor: "rgba(239,68,68,0.2)", borderStyle: "solid" }}>
-                  {c}
-                </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 6,
+                marginTop: 12,
+              }}
+            >
+              {result.categories.map((c) => (
+                <View key={c} style={styles.categoryPill}>
+                  <Text style={styles.categoryPillText}>{c}</Text>
+                </View>
               ))}
             </View>
           )}
-        </View>
+        </Animated.View>
       )}
     </View>
   );
 }
 
+/* ─── PERSONALIZE ──────────────────────────────────────────────────────── */
+
+const AVAILABLE_MODULES = [
+  "immo",
+  "jobs",
+  "transport",
+  "sante",
+  "paiement",
+  "marketplace",
+  "agri",
+  "community",
+  "evenements",
+  "voyages",
+  "apprendre",
+  "fitness",
+  "media",
+];
+
 function PersonalizePanel() {
   const aiPersonalize = useAction(api.ai.aiPersonalize);
   const { isAuthenticated } = useConvexAuth();
-  const savedPrefs = useQuery(api.aiPreferences.getMyPreferences, isAuthenticated ? {} : "skip");
+  const savedPrefs = useQuery(
+    api.aiPreferences.getMyPreferences,
+    isAuthenticated ? {} : "skip",
+  );
   const savePreferences = useMutation(api.aiPreferences.savePreferences);
 
   const [interests, setInterests] = useState("");
   const [city, setCity] = useState("");
   const [activity, setActivity] = useState("");
-  const [result, setResult] = useState<{ recommendedModules: string[]; recommendedTags: string[]; welcomeMessage: string } | null>(null);
+  const [result, setResult] = useState<{
+    recommendedModules: string[];
+    recommendedTags: string[];
+    welcomeMessage: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Pre-fill from saved preferences
   useEffect(() => {
     if (savedPrefs && !interests) {
       setInterests(savedPrefs.interests.join(", "));
       setCity(savedPrefs.city ?? "");
-      if (savedPrefs.recommendedModules || savedPrefs.recommendedTags || savedPrefs.welcomeMessage) {
+      if (
+        savedPrefs.recommendedModules ||
+        savedPrefs.recommendedTags ||
+        savedPrefs.welcomeMessage
+      ) {
         setResult({
           recommendedModules: savedPrefs.recommendedModules ?? [],
           recommendedTags: savedPrefs.recommendedTags ?? [],
@@ -463,114 +994,183 @@ function PersonalizePanel() {
         });
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedPrefs]);
 
   const run = async () => {
     setLoading(true);
     try {
-      const interestList = interests.split(",").map(s => s.trim()).filter(Boolean);
+      const interestList = interests
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
       const res = await aiPersonalize({
         userInterests: interestList,
-        userCity: city || undefined,
-        recentActivity: activity.split(",").map(s => s.trim()).filter(Boolean),
-        availableModules: ["immo", "jobs", "transport", "sante", "paiement", "marketplace", "agri", "community", "evenements", "voyages", "apprendre", "fitness", "media"],
+        userCity: city.trim() || undefined,
+        recentActivity: activity
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        availableModules: AVAILABLE_MODULES,
       });
       setResult(res);
-      // Auto-save to Convex
+
       if (isAuthenticated) {
         await savePreferences({
           interests: interestList,
-          city: city || undefined,
+          city: city.trim() || undefined,
           recommendedModules: res.recommendedModules,
           recommendedTags: res.recommendedTags,
           welcomeMessage: res.welcomeMessage,
         });
         setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        setTimeout(() => setSaved(false), 2600);
       }
-    } catch { UIService.openToast("Erreur de personnalisation", "error"); }
-    finally { setLoading(false); }
+    } catch {
+      toast.error("Erreur de personnalisation");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <View className="flex flex-col gap-4">
+    <View style={{ gap: 16 }}>
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Intérêts (séparés par virgule)</Text>
+        <FieldLabel>Intérêts (séparés par virgule)</FieldLabel>
         <TextInput
-         
           value={interests}
-          onChangeText={text => setInterests(text)}
-          placeholder="immobilier, emploi, agriculture, santé..."
-          className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/25 outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
+          onChangeText={setInterests}
+          placeholder="immobilier, emploi, agriculture…"
+          placeholderTextColor={T.faint}
+          style={styles.input}
         />
       </View>
+
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Ville</Text>
+        <FieldLabel>Ville</FieldLabel>
         <TextInput
-         
           value={city}
-          onChangeText={text => setCity(text)}
-          placeholder="Kinshasa, Brazzaville, Douala..."
-          className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/25 outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
+          onChangeText={setCity}
+          placeholder="Kinshasa, Brazzaville…"
+          placeholderTextColor={T.faint}
+          style={styles.input}
         />
       </View>
+
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Activité récente (séparée par virgule)</Text>
+        <FieldLabel>Activité récente</FieldLabel>
         <TextInput
-         
           value={activity}
-          onChangeText={text => setActivity(text)}
-          placeholder="jobs, immo, marketplace..."
-          className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/25 outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
+          onChangeText={setActivity}
+          placeholder="jobs, immo, marketplace…"
+          placeholderTextColor={T.faint}
+          style={styles.input}
         />
       </View>
-      <Pressable
-        onPress={() => { void run(); }}
-        disabled={loading}
-        className="flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-        style={{ opacity: loading ? 0.7 : 1 }}
-      >
-        {loading ? <Loader2 size={16} className="animate-spin" /> : saved ? <Check size={16} /> : <Star size={16} />}
-        {loading ? "Personnalisation…" : saved ? "Préférences sauvegardées !" : "Obtenir mes recommandations"}
-      </Pressable>
+
+      <PrimaryButton
+        label={
+          saved ? "Préférences sauvegardées !" : "Obtenir mes recommandations"
+        }
+        loadingLabel="Personnalisation…"
+        onPress={run}
+        loading={loading}
+        color="#EC4899"
+        icon={saved ? Check : Star}
+      />
+
       {result && (
-        <View className="mt-1 space-y-3">
-          {/* Welcome message */}
-          <View className="rounded-2xl p-4"
-            style={{ backgroundColor: "rgba(236,72,153,0.08)", borderWidth: 1, borderColor: "rgba(236,72,153,0.2)", borderStyle: "solid" }}>
-            <Text className="text-xs text-white/40 mb-1">Message personnalisé</Text>
-            <Text className="text-sm text-white font-semibold">{result.welcomeMessage}</Text>
-          </View>
-          {/* Modules */}
+        <View style={{ gap: 10 }}>
+          {!!result.welcomeMessage && (
+            <View
+              style={[
+                styles.personalCard,
+                {
+                  borderColor: alpha("#EC4899", 0.28),
+                  backgroundColor: alpha("#EC4899", 0.07),
+                },
+              ]}
+            >
+              <Text style={styles.personalCardLabel}>MESSAGE PERSONNEL</Text>
+              <Text style={styles.personalCardText}>
+                {result.welcomeMessage}
+              </Text>
+            </View>
+          )}
+
           {result.recommendedModules.length > 0 && (
-            <View className="rounded-2xl p-4"
-              style={{ backgroundColor: "rgba(139,92,246,0.08)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}>
-              <Text className="text-xs text-white/40 mb-2">Modules recommandés</Text>
-              <View className="flex flex-wrap gap-2">
-                {result.recommendedModules.map(m => (
-                  <Text key={m} className="px-3 py-1 rounded-full text-xs font-semibold"
-                    style={{ backgroundColor: "rgba(139,92,246,0.15)", color: "#C4B5FD", borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}>
-                    {m}
-                  </Text>
+            <View
+              style={[
+                styles.personalCard,
+                {
+                  borderColor: alpha("#8B5CF6", 0.28),
+                  backgroundColor: alpha("#8B5CF6", 0.06),
+                },
+              ]}
+            >
+              <Text style={styles.personalCardLabel}>MODULES RECOMMANDÉS</Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  marginTop: 10,
+                }}
+              >
+                {result.recommendedModules.map((m) => (
+                  <View
+                    key={m}
+                    style={[
+                      styles.pill,
+                      {
+                        backgroundColor: alpha("#8B5CF6", 0.16),
+                        borderColor: alpha("#8B5CF6", 0.32),
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.pillText, { color: "#C4B5FD" }]}>
+                      {m}
+                    </Text>
+                  </View>
                 ))}
               </View>
             </View>
           )}
-          {/* Tags */}
+
           {result.recommendedTags.length > 0 && (
-            <View className="rounded-2xl p-4"
-              style={{ backgroundColor: "rgba(245,158,11,0.08)", borderWidth: 1, borderColor: "rgba(245,158,11,0.2)", borderStyle: "solid" }}>
-              <Text className="text-xs text-white/40 mb-2">Tags d'intérêt</Text>
-              <View className="flex flex-wrap gap-2">
-                {result.recommendedTags.map(t => (
-                  <Text key={t} className="px-3 py-1 rounded-full text-xs"
-                    style={{ backgroundColor: "rgba(245,158,11,0.1)", color: "#FCD34D", borderWidth: 1, borderColor: "rgba(245,158,11,0.2)", borderStyle: "solid" }}>
-                    #{t}
-                  </Text>
+            <View
+              style={[
+                styles.personalCard,
+                {
+                  borderColor: alpha("#F59E0B", 0.28),
+                  backgroundColor: alpha("#F59E0B", 0.06),
+                },
+              ]}
+            >
+              <Text style={styles.personalCardLabel}>TAGS D'INTÉRÊT</Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  marginTop: 10,
+                }}
+              >
+                {result.recommendedTags.map((t) => (
+                  <View
+                    key={t}
+                    style={[
+                      styles.pill,
+                      {
+                        backgroundColor: alpha("#F59E0B", 0.14),
+                        borderColor: alpha("#F59E0B", 0.3),
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.pillText, { color: "#FCD34D" }]}>
+                      #{t}
+                    </Text>
+                  </View>
                 ))}
               </View>
             </View>
@@ -580,196 +1180,657 @@ function PersonalizePanel() {
     </View>
   );
 }
+
+/* ─── IMAGE ────────────────────────────────────────────────────────────── */
 
 function ImagePanel() {
   const analyzeImage = useAction(api.ai.analyzeImage);
   const [imageUrl, setImageUrl] = useState("");
-  const [task, setTask] = useState<"describe" | "extract_text" | "property_info" | "product_info" | "id_verify">("describe");
+  const [task, setTask] =
+    useState<(typeof IMAGE_TASKS)[number]["value"]>("describe");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
-  const TASKS = [
-    { value: "describe",       label: "Décrire l'image" },
-    { value: "extract_text",   label: "Extraire le texte (OCR)" },
-    { value: "property_info",  label: "Info immobilier" },
-    { value: "product_info",   label: "Identifier un produit" },
-    { value: "id_verify",      label: "Vérifier une pièce d'identité" },
-  ];
+  useEffect(() => {
+    setImgError(false);
+  }, [imageUrl]);
 
   const run = async () => {
-    if (!imageUrl.trim()) { UIService.openToast("Saisis une URL d'image", "error"); return; }
+    if (!imageUrl.trim()) return toast.error("Saisis une URL d'image");
     setLoading(true);
     try {
-      const res = await analyzeImage({ imageUrl, task });
+      const res = await analyzeImage({ imageUrl: imageUrl.trim(), task });
       setResult(res.result);
-    } catch { UIService.openToast("Erreur d'analyse", "error"); }
-    finally { setLoading(false); }
-  };
-
-  const copyResult = () => {
-    void undefined.writeText(result);
-    UIService.openToast("Copié !", "success");
+    } catch {
+      toast.error("Erreur d'analyse");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <View className="flex flex-col gap-4">
+    <View style={{ gap: 16 }}>
       <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">URL de l'image</Text>
+        <FieldLabel>URL de l'image</FieldLabel>
         <TextInput
-         
           value={imageUrl}
-          onChangeText={text => setImageUrl(text)}
-          placeholder="https://..."
-          className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/25 outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-         keyboardType="url" autoCapitalize="none" autoCorrect={false}/>
+          onChangeText={setImageUrl}
+          placeholder="https://…"
+          placeholderTextColor={T.faint}
+          style={styles.input}
+          keyboardType="url"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
       </View>
-      {imageUrl && (
-        <Image
-          src={imageUrl}
-          alt="Preview"
-          className="w-full max-h-48 object-cover rounded-2xl"
-          onError={e => { (e.target as Image).style.display = "none"; }}
+
+      {!!imageUrl && !imgError && (
+        <RNImage
+          source={{ uri: imageUrl }}
+          onError={() => setImgError(true)}
+          style={styles.imagePreview}
+          resizeMode="cover"
         />
       )}
-      <View>
-        <Text className="text-xs text-white/50 mb-1.5 block">Type d'analyse</Text>
-        <View className="flex flex-col gap-2">
-          {TASKS.map(t => (
-            <Pressable key={t.value} onPress={() => setTask(t.value as typeof task)}
-              className={cn("flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-left cursor-pointer transition-all",
-                task === t.value ? "text-white" : "text-white/50")}
-              style={task === t.value
-                ? { backgroundColor: "rgba(249,115,22,0.15)", borderWidth: 1, borderColor: "rgba(249,115,22,0.35)", borderStyle: "solid" }
-                : { backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }
-              }
-            >
-              {task === t.value && <Check size={13} style={{ color: "#FB923C" }} />}
-              {t.label}
-            </Pressable>
-          ))}
-        </View>
-      </View>
-      <Pressable
-        onPress={() => { void run(); }}
-        disabled={loading}
-        className="flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold"
-        style={{ opacity: loading ? 0.7 : 1 }}
-      >
-        {loading ? <Loader2 size={16} className="animate-spin" /> : <Image size={16} />}
-        {loading ? "Analyse en cours…" : "Analyser l'image"}
-      </Pressable>
-      {result && <ResultBox text={result} onCopy={copyResult} />}
-    </View>
-  );
-}
 
-// ─── Main Page ─────────────────────────────────────────────────────────────────
-
-interface Props {
-  onBack: () => void;
-}
-
-export default function AIStudioPage({ onBack }: Props) {
-  const [activeTab, setActiveTab] = useState<TabId>("generate");
-
-  const activeTabData = TABS.find(t => t.id === activeTab)!;
-
-  return (
-    <View
-      className="h-full w-full flex flex-col overflow-hidden"
-      style={{  }}
-    >
-      {/* Header */}
-      <View className="flex-shrink-0 px-5 pt-14 pb-4">
-        <View className="flex items-center gap-3 mb-6">
-          <Pressable onPress={onBack}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-            <ArrowLeft size={16} className="text-white" />
-          </Pressable>
-          <View className="flex-1">
-            <View className="flex items-center gap-2">
-              <Text className="text-lg font-black text-white tracking-tight">IA Studio</Text>
-              <Text className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-                style={{ color: "#fff" }}>
-                BETA
-              </Text>
-            </View>
-            <Text className="text-xs text-white/40">Toutes les actions intelligentes</Text>
-          </View>
-          {/* Stats badge */}
-          <View className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
-            style={{ backgroundColor: "rgba(139,92,246,0.12)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}>
-            <Zap size={11} style={{ color: "#A78BFA" }} />
-            <Text className="text-[10px] font-bold" style={{ color: "#A78BFA" }}>6 outils</Text>
-          </View>
-        </View>
-
-        {/* Info banner */}
-        <View className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-4"
-          style={{ backgroundColor: "rgba(139,92,246,0.07)", borderWidth: 1, borderColor: "rgba(139,92,246,0.15)", borderStyle: "solid" }}>
-          <Sparkles size={16} style={{ color: "#A78BFA" }} className="flex-shrink-0" />
-          <Text className="text-xs text-white/50 leading-relaxed">
-            Alimenté par <strong className="text-white/70">GPT-5 mini</strong> — conçu pour l'Afrique centrale. Génère, traduis, modère du contenu en quelques secondes.
+      {imgError && (
+        <View style={styles.imageError}>
+          <AlertCircle size={16} color="#F87171" />
+          <Text
+            style={{
+              color: "#F87171",
+              fontSize: 12,
+              fontWeight: "600",
+              flex: 1,
+            }}
+          >
+            Impossible de charger l'image
           </Text>
         </View>
+      )}
 
-        {/* Tabs */}
-        <View className="flex gap-1.5 overflow-x-auto pb-1" style={{  }}>
-          {TABS.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
+      <View>
+        <FieldLabel>Type d'analyse</FieldLabel>
+        <View style={{ gap: 7 }}>
+          {IMAGE_TASKS.map((t) => {
+            const active = task === t.value;
+            const Icon = t.icon;
             return (
               <Pressable
-                key={tab.id}
-                onPress={() => setActiveTab(tab.id)}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold"
-                style={isActive
-                  ? { backgroundColor: `${tab.color}22`, borderStyle: "solid" }
-                  : { backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }
-                }
+                key={t.value}
+                onPress={() => setTask(t.value)}
+                style={({ pressed }) => [
+                  styles.taskRow,
+                  {
+                    backgroundColor: active
+                      ? alpha("#F97316", 0.14)
+                      : "rgba(255,255,255,0.03)",
+                    borderColor: active ? alpha("#F97316", 0.36) : T.border,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
               >
-                <Icon size={12} />
-                {tab.label}
+                <Icon size={14} color={active ? "#FB923C" : T.faint} />
+                <Text
+                  style={{
+                    flex: 1,
+                    color: active ? "#FB923C" : T.dim,
+                    fontSize: 13,
+                    fontWeight: active ? "800" : "600",
+                  }}
+                >
+                  {t.label}
+                </Text>
+                {active && <Check size={13} color="#FB923C" />}
               </Pressable>
             );
           })}
         </View>
       </View>
 
-      {/* Panel */}
-      <View className="flex-1 overflow-y-auto px-5 pb-8" style={{  }}>
-        {/* Tab title */}
-        <View className="flex items-center gap-2.5 mb-5">
-          <View className="w-8 h-8 rounded-xl flex items-center justify-center"
-            style={{ backgroundColor: `${activeTabData.color}22`, borderStyle: "solid" }}>
-            <activeTabData.icon size={15} style={{ color: activeTabData.color }} />
-          </View>
-          <View>
-            <Text className="text-sm font-bold text-white">{activeTabData.label}</Text>
-          </View>
-        </View>
+      <PrimaryButton
+        label="Analyser l'image"
+        loadingLabel="Analyse…"
+        onPress={run}
+        loading={loading}
+        disabled={!imageUrl.trim() || imgError}
+        color="#F97316"
+        icon={ImageIcon}
+      />
 
-        <>
-          <View
-            key={activeTab}
-          >
-            {activeTab === "generate" && <GeneratePanel />}
-            {activeTab === "tags" && <TagsPanel />}
-            {activeTab === "translate" && <TranslatePanel />}
-            {activeTab === "moderate" && <ModeratePanel />}
-            {activeTab === "personalize" && <PersonalizePanel />}
-            {activeTab === "image" && <ImagePanel />}
-          </View>
-        </>
-      </View>
-
-      {/* Footer note */}
-      <View className="flex-shrink-0 px-5 pb-6 pt-2 flex items-center justify-center gap-1.5">
-        <Clock size={10} className="text-white/20" />
-        <Text className="text-[9px] text-white/20"><Text>Résultats générés par IA — Vérifiez toujours avant publication</Text></Text>
-      </View>
+      {!!result && <ResultBox text={result} color="#F97316" label="ANALYSE" />}
     </View>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MAIN PAGE
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export default function AIStudioPage({ onBack }: Props) {
+  const [activeTab, setActiveTab] = useState<TabId>("generate");
+  const activeTabData = useMemo(
+    () => TABS.find((t) => t.id === activeTab)!,
+    [activeTab],
+  );
+  const ActiveIcon = activeTabData.icon;
+
+  // Animation d'entrée de panneau
+  const panelOpacity = useRef(new Animated.Value(1)).current;
+  const panelTranslate = useRef(new Animated.Value(0)).current;
+
+  const handleTabChange = (id: TabId) => {
+    if (id === activeTab) return;
+    Animated.parallel([
+      Animated.timing(panelOpacity, {
+        toValue: 0,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(panelTranslate, {
+        toValue: 8,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setActiveTab(id);
+      Animated.parallel([
+        Animated.timing(panelOpacity, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.timing(panelTranslate, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  };
+
+  const renderPanel = () => {
+    switch (activeTab) {
+      case "generate":
+        return <GeneratePanel />;
+      case "tags":
+        return <TagsPanel />;
+      case "translate":
+        return <TranslatePanel />;
+      case "moderate":
+        return <ModeratePanel />;
+      case "personalize":
+        return <PersonalizePanel />;
+      case "image":
+        return <ImagePanel />;
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.root}
+    >
+      <View pointerEvents="none" style={styles.glow} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerRow}>
+          <Pressable
+            onPress={onBack}
+            style={({ pressed }) => [
+              styles.backBtn,
+              { transform: [{ scale: pressed ? 0.92 : 1 }] },
+            ]}
+          >
+            <ArrowLeft size={18} color="#fff" />
+          </Pressable>
+
+          <View style={{ flex: 1 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              <Text style={styles.title}>IA Studio</Text>
+              <View style={styles.betaPill}>
+                <Text style={styles.betaText}>BETA</Text>
+              </View>
+            </View>
+            <Text style={styles.subtitle}>
+              6 outils intelligents à portée de main
+            </Text>
+          </View>
+
+          <View style={styles.powerPill}>
+            <Zap size={11} color="#C4B5FD" />
+            <Text style={styles.powerText}>GPT‑5 mini</Text>
+          </View>
+        </View>
+
+        {/* Tabs horizontales */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            gap: 8,
+            paddingVertical: 14,
+            paddingRight: 20,
+          }}
+          style={{ marginHorizontal: -20, paddingHorizontal: 20 }}
+        >
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <Pressable
+                key={tab.id}
+                onPress={() => handleTabChange(tab.id)}
+                style={({ pressed }) => [
+                  styles.tabPill,
+                  active && {
+                    backgroundColor: alpha(tab.color, 0.16),
+                    borderColor: alpha(tab.color, 0.4),
+                  },
+                  { opacity: pressed ? 0.82 : 1 },
+                ]}
+              >
+                <Icon size={13} color={active ? tab.color : T.faint} />
+                <Text
+                  style={[
+                    styles.tabPillText,
+                    active && { color: tab.color, fontWeight: "800" },
+                  ]}
+                >
+                  {tab.short}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Contenu */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View
+          style={{
+            opacity: panelOpacity,
+            transform: [{ translateY: panelTranslate }],
+          }}
+        >
+          {/* Bandeau de contexte du panneau */}
+          <View
+            style={[
+              styles.panelBanner,
+              {
+                backgroundColor: alpha(activeTabData.color, 0.08),
+                borderColor: alpha(activeTabData.color, 0.22),
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.panelBannerIcon,
+                { backgroundColor: alpha(activeTabData.color, 0.18) },
+              ]}
+            >
+              <ActiveIcon size={16} color={activeTabData.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.panelBannerTitle}>{activeTabData.label}</Text>
+              <Text style={styles.panelBannerTagline}>
+                {activeTabData.tagline}
+              </Text>
+            </View>
+          </View>
+
+          {renderPanel()}
+        </Animated.View>
+      </ScrollView>
+
+      {/* Footer */}
+      <View style={styles.footer}>
+        <Clock size={10} color={T.ghost} />
+        <Text style={styles.footerText}>
+          Résultats générés par IA — vérifie avant publication
+        </Text>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function alpha(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   STYLES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: T.bg },
+
+  glow: {
+    position: "absolute",
+    top: -160,
+    left: -80,
+    right: -80,
+    height: 340,
+    borderRadius: 220,
+    backgroundColor: "rgba(139,92,246,0.14)",
+  },
+
+  /* Header */
+  header: { paddingTop: 56, paddingHorizontal: 20 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  title: {
+    color: T.text,
+    fontSize: 21,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+  subtitle: { color: T.faint, fontSize: 11.5, marginTop: 2 },
+  betaPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 999,
+    backgroundColor: T.primary,
+  },
+  betaText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  powerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: "rgba(139,92,246,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.28)",
+  },
+  powerText: { color: "#C4B5FD", fontSize: 10, fontWeight: "800" },
+
+  /* Tabs */
+  tabPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  tabPillText: { color: T.faint, fontSize: 12, fontWeight: "600" },
+
+  /* Content */
+  content: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 6 },
+
+  /* Panel banner */
+  panelBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  panelBannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  panelBannerTitle: {
+    color: T.text,
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+  },
+  panelBannerTagline: { color: T.faint, fontSize: 11.5, marginTop: 2 },
+
+  /* Field label */
+  fieldLabel: {
+    color: T.faint,
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  hint: { color: T.ghost, fontSize: 10.5, marginTop: 6, fontWeight: "600" },
+
+  /* Input */
+  input: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: T.text,
+    fontSize: 13.5,
+  },
+  inputMulti: { minHeight: 100, paddingTop: 12 },
+
+  /* Chip */
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 13,
+    borderWidth: 1,
+  },
+
+  /* Primary button */
+  primaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 52,
+    borderRadius: 18,
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  primaryBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+
+  /* Result */
+  resultBox: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  resultHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  iconBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  /* Tags result */
+  tagResultCard: {
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: alpha("#F59E0B", 0.07),
+    borderWidth: 1,
+    borderColor: alpha("#F59E0B", 0.26),
+  },
+  tagResultHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  tagResultTitle: {
+    color: "#FCD34D",
+    fontSize: 11.5,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  tagPill: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: alpha("#F59E0B", 0.14),
+    borderWidth: 1,
+    borderColor: alpha("#F59E0B", 0.3),
+  },
+  tagPillText: { color: "#FCD34D", fontSize: 11.5, fontWeight: "800" },
+
+  /* Translate detected badge */
+  detectedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: alpha("#3B82F6", 0.14),
+    borderWidth: 1,
+    borderColor: alpha("#3B82F6", 0.28),
+  },
+  detectedBadgeText: { color: "#93C5FD", fontSize: 10.5, fontWeight: "800" },
+
+  /* Moderation */
+  modCard: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  modIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modReason: {
+    color: T.dim,
+    fontSize: 12,
+    marginTop: 12,
+    lineHeight: 18,
+  },
+  categoryPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: alpha("#EF4444", 0.12),
+    borderWidth: 1,
+    borderColor: alpha("#EF4444", 0.28),
+  },
+  categoryPillText: { color: "#FCA5A5", fontSize: 10, fontWeight: "800" },
+
+  /* Personalize cards */
+  personalCard: {
+    padding: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  personalCardLabel: {
+    color: T.faint,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+  },
+  personalCardText: {
+    color: T.text,
+    fontSize: 13.5,
+    fontWeight: "700",
+    marginTop: 8,
+    lineHeight: 19,
+  },
+  pill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  pillText: { fontSize: 11, fontWeight: "800" },
+
+  /* Image */
+  imagePreview: {
+    width: "100%",
+    height: WIDTH * 0.55,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  imageError: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: alpha("#EF4444", 0.08),
+    borderWidth: 1,
+    borderColor: alpha("#EF4444", 0.28),
+  },
+  taskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+
+  /* Footer */
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  footerText: {
+    color: T.ghost,
+    fontSize: 10,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+});

@@ -1,7 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useFavorites } from "@/hooks/use-favorites";
-import { useNotifications } from "@/hooks/use-notifications";
+import { useFavorites } from "@/hooks/use-favorites.ts";
+import { useNotifications } from "@/hooks/use-notifications.ts";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { buildNavigation } from "../navigation.builder";
 import { moduleBadgeMap } from "../navigation.badges";

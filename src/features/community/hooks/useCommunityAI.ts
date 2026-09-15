@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityAI.ts
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useCommunityAI() {
@@ -18,7 +17,7 @@ export function useCommunityAI() {
         const result = await translateText({ text, targetLang });
         return result.translatedText;
       } catch (error) {
-        UIService.openToast("Erreur de traduction", "error");
+        toast.error("Erreur de traduction");
         throw error;
       }
     },
@@ -27,7 +26,7 @@ export function useCommunityAI() {
         const result = await summarizeText({ text });
         return result.summary;
       } catch (error) {
-        UIService.openToast("Erreur de résumé", "error");
+        toast.error("Erreur de résumé");
         throw error;
       }
     },
@@ -36,7 +35,7 @@ export function useCommunityAI() {
         const result = await moderateText({ text });
         return result;
       } catch (error) {
-        UIService.openToast("Erreur de modération", "error");
+        toast.error("Erreur de modération");
         throw error;
       }
     },
@@ -45,7 +44,7 @@ export function useCommunityAI() {
         const result = await suggestHashtags({ text });
         return result.hashtags;
       } catch (error) {
-        UIService.openToast("Erreur de suggestion de hashtags", "error");
+        toast.error("Erreur de suggestion de hashtags");
         throw error;
       }
     },
@@ -54,7 +53,7 @@ export function useCommunityAI() {
         const result = await generateReply({ commentId, context });
         return result.reply;
       } catch (error) {
-        UIService.openToast("Erreur de génération de réponse", "error");
+        toast.error("Erreur de génération de réponse");
         throw error;
       }
     },

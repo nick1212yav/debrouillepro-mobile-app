@@ -1,5 +1,15 @@
-import { View, Pressable, Text, Image } from "react-native";
-import type { ReactNode } from "react";
+// src/pages/home/_components/FeedCards.tsx
+import {
+  View,
+  Pressable,
+  Text,
+  Image as RNImage,
+  Animated,
+  Easing,
+  StyleSheet,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRef, useEffect, type ReactNode } from "react";
 import {
   Phone,
   MapPin,
@@ -21,17 +31,13 @@ import {
   CalendarDays,
   ShoppingBag,
   ArrowUpRight,
-  ShieldCheck,
-  Zap,
   Navigation,
-  ExternalLink,
   Bookmark,
 } from "lucide-react-native";
-
-import FavoriteButton from "@/components/FavoriteButton";
+import FavoriteButton from "@/components/FavoriteButton.tsx";
 
 /* ============================================================================
- * DESIGN SYSTEM
+ * COLORS
  * ========================================================================== */
 
 const COLORS = {
@@ -49,13 +55,13 @@ const COLORS = {
 } as const;
 
 const FALLBACK_IMAGE =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='600' viewBox='0 0 900 600'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%238b5cf6'/%3E%3Cstop offset='100%25' stop-color='%230ea5e9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='900' height='600' fill='%23101018'/%3E%3Ccircle cx='700' cy='100' r='250' fill='url(%23g)' opacity='.18'/%3E%3Ccircle cx='100' cy='550' r='280' fill='%236366f1' opacity='.12'/%3E%3C/svg%3E";
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='900' height='600'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%238b5cf6'/><stop offset='100%25' stop-color='%230ea5e9'/></linearGradient></defs><rect width='900' height='600' fill='%23101018'/><circle cx='700' cy='100' r='250' fill='url(%23g)' opacity='.18'/><circle cx='100' cy='550' r='280' fill='%236366f1' opacity='.12'/></svg>";
 
-type BaseCardProps = {
-  onClick?: () => void;
-  delay?: number;
-};
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
+type BaseCardProps = { onClick?: () => void; delay?: number };
 type ActionHandler = () => void;
 
 export interface FeedCardStats {
@@ -65,7 +71,6 @@ export interface FeedCardStats {
   views?: number;
   saves?: number;
 }
-
 export interface FeedAuthor {
   name: string;
   avatar?: string | null;
@@ -74,13 +79,11 @@ export interface FeedAuthor {
   rating?: number | null;
   reviews?: number | null;
 }
-
 export interface FeedMedia {
   image?: string | null;
   images?: string[];
   alt?: string;
 }
-
 export interface FavoriteItem {
   id: string;
   module: string;
@@ -91,7 +94,6 @@ export interface FavoriteItem {
   badgeColor?: string;
   savedAt?: number;
 }
-
 export interface ImmoCardData {
   id: string;
   title: string;
@@ -105,7 +107,6 @@ export interface ImmoCardData {
   features?: string[];
   favorite?: FavoriteItem;
 }
-
 export interface TalentCardData {
   id: string;
   name: string;
@@ -120,7 +121,6 @@ export interface TalentCardData {
   stats?: FeedCardStats;
   favorite?: FavoriteItem;
 }
-
 export interface JobCardData {
   id: string;
   title: string;
@@ -134,7 +134,6 @@ export interface JobCardData {
   verified?: boolean;
   favorite?: FavoriteItem;
 }
-
 export interface CommunityCardData {
   id: string;
   title: string;
@@ -148,7 +147,6 @@ export interface CommunityCardData {
   verified?: boolean;
   favorite?: FavoriteItem;
 }
-
 export interface EventCardData {
   id: string;
   title: string;
@@ -162,7 +160,6 @@ export interface EventCardData {
   capacityLabel?: string;
   favorite?: FavoriteItem;
 }
-
 export interface AgriCardData {
   id: string;
   title: string;
@@ -176,14 +173,12 @@ export interface AgriCardData {
   sales?: number;
   favorite?: FavoriteItem;
 }
-
 export interface WeatherDay {
   label: string;
   icon?: string;
   temperature?: string;
   condition?: string;
 }
-
 export interface AgriWeatherData {
   title: string;
   location?: string;
@@ -191,7 +186,6 @@ export interface AgriWeatherData {
   badge?: string;
   days?: WeatherDay[];
 }
-
 export interface TravelCardData {
   id: string;
   origin: string;
@@ -203,7 +197,6 @@ export interface TravelCardData {
   image?: string | null;
   favorite?: FavoriteItem;
 }
-
 export interface BusTrip {
   id: string;
   route: string;
@@ -211,7 +204,6 @@ export interface BusTrip {
   price?: string;
   seats?: number;
 }
-
 export interface MediaCardData {
   id: string;
   title: string;
@@ -223,7 +215,6 @@ export interface MediaCardData {
   stats?: FeedCardStats;
   favorite?: FavoriteItem;
 }
-
 export interface PodcastCardData {
   id: string;
   title: string;
@@ -231,7 +222,6 @@ export interface PodcastCardData {
   duration?: string;
   author?: string;
 }
-
 export interface RecommendationData {
   id: string;
   label: string;
@@ -240,14 +230,12 @@ export interface RecommendationData {
   icon?: ReactNode;
   color?: string;
 }
-
 export interface ReferralCardData {
   title?: string;
   description?: string;
   rewardLabel?: string;
   totalEarnedLabel?: string;
 }
-
 export interface MarketplacePromoData {
   title?: string;
   description?: string;
@@ -256,71 +244,149 @@ export interface MarketplacePromoData {
 }
 
 /* ============================================================================
- * UTILITIES
+ * HELPERS
  * ========================================================================== */
 
-function formatNumber(value?: number) {
+function formatNumber(value?: number): string | null {
   if (value === undefined || value === null) return null;
-
-  return new Intl.NumberFormat(undefined, {
-    notation: value >= 1000 ? "compact" : "standard",
-    maximumFractionDigits: 1,
-  }).format(value);
+  try {
+    return new Intl.NumberFormat(undefined, {
+      notation: value >= 1000 ? "compact" : "standard",
+      maximumFractionDigits: 1,
+    }).format(value);
+  } catch {
+    return String(value);
+  }
 }
 
-function safeImage(image?: string | null) {
+function safeImage(image?: string | null): string {
   return image || FALLBACK_IMAGE;
 }
+
+/* ============================================================================
+ * FADE UP WRAPPER
+ * ========================================================================== */
+
+function FadeUp({
+  delay = 0,
+  distance = 18,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: any;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 440,
+      delay: delay * 1000,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+            {
+              scale: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.985, 1],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * CARD IMAGE
+ * ========================================================================== */
+
+function CardImage({
+  src,
+  alt,
+  style,
+}: {
+  src?: string | null;
+  alt: string;
+  style?: any;
+}) {
+  return (
+    <RNImage
+      source={{ uri: safeImage(src) }}
+      style={style}
+      accessibilityLabel={alt}
+    />
+  );
+}
+
+/* ============================================================================
+ * GLASS CARD
+ * ========================================================================== */
 
 function GlassCard({
   children,
   delay = 0,
   onClick,
-  className = "",
-}: BaseCardProps & {
-  children: ReactNode;
-  className?: string;
-}) {
+  style,
+}: BaseCardProps & { children: ReactNode; style?: any }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.992,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
   return (
-    <Pressable
-      onPress={onClick}
-      className={[
-        "mx-5 overflow-hidden rounded-[28px]",
-        "cursor-pointer relative",
-        "transition-shadow duration-300",
-        className,
-      ].join(" ")}
-      style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.09)", borderStyle: "solid" }}
-    >
-      {children}
-    </Pressable>
+    <FadeUp delay={delay}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          onPress={onClick}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          disabled={!onClick}
+          style={[styles.glassCard, style]}
+        >
+          {children}
+        </Pressable>
+      </Animated.View>
+    </FadeUp>
   );
 }
 
-function Image({
-  src,
-  alt,
-  className = "",
-}: {
-  src?: string | null;
-  alt: string;
-  className?: string;
-}) {
-  return (
-    <Image
-     
-     
-      loading="lazy"
-      className={className}
-      onError={(event) => {
-        const
-        if (target.src !== FALLBACK_IMAGE) {
-          target.src = FALLBACK_IMAGE;
-        }
-      }}
-     source={{ uri: safeImage(src) }} accessibilityLabel={alt}/>
-  );
-}
+/* ============================================================================
+ * BADGE
+ * ========================================================================== */
 
 function Badge({
   children,
@@ -332,62 +398,120 @@ function Badge({
   icon?: ReactNode;
 }) {
   return (
-    <Text
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black tracking-wide text-white"
-      style={{ backgroundColor: `${color}cc`, borderStyle: "solid" }}
+    <View
+      style={[
+        styles.badge,
+        {
+          backgroundColor: `${color}CC`,
+          shadowColor: color,
+        },
+      ]}
     >
       {icon}
-      {children}
-    </Text>
+      <Text style={styles.badgeText}>{children}</Text>
+    </View>
   );
 }
+
+/* ============================================================================
+ * ICON BUTTON
+ * ========================================================================== */
 
 function IconButton({
   children,
   label,
-  onClick,
+  onPress,
 }: {
   children: ReactNode;
   label: string;
-  onClick?: ActionHandler;
+  onPress?: ActionHandler;
 }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
   return (
-    <Pressable
-     
-      accessibilityLabel={label}
-     
-      onPress={(event) => {
-        onClick?.();
-      }}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-      style={{ backgroundColor: "rgba(255,255,255,.07)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}
-    >
-      {children}
-    </Pressable>
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        accessibilityLabel={label}
+        hitSlop={6}
+        style={styles.iconButton}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
   );
 }
 
+/* ============================================================================
+ * ACTION BUTTON
+ * ========================================================================== */
+
 function ActionButton({
   children,
-  onClick,
+  onPress,
   color = COLORS.violet,
 }: {
   children: ReactNode;
-  onClick?: ActionHandler;
+  onPress?: ActionHandler;
   color?: string;
 }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
   return (
-    <Pressable
-      onPress={(event) => {
-        onClick?.();
-      }}
-      className="flex w-full items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-black"
-      style={{ backgroundColor: `${color}16`, borderStyle: "solid" }}
-    >
-      {children}
-    </Pressable>
+    <Animated.View style={{ transform: [{ scale }], width: "100%" }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={[
+          styles.actionButton,
+          {
+            backgroundColor: `${color}1F`,
+            borderColor: `${color}55`,
+          },
+        ]}
+      >
+        <View style={styles.actionButtonInner}>{children}</View>
+      </Pressable>
+    </Animated.View>
   );
 }
+
+/* ============================================================================
+ * RATING
+ * ========================================================================== */
 
 function Rating({
   rating,
@@ -399,45 +523,43 @@ function Rating({
   if (rating === undefined || rating === null) return null;
 
   return (
-    <View className="flex items-center gap-1">
-      <View className="flex items-center gap-0.5">
-        {[0, 1, 2, 3, 4].map((index) => (
-          <Star
-            key={index}
-            size={10}
-            className={
-              index < Math.round(rating)
-                ? "fill-yellow-400 text-yellow-400"
-                : "text-white/15"
-            }
-          />
-        ))}
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+        {[0, 1, 2, 3, 4].map((index) => {
+          const filled = index < Math.round(rating);
+          return (
+            <Star
+              key={index}
+              size={10}
+              color={filled ? "#FBBF24" : "rgba(255,255,255,0.18)"}
+              fill={filled ? "#FBBF24" : "none"}
+            />
+          );
+        })}
       </View>
-
-      <Text className="text-[10px] font-bold text-white/55">
-        {rating.toFixed(1)}
-      </Text>
-
-      {reviews !== undefined && reviews !== null && (
-        <Text className="text-[9px] text-white/25">
-          · {formatNumber(reviews)}
-        </Text>
-      )}
+      <Text style={styles.ratingValue}>{rating.toFixed(1)}</Text>
+      {reviews !== undefined && reviews !== null ? (
+        <Text style={styles.ratingReviews}>· {formatNumber(reviews)}</Text>
+      ) : null}
     </View>
   );
 }
 
+/* ============================================================================
+ * FAVORITE
+ * ========================================================================== */
+
 function Favorite({
   item,
-  onClick,
+  onPress,
 }: {
   item?: FavoriteItem;
-  onClick?: ActionHandler;
+  onPress?: ActionHandler;
 }) {
   if (!item) {
     return (
-      <IconButton label="Enregistrer" onPress={onClick}>
-        <Bookmark size={15} />
+      <IconButton label="Enregistrer" onPress={onPress}>
+        <Bookmark size={15} color="rgba(255,255,255,0.7)" />
       </IconButton>
     );
   }
@@ -445,36 +567,36 @@ function Favorite({
   return (
     <FavoriteButton
       className="h-9 w-9"
-      item={{
-        ...item,
-        savedAt: item.savedAt ?? Date.now(),
-      }}
+      item={{ ...item, savedAt: item.savedAt ?? Date.now() }}
     />
   );
 }
 
+/* ============================================================================
+ * STAT
+ * ========================================================================== */
+
 function Stat({ icon, value }: { icon: ReactNode; value?: number }) {
   if (value === undefined || value === null) return null;
-
   return (
-    <Text className="flex items-center gap-1.5 text-[10px] text-white/35">
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
       {icon}
-      {formatNumber(value)}
-    </Text>
+      <Text style={styles.statText}>{formatNumber(value)}</Text>
+    </View>
   );
 }
 
+/* ============================================================================
+ * VERIFIED
+ * ========================================================================== */
+
 function Verified({ verified }: { verified?: boolean }) {
   if (!verified) return null;
-
   return (
-    <Text
-      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-black text-blue-300"
-      style={{ backgroundColor: "rgba(59,130,246,.12)", borderWidth: 1, borderColor: "rgba(59,130,246,.18)", borderStyle: "solid" }}
-    >
-      <CheckCircle2 size={8} />
-      Vérifié
-    </Text>
+    <View style={styles.verified}>
+      <CheckCircle2 size={8} color="#93C5FD" />
+      <Text style={styles.verifiedText}>Vérifié</Text>
+    </View>
   );
 }
 
@@ -496,88 +618,87 @@ export function ImmoCard({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.04} onPress={onClick}>
-      <View className="relative h-52 overflow-hidden">
-        <Image
+    <GlassCard delay={0.04} onClick={onClick}>
+      <View style={styles.heroImage}>
+        <CardImage
           src={data.image}
           alt={data.title}
-          className="h-full w-full object-cover"
+          style={styles.heroImageInner}
+        />
+        <LinearGradient
+          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)"]}
+          locations={[0.4, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
         />
 
-        <View
-          className="absolute inset-0"
-          style={{  }}
-        />
-
-        {data.status && (
-          <View className="absolute left-3 top-3">
+        {data.status ? (
+          <View style={styles.heroBadgeLeft}>
             <Badge color={data.statusColor || COLORS.orange}>
               {data.status}
             </Badge>
           </View>
-        )}
-
-        <View className="absolute right-3 top-3">
+        ) : null}
+        <View style={styles.heroFavorite}>
           <Favorite item={data.favorite} />
         </View>
 
-        <View className="absolute bottom-4 left-4 right-4">
-          <Text className="text-[26px] font-black tracking-tight text-white">
+        <View style={styles.heroBottom}>
+          <Text style={styles.heroPrice}>
             {data.price}
-            {data.priceSuffix && (
-              <Text className="ml-1 text-xs font-medium text-white/55">
-                {data.priceSuffix}
-              </Text>
-            )}
+            {data.priceSuffix ? (
+              <Text style={styles.heroPriceSuffix}> {data.priceSuffix}</Text>
+            ) : null}
           </Text>
-
-          <View className="mt-1 flex items-center gap-2">
-            {data.location && (
+          <View style={styles.heroMetaRow}>
+            {data.location ? (
               <>
-                <MapPin size={11} className="text-white/45" />
-                <Text className="truncate text-[11px] text-white/55">
+                <MapPin size={11} color="rgba(255,255,255,0.55)" />
+                <Text style={styles.heroMeta} numberOfLines={1}>
                   {data.location}
                 </Text>
               </>
-            )}
-
-            {data.views !== undefined && (
+            ) : null}
+            {data.views !== undefined ? (
               <>
-                <Text className="text-white/20">·</Text>
-                <Text className="text-[10px] text-white/35">
+                <Text style={styles.heroMetaDot}>·</Text>
+                <Text style={styles.heroMetaDim}>
                   {formatNumber(data.views)} vues
                 </Text>
               </>
-            )}
+            ) : null}
           </View>
         </View>
       </View>
 
-      <View className="p-4">
-        <Text className="mb-3 text-sm font-black text-white">{data.title}</Text>
+      <View style={styles.body}>
+        <Text style={styles.cardTitle}>{data.title}</Text>
 
         {data.features?.length ? (
-          <View className="mb-3 flex flex-wrap gap-1.5">
+          <View style={styles.featuresRow}>
             {data.features.slice(0, 5).map((feature) => (
-              <Text
-                key={feature}
-                className="rounded-xl px-2 py-1 text-[9px] font-bold text-white/50"
-                style={{ backgroundColor: "rgba(255,255,255,.055)", borderWidth: 1, borderColor: "rgba(255,255,255,.06)", borderStyle: "solid" }}
-              >
-                {feature}
-              </Text>
+              <View key={feature} style={styles.featureChip}>
+                <Text style={styles.featureChipText}>{feature}</Text>
+              </View>
             ))}
           </View>
         ) : null}
 
-        <View className="gap-2">
+        <View style={{ gap: 8 }}>
           <ActionButton color={COLORS.green} onPress={onCall}>
-            <Phone size={13} />
-            <Text>Appeler</Text></ActionButton>
-
+            <Phone size={13} color={COLORS.green} />
+            <Text style={[styles.actionButtonText, { color: COLORS.green }]}>
+              Appeler
+            </Text>
+          </ActionButton>
           <ActionButton color={COLORS.blue} onPress={onLocate}>
-            <Navigation size={13} />
-            <Text>Localiser</Text></ActionButton>
+            <Navigation size={13} color={COLORS.blue} />
+            <Text style={[styles.actionButtonText, { color: COLORS.blue }]}>
+              Localiser
+            </Text>
+          </ActionButton>
         </View>
       </View>
     </GlassCard>
@@ -591,11 +712,11 @@ export function ImmoCard2({
   data?: ImmoCardData;
   onClick?: () => void;
 }) {
-  return <ImmoCard data={data} onPress={onClick} />;
+  return <ImmoCard data={data} onClick={onClick} />;
 }
 
 /* ============================================================================
- * JOBS / TALENTS
+ * TALENTS
  * ========================================================================== */
 
 export function TalentsCard({
@@ -612,124 +733,109 @@ export function TalentsCard({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.08} onPress={onClick}>
-      <View className="p-4">
-        <View className="flex items-center justify-between gap-3">
-          <View className="flex min-w-0 items-center gap-3">
-            <View className="relative">
-              <Image
+    <GlassCard delay={0.08} onClick={onClick}>
+      <View style={styles.body}>
+        <View style={styles.rowBetween}>
+          <View style={styles.rowGap}>
+            <View style={styles.avatarWrap}>
+              <CardImage
                 src={data.avatar}
                 alt={data.name}
-                className="h-11 w-11 rounded-2xl object-cover"
+                style={styles.avatarImg}
               />
-              {data.availability && (
-                <Text
-                  className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2"
-                  style={{ backgroundColor: COLORS.green, borderColor: "#14141c" }}
-                />
-              )}
+              {data.availability ? <View style={styles.onlineDot} /> : null}
             </View>
-
-            <View className="min-w-0">
-              <View className="flex items-center gap-1.5">
-                <Text className="truncate text-xs font-black text-white">
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <View style={styles.rowGapSm}>
+                <Text style={styles.cardTitleSm} numberOfLines={1}>
                   {data.name}
                 </Text>
                 <Verified verified={data.verified} />
               </View>
-
-              {data.profession && (
-                <Text className="truncate text-[10px] text-white/40">
+              {data.profession ? (
+                <Text style={styles.muted10} numberOfLines={1}>
                   {data.profession}
                 </Text>
-              )}
-
-              {data.location && (
-                <View className="mt-0.5 flex items-center gap-1 text-[9px] text-white/30">
-                  <MapPin size={9} />
-                  {data.location}
+              ) : null}
+              {data.location ? (
+                <View style={styles.locationRow}>
+                  <MapPin size={9} color="rgba(255,255,255,0.4)" />
+                  <Text style={styles.locationText}>{data.location}</Text>
                 </View>
-              )}
+              ) : null}
             </View>
           </View>
-
           <IconButton label="Plus d'options">
-            <MoreHorizontal size={16} />
+            <MoreHorizontal size={16} color="rgba(255,255,255,0.7)" />
           </IconButton>
         </View>
 
-        <View className="mt-4 flex gap-3">
-          <View className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl">
-            <Image
+        <View style={styles.talentMiddle}>
+          <View style={styles.talentPhotoWrap}>
+            <CardImage
               src={data.avatar}
               alt={data.name}
-              className="h-full w-full object-cover"
+              style={styles.talentPhoto}
             />
-
-            {data.availability && (
-              <View className="absolute bottom-0 left-0 right-0 bg-black/65 px-1 py-1 text-center text-[8px] font-black text-green-300">
-                <Text>DISPONIBLE</Text></View>
-            )}
+            {data.availability ? (
+              <View style={styles.talentAvailOverlay}>
+                <Text style={styles.talentAvailText}>DISPONIBLE</Text>
+              </View>
+            ) : null}
           </View>
-
-          <View className="min-w-0 flex-1">
-            {data.availability && (
-              <Badge color={COLORS.green}>
-                <Zap size={8} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            {data.availability ? (
+              <Badge color={COLORS.green} icon={<Zap size={8} color="#fff" />}>
                 {data.availability}
               </Badge>
-            )}
-
-            {data.responseTime && (
-              <Text className="mt-2 text-[10px] text-white/45">
+            ) : null}
+            {data.responseTime ? (
+              <Text style={styles.talentResponseTime}>
                 Réponse généralement ·{" "}
-                <Text className="font-bold text-green-300">
+                <Text style={{ color: "#6EE7B7", fontWeight: "800" }}>
                   {data.responseTime}
                 </Text>
               </Text>
-            )}
-
-            <View className="mt-2">
+            ) : null}
+            <View style={{ marginTop: 8 }}>
               <Rating rating={data.rating} reviews={data.reviews} />
             </View>
           </View>
         </View>
 
-        <View className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
-          <View className="flex items-center gap-4">
+        <View style={styles.cardFooter}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
             <Pressable
-             
-              onPress={(event) => {
-                onMessage?.();
-              }}
-              className="flex items-center gap-1.5"
+              onPress={onMessage}
+              hitSlop={6}
+              style={styles.footerAction}
             >
-              <MessageCircle size={14} className="text-white/35" />
-              <Text className="text-[10px] text-white/35">
+              <MessageCircle size={14} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.footerActionText}>
                 {formatNumber(data.stats?.comments)}
               </Text>
             </Pressable>
-
             <Pressable
-             
-              onPress={(event) => {
-                onShare?.();
-              }}
-              className="flex items-center gap-1.5"
+              onPress={onShare}
+              hitSlop={6}
+              style={styles.footerAction}
             >
-              <Share2 size={14} className="text-white/35" />
-              <Text className="text-[10px] text-white/35">
+              <Share2 size={14} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.footerActionText}>
                 {formatNumber(data.stats?.shares)}
               </Text>
             </Pressable>
           </View>
-
           <Favorite item={data.favorite} />
         </View>
       </View>
     </GlassCard>
   );
 }
+
+/* ============================================================================
+ * JOBS
+ * ========================================================================== */
 
 export function JobsCard2({
   data,
@@ -743,74 +849,66 @@ export function JobsCard2({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.1} onPress={onClick}>
-      <View className="relative p-4">
-        <View
-          className="absolute -right-12 -top-12 h-32 w-32 rounded-full"
-          style={{ backgroundColor: `${COLORS.violet}20` }}
-        />
-
-        <View className="relative flex items-start gap-3">
-          <View
-            className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl"
-            style={{ backgroundColor: "rgba(139,92,246,.13)", borderWidth: 1, borderColor: "rgba(139,92,246,.22)", borderStyle: "solid" }}
+    <GlassCard delay={0.1} onClick={onClick}>
+      <View style={styles.body}>
+        <View style={styles.jobOrb} pointerEvents="none" />
+        <View style={styles.rowGap}>
+          <LinearGradient
+            colors={[`${COLORS.violet}22`, `${COLORS.violet}0A`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.jobLogoWrap}
           >
             {data.logo ? (
-              <Image
+              <CardImage
                 src={data.logo}
                 alt={data.company || data.title}
-                className="h-full w-full object-cover"
+                style={styles.jobLogoImg}
               />
             ) : (
-              <Text className="text-xl">{data.icon || "💼"}</Text>
+              <Text style={{ fontSize: 22 }}>{data.icon || "💼"}</Text>
             )}
-          </View>
-
-          <View className="min-w-0 flex-1">
-            <View className="flex items-start justify-between gap-2">
-              <View>
-                <Text className="text-sm font-black leading-tight text-white">
-                  {data.title}
-                </Text>
-
-                {data.company && (
-                  <Text className="mt-1 text-[10px] text-white/45">
-                    {data.company}
-                  </Text>
-                )}
-
-                {data.location && (
-                  <View className="mt-1 flex items-center gap-1 text-[9px] text-white/30">
-                    <MapPin size={9} />
-                    {data.location}
+          </LinearGradient>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={styles.rowBetweenStart}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.cardTitleSm}>{data.title}</Text>
+                {data.company ? (
+                  <Text style={styles.muted10}>{data.company}</Text>
+                ) : null}
+                {data.location ? (
+                  <View style={styles.locationRow}>
+                    <MapPin size={9} color="rgba(255,255,255,0.4)" />
+                    <Text style={styles.locationText}>{data.location}</Text>
                   </View>
-                )}
+                ) : null}
               </View>
-
               <Favorite item={data.favorite} />
             </View>
-
-            <View className="mt-3 flex flex-wrap gap-1.5">
-              {data.employmentType && (
+            <View style={styles.badgesRow}>
+              {data.employmentType ? (
                 <Badge color={COLORS.violet}>{data.employmentType}</Badge>
-              )}
-
-              {data.salary && <Badge color={COLORS.green}>{data.salary}</Badge>}
-
-              {data.experience && (
+              ) : null}
+              {data.salary ? (
+                <Badge color={COLORS.green}>{data.salary}</Badge>
+              ) : null}
+              {data.experience ? (
                 <Badge color={COLORS.blue}>{data.experience}</Badge>
-              )}
+              ) : null}
             </View>
           </View>
         </View>
 
-        {onApply && (
-          <View className="mt-4">
+        {onApply ? (
+          <View style={{ marginTop: 16 }}>
             <ActionButton color={COLORS.violet} onPress={onApply}>
-              <ArrowUpRight size={13} />
-              <Text>Postuler maintenant</Text></ActionButton>
+              <ArrowUpRight size={13} color={COLORS.violet} />
+              <Text style={[styles.actionButtonText, { color: COLORS.violet }]}>
+                Postuler maintenant
+              </Text>
+            </ActionButton>
           </View>
-        )}
+        ) : null}
       </View>
     </GlassCard>
   );
@@ -834,107 +932,118 @@ export function CommunityCard({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.12} onPress={onClick}>
-      <View className="p-4">
-        <View className="flex items-center gap-3">
-          <View
-            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl"
-            style={{ backgroundColor: "rgba(139,92,246,.13)", borderWidth: 1, borderColor: "rgba(139,92,246,.2)", borderStyle: "solid" }}
+    <GlassCard delay={0.12} onClick={onClick}>
+      <View style={styles.body}>
+        <View style={styles.rowGap}>
+          <LinearGradient
+            colors={[`${COLORS.violet}22`, `${COLORS.violet}0A`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.communityIconWrap}
           >
             {data.image ? (
-              <Image
+              <CardImage
                 src={data.image}
                 alt={data.title}
-                className="h-full w-full object-cover"
+                style={styles.communityIconImg}
               />
             ) : (
-              <Users size={16} className="text-purple-300" />
+              <Users size={16} color="#C4B5FD" />
             )}
-          </View>
-
-          <View className="min-w-0 flex-1">
-            <View className="flex items-center gap-1.5">
-              <Text className="truncate text-xs font-black text-white">
+          </LinearGradient>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={styles.rowGapSm}>
+              <Text style={styles.cardTitleSm} numberOfLines={1}>
                 {data.title}
               </Text>
               <Verified verified={data.verified} />
             </View>
-
-            {data.community && (
-              <Text className="truncate text-[10px] text-white/35">
+            {data.community ? (
+              <Text style={styles.muted10} numberOfLines={1}>
                 {data.community}
               </Text>
-            )}
+            ) : null}
           </View>
-
-          {data.members !== undefined && (
+          {data.members !== undefined ? (
             <Badge color={COLORS.violet}>
-              {formatNumber(data.members)} <Text>membres</Text></Badge>
-          )}
+              {formatNumber(data.members)} membres
+            </Badge>
+          ) : null}
         </View>
 
-        {data.description && (
-          <Text className="mt-4 text-xs leading-relaxed text-white/55">
-            {data.description}
-          </Text>
-        )}
+        {data.description ? (
+          <Text style={styles.communityDesc}>{data.description}</Text>
+        ) : null}
 
         {data.avatars?.length ? (
-          <View className="mt-4 flex items-center gap-3">
-            <View className="flex -space-x-2">
+          <View style={styles.avatarsRow}>
+            <View style={styles.avatarsStack}>
               {data.avatars.slice(0, 5).map((avatar, index) => (
-                <Image
+                <CardImage
                   key={`${avatar}-${index}`}
                   src={avatar}
                   alt=""
-                  className="h-7 w-7 rounded-full border-2 border-[#17171f] object-cover"
+                  style={[styles.avatarMini, index > 0 && { marginLeft: -8 }]}
                 />
               ))}
             </View>
-
-            {data.replies !== undefined && (
-              <Text className="text-[10px] text-white/35">
+            {data.replies !== undefined ? (
+              <Text style={styles.muted10}>
                 {formatNumber(data.replies)} réponses
               </Text>
-            )}
+            ) : null}
           </View>
         ) : null}
 
-        <View className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
-          <View className="flex items-center gap-4">
-            <Stat icon={<Heart size={13} />} value={data.stats?.likes} />
+        <View style={styles.cardFooter}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
             <Stat
-              icon={<MessageCircle size={13} />}
+              icon={<Heart size={13} color="rgba(255,255,255,0.4)" />}
+              value={data.stats?.likes}
+            />
+            <Stat
+              icon={<MessageCircle size={13} color="rgba(255,255,255,0.4)" />}
               value={data.stats?.comments}
             />
             <Pressable
-             
-              onPress={(event) => {
-                onShare?.();
-              }}
-              className="flex items-center gap-1.5"
+              onPress={onShare}
+              hitSlop={6}
+              style={styles.footerAction}
             >
-              <Share2 size={13} className="text-white/30" />
-              <Text className="text-[10px] text-white/30">
+              <Share2 size={13} color="rgba(255,255,255,0.45)" />
+              <Text style={styles.footerActionText}>
                 {formatNumber(data.stats?.shares)}
               </Text>
             </Pressable>
           </View>
-
-          {onReply && (
+          {onReply ? (
             <Pressable
-              onPress={(event) => {
-                onReply();
-              }}
-              className="rounded-xl px-3 py-1.5 text-[10px] font-black text-purple-300"
-              style={{ backgroundColor: "rgba(139,92,246,.13)" }}
+              onPress={onReply}
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.replyBtn,
+                pressed && { opacity: 0.7 },
+              ]}
             >
-              <Text>Répondre</Text></Pressable>
-          )}
+              <Text style={styles.replyBtnText}>Répondre</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </GlassCard>
   );
+}
+
+export function CommunityCard2({
+  data,
+  onClick,
+  onReply,
+}: {
+  data?: CommunityCardData;
+  onClick?: () => void;
+  onReply?: ActionHandler;
+}) {
+  return <CommunityCard data={data} onClick={onClick} onReply={onReply} />;
 }
 
 /* ============================================================================
@@ -949,99 +1058,72 @@ export function EvenementsCard({
   onClick?: () => void;
 }) {
   if (!data) return null;
-
   const capacity = Math.max(0, Math.min(100, data.capacityPercent || 0));
 
   return (
-    <GlassCard delay={0.1} onPress={onClick}>
-      <View className="relative h-52 overflow-hidden">
-        <Image
+    <GlassCard delay={0.1} onClick={onClick}>
+      <View style={styles.heroImage}>
+        <CardImage
           src={data.image}
           alt={data.title}
-          className="h-full w-full object-cover"
+          style={styles.heroImageInner}
+        />
+        <LinearGradient
+          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)"]}
+          locations={[0.4, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
         />
 
-        <View
-          className="absolute inset-0"
-          style={{  }}
-        />
-
-        {data.badge && (
-          <View className="absolute left-3 top-3">
-            <Badge color={data.badgeColor || COLORS.pink}>
-              <CalendarDays size={9} />
+        {data.badge ? (
+          <View style={styles.heroBadgeLeft}>
+            <Badge
+              color={data.badgeColor || COLORS.pink}
+              icon={<CalendarDays size={9} color="#fff" />}
+            >
               {data.badge}
             </Badge>
           </View>
-        )}
-
-        <View className="absolute right-3 top-3">
+        ) : null}
+        <View style={styles.heroFavorite}>
           <Favorite item={data.favorite} />
         </View>
-
-        <View className="absolute bottom-4 left-4 right-4">
-          <Text className="text-lg font-black leading-tight text-white">
-            {data.title}
-          </Text>
-
-          <View className="mt-2 flex flex-wrap items-center gap-2">
-            {data.dateLabel && (
-              <Text className="flex items-center gap-1 text-[10px] text-white/55">
-                <Clock size={10} />
-                {data.dateLabel}
-              </Text>
-            )}
-
-            {data.location && (
-              <Text className="flex items-center gap-1 text-[10px] text-white/55">
-                <MapPin size={10} />
-                {data.location}
-              </Text>
-            )}
+        <View style={styles.heroBottom}>
+          <Text style={styles.heroTitle}>{data.title}</Text>
+          <View style={styles.heroInfoRow}>
+            {data.dateLabel ? (
+              <View style={styles.heroInfoItem}>
+                <Clock size={10} color="rgba(255,255,255,0.6)" />
+                <Text style={styles.heroInfoText}>{data.dateLabel}</Text>
+              </View>
+            ) : null}
+            {data.location ? (
+              <View style={styles.heroInfoItem}>
+                <MapPin size={10} color="rgba(255,255,255,0.6)" />
+                <Text style={styles.heroInfoText}>{data.location}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
 
-      <View className="p-4">
-        <View className="mb-3 flex items-center justify-between">
-          {data.price && (
-            <Text className="text-sm font-black text-purple-300">
-              {data.price}
-            </Text>
+      <View style={styles.body}>
+        <View style={styles.rowBetween}>
+          {data.price ? (
+            <Text style={styles.eventPrice}>{data.price}</Text>
+          ) : (
+            <View />
           )}
-
-          {data.capacityLabel && (
-            <Text className="text-[9px] font-bold text-white/40">
-              {data.capacityLabel}
-            </Text>
-          )}
+          {data.capacityLabel ? (
+            <Text style={styles.eventCapacityLabel}>{data.capacityLabel}</Text>
+          ) : null}
         </View>
 
-        {data.capacityPercent !== undefined && (
-          <View>
-            <View className="mb-1.5 flex justify-between">
-              <Text className="text-[9px] font-bold text-white/30">
-                Disponibilité
-              </Text>
-
-              <Text
-                className="text-[9px] font-black"
-                style={{
-                  color: capacity >= 85 ? COLORS.red : COLORS.green,
-                }}
-              >
-                {capacity}%
-              </Text>
-            </View>
-
-            <View className="h-1.5 overflow-hidden rounded-full bg-white/[.06]">
-              <View
-                className="h-full rounded-full"
-                style={{  }}
-              />
-            </View>
-          </View>
-        )}
+        {data.capacityPercent !== undefined ? (
+          <EventCapacityBar capacity={capacity} />
+        ) : null}
       </View>
     </GlassCard>
   );
@@ -1054,7 +1136,51 @@ export function EvenementsCard2({
   data?: EventCardData;
   onClick?: () => void;
 }) {
-  return <EvenementsCard data={data} onPress={onClick} />;
+  return <EvenementsCard data={data} onClick={onClick} />;
+}
+
+function EventCapacityBar({ capacity }: { capacity: number }) {
+  const barAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(barAnim, {
+      toValue: capacity,
+      duration: 900,
+      delay: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [capacity, barAnim]);
+
+  const width = barAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["0%", "100%"],
+  });
+
+  const barColor = capacity >= 85 ? COLORS.red : COLORS.green;
+
+  return (
+    <View>
+      <View style={styles.capacityLabels}>
+        <Text style={styles.capacityLabelText}>Disponibilité</Text>
+        <Text style={[styles.capacityValueText, { color: barColor }]}>
+          {capacity}%
+        </Text>
+      </View>
+      <View style={styles.capacityTrack}>
+        <Animated.View
+          style={[
+            styles.capacityFill,
+            {
+              width,
+              backgroundColor: barColor,
+              shadowColor: barColor,
+            },
+          ]}
+        />
+      </View>
+    </View>
+  );
 }
 
 /* ============================================================================
@@ -1073,78 +1199,71 @@ export function AgriCard({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.08} onPress={onClick}>
-      <View className="p-4">
-        <View className="mb-4 flex items-center gap-2">
-          <View
-            className="flex h-9 w-9 items-center justify-center rounded-xl"
-            style={{ backgroundColor: "rgba(34,197,94,.13)", borderWidth: 1, borderColor: "rgba(34,197,94,.18)", borderStyle: "solid" }}
+    <GlassCard delay={0.08} onClick={onClick}>
+      <View style={styles.body}>
+        <View style={styles.rowGap}>
+          <LinearGradient
+            colors={[`${COLORS.green}22`, `${COLORS.green}0A`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.agriIconWrap}
           >
-            <Leaf size={15} className="text-green-400" />
-          </View>
-
-          <View className="min-w-0 flex-1">
-            <Text className="text-xs font-black text-white">
+            <Leaf size={15} color={COLORS.green} />
+          </LinearGradient>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.cardTitleSm}>
               {data.seller || "Agriculture"}
             </Text>
-
-            {data.location && (
-              <Text className="text-[10px] text-white/35">{data.location}</Text>
-            )}
+            {data.location ? (
+              <Text style={styles.muted10}>{data.location}</Text>
+            ) : null}
           </View>
-
-          {data.badge && (
-            <Badge color={COLORS.green}>
-              <Leaf size={8} />
+          {data.badge ? (
+            <Badge color={COLORS.green} icon={<Leaf size={8} color="#fff" />}>
               {data.badge}
             </Badge>
-          )}
+          ) : null}
         </View>
 
-        <View className="flex gap-3">
-          <View className="h-28 w-28 shrink-0 overflow-hidden rounded-2xl">
-            <Image
+        <View style={styles.agriMiddle}>
+          <View style={styles.agriImageWrap}>
+            <CardImage
               src={data.image}
               alt={data.title}
-              className="h-full w-full object-cover"
+              style={styles.agriImage}
             />
           </View>
-
-          <View className="min-w-0 flex-1">
-            <Text className="text-sm font-black leading-tight text-white">
-              {data.title}
-            </Text>
-
-            {data.price && (
-              <Text className="mt-2 text-xl font-black text-green-400">
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.cardTitleSm}>{data.title}</Text>
+            {data.price ? (
+              <Text style={styles.agriPrice}>
                 {data.price}
-                {data.unit && (
-                  <Text className="ml-1 text-[10px] font-medium text-white/35">
-                    {data.unit}
-                  </Text>
-                )}
+                {data.unit ? (
+                  <Text style={styles.agriUnit}> {data.unit}</Text>
+                ) : null}
               </Text>
-            )}
-
-            <View className="mt-2">
+            ) : null}
+            <View style={{ marginTop: 8 }}>
               <Rating rating={data.rating} />
             </View>
-
-            {data.sales !== undefined && (
-              <Text className="mt-1 text-[9px] text-white/30">
+            {data.sales !== undefined ? (
+              <Text style={styles.muted10}>
                 {formatNumber(data.sales)} ventes
               </Text>
-            )}
+            ) : null}
           </View>
         </View>
 
-        {onContact && (
-          <View className="mt-4">
+        {onContact ? (
+          <View style={{ marginTop: 16 }}>
             <ActionButton color={COLORS.green} onPress={onContact}>
-              <Phone size={12} />
-              <Text>Contacter</Text></ActionButton>
+              <Phone size={12} color={COLORS.green} />
+              <Text style={[styles.actionButtonText, { color: COLORS.green }]}>
+                Contacter
+              </Text>
+            </ActionButton>
           </View>
-        )}
+        ) : null}
       </View>
     </GlassCard>
   );
@@ -1160,49 +1279,41 @@ export function AgriCard2({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.12} onPress={onClick}>
-      <View className="p-4">
-        <View className="flex items-center gap-3">
-          <View
-            className="flex h-10 w-10 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: "rgba(59,130,246,.12)", borderWidth: 1, borderColor: "rgba(59,130,246,.18)", borderStyle: "solid" }}
+    <GlassCard delay={0.12} onClick={onClick}>
+      <View style={styles.body}>
+        <View style={styles.rowGap}>
+          <LinearGradient
+            colors={[`${COLORS.blue}22`, `${COLORS.blue}0A`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.agriIconWrap}
           >
-            <Text className="text-xl">{data.days?.[0]?.icon || "🌦️"}</Text>
+            <Text style={{ fontSize: 20 }}>{data.days?.[0]?.icon || "🌦️"}</Text>
+          </LinearGradient>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.cardTitleSm}>{data.title}</Text>
+            {data.location ? (
+              <Text style={styles.muted10}>{data.location}</Text>
+            ) : null}
           </View>
-
-          <View className="min-w-0 flex-1">
-            <Text className="text-xs font-black text-white">{data.title}</Text>
-            {data.location && (
-              <Text className="text-[10px] text-white/35">{data.location}</Text>
-            )}
-          </View>
-
-          {data.badge && <Badge color={COLORS.orange}>{data.badge}</Badge>}
+          {data.badge ? (
+            <Badge color={COLORS.orange}>{data.badge}</Badge>
+          ) : null}
         </View>
 
-        {data.message && (
-          <Text className="mt-4 text-xs leading-relaxed text-white/55">
-            {data.message}
-          </Text>
-        )}
+        {data.message ? (
+          <Text style={styles.communityDesc}>{data.message}</Text>
+        ) : null}
 
         {data.days?.length ? (
-          <View className="mt-4 gap-1.5">
+          <View style={styles.weatherRow}>
             {data.days.slice(0, 5).map((day) => (
-              <View
-                key={day.label}
-                className="flex flex-col items-center gap-1 rounded-xl px-1 py-2"
-                style={{ backgroundColor: "rgba(255,255,255,.04)", borderWidth: 1, borderColor: "rgba(255,255,255,.05)", borderStyle: "solid" }}
-              >
-                <Text className="text-[8px] text-white/30">{day.label}</Text>
-
-                <Text className="text-sm">{day.icon || "•"}</Text>
-
-                {day.temperature && (
-                  <Text className="text-[9px] font-black text-white/55">
-                    {day.temperature}
-                  </Text>
-                )}
+              <View key={day.label} style={styles.weatherDay}>
+                <Text style={styles.weatherLabel}>{day.label}</Text>
+                <Text style={{ fontSize: 14 }}>{day.icon || "•"}</Text>
+                {day.temperature ? (
+                  <Text style={styles.weatherTemp}>{day.temperature}</Text>
+                ) : null}
               </View>
             ))}
           </View>
@@ -1228,67 +1339,65 @@ export function VoyagesCard({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.08} onPress={onClick}>
-      <View className="relative h-48 overflow-hidden">
-        <Image
+    <GlassCard delay={0.08} onClick={onClick}>
+      <View style={styles.heroImageSmall}>
+        <CardImage
           src={data.image}
           alt={`${data.origin} → ${data.destination}`}
-          className="h-full w-full object-cover"
+          style={styles.heroImageInner}
+        />
+        <LinearGradient
+          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)"]}
+          locations={[0.4, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
         />
 
-        <View
-          className="absolute inset-0"
-          style={{  }}
-        />
-
-        {data.badge && (
-          <View className="absolute left-3 top-3">
-            <Badge color={COLORS.sky}>
-              <Plane size={9} />
+        {data.badge ? (
+          <View style={styles.heroBadgeLeft}>
+            <Badge color={COLORS.sky} icon={<Plane size={9} color="#fff" />}>
               {data.badge}
             </Badge>
           </View>
-        )}
-
-        <View className="absolute right-3 top-3">
+        ) : null}
+        <View style={styles.heroFavorite}>
           <Favorite item={data.favorite} />
         </View>
-
-        <View className="absolute bottom-4 left-4 right-4">
-          <Text className="text-xs font-medium text-white/55">
+        <View style={styles.heroBottom}>
+          <Text style={styles.heroInfoText}>
             {data.origin}
-            <Text className="mx-2 text-sky-300">→</Text>
+            <Text style={{ color: "#7DD3FC" }}> → </Text>
             {data.destination}
           </Text>
-
-          {data.price && (
-            <View className="mt-1 flex items-baseline gap-2">
-              <Text className="text-xl font-black text-white">{data.price}</Text>
-
-              {data.oldPrice && (
-                <Text className="text-[10px] text-white/35 line-through">
-                  {data.oldPrice}
-                </Text>
-              )}
+          {data.price ? (
+            <View style={styles.rowGapSm}>
+              <Text style={styles.heroPrice}>{data.price}</Text>
+              {data.oldPrice ? (
+                <Text style={styles.oldPrice}>{data.oldPrice}</Text>
+              ) : null}
             </View>
-          )}
-
-          {data.departure && (
-            <View className="mt-1 flex items-center gap-1.5 text-[10px] text-white/40">
-              <Clock size={10} />
-              {data.departure}
+          ) : null}
+          {data.departure ? (
+            <View style={styles.heroInfoItem}>
+              <Clock size={10} color="rgba(255,255,255,0.55)" />
+              <Text style={styles.heroInfoText}>{data.departure}</Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
 
-      {onBook && (
-        <View className="p-4">
+      {onBook ? (
+        <View style={styles.body}>
           <ActionButton color={COLORS.sky} onPress={onBook}>
-            <Plane size={12} />
-            <Text>Réserver</Text></ActionButton>
+            <Plane size={12} color={COLORS.sky} />
+            <Text style={[styles.actionButtonText, { color: COLORS.sky }]}>
+              Réserver
+            </Text>
+          </ActionButton>
         </View>
-      )}
+      ) : null}
     </GlassCard>
   );
 }
@@ -1305,50 +1414,47 @@ export function VoyagesCard2({
   if (!trips?.length) return null;
 
   return (
-    <GlassCard delay={0.1} onPress={onClick}>
-      <View className="p-4">
-        <View className="mb-4 flex items-center gap-3">
-          <View
-            className="flex h-10 w-10 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: "rgba(14,165,233,.12)", borderWidth: 1, borderColor: "rgba(14,165,233,.18)", borderStyle: "solid" }}
+    <GlassCard delay={0.1} onClick={onClick}>
+      <View style={styles.body}>
+        <View style={styles.rowGap}>
+          <LinearGradient
+            colors={[`${COLORS.sky}22`, `${COLORS.sky}0A`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.communityIconWrap}
           >
-            <Text className="text-xl">🚌</Text>
-          </View>
-
+            <Text style={{ fontSize: 20 }}>🚌</Text>
+          </LinearGradient>
           <View>
-            <Text className="text-xs font-black text-white">Départs disponibles</Text>
-            <Text className="text-[10px] text-white/35">Transport inter-villes</Text>
+            <Text style={styles.cardTitleSm}>Départs disponibles</Text>
+            <Text style={styles.muted10}>Transport inter-villes</Text>
           </View>
         </View>
 
-        <View className="divide-y divide-white/5">
-          {trips.map((trip) => (
+        <View style={{ marginTop: 16 }}>
+          {trips.map((trip, idx) => (
             <Pressable
-             
               key={trip.id}
-              onPress={(event) => {
-                onTripClick?.(trip);
-              }}
-              className="flex w-full items-center gap-3 py-3 text-left"
+              onPress={() => onTripClick?.(trip)}
+              style={({ pressed }) => [
+                styles.tripRow,
+                idx < trips.length - 1 && styles.tripRowBorder,
+                pressed && { opacity: 0.7 },
+              ]}
             >
-              <View className="min-w-0 flex-1">
-                <Text className="truncate text-xs font-bold text-white">
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.tripRoute} numberOfLines={1}>
                   {trip.route}
                 </Text>
-
-                <Text className="mt-0.5 text-[10px] text-white/35">
+                <Text style={styles.muted10}>
                   {trip.time}
-                  {trip.seats !== undefined && <> · {trip.seats} places</>}
+                  {trip.seats !== undefined ? ` · ${trip.seats} places` : ""}
                 </Text>
               </View>
-
-              {trip.price && (
-                <Text className="shrink-0 text-xs font-black text-sky-400">
-                  {trip.price}
-                </Text>
-              )}
-
-              <ChevronRight size={13} className="text-white/20" />
+              {trip.price ? (
+                <Text style={styles.tripPrice}>{trip.price}</Text>
+              ) : null}
+              <ChevronRight size={13} color="rgba(255,255,255,0.3)" />
             </Pressable>
           ))}
         </View>
@@ -1358,7 +1464,7 @@ export function VoyagesCard2({
 }
 
 /* ============================================================================
- * MEDIA / ACTUALITÉS
+ * MEDIA
  * ========================================================================== */
 
 export function MediaCard({
@@ -1375,92 +1481,80 @@ export function MediaCard({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.08} onPress={onClick}>
-      {data.image && (
-        <View className="relative h-44 overflow-hidden">
-          <Image
+    <GlassCard delay={0.08} onClick={onClick}>
+      {data.image ? (
+        <View style={styles.heroImageSmall}>
+          <CardImage
             src={data.image}
             alt={data.title}
-            className="h-full w-full object-cover"
+            style={styles.heroImageInner}
           />
-
-          <View
-            className="absolute inset-0"
-            style={{  }}
+          <LinearGradient
+            colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)"]}
+            locations={[0.4, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
           />
-
-          {data.category && (
-            <View className="absolute left-3 top-3">
-              <Badge color={COLORS.cyan}>
-                <Newspaper size={9} />
+          {data.category ? (
+            <View style={styles.heroBadgeLeft}>
+              <Badge
+                color={COLORS.cyan}
+                icon={<Newspaper size={9} color="#fff" />}
+              >
                 {data.category}
               </Badge>
             </View>
-          )}
-
-          <View className="absolute bottom-4 left-4 right-4">
-            <Text className="text-base font-black leading-tight text-white">
+          ) : null}
+          <View style={styles.heroBottom}>
+            <Text style={styles.heroTitle} numberOfLines={3}>
               {data.title}
             </Text>
           </View>
         </View>
-      )}
+      ) : null}
 
-      <View className="p-4">
-        {!data.image && data.category && (
+      <View style={styles.body}>
+        {!data.image && data.category ? (
           <Badge color={COLORS.cyan}>{data.category}</Badge>
-        )}
+        ) : null}
+        {!data.image ? (
+          <Text style={[styles.cardTitle, { marginTop: 8 }]}>{data.title}</Text>
+        ) : null}
 
-        {!data.image && (
-          <Text className="mt-2 text-base font-black text-white">{data.title}</Text>
-        )}
+        {data.description ? (
+          <Text style={styles.communityDesc}>{data.description}</Text>
+        ) : null}
 
-        {data.description && (
-          <Text className="mt-2 text-xs leading-relaxed text-white/45">
-            {data.description}
-          </Text>
-        )}
-
-        <View className="mt-4 flex items-center justify-between">
-          <View className="flex min-w-0 items-center gap-2">
-            <Newspaper size={11} className="shrink-0 text-white/25" />
-
-            <View className="min-w-0">
-              {data.source && (
-                <Text className="truncate text-[10px] font-bold text-white/40">
+        <View style={styles.rowBetween}>
+          <View style={styles.rowGapSm}>
+            <Newspaper size={11} color="rgba(255,255,255,0.35)" />
+            <View style={{ minWidth: 0 }}>
+              {data.source ? (
+                <Text style={styles.mediaSource} numberOfLines={1}>
                   {data.source}
                 </Text>
-              )}
-
-              {data.publishedAt && (
-                <Text className="text-[9px] text-white/25">{data.publishedAt}</Text>
-              )}
+              ) : null}
+              {data.publishedAt ? (
+                <Text style={styles.mediaDate}>{data.publishedAt}</Text>
+              ) : null}
             </View>
           </View>
-
-          <View className="flex items-center gap-3">
-            <Pressable
-             
-              onPress={(event) => {
-                onLike?.();
-              }}
-              className="flex items-center gap-1"
-            >
-              <Heart size={13} className="text-white/30" />
-              <Text className="text-[10px] text-white/30">
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <Pressable onPress={onLike} hitSlop={6} style={styles.footerAction}>
+              <Heart size={13} color="rgba(255,255,255,0.45)" />
+              <Text style={styles.footerActionText}>
                 {formatNumber(data.stats?.likes)}
               </Text>
             </Pressable>
-
             <Pressable
-             
-              onPress={(event) => {
-                onShare?.();
-              }}
-              className="flex items-center gap-1"
+              onPress={onShare}
+              hitSlop={6}
+              style={styles.footerAction}
             >
-              <Share2 size={13} className="text-white/30" />
-              <Text className="text-[10px] text-white/30">
+              <Share2 size={13} color="rgba(255,255,255,0.45)" />
+              <Text style={styles.footerActionText}>
                 {formatNumber(data.stats?.shares)}
               </Text>
             </Pressable>
@@ -1485,53 +1579,56 @@ export function MediaCard2({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.1} onPress={onClick}>
-      <View className="p-4">
-        <View className="mb-4 flex items-center justify-between">
-          <Badge color={COLORS.pink}><Text>🎙️ Podcast</Text></Badge>
-
-          {data.duration && (
-            <Text className="text-[9px] text-white/30">{data.duration}</Text>
-          )}
+    <GlassCard delay={0.1} onClick={onClick}>
+      <View style={styles.body}>
+        <View style={styles.rowBetween}>
+          <Badge color={COLORS.pink}>🎙️ Podcast</Badge>
+          {data.duration ? (
+            <Text style={styles.mediaDate}>{data.duration}</Text>
+          ) : null}
         </View>
-
-        <Text className="text-sm font-black leading-tight text-white">
+        <Text style={[styles.cardTitleSm, { marginTop: 12 }]}>
           {data.title}
         </Text>
-
-        {data.description && (
-          <Text className="mt-2 text-xs leading-relaxed text-white/45">
-            {data.description}
+        {data.description ? (
+          <Text style={styles.communityDesc}>{data.description}</Text>
+        ) : null}
+        {data.author ? (
+          <Text style={[styles.mediaDate, { marginTop: 8 }]}>
+            {data.author}
           </Text>
-        )}
+        ) : null}
 
-        {data.author && (
-          <Text className="mt-2 text-[10px] text-white/30">{data.author}</Text>
-        )}
-
-        <View className="mt-4 flex gap-2">
-          {onPlay && (
+        <View style={styles.podcastActions}>
+          {onPlay ? (
             <Pressable
-              onPress={(event) => {
-                onPlay();
-              }}
-              className="flex-1 rounded-xl py-2.5 text-xs font-black text-white"
-              style={{  }}
+              onPress={onPlay}
+              style={({ pressed }) => [
+                styles.podcastPlay,
+                pressed && { opacity: 0.85 },
+              ]}
             >
-              <Text>▶ Écouter</Text></Pressable>
-          )}
-
-          {onFollow && (
+              <LinearGradient
+                colors={[COLORS.pink, "#BE185D"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.podcastPlayInner}
+              >
+                <Text style={styles.podcastPlayText}>▶ Écouter</Text>
+              </LinearGradient>
+            </Pressable>
+          ) : null}
+          {onFollow ? (
             <Pressable
-             
-              onPress={(event) => {
-                onFollow();
-              }}
-              className="rounded-xl px-4 py-2.5 text-xs font-bold text-white/55"
-              style={{ backgroundColor: "rgba(255,255,255,.06)" }}
+              onPress={onFollow}
+              style={({ pressed }) => [
+                styles.podcastFollow,
+                pressed && { opacity: 0.75 },
+              ]}
             >
-              <Text>Suivre</Text></Pressable>
-          )}
+              <Text style={styles.podcastFollowText}>Suivre</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </GlassCard>
@@ -1539,23 +1636,7 @@ export function MediaCard2({
 }
 
 /* ============================================================================
- * COMMUNITY — SECONDARY
- * ========================================================================== */
-
-export function CommunityCard2({
-  data,
-  onClick,
-  onReply,
-}: {
-  data?: CommunityCardData;
-  onClick?: () => void;
-  onReply?: ActionHandler;
-}) {
-  return <CommunityCard data={data} onPress={onClick} onReply={onReply} />;
-}
-
-/* ============================================================================
- * IA — "POUR VOUS"
+ * AI RECOMMEND
  * ========================================================================== */
 
 export function AIRecommendCard({
@@ -1573,29 +1654,63 @@ export function AIRecommendCard({
   color?: string;
   onClick?: () => void;
 }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
   return (
-    <Pressable
-      onPress={onClick}
-      className="relative flex w-full items-center gap-3 overflow-hidden rounded-2xl p-3 text-left"
-      style={{ borderStyle: "solid" }}
-    >
-      <View
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl"
-        style={{ backgroundColor: `${color}15`, borderStyle: "solid" }}
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onClick}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={[styles.aiRecommendCard, { borderColor: `${color}40` }]}
       >
-        {icon || emoji || <Sparkles size={16} style={{ color }} />}
-      </View>
-
-      <View className="min-w-0 flex-1">
-        <Text className="truncate text-sm font-black text-white">{label}</Text>
-
-        {desc && (
-          <Text className="mt-0.5 truncate text-[10px] text-white/40">{desc}</Text>
-        )}
-      </View>
-
-      <ChevronRight size={15} className="shrink-0 text-white/20" />
-    </Pressable>
+        <LinearGradient
+          colors={[`${color}22`, "rgba(255,255,255,0)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        <View
+          style={[
+            styles.aiRecommendIcon,
+            { backgroundColor: `${color}25`, borderColor: `${color}55` },
+          ]}
+        >
+          {icon || (
+            <Text style={{ fontSize: 18 }}>
+              {emoji || <Sparkles size={16} color={color} />}
+            </Text>
+          )}
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.cardTitleSm} numberOfLines={1}>
+            {label}
+          </Text>
+          {desc ? (
+            <Text style={styles.muted10} numberOfLines={1}>
+              {desc}
+            </Text>
+          ) : null}
+        </View>
+        <ChevronRight size={15} color={`${color}CC`} />
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -1609,26 +1724,15 @@ export function PourVousSection({
   if (!recommendations?.length) return null;
 
   return (
-    <View className="mx-5">
-      <View className="mb-3 flex items-center gap-2">
-        <View
-          className="flex h-6 w-6 items-center justify-center rounded-lg"
-          style={{  }}
-        >
-          <Sparkles size={11} className="text-white" />
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <PulsingSparkleBadge />
+        <Text style={styles.sectionTitle}>Pour vous</Text>
+        <View style={styles.sectionAiBadge}>
+          <Text style={styles.sectionAiBadgeText}>IA</Text>
         </View>
-
-        <Text className="text-sm font-black text-white">Pour vous</Text>
-
-        <Text
-          className="rounded-full px-1.5 py-0.5 text-[8px] font-black text-purple-300"
-          style={{ backgroundColor: "rgba(139,92,246,.15)" }}
-        >
-          IA
-        </Text>
       </View>
-
-      <View className="flex flex-col gap-2">
+      <View style={{ gap: 8 }}>
         {recommendations.map((recommendation) => (
           <AIRecommendCard
             key={recommendation.id}
@@ -1637,13 +1741,60 @@ export function PourVousSection({
             emoji={recommendation.emoji}
             icon={recommendation.icon}
             color={recommendation.color}
-            onPress={
+            onClick={
               onNavigate ? () => onNavigate(recommendation.id) : undefined
             }
           />
         ))}
       </View>
     </View>
+  );
+}
+
+function PulsingSparkleBadge() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.06],
+  });
+  const rotate = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "6deg"],
+  });
+
+  return (
+    <Animated.View
+      style={[styles.sectionIconWrap, { transform: [{ scale }, { rotate }] }]}
+    >
+      <LinearGradient
+        colors={["#A78BFA", "#7C3AED"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.sectionIconGradient}
+      >
+        <Sparkles size={11} color="#fff" />
+      </LinearGradient>
+    </Animated.View>
   );
 }
 
@@ -1663,57 +1814,48 @@ export function ParrainagePromoCard({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.14} onPress={onClick}>
-      <View className="relative overflow-hidden p-4">
-        <View
-          className="absolute -right-12 -top-12 h-40 w-40 rounded-full"
-          style={{ backgroundColor: "rgba(139,92,246,.22)" }}
-        />
-
-        <View className="relative flex items-center gap-3">
-          <View
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: "rgba(139,92,246,.15)", borderWidth: 1, borderColor: "rgba(139,92,246,.22)", borderStyle: "solid" }}
+    <GlassCard delay={0.14} onClick={onClick}>
+      <View style={[styles.body, { overflow: "hidden" }]}>
+        <View style={styles.referralOrb} pointerEvents="none" />
+        <View style={styles.rowGap}>
+          <LinearGradient
+            colors={[`${COLORS.violet}22`, `${COLORS.violet}0A`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.referralIcon}
           >
-            <Gift size={16} className="text-purple-300" />
-          </View>
-
-          <View className="min-w-0">
-            <Text className="text-xs font-black text-white">
+            <Gift size={16} color="#C4B5FD" />
+          </LinearGradient>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.cardTitleSm}>
               {data.title || "Programme Parrainage"}
             </Text>
-
-            {data.description && (
-              <Text className="mt-0.5 text-[10px] text-white/40">
-                {data.description}
-              </Text>
-            )}
+            {data.description ? (
+              <Text style={styles.muted10}>{data.description}</Text>
+            ) : null}
           </View>
         </View>
 
-        {data.rewardLabel && (
-          <View className="relative mt-4">
-            <Text className="text-sm font-bold text-white/70">
-              {data.rewardLabel}
-            </Text>
-          </View>
-        )}
+        {data.rewardLabel ? (
+          <Text style={styles.referralReward}>{data.rewardLabel}</Text>
+        ) : null}
 
-        <View className="relative mt-4 flex gap-2">
-          {onShare && (
+        <View style={styles.referralActions}>
+          {onShare ? (
             <ActionButton color={COLORS.violet} onPress={onShare}>
-              <Share2 size={12} />
-              <Text>Partager</Text></ActionButton>
-          )}
-
-          {data.totalEarnedLabel && (
-            <View
-              className="flex shrink-0 items-center rounded-2xl px-4 text-[10px] font-black text-white"
-              style={{  }}
-            >
-              {data.totalEarnedLabel}
+              <Share2 size={12} color={COLORS.violet} />
+              <Text style={[styles.actionButtonText, { color: COLORS.violet }]}>
+                Partager
+              </Text>
+            </ActionButton>
+          ) : null}
+          {data.totalEarnedLabel ? (
+            <View style={styles.referralEarned}>
+              <Text style={styles.referralEarnedText}>
+                {data.totalEarnedLabel}
+              </Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
     </GlassCard>
@@ -1734,59 +1876,49 @@ export function MarketplacePromoCard({
   if (!data) return null;
 
   return (
-    <GlassCard delay={0.18} onPress={onClick}>
-      <View className="relative h-44 overflow-hidden">
-        <Image
+    <GlassCard delay={0.18} onClick={onClick}>
+      <View style={styles.marketplaceHero}>
+        <CardImage
           src={data.image}
           alt={data.title || "Marketplace"}
-          className="h-full w-full object-cover"
+          style={styles.heroImageInner}
+        />
+        <LinearGradient
+          colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.78)"]}
+          locations={[0, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
         />
 
-        <View
-          className="absolute inset-0"
-          style={{  }}
-        />
-
-        <View className="absolute inset-0 flex flex-col justify-between p-4">
-          <View className="flex items-center gap-3">
-            <View
-              className="flex h-10 w-10 items-center justify-center rounded-2xl text-lg"
-              style={{ backgroundColor: "rgba(255,255,255,.16)" }}
-            >
-              <ShoppingBag size={18} className="text-white" />
+        <View style={styles.marketplaceOverlay}>
+          <View style={styles.rowGap}>
+            <View style={styles.marketplaceIcon}>
+              <ShoppingBag size={18} color="#fff" />
             </View>
-
-            <View className="min-w-0">
-              <Text className="text-base font-black leading-tight text-white">
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.heroTitle} numberOfLines={1}>
                 {data.title}
               </Text>
-
-              {data.description && (
-                <Text className="mt-0.5 text-xs text-white/75">
+              {data.description ? (
+                <Text style={styles.marketplaceDesc} numberOfLines={1}>
                   {data.description}
                 </Text>
-              )}
+              ) : null}
             </View>
           </View>
 
-          <View className="flex items-end justify-between gap-3">
-            <View className="flex min-w-0 flex-wrap gap-1.5">
+          <View style={styles.marketplaceBottom}>
+            <View style={styles.marketplaceCats}>
               {data.categories?.slice(0, 4).map((category) => (
-                <Text
-                  key={category}
-                  className="rounded-full px-2.5 py-1 text-[9px] font-black text-white"
-                  style={{ backgroundColor: "rgba(255,255,255,.17)" }}
-                >
-                  {category}
-                </Text>
+                <View key={category} style={styles.marketplaceCat}>
+                  <Text style={styles.marketplaceCatText}>{category}</Text>
+                </View>
               ))}
             </View>
-
-            <View
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-              style={{ backgroundColor: "rgba(255,255,255,.18)" }}
-            >
-              <ArrowUpRight size={17} className="text-white" />
+            <View style={styles.marketplaceArrow}>
+              <ArrowUpRight size={17} color="#fff" />
             </View>
           </View>
         </View>
@@ -1796,7 +1928,7 @@ export function MarketplacePromoCard({
 }
 
 /* ============================================================================
- * UNIVERSAL EMPTY STATE
+ * EMPTY STATE
  * ========================================================================== */
 
 export function FeedCardEmpty({
@@ -1813,37 +1945,907 @@ export function FeedCardEmpty({
   onAction?: ActionHandler;
 }) {
   return (
-    <View
-      className="mx-5 rounded-[28px] p-8 text-center"
-      style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-    >
-      <View
-        className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl"
-        style={{ backgroundColor: "rgba(139,92,246,.12)", borderWidth: 1, borderColor: "rgba(139,92,246,.18)", borderStyle: "solid" }}
-      >
-        {icon || <Sparkles size={20} className="text-purple-300" />}
+    <FadeUp distance={14}>
+      <View style={styles.emptyCard}>
+        <LinearGradient
+          colors={[`${COLORS.violet}22`, "rgba(255,255,255,0)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+        <View style={styles.emptyIcon}>
+          {icon || <Sparkles size={20} color="#C4B5FD" />}
+        </View>
+        <Text style={styles.emptyTitle}>{title}</Text>
+        {description ? (
+          <Text style={styles.emptyDescription}>{description}</Text>
+        ) : null}
+        {actionLabel && onAction ? (
+          <Pressable
+            onPress={onAction}
+            style={({ pressed }) => [
+              styles.emptyAction,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <LinearGradient
+              colors={["#8B5CF6", "#6366F1"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.emptyActionInner}
+            >
+              <Text style={styles.emptyActionText}>{actionLabel}</Text>
+            </LinearGradient>
+          </Pressable>
+        ) : null}
       </View>
-
-      <Text className="mt-4 text-sm font-black text-white">{title}</Text>
-
-      {description && (
-        <Text className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-white/35">
-          {description}
-        </Text>
-      )}
-
-      {actionLabel && onAction && (
-        <Pressable
-          onPress={onAction}
-          className="mt-5 rounded-2xl px-5 py-2.5 text-xs font-black text-white"
-          style={{  }}
-        >
-          {actionLabel}
-        </Pressable>
-      )}
-    </View>
+    </FadeUp>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  // ── GlassCard
+  glassCard: {
+    marginHorizontal: 20,
+    borderRadius: 28,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "rgba(12,10,28,0.55)",
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
+  },
+
+  // ── Badge
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.3,
+  },
+
+  // ── IconButton
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  // ── ActionButton
+  actionButton: {
+    width: "100%",
+    paddingVertical: 11,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionButtonInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  actionButtonText: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+
+  // ── Rating
+  ratingValue: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.7)",
+  },
+  ratingReviews: {
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.4)",
+  },
+
+  // ── Stat
+  statText: {
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "600",
+  },
+
+  // ── Verified
+  verified: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(59,130,246,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(59,130,246,0.3)",
+  },
+  verifiedText: {
+    fontSize: 8,
+    fontWeight: "900",
+    color: "#93C5FD",
+  },
+
+  // ── Hero image
+  heroImage: {
+    height: 208,
+    width: "100%",
+    overflow: "hidden",
+  },
+  heroImageSmall: {
+    height: 192,
+    width: "100%",
+    overflow: "hidden",
+  },
+  heroImageInner: {
+    width: "100%",
+    height: "100%",
+  },
+  heroBadgeLeft: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+  },
+  heroFavorite: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+  },
+  heroBottom: {
+    position: "absolute",
+    bottom: 16,
+    left: 16,
+    right: 16,
+  },
+  heroPrice: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.6,
+  },
+  heroPriceSuffix: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.55)",
+  },
+  heroTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#fff",
+    lineHeight: 22,
+    letterSpacing: -0.4,
+  },
+  heroMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+  },
+  heroMeta: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.6)",
+    flexShrink: 1,
+    fontWeight: "500",
+  },
+  heroMetaDot: {
+    color: "rgba(255,255,255,0.3)",
+  },
+  heroMetaDim: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  heroInfoRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 6,
+  },
+  heroInfoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  heroInfoText: {
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.6)",
+    fontWeight: "500",
+  },
+  oldPrice: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.4)",
+    textDecorationLine: "line-through",
+    marginLeft: 8,
+    alignSelf: "flex-end",
+  },
+
+  // ── Body
+  body: {
+    padding: 16,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#fff",
+    marginBottom: 12,
+    letterSpacing: -0.2,
+  },
+  cardTitleSm: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  muted10: {
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "500",
+  },
+
+  // ── Layout
+  rowGap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  rowGapSm: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  rowBetween: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  rowBetweenStart: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  // ── Features
+  featuresRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 12,
+  },
+  featureChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  featureChipText: {
+    fontSize: 9.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.6)",
+  },
+
+  // ── Talents
+  avatarWrap: {
+    position: "relative",
+    width: 44,
+    height: 44,
+  },
+  avatarImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+  },
+  onlineDot: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: COLORS.green,
+    borderWidth: 2,
+    borderColor: "#0F0720",
+    shadowColor: COLORS.green,
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 3,
+  },
+  locationText: {
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  talentMiddle: {
+    flexDirection: "row",
+    gap: 14,
+    marginTop: 16,
+  },
+  talentPhotoWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 18,
+    overflow: "hidden",
+    position: "relative",
+  },
+  talentPhoto: {
+    width: "100%",
+    height: "100%",
+  },
+  talentAvailOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingVertical: 4,
+    backgroundColor: "rgba(0,0,0,0.65)",
+  },
+  talentAvailText: {
+    fontSize: 8,
+    fontWeight: "900",
+    color: "#6EE7B7",
+    textAlign: "center",
+    letterSpacing: 0.6,
+  },
+  talentResponseTime: {
+    marginTop: 8,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "500",
+  },
+
+  // ── Job
+  jobOrb: {
+    position: "absolute",
+    top: -60,
+    right: -60,
+    width: 128,
+    height: 128,
+    borderRadius: 9999,
+    backgroundColor: "rgba(139,92,246,0.15)",
+  },
+  jobLogoWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.35)",
+    overflow: "hidden",
+  },
+  jobLogoImg: {
+    width: "100%",
+    height: "100%",
+  },
+  badgesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 12,
+  },
+
+  // ── Community
+  communityIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.35)",
+    overflow: "hidden",
+  },
+  communityIconImg: {
+    width: "100%",
+    height: "100%",
+  },
+  communityDesc: {
+    marginTop: 14,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.55)",
+    fontWeight: "500",
+  },
+  avatarsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 14,
+  },
+  avatarsStack: {
+    flexDirection: "row",
+  },
+  avatarMini: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#17171F",
+  },
+
+  // ── Footer
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+  },
+  footerAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  footerActionText: {
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "600",
+  },
+  replyBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: "rgba(139,92,246,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.35)",
+  },
+  replyBtnText: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    color: "#C4B5FD",
+    letterSpacing: 0.2,
+  },
+
+  // ── Event
+  eventPrice: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#C4B5FD",
+  },
+  eventCapacityLabel: {
+    fontSize: 9.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.5)",
+  },
+  capacityLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  capacityLabelText: {
+    fontSize: 9.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.4)",
+  },
+  capacityValueText: {
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+  capacityTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    overflow: "hidden",
+  },
+  capacityFill: {
+    height: "100%",
+    borderRadius: 3,
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
+  // ── Agri
+  agriIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.3)",
+  },
+  agriMiddle: {
+    flexDirection: "row",
+    gap: 14,
+    marginTop: 16,
+  },
+  agriImageWrap: {
+    width: 112,
+    height: 112,
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  agriImage: {
+    width: "100%",
+    height: "100%",
+  },
+  agriPrice: {
+    marginTop: 8,
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#6EE7B7",
+    letterSpacing: -0.5,
+  },
+  agriUnit: {
+    fontSize: 10.5,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.4)",
+  },
+
+  // ── Weather
+  weatherRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 14,
+  },
+  weatherDay: {
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    minWidth: 56,
+  },
+  weatherLabel: {
+    fontSize: 8.5,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "700",
+  },
+  weatherTemp: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.7)",
+  },
+
+  // ── Voyages
+  tripRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+  },
+  tripRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  tripRoute: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  tripPrice: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "#7DD3FC",
+    marginRight: 4,
+  },
+
+  // ── Media
+  mediaSource: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.55)",
+  },
+  mediaDate: {
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.35)",
+    fontWeight: "500",
+  },
+
+  // ── Podcast
+  podcastActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 16,
+  },
+  podcastPlay: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  podcastPlayInner: {
+    paddingVertical: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  podcastPlayText: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+  podcastFollow: {
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  podcastFollowText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.7)",
+  },
+
+  // ── AI Recommend
+  aiRecommendCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    overflow: "hidden",
+  },
+  aiRecommendIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  // ── PourVous section
+  section: {
+    marginHorizontal: 20,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  sectionIconWrap: {
+    width: 24,
+    height: 24,
+  },
+  sectionIconGradient: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#8B5CF6",
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+  sectionAiBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(139,92,246,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.35)",
+  },
+  sectionAiBadgeText: {
+    fontSize: 8,
+    fontWeight: "900",
+    color: "#C4B5FD",
+    letterSpacing: 0.6,
+  },
+
+  // ── Referral
+  referralOrb: {
+    position: "absolute",
+    top: -60,
+    right: -60,
+    width: 160,
+    height: 160,
+    borderRadius: 9999,
+    backgroundColor: "rgba(139,92,246,0.22)",
+  },
+  referralIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.35)",
+  },
+  referralReward: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.85)",
+  },
+  referralActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 16,
+  },
+  referralEarned: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    backgroundColor: "rgba(52,211,153,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.35)",
+  },
+  referralEarnedText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#6EE7B7",
+    letterSpacing: 0.2,
+  },
+
+  // ── Marketplace
+  marketplaceHero: {
+    height: 176,
+    width: "100%",
+    overflow: "hidden",
+  },
+  marketplaceOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    padding: 16,
+    justifyContent: "space-between",
+  },
+  marketplaceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  marketplaceDesc: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.75)",
+    fontWeight: "500",
+  },
+  marketplaceBottom: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  marketplaceCats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  marketplaceCat: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  marketplaceCatText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+  marketplaceArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+
+  // ── Empty
+  emptyCard: {
+    marginHorizontal: 20,
+    padding: 32,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(12,10,28,0.5)",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.3)",
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  emptyDescription: {
+    marginTop: 6,
+    maxWidth: 280,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.45)",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  emptyAction: {
+    marginTop: 20,
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
+  },
+  emptyActionInner: {
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+  },
+  emptyActionText: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+});
 
 /* ============================================================================
  * EXPORTS UTILITAIRES

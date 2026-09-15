@@ -1,8 +1,6 @@
-// src/features/immo/components/PropertyMap.tsx
-
-import { Alert, Linking, Platform, Pressable, Text, View } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
-import { MapPin } from "lucide-react-native";
+import { View, Text, Pressable, Linking } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { MapPin, Loader2 } from "lucide-react-native";
 
 interface Props {
   city: string;
@@ -12,163 +10,160 @@ interface Props {
 }
 
 export function PropertyMap({ city, address, latitude, longitude }: Props) {
-  const hasCoords =
-    typeof latitude === "number" &&
-    Number.isFinite(latitude) &&
-    typeof longitude === "number" &&
-    Number.isFinite(longitude);
+  const mapRef = useRef<View>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const locationLabel =
-    address?.trim() || city?.trim() || "Adresse non renseignée";
+  const hasCoords = latitude && longitude;
 
-  const openMaps = async () => {
+  // Charger Leaflet dynamiquement (évite les problèmes SSR)
+  useEffect(() => {
     if (!hasCoords) {
+      setIsLoading(false);
       return;
     }
+    if (!mapRef.current) return;
 
-    const latitudeValue = latitude.toFixed(6);
-    const longitudeValue = longitude.toFixed(6);
-    const label = encodeURIComponent(locationLabel);
+    let isMounted = true;
 
-    try {
-      if (Platform.OS === "ios") {
-        const appleMapsUrl =
-          `http://maps.apple.com/?ll=${latitudeValue},${longitudeValue}` +
-          `&q=${label}`;
+    const loadMap = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-        await Linking.openURL(appleMapsUrl);
-        return;
+        // Charger Leaflet et son CSS
+        const L = await import("leaflet");
+        await import("leaflet/dist/leaflet.css");
+
+        if (!isMounted || !mapRef.current) return;
+
+        // Nettoyer l'ancienne carte si elle existe
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.remove();
+          mapInstanceRef.current = null;
+        }
+
+        // Créer la carte
+        const map = L.map(mapRef.current, {
+          center: [latitude!, longitude!],
+          zoom: 15,
+          zoomControl: false, // on ajoutera un contrôle personnalisé plus tard
+          attributionControl: true,
+        });
+
+        // Ajouter le fond de carte OpenStreetMap
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }).addTo(map);
+
+        // Icône personnalisée (éviter les problèmes d'icône par défaut de Leaflet)
+        const icon = L.divIcon({
+          className: "custom-marker",
+          html: `<div style="
+            background: #F97316;
+            width: 28px;
+            height: 28px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+            box-shadow: 0 4px 12px rgba(249,115,22,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <div style="
+              transform: rotate(45deg);
+              color: white;
+              font-size: 12px;
+              font-weight: bold;
+            ">🏠</div>
+          </div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 28],
+          popupAnchor: [0, -28],
+        });
+
+        // Ajouter le marqueur
+        const marker = L.marker([latitude!, longitude!], { icon }).addTo(map);
+
+        // Popup avec les informations
+        const popupContent = `
+          <div style="font-family: system-ui, sans-serif; padding: 4px 0;">
+            <strong style="color: #1a1a2e;">${address || city}</strong>
+            ${address ? `<br/><span style="color: #666; font-size: 12px;">${city}</span>` : ""}
+            <br/>
+            <span style="color: #999; font-size: 11px;">
+              📍 ${latitude!.toFixed(6)}, ${longitude!.toFixed(6)}
+            </span>
+          </div>
+        `;
+        marker.bindPopup(popupContent);
+
+        markerRef.current = marker;
+
+        // Ajouter un contrôle de zoom personnalisé en bas à droite
+        L.control
+          .zoom({
+            position: "bottomright",
+          })
+          .addTo(map);
+
+        mapInstanceRef.current = map;
+
+        // Ouvrir le popup automatiquement après un court délai
+        setTimeout(() => {
+          if (markerRef.current && isMounted) {
+            markerRef.current.openPopup();
+          }
+        }, 500);
+
+        setIsLoading(false);
+      } catch (err) {
+        console.error("Erreur lors du chargement de la carte:", err);
+        if (isMounted) {
+          setError("Impossible de charger la carte");
+          setIsLoading(false);
+        }
       }
+    };
 
-      const geoUrl =
-        `geo:${latitudeValue},${longitudeValue}` +
-        `?q=${latitudeValue},${longitudeValue}(${label})`;
+    loadMap();
 
-      const supported = await Linking.canOpenURL(geoUrl);
-
-      if (supported) {
-        await Linking.openURL(geoUrl);
-        return;
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
       }
+    };
+  }, [latitude, longitude, address, city, hasCoords]);
 
-      const browserMapsUrl =
-        `https://www.google.com/maps/search/?api=1&query=` +
-        `${latitudeValue},${longitudeValue}`;
-
-      await Linking.openURL(browserMapsUrl);
-    } catch (error) {
-      console.error(
-        "Impossible d'ouvrir l'application de cartographie:",
-        error,
-      );
-
-      Alert.alert(
-        "Erreur",
-        "Impossible d'ouvrir l'application de cartographie.",
-      );
-    }
+  // Fonction pour ouvrir Google Maps
+  const openGoogleMaps = () => {
+    if (!hasCoords) return;
+    const url = `https://www.google.com/maps?q=${latitude},${longitude}`;
+    Linking.openURL(String(url));
   };
 
+  // Affichage sans coordonnées
   if (!hasCoords) {
     return (
-      <View className="rounded-2xl bg-white/5 p-4">
-        <Text className="text-[10px] uppercase tracking-wider text-white/40">
-          Localisation
-        </Text>
-
-        <View className="mt-1 flex-row items-center">
-          <MapPin size={14} color="rgba(255,255,255,0.3)" />
-
-          <Text
-            className="ml-1 flex-1 text-sm font-medium text-white"
-            numberOfLines={2}
-          >
-            {locationLabel}
-          </Text>
-        </View>
-
-        <View className="mt-3 h-40 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-          <MapPin size={28} color="rgba(255,255,255,0.2)" />
-
-          <Text className="mt-2 text-sm text-white/30">
-            Coordonnées non disponibles
-          </Text>
-        </View>
-      </View>
+      <View className="bg-white/5 rounded-2xl p-4"><Text className="text-[10px] text-white/40 uppercase tracking-wider">Localisation
+        </Text><Text className="text-white font-medium mt-1 flex items-center gap-1"><MapPin size={14} className="text-white/30" />{address || city || "Adresse non renseignée"}</Text><View className="mt-2 rounded-xl h-40 flex items-center justify-center bg-white/5 border border-white/10"><Text className="text-white/30 text-sm">Coordonnées non disponibles</Text></View></View>
     );
   }
 
-  const region = {
-    latitude,
-    longitude,
-    latitudeDelta: 0.012,
-    longitudeDelta: 0.012,
-  };
-
+  // Rendu principal
   return (
-    <View className="rounded-2xl bg-white/5 p-4">
-      <View className="flex-row items-start justify-between">
-        <View className="mr-3 flex-1">
-          <Text className="text-[10px] uppercase tracking-wider text-white/40">
-            Localisation
-          </Text>
-
-          <View className="mt-1 flex-row items-center">
-            <MapPin size={14} color="rgba(255,255,255,0.3)" />
-
-            <Text
-              className="ml-1 flex-1 text-sm font-medium text-white"
-              numberOfLines={2}
-            >
-              {locationLabel}
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          onPress={openMaps}
-          accessibilityRole="button"
-          accessibilityLabel="Ouvrir l'itinéraire"
-          className="rounded-full bg-white/5 px-3 py-2"
-        >
-          <Text className="text-xs font-medium text-orange-400">
-            Itinéraire
-          </Text>
-        </Pressable>
-      </View>
-
-      <View className="mt-3 h-48 overflow-hidden rounded-xl">
-        <MapView
-          provider={PROVIDER_DEFAULT}
-          className="h-full w-full"
-          initialRegion={region}
-          scrollEnabled
-          zoomEnabled
-          rotateEnabled={false}
-          pitchEnabled={false}
-          toolbarEnabled
-          accessibilityLabel={`Carte de ${locationLabel}`}
-        >
-          <Marker
-            coordinate={{
-              latitude,
-              longitude,
-            }}
-            title={address || city || "Bien immobilier"}
-            description={
-              address ? city : `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-            }
-            pinColor="#F97316"
-          />
-        </MapView>
-
-        <View
-          pointerEvents="none"
-          className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-1"
-        >
-          <Text className="text-[10px] text-white/60">Carte</Text>
-        </View>
-      </View>
-    </View>
+    <View className="bg-white/5 rounded-2xl p-4"><View className="flex items-center justify-between"><View><Text className="text-[10px] text-white/40 uppercase tracking-wider">Localisation
+          </Text><Text className="text-white font-medium mt-1 flex items-center gap-1"><MapPin size={14} className="text-white/30" />{address || city}</Text></View>{}<Pressable onPress={openGoogleMaps} className="text-xs text-orange-400 transition-colors bg-white/5 px-3 py-1 rounded-full"><Text>Itinéraire</Text></Pressable></View><View className="mt-2 rounded-xl overflow-hidden h-48 relative">{}<View ref={mapRef} className="w-full h-full rounded-xl" style={{ backgroundColor: "#e8ecf1" }} />{}{isLoading && (
+          <View className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl"><Loader2 className="w-6 h-6 text-white animate-spin" /></View>
+        )}{}{error && (
+          <View className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm rounded-xl p-4 text-center"><Text className="text-white/70 text-sm">{error}</Text><Pressable onPress={openGoogleMaps} className="mt-2 text-xs text-orange-400"><Text>Voir sur Google Maps</Text></Pressable></View>
+        )}{}<View className="absolute bottom-2 right-2 bg-black/60 text-white/60 text-[10px] px-2 py-1 rounded-full pointer-events-none"><Text>OpenStreetMap</Text></View></View></View>
   );
 }

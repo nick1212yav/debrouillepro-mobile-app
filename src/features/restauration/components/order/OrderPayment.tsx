@@ -57,39 +57,19 @@ export function OrderPayment({
   const Icon = config.icon;
 
   return (
-    <View className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-left space-y-3">
-      <View className="flex justify-between items-center">
-        <Text className="text-xs font-bold uppercase tracking-wider text-white/40">
-          Mode de règlement
-        </Text>
-        {isPaid ? (
-          <Text className="inline-flex items-center gap-1 text-[10px] font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            <Check size={10} /> Payé
+    <View className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-left space-y-3"><View className="flex justify-between items-center"><Text className="text-xs font-bold uppercase tracking-wider text-white/40">Mode de règlement
+        </Text>{isPaid ? (
+          <Text className="inline-flex items-center gap-1 text-[10px] font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full uppercase tracking-wider"><Check size={10} />Payé
           </Text>
         ) : (
-          <Text className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-            Attente règlement
+          <Text className="inline-flex items-center gap-1 text-[10px] font-black bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Attente règlement
           </Text>
-        )}
-      </View>
-
-      <View className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-        <Icon size={16} className={config.color} />
-        <View>
-          <Text className="block text-xs font-extrabold text-white">
-            {config.label}
-          </Text>
-          <Text className="block text-[10px] text-white/40 mt-0.5">
-            <Text>Montant :</Text>{totalAmount.toLocaleString()} <Text>FCFA</Text></Text>
-        </View>
-      </View>
-
-      {transactionId && (
+        )}</View><View className="flex items-center gap-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]"><Icon size={16} className={config.color} /><View><Text className="block text-xs font-extrabold text-white">{config.label}</Text><Text className="block text-[10px] text-white/40 mt-0.5">Montant : {totalAmount.toLocaleString()}FCFA
+          </Text></View></View>{transactionId && (
         <View className="flex justify-between items-center text-[10px] text-white/30 pt-1.5 border-t border-white/[0.04]">
-          <Text><Text>Numéro de transaction</Text></Text>
+          <Text>Numéro de transaction</Text>
           <Text className="font-mono">{transactionId}</Text>
         </View>
-      )}
-    </View>
+      )}</View>
   );
 }

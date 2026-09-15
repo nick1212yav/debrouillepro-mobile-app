@@ -1,4 +1,5 @@
-import { View, Text, Image, GestureResponderEvent, ViewStyle, TextStyle, ImageStyle, Pressable } from "react-native";
+import { View, Image, Text, GestureResponderEvent, Pressable, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+
 // src/features/messages/notifications/components/MessageNotification.tsx
 import type { MessageNotification as MessageNotificationData } from "../services/notifications.service";
 
@@ -80,6 +81,7 @@ export function MessageNotification({
   };
 
   const handleRemove = (event: GestureResponderEvent) => {
+    event.stopPropagation();
     onRemove?.(notification);
   };
 
@@ -99,98 +101,41 @@ export function MessageNotification({
   };
 
   return (
-    <Pressable
-      accessibilityRole={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onPress={handleClick}
-      onKeyDown={(event) => {
-        if (onClick && (event.key === "Enter" || event.key === " ")) {
+    <View accessibilityRole={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onPress={handleClick} onKeyPress={(event) => {
+        if (onClick && (event.nativeEvent.key === "Enter" || event.nativeEvent.key === " ")) {
           handleClick();
         }
-      }}
-      style={containerStyle}
-    >
-      {notification.senderAvatar ? (
-        <Image
-         
-         
-          style={{ width: compact ? 34 : 42, height: compact ? 34 : 42, minWidth: compact ? 34 : 42, borderRadius: "50%" }}
-         source={{ uri: notification.senderAvatar }} accessibilityLabel={notification.senderName ?? "Utilisateur"}/>
+      }} style={containerStyle}>{notification.senderAvatar ? (
+        <Image style={{ width: compact ? 34 : 42, height: compact ? 34 : 42, minWidth: compact ? 34 : 42, borderRadius: 50 }} source={{ uri: notification.senderAvatar }} accessibilityLabel={notification.senderName ?? "Utilisateur"} />
       ) : (
-        <View
-         
-          style={{ width: compact ? 34 : 42, height: compact ? 34 : 42, minWidth: compact ? 34 : 42, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--messages-avatar-bg, #e5e7eb)" }}
-        >
-          {getNotificationIcon(notification.type)}
-        </View>
-      )}
-
-      <View
-        style={{
+        <View accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" style={{ width: compact ? 34 : 42, height: compact ? 34 : 42, minWidth: compact ? 34 : 42, borderRadius: 50, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--messages-avatar-bg, #e5e7eb)", fontSize: compact ? 16 : 19 }}>{getNotificationIcon(notification.type)}</View>
+      )}<View style={{
           flex: 1,
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
           gap: 3,
-        }}
-      >
-        <View
-          style={{
+        }}><View style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
             minWidth: 0,
-          }}
-        >
-          <strong
-            style={{ minWidth: 0, overflow: "hidden", fontSize: compact ? 13 : 14 }}
-          >
-            {notification.title}
-          </strong>
-
-          <Text
-            style={{
+          }}><strong style={{ minWidth: 0, overflow: "hidden", fontSize: compact ? 13 : 14 }}>{notification.title}</strong><Text style={{
               marginLeft: "auto",
               flexShrink: 0,
               fontSize: 11,
               opacity: 0.55,
-            }}
-          >
-            {formatNotificationTime(notification.timestamp)}
-          </Text>
-        </View>
-
-        {notification.body && (
-          <View
-            style={{ opacity: 0.72, overflow: "hidden" }}
-          >
+            }}>{formatNotificationTime(notification.timestamp)}</Text></View>{notification.body && (
+          <View style={{ fontSize: compact ? 12 : 13, lineHeight: 1.4, opacity: 0.72, overflow: "hidden" }}>
             {notification.body}
           </View>
-        )}
-      </View>
-
-      {!notification.read && (
-        <Text
-          accessibilityLabel="Non lu"
-          style={{
-            width: 8,
-            height: 8,
-            minWidth: 8,
-            borderRadius: "50%",
-            backgroundColor: "#2563eb",
-          }}
-        />
-      )}
-
-      {onRemove && (
-        <Pressable
-          accessibilityLabel="Supprimer la notification"
-          onPress={handleRemove}
-          style={{ borderWidth: 0, backgroundColor: "transparent", padding: 4, opacity: 0.55 }}
-        >
-          <Text>×</Text></Pressable>
-      )}
-    </Pressable>
+        )}</View>{!notification.read && (
+        <Text accessibilityLabel="Non lu" style={{ width: 8, height: 8, minWidth: 8, borderRadius: 50, backgroundColor: "#2563eb" }} />
+      )}{onRemove && (
+        <Pressable accessibilityLabel="Supprimer la notification" onPress={handleRemove} style={{ borderWidth: 0, backgroundColor: "transparent", padding: 4, opacity: 0.55, fontSize: 15 }}>
+          ×
+        </Pressable>
+      )}</View>
   );
 }
 

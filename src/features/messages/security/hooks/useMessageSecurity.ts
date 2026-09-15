@@ -67,7 +67,7 @@ export function useMessageSecurity(): UseMessageSecurityResult {
   useEffect(() => {
     refresh();
 
-    if (typeof undefined === "undefined") {
+    if (typeof window === "undefined") {
       return;
     }
 
@@ -75,10 +75,10 @@ export function useMessageSecurity(): UseMessageSecurityResult {
       refresh();
     };
 
-    undefined;
+    window.addEventListener("storage", handleStorage);
 
     return () => {
-      undefined;
+      window.removeEventListener("storage", handleStorage);
     };
   }, [refresh]);
 

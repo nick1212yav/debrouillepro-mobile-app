@@ -22,20 +22,14 @@ export function ConversationHeader({
   return (
     <View className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
       {onBack && (
-        <Pressable
-          onPress={onBack}
-          className="flex h-9 w-9 items-center justify-center rounded-full"
-          accessibilityLabel="Retour"
-        >
+        <Pressable onPress={onBack} className="flex h-9 w-9 items-center justify-center rounded-full" accessibilityLabel="Retour">
           ←
         </Pressable>
       )}
 
       <View className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">
         {avatar ? (
-          <Image
-            className="h-full w-full object-cover" source={{ uri: avatar }} accessibilityLabel={title}
-          />
+          <Image className="h-full w-full object-cover" source={{ uri: avatar }} accessibilityLabel={title} />
         ) : (
           <Text className="font-semibold text-white/70">
             {title.charAt(0).toUpperCase()}
@@ -55,11 +49,7 @@ export function ConversationHeader({
       </View>
 
       {onInfo && (
-        <Pressable
-          onPress={onInfo}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-white/70"
-          accessibilityLabel="Informations"
-        >
+        <Pressable onPress={onInfo} className="flex h-9 w-9 items-center justify-center rounded-full text-white/70" accessibilityLabel="Informations">
           ⓘ
         </Pressable>
       )}

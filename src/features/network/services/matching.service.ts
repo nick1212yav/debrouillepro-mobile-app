@@ -1,5 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/services/matching.service.ts
 import type { Id } from "@/convex/_generated/dataModel";
 import type {
@@ -8,6 +6,7 @@ import type {
   NetworkOpportunityFilters,
 } from "../types/opportunity.types";
 import type { NetworkUser } from "../types/network.types"; // ✅ Correction : import du type manquant
+import { toast } from "sonner";
 
 /**
  * Service pour les recommandations et le matching professionnel.
@@ -53,10 +52,10 @@ export class MatchingService {
     // ✅ Correction : Id<"jobs"> -> string
     try {
       await applyFn({ jobId });
-      UIService.openToast("Candidature envoyée", "success");
+      toast.success("Candidature envoyée");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la candidature", "error");
+      toast.error("Erreur lors de la candidature");
       return false;
     }
   }
@@ -71,10 +70,10 @@ export class MatchingService {
   ): Promise<boolean> {
     try {
       await saveFn({ id, type });
-      UIService.openToast("Sauvegardé", "success");
+      toast.success("Sauvegardé");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la sauvegarde", "error");
+      toast.error("Erreur lors de la sauvegarde");
       return false;
     }
   }
@@ -89,10 +88,10 @@ export class MatchingService {
   ): Promise<boolean> {
     try {
       await unsaveFn({ id, type });
-      UIService.openToast("Retiré des sauvegardes", "success");
+      toast.success("Retiré des sauvegardes");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
       return false;
     }
   }
@@ -139,10 +138,10 @@ export class MatchingService {
   ): Promise<boolean> {
     try {
       await requestFn({ toUserId, context });
-      UIService.openToast("Demande de recommandation envoyée", "success");
+      toast.success("Demande de recommandation envoyée");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la demande", "error");
+      toast.error("Erreur lors de la demande");
       return false;
     }
   }

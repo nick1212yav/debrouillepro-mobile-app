@@ -1,18 +1,24 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { Pressable, View, Text } from "react-native";
+// src/components/AIWriteAssist.tsx
 /**
- * AIWriteAssist – inline AI helper for forms.
+ * AIWriteAssist – inline AI helper for forms (React Native).
  * Provides "generate description" and "suggest tags" buttons
  * that can be embedded in any publication/creation form.
  */
-import { useState } from "react";
-import { Sparkles, Tag, Loader2, Check, ChevronDown, X } from "lucide-react-native";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from "react-native";
+import { Sparkles, Tag, Check, ChevronDown, X } from "lucide-react-native";
 import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { cn } from "@/lib/utils";
+import { api } from "@/convex/_generated/api";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
+// ── Types ────────────────────────────────────────────────────────────────
 type ContentType =
   | "post"
   | "job_description"
@@ -24,31 +30,23 @@ type ContentType =
 type Tone = "casual" | "formel" | "persuasif" | "informatif";
 
 interface AIWriteAssistProps {
-  /** Maps publication type to ContentType for the generate action */
   contentType: ContentType;
-  /** Current topic/title to use as input for generation */
   topic: string;
-  /** Called with the generated description text */
   onGenerated: (text: string) => void;
-  /** Current description text to extract tags from */
   description: string;
-  /** Called with suggested tags array */
   onTagsSuggested: (tags: string[]) => void;
-  /** Optional category context for tags */
   category?: string;
-  /** Color accent */
   color?: string;
 }
 
 const TONES: { value: Tone; label: string }[] = [
-  { value: "casual",     label: "Décontracté" },
-  { value: "formel",     label: "Formel" },
-  { value: "persuasif",  label: "Persuasif" },
+  { value: "casual", label: "Décontracté" },
+  { value: "formel", label: "Formel" },
+  { value: "persuasif", label: "Persuasif" },
   { value: "informatif", label: "Informatif" },
 ];
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
+// ── Component ────────────────────────────────────────────────────────────
 export default function AIWriteAssist({
   contentType,
   topic,
@@ -70,7 +68,10 @@ export default function AIWriteAssist({
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
-      UIService.openToast("Remplis d'abord le titre pour que l'IA puisse générer une description", "error");
+      Alert.alert(
+        "Erreur",
+        "Remplis d'abord le titre pour que l'IA puisse générer une description",
+      );
       return;
     }
     setGeneratingText(true);
@@ -82,9 +83,9 @@ export default function AIWriteAssist({
         maxWords: 120,
       });
       onGenerated(content);
-      UIService.openToast("Description générée !", "success");
+      Alert.alert("Succès", "Description générée !");
     } catch {
-      UIService.openToast("Erreur de génération IA", "error");
+      Alert.alert("Erreur", "Erreur de génération IA");
     } finally {
       setGeneratingText(false);
     }
@@ -93,7 +94,7 @@ export default function AIWriteAssist({
   const handleSuggestTags = async () => {
     const source = description.trim() || topic.trim();
     if (!source) {
-      UIService.openToast("Remplis le titre ou la description d'abord", "error");
+      Alert.alert("Erreur", "Remplis le titre ou la description d'abord");
       return;
     }
     setGeneratingTags(true);
@@ -102,110 +103,273 @@ export default function AIWriteAssist({
       setSuggestedTags(tags);
       setShowTags(true);
       onTagsSuggested(tags);
-      UIService.openToast(`${tags.length} tags suggérés !`, "success");
+      Alert.alert("Succès", `${tags.length} tags suggérés !`);
     } catch {
-      UIService.openToast("Erreur de suggestion de tags", "error");
+      Alert.alert("Erreur", "Erreur de suggestion de tags");
     } finally {
       setGeneratingTags(false);
     }
   };
 
+  const toneLabel = TONES.find((t) => t.value === tone)?.label ?? "";
+
   return (
-    <View className="mb-2">
-      {/* Action row */}
-      <View className="flex items-center gap-2 flex-wrap">
-        {/* Generate description button */}
+    <View style={styles.container}>
+      {/* Ligne d'actions */}
+      <View style={styles.actionsRow}>
+        {/* Bouton "Générer description" */}
         <Pressable
-          onPress={() => { void handleGenerate(); }}
+          onPress={handleGenerate}
           disabled={generatingText}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-60"
-          style={{ backgroundColor: `${color}18`, borderStyle: "solid" }}
+          style={({ pressed }) => [
+            styles.pillButton,
+            {
+              backgroundColor: `${color}18`,
+              borderColor: `${color}40`,
+            },
+            generatingText && styles.disabled,
+            pressed && styles.pressed,
+          ]}
         >
-          {generatingText
-            ? <Loader2 size={11} className="animate-spin" />
-            : <Sparkles size={11} />
-          }
-          {generatingText ? "Génération…" : "Générer description"}
+          {generatingText ? (
+            <ActivityIndicator size="small" color={color} />
+          ) : (
+            <Sparkles size={11} color={color} />
+          )}
+          <Text style={[styles.pillText, { color }]}>
+            {generatingText ? "Génération…" : "Générer description"}
+          </Text>
         </Pressable>
 
-        {/* Tone picker */}
-        <View className="relative">
+        {/* Sélecteur de ton */}
+        <View style={styles.tonePickerWrapper}>
           <Pressable
-            onPress={() => setShowTonePicker(v => !v)}
-            className="flex items-center gap-1 px-2.5 py-2 rounded-xl text-[10px] font-semibold"
-            style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
+            onPress={() => setShowTonePicker((v) => !v)}
+            style={({ pressed }) => [
+              styles.toneButton,
+              pressed && styles.pressed,
+            ]}
           >
-            {TONES.find(t => t.value === tone)?.label}
-            <ChevronDown size={10} />
+            <Text style={styles.toneButtonText}>{toneLabel}</Text>
+            <ChevronDown size={10} color="rgba(255,255,255,0.6)" />
           </Pressable>
-          <>
-            {showTonePicker && (
-              <View
-                className="absolute top-full mt-1 left-0 z-50 rounded-xl overflow-hidden py-1 min-w-[120px]"
-                style={{ backgroundColor: "#12122a", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-              >
-                {TONES.map(t => (
+
+          {showTonePicker && (
+            <View style={styles.toneDropdown}>
+              {TONES.map((t) => {
+                const isSelected = tone === t.value;
+                return (
                   <Pressable
                     key={t.value}
-                    onPress={() => { setTone(t.value); setShowTonePicker(false); }}
-                    className={cn(
-                      "w-full px-3 py-2 text-left text-xs cursor-pointer transition-colors hover:bg-white/5",
-                      tone === t.value ? "font-bold" : "text-white/60"
-                    )}
-                    style={{  }}
+                    onPress={() => {
+                      setTone(t.value);
+                      setShowTonePicker(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.toneOption,
+                      pressed && styles.toneOptionHover,
+                    ]}
                   >
-                    {tone === t.value && <Check size={9} className="inline mr-1.5" />}
-                    {t.label}
+                    {isSelected && <Check size={9} color="#FFFFFF" />}
+                    <Text
+                      style={[
+                        styles.toneOptionText,
+                        isSelected
+                          ? styles.toneOptionTextSelected
+                          : styles.toneOptionTextInactive,
+                      ]}
+                    >
+                      {t.label}
+                    </Text>
                   </Pressable>
-                ))}
-              </View>
-            )}
-          </>
+                );
+              })}
+            </View>
+          )}
         </View>
 
-        {/* Suggest tags button */}
+        {/* Bouton "Tags auto" */}
         <Pressable
-          onPress={() => { void handleSuggestTags(); }}
+          onPress={handleSuggestTags}
           disabled={generatingTags}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-60"
-          style={{ backgroundColor: "rgba(245,158,11,0.12)", borderWidth: 1, borderColor: "rgba(245,158,11,0.3)", borderStyle: "solid" }}
+          style={({ pressed }) => [
+            styles.pillButton,
+            styles.tagsButton,
+            generatingTags && styles.disabled,
+            pressed && styles.pressed,
+          ]}
         >
-          {generatingTags
-            ? <Loader2 size={11} className="animate-spin" />
-            : <Tag size={11} />
-          }
-          {generatingTags ? "Analyse…" : "Tags auto"}
+          {generatingTags ? (
+            <ActivityIndicator size="small" color="#FCD34D" />
+          ) : (
+            <Tag size={11} color="#FCD34D" />
+          )}
+          <Text style={[styles.pillText, { color: "#FCD34D" }]}>
+            {generatingTags ? "Analyse…" : "Tags auto"}
+          </Text>
         </Pressable>
       </View>
 
-      {/* Suggested tags display */}
-      <>
-        {showTags && suggestedTags.length > 0 && (
-          <View
-            className="mt-2 overflow-hidden"
-          >
-            <View className="rounded-2xl p-3"
-              style={{ backgroundColor: "rgba(245,158,11,0.06)", borderWidth: 1, borderColor: "rgba(245,158,11,0.2)", borderStyle: "solid" }}>
-              <View className="flex items-center justify-between mb-2">
-                <Text className="text-[10px] text-white/40 uppercase tracking-wider">Tags suggérés par l'IA</Text>
-                <Pressable onPress={() => setShowTags(false)} className="">
-                  <X size={11} className="text-white/30" />
-                </Pressable>
-              </View>
-              <View className="flex flex-wrap gap-1.5">
-                {suggestedTags.map(tag => (
-                  <Text key={tag}
-                    className="px-2.5 py-1 rounded-full text-[10px] font-semibold"
-                    style={{ backgroundColor: "rgba(245,158,11,0.15)", color: "#FCD34D", borderWidth: 1, borderColor: "rgba(245,158,11,0.25)", borderStyle: "solid" }}
-                  >
-                    <Text>#</Text>{tag}
-                  </Text>
-                ))}
-              </View>
-            </View>
+      {/* Panneau de tags suggérés */}
+      {showTags && suggestedTags.length > 0 && (
+        <View style={styles.tagsPanel}>
+          <View style={styles.tagsHeader}>
+            <Text style={styles.tagsHeaderText}>Tags suggérés par l'IA</Text>
+            <Pressable onPress={() => setShowTags(false)} hitSlop={6}>
+              <X size={11} color="rgba(255,255,255,0.3)" />
+            </Pressable>
           </View>
-        )}
-      </>
+          <View style={styles.tagsList}>
+            {suggestedTags.map((tag) => (
+              <View key={tag} style={styles.tagChip}>
+                <Text style={styles.tagChipText}>#{tag}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
+
+// ── Styles ───────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 8,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  // Boutons "pill"
+  pillButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  pillText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  tagsButton: {
+    backgroundColor: "rgba(245,158,11,0.12)",
+    borderColor: "rgba(245,158,11,0.3)",
+  },
+
+  // Sélecteur de ton
+  tonePickerWrapper: {
+    position: "relative",
+    zIndex: 50,
+  },
+  toneButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  toneButtonText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  toneDropdown: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    marginTop: 4,
+    minWidth: 120,
+    borderRadius: 12,
+    paddingVertical: 4,
+    backgroundColor: "#12122a",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    overflow: "hidden",
+    // Ombre iOS + Android
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  toneOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    width: "100%",
+  },
+  toneOptionHover: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  toneOptionText: {
+    fontSize: 12,
+  },
+  toneOptionTextSelected: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  toneOptionTextInactive: {
+    color: "rgba(255,255,255,0.6)",
+  },
+
+  // Panneau tags
+  tagsPanel: {
+    marginTop: 8,
+    borderRadius: 16,
+    padding: 12,
+    backgroundColor: "rgba(245,158,11,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.2)",
+  },
+  tagsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  tagsHeaderText: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  tagsList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  tagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(245,158,11,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.25)",
+  },
+  tagChipText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#FCD34D",
+  },
+
+  // États
+  disabled: {
+    opacity: 0.6,
+  },
+  pressed: {
+    transform: [{ scale: 0.96 }],
+  },
+});

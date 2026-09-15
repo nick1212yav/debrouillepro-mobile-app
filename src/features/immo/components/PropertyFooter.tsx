@@ -40,12 +40,14 @@ export function PropertyFooter({
 }: Props) {
   // ✅ Fonctions pour Appeler et WhatsApp
   const handleCall = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     if (phone) {
-      undefined.href = `tel:${phone}`;
+      Linking.openURL(`tel:${phone}`);
     }
   };
 
   const handleWhatsApp = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     if (phone) {
       const cleaned = phone.replace(/[^0-9]/g, "");
       Linking.openURL(String(`https://wa.me/${cleaned}`));
@@ -58,44 +60,25 @@ export function PropertyFooter({
       <View className="flex flex-wrap gap-2 mt-3">
         {phone && (
           <>
-            <Pressable
-              onPress={handleCall}
-              className="flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5"
-              style={{ backgroundColor: "rgba(16,185,129,0.2)", borderWidth: 1, borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}
-            >
+            <Pressable onPress={handleCall} className="flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 active:scale-95 transition-transform" style={{ backgroundColor: "rgba(16,185,129,0.2)", borderWidth: 1, borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}>
               <Phone size={13} /> Appeler
             </Pressable>
-            <Pressable
-              onPress={handleWhatsApp}
-              className="flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5"
-              style={{ backgroundColor: "rgba(37,211,102,0.2)", borderWidth: 1, borderColor: "rgba(37,211,102,0.2)", borderStyle: "solid" }}
-            >
+            <Pressable onPress={handleWhatsApp} className="flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 active:scale-95 transition-transform" style={{ backgroundColor: "rgba(37,211,102,0.2)", borderWidth: 1, borderColor: "rgba(37,211,102,0.2)", borderStyle: "solid" }}>
               <Smartphone size={13} /> WhatsApp
             </Pressable>
           </>
         )}
-        <Pressable
-          onPress={onContact}
-          className="flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5"
-          style={{ backgroundColor: `${color}20`, borderStyle: "solid" }}
-        >
+        <Pressable onPress={onContact} className="flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 active:scale-95 transition-transform" style={{ backgroundColor: `${color}20`, borderStyle: "solid" }}>
           <MessageCircle size={13} /> Contacter
         </Pressable>
-        <Pressable
-          onPress={onVisit}
-          className="flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 text-white"
-          style={{  }}
-        >
+        <Pressable onPress={onVisit} className="flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 active:scale-95 transition-transform text-white" style={{  }}>
           <Calendar size={13} /> Visiter
         </Pressable>
       </View>
 
       {/* ✅ Actions sociales */}
       <View className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
-        <Pressable
-          onPress={onLike}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/50"
-        >
+        <Pressable onPress={onLike} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/50 transition-colors">
           <Heart
             size={14}
             className={isLiked ? "fill-purple-400 text-purple-400" : ""}
@@ -103,25 +86,16 @@ export function PropertyFooter({
           <Text>{likeCount > 0 ? likeCount : ""}</Text>
         </Pressable>
 
-        <Pressable
-          onPress={onComment}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/50"
-        >
+        <Pressable onPress={onComment} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/50 transition-colors">
           <MessageCircle size={14} />
           <Text>{commentCount > 0 ? commentCount : ""}</Text>
         </Pressable>
 
-        <Pressable
-          onPress={onShare}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/50"
-        >
+        <Pressable onPress={onShare} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/50 transition-colors">
           <Share2 size={14} />
         </Pressable>
 
-        <Pressable
-          onPress={onBookmark}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/50 ml-auto"
-        >
+        <Pressable onPress={onBookmark} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/50 transition-colors ml-auto">
           <Bookmark
             size={14}
             className={isBookmarked ? "fill-yellow-400 text-yellow-400" : ""}

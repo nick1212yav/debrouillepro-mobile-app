@@ -85,6 +85,7 @@ export default function AgriPage({ onBack, onSelectProduct }: AgriPageProps) {
 
   const handleToggleFavorite = useCallback(
     (id: string, e: GestureResponderEvent) => {
+      e.stopPropagation();
       setFavorites((prev) =>
         prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
       );
@@ -99,94 +100,17 @@ export default function AgriPage({ onBack, onSelectProduct }: AgriPageProps) {
   }, []);
 
   return (
-    <View
-      className="h-full w-full flex flex-col overflow-hidden"
-      style={{  }}
-    >
-      {/* Barre supérieure de navigation */}
-      <View className="px-5 pt-12 pb-3 flex items-center justify-between border-b border-white/5 bg-black/10">
-        <View className="flex items-center gap-3">
-          <Pressable
-            onPress={onBack}
-            className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/[0.03] border border-white/5"
-          >
-            <ArrowLeft size={18} className="text-white" />
-          </Pressable>
-          <View>
-            <Text className="text-white font-black text-base flex items-center gap-2">
-              Marché Agricole <Text className="text-xl">🌱</Text>
-            </Text>
-            <Text className="text-white/40 text-[10px] tracking-wide">
-              Produits locaux, intrants & conseils d'agronomes
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          onPress={() => setIsCreateSheetOpen(true)}
-          className="flex items-center gap-1.5 px-3.5 h-10 rounded-2xl text-xs font-bold bg-green-500 text-black border border-green-400/20 shadow-lg shadow-green-500/10"
-        >
-          <Plus size={15} strokeWidth={2.5} />
-          <Text>Vendre</Text>
-        </Pressable>
-      </View>
-
-      {/* Zone fixe de filtrage et recherche */}
-      <View className="p-4 space-y-3 bg-black/5 border-b border-white/5 flex-shrink-0">
-        <View className="flex items-center gap-2">
-          <View className="flex-1">
-            <AgriSearch value={searchQuery} onChange={setSearchQuery} />
-          </View>
-
-          {/* Sélecteur de mode d'affichage */}
-          <View className="flex items-center p-0.5 rounded-xl bg-white/[0.03] border border-white/5">
-            <Pressable
-              onPress={() => setViewMode("grid")}
-              className={`p-2 rounded-lg transition-colors ${
+    <View className="h-full w-full flex flex-col overflow-hidden" style={{  }}>{}<View className="px-5 pt-12 pb-3 flex items-center justify-between border-b border-white/5 bg-black/10 backdrop-blur-md"><View className="flex items-center gap-3"><Pressable whileTap={{ scale: 0.92 }} onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/[0.03] border border-white/5 transition-colors"><ArrowLeft size={18} className="text-white" /></Pressable><View><Text className="text-white font-black text-base flex items-center gap-2">Marché Agricole <Text className="text-xl">🌱</Text></Text><Text className="text-white/40 text-[10px] tracking-wide">Produits locaux, intrants & conseils d'agronomes
+            </Text></View></View><Pressable whileTap={{ scale: 0.95 }} onPress={() => setIsCreateSheetOpen(true)} className="flex items-center gap-1.5 px-3.5 h-10 rounded-2xl text-xs font-bold bg-green-500 text-black border border-green-400/20 shadow-lg shadow-green-500/10 transition-colors"><Plus size={15} strokeWidth={2.5} /><Text>Vendre</Text></Pressable></View>{}<View className="p-4 space-y-3 bg-black/5 border-b border-white/5 flex-shrink-0"><View className="flex items-center gap-2"><View className="flex-1"><AgriSearch value={searchQuery} onChange={setSearchQuery} /></View>{}<View className="flex items-center p-0.5 rounded-xl bg-white/[0.03] border border-white/5"><Pressable onPress={() => setViewMode("grid")} className={`p-2 rounded-lg transition-colors ${
                 viewMode === "grid"
                   ? "bg-white/[0.05] text-green-400"
                   : "text-white/40 hover:text-white/70"
-              }`}
-            >
-              <Grid size={13} />
-            </Pressable>
-            <Pressable
-              onPress={() => setViewMode("list")}
-              className={`p-2 rounded-lg transition-colors ${
+              }`}><Grid size={13} /></Pressable><Pressable onPress={() => setViewMode("list")} className={`p-2 rounded-lg transition-colors ${
                 viewMode === "list"
                   ? "bg-white/[0.05] text-green-400"
                   : "text-white/40 hover:text-white/70"
-              }`}
-            >
-              <List size={13} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Catégories de cultures */}
-        <AgriCategoryFilter
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-        />
-
-        {/* Filtres avancés & Tri */}
-        <View className="flex items-center justify-between gap-4 pt-1.5 border-t border-white/5">
-          <AgriFilters
-            activeFiltersCount={activeFiltersCount}
-            onOpenFilters={() => setIsFilterSheetOpen(true)}
-            onClearAll={handleClearFilters}
-          />
-          <AgriSort value={sortOption} onChange={setSortOption} />
-        </View>
-      </View>
-
-      {/* Flux de produits (Grille ou Liste) */}
-      <View className="flex-1 overflow-y-auto px-5 py-4 scrollbar-none">
-        <>
-          {viewMode === "grid" ? (
-            <View
-              key="grid"
-            >
+              }`}><List size={13} /></Pressable></View></View>{}<AgriCategoryFilter selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />{}<View className="flex items-center justify-between gap-4 pt-1.5 border-t border-white/5"><AgriFilters activeFiltersCount={activeFiltersCount} onOpenFilters={() => setIsFilterSheetOpen(true)} onClearAll={handleClearFilters} /><AgriSort value={sortOption} onChange={setSortOption} /></View></View>{}<View className="flex-1 overflow-y-auto px-5 py-4"><View>{viewMode === "grid" ? (
+            <View key="grid" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
               <AgriGrid
                 products={filteredProducts}
                 isLoading={isLoading}
@@ -196,9 +120,7 @@ export default function AgriPage({ onBack, onSelectProduct }: AgriPageProps) {
               />
             </View>
           ) : (
-            <View
-              key="list"
-            >
+            <View key="list" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
               <AgriList
                 products={filteredProducts}
                 isLoading={isLoading}
@@ -207,26 +129,6 @@ export default function AgriPage({ onBack, onSelectProduct }: AgriPageProps) {
                 onSelectProduct={onSelectProduct}
               />
             </View>
-          )}
-        </>
-      </View>
-
-      {/* Sheets flottantes */}
-      <FilterAgriSheet
-        isOpen={isFilterSheetOpen}
-        onClose={() => setIsFilterSheetOpen(false)}
-        selectedLocation={selectedLocation}
-        onSelectLocation={setSelectedLocation}
-        priceRange={priceRange}
-        onChangePrice={setPriceRange}
-        selectedStatus={selectedStatus}
-        onChangeStatus={setSelectedStatus}
-      />
-
-      <CreateAgriSheet
-        isOpen={isCreateSheetOpen}
-        onClose={() => setIsCreateSheetOpen(false)}
-      />
-    </View>
+          )}</View></View>{}<FilterAgriSheet isOpen={isFilterSheetOpen} onClose={() => setIsFilterSheetOpen(false)} selectedLocation={selectedLocation} onSelectLocation={setSelectedLocation} priceRange={priceRange} onChangePrice={setPriceRange} selectedStatus={selectedStatus} onChangeStatus={setSelectedStatus} /><CreateAgriSheet isOpen={isCreateSheetOpen} onClose={() => setIsCreateSheetOpen(false)} /></View>
   );
 }

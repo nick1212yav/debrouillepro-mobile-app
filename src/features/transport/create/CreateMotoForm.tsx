@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateMotoForm.tsx
 import { useForm } from "react-hook-form";
@@ -101,13 +101,9 @@ export function CreateMotoForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="driverName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="driverName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom complet du motard *</Text></FormLabel>
+              <FormLabel>Nom complet du motard *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Alain Mutombo"
@@ -117,15 +113,9 @@ export function CreateMotoForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone direct *</Text></FormLabel>
+              <FormLabel>Téléphone direct *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: +243 890 000 000"
@@ -135,16 +125,9 @@ export function CreateMotoForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="motoModel"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="motoModel" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Modèle de la moto *</Text></FormLabel>
+                <FormLabel>Modèle de la moto *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: TVS Star HLX, Haojin"
@@ -154,14 +137,9 @@ export function CreateMotoForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="licensePlate"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="licensePlate" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Numéro de plaque *</Text></FormLabel>
+                <FormLabel>Numéro de plaque *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: M-1234BC01"
@@ -171,37 +149,24 @@ export function CreateMotoForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="pricePerKm"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="pricePerKm" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prix estimé par km *</Text></FormLabel>
+                <FormLabel>Prix estimé par km *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -212,23 +177,16 @@ export function CreateMotoForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                    <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="operatingZone"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="operatingZone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Zone d'activité habituelle *</Text></FormLabel>
+              <FormLabel>Zone d'activité habituelle *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Kintambo, Gombe, Limete"
@@ -238,68 +196,50 @@ export function CreateMotoForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Casque fourni */}
-        <FormField
-          control={form.control}
-          name="helmetProvided"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="helmetProvided" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-3 bg-white/5">
               <View className="space-y-0.5">
                 <FormLabel className="text-white/90">
-                  <Text>Casque fourni au client *</Text></FormLabel>
+                  Casque fourni au client *
+                </FormLabel>
                 <FormDescription className="text-white/40 text-xs">
-                  <Text>Obligatoire selon la charte DébrouillePro</Text></FormDescription>
+                  Obligatoire selon la charte DébrouillePro
+                </FormDescription>
               </View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                   className="data-[state=checked]:bg-violet-600"
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        {/* Assurance active */}
-        <FormField
-          control={form.control}
-          name="insuranceActive"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="insuranceActive" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-3 bg-white/5">
               <View className="space-y-0.5">
                 <FormLabel className="text-white/90">
-                  <Text>Assurance responsabilité civile active *</Text></FormLabel>
+                  Assurance responsabilité civile active *
+                </FormLabel>
                 <FormDescription className="text-white/40 text-xs">
-                  <Text>Protection obligatoire pour le conducteur et le passager</Text></FormDescription>
+                  Protection obligatoire pour le conducteur et le passager
+                </FormDescription>
               </View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                   className="data-[state=checked]:bg-violet-600"
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+          )} /><Button  className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Enregistrement...</Text></>
+              Enregistrement...
+            </>
           ) : (
             "🏍️ Enregistrer le service de Moto-Taxi"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

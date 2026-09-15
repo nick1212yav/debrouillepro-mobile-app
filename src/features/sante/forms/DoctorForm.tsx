@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/sante/forms/DoctorForm.tsx
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -135,32 +136,17 @@ export function DoctorForm({
 
   return (
     <Form {...form}>
-      <View
-       
-        className="space-y-4 text-left"
-      >
-        {/* Nom */}
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
+      <View className="space-y-4 text-left">{}<FormField control={form.control} name="name" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom complet *</Text></FormLabel>
+              <FormLabel>Nom complet *</FormLabel>
               <FormControl>
                 <Input placeholder="Dr. Jean Dupont" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Spécialité */}
-        <FormField
-          control={form.control}
-          name="specialty"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="specialty" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Spécialité *</Text></FormLabel>
+              <FormLabel>Spécialité *</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -177,106 +163,57 @@ export function DoctorForm({
               </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Téléphone */}
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone *</Text></FormLabel>
+              <FormLabel>Téléphone *</FormLabel>
               <FormControl>
                 <Input placeholder="+243 123 456 789" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Email */}
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="email" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Email</Text></FormLabel>
+              <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input placeholder="dr.dupont@exemple.com" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Adresse */}
-        <FormField
-          control={form.control}
-          name="address"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="address" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Adresse *</Text></FormLabel>
+              <FormLabel>Adresse *</FormLabel>
               <FormControl>
                 <Input placeholder="12 Avenue Lumumba" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Ville */}
-        <FormField
-          control={form.control}
-          name="city"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="city" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Ville *</Text></FormLabel>
+              <FormLabel>Ville *</FormLabel>
               <FormControl>
                 <Input placeholder="Kinshasa" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Pays */}
-        <FormField
-          control={form.control}
-          name="country"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="country" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Pays</Text></FormLabel>
+              <FormLabel>Pays</FormLabel>
               <FormControl>
                 <Input placeholder="RDC" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Tarif */}
-        <FormField
-          control={form.control}
-          name="fees"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="fees" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Tarif de consultation</Text></FormLabel>
+              <FormLabel>Tarif de consultation</FormLabel>
               <FormControl>
                 <Input type="number" placeholder="25000" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Devise */}
-        <FormField
-          control={form.control}
-          name="currency"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="currency" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Devise</Text></FormLabel>
+              <FormLabel>Devise</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -284,83 +221,48 @@ export function DoctorForm({
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                  <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                  <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                  <SelectItem value="FCFA">FCFA</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Expérience */}
-        <FormField
-          control={form.control}
-          name="experience"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="experience" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Expérience (années)</Text></FormLabel>
+              <FormLabel>Expérience (années)</FormLabel>
               <FormControl>
                 <Input type="number" placeholder="10" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Langues */}
-        <FormField
-          control={form.control}
-          name="languages"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="languages" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Langues parlées</Text></FormLabel>
+              <FormLabel>Langues parlées</FormLabel>
               <FormControl>
                 <Input placeholder="Français, Anglais, Lingala" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Assurances */}
-        <FormField
-          control={form.control}
-          name="insurances"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="insurances" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Assurances acceptées</Text></FormLabel>
+              <FormLabel>Assurances acceptées</FormLabel>
               <FormControl>
                 <Input placeholder="Mutuelle, RAM, etc." {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Horaires */}
-        <FormField
-          control={form.control}
-          name="schedule"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="schedule" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Horaires</Text></FormLabel>
+              <FormLabel>Horaires</FormLabel>
               <FormControl>
                 <Input placeholder="Lun-Ven 09:00 - 18:00" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Biographie */}
-        <FormField
-          control={form.control}
-          name="bio"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="bio" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Biographie</Text></FormLabel>
+              <FormLabel>Biographie</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Présentation du médecin, diplômes, etc."
@@ -371,14 +273,7 @@ export function DoctorForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Sélection d'images pour le profil et le cabinet médical [2] */}
-        <FormField
-          control={form.control}
-          name="images"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="images" render={({ field }) => (
             <FormItem>
               <FormControl>
                 <HealthImageSelector
@@ -390,57 +285,27 @@ export function DoctorForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Consultation en ligne */}
-        <FormField
-          control={form.control}
-          name="online"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="online" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-              <View className="space-y-0.5">
-                <FormLabel><Text>Consultation en ligne</Text></FormLabel>
-                <View className="text-sm text-muted-foreground">
-                  <Text>Le médecin propose des consultations à distance</Text></View>
-              </View>
+              <View className="space-y-0.5"><FormLabel>Consultation en ligne</FormLabel><View className="text-sm text-muted-foreground"><Text>Le médecin propose des consultations à distance</Text></View></View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        {/* Vérifié */}
-        <FormField
-          control={form.control}
-          name="verified"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="verified" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-              <View className="space-y-0.5">
-                <FormLabel><Text>Compte vérifié</Text></FormLabel>
-                <View className="text-sm text-muted-foreground">
-                  <Text>Le profil a été validé par l'administration</Text></View>
-              </View>
+              <View className="space-y-0.5"><FormLabel>Compte vérifié</FormLabel><View className="text-sm text-muted-foreground"><Text>Le profil a été validé par l'administration</Text></View></View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        {/* Bouton de soumission */}
-        <Button className="w-full h-11" disabled={isLoading}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isLoading ? "Enregistrement..." : submitLabel}
-        </Button>
-      </View>
+          )} />{}<Button  className="w-full h-11" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isLoading ? "Enregistrement..." : submitLabel}</Button></View>
     </Form>
   );
 }

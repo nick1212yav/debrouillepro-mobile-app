@@ -1,5 +1,4 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Pressable, TextInput } from "react-native";
+import { View, Pressable, Text, TextInput } from "react-native";
 import { useState } from "react";
 import {
   ArrowLeft, Star, MessageCircle, Users, BookOpen, Search,
@@ -10,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 
@@ -252,482 +252,111 @@ export default function MentoratPage({ onBack }: Props) {
   };
 
   return (
-    <View className="h-full flex flex-col overflow-hidden" style={{  }}>
-      {/* Header */}
-      <View className="flex items-center gap-3 px-4 pt-12 pb-4">
-        <Pressable onPress={onBack} className="p-2 rounded-xl text-white/60">
-          <ArrowLeft size={20} />
-        </Pressable>
-        <View className="flex-1">
-          <Text className="text-white font-bold text-xl">Mentorat & Communauté</Text>
-          <Text className="text-white/50 text-xs">Apprenez ensemble, grandissez ensemble</Text>
-        </View>
-        <View className="flex items-center gap-1 px-3 py-1.5 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.15)" }}>
-          <Users size={13} className="text-indigo-400" />
-          <Text className="text-indigo-400 font-bold text-sm">2.4k</Text>
-        </View>
-      </View>
-
-      {/* Tabs */}
-      <View className="flex gap-1 px-4 pb-3">
-        {TABS.map((t) => (
-          <Pressable key={t} onPress={() => setTab(t)}
-            className="flex-1 py-2 rounded-xl text-xs font-semibold"
-            style={{ backgroundColor: tab === t ? "rgba(99,102,241,0.3)" : "rgba(255,255,255,0.05)", borderColor: "rgba(99,102,241,0.5)", borderStyle: "solid" }}>
-            {t}
-          </Pressable>
-        ))}
-      </View>
-
-      <View className="flex-1 overflow-y-auto px-4 pb-6">
-
-        {/* ── MENTORS ── */}
-        {tab === "Mentors" && (
-          <View className="space-y-4">
-            {/* Search */}
-            <View className="flex items-center gap-2 px-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-              <Search size={15} className="text-white/40 flex-shrink-0" />
-              <TextInput
-                value={searchQuery}
-                onChangeText={(text) => setSearchQuery(text)}
-                placeholder="Rechercher un mentor ou une spécialité…"
-                className="flex-1 bg-transparent text-white text-sm py-3 outline-none placeholder:text-white/30"
-              />
-              {searchQuery && (
+    <View className="h-full flex flex-col overflow-hidden" style={{  }}>{}<View className="flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={onBack} className="p-2 rounded-xl text-white/60"><ArrowLeft size={20} /></Pressable><View className="flex-1"><Text className="text-white font-bold text-xl">Mentorat & Communauté</Text><Text className="text-white/50 text-xs">Apprenez ensemble, grandissez ensemble</Text></View><View className="flex items-center gap-1 px-3 py-1.5 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.15)" }}><Users size={13} className="text-indigo-400" /><Text className="text-indigo-400 font-bold text-sm">2.4k</Text></View></View>{}<View className="flex gap-1 px-4 pb-3">{TABS.map((t) => (
+          <Pressable key={t} onPress={() => setTab(t)} className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all" style={{ backgroundColor: tab === t ? "rgba(99,102,241,0.3)" : "rgba(255,255,255,0.05)", borderColor: "rgba(99,102,241,0.5)", borderStyle: "solid" }}>{t}</Pressable>
+        ))}</View><View className="flex-1 overflow-y-auto px-4 pb-6">{}{tab === "Mentors" && (
+          <View className="space-y-4">{}<View className="flex items-center gap-2 px-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Search size={15} className="text-white/40 flex-shrink-0" /><TextInput value={searchQuery} onChangeText={(value) => setSearchQuery(value)} placeholder="Rechercher un mentor ou une spécialité…" className="flex-1 bg-transparent text-white text-sm py-3 outline-none placeholder:text-white/30" />{searchQuery && (
                 <Pressable onPress={() => setSearchQuery("")} className="text-white/40"><X size={14} /></Pressable>
-              )}
-            </View>
-
-            {/* Specialty filter */}
-            <View className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {specialties.map((s) => (
-                <Pressable key={s} onPress={() => setSpecialtyFilter(s)}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ backgroundColor: specialtyFilter === s ? "rgba(99,102,241,0.35)" : "rgba(255,255,255,0.06)", borderColor: "rgba(99,102,241,0.5)", borderStyle: "solid" }}>
-                  {s}
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Featured banner */}
-            <View className="rounded-2xl p-4 flex items-center gap-3" style={{ borderWidth: 1, borderColor: "rgba(99,102,241,0.3)", borderStyle: "solid" }}>
-              <Crown size={22} className="text-amber-400 flex-shrink-0" />
-              <View>
-                <View className="text-white font-semibold text-sm"><Text>Mentor de la semaine</Text></View>
-                <View className="text-white/60 text-xs mt-0.5"><Text>Dr. Aminata Diallo · 4.9 ⭐ · 340 sessions</Text></View>
-              </View>
-              <ChevronRight size={16} className="text-white/40 ml-auto flex-shrink-0" />
-            </View>
-
-            {/* Mentor cards */}
-            {filteredMentors.map((mentor, i) => (
-              <Pressable key={mentor.id}
-                onPress={() => setSelectedMentor(mentor)}
-                className="rounded-2xl p-4"
-                style={{ backgroundColor: `${mentor.color}10`, borderStyle: "solid" }}>
-                <View className="flex items-start gap-3">
-                  <View className="relative flex-shrink-0">
-                    <View className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl" style={{ backgroundColor: `${mentor.color}20` }}>
-                      {mentor.avatar}
-                    </View>
-                    {mentor.available && (
+              )}</View>{}<View className="flex gap-2 overflow-x-auto pb-1">{specialties.map((s) => (
+                <Pressable key={s} onPress={() => setSpecialtyFilter(s)} className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all" style={{ backgroundColor: specialtyFilter === s ? "rgba(99,102,241,0.35)" : "rgba(255,255,255,0.06)", borderColor: "rgba(99,102,241,0.5)", borderStyle: "solid" }}>{s}</Pressable>
+              ))}</View>{}<View className="rounded-2xl p-4 flex items-center gap-3" style={{ borderWidth: 1, borderColor: "rgba(99,102,241,0.3)", borderStyle: "solid" }}><Crown size={22} className="text-amber-400 flex-shrink-0" /><View><View className="text-white font-semibold text-sm"><Text>Mentor de la semaine</Text></View><View className="text-white/60 text-xs mt-0.5"><Text>Dr. Aminata Diallo · 4.9 ⭐ · 340 sessions</Text></View></View><ChevronRight size={16} className="text-white/40 ml-auto flex-shrink-0" /></View>{}{filteredMentors.map((mentor, i) => (
+              <View key={mentor.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} onPress={() => setSelectedMentor(mentor)} className="rounded-2xl p-4" style={{ backgroundColor: `${mentor.color}10`, borderStyle: "solid" }}>
+                <View className="flex items-start gap-3"><View className="relative flex-shrink-0"><View className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl" style={{ backgroundColor: `${mentor.color}20` }}>{mentor.avatar}</View>{mentor.available && (
                       <View className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#0a0a1a] bg-emerald-400" />
-                    )}
-                  </View>
-                  <View className="flex-1 min-w-0">
-                    <View className="flex items-center gap-2 flex-wrap">
-                      <Text className="text-white font-semibold text-sm">{mentor.name}</Text>
-                      {mentor.badges.slice(0, 1).map((b) => (
-                        <Badge key={b} className="text-xs border-0 px-1.5 py-0" style={{ backgroundColor: `${mentor.color}25`, color: mentor.color }}>{b}</Badge>
-                      ))}
-                    </View>
-                    <View className="text-white/50 text-xs mt-0.5 truncate">{mentor.title}</View>
-                    <View className="flex flex-wrap gap-1 mt-1.5">
-                      {mentor.specialties.map((s) => (
+                    )}</View><View className="flex-1 min-w-0"><View className="flex items-center gap-2 flex-wrap"><Text className="text-white font-semibold text-sm">{mentor.name}</Text>{mentor.badges.slice(0, 1).map((b) => (
+                        <Badge key={b} className="text-xs border-0 px-1.5 py-0" style={{ backgroundColor: `${mentor.color}25` }}>{b}</Badge>
+                      ))}</View><View className="text-white/50 text-xs mt-0.5 truncate">{mentor.title}</View><View className="flex flex-wrap gap-1 mt-1.5">{mentor.specialties.map((s) => (
                         <Text key={s} className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.6)" }}>{s}</Text>
-                      ))}
-                    </View>
-                    <View className="flex items-center gap-3 mt-2">
-                      <View className="flex items-center gap-1 text-amber-400 text-xs">
-                        <Star size={11} className="fill-amber-400" /><Text className="font-bold">{mentor.rating}</Text>
-                        <Text className="text-white/30">({mentor.reviews})</Text>
-                      </View>
-                      <View className="flex items-center gap-1 text-white/40 text-xs">
-                        <Video size={11} /><Text>{mentor.sessions} sessions</Text>
-                      </View>
-                      <View className="ml-auto font-semibold text-sm" style={{  }}>
-                        {mentor.price}
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </Pressable>
-            ))}
-
-            {filteredMentors.length === 0 && (
-              <View className="text-center py-12 text-white/40">
-                <Users size={36} className="mx-auto mb-3 opacity-40" />
-                <View className="text-sm"><Text>Aucun mentor trouvé</Text></View>
+                      ))}</View><View className="flex items-center gap-3 mt-2"><View className="flex items-center gap-1 text-amber-400 text-xs"><Star size={11} className="fill-amber-400" /><Text className="font-bold">{mentor.rating}</Text><Text className="text-white/30">({mentor.reviews})</Text></View><View className="flex items-center gap-1 text-white/40 text-xs"><Video size={11} /><Text>{mentor.sessions}sessions</Text></View><View className="ml-auto font-semibold text-sm" style={{  }}>{mentor.price}</View></View></View></View>
               </View>
-            )}
-          </View>
-        )}
-
-        {/* ── FORUM ── */}
-        {tab === "Forum" && (
-          <View className="space-y-4">
-            {/* New post button */}
-            <Pressable onPress={() => setShowNewPost(true)}
-              className="w-full flex items-center gap-3 p-3 rounded-2xl"
-              style={{ backgroundColor: "rgba(99,102,241,0.12)", borderWidth: 1, borderColor: "rgba(99,102,241,0.4)", borderStyle: "dashed" }}>
-              <PlusCircle size={18} className="text-indigo-400" />
-              <Text className="text-indigo-300 text-sm">Poser une question ou partager…</Text>
-            </Pressable>
-
-            {/* Category filter */}
-            <View className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {FORUM_CATEGORIES.map((cat) => (
-                <Pressable key={cat} onPress={() => setForumFilter(cat)}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ backgroundColor: forumFilter === cat ? "rgba(99,102,241,0.35)" : "rgba(255,255,255,0.06)", borderColor: "rgba(99,102,241,0.5)", borderStyle: "solid" }}>
-                  {cat}
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Posts */}
-            {filteredPosts.map((post, i) => (
-              <View key={post.id}
-                className="rounded-2xl p-4"
-                style={{ backgroundColor: post.pinned ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.04)", borderColor: "rgba(99,102,241,0.3)", borderStyle: "solid" }}>
-                <View className="flex items-center gap-2 mb-2">
-                  <View className="w-8 h-8 rounded-full flex items-center justify-center text-lg" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>
-                    {post.avatar}
-                  </View>
-                  <View>
-                    <View className="text-white text-xs font-semibold">{post.author}</View>
-                    <View className="text-white/30 text-xs"><Text>il y a</Text>{post.time}</View>
-                  </View>
-                  <View className="ml-auto flex items-center gap-2">
-                    {post.pinned && <Pin size={12} className="text-indigo-400" />}
-                    <Badge className="text-xs border-0 px-2 py-0" style={{ backgroundColor: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)" }}>{post.category}</Badge>
-                  </View>
-                </View>
+            ))}{filteredMentors.length === 0 && (
+              <View className="text-center py-12 text-white/40"><Users size={36} className="mx-auto mb-3 opacity-40" /><View className="text-sm"><Text>Aucun mentor trouvé</Text></View></View>
+            )}</View>
+        )}{}{tab === "Forum" && (
+          <View className="space-y-4">{}<Pressable onPress={() => setShowNewPost(true)} className="w-full flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: "rgba(99,102,241,0.12)", borderWidth: 1, borderColor: "rgba(99,102,241,0.4)", borderStyle: "dashed" }}><PlusCircle size={18} className="text-indigo-400" /><Text className="text-indigo-300 text-sm">Poser une question ou partager…</Text></Pressable>{}<View className="flex gap-2 overflow-x-auto pb-1">{FORUM_CATEGORIES.map((cat) => (
+                <Pressable key={cat} onPress={() => setForumFilter(cat)} className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all" style={{ backgroundColor: forumFilter === cat ? "rgba(99,102,241,0.35)" : "rgba(255,255,255,0.06)", borderColor: "rgba(99,102,241,0.5)", borderStyle: "solid" }}>{cat}</Pressable>
+              ))}</View>{}{filteredPosts.map((post, i) => (
+              <View key={post.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="rounded-2xl p-4" style={{ backgroundColor: post.pinned ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.04)", borderColor: "rgba(99,102,241,0.3)", borderStyle: "solid" }}>
+                <View className="flex items-center gap-2 mb-2"><View className="w-8 h-8 rounded-full flex items-center justify-center text-lg" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>{post.avatar}</View><View><View className="text-white text-xs font-semibold">{post.author}</View><View className="text-white/30 text-xs"><Text>il y a</Text>{post.time}</View></View><View className="ml-auto flex items-center gap-2">{post.pinned && <Pin size={12} className="text-indigo-400" />}<Badge className="text-xs border-0 px-2 py-0" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>{post.category}</Badge></View></View>
                 <Text className="text-white font-semibold text-sm mb-1">{post.title}</Text>
                 <Text className="text-white/50 text-xs leading-relaxed mb-3">{post.content}</Text>
-                <View className="flex flex-wrap gap-1 mb-3">
-                  {post.tags.map((tag) => (
+                <View className="flex flex-wrap gap-1 mb-3">{post.tags.map((tag) => (
                     <Text key={tag} className="text-xs px-2 py-0.5 rounded-full text-indigo-300" style={{ backgroundColor: "rgba(99,102,241,0.15)" }}>#{tag}</Text>
-                  ))}
-                </View>
-                <View className="flex items-center gap-4">
-                  <Pressable onPress={() => toggleLike(post.id)} className="flex items-center gap-1.5"
-                    style={{  }}>
-                    <Heart size={14} className={likedPosts.has(post.id) ? "fill-red-500" : ""} />
-                    <Text className="text-xs">{post.likes + (likedPosts.has(post.id) ? 1 : 0)}</Text>
-                  </Pressable>
-                  <Pressable className="flex items-center gap-1.5 text-white/40"
-                    onPress={() => UIService.openToast("Ouverture du fil de discussion…", "info")}>
-                    <MessageCircle size={14} /><Text className="text-xs">{post.replies}</Text>
-                  </Pressable>
-                  <Pressable className="ml-auto text-white/30"
-                    onPress={() => UIService.openToast("Post partagé !", "success")}>
-                    <TrendingUp size={14} />
-                  </Pressable>
-                </View>
+                  ))}</View>
+                <View className="flex items-center gap-4"><Pressable onPress={() => toggleLike(post.id)} className="flex items-center gap-1.5 transition-all" style={{  }}><Heart size={14} className={likedPosts.has(post.id) ? "fill-red-500" : ""} /><Text className="text-xs">{post.likes + (likedPosts.has(post.id) ? 1 : 0)}</Text></Pressable><Pressable className="flex items-center gap-1.5 text-white/40 transition-all" onPress={() => toast.info("Ouverture du fil de discussion…")}><MessageCircle size={14} /><Text className="text-xs">{post.replies}</Text></Pressable><Pressable className="ml-auto text-white/30 transition-all" onPress={() => toast.success("Post partagé !")}><TrendingUp size={14} /></Pressable></View>
               </View>
-            ))}
-          </View>
-        )}
-
-        {/* ── TABLEAU DE BORD ── */}
-        {tab === "Tableau de Bord" && (
-          <View className="space-y-5">
-            {/* Stats row */}
-            <View className="gap-2">
-              {[
+            ))}</View>
+        )}{}{tab === "Tableau de Bord" && (
+          <View className="space-y-5">{}<View className="gap-2">{[
                 { icon: <BookOpen size={14} className="text-indigo-400" />, value: stats?.coursesEnrolled?.toString() ?? "—",    label: "Cours actifs" },
                 { icon: <Award size={14} className="text-amber-400" />,    value: stats?.certificates?.toString() ?? "—",    label: "Certifs" },
                 { icon: <Users size={14} className="text-emerald-400" />,  value: stats?.mentorSessions?.toString() ?? "—",    label: "Sessions" },
               ].map((s) => (
-                <View key={s.label} className="rounded-xl p-3 text-center" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-                  <View className="flex justify-center mb-1">{s.icon}</View>
-                  <View className="text-white font-bold text-lg">{s.value}</View>
-                  <View className="text-white/40 text-xs">{s.label}</View>
-                </View>
-              ))}
-            </View>
-
-            {/* Active courses */}
-            <View>
-              <View className="flex items-center justify-between mb-3">
-                <Text className="text-white/70 text-sm font-semibold uppercase tracking-wider">Mes Cours en cours</Text>
-                <ChevronRight size={14} className="text-white/30" />
-              </View>
-              <View className="space-y-3">
-                {MY_PROGRESS.map((c) => (
-                  <View key={c.course} className="rounded-xl p-3" style={{ backgroundColor: `${c.color}12`, borderStyle: "solid" }}>
-                    <View className="flex items-center gap-2 mb-2">
-                      <Text className="text-lg">{c.icon}</Text>
-                      <Text className="text-white font-medium text-sm">{c.course}</Text>
-                      <Text className="ml-auto text-xs font-bold" style={{ color: c.color }}>{c.progress}%</Text>
-                    </View>
-                    <Progress value={c.progress} className="h-1.5" />
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Upcoming sessions */}
-            <View>
-              <View className="flex items-center justify-between mb-3">
-                <Text className="text-white/70 text-sm font-semibold uppercase tracking-wider">Prochaines sessions</Text>
-                <Zap size={14} className="text-amber-400" />
-              </View>
-              <View className="space-y-3">
-                {MY_SESSIONS.map((s) => (
-                  <View key={s.topic} className="rounded-xl p-3 flex items-center gap-3" style={{ backgroundColor: `${s.color}10`, borderStyle: "solid" }}>
-                    <View className="text-2xl">{s.avatar}</View>
-                    <View className="flex-1 min-w-0">
-                      <View className="text-white font-medium text-sm">{s.mentor}</View>
-                      <View className="text-white/50 text-xs truncate">{s.topic}</View>
-                    </View>
-                    <View className="flex items-center gap-1 text-xs" style={{  }}>
-                      <Calendar size={11} />
-                      <Text>{s.date}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Recent badges */}
-            <View>
-              <Text className="text-white/70 text-sm font-semibold uppercase tracking-wider mb-3">Derniers badges</Text>
-              <View className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-                {[
+                <View key={s.label} className="rounded-xl p-3 text-center" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="flex justify-center mb-1">{s.icon}</View><View className="text-white font-bold text-lg">{s.value}</View><View className="text-white/40 text-xs">{s.label}</View></View>
+              ))}</View>{}<View><View className="flex items-center justify-between mb-3"><Text className="text-white/70 text-sm font-semibold uppercase tracking-wider">Mes Cours en cours</Text><ChevronRight size={14} className="text-white/30" /></View><View className="space-y-3">{MY_PROGRESS.map((c) => (
+                  <View key={c.course} className="rounded-xl p-3" style={{ backgroundColor: `${c.color}12`, borderStyle: "solid" }}><View className="flex items-center gap-2 mb-2"><Text className="text-lg">{c.icon}</Text><Text className="text-white font-medium text-sm">{c.course}</Text><Text className="ml-auto text-xs font-bold" style={{ color: c.color }}>{c.progress}%</Text></View><Progress value={c.progress} className="h-1.5" /></View>
+                ))}</View></View>{}<View><View className="flex items-center justify-between mb-3"><Text className="text-white/70 text-sm font-semibold uppercase tracking-wider">Prochaines sessions</Text><Zap size={14} className="text-amber-400" /></View><View className="space-y-3">{MY_SESSIONS.map((s) => (
+                  <View key={s.topic} className="rounded-xl p-3 flex items-center gap-3" style={{ backgroundColor: `${s.color}10`, borderStyle: "solid" }}><View className="text-2xl">{s.avatar}</View><View className="flex-1 min-w-0"><View className="text-white font-medium text-sm">{s.mentor}</View><View className="text-white/50 text-xs truncate">{s.topic}</View></View><View className="flex items-center gap-1 text-xs" style={{  }}><Calendar size={11} /><Text>{s.date}</Text></View></View>
+                ))}</View></View>{}<View><Text className="text-white/70 text-sm font-semibold uppercase tracking-wider mb-3">Derniers badges</Text><View className="flex gap-3 overflow-x-auto pb-1">{[
                   { icon: "🎯", label: "Premier Pas", color: "#94A3B8" },
                   { icon: "💯", label: "Perfectionniste", color: "#A855F7" },
                   { icon: "🔥", label: "En Série", color: "#6366F1" },
                   { icon: "🧘", label: "Équilibre", color: "#6366F1" },
                   { icon: "🎨", label: "Créateur", color: "#94A3B8" },
                 ].map((b) => (
-                  <View key={b.label} className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-2xl"
-                    style={{ backgroundColor: `${b.color}15`, borderStyle: "solid", minWidth: 72 }}>
-                    <Text className="text-2xl">{b.icon}</Text>
-                    <Text className="text-white/60 text-xs text-center leading-tight">{b.label}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Leaderboard teaser */}
-            <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(245,158,11,0.1)", borderWidth: 1, borderColor: "rgba(245,158,11,0.25)", borderStyle: "solid" }}>
-              <View className="flex items-center gap-2 mb-2">
-                <Crown size={16} className="text-amber-400" />
-                <Text className="text-white font-semibold text-sm">Classement hebdomadaire</Text>
-              </View>
-              <View className="flex items-center gap-3 mb-3">
-                <View className="text-center">
-                  <View className="text-2xl"><Text>🥇</Text></View>
-                  <View className="text-white/60 text-xs"><Text>Amadou K.</Text></View>
-                </View>
-                <View className="text-center">
-                  <View className="text-2xl"><Text>🥈</Text></View>
-                  <View className="text-white/60 text-xs"><Text>Fatou D.</Text></View>
-                </View>
-                <View className="text-center">
-                  <View className="text-2xl"><Text>🥉</Text></View>
-                  <View className="text-white/60 text-xs"><Text>Moussa T.</Text></View>
-                </View>
-                <View className="ml-auto text-right">
-                  <View className="text-white/50 text-xs"><Text>Votre rang</Text></View>
-                  <View className="text-white font-bold text-lg"><Text>#5</Text></View>
-                </View>
-              </View>
-              <Progress value={32} className="h-1.5" />
-              <View className="text-white/40 text-xs mt-1"><Text>+3 positions possibles cette semaine</Text></View>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* ── MENTOR DETAIL MODAL ── */}
-      <>
-        {selectedMentor && (
-          <Pressable
-            className="absolute inset-0 z-50 flex items-end"
-            style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
-            onPress={() => setSelectedMentor(null)}>
-            <Pressable
-              className="w-full max-h-[88vh] overflow-y-auto rounded-t-3xl pb-8"
-              style={{  }}
-              onPress={(e) => e.stopPropagation()}>
-              <View className="p-5">
-                <View className="w-12 h-1 rounded-full mx-auto mb-5" style={{ backgroundColor: "rgba(255,255,255,0.15)" }} />
-
-                {/* Mentor profile */}
-                <View className="flex items-start gap-4 mb-4">
-                  <View className="relative flex-shrink-0">
-                    <View className="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl" style={{ backgroundColor: `${selectedMentor.color}20` }}>
-                      {selectedMentor.avatar}
-                    </View>
-                    {selectedMentor.available && (
-                      <View className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-[#0f0f1e] bg-emerald-400 flex items-center justify-center">
-                        <CheckCircle size={10} color="white" />
-                      </View>
-                    )}
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-white font-bold text-lg">{selectedMentor.name}</Text>
-                    <View className="text-white/50 text-sm">{selectedMentor.title}</View>
-                    <View className="flex gap-2 mt-2 flex-wrap">
-                      {selectedMentor.badges.map((b) => (
-                        <Badge key={b} className="text-xs border-0" style={{ backgroundColor: `${selectedMentor.color}25`, color: selectedMentor.color }}>{b}</Badge>
-                      ))}
-                    </View>
-                  </View>
-                </View>
-
-                {/* Stats */}
-                <View className="gap-3 mb-4">
-                  {[
+                  <View key={b.label} className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-2xl" style={{ backgroundColor: `${b.color}15`, borderStyle: "solid", minWidth: 72 }}><Text className="text-2xl">{b.icon}</Text><Text className="text-white/60 text-xs text-center leading-tight">{b.label}</Text></View>
+                ))}</View></View>{}<View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(245,158,11,0.1)", borderWidth: 1, borderColor: "rgba(245,158,11,0.25)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-2"><Crown size={16} className="text-amber-400" /><Text className="text-white font-semibold text-sm">Classement hebdomadaire</Text></View><View className="flex items-center gap-3 mb-3"><View className="text-center"><View className="text-2xl"><Text>🥇</Text></View><View className="text-white/60 text-xs"><Text>Amadou K.</Text></View></View><View className="text-center"><View className="text-2xl"><Text>🥈</Text></View><View className="text-white/60 text-xs"><Text>Fatou D.</Text></View></View><View className="text-center"><View className="text-2xl"><Text>🥉</Text></View><View className="text-white/60 text-xs"><Text>Moussa T.</Text></View></View><View className="ml-auto text-right"><View className="text-white/50 text-xs"><Text>Votre rang</Text></View><View className="text-white font-bold text-lg"><Text>#5</Text></View></View></View><Progress value={32} className="h-1.5" /><View className="text-white/40 text-xs mt-1"><Text>+3 positions possibles cette semaine</Text></View></View></View>
+        )}</View>{}<View>{selectedMentor && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} onPress={() => setSelectedMentor(null)}>
+            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring" as const, damping: 28, stiffness: 300 }} className="w-full max-h-[88vh] overflow-y-auto rounded-t-3xl pb-8" style={{  }} onPress={(e) => e.stopPropagation()}>
+              <View className="p-5"><View className="w-12 h-1 rounded-full mx-auto mb-5" style={{ backgroundColor: "rgba(255,255,255,0.15)" }} />{}<View className="flex items-start gap-4 mb-4"><View className="relative flex-shrink-0"><View className="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl" style={{ backgroundColor: `${selectedMentor.color}20` }}>{selectedMentor.avatar}</View>{selectedMentor.available && (
+                      <View className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-[#0f0f1e] bg-emerald-400 flex items-center justify-center"><CheckCircle size={10} color="white" /></View>
+                    )}</View><View className="flex-1"><Text className="text-white font-bold text-lg">{selectedMentor.name}</Text><View className="text-white/50 text-sm">{selectedMentor.title}</View><View className="flex gap-2 mt-2 flex-wrap">{selectedMentor.badges.map((b) => (
+                        <Badge key={b} className="text-xs border-0" style={{ backgroundColor: `${selectedMentor.color}25` }}>{b}</Badge>
+                      ))}</View></View></View>{}<View className="gap-3 mb-4">{[
                     { label: "Note",     value: `${selectedMentor.rating}⭐` },
                     { label: "Avis",     value: selectedMentor.reviews },
                     { label: "Sessions", value: selectedMentor.sessions },
                   ].map((s) => (
-                    <View key={s.label} className="rounded-xl p-2.5 text-center" style={{ backgroundColor: `${selectedMentor.color}12`, borderStyle: "solid" }}>
-                      <View className="text-white font-bold text-sm">{s.value}</View>
-                      <View className="text-white/40 text-xs">{s.label}</View>
-                    </View>
-                  ))}
-                </View>
-
-                {/* Bio */}
-                <Text className="text-white/60 text-sm leading-relaxed mb-4">{selectedMentor.bio}</Text>
-
-                {/* Details */}
-                <View className="space-y-2 mb-5">
-                  <View className="flex items-center gap-2 text-sm">
-                    <Clock size={14} className="text-white/40" />
-                    <Text className="text-white/60">Temps de réponse :</Text>
-                    <Text className="text-white">{selectedMentor.responseTime}</Text>
-                  </View>
-                  <View className="flex items-center gap-2 text-sm">
-                    <Globe size={14} className="text-white/40" />
-                    <Text className="text-white/60">Langues :</Text>
-                    <Text className="text-white">{selectedMentor.languages.join(", ")}</Text>
-                  </View>
-                  <View className="flex items-center gap-2 text-sm">
-                    <Filter size={14} className="text-white/40" />
-                    <Text className="text-white/60">Spécialités :</Text>
-                    <Text className="text-white">{selectedMentor.specialties.join(", ")}</Text>
-                  </View>
-                </View>
-
-                {/* Message area */}
-                <View className="rounded-xl p-3 mb-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                  <TextInput
-                    value={messageText}
-                    onChangeText={(text) => setMessageText(text)}
-                    placeholder={`Écrivez un message à ${selectedMentor.name.split(" ")[0]}…`}
-                   
-                    className="w-full bg-transparent text-white text-sm outline-none placeholder:text-white/30"
-                   multiline textAlignVertical="top"/>
-                </View>
-
-                {/* Actions */}
-                <View className="gap-3">
-                  <Button className="flex items-center gap-2"
-                    style={{ backgroundColor: `${selectedMentor.color}35`, color: "white" }}
-                    onPress={() => {
+                    <View key={s.label} className="rounded-xl p-2.5 text-center" style={{ backgroundColor: `${selectedMentor.color}12`, borderStyle: "solid" }}><View className="text-white font-bold text-sm">{s.value}</View><View className="text-white/40 text-xs">{s.label}</View></View>
+                  ))}</View>{}<Text className="text-white/60 text-sm leading-relaxed mb-4">{selectedMentor.bio}</Text>{}<View className="space-y-2 mb-5"><View className="flex items-center gap-2 text-sm"><Clock size={14} className="text-white/40" /><Text className="text-white/60">Temps de réponse :</Text><Text className="text-white">{selectedMentor.responseTime}</Text></View><View className="flex items-center gap-2 text-sm"><Globe size={14} className="text-white/40" /><Text className="text-white/60">Langues :</Text><Text className="text-white">{selectedMentor.languages.join(", ")}</Text></View><View className="flex items-center gap-2 text-sm"><Filter size={14} className="text-white/40" /><Text className="text-white/60">Spécialités :</Text><Text className="text-white">{selectedMentor.specialties.join(", ")}</Text></View></View>{}<View className="rounded-xl p-3 mb-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><TextInput value={messageText} onChangeText={(value) => setMessageText(value)} placeholder={`Écrivez un message à ${selectedMentor.name.split(" ")[0]}…`} className="w-full bg-transparent text-white text-sm outline-none placeholder:text-white/30" multiline textAlignVertical="top" /></View>{}<View className="gap-3"><Button className="flex items-center gap-2" style={{ backgroundColor: `${selectedMentor.color}35` }} onPress={() => {
                       setShowRequestModal(true);
-                    }}>
-                    <Video size={15} /> <Text>Réserver session</Text></Button>
-                  <Button className="flex items-center gap-2"
-                    style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "white" }}
-                    onPress={() => {
-                      if (!messageText.trim()) { UIService.openToast("Écrivez un message d'abord", "error"); return; }
-                      UIService.openToast(`Message envoyé à ${selectedMentor.name.split(" ")[0]} !`, "success");
+                    }}><Video size={15} />Réserver session
+                  </Button><Button className="flex items-center gap-2" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} onPress={() => {
+                      if (!messageText.trim()) { toast.error("Écrivez un message d'abord"); return; }
+                      toast.success(`Message envoyé à ${selectedMentor.name.split(" ")[0]} !`);
                       setMessageText("");
                       setSelectedMentor(null);
-                    }}>
-                    <Send size={15} /> <Text>Envoyer</Text></Button>
-                </View>
-              </View>
-            </Pressable>
-          </Pressable>
-        )}
-      </>
-
-      {/* ── SESSION REQUEST CONFIRMATION ── */}
-      <>
-        {showRequestModal && selectedMentor && (
-          <Pressable
-            className="absolute inset-0 z-[60] flex items-center justify-center px-6"
-            style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
-            onPress={() => setShowRequestModal(false)}>
-            <Pressable
-              className="w-full max-w-sm rounded-3xl p-6 text-center"
-              style={{ borderStyle: "solid" }}
-              onPress={(e) => e.stopPropagation()}>
+                    }}><Send size={15} />Envoyer
+                  </Button></View></View>
+            </View>
+          </View>
+        )}</View>{}<View>{showRequestModal && selectedMentor && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[60] flex items-center justify-center px-6" style={{ backgroundColor: "rgba(0,0,0,0.8)" }} onPress={() => setShowRequestModal(false)}>
+            <View initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.85, opacity: 0 }} transition={{ type: "spring" as const, stiffness: 260, damping: 22 }} className="w-full max-w-sm rounded-3xl p-6 text-center" style={{ borderStyle: "solid" }} onPress={(e) => e.stopPropagation()}>
               <View className="text-5xl mb-3">{selectedMentor.avatar}</View>
               <Text className="text-white font-bold text-lg mb-1">Demande de session</Text>
-              <Text className="text-white/60 text-sm mb-5">
-                Confirmer votre demande de session avec <Text className="text-white font-semibold">{selectedMentor.name}</Text> ?
-                <br />
-                <Text className="text-xs mt-1 inline-block" style={{ color: selectedMentor.price === "Gratuit" ? "#10B981" : selectedMentor.color }}>
-                  Tarif : {selectedMentor.price}
-                </Text>
-              </Text>
-              <View className="gap-3">
-                <Button className="" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)" }}
-                  onPress={() => setShowRequestModal(false)}>
-                  <Text>Annuler</Text></Button>
-                <Button className="flex items-center justify-center gap-2"
-                  style={{ backgroundColor: `${selectedMentor.color}35`, color: "white" }}
-                  onPress={() => {
-                    UIService.openToast(`Demande envoyée à ${selectedMentor.name.split(" ")[0]} ! Réponse sous ${selectedMentor.responseTime}`, "success");
+              <Text className="text-white/60 text-sm mb-5">Confirmer votre demande de session avec <Text className="text-white font-semibold">{selectedMentor.name}</Text>?
+                <br /><Text className="text-xs mt-1 inline-block" style={{ color: selectedMentor.price === "Gratuit" ? "#10B981" : selectedMentor.color }}>Tarif : {selectedMentor.price}</Text></Text>
+              <View className="gap-3"><Button className="" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} onPress={() => setShowRequestModal(false)}>Annuler
+                </Button><Button className="flex items-center justify-center gap-2" style={{ backgroundColor: `${selectedMentor.color}35` }} onPress={() => {
+                    toast.success(`Demande envoyée à ${selectedMentor.name.split(" ")[0]} ! Réponse sous ${selectedMentor.responseTime}`);
                     setShowRequestModal(false);
                     setSelectedMentor(null);
-                  }}>
-                  <CheckCircle size={15} /> <Text>Confirmer</Text></Button>
-              </View>
-            </Pressable>
-          </Pressable>
-        )}
-      </>
-
-      {/* ── NEW POST MODAL ── */}
-      <>
-        {showNewPost && (
-          <Pressable
-            className="absolute inset-0 z-50 flex items-end"
-            style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
-            onPress={() => setShowNewPost(false)}>
-            <Pressable
-              className="w-full rounded-t-3xl pb-8"
-              style={{  }}
-              onPress={(e) => e.stopPropagation()}>
-              <View className="p-5">
-                <View className="w-12 h-1 rounded-full mx-auto mb-4" style={{ backgroundColor: "rgba(255,255,255,0.15)" }} />
-                <Text className="text-white font-bold text-lg mb-4">Nouvelle discussion</Text>
-                <View className="space-y-3">
-                  <TextInput placeholder="Titre de votre question…" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none placeholder:text-white/30" />
-                  <TextInput placeholder="Décrivez votre question ou partagez votre expérience…"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none placeholder:text-white/30"  multiline textAlignVertical="top"/>
-                </View>
-                <Button className="w-full mt-4 flex items-center justify-center gap-2" style={{ backgroundColor: "rgba(99,102,241,0.35)", color: "white" }}
-                  onPress={() => {
-                    UIService.openToast("Post publié dans le forum !", "success");
+                  }}><CheckCircle size={15} />Confirmer
+                </Button></View>
+            </View>
+          </View>
+        )}</View>{}<View>{showNewPost && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} onPress={() => setShowNewPost(false)}>
+            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring" as const, damping: 28, stiffness: 300 }} className="w-full rounded-t-3xl pb-8" style={{  }} onPress={(e) => e.stopPropagation()}>
+              <View className="p-5"><View className="w-12 h-1 rounded-full mx-auto mb-4" style={{ backgroundColor: "rgba(255,255,255,0.15)" }} /><Text className="text-white font-bold text-lg mb-4">Nouvelle discussion</Text><View className="space-y-3"><TextInput placeholder="Titre de votre question…" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none placeholder:text-white/30" /><TextInput placeholder="Décrivez votre question ou partagez votre expérience…" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none placeholder:text-white/30" multiline textAlignVertical="top" /></View><Button className="w-full mt-4 flex items-center justify-center gap-2" style={{ backgroundColor: "rgba(99,102,241,0.35)" }} onPress={() => {
+                    toast.success("Post publié dans le forum !");
                     setShowNewPost(false);
-                  }}>
-                  <Send size={15} /> <Text>Publier</Text></Button>
-              </View>
-            </Pressable>
-          </Pressable>
-        )}
-      </>
-    </View>
+                  }}><Send size={15} />Publier
+                </Button></View>
+            </View>
+          </View>
+        )}</View></View>
   );
 }

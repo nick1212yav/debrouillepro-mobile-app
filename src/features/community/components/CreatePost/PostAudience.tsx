@@ -24,15 +24,11 @@ export function PostAudience({ audience, onChange }: Props) {
         const Icon = opt.icon;
         const active = audience === opt.value;
         return (
-          <Pressable
-            key={opt.value}
-            onPress={() => onChange(opt.value)}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors ${
+          <Pressable key={opt.value} onPress={() => onChange(opt.value)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors ${
               active
                 ? "bg-purple-500/20 text-purple-400"
                 : "text-white/40 hover:bg-white/5"
-            }`}
-          >
+            }`}>
             <Icon size={12} /> {opt.label}
           </Pressable>
         );

@@ -1,7 +1,7 @@
-import { useRouter } from "expo-router";
 import { View, Pressable, Image, Text, GestureResponderEvent } from "react-native";
 
 // src/features/transport/components/TransportCard.tsx
+import { useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import {
   Clock,
@@ -69,7 +69,7 @@ export function TransportCard({
   isLiked = false,
   isBookmarked = false,
 }: Props) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const meta = parseMeta(publication.meta);
   const emoji = getModuleEmoji(publication.type);
   const [isHovered, setIsHovered] = useState(false);
@@ -110,58 +110,59 @@ export function TransportCard({
 
   // Handlers
   const handleCardClick = useCallback(() => {
-    router.push(`/transport/${publication._id}`);
-  }, [router, publication._id]);
+    navigate(`/transport/${publication._id}`);
+  }, [navigate, publication._id]);
 
   const handleLike = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     setLiked(!liked);
     onLike?.();
   };
 
   const handleBookmark = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     setBookmarked(!bookmarked);
     onBookmark?.();
   };
 
   const handleShare = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     onShare?.();
   };
 
   const handleComment = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     onComment?.();
   };
 
   const handleBook = (e: GestureResponderEvent) => {
-    router.push(`/transport/${publication._id}?tab=booking`);
+    e.stopPropagation();
+    navigate(`/transport/${publication._id}?tab=booking`);
   };
 
   // Badge de statut
   const renderStatusBadge = () => {
     if (tripStatus === "active") {
       return (
-        <Text className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-500/90 text-white border border-blue-400/30">
-          <CheckCircle size={10} /> Disponible
+        <Text className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-500/90 text-white backdrop-blur-sm border border-blue-400/30"><CheckCircle size={10} />Disponible
         </Text>
       );
     }
     if (tripStatus === "completed") {
       return (
-        <Text className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-green-500/90 text-white border border-green-400/30">
-          <CheckCircle size={10} /> Terminé
+        <Text className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-green-500/90 text-white backdrop-blur-sm border border-green-400/30"><CheckCircle size={10} />Terminé
         </Text>
       );
     }
     if (tripStatus === "cancelled") {
       return (
-        <Text className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-500/90 text-white border border-red-400/30">
-          <XCircle size={10} /> Annulé
+        <Text className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-500/90 text-white backdrop-blur-sm border border-red-400/30"><XCircle size={10} />Annulé
         </Text>
       );
     }
     if (tripStatus === "sold" || tripStatus === "closed") {
       return (
-        <Text className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-500/90 text-white border border-gray-400/30">
-          <XCircle size={10} /> Fermé
+        <Text className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-500/90 text-white backdrop-blur-sm border border-gray-400/30"><XCircle size={10} />Fermé
         </Text>
       );
     }
@@ -170,237 +171,70 @@ export function TransportCard({
 
   // Équipements
   const amenityBadges = amenities.slice(0, 3).map((amenity: string) => (
-    <Text
-      key={amenity}
-      className="px-2.5 py-0.5 rounded-full text-[10px] font-medium"
-      style={{ backgroundColor: `${color}15`, color: color, borderStyle: "solid" }}
-    >
-      {amenity}
-    </Text>
+    <Text key={amenity} className="px-2.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: `${color}15`, color: color, borderStyle: "solid" }}>{amenity}</Text>
   ));
 
   return (
-    <Pressable
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-      onPress={handleCardClick}
-      className="relative rounded-3xl overflow-hidden"
-      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", transform: isHovered ? "scale(1.015)" : "scale(1)" }}
-    >
+    <View initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{
+        delay: 0.05 + index * 0.04,
+        type: "spring",
+        damping: 20,
+        stiffness: 300,
+      }} onHoverStart={() => setIsHovered(true)} onHoverEnd={() => setIsHovered(false)} onPress={handleCardClick} className="relative rounded-3xl overflow-hidden transition-all duration-300" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", boxShadow: isHovered
+                ? `0 20px 60px rgba(0,0,0,0.3), 0 0 40px ${color}15`
+                : "0 4px 20px rgba(0,0,0,0.1)", transform: isHovered ? [{ scale: 1.015 }] : [{ scale: 1 }] }}>
       {/* Glow effect */}
-      <View
-        className="absolute inset-0 opacity-0"
-        style={{ opacity: isHovered ? 1 : 0 }}
-      />
+      <View className="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-500" style={{ opacity: isHovered ? 1 : 0 }} />
 
       {/* Image / Gallery */}
-      <View className="relative h-52 overflow-hidden bg-black/20">
-        {images.length > 0 ? (
-          <Image
-            src={images[0]}
-            alt={`${origin} → ${destination}`}
-            className="w-full h-full object-cover"
-            style={{
-              transform: isHovered ? "scale(1.05)" : "scale(1)"
-            }}
-            loading="lazy"
-          />
+      <View className="relative h-52 overflow-hidden bg-black/20">{images.length > 0 ? (
+          <Image src={images[0]} alt={`${origin} → ${destination}`} className="w-full h-full object-cover" style={{ transform: isHovered ? [{ scale: 1.05 }] : [{ scale: 1 }] }}  />
         ) : (
-          <View
-            className="w-full h-full flex items-center justify-center"
-            style={{ backgroundColor: `${color}22` }}
-          >
-            <Car size={48} className="opacity-30" style={{ color }} />
-          </View>
-        )}
-
-        {/* Gradient overlay */}
-        <View
-          className="absolute inset-0"
-          style={{  }}
-        />
-
-        {/* Badge statut */}
-        <View className="absolute top-3 left-3">{renderStatusBadge()}</View>
-
-        {/* Type de véhicule */}
-        <View
-          className="absolute top-3 right-3 px-2.5 py-1 rounded-xl text-[10px] font-bold"
-          style={{ backgroundColor: `${color}cc` }}
-        >
-          {vehicleType || "Transport"}
-        </View>
-
-        {/* Prix sur l'image */}
-        {pricePerSeat > 0 && (
-          <View className="absolute bottom-3 left-3">
-            <Text
-              className="px-3 py-1.5 rounded-xl text-sm font-bold"
-              style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#FCD34D", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-            >
-              {formattedPrice}
-            </Text>
-          </View>
-        )}
-
-        {/* Places disponibles */}
-        {seats > 0 && (
-          <View className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium text-white/80 bg-black/30">
-            <Users size={12} />
-            {seats} <Text>place</Text>{seats > 1 ? "s" : ""}
-          </View>
-        )}
-      </View>
+          <View className="w-full h-full flex items-center justify-center" style={{ backgroundColor: `${color}22` }}><Car size={48} className="opacity-30" style={{ color }} /></View>
+        )}{}<View className="absolute inset-0" style={{  }} />{}<View className="absolute top-3 left-3">{renderStatusBadge()}</View>{}<View className="absolute top-3 right-3 px-2.5 py-1 rounded-xl text-[10px] font-bold backdrop-blur-sm" style={{ backgroundColor: `${color}cc`, boxShadow: `0 4px 12px ${color}40` }}>{vehicleType || "Transport"}</View>{}{pricePerSeat > 0 && (
+          <View className="absolute bottom-3 left-3"><Text className="px-3 py-1.5 rounded-xl text-sm font-bold backdrop-blur-md" style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#FCD34D", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>{formattedPrice}</Text></View>
+        )}{}{seats > 0 && (
+          <View className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm text-white/80 bg-black/30"><Users size={12} />{seats}<Text>place</Text>{seats > 1 ? "s" : ""}</View>
+        )}</View>
 
       {/* Contenu */}
-      <View className="p-4 space-y-3">
-        {/* En-tête : origine → destination */}
-        <View className="flex items-start justify-between gap-3">
-          <View className="flex-1 min-w-0">
-            <View className="flex items-center gap-2 mb-0.5">
-              <Text
-                className="text-[10px] font-bold uppercase tracking-wider"
-                style={{ color }}
-              >
-                Transport
-              </Text>
-              <Text className="text-white/20">·</Text>
-              <Text className="text-[9px] text-white/30">{timeAgo}</Text>
-            </View>
-            {origin && destination && (
-              <Text className="text-white font-bold text-base leading-tight">
-                {origin} <Text className="text-violet-400">→</Text>{" "}
-                {destination}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Détails du trajet */}
-        <View className="flex flex-wrap items-center gap-3 text-xs text-white/60">
-          {departureTime && (
-            <Text className="flex items-center gap-1.5">
-              <Clock size={12} className="text-white/30" />
-              {departureTime}
-            </Text>
-          )}
-          {vehicleType && (
-            <Text className="flex items-center gap-1.5 capitalize">
-              <Car size={12} className="text-white/30" />
-              {vehicleType}
-            </Text>
-          )}
-          {company && (
-            <Text className="flex items-center gap-1.5">
-              <Text className="text-white/30">•</Text>
-              {company}
-            </Text>
-          )}
-        </View>
-
-        {/* Équipements / options */}
-        {(amenities.length > 0 ||
+      <View className="p-4 space-y-3">{}<View className="flex items-start justify-between gap-3"><View className="flex-1 min-w-0"><View className="flex items-center gap-2 mb-0.5"><Text className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>Transport
+              </Text><Text className="text-white/20">·</Text><Text className="text-[9px] text-white/30">{timeAgo}</Text></View>{origin && destination && (
+              <Text className="text-white font-bold text-base leading-tight">{origin}<Text className="text-violet-400">→</Text>{" "}{destination}</Text>
+            )}</View></View>{}<View className="flex flex-wrap items-center gap-3 text-xs text-white/60">{departureTime && (
+            <Text className="flex items-center gap-1.5"><Clock size={12} className="text-white/30" />{departureTime}</Text>
+          )}{vehicleType && (
+            <Text className="flex items-center gap-1.5 capitalize"><Car size={12} className="text-white/30" />{vehicleType}</Text>
+          )}{company && (
+            <Text className="flex items-center gap-1.5"><Text className="text-white/30">•</Text>{company}</Text>
+          )}</View>{}{(amenities.length > 0 ||
           luggageAllowed ||
           petsAllowed ||
           insuranceIncluded) && (
-          <View className="flex flex-wrap gap-1.5">
-            {amenityBadges}
-            {luggageAllowed && (
-              <Text className="flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">
-                <Package size={10} /> Bagages
+          <View className="flex flex-wrap gap-1.5">{amenityBadges}{luggageAllowed && (
+              <Text className="flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20"><Package size={10} />Bagages
               </Text>
-            )}
-            {petsAllowed && (
-              <Text className="flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                <Dog size={10} /> Animaux
+            )}{petsAllowed && (
+              <Text className="flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20"><Dog size={10} />Animaux
               </Text>
-            )}
-            {insuranceIncluded && (
-              <Text className="flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/10 text-green-300 border border-green-500/20">
-                <ShieldCheck size={10} /> Assuré
+            )}{insuranceIncluded && (
+              <Text className="flex items-center gap-0.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-green-500/10 text-green-300 border border-green-500/20"><ShieldCheck size={10} />Assuré
               </Text>
-            )}
-          </View>
-        )}
-
-        {/* Statistiques */}
-        <View className="flex items-center gap-3 text-xs text-white/30">
-          <View className="flex items-center gap-1">
-            <Eye size={11} />
-            <Text>{viewCount}</Text>
-          </View>
-          <View className="flex items-center gap-1">
-            <Heart size={11} />
-            <Text>{likeCount}</Text>
-          </View>
-          {publication.shareCount && publication.shareCount > 0 && (
-            <View className="flex items-center gap-1">
-              <Share2 size={11} />
-              <Text>{publication.shareCount}</Text>
-            </View>
-          )}
-        </View>
-      </View>
+            )}</View>
+        )}{}<View className="flex items-center gap-3 text-xs text-white/30"><View className="flex items-center gap-1"><Eye size={11} /><Text>{viewCount}</Text></View><View className="flex items-center gap-1"><Heart size={11} /><Text>{likeCount}</Text></View>{publication.shareCount && publication.shareCount > 0 && (
+            <View className="flex items-center gap-1"><Share2 size={11} /><Text>{publication.shareCount}</Text></View>
+          )}</View></View>
 
       {/* Actions */}
-      <View className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between flex-wrap gap-2">
-        <View className="flex items-center gap-1">
-          {/* Like */}
-          <Pressable
-            onPress={handleLike}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+      <View className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between flex-wrap gap-2"><View className="flex items-center gap-1">{}<Pressable whileTap={{ scale: 0.85 }} onPress={handleLike} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
               liked
                 ? "text-rose-400 bg-rose-500/10"
                 : "text-white/40 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <Heart size={14} className={liked ? "fill-rose-400" : ""} />
-            <Text>{likeCount}</Text>
-          </Pressable>
-
-          {/* Comment */}
-          <Pressable
-            onPress={handleComment}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40"
-          >
-            <MessageCircle size={14} />
-          </Pressable>
-
-          {/* Share */}
-          <Pressable
-            onPress={handleShare}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40"
-          >
-            <Share2 size={14} />
-          </Pressable>
-
-          {/* Bookmark */}
-          <Pressable
-            onPress={handleBookmark}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+            }`}><Heart size={14} className={liked ? "fill-rose-400" : ""} /><Text>{likeCount}</Text></Pressable>{}<Pressable whileTap={{ scale: 0.85 }} onPress={handleComment} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40 transition-all"><MessageCircle size={14} /></Pressable>{}<Pressable whileTap={{ scale: 0.85 }} onPress={handleShare} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40 transition-all"><Share2 size={14} /></Pressable>{}<Pressable whileTap={{ scale: 0.85 }} onPress={handleBookmark} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
               bookmarked
                 ? "text-amber-400 bg-amber-500/10"
                 : "text-white/40 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <Bookmark
-              size={14}
-              className={bookmarked ? "fill-amber-400" : ""}
-            />
-          </Pressable>
-        </View>
-
-        {/* CTA Réserver */}
-        <Pressable
-          onPress={handleBook}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white"
-          style={{  }}
-        >
-          <CalendarDays size={12} />
-          <Text><Text>Réserver</Text></Text>
-          <ChevronRight size={12} className="opacity-60" />
-        </Pressable>
-      </View>
-    </Pressable>
+            }`}><Bookmark size={14} className={bookmarked ? "fill-amber-400" : ""} /></Pressable></View>{}<Pressable whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onPress={handleBook} className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-all" style={{ boxShadow: `0 4px 16px ${color}40` }}><CalendarDays size={12} /><Text>Réserver</Text><ChevronRight size={12} className="opacity-60" /></Pressable></View>
+    </View>
   );
 }

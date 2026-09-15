@@ -1,9 +1,19 @@
-import { View, Pressable, Text } from "react-native";
+// src/pages/home/_components/AIBanner.tsx
+import {
+  View,
+  Pressable,
+  Text,
+  Animated,
+  Easing,
+  StyleSheet,
+  useWindowDimensions,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useRef } from "react";
 import {
   ArrowRight,
   Sparkles,
   Wand2,
-  Zap,
   Brain,
   ChevronRight,
 } from "lucide-react-native";
@@ -13,222 +23,722 @@ interface AIBannerProps {
   onOpenStudio?: () => void;
 }
 
-export default function AIBanner({ onOpenAI, onOpenStudio }: AIBannerProps) {
-  const hasStudio = typeof onOpenStudio === "function";
+/* ============================================================================
+ * ANIMATED BACKGROUND (orbs)
+ * ========================================================================== */
+
+function BannerAmbient() {
+  const orbA = useRef(new Animated.Value(0)).current;
+  const orbB = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = (v: Animated.Value, to: number, dur: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(v, {
+            toValue: to,
+            duration: dur,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(v, {
+            toValue: 0,
+            duration: dur,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    loop(orbA, -40, 8000);
+    loop(orbB, 50, 10000);
+  }, [orbA, orbB]);
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {/* Orbe haut-droit */}
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 260,
+            height: 260,
+            top: -130,
+            right: -110,
+            backgroundColor: "rgba(139,92,246,0.55)",
+            transform: [{ translateY: orbA }],
+          },
+        ]}
+      />
+      {/* Orbe bas-gauche */}
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 220,
+            height: 220,
+            bottom: -120,
+            left: -90,
+            backgroundColor: "rgba(99,102,241,0.45)",
+            transform: [{ translateY: orbB }],
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+/* ============================================================================
+ * PULSING AVATAR
+ * ========================================================================== */
+
+function PulsingAvatar({ size = 44 }: { size?: number }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(rotate, {
+          toValue: 1,
+          duration: 4000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotate, {
+          toValue: 0,
+          duration: 4000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse, rotate]);
+
+  const scale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.08],
+  });
+  const rotation = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "8deg"],
+  });
+  const haloScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.6],
+  });
+  const haloOpacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 0],
+  });
 
   return (
     <View
-      className="relative mx-5 mt-3 overflow-hidden rounded-[30px]"
-      accessibilityLabel="Débrouille AI"
+      style={{
+        width: size,
+        height: size,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
-      {/* =========================================================
-          AMBIENT AI LIGHT
-      ========================================================== */}
-
-      <View
-        className="absolute -right-20 -top-24 h-60 w-60 rounded-full"
-        style={{  }}
+      {/* Halo */}
+      <Animated.View
+        style={[
+          styles.avatarHalo,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 3,
+            transform: [{ scale: haloScale }],
+            opacity: haloOpacity,
+          },
+        ]}
       />
-
-      <View
-        className="absolute -bottom-24 -left-16 h-52 w-52 rounded-full"
-        style={{  }}
-      />
-
-      {/* =========================================================
-          GLASS SURFACE
-      ========================================================== */}
-
-      <View
-        className="relative overflow-hidden"
-        style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.24)", borderStyle: "solid" }}
+      <Animated.View
+        style={{
+          transform: [{ scale }, { rotate: rotation }],
+        }}
       >
-        {/* Decorative grid */}
-        <View
-         
-          className="absolute inset-0 opacity-[0.035]"
-         
+        <LinearGradient
+          colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.avatarGradient,
+            { width: size, height: size, borderRadius: size / 3 },
+          ]}
+        >
+          <Sparkles size={size * 0.42} color="#fff" strokeWidth={2.3} />
+        </LinearGradient>
+      </Animated.View>
+
+      {/* Green dot online */}
+      <View
+        style={[
+          styles.onlineDot,
+          {
+            width: size * 0.24,
+            height: size * 0.24,
+            borderRadius: size * 0.12,
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+/* ============================================================================
+ * CAPABILITY CHIP
+ * ========================================================================== */
+
+function CapabilityChip({ label, delay }: { label: string; delay: number }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 420,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [
+          {
+            translateY: anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [8, 0],
+            }),
+          },
+        ],
+      }}
+    >
+      <View style={styles.capabilityChip}>
+        <Text style={styles.capabilityChipText}>{label}</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * MAIN BANNER
+ * ========================================================================== */
+
+export default function AIBanner({ onOpenAI, onOpenStudio }: AIBannerProps) {
+  const hasStudio = typeof onOpenStudio === "function";
+
+  // Entrance animation
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const headlineAnim = useRef(new Animated.Value(0)).current;
+  const actionsAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.stagger(120, [
+      Animated.timing(headerAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(headlineAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(actionsAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [headerAnim, headlineAnim, actionsAnim]);
+
+  const buildEntrance = (anim: Animated.Value, distance = 14) => ({
+    opacity: anim,
+    transform: [
+      {
+        translateY: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [distance, 0],
+        }),
+      },
+    ],
+  });
+
+  return (
+    <View style={styles.wrapper} accessibilityLabel="Débrouille AI">
+      {/* Glass surface with gradient */}
+      <View style={styles.surface}>
+        {/* Base gradient */}
+        <LinearGradient
+          colors={[
+            "rgba(139,92,246,0.16)",
+            "rgba(76,29,149,0.10)",
+            "rgba(15,7,32,0.85)",
+          ]}
+          locations={[0, 0.45, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
         />
 
-        {/* =======================================================
-            HEADER
-        ======================================================== */}
+        {/* Inner top highlight */}
+        <LinearGradient
+          colors={["rgba(255,255,255,0.10)", "rgba(255,255,255,0)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.topHighlight}
+          pointerEvents="none"
+        />
 
-        <View className="relative flex items-center gap-3 px-4 pb-3 pt-4">
-          {/* AI orb */}
-          <View
-            className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
-            style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.16)", borderStyle: "solid" }}
-          >
-            <View
-            >
-              <Sparkles size={17} className="text-white" strokeWidth={2.2} />
+        {/* Ambient orbs */}
+        <BannerAmbient />
+
+        {/* Border ring */}
+        <View style={styles.borderRing} pointerEvents="none" />
+
+        {/* ─────────── HEADER ─────────── */}
+        <Animated.View style={[styles.header, buildEntrance(headerAnim, 12)]}>
+          <PulsingAvatar size={44} />
+
+          <View style={styles.headerText}>
+            <View style={styles.headerTitleRow}>
+              <Text style={styles.headerTitle}>Débrouille AI</Text>
+              <View style={styles.intelligenceBadge}>
+                <Text style={styles.intelligenceBadgeText}>INTELLIGENCE</Text>
+              </View>
             </View>
-
-            <Text
-             
-              className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: "#C4B5FD" }}
-            />
-          </View>
-
-          <View className="min-w-0 flex-1">
-            <View className="flex items-center gap-2">
-              <Text className="text-[12px] font-black tracking-tight text-white">
-                Débrouille AI
-              </Text>
-
-              <Text
-                className="rounded-full px-2 py-0.5 text-[7px] font-black uppercase tracking-[0.12em]"
-                style={{ color: "#DDD6FE", backgroundColor: "rgba(139,92,246,.14)", borderWidth: 1, borderColor: "rgba(139,92,246,.22)", borderStyle: "solid" }}
-              >
-                Intelligence
-              </Text>
+            <View style={styles.headerSubRow}>
+              <Brain size={9} color="rgba(255,255,255,0.45)" />
+              <Text style={styles.headerSub}>Votre copilote numérique</Text>
             </View>
-
-            <Text className="mt-0.5 flex items-center gap-1 text-[9px] text-white/35">
-              <Brain size={9} />
-              Votre copilote numérique
-            </Text>
           </View>
 
-          {/* Live indicator */}
-          <View className="flex items-center gap-1.5 rounded-full px-2 py-1">
-            <Text
-              className="h-1.5 w-1.5 rounded-full bg-emerald-400"
-            />
-
-            <Text className="text-[8px] font-bold text-white/30">Prêt</Text>
+          <View style={styles.statusPill}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>Prêt</Text>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* =======================================================
-            HERO MESSAGE
-        ======================================================== */}
-
-        <View className="relative px-4 pb-4">
-          <View className="max-w-[340px]">
-            <Text className="text-[19px] font-black leading-[1.15] tracking-[-0.035em] text-white">
-              Une idée.
-              <br />
-              <Text
-                style={{ WebkitBackgroundClip: "text" }}
-              >
-                Des possibilités infinies.
-              </Text>
+        {/* ─────────── HEADLINE ─────────── */}
+        <Animated.View
+          style={[styles.headlineBlock, buildEntrance(headlineAnim, 14)]}
+        >
+          <Text style={styles.headline}>
+            Une idée.{"\n"}
+            <Text style={styles.headlineAccent}>
+              Des possibilités infinies.
             </Text>
+          </Text>
+          <Text style={styles.headlineSub}>
+            Pose une question, crée, transforme ou donne vie à ton prochain
+            projet avec l'intelligence de Débrouille.
+          </Text>
+        </Animated.View>
 
-            <Text className="mt-2 max-w-[310px] text-[10px] leading-[1.55] text-white/42">
-              Pose une question, crée, transforme ou donne vie à ton prochain
-              projet avec l'intelligence de Débrouille.
-            </Text>
-          </View>
-        </View>
-
-        {/* =======================================================
-            ACTIONS
-        ======================================================== */}
-
-        <View className="relative gap-2 px-4 pb-4">
-          {/* CHAT IA */}
+        {/* ─────────── ACTIONS ─────────── */}
+        <Animated.View
+          style={[styles.actionsBlock, buildEntrance(actionsAnim, 14)]}
+        >
+          {/* Primary — Parler à l'IA */}
           <Pressable
             onPress={onOpenAI}
-            className="group relative flex items-center gap-3 overflow-hidden rounded-2xl p-3 text-left"
-            style={{  }}
+            accessibilityRole="button"
+            accessibilityLabel="Parler à Débrouille AI"
+            style={({ pressed }) => [
+              styles.primaryActionOuter,
+              pressed && styles.pressed,
+            ]}
           >
-            {/* Shine */}
-            <View
-              className="absolute inset-y-0 -left-20 w-16 bg-white/20"
-            />
+            <LinearGradient
+              colors={["#8B5CF6", "#6366F1", "#7C3AED"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryAction}
+            >
+              {/* Subtle shine */}
+              <View style={styles.primaryActionShine} pointerEvents="none" />
 
-            <View className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/14">
-              <Sparkles size={16} className="text-white" strokeWidth={2.2} />
-            </View>
-
-            <View className="relative min-w-0 flex-1">
-              <Text className="text-[11px] font-black text-white">Parler à l'IA</Text>
-              <Text className="mt-0.5 truncate text-[8px] text-white/55">
-                Demande n'importe quoi
-              </Text>
-            </View>
-
-            <ArrowRight
-              size={14}
-              className="relative flex-shrink-0 text-white/60"
-            />
+              <View style={styles.primaryIconBox}>
+                <Sparkles size={16} color="#fff" strokeWidth={2.3} />
+              </View>
+              <View style={styles.primaryTextWrap}>
+                <Text style={styles.primaryTitle}>Parler à l'IA</Text>
+                <Text style={styles.primarySub}>Demande n'importe quoi</Text>
+              </View>
+              <ArrowRight size={15} color="rgba(255,255,255,0.85)" />
+            </LinearGradient>
           </Pressable>
 
-          {/* IA STUDIO */}
-          {hasStudio && (
+          {/* Studio */}
+          {hasStudio ? (
             <Pressable
               onPress={onOpenStudio}
-              className="group relative flex items-center gap-3 overflow-hidden rounded-2xl p-3 text-left"
-              style={{ backgroundColor: "rgba(245,158,11,.09)", borderWidth: 1, borderColor: "rgba(245,158,11,.20)", borderStyle: "solid" }}
+              accessibilityRole="button"
+              accessibilityLabel="Ouvrir IA Studio"
+              style={({ pressed }) => [
+                styles.studioAction,
+                pressed && styles.pressed,
+              ]}
             >
-              <View
-               
-                className="absolute -right-8 -top-8 h-20 w-20 rounded-full"
-                style={{ backgroundColor: "rgba(245,158,11,.18)" }}
+              <LinearGradient
+                colors={["rgba(245,158,11,0.14)", "rgba(245,158,11,0.04)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
               />
 
-              <View
-                className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
-                style={{ backgroundColor: "rgba(245,158,11,.11)", borderWidth: 1, borderColor: "rgba(245,158,11,.15)", borderStyle: "solid" }}
-              >
-                <Wand2 size={16} style={{ color: "#FCD34D" }} />
+              <View style={styles.studioIconBox}>
+                <Wand2 size={16} color="#FDE68A" />
               </View>
 
-              <View className="relative min-w-0 flex-1">
-                <Text
-                  className="text-[11px] font-black"
-                  style={{ color: "#FDE68A" }}
-                >
-                  IA Studio
-                </Text>
-                <Text className="mt-0.5 truncate text-[8px] text-white/35">
+              <View style={styles.studioTextWrap}>
+                <Text style={styles.studioTitle}>IA Studio</Text>
+                <Text style={styles.studioSub}>
                   Créer · Transformer · Générer
                 </Text>
               </View>
 
-              <ChevronRight
-                size={14}
-                style={{ color: "rgba(252,211,77,.45)" }}
-                className="relative flex-shrink-0"
-              />
+              <ChevronRight size={15} color="rgba(253,230,138,0.7)" />
             </Pressable>
-          )}
-        </View>
+          ) : null}
+        </Animated.View>
 
-        {/* =======================================================
-            CAPABILITIES
-        ======================================================== */}
-
-        <View
-          className="relative flex items-center gap-1.5 overflow-x-auto px-4 pb-4"
-          style={{  }}
-        >
+        {/* ─────────── CAPABILITIES ─────────── */}
+        <View style={styles.capabilitiesRow}>
           {["Comprendre", "Créer", "Traduire", "Transformer"].map(
-            (capability, index) => (
-              <Text
+            (capability, i) => (
+              <CapabilityChip
                 key={capability}
-                className="flex-shrink-0 rounded-full px-2.5 py-1 text-[8px] font-semibold text-white/32"
-                style={{ backgroundColor: "rgba(255,255,255,.035)", borderWidth: 1, borderColor: "rgba(255,255,255,.055)", borderStyle: "solid" }}
-              >
-                {capability}
-              </Text>
+                label={capability}
+                delay={520 + i * 60}
+              />
             ),
           )}
         </View>
-
-        {/* =======================================================
-            BOTTOM AI SHIMMER
-        ======================================================== */}
-
-        <View
-          className="absolute bottom-0 left-0 h-px w-full"
-          style={{  }}
-        />
       </View>
     </View>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  wrapper: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderRadius: 30,
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.45,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 12,
+  },
+
+  surface: {
+    borderRadius: 30,
+    overflow: "hidden",
+    backgroundColor: "#0F0720",
+  },
+
+  topHighlight: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+  },
+
+  borderRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.28)",
+  },
+
+  orb: {
+    position: "absolute",
+    borderRadius: 9999,
+    opacity: 0.55,
+  },
+
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.985 }],
+  },
+
+  // ── Avatar
+  avatarHalo: {
+    position: "absolute",
+    backgroundColor: "rgba(167,139,250,0.35)",
+  },
+  avatarGradient: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    shadowColor: "#8B5CF6",
+    shadowOpacity: 0.65,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  onlineDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: "#34D399",
+    borderWidth: 2,
+    borderColor: "#0F0720",
+    shadowColor: "#34D399",
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
+  // ── Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.4,
+  },
+  intelligenceBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(139,92,246,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.35)",
+  },
+  intelligenceBadgeText: {
+    fontSize: 7.5,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    color: "#DDD6FE",
+  },
+  headerSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 4,
+  },
+  headerSub: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "600",
+  },
+  statusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(52,211,153,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.25)",
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#34D399",
+    shadowColor: "#34D399",
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  statusText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "rgba(110,231,183,0.9)",
+  },
+
+  // ── Headline
+  headlineBlock: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  headline: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.8,
+    lineHeight: 27,
+  },
+  headlineAccent: {
+    color: "#C4B5FD",
+  },
+  headlineSub: {
+    marginTop: 8,
+    maxWidth: 330,
+    fontSize: 11,
+    lineHeight: 17,
+    color: "rgba(255,255,255,0.5)",
+  },
+
+  // ── Actions block
+  actionsBlock: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 10,
+  },
+
+  // Primary
+  primaryActionOuter: {
+    borderRadius: 18,
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
+  },
+  primaryAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  primaryActionShine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.22)",
+  },
+  primaryIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  primaryTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  primaryTitle: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  primarySub: {
+    marginTop: 2,
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "500",
+  },
+
+  // Studio
+  studioAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.28)",
+    overflow: "hidden",
+    backgroundColor: "rgba(245,158,11,0.04)",
+  },
+  studioIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(245,158,11,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.28)",
+  },
+  studioTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  studioTitle: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "#FDE68A",
+    letterSpacing: -0.2,
+  },
+  studioSub: {
+    marginTop: 2,
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "500",
+  },
+
+  // Capabilities
+  capabilitiesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  capabilityChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  capabilityChipText: {
+    fontSize: 9.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.5)",
+    letterSpacing: 0.2,
+  },
+});

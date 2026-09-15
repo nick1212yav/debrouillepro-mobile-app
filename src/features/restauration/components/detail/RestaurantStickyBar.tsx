@@ -15,15 +15,8 @@ export function RestaurantStickyBar({
   if (itemsCount === 0) return null;
 
   return (
-    <View
-      className="fixed bottom-0 left-0 right-0 p-4 z-40 border-t border-white/10"
-      style={{ backgroundColor: "rgba(2,6,23,0.95)" }}
-    >
-      <Pressable
-        onPress={onCheckout}
-        className="w-full flex items-center justify-between py-4 px-6 rounded-2xl"
-        style={{  }}
-      >
+    <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="fixed bottom-0 left-0 right-0 p-4 z-40 border-t border-white/10" style={{ backgroundColor: "rgba(2,6,23,0.95)" }}>
+      <Pressable onPress={onCheckout} className="w-full flex items-center justify-between py-4 px-6 rounded-2xl active:scale-[0.98] transition-all" style={{ boxShadow: "0 10px 25px -5px rgba(249,115,22,0.4)" }}>
         <View className="flex items-center gap-2">
           <ShoppingBag size={18} className="text-white" />
           <Text className="text-white font-black text-xs uppercase tracking-wider">

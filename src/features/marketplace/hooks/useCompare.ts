@@ -1,8 +1,7 @@
-import { Alert } from "react-native";
-
 // src/features/marketplace/hooks/useCompare.ts
 import { useState } from "react";
 import type { Product } from "../types";
+import { Alert } from "react-native";
 
 export function useCompare() {
   const [compareList, setCompareList] = useState<string[]>([]);

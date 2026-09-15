@@ -1,10 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/hooks/useNetworkExperience.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { NetworkExperience } from "../types/experience.types";
+import { toast } from "sonner";
 
 interface UseNetworkExperienceOptions {
   userId: Id<"users">;
@@ -25,10 +24,10 @@ export function useNetworkExperience({ userId }: UseNetworkExperienceOptions) {
     try {
       // ✅ Correction : retrait de 'userId' car l'authentification est déduite côté serveur Convex
       const id = await addExperience(data);
-      UIService.openToast("Expérience ajoutée", "success");
+      toast.success("Expérience ajoutée");
       return id;
     } catch {
-      UIService.openToast("Erreur lors de l'ajout", "error");
+      toast.error("Erreur lors de l'ajout");
       return null;
     }
   };
@@ -39,10 +38,10 @@ export function useNetworkExperience({ userId }: UseNetworkExperienceOptions) {
   ) => {
     try {
       await updateExperience({ id: experienceId, ...data });
-      UIService.openToast("Expérience mise à jour", "success");
+      toast.success("Expérience mise à jour");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la mise à jour", "error");
+      toast.error("Erreur lors de la mise à jour");
       return false;
     }
   };
@@ -51,10 +50,10 @@ export function useNetworkExperience({ userId }: UseNetworkExperienceOptions) {
     // ✅ Correction : typé Id<"networkExperiences"> au lieu de string
     try {
       await deleteExperience({ id: experienceId });
-      UIService.openToast("Expérience supprimée", "success");
+      toast.success("Expérience supprimée");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
       return false;
     }
   };

@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { Pressable, View, Text, TextInput } from "react-native";
+import { View, Text, TextInput, NativeSyntheticEvent, Pressable } from "react-native";
 import { useState } from "react";
 import { Tag, ShieldCheck, AlertCircle, Calendar } from "lucide-react-native";
 
@@ -40,7 +40,8 @@ export function CreatePromotionForm({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleFormSubmit = async (e: unknown) => {
+  const handleFormSubmit = async (e: NativeSyntheticEvent<any>) => {
+    e.preventDefault();
     if (!validateForm()) return;
 
     const payload = {
@@ -60,116 +61,27 @@ export function CreatePromotionForm({
   };
 
   return (
-    <View
-     
-      className="max-w-md mx-auto p-6 rounded-3xl bg-slate-900/50 border border-slate-800 text-left space-y-5"
-    >
-      <View className="flex items-center gap-3 border-b border-slate-800 pb-3">
-        <Tag className="text-orange-500 w-5 h-5" />
-        <View>
-          <Text className="text-base font-black text-white">
-            Générer une Offre Promotionnelle
-          </Text>
-          <Text className="text-[10px] text-slate-400">
-            Émettez des bons d'achats pour fidéliser vos clients
-          </Text>
-        </View>
-      </View>
-
-      <View className="space-y-1.5">
-        <Text className="block text-[10px] text-slate-400 uppercase font-bold">
-          Code Promotionnel (CODE UNIQUE)
-        </Text>
-        <TextInput
-         
-          placeholder="Ex: MAMA225, PROMOFREE"
-          value={code}
-          onChangeText={(text) => setCode(text.toUpperCase())}
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white font-mono outline-none"
-         />
-        {errors.code && (
-          <Text className="text-[10px] text-rose-500 flex items-center gap-1">
-            <AlertCircle size={10} />
-            {errors.code}
-          </Text>
-        )}
-      </View>
-
-      <View className="gap-3">
-        <View className="space-y-1.5">
-          <Text className="block text-[10px] text-slate-400 uppercase font-bold">
-            Type de réduction
-          </Text>
-          <Picker
-           
-            onValueChange={(val) => setDiscountType(val as any)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none"
-           selectedValue={discountType}>
-            <Picker.Item label="Pourcentage (%)" value="percent" />
-            <Picker.Item label="Montant Fixe (FCFA)" value="fixed" />
-          </Picker>
-        </View>
-
-        <View className="space-y-1.5">
-          <Text className="block text-[10px] text-slate-400 uppercase font-bold">
-            Valeur
-          </Text>
-          <TextInput
-           
-            value={discountValue}
-            onChangeText={(text) => setDiscountValue(Number(text))}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none"
-            min={1}
-            keyboardType="numeric"/>
-          {errors.discountValue && (
+    <View className="max-w-md mx-auto p-6 rounded-3xl bg-slate-900/50 border border-slate-800 text-left space-y-5"><View className="flex items-center gap-3 border-b border-slate-800 pb-3"><Tag className="text-orange-500 w-5 h-5" /><View><Text className="text-base font-black text-white">Générer une Offre Promotionnelle
+          </Text><Text className="text-[10px] text-slate-400">Émettez des bons d'achats pour fidéliser vos clients
+          </Text></View></View><View className="space-y-1.5"><Text className="block text-[10px] text-slate-400 uppercase font-bold">Code Promotionnel (CODE UNIQUE)
+        </Text><TextInput placeholder="Ex: MAMA225, PROMOFREE" value={code} onChangeText={(value) => setCode(value.toUpperCase())} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white font-mono outline-none focus:border-orange-500/50" required />{errors.code && (
+          <Text className="text-[10px] text-rose-500 flex items-center gap-1"><AlertCircle size={10} />{errors.code}</Text>
+        )}</View><View className="gap-3"><View className="space-y-1.5"><Text className="block text-[10px] text-slate-400 uppercase font-bold">Type de réduction
+          </Text><Picker onValueChange={(value) => setDiscountType(value as any)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-orange-500/50" selectedValue={discountType}><Picker.Item label="Pourcentage (%)" value="percent" /><Picker.Item label="Montant Fixe (FCFA)" value="fixed" /></Picker></View><View className="space-y-1.5"><Text className="block text-[10px] text-slate-400 uppercase font-bold">Valeur
+          </Text><TextInput value={discountValue} onChangeText={(value) => setDiscountValue(Number(value))} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-orange-500/50" required keyboardType="numeric" />{errors.discountValue && (
             <Text className="text-[10px] text-rose-500 flex items-center gap-1">
               <AlertCircle size={10} />
               {errors.discountValue}
             </Text>
-          )}
-        </View>
-      </View>
-
-      <View className="space-y-1.5">
-        <Text className="block text-[10px] text-slate-400 uppercase font-bold">
-          Achat Minimum Requis (FCFA)
-        </Text>
-        <TextInput
-         
-          value={minPurchaseRequired}
-          onChangeText={(text) => setMinPurchaseRequired(Number(text))}
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none"
-          min={0}
-         keyboardType="numeric"/>
-      </View>
-
-      <View className="space-y-1.5">
-        <Text className="block text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1">
-          <Calendar size={11} /> Date d'expiration
-        </Text>
-        <TextInput
-         
-          value={expiryDate}
-          onChangeText={(text) => setExpiryDate(text)}
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none"
-         />
-        {errors.expiryDate && (
+          )}</View></View><View className="space-y-1.5"><Text className="block text-[10px] text-slate-400 uppercase font-bold">Achat Minimum Requis (FCFA)
+        </Text><TextInput value={minPurchaseRequired} onChangeText={(value) => setMinPurchaseRequired(Number(value))} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-orange-500/50" keyboardType="numeric" /></View><View className="space-y-1.5"><Text className="block text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1"><Calendar size={11} />Date d'expiration
+        </Text><TextInput value={expiryDate} onChangeText={(value) => setExpiryDate(value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-orange-500/50" required />{errors.expiryDate && (
           <Text className="text-[10px] text-rose-500 flex items-center gap-1">
             <AlertCircle size={10} />
             {errors.expiryDate}
           </Text>
-        )}
-      </View>
-
-      <Pressable
-        disabled={isSubmitting || !code.trim() || !expiryDate}
-        className="w-full py-4 rounded-xl bg-orange-500 disabled:bg-slate-800 disabled:text-white/20 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-orange-500/10"
-      >
-        <ShieldCheck size={14} />
-        {isSubmitting
+        )}</View><Pressable disabled={isSubmitting || !code.trim() || !expiryDate} className="w-full py-4 rounded-xl bg-orange-500 disabled:bg-slate-800 disabled:text-white/20 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md shadow-orange-500/10"><ShieldCheck size={14} />{isSubmitting
           ? "Création du coupon..."
-          : "Activer l'Offre de Réduction"}
-      </Pressable>
-    </View>
+          : "Activer l'Offre de Réduction"}</Pressable></View>
   );
 }

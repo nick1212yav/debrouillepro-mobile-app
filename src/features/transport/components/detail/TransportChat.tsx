@@ -1,12 +1,22 @@
+import { View, Text, NativeSyntheticEvent } from "react-native";
+
 // src/features/transport/components/detail/TransportChat.tsx
-
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, useRef, useEffect } from "react";
 import { MessageSquare, Send } from "lucide-react-native";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
 import { useDriverChat } from "../../hooks/useDriverChat";
+
+/* __DEBROUILLEPRO_NATIVE_DOM_API_HELPERS_V8__ — scrollIntoView helper */
+const __debrouilleProNativeScrollIntoView = async (ref: { current?: { measure?: (cb: (x: number, y: number, w: number, h: number, px: number, py: number) => void) => void } }): Promise<void> => {
+  return new Promise((resolve) => {
+    ref.current?.measure?.((_x, _y, _w, _h, _px, py) => {
+      console.warn('__debrouilleProNativeScrollIntoView: implement scrollTo with pageY on your ScrollView ref');
+      resolve();
+    });
+  });
+};
+
 
 interface TransportChatProps {
   bookingId: string;
@@ -18,121 +28,28 @@ export function TransportChat({
   driverName = "Conducteur",
 }: TransportChatProps) {
   const { messages, sendMessage } = useDriverChat(bookingId);
-
   const [inputText, setInputText] = useState("");
+  const chatEndRef = useRef<View | null>(null);
 
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
-
-  const handleSend = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const text = inputText.trim();
-
-    if (!text) {
-      return;
-    }
-
-    try {
-      await Promise.resolve(sendMessage(text));
-      setInputText("");
-    } catch (error) {
-      console.error("Impossible d'envoyer le message:", error);
-    }
+  const handleSend = (e: NativeSyntheticEvent<any>) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+    sendMessage(inputText);
+    setInputText("");
   };
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
-    });
-  }, [messages.length]);
+    __debrouilleProNativeScrollIntoView(chatEndRef.current);
+  }, [messages]);
 
   return (
-    <div className="select-none space-y-4 rounded-3xl border border-white/5 bg-white/[0.02] p-5">
-      {/* HEADER */}
-
-      <div className="flex items-center gap-2">
-        <MessageSquare size={16} className="text-violet-400" />
-
-        <span className="text-[10px] font-black uppercase tracking-widest text-violet-400">
-          Messagerie de course
-        </span>
-      </div>
-
-      {/* MESSAGES */}
-
-      <div
-        className="h-48 space-y-3.5 overflow-y-auto rounded-2xl border border-white/5 bg-black/40 p-3.5"
-        style={{ scrollbarWidth: "none" }}
-      >
-        {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-4 text-center">
-            <p className="text-[11px] text-white/30">
-              Envoyez un message à {driverName}.
-            </p>
-          </div>
-        ) : (
-          messages.map((message) => {
-            const isPassenger = message.sender === "passenger";
-
-            return (
-              <div
-                key={message.id}
-                className={`flex ${
-                  isPassenger ? "justify-end" : "justify-start"
-                }`}
-              >
-                <div className="max-w-[85%] space-y-1">
-                  <div
-                    className={[
-                      "rounded-2xl p-3 text-[11px] font-semibold leading-relaxed",
-                      isPassenger
-                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white"
-                        : "border border-white/5 bg-white/5 text-white/80",
-                    ].join(" ")}
-                  >
-                    {message.text}
-                  </div>
-
-                  <p
-                    className={[
-                      "px-1 text-[7px] text-white/30",
-                      isPassenger ? "text-right" : "text-left",
-                    ].join(" ")}
-                  >
-                    {isPassenger ? "Vous" : driverName}
-                  </p>
-                </div>
-              </div>
-            );
-          })
-        )}
-
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* MESSAGE INPUT */}
-
-      <form onSubmit={handleSend} className="flex gap-2">
-        <Input
-          value={inputText}
-          onChange={(event) => setInputText(event.target.value)}
-          placeholder={`Écrire un message à ${driverName}...`}
-          className="h-10 flex-1 rounded-xl border-white/10 bg-white/5 text-xs placeholder:text-white/20"
-        />
-
-        <Button
-          size="icon"
-          disabled={!inputText.trim()}
-          className="h-10 w-10 shrink-0 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Envoyer le message"
-          title="Envoyer"
-        >
-          <Send size={14} className="text-white" />
-        </Button>
-      </form>
-    </div>
+    <View className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] space-y-4"><View className="flex items-center gap-2"><MessageSquare size={16} className="text-violet-400" /><Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest">Messagerie de course [2]
+        </Text></View>{}<View className="h-48 rounded-2xl bg-black/40 p-3.5 overflow-y-auto space-y-3.5 border border-white/5" style={{  }}>{messages.map((msg) => (
+          <View key={msg.id} className={`flex ${msg.sender === "passenger" ? "justify-end" : "justify-start"}`}><View className="space-y-1 max-w-[85%]"><View className={`p-3 rounded-2xl text-[11px] leading-relaxed ${
+                  msg.sender === "passenger"
+                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold"
+                    : "bg-white/5 text-white/80 border border-white/5 font-semibold"
+                }`}>{msg.text}</View><Text className="text-[7px] text-white/30 text-right px-1">{msg.sender === "passenger" ? "Vous" : driverName}</Text></View></View>
+        ))}<View ref={chatEndRef} /></View>{}<View className="flex gap-2"><Input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="Écrire un message au chauffeur... [2]" className="flex-1 h-10 rounded-xl bg-white/5 border-white/10 text-xs placeholder:text-white/20" /><Button  size="icon" className="w-10 h-10 rounded-xl bg-violet-600"><Send size={14} className="text-white" /></Button></View></View>
   );
 }
-
-export default TransportChat;

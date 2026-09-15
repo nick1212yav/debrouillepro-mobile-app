@@ -1,10 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/hooks/useNetworkEducation.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { NetworkEducation } from "../types/education.types";
+import { toast } from "sonner";
 
 interface UseNetworkEducationOptions {
   userId: Id<"users">;
@@ -25,10 +24,10 @@ export function useNetworkEducation({ userId }: UseNetworkEducationOptions) {
     try {
       // ✅ Correction : retrait de 'userId' car l'authentification est déduite côté serveur Convex
       const id = await addEducation(data);
-      UIService.openToast("Formation ajoutée", "success");
+      toast.success("Formation ajoutée");
       return id;
     } catch {
-      UIService.openToast("Erreur lors de l'ajout", "error");
+      toast.error("Erreur lors de l'ajout");
       return null;
     }
   };
@@ -39,10 +38,10 @@ export function useNetworkEducation({ userId }: UseNetworkEducationOptions) {
   ) => {
     try {
       await updateEducation({ id: educationId, ...data });
-      UIService.openToast("Formation mise à jour", "success");
+      toast.success("Formation mise à jour");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la mise à jour", "error");
+      toast.error("Erreur lors de la mise à jour");
       return false;
     }
   };
@@ -51,10 +50,10 @@ export function useNetworkEducation({ userId }: UseNetworkEducationOptions) {
     // ✅ Correction : typé Id<"networkEducations"> au lieu de string
     try {
       await deleteEducation({ id: educationId });
-      UIService.openToast("Formation supprimée", "success");
+      toast.success("Formation supprimée");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
       return false;
     }
   };

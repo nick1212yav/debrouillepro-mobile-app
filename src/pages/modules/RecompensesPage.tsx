@@ -1,17 +1,17 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Text, Pressable } from "react-native";
 import { useState } from "react";
 import {
   ArrowLeft, Zap, Lock, Sparkles, Crown,
   TrendingUp, Check,
 } from "lucide-react-native";
+import { toast } from "sonner";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
-import { Skeleton } from "@/components/ui/skeleton";
-import { SignInButton } from "@/components/ui/signin";
-import { getLevel, getLevelProgress, LEVEL_ORDER } from "@/hooks/use-points";
-import type { Level } from "@/hooks/use-points";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
+import { getLevel, getLevelProgress, LEVEL_ORDER } from "@/hooks/use-points.ts";
+import type { Level } from "@/hooks/use-points.ts";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const LEVEL_COLORS: Record<Level, { from: string; to: string; glow: string; text: string }> = {
@@ -95,53 +95,11 @@ function LevelCard({ total }: { total: number }) {
   const colors = LEVEL_COLORS[level];
 
   return (
-    <View className="mx-5 mb-4 rounded-3xl overflow-hidden p-5 relative"
-      style={{ borderStyle: "solid" }}>
-      {/* Glow */}
-      <View className="absolute -top-10 -right-10 w-40 h-40 rounded-full"
-        style={{  }} />
-
-      <View className="flex items-center justify-between mb-4 relative">
-        <View>
-          <View className="flex items-center gap-2 mb-1">
-            <Text className="text-3xl">{LEVEL_ICONS[level]}</Text>
-            <View>
-              <View className="text-white font-black text-lg leading-tight"><Text>Niveau</Text>{level}</View>
-              <View className="text-white/50 text-xs"><Text>Membre Pro Débrouille</Text></View>
-            </View>
-          </View>
-        </View>
-        <View className="text-right">
-          <View className="font-black text-3xl leading-tight" style={{  }}>{total.toLocaleString()}</View>
-          <View className="text-white/50 text-xs"><Text>points XP</Text></View>
-        </View>
-      </View>
-
-      {/* Progress bar */}
-      {nextLevel && (
-        <View>
-          <View className="flex items-center justify-between mb-1.5">
-            <Text className="text-xs text-white/50">Progression vers {LEVEL_ICONS[nextLevel]} {nextLevel}</Text>
-            <Text className="text-xs font-bold" style={{ color: colors.text }}>{progress}%</Text>
-          </View>
-          <View className="h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}>
-            <View
-              className="h-full rounded-full"
-              style={{  }}
-            />
-          </View>
-          <View className="text-right mt-1">
-            <Text className="text-[10px] text-white/40">{pointsToNext} pts restants</Text>
-          </View>
-        </View>
-      )}
-      {!nextLevel && (
-        <View className="flex items-center gap-2 mt-2">
-          <Crown size={14} style={{ color: colors.text }} />
-          <Text className="text-xs font-bold" style={{ color: colors.text }}>Niveau maximum atteint — Félicitations !</Text>
-        </View>
-      )}
-    </View>
+    <View className="mx-5 mb-4 rounded-3xl overflow-hidden p-5 relative" style={{ borderStyle: "solid" }}>{}<View className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none" style={{  }} /><View className="flex items-center justify-between mb-4 relative"><View><View className="flex items-center gap-2 mb-1"><Text className="text-3xl">{LEVEL_ICONS[level]}</Text><View><View className="text-white font-black text-lg leading-tight"><Text>Niveau</Text>{level}</View><View className="text-white/50 text-xs"><Text>Membre Pro Débrouille</Text></View></View></View></View><View className="text-right"><View className="font-black text-3xl leading-tight" style={{  }}>{total.toLocaleString()}</View><View className="text-white/50 text-xs"><Text>points XP</Text></View></View></View>{}{nextLevel && (
+        <View><View className="flex items-center justify-between mb-1.5"><Text className="text-xs text-white/50">Progression vers {LEVEL_ICONS[nextLevel]}{nextLevel}</Text><Text className="text-xs font-bold" style={{ color: colors.text }}>{progress}%</Text></View><View className="h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><View initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }} className="h-full rounded-full" style={{  }} /></View><View className="text-right mt-1"><Text className="text-[10px] text-white/40">{pointsToNext}pts restants</Text></View></View>
+      )}{!nextLevel && (
+        <View className="flex items-center gap-2 mt-2"><Crown size={14} style={{  }} /><Text className="text-xs font-bold" style={{ color: colors.text }}>Niveau maximum atteint — Félicitations !</Text></View>
+      )}</View>
   );
 }
 
@@ -150,37 +108,18 @@ function LevelRoadmap({ total }: { total: number }) {
   const currentLevel = getLevel(total);
 
   return (
-    <View className="mx-5 mb-4 rounded-3xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-      <View className="flex items-center gap-2 mb-3">
-        <TrendingUp size={14} className="text-white/60" />
-        <Text className="text-white/70 text-xs font-semibold uppercase tracking-wider">Paliers de niveau</Text>
-      </View>
-      <View className="flex items-center justify-between">
-        {LEVEL_ORDER.map((lvl: Level, i: number) => {
+    <View className="mx-5 mb-4 rounded-3xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-3"><TrendingUp size={14} className="text-white/60" /><Text className="text-white/70 text-xs font-semibold uppercase tracking-wider">Paliers de niveau</Text></View><View className="flex items-center justify-between">{LEVEL_ORDER.map((lvl: Level, i: number) => {
           const isReached = LEVEL_ORDER.indexOf(currentLevel) >= i;
           const isCurrent = currentLevel === lvl;
           const c = LEVEL_COLORS[lvl];
           return (
-            <View key={lvl} className="flex flex-col items-center gap-1 flex-1">
-              <View className="relative w-10 h-10 rounded-2xl flex items-center justify-center text-xl"
-                style={{ backgroundColor: isReached ? `${c.from}33` : "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                {LEVEL_ICONS[lvl]}
-                {isReached && !isCurrent && (
-                  <View className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: c.from }}>
-                    <Check size={9} className="text-black" />
-                  </View>
-                )}
-              </View>
-              <Text className="text-[10px] font-semibold" style={{ color: isReached ? c.text : "rgba(255,255,255,0.3)" }}>{lvl}</Text>
-              <Text className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>{LEVEL_THRESHOLDS[lvl].toLocaleString()}</Text>
-              {i < LEVEL_ORDER.length - 1 && (
+            <View key={lvl} className="flex flex-col items-center gap-1 flex-1"><View className="relative w-10 h-10 rounded-2xl flex items-center justify-center text-xl transition-all" style={{ backgroundColor: isReached ? `${c.from}33` : "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", boxShadow: isCurrent ? `0 0 16px ${c.glow}` : "none" }}>{LEVEL_ICONS[lvl]}{isReached && !isCurrent && (
+                  <View className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: c.from }}><Check size={9} className="text-black" /></View>
+                )}</View><Text className="text-[10px] font-semibold" style={{ color: isReached ? c.text : "rgba(255,255,255,0.3)" }}>{lvl}</Text><Text className="text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>{LEVEL_THRESHOLDS[lvl].toLocaleString()}</Text>{i < LEVEL_ORDER.length - 1 && (
                 <View className="absolute" style={{ display: "none" }} />
-              )}
-            </View>
+              )}</View>
           );
-        })}
-      </View>
-    </View>
+        })}</View></View>
   );
 }
 
@@ -193,48 +132,10 @@ function RewardCard({ reward, total, isClaimed, onClaim }: { reward: Reward; tot
   const c = LEVEL_COLORS[reward.minLevel];
 
   return (
-    <View
-      className="rounded-2xl p-3.5 relative overflow-hidden"
-      style={{ backgroundColor: isClaimed ? "rgba(16,185,129,0.08)" : isLocked ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.06)", borderColor: "rgba(16,185,129,0.3)", borderStyle: "solid", opacity: isLocked && !isClaimed ? 0.7 : 1 }}
-    >
-      <View className="flex items-center gap-3">
-        <View className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
-          style={{ backgroundColor: isClaimed ? "rgba(16,185,129,0.15)" : `${c.from}18` }}>
-          {isClaimed ? "✅" : reward.emoji}
-        </View>
-        <View className="flex-1 min-w-0">
-          <View className="flex items-center gap-1.5 mb-0.5">
-            <Text className="text-white font-semibold text-sm truncate">{reward.title}</Text>
-            {isLocked && !isClaimed && <Lock size={11} className="text-white/30 flex-shrink-0" />}
-          </View>
-          <Text className="text-white/40 text-xs leading-tight truncate">{reward.desc}</Text>
-          <View className="flex items-center gap-2 mt-1.5">
-            <Text className="text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: `${c.from}22`, color: c.text, borderStyle: "solid" }}>
-              {LEVEL_ICONS[reward.minLevel]} {reward.minLevel}
-            </Text>
-            <Text className="text-xs font-black" style={{ color: isClaimed ? "#10B981" : "#A78BFA" }}>
-              {isClaimed ? "Obtenu" : `${reward.cost} pts`}
-            </Text>
-          </View>
-        </View>
-        <View className="flex flex-col items-end gap-1.5 flex-shrink-0">
-          <Text className="text-xs font-black px-2 py-1 rounded-xl"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" }}>
-            {reward.value}
-          </Text>
-          {!isClaimed && (
-            <Pressable
-              onPress={onClaim}
-              disabled={isLocked}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed"
-              style={{  }}
-            >
-              {total < reward.cost ? `${reward.cost - total} pts` : "Obtenir"}
-            </Pressable>
-          )}
-        </View>
-      </View>
+    <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-3.5 relative overflow-hidden" style={{ backgroundColor: isClaimed ? "rgba(16,185,129,0.08)" : isLocked ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.06)", borderColor: "rgba(16,185,129,0.3)", borderStyle: "solid", opacity: isLocked && !isClaimed ? 0.7 : 1 }}>
+      <View className="flex items-center gap-3"><View className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{ backgroundColor: isClaimed ? "rgba(16,185,129,0.15)" : `${c.from}18` }}>{isClaimed ? "✅" : reward.emoji}</View><View className="flex-1 min-w-0"><View className="flex items-center gap-1.5 mb-0.5"><Text className="text-white font-semibold text-sm truncate">{reward.title}</Text>{isLocked && !isClaimed && <Lock size={11} className="text-white/30 flex-shrink-0" />}</View><Text className="text-white/40 text-xs leading-tight truncate">{reward.desc}</Text><View className="flex items-center gap-2 mt-1.5"><Text className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${c.from}22`, color: c.text, borderStyle: "solid" }}>{LEVEL_ICONS[reward.minLevel]}{reward.minLevel}</Text><Text className="text-xs font-black" style={{ color: isClaimed ? "#10B981" : "#A78BFA" }}>{isClaimed ? "Obtenu" : `${reward.cost} pts`}</Text></View></View><View className="flex flex-col items-end gap-1.5 flex-shrink-0"><Text className="text-xs font-black px-2 py-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" }}>{reward.value}</Text>{!isClaimed && (
+            <Pressable onPress={onClaim} disabled={isLocked} className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:opacity-30" style={{  }}>{total < reward.cost ? `${reward.cost - total} pts` : "Obtenir"}</Pressable>
+          )}</View></View>
     </View>
   );
 }
@@ -252,16 +153,16 @@ function RecompensesContent({ onBack }: { onBack: () => void }) {
 
   const handleClaim = (reward: Reward) => {
     if (claimedRewards.includes(reward.id)) {
-      UIService.openToast("Récompense déjà obtenue", "info");
+      toast.info("Récompense déjà obtenue");
       return;
     }
     if (total < reward.cost) {
-      UIService.openToast(`Il vous manque ${reward.cost - total} points`, "error");
+      toast.error(`Il vous manque ${reward.cost - total} points`);
       return;
     }
     // Toast-only redemption for now
     setClaimedRewards((prev) => [...prev, reward.id]);
-    UIService.openToast(`🎉 ${reward.title} débloqué !`, "success");
+    toast.success(`🎉 ${reward.title} débloqué !`);
   };
 
   const filteredRewards = REWARDS.filter(r => filterLevel === "Tous" || r.minLevel === filterLevel);
@@ -269,29 +170,9 @@ function RecompensesContent({ onBack }: { onBack: () => void }) {
   // Loading skeleton
   if (rewardsData === undefined) {
     return (
-      <View className="flex flex-col h-full overflow-hidden"
-        style={{  }}>
-        <View className="flex-shrink-0 px-5 pt-12 pb-4">
-          <View className="flex items-center gap-3 mb-5">
-            <Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-              <ArrowLeft size={20} className="text-white" />
-            </Pressable>
-            <View className="flex-1">
-              <Text className="text-white font-black text-xl">Récompenses 🏆</Text>
-              <Text className="text-white/40 text-xs">Chargement...</Text>
-            </View>
-          </View>
-          <Skeleton className="h-40 w-full rounded-3xl mb-4" />
-          <Skeleton className="h-20 w-full rounded-3xl mb-4" />
-          <Skeleton className="h-10 w-full rounded-2xl" />
-        </View>
-        <View className="flex-1 px-5 pb-8 space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
+      <View className="flex flex-col h-full overflow-hidden" style={{  }}><View className="flex-shrink-0 px-5 pt-12 pb-4"><View className="flex items-center gap-3 mb-5"><Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={20} className="text-white" /></Pressable><View className="flex-1"><Text className="text-white font-black text-xl">Récompenses 🏆</Text><Text className="text-white/40 text-xs">Chargement...</Text></View></View><Skeleton className="h-40 w-full rounded-3xl mb-4" /><Skeleton className="h-20 w-full rounded-3xl mb-4" /><Skeleton className="h-10 w-full rounded-2xl" /></View><View className="flex-1 px-5 pb-8 space-y-3">{Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full rounded-2xl" />
-          ))}
-        </View>
-      </View>
+          ))}</View></View>
     );
   }
 
@@ -311,151 +192,54 @@ function RecompensesContent({ onBack }: { onBack: () => void }) {
   const totalEarned = historyEvents.reduce((s, e) => s + (e.points > 0 ? e.points : 0), 0);
 
   return (
-    <View className="flex flex-col h-full overflow-hidden"
-      style={{  }}>
-      {/* Glows */}
-      <View className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40"
-        style={{  }} />
-      <View className="absolute bottom-1/3 right-0 w-48 h-48"
-        style={{  }} />
-
-      {/* Header */}
-      <View className="flex-shrink-0 px-5 pt-12 pb-4">
-        <View className="flex items-center gap-3 mb-5">
-          <Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-            <ArrowLeft size={20} className="text-white" />
-          </Pressable>
-          <View className="flex-1">
-            <Text className="text-white font-black text-xl">Récompenses 🏆</Text>
-            <Text className="text-white/40 text-xs">Gagnez des points · Débloquez des avantages</Text>
-          </View>
-          <View className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
-            style={{ backgroundColor: "rgba(255,215,0,0.12)", borderWidth: 1, borderColor: "rgba(255,215,0,0.25)", borderStyle: "solid" }}>
-            <Zap size={14} className="text-yellow-400" />
-            <Text className="text-yellow-400 font-black text-sm">{total.toLocaleString()}</Text>
-            <Text className="text-yellow-400/60 text-xs">pts</Text>
-          </View>
-        </View>
-
-        {/* Level card */}
-        <View className="mx-0 mb-4">
-          <LevelCard total={total} />
-        </View>
-
-        {/* Level roadmap */}
-        <LevelRoadmap total={total} />
-
-        {/* Tabs */}
-        <View className="flex gap-1 rounded-2xl p-1" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
-          {([["rewards", "🎁 Récompenses"], ["history", "📋 Historique"], ["earn", "⚡ Gagner"]] as [Tab, string][]).map(([t, label]) => (
-            <Pressable key={t} onPress={() => setTab(t)}
-              className="flex-1 py-2 rounded-xl text-xs font-bold"
-              style={{ backgroundColor: tab === t ? "rgba(139,92,246,0.3)" : "transparent", borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}
-            >
-              {label}
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Content */}
-      <View className="flex-1 overflow-y-auto px-5 pb-8" style={{  }}>
-        <>
-          {/* ── Rewards tab ── */}
-          {tab === "rewards" && (
-            <View key="rewards">
+    <View className="flex flex-col h-full overflow-hidden" style={{  }}>{}<View className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 pointer-events-none" style={{  }} /><View className="absolute bottom-1/3 right-0 w-48 h-48 pointer-events-none" style={{  }} />{}<View className="flex-shrink-0 px-5 pt-12 pb-4"><View className="flex items-center gap-3 mb-5"><Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={20} className="text-white" /></Pressable><View className="flex-1"><Text className="text-white font-black text-xl">Récompenses 🏆</Text><Text className="text-white/40 text-xs">Gagnez des points · Débloquez des avantages</Text></View><View className="flex items-center gap-1.5 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,215,0,0.12)", borderWidth: 1, borderColor: "rgba(255,215,0,0.25)", borderStyle: "solid" }}><Zap size={14} className="text-yellow-400" /><Text className="text-yellow-400 font-black text-sm">{total.toLocaleString()}</Text><Text className="text-yellow-400/60 text-xs">pts</Text></View></View>{}<View className="mx-0 mb-4"><LevelCard total={total} /></View>{}<LevelRoadmap total={total} />{}<View className="flex gap-1 rounded-2xl p-1" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>{([["rewards", "🎁 Récompenses"], ["history", "📋 Historique"], ["earn", "⚡ Gagner"]] as [Tab, string][]).map(([t, label]) => (
+            <Pressable key={t} onPress={() => setTab(t)} className="flex-1 py-2 rounded-xl text-xs font-bold transition-all" style={{ backgroundColor: tab === t ? "rgba(139,92,246,0.3)" : "transparent", borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}>{label}</Pressable>
+          ))}</View></View>{}<View className="flex-1 overflow-y-auto px-5 pb-8" style={{  }}><View>{}{tab === "rewards" && (
+            <View key="rewards" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {/* Level filter */}
-              <View className="flex gap-2 overflow-x-auto pb-2 mb-4" style={{  }}>
-                {(["Tous", ...LEVEL_ORDER] as (Level | "Tous")[]).map(l => (
-                  <Pressable key={l} onPress={() => setFilterLevel(l)}
-                    className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold"
-                    style={{ backgroundColor: filterLevel === l ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.06)", borderColor: "#8B5CF6", borderStyle: "solid" }}
-                  >
-                    {l === "Tous" ? "🎁 Tous" : `${LEVEL_ICONS[l]} ${l}`}
-                  </Pressable>
-                ))}
-              </View>
-              <View className="flex flex-col gap-3">
-                {filteredRewards.map((r, i) => (
-                  <View key={r.id}>
+              <View className="flex gap-2 overflow-x-auto pb-2 mb-4" style={{  }}>{(["Tous", ...LEVEL_ORDER] as (Level | "Tous")[]).map(l => (
+                  <Pressable key={l} onPress={() => setFilterLevel(l)} className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all" style={{ backgroundColor: filterLevel === l ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.06)", borderColor: "#8B5CF6", borderStyle: "solid" }}>{l === "Tous" ? "🎁 Tous" : `${LEVEL_ICONS[l]} ${l}`}</Pressable>
+                ))}</View>
+              <View className="flex flex-col gap-3">{filteredRewards.map((r, i) => (
+                  <View key={r.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                     <RewardCard reward={r} total={total} isClaimed={claimedRewards.includes(r.id)} onClaim={() => handleClaim(r)} />
                   </View>
-                ))}
-              </View>
+                ))}</View>
             </View>
-          )}
-
-          {/* ── History tab ── */}
-          {tab === "history" && (
-            <View key="history">
+          )}{}{tab === "history" && (
+            <View key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {/* Summary stats */}
-              <View className="gap-2 mb-4">
-                {[
+              <View className="gap-2 mb-4">{[
                   { label: "Total gagné", value: totalEarned.toLocaleString(), unit: "pts", color: "#A78BFA" },
                   { label: "Actions", value: `${historyEvents.length}`, unit: "événements", color: "#34D399" },
                   { label: "Badges", value: `${rewardsData.badgeCount}`, unit: "obtenus", color: "#FB923C" },
                 ].map(s => (
-                  <View key={s.label} className="rounded-2xl p-3 text-center" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                    <View className="font-black text-lg" style={{  }}>{s.value}</View>
-                    <View className="text-white/40 text-[10px]">{s.unit}</View>
-                    <View className="text-white/60 text-[10px] mt-0.5">{s.label}</View>
-                  </View>
-                ))}
-              </View>
+                  <View key={s.label} className="rounded-2xl p-3 text-center" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="font-black text-lg" style={{  }}>{s.value}</View><View className="text-white/40 text-[10px]">{s.unit}</View><View className="text-white/60 text-[10px] mt-0.5">{s.label}</View></View>
+                ))}</View>
 
-              <View className="flex flex-col gap-2">
-                {historyEvents.length === 0 ? (
+              <View className="flex flex-col gap-2">{historyEvents.length === 0 ? (
                   <View className="text-center py-10 text-white/30 text-sm"><Text>Aucun historique pour le moment</Text></View>
                 ) : (
                   historyEvents.map((event, i) => (
-                    <View key={event.id}
-                      className="flex items-center gap-3 rounded-2xl p-3"
-                      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-                      <View className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.15)" }}>
-                        {event.emoji}
-                      </View>
-                      <View className="flex-1 min-w-0">
-                        <View className="text-white text-sm font-semibold truncate">{event.action}</View>
-                        <View className="text-white/40 text-xs">{event.module} <Text>·</Text>{new Date(event.timestamp).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</View>
-                      </View>
-                      <View className="font-black text-sm flex-shrink-0" style={{  }}>
-                        {event.points > 0 ? "+" : ""}{event.points} <Text>pts</Text></View>
+                    <View key={event.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }} className="flex items-center gap-3 rounded-2xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
+                      <View className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.15)" }}>{event.emoji}</View>
+                      <View className="flex-1 min-w-0"><View className="text-white text-sm font-semibold truncate">{event.action}</View><View className="text-white/40 text-xs">{event.module}<Text>·</Text>{new Date(event.timestamp).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</View></View>
+                      <View className="font-black text-sm flex-shrink-0" style={{  }}>{event.points > 0 ? "+" : ""}{event.points}<Text>pts</Text></View>
                     </View>
                   ))
-                )}
-              </View>
+                )}</View>
             </View>
-          )}
-
-          {/* ── Earn tab ── */}
-          {tab === "earn" && (
-            <View key="earn">
-              <View className="rounded-2xl p-4 mb-4" style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}>
-                <View className="flex items-center gap-2 mb-1">
-                  <Sparkles size={16} className="text-purple-400" />
-                  <Text className="text-white font-bold text-sm">Comment gagner des points ?</Text>
-                </View>
-                <Text className="text-white/50 text-xs">Chaque interaction dans Débrouille Pro vous rapporte des points XP. Plus vous utilisez l'app, plus vous montez en niveau !</Text>
-              </View>
-              <View className="flex flex-col gap-2">
-                {EARN_WAYS.map((w, i) => (
-                  <View key={w.label}
-                    className="flex items-center justify-between rounded-2xl p-3.5"
-                    style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                    <View className="flex items-center gap-3">
-                      <Text className="text-2xl">{w.emoji}</Text>
-                      <Text className="text-white text-sm">{w.label}</Text>
-                    </View>
+          )}{}{tab === "earn" && (
+            <View key="earn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <View className="rounded-2xl p-4 mb-4" style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-1"><Sparkles size={16} className="text-purple-400" /><Text className="text-white font-bold text-sm">Comment gagner des points ?</Text></View><Text className="text-white/50 text-xs">Chaque interaction dans Débrouille Pro vous rapporte des points XP. Plus vous utilisez l'app, plus vous montez en niveau !</Text></View>
+              <View className="flex flex-col gap-2">{EARN_WAYS.map((w, i) => (
+                  <View key={w.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="flex items-center justify-between rounded-2xl p-3.5" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+                    <View className="flex items-center gap-3"><Text className="text-2xl">{w.emoji}</Text><Text className="text-white text-sm">{w.label}</Text></View>
                     <Text className="font-black text-sm" style={{ color: "#A78BFA" }}>{w.pts}</Text>
                   </View>
-                ))}
-              </View>
+                ))}</View>
             </View>
-          )}
-        </>
-      </View>
-    </View>
+          )}</View></View></View>
   );
 }
 
@@ -471,35 +255,10 @@ export default function RecompensesPage({ onBack }: RecompensesPageProps) {
         <RecompensesContent onBack={onBack} />
       </Authenticated>
       <Unauthenticated>
-        <View className="flex flex-col h-full items-center justify-center gap-4"
-          style={{  }}>
-          <View className="absolute top-5 left-5">
-            <Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-              <ArrowLeft size={20} className="text-white" />
-            </Pressable>
-          </View>
-          <Text className="text-4xl">🏆</Text>
-          <Text className="text-white font-bold text-lg">Récompenses</Text>
-          <Text className="text-white/50 text-sm text-center max-w-xs">Connectez-vous pour voir vos points XP et débloquer des récompenses</Text>
-          <SignInButton />
-        </View>
+        <View className="flex flex-col h-full items-center justify-center gap-4" style={{  }}><View className="absolute top-5 left-5"><Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={20} className="text-white" /></Pressable></View><Text className="text-4xl">🏆</Text><Text className="text-white font-bold text-lg">Récompenses</Text><Text className="text-white/50 text-sm text-center max-w-xs">Connectez-vous pour voir vos points XP et débloquer des récompenses</Text><SignInButton /></View>
       </Unauthenticated>
       <AuthLoading>
-        <View className="flex flex-col h-full"
-          style={{  }}>
-          <View className="flex-shrink-0 px-5 pt-12 pb-4">
-            <View className="flex items-center gap-3 mb-5">
-              <Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center"
-                style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-                <ArrowLeft size={20} className="text-white" />
-              </Pressable>
-              <Skeleton className="h-6 w-40" />
-            </View>
-            <Skeleton className="h-40 w-full rounded-3xl mb-4" />
-            <Skeleton className="h-20 w-full rounded-3xl" />
-          </View>
-        </View>
+        <View className="flex flex-col h-full" style={{  }}><View className="flex-shrink-0 px-5 pt-12 pb-4"><View className="flex items-center gap-3 mb-5"><Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={20} className="text-white" /></Pressable><Skeleton className="h-6 w-40" /></View><Skeleton className="h-40 w-full rounded-3xl mb-4" /><Skeleton className="h-20 w-full rounded-3xl" /></View></View>
       </AuthLoading>
     </>
   );

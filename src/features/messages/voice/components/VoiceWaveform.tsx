@@ -14,7 +14,7 @@ export function VoiceWaveform({
   const safeProgress = Math.max(0, Math.min(1, progress));
 
   return (
-    <View className="flex h-8 flex-1 items-center gap-[2px]">
+    <View className="flex h-8 flex-1 items-center gap-[2px]" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants">
       {Array.from({
         length: bars,
       }).map((_, index) => {
@@ -25,17 +25,13 @@ export function VoiceWaveform({
         const isActive = position <= safeProgress;
 
         return (
-          <Text
-            key={index}
-            className={`w-[2px] rounded-full transition-opacity ${
+          <Text key={index} className={`w-[2px] rounded-full transition-opacity ${
               isActive || active
                 ? "bg-current opacity-100"
                 : "bg-current opacity-30"
-            }`}
-            style={{
+            }`} style={{
               height: `${height}%`,
-            }}
-          />
+            }} />
         );
       })}
     </View>

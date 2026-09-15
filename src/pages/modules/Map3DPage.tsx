@@ -1,747 +1,188 @@
-// src/pages/modules/Map3DPage.tsx
-
-import { useCallback, useMemo, useState } from "react";
+import { View, Pressable, Text, TextInput } from "react-native";
+import { useState, useEffect, useRef } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
 import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import {
-  ArrowLeft,
-  Building2,
-  ChevronRight,
-  Coffee,
-  Layers,
-  Locate,
-  MapPin,
-  Navigation,
-  ShoppingBag,
-  Trees,
+  ArrowLeft, Map, Layers, Compass, Search, Navigation, Locate,
 } from "lucide-react-native";
 
-interface Map3DPageProps {
-  onBack?: () => void;
+// Fix default icon paths
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+// Colored div icon factory
+function makeIcon(color: string) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="
+      width:32px;height:32px;border-radius:50% 50% 50% 0;
+      background:${color};
+      border:3px solid rgba(255,255,255,0.9);
+      box-shadow:0 4px 14px rgba(0,0,0,0.5);
+      display:flex;align-items:center;justify-content:center;
+      transform:rotate(-45deg);
+    ">
+      <span style="transform:rotate(45deg);display:block;width:8px;height:8px;border-radius:50%;background:white;"></span>
+    </div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -36],
+  });
 }
 
-type Tab = "Carte" | "Couches" | "Explorer";
+// Fly-to component for geolocation
+function FlyTo({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.flyTo([lat, lng], 15, { duration: 1.5 });
+  }, [lat, lng, map]);
+  return null;
+}
 
-interface PointOfInterest {
-  id: string;
+const POI_CATEGORIES = ["Tout", "Hôpitaux", "Écoles", "Marchés", "Banques", "Hôtels"] as const;
+type PoiCategory = (typeof POI_CATEGORIES)[number];
+
+type Poi = {
+  id: number;
   name: string;
-  category: string;
+  category: Exclude<PoiCategory, "Tout">;
   lat: number;
   lng: number;
   color: string;
-  icon: "building" | "shopping" | "coffee" | "nature";
-}
-
-interface MapLayer {
-  id: string;
-  label: string;
-  active: boolean;
-}
-
-const INITIAL_REGION = {
-  latitude: 5.3599517,
-  longitude: -4.0082563,
-  latitudeDelta: 0.08,
-  longitudeDelta: 0.08,
 };
 
-const POINTS_OF_INTEREST: PointOfInterest[] = [
-  {
-    id: "plateau",
-    name: "Plateau",
-    category: "Centre d'affaires",
-    lat: 5.320357,
-    lng: -4.016107,
-    color: "#06B6D4",
-    icon: "building",
-  },
-  {
-    id: "cocody",
-    name: "Cocody",
-    category: "Quartier résidentiel",
-    lat: 5.360004,
-    lng: -3.986777,
-    color: "#8B5CF6",
-    icon: "building",
-  },
-  {
-    id: "marcory",
-    name: "Marcory",
-    category: "Commerce",
-    lat: 5.294685,
-    lng: -3.981027,
-    color: "#F97316",
-    icon: "shopping",
-  },
-  {
-    id: "riviera",
-    name: "Riviera",
-    category: "Restaurants & loisirs",
-    lat: 5.37127,
-    lng: -3.970901,
-    color: "#EC4899",
-    icon: "coffee",
-  },
-  {
-    id: "parc",
-    name: "Zone verte",
-    category: "Nature & détente",
-    lat: 5.3445,
-    lng: -4.035,
-    color: "#22C55E",
-    icon: "nature",
-  },
+const POIS: Poi[] = [
+  { id: 1, name: "CHU de Cocody", category: "Hôpitaux", lat: 5.368, lng: -3.968, color: "#EF4444" },
+  { id: 2, name: "UFHB – Campus", category: "Écoles", lat: 5.349, lng: -3.994, color: "#6366F1" },
+  { id: 3, name: "Marché Adjamé", category: "Marchés", lat: 5.372, lng: -4.025, color: "#F97316" },
+  { id: 4, name: "SGBCI Plateau", category: "Banques", lat: 5.320, lng: -4.022, color: "#10B981" },
+  { id: 5, name: "Hôtel Ivoire", category: "Hôtels", lat: 5.336, lng: -3.980, color: "#8B5CF6" },
+  { id: 6, name: "Marché de Treichville", category: "Marchés", lat: 5.299, lng: -4.012, color: "#F97316" },
+  { id: 7, name: "Lycée Classique", category: "Écoles", lat: 5.380, lng: -4.040, color: "#6366F1" },
+  { id: 8, name: "Clinique Sainte Marie", category: "Hôpitaux", lat: 5.342, lng: -3.962, color: "#EF4444" },
 ];
 
-const INITIAL_LAYERS: MapLayer[] = [
-  {
-    id: "buildings",
-    label: "Bâtiments",
-    active: true,
-  },
-  {
-    id: "places",
-    label: "Points d'intérêt",
-    active: true,
-  },
-  {
-    id: "transport",
-    label: "Transport",
-    active: false,
-  },
-  {
-    id: "terrain",
-    label: "Relief",
-    active: false,
-  },
+const LAYERS = [
+  { id: "satellite", label: "Satellite", active: false },
+  { id: "routes", label: "Routes", active: true },
+  { id: "terrain", label: "Terrain 3D", active: true },
+  { id: "traffic", label: "Trafic", active: false },
+  { id: "population", label: "Densité pop.", active: false },
 ];
 
-function getPoiIcon(type: PointOfInterest["icon"], color: string) {
-  const size = 15;
+// Abidjan center
+const ABIDJAN_CENTER: [number, number] = [5.354, -4.008];
 
-  switch (type) {
-    case "building":
-      return <Building2 size={size} color={color} />;
+export default function Map3DPage({ onBack }: { onBack: () => void }) {
+  const [activeCategory, setActiveCategory] = useState<PoiCategory>("Tout");
+  const [layers, setLayers] = useState(LAYERS);
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("Carte");
+  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [flyTarget, setFlyTarget] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const mapRef = useRef<L.Map | null>(null);
 
-    case "shopping":
-      return <ShoppingBag size={size} color={color} />;
+  const toggleLayer = (id: string) => setLayers(prev => prev.map(l => l.id === id ? { ...l, active: !l.active } : l));
 
-    case "coffee":
-      return <Coffee size={size} color={color} />;
+  const visiblePois = POIS.filter(p => {
+    const matchCategory = activeCategory === "Tout" || p.category === activeCategory;
+    const matchSearch = search === "" || p.name.toLowerCase().includes(search.toLowerCase());
+    return matchCategory && matchSearch;
+  });
 
-    case "nature":
-      return <Trees size={size} color={color} />;
-
-    default:
-      return <MapPin size={size} color={color} />;
-  }
-}
-
-export default function Map3DPage({ onBack }: Map3DPageProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("Carte");
-
-  const [layers, setLayers] = useState<MapLayer[]>(INITIAL_LAYERS);
-
-  const [selectedPoint, setSelectedPoint] = useState<PointOfInterest | null>(
-    null,
-  );
-
-  const [isLocating, setIsLocating] = useState(false);
-
-  const activePoints = useMemo(() => {
-    const placesLayer = layers.find((layer) => layer.id === "places");
-
-    if (!placesLayer?.active) {
-      return [];
-    }
-
-    return POINTS_OF_INTEREST;
-  }, [layers]);
-
-  const toggleLayer = useCallback((layerId: string) => {
-    setLayers((currentLayers) =>
-      currentLayers.map((layer) =>
-        layer.id === layerId
-          ? {
-              ...layer,
-              active: !layer.active,
-            }
-          : layer,
-      ),
+  const handleLocate = () => {
+    if (!("geolocation" in navigator)) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserPos(coords);
+        setFlyTarget(coords);
+        setLocating(false);
+      },
+      () => {
+        setFlyTarget({ lat: ABIDJAN_CENTER[0], lng: ABIDJAN_CENTER[1] });
+        setLocating(false);
+      },
+      { timeout: 8000 }
     );
-  }, []);
-
-  const handleLocate = useCallback(() => {
-    setIsLocating(true);
-
-    // Placeholder natif sûr.
-    // La géolocalisation réelle peut ensuite être branchée
-    // avec expo-location si le projet l'utilise.
-
-    setTimeout(() => {
-      setIsLocating(false);
-    }, 700);
-  }, []);
-
-  const handleSelectPoint = useCallback((point: PointOfInterest) => {
-    setSelectedPoint(point);
-    setActiveTab("Carte");
-  }, []);
+  };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-
-      <View style={styles.header}>
-        <Pressable
-          onPress={onBack}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.pressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-        >
-          <ArrowLeft size={20} color="#FFFFFF" />
-        </Pressable>
-
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>Carte 3D Interactive</Text>
-
-          <Text style={styles.subtitle}>Explorer · Mesurer · Interagir</Text>
-        </View>
-
-        <Pressable
-          onPress={handleLocate}
-          disabled={isLocating}
-          style={({ pressed }) => [
-            styles.locateButton,
-            pressed && styles.pressed,
-            isLocating && styles.disabled,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Localiser ma position"
-        >
-          {isLocating ? (
-            <ActivityIndicator size="small" color="#06B6D4" />
+    <View className="h-full flex flex-col overflow-hidden" style={{  }}>{}<View className="flex items-center gap-3 px-4 pt-12 pb-3"><Pressable onPress={onBack} className="p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,.08)" }}><ArrowLeft size={18} color="white" /></Pressable><View className="flex-1"><Text className="text-white font-bold text-lg">Carte 3D Interactive</Text><Text className="text-gray-400 text-xs">Explorer · Mesurer · Interagir</Text></View><Pressable onPress={handleLocate} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(6,182,212,.15)" }}>{locating ? (
+            <View animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" as const }}>
+              <Navigation size={16} color="#06B6D4" />
+            </View>
           ) : (
-            <Locate size={18} color="#06B6D4" />
-          )}
-        </Pressable>
-      </View>
-
-      {/* Tabs */}
-
-      <View style={styles.tabsContainer}>
-        {(["Carte", "Couches", "Explorer"] as Tab[]).map((tab) => {
-          const active = activeTab === tab;
-
-          return (
-            <Pressable
-              key={tab}
-              onPress={() => setActiveTab(tab)}
-              style={[styles.tab, active && styles.tabActive]}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.tabText, active && styles.tabTextActive]}>
-                {tab}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Carte */}
-
-      {activeTab === "Carte" && (
-        <View style={styles.mapWrapper}>
-          <MapView
-            provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-            style={styles.map}
-            initialRegion={INITIAL_REGION}
-            mapType="hybrid"
-            showsBuildings
-            showsCompass
-            showsScale
-            showsTraffic={layers.some(
-              (layer) => layer.id === "transport" && layer.active,
-            )}
-          >
-            {activePoints.map((point) => (
-              <Marker
-                key={point.id}
-                coordinate={{
-                  latitude: point.lat,
-                  longitude: point.lng,
-                }}
-                title={point.name}
-                description={point.category}
-                onPress={() => setSelectedPoint(point)}
-              >
-                <View
-                  style={[
-                    styles.marker,
-                    {
-                      borderColor: point.color,
-                    },
-                  ]}
+            <Locate size={16} color="#06B6D4" />
+          )}</Pressable></View>{}<View className="flex gap-1 mx-4 mb-3 p-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,.04)" }}>{["Carte", "Couches", "Explorer"].map(tab => (
+          <Pressable key={tab} onPress={() => setActiveTab(tab)} className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: activeTab === tab ? "rgba(255,255,255,.1)" : "transparent" }}>{tab}</Pressable>
+        ))}</View>{}{activeTab === "Carte" && (
+        <View className="flex-1 flex flex-col overflow-hidden px-4 pb-4">{}<View className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,.06)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}><Search size={14} color="#9CA3AF" /><TextInput value={search} onChangeText={value => setSearch(value)} placeholder="Rechercher un lieu..." className="flex-1 bg-transparent text-white text-sm outline-none" /></View>{}<View className="flex gap-2 mb-3 overflow-x-auto" style={{  }}>{POI_CATEGORIES.map(cat => (
+              <Pressable key={cat} onPress={() => setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={{ backgroundColor: activeCategory === cat ? "#06B6D4" : "rgba(255,255,255,.06)" }}>{cat}</Pressable>
+            ))}</View>{}<View className="flex-1 relative rounded-2xl overflow-hidden" style={{ borderWidth: 1, borderColor: "rgba(6,182,212,.2)", borderStyle: "solid", minHeight: 280 }}><MapContainer center={ABIDJAN_CENTER} zoom={13} className="h-full w-full" ref={mapRef} zoomControl={false}><TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' />{flyTarget && <FlyTo lat={flyTarget.lat} lng={flyTarget.lng} />}{}{userPos && (
+                <Marker
+                  position={[userPos.lat, userPos.lng]}
+                  icon={L.divIcon({
+                    className: "",
+                    html: `<div style="
+                      width:18px;height:18px;border-radius:50%;
+                      background:#06B6D4;
+                      border:3px solid white;
+                      box-shadow:0 0 0 6px rgba(6,182,212,0.3);
+                    "></div>`,
+                    iconSize: [18, 18],
+                    iconAnchor: [9, 9],
+                  })}
                 >
-                  {getPoiIcon(point.icon, point.color)}
-                </View>
-              </Marker>
-            ))}
-          </MapView>
-
-          <View style={styles.mapBadge}>
-            <Text style={styles.mapBadgeText}>
-              Abidjan · {activePoints.length} POI
-            </Text>
-          </View>
-
-          {selectedPoint && (
-            <View style={styles.selectedPointCard}>
-              <View
-                style={[
-                  styles.selectedPointIcon,
-                  {
-                    backgroundColor: `${selectedPoint.color}22`,
-                  },
-                ]}
-              >
-                {getPoiIcon(selectedPoint.icon, selectedPoint.color)}
-              </View>
-
-              <View style={styles.selectedPointContent}>
-                <Text style={styles.selectedPointName}>
-                  {selectedPoint.name}
-                </Text>
-
-                <Text style={styles.selectedPointCategory}>
-                  {selectedPoint.category}
-                </Text>
-              </View>
-
-              <Pressable
-                onPress={() => setSelectedPoint(null)}
-                style={styles.closeSelectedButton}
-              >
-                <Text style={styles.closeSelectedText}>×</Text>
-              </Pressable>
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* Couches */}
-
-      {activeTab === "Couches" && (
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.sectionDescription}>
-            Activez les couches à afficher sur la carte.
-          </Text>
-
-          {layers.map((layer) => (
-            <View key={layer.id} style={styles.layerCard}>
-              <View style={styles.layerIcon}>
-                <Layers
-                  size={18}
-                  color={layer.active ? "#06B6D4" : "#9CA3AF"}
-                />
-              </View>
-
-              <Text style={styles.layerLabel}>{layer.label}</Text>
-
-              <Pressable
-                onPress={() => toggleLayer(layer.id)}
-                style={[styles.switch, layer.active && styles.switchActive]}
-                accessibilityRole="switch"
-                accessibilityState={{
-                  checked: layer.active,
-                }}
-              >
-                <View
-                  style={[
-                    styles.switchThumb,
-                    layer.active
-                      ? styles.switchThumbActive
-                      : styles.switchThumbInactive,
-                  ]}
-                />
+                  <Popup><Text className="font-bold text-xs">Votre position</Text></Popup>
+                </Marker>
+              )}{}{visiblePois.map(poi => (
+                <Marker
+                  key={poi.id}
+                  position={[poi.lat, poi.lng]}
+                  icon={makeIcon(poi.color)}
+                >
+                  <Popup>
+                    <View className="text-xs"><Text className="font-bold">{poi.name}</Text><Text className="text-gray-500">{poi.category}</Text></View>
+                  </Popup>
+                </Marker>
+              ))}</MapContainer>{}<View className="absolute bottom-3 left-3 z-[500] px-2 py-1 rounded-lg text-xs text-cyan-400" style={{ backgroundColor: "rgba(0,0,0,.7)" }}><Text>Abidjan ·</Text>{visiblePois.length}<Text>POI</Text></View></View></View>
+      )}{}{activeTab === "Couches" && (
+        <View className="flex-1 overflow-y-auto px-4 pb-6 space-y-3">
+          <Text className="text-gray-400 text-xs">Activez les couches à afficher sur la carte :</Text>
+          {layers.map(layer => (
+            <View key={layer.id} className="flex items-center gap-3 p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,.04)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}>
+              <Layers size={16} color={layer.active ? "#06B6D4" : "#9CA3AF"} />
+              <Text className="text-white text-sm flex-1">{layer.label}</Text>
+              <Pressable onPress={() => toggleLayer(layer.id)} className="w-12 h-6 rounded-full relative transition-all" style={{ backgroundColor: layer.active ? "#06B6D4" : "rgba(255,255,255,.1)" }}>
+                <View className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" style={{ left: layer.active ? "calc(100% - 20px)" : "4px" }} />
               </Pressable>
             </View>
           ))}
-        </ScrollView>
-      )}
-
-      {/* Explorer */}
-
-      {activeTab === "Explorer" && (
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.sectionDescription}>
-            {POINTS_OF_INTEREST.length} points d'intérêt
-          </Text>
-
-          {POINTS_OF_INTEREST.map((point) => (
-            <Pressable
-              key={point.id}
-              onPress={() => handleSelectPoint(point)}
-              style={({ pressed }) => [
-                styles.poiCard,
-                pressed && styles.pressed,
-              ]}
-              accessibilityRole="button"
-            >
-              <View
-                style={[
-                  styles.poiIcon,
-                  {
-                    backgroundColor: `${point.color}22`,
-                  },
-                ]}
-              >
-                {getPoiIcon(point.icon, point.color)}
-              </View>
-
-              <View style={styles.poiContent}>
-                <Text style={styles.poiName}>{point.name}</Text>
-
-                <Text style={styles.poiCategory}>{point.category}</Text>
-              </View>
-
-              <ChevronRight size={18} color="#6B7280" />
-            </Pressable>
-          ))}
-        </ScrollView>
-      )}
-
-      {/* Navigation rapide */}
-
-      {activeTab === "Carte" && (
-        <View style={styles.bottomHint}>
-          <Navigation size={14} color="#06B6D4" />
-
-          <Text style={styles.bottomHintText}>
-            Touchez un point pour explorer ses détails
-          </Text>
         </View>
-      )}
-    </View>
+      )}{}{activeTab === "Explorer" && (
+        <View className="flex-1 overflow-y-auto px-4 pb-6 space-y-3">
+          <Text className="text-gray-400 text-xs">{visiblePois.length} points d'intérêt</Text>
+          {POIS.map((poi, i) => (
+            <View key={poi.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,.04)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }} onPress={() => {
+                setFlyTarget({ lat: poi.lat, lng: poi.lng });
+                setActiveTab("Carte");
+              }}>
+              <View className="w-8 h-8 rounded-full" style={{ backgroundColor: poi.color }} />
+              <View className="flex-1">
+                <Text className="text-white font-medium text-sm">{poi.name}</Text>
+                <Text className="text-xs" style={{ color: poi.color }}>{poi.category}</Text>
+              </View>
+              <Compass size={14} color="#9CA3AF" />
+            </View>
+          ))}
+        </View>
+      )}</View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#020617",
-  },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 52,
-    paddingBottom: 14,
-  },
-
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-
-  headerContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-
-  title: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-
-  subtitle: {
-    color: "#9CA3AF",
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  locateButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(6,182,212,0.15)",
-  },
-
-  disabled: {
-    opacity: 0.65,
-  },
-
-  pressed: {
-    opacity: 0.72,
-  },
-
-  tabsContainer: {
-    flexDirection: "row",
-    marginHorizontal: 16,
-    marginBottom: 14,
-    padding: 4,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-
-  tabActive: {
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
-
-  tabText: {
-    color: "#6B7280",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  tabTextActive: {
-    color: "#FFFFFF",
-  },
-
-  mapWrapper: {
-    flex: 1,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    overflow: "hidden",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(6,182,212,0.20)",
-  },
-
-  map: {
-    flex: 1,
-  },
-
-  marker: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#111827",
-    borderWidth: 2,
-  },
-
-  mapBadge: {
-    position: "absolute",
-    left: 12,
-    bottom: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: "rgba(0,0,0,0.72)",
-  },
-
-  mapBadgeText: {
-    color: "#22D3EE",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-
-  selectedPointCard: {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    top: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 16,
-    backgroundColor: "rgba(2,6,23,0.94)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-
-  selectedPointIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  selectedPointContent: {
-    flex: 1,
-    marginLeft: 10,
-  },
-
-  selectedPointName: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  selectedPointCategory: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    marginTop: 2,
-  },
-
-  closeSelectedButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-
-  closeSelectedText: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    lineHeight: 22,
-  },
-
-  scrollContainer: {
-    flex: 1,
-  },
-
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 28,
-  },
-
-  sectionDescription: {
-    color: "#9CA3AF",
-    fontSize: 12,
-    marginBottom: 12,
-  },
-
-  layerCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    marginBottom: 10,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-
-  layerIcon: {
-    width: 34,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  layerLabel: {
-    flex: 1,
-    color: "#FFFFFF",
-    fontSize: 14,
-  },
-
-  switch: {
-    width: 48,
-    height: 26,
-    padding: 3,
-    borderRadius: 13,
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
-
-  switchActive: {
-    backgroundColor: "#06B6D4",
-  },
-
-  switchThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-  },
-
-  switchThumbInactive: {
-    alignSelf: "flex-start",
-  },
-
-  switchThumbActive: {
-    alignSelf: "flex-end",
-  },
-
-  poiCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    marginBottom: 10,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-
-  poiIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  poiContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-
-  poiName: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-
-  poiCategory: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    marginTop: 3,
-  },
-
-  bottomHint: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.06)",
-  },
-
-  bottomHintText: {
-    color: "#6B7280",
-    fontSize: 11,
-  },
-});

@@ -16,14 +16,9 @@ export function MenuFilters({
       {availableFilters.map((filter) => {
         const isSelected = selectedFilters.includes(filter);
         return (
-          <Pressable
-            key={filter}
-            onPress={() => onToggleFilter(filter)}
-            className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider"
-            style={{ backgroundColor: isSelected
-                            ? "rgba(249,115,22,0.25)"
-                            : "rgba(255,255,255,0.03)", borderColor: "rgba(249,115,22,0.4)", borderStyle: "solid" }}
-          >
+          <Pressable key={filter} onPress={() => onToggleFilter(filter)} className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-300" style={{ backgroundColor: isSelected
+                          ? "rgba(249,115,22,0.25)"
+                          : "rgba(255,255,255,0.03)", borderColor: "rgba(249,115,22,0.4)", borderStyle: "solid" }}>
             {filter.replace("-", " ")}
           </Pressable>
         );

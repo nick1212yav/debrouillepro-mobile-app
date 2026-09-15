@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditPharmacySheet.tsx
@@ -12,6 +11,7 @@ import {
 import { PharmacyForm, type PharmacyFormValues } from "../forms/PharmacyForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface EditPharmacySheetProps {
   open: boolean;
@@ -40,11 +40,11 @@ export function EditPharmacySheet({
             .map((s: string) => s.trim())
             .filter(Boolean) || [],
       });
-      UIService.openToast("Pharmacie mise à jour", "success");
+      toast.success("Pharmacie mise à jour");
       onOpenChange(false);
       onSuccess?.();
     } catch (e) {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
 

@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreateVaccinationSheet.tsx
@@ -13,6 +12,7 @@ import { VaccinationForm } from "../forms/VaccinationForm";
 import type { VaccinationFormValues } from "../forms/VaccinationForm";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface CreateVaccinationSheetProps {
   open: boolean;
@@ -41,7 +41,7 @@ export function CreateVaccinationSheet({
         batchNumber: data.batchNumber,
         sideEffects: data.sideEffects,
       });
-      UIService.openToast("Vaccination enregistrée !", "success");
+      toast.success("Vaccination enregistrée !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -49,7 +49,7 @@ export function CreateVaccinationSheet({
         error instanceof Error
           ? error.message
           : "Erreur lors de l'enregistrement";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

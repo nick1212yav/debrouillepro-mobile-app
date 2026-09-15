@@ -69,74 +69,32 @@ export function CommunityPayments({
 
   if (step === "done") {
     return (
-      <View className="text-center py-6 space-y-3">
-        <CheckCircle size={48} className="text-emerald-400 mx-auto" />
-        <Text className="text-white font-bold text-lg">Paiement réussi !</Text>
-        <Text className="text-white/50 text-sm">Merci pour votre transaction</Text>
-        <Pressable
-          onPress={onCancel}
-          className="mt-2 text-purple-400 text-sm"
-        >
-          <Text>Retour</Text></Pressable>
-      </View>
+      <View className="text-center py-6 space-y-3"><CheckCircle size={48} className="text-emerald-400 mx-auto" /><Text className="text-white font-bold text-lg">Paiement réussi !</Text><Text className="text-white/50 text-sm">Merci pour votre transaction</Text><Pressable onPress={onCancel} className="mt-2 text-purple-400 text-sm"><Text>Retour</Text></Pressable></View>
     );
   }
 
   return (
-    <View className="space-y-4">
-      <View className="flex items-center justify-between">
-        <Text className="text-white font-bold text-lg">Paiement</Text>
-        <Pressable
-          onPress={onCancel}
-          className="text-white/40"
-        >
-          <Text>Annuler</Text></Pressable>
-      </View>
-
-      <View className="bg-white/5 rounded-xl p-4 flex items-center justify-between">
-        <Text className="text-white/50 text-sm">Montant à payer</Text>
-        <Text className="text-white font-bold text-xl">
-          {amount} {currency}
-        </Text>
-      </View>
-
-      <View className="space-y-2">
-        <Text className="text-sm font-medium text-white/50">
-          <Text>Choisissez un moyen de paiement</Text></Text>
-        {PAYMENT_METHODS.map((method) => {
+    <View className="space-y-4"><View className="flex items-center justify-between"><Text className="text-white font-bold text-lg">Paiement</Text><Pressable onPress={onCancel} className="text-white/40 transition-colors"><Text>Annuler</Text></Pressable></View><View className="bg-white/5 rounded-xl p-4 flex items-center justify-between"><Text className="text-white/50 text-sm">Montant à payer</Text><Text className="text-white font-bold text-xl">{amount}{currency}</Text></View><View className="space-y-2"><Text className="text-sm font-medium text-white/50">Choisissez un moyen de paiement
+        </Text>{PAYMENT_METHODS.map((method) => {
           const isSelected = selected === method.id;
           const Icon = method.icon;
           return (
-            <Pressable
-              key={method.id}
-              onPress={() => setSelected(method.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+            <Pressable key={method.id} onPress={() => setSelected(method.id)} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
                 isSelected
                   ? "bg-purple-500/20 border-purple-400/50"
                   : "bg-white/5 border-white/5 hover:bg-white/10"
-              } border`}
-            >
-              <Icon size={18} style={{ color: method.color }} />
+              } border`}>
+              <Icon size={18} style={{  }} />
               <Text className="text-white/80 text-sm">{method.label}</Text>
               {isSelected && (
                 <CheckCircle size={14} className="text-purple-400 ml-auto" />
               )}
             </Pressable>
           );
-        })}
-      </View>
-
-      <Pressable
-        onPress={handlePay}
-        disabled={!selected || isLoading}
-        className="w-full py-3 rounded-xl text-white font-bold flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-red-500 disabled:opacity-50"
-      >
-        {isLoading ? (
+        })}</View><Pressable onPress={handlePay} disabled={!selected || isLoading} className="w-full py-3 rounded-xl text-white font-bold flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-red-500 disabled:opacity-50">{isLoading ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           "Payer maintenant"
-        )}
-      </Pressable>
-    </View>
+        )}</Pressable></View>
   );
 }

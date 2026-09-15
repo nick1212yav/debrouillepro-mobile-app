@@ -1,5 +1,6 @@
 import { View, Pressable, Text } from "react-native";
 import { useState, useEffect, useRef } from "react";
+import { AnimatePresence } from "motion/react";
 import {
   ArrowLeft, Brain, Timer, Trophy, Star, Zap, Target, CheckCircle,
   XCircle, RotateCcw, Play, ChevronRight, Medal, TrendingUp, BookOpen,
@@ -399,117 +400,45 @@ export default function QuizPage({ onBack }: Props) {
   // --- MENU ---
   if (state === "menu") {
     return (
-      <View className="h-full flex flex-col overflow-hidden" style={{  }}>
-        {/* Header */}
-        <View className="flex items-center gap-3 px-4 pt-12 pb-4">
-          <Pressable onPress={onBack} className="p-2 rounded-xl text-white/60">
-            <ArrowLeft size={20} />
-          </Pressable>
-          <View className="flex-1">
-            <Text className="text-white font-bold text-xl">Quiz & Évaluations</Text>
-            <Text className="text-white/50 text-xs">Testez vos connaissances</Text>
-          </View>
-          <View className="flex items-center gap-1 px-3 py-1.5 rounded-full" style={{ backgroundColor: "rgba(251,191,36,0.15)" }}>
-            <Flame size={14} className="text-amber-400" />
-            <Text className="text-amber-400 font-bold text-sm">{streak}</Text>
-          </View>
-        </View>
-
-        <View className="flex-1 overflow-y-auto px-4 pb-6 space-y-6">
-          {/* Stats row */}
-          <View className="gap-3">
-            {[
+      <View className="h-full flex flex-col overflow-hidden" style={{  }}>{}<View className="flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={onBack} className="p-2 rounded-xl text-white/60"><ArrowLeft size={20} /></Pressable><View className="flex-1"><Text className="text-white font-bold text-xl">Quiz & Évaluations</Text><Text className="text-white/50 text-xs">Testez vos connaissances</Text></View><View className="flex items-center gap-1 px-3 py-1.5 rounded-full" style={{ backgroundColor: "rgba(251,191,36,0.15)" }}><Flame size={14} className="text-amber-400" /><Text className="text-amber-400 font-bold text-sm">{streak}</Text></View></View><View className="flex-1 overflow-y-auto px-4 pb-6 space-y-6">{}<View className="gap-3">{[
               { icon: <Trophy size={16} className="text-yellow-400" />, label: "Quiz joués", value: history.length },
               { icon: <Star size={16} className="text-indigo-400" />, label: "Meilleur score", value: history.length ? `${Math.max(...history.map((h) => Math.round((h.score / h.total) * 100)))}%` : "—" },
               { icon: <TrendingUp size={16} className="text-emerald-400" />, label: "Série", value: `${streak} 🔥` },
             ].map((s) => (
-              <View key={s.label}
-                className="rounded-2xl p-3 text-center" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+              <View key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-3 text-center" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
                 <View className="flex justify-center mb-1">{s.icon}</View>
                 <View className="text-white font-bold text-lg">{s.value}</View>
                 <View className="text-white/40 text-xs">{s.label}</View>
               </View>
-            ))}
-          </View>
-
-          {/* Mode selection */}
-          <View>
-            <Text className="text-white/70 text-sm font-semibold mb-3 uppercase tracking-wider">Mode de jeu</Text>
-            <View className="space-y-2">
-              {(Object.entries(MODE_INFO) as [QuizMode, typeof MODE_INFO[QuizMode]][]).map(([mode, info]) => (
-                <Pressable key={mode}
-                  onPress={() => setSelectedMode(mode)}
-                  className="w-full flex items-center gap-3 p-3 rounded-2xl"
-                  style={{ backgroundColor: selectedMode === mode ? `${info.color}22` : "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                  <View className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${info.color}33` }}>
-                    <Text style={{ color: info.color }}>{info.icon}</Text>
-                  </View>
-                  <View className="flex-1 text-left">
-                    <View className="text-white font-semibold text-sm">{info.label}</View>
-                    <View className="text-white/40 text-xs">{info.desc}</View>
-                  </View>
+            ))}</View>{}<View><Text className="text-white/70 text-sm font-semibold mb-3 uppercase tracking-wider">Mode de jeu</Text><View className="space-y-2">{(Object.entries(MODE_INFO) as [QuizMode, typeof MODE_INFO[QuizMode]][]).map(([mode, info]) => (
+                <Pressable key={mode} whileTap={{ scale: 0.98 }} onPress={() => setSelectedMode(mode)} className="w-full flex items-center gap-3 p-3 rounded-2xl transition-all" style={{ backgroundColor: selectedMode === mode ? `${info.color}22` : "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+                  <View className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${info.color}33` }}><Text style={{ color: info.color }}>{info.icon}</Text></View>
+                  <View className="flex-1 text-left"><View className="text-white font-semibold text-sm">{info.label}</View><View className="text-white/40 text-xs">{info.desc}</View></View>
                   {info.timePerQ && (
-                    <Badge style={{ backgroundColor: `${info.color}33`, color: info.color }} className="text-xs border-0">
-                      {info.timePerQ}<Text>s</Text></Badge>
+                    <Badge style={{ backgroundColor: `${info.color}33` }} className="text-xs border-0">
+                      {info.timePerQ}s
+                    </Badge>
                   )}
-                  {selectedMode === mode && <CheckCircle size={16} style={{ color: info.color }} />}
+                  {selectedMode === mode && <CheckCircle size={16} style={{  }} />}
                 </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {/* Categories */}
-          <View>
-            <Text className="text-white/70 text-sm font-semibold mb-3 uppercase tracking-wider">Choisir une catégorie</Text>
-            <View className="gap-3">
-              {CATEGORIES.map((cat) => {
+              ))}</View></View>{}<View><Text className="text-white/70 text-sm font-semibold mb-3 uppercase tracking-wider">Choisir une catégorie</Text><View className="gap-3">{CATEGORIES.map((cat) => {
                 const catHistory = history.filter((h) => h.category === cat.label);
                 const best = catHistory.length ? Math.max(...catHistory.map((h) => Math.round((h.score / h.total) * 100))) : null;
                 return (
-                  <Pressable key={cat.id}
-                    onPress={() => startQuiz(cat, selectedMode)}
-                    className="p-4 rounded-2xl text-left"
-                    style={{ backgroundColor: `${cat.color}15`, borderStyle: "solid" }}>
+                  <Pressable key={cat.id} whileTap={{ scale: 0.96 }} onPress={() => startQuiz(cat, selectedMode)} className="p-4 rounded-2xl text-left" style={{ backgroundColor: `${cat.color}15`, borderStyle: "solid" }}>
                     <View className="text-3xl mb-2">{cat.icon}</View>
                     <View className="text-white font-semibold text-sm">{cat.label}</View>
-                    <View className="text-white/40 text-xs mt-0.5">{cat.questions.length} <Text>questions</Text></View>
+                    <View className="text-white/40 text-xs mt-0.5">{cat.questions.length}<Text>questions</Text></View>
                     {best !== null && (
-                      <View className="mt-2 flex items-center gap-1">
-                        <Trophy size={10} style={{ color: cat.color }} />
-                        <Text className="text-xs font-bold" style={{ color: cat.color }}>{best}%</Text>
-                      </View>
+                      <View className="mt-2 flex items-center gap-1"><Trophy size={10} style={{  }} /><Text className="text-xs font-bold" style={{ color: cat.color }}>{best}%</Text></View>
                     )}
                   </Pressable>
                 );
-              })}
-            </View>
-          </View>
-
-          {/* Recent history */}
-          {history.length > 0 && (
-            <View>
-              <Text className="text-white/70 text-sm font-semibold mb-3 uppercase tracking-wider">Historique récent</Text>
-              <View className="space-y-2">
-                {history.slice(-5).reverse().map((h, i) => (
-                  <View key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
-                    <View className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(99,102,241,0.2)" }}>
-                      <BarChart2 size={14} className="text-indigo-400" />
-                    </View>
-                    <View className="flex-1 min-w-0">
-                      <View className="text-white text-sm font-medium">{h.category}</View>
-                      <View className="text-white/40 text-xs">{MODE_INFO[h.mode].label} <Text>·</Text>{new Date(h.date).toLocaleDateString("fr-FR")}</View>
-                    </View>
-                    <View className="text-right">
-                      <View className="text-white font-bold text-sm">{h.score}<Text>/</Text>{h.total}</View>
-                      <View className="text-white/40 text-xs">{Math.round((h.score / h.total) * 100)}<Text>%</Text></View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-        </View>
-      </View>
+              })}</View></View>{}{history.length > 0 && (
+            <View><Text className="text-white/70 text-sm font-semibold mb-3 uppercase tracking-wider">Historique récent</Text><View className="space-y-2">{history.slice(-5).reverse().map((h, i) => (
+                  <View key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><View className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(99,102,241,0.2)" }}><BarChart2 size={14} className="text-indigo-400" /></View><View className="flex-1 min-w-0"><View className="text-white text-sm font-medium">{h.category}</View><View className="text-white/40 text-xs">{MODE_INFO[h.mode].label}<Text>·</Text>{new Date(h.date).toLocaleDateString("fr-FR")}</View></View><View className="text-right"><View className="text-white font-bold text-sm">{h.score}<Text>/</Text>{h.total}</View><View className="text-white/40 text-xs">{Math.round((h.score / h.total) * 100)}<Text>%</Text></View></View></View>
+                ))}</View></View>
+          )}</View></View>
     );
   }
 
@@ -520,62 +449,11 @@ export default function QuizPage({ onBack }: Props) {
     const timerColor = timerPct > 50 ? "#10B981" : timerPct > 25 ? "#F59E0B" : "#EF4444";
 
     return (
-      <View className="h-full flex flex-col overflow-hidden" style={{  }}>
-        {/* Header */}
-        <View className="flex items-center gap-3 px-4 pt-12 pb-3">
-          <Pressable onPress={() => setState("menu")} className="p-2 rounded-xl text-white/60">
-            <ArrowLeft size={20} />
-          </Pressable>
-          <View className="flex-1">
-            <View className="flex items-center gap-2">
-              <Text className="text-white/60 text-sm">{selectedCategory?.label}</Text>
-              <Badge className="text-xs border-0" style={{ backgroundColor: `${modeInfo.color}33`, color: modeInfo.color }}>{modeInfo.label}</Badge>
-            </View>
-            <Progress value={((currentIdx) / questions.length) * 100} className="h-1 mt-1.5" />
-          </View>
-          <View className="text-white/60 text-sm font-mono">{currentIdx + 1}<Text>/</Text>{questions.length}</View>
-        </View>
-
-        {/* Timer */}
-        {limit ? (
-          <View className="px-4 mb-2">
-            <View className="flex items-center justify-between mb-1">
-              <View className="flex items-center gap-1 text-xs" style={{  }}>
-                <Timer size={12} />
-                <Text>{timeLeft}s</Text>
-              </View>
-              <Clock size={12} className="text-white/30" />
-            </View>
-            <View className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <View className="h-full rounded-full" style={{ width: `${timerPct}%`, backgroundColor: timerColor }} />
-            </View>
-          </View>
+      <View className="h-full flex flex-col overflow-hidden" style={{  }}>{}<View className="flex items-center gap-3 px-4 pt-12 pb-3"><Pressable onPress={() => setState("menu")} className="p-2 rounded-xl text-white/60"><ArrowLeft size={20} /></Pressable><View className="flex-1"><View className="flex items-center gap-2"><Text className="text-white/60 text-sm">{selectedCategory?.label}</Text><Badge className="text-xs border-0" style={{ backgroundColor: `${modeInfo.color}33` }}>{modeInfo.label}</Badge></View><Progress value={((currentIdx) / questions.length) * 100} className="h-1 mt-1.5" /></View><View className="text-white/60 text-sm font-mono">{currentIdx + 1}<Text>/</Text>{questions.length}</View></View>{}{limit ? (
+          <View className="px-4 mb-2"><View className="flex items-center justify-between mb-1"><View className="flex items-center gap-1 text-xs" style={{  }}><Timer size={12} /><Text>{timeLeft}s</Text></View><Clock size={12} className="text-white/30" /></View><View className="h-1.5 rounded-full bg-white/10 overflow-hidden"><View className="h-full rounded-full" style={{ width: `${timerPct}%`, backgroundColor: timerColor }} transition={{ duration: 0.5 }} /></View></View>
         ) : (
-          <View className="px-4 mb-2 flex justify-end">
-            <View className="flex items-center gap-1 text-white/30 text-xs">
-              <Clock size={12} /><Text>{elapsed}s</Text>
-            </View>
-          </View>
-        )}
-
-        <View className="flex-1 overflow-y-auto px-4 pb-6">
-          <>
-            <View key={currentIdx}>
-              {/* Difficulty badge */}
-              <View className="flex gap-2 mb-4">
-                <Badge className="text-xs border-0" style={{ backgroundColor: currentQ.difficulty === "easy" ? "#10B98133" : currentQ.difficulty === "medium" ? "#F59E0B33" : "#EF444433", color: currentQ.difficulty === "easy" ? "#10B981" : currentQ.difficulty === "medium" ? "#F59E0B" : "#EF4444" }}>
-                  {currentQ.difficulty === "easy" ? "Facile" : currentQ.difficulty === "medium" ? "Intermédiaire" : "Difficile"}
-                </Badge>
-              </View>
-
-              {/* Question */}
-              <View className="rounded-2xl p-5 mb-5" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                <Text className="text-white font-semibold text-lg leading-relaxed">{currentQ.question}</Text>
-              </View>
-
-              {/* Options */}
-              <View className="space-y-3">
-                {currentQ.options.map((opt, i) => {
+          <View className="px-4 mb-2 flex justify-end"><View className="flex items-center gap-1 text-white/30 text-xs"><Clock size={12} /><Text>{elapsed}s</Text></View></View>
+        )}<View className="flex-1 overflow-y-auto px-4 pb-6"><View><View key={currentIdx} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }}>{}<View className="flex gap-2 mb-4"><Badge className="text-xs border-0" style={{ backgroundColor: currentQ.difficulty === "easy" ? "#10B98133" : currentQ.difficulty === "medium" ? "#F59E0B33" : "#EF444433" }}>{currentQ.difficulty === "easy" ? "Facile" : currentQ.difficulty === "medium" ? "Intermédiaire" : "Difficile"}</Badge></View>{}<View className="rounded-2xl p-5 mb-5" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Text className="text-white font-semibold text-lg leading-relaxed">{currentQ.question}</Text></View>{}<View className="space-y-3">{currentQ.options.map((opt, i) => {
                   const isChosen = chosen === i;
                   const isCorrect = i === currentQ.correct;
                   let bg = "rgba(255,255,255,0.05)";
@@ -586,41 +464,20 @@ export default function QuizPage({ onBack }: Props) {
                     else if (isChosen) { bg = "rgba(239,68,68,0.2)"; border = "#EF4444"; textColor = "#EF4444"; }
                   }
                   return (
-                    <Pressable key={i}
-                      onPress={() => handleAnswer(i)}
-                      disabled={chosen !== null}
-                      className="w-full flex items-center gap-3 p-4 rounded-2xl text-left"
-                      style={{ backgroundColor: bg, borderStyle: "solid" }}>
-                      <View className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0"
-                        style={{ backgroundColor: chosen !== null && isCorrect ? "#10B98133" : chosen !== null && isChosen ? "#EF444433" : "rgba(255,255,255,0.1)" }}>
-                        {chosen !== null ? (isCorrect ? <CheckCircle size={16} color="#10B981" /> : isChosen ? <XCircle size={16} color="#EF4444" /> : String.fromCharCode(65 + i)) : String.fromCharCode(65 + i)}
-                      </View>
+                    <Pressable key={i} whileTap={{ scale: 0.98 }} onPress={() => handleAnswer(i)} disabled={chosen !== null} className="w-full flex items-center gap-3 p-4 rounded-2xl text-left transition-all" style={{ backgroundColor: bg, borderStyle: "solid" }}>
+                      <View className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0" style={{ backgroundColor: chosen !== null && isCorrect ? "#10B98133" : chosen !== null && isChosen ? "#EF444433" : "rgba(255,255,255,0.1)" }}>{chosen !== null ? (isCorrect ? <CheckCircle size={16} color="#10B981" /> : isChosen ? <XCircle size={16} color="#EF4444" /> : String.fromCharCode(65 + i)) : String.fromCharCode(65 + i)}</View>
                       <Text className="font-medium">{opt}</Text>
                     </Pressable>
                   );
-                })}
-              </View>
-
-              {/* Explanation (training mode) */}
-              <AnimatePresence>
-                {showExplain && (
-                  <View
-                    className="mt-4 p-4 rounded-2xl" style={{ backgroundColor: "rgba(99,102,241,0.15)", borderWidth: 1, borderColor: "rgba(99,102,241,0.3)", borderStyle: "solid" }}>
-                    <View className="flex items-start gap-2">
-                      <Brain size={16} className="text-indigo-400 mt-0.5 flex-shrink-0" />
-                      <Text className="text-white/80 text-sm leading-relaxed">{currentQ.explanation}</Text>
-                    </View>
+                })}</View>{}<AnimatePresence>{showExplain && (
+                  <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 p-4 rounded-2xl" style={{ backgroundColor: "rgba(99,102,241,0.15)", borderWidth: 1, borderColor: "rgba(99,102,241,0.3)", borderStyle: "solid" }}>
+                    <View className="flex items-start gap-2"><Brain size={16} className="text-indigo-400 mt-0.5 flex-shrink-0" /><Text className="text-white/80 text-sm leading-relaxed">{currentQ.explanation}</Text></View>
                     <Button onPress={nextQuestion} className="mt-3 w-full"
-                      style={{ backgroundColor: "rgba(99,102,241,0.4)", color: "white" }}>
+                      style={{ backgroundColor: "rgba(99,102,241,0.4)" }}>
                       {isLastQ ? "Voir les résultats" : "Question suivante"} <ChevronRight size={16} />
                     </Button>
                   </View>
-                )}
-              </AnimatePresence>
-            </View>
-          </>
-        </View>
-      </View>
+                )}</AnimatePresence></View></View></View></View>
     );
   }
 
@@ -633,92 +490,18 @@ export default function QuizPage({ onBack }: Props) {
   ].filter(Boolean);
 
   return (
-    <View className="h-full flex flex-col overflow-hidden" style={{  }}>
-      <View className="flex items-center gap-3 px-4 pt-12 pb-4">
-        <Pressable onPress={() => setState("menu")} className="p-2 rounded-xl text-white/60">
-          <ArrowLeft size={20} />
-        </Pressable>
-        <Text className="text-white font-bold text-xl">Résultats</Text>
-      </View>
-
-      <View className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">
-        {/* Score circle */}
-        <View
-          className="flex flex-col items-center py-6">
-          <View className="relative w-32 h-32">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
-              <circle cx="50" cy="50" r="40" fill="none" stroke={pct >= 80 ? "#10B981" : pct >= 60 ? "#F59E0B" : "#EF4444"}
-                strokeWidth="8" strokeLinecap="round"
-                strokeDasharray={`${pct * 2.51} 251`} />
-            </svg>
-            <View className="absolute inset-0 flex flex-col items-center justify-center">
-              <Text className="text-white font-black text-3xl">{pct}%</Text>
-              <Text className="text-white/40 text-xs">{score}/{questions.length}</Text>
-            </View>
-          </View>
-          <View className="mt-3 text-white font-semibold text-lg">
-            {pct >= 80 ? "Excellent travail !" : pct >= 60 ? "Bien joué !" : "Continuez à pratiquer"}
-          </View>
-          <View className="flex gap-2 mt-2">
-            {badges.map((b) => b && (
-              <Text key={b.label} className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold"
-                style={{ backgroundColor: `${b.color}22`, color: b.color }}>
-                {b.icon} {b.label}
-              </Text>
-            ))}
-          </View>
-        </View>
-
-        {/* Per-question breakdown */}
-        <View>
-          <Text className="text-white/70 text-sm font-semibold mb-3 uppercase tracking-wider">Détail des réponses</Text>
-          <View className="space-y-2">
-            {answers.map((a, i) => {
+    <View className="h-full flex flex-col overflow-hidden" style={{  }}><View className="flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={() => setState("menu")} className="p-2 rounded-xl text-white/60"><ArrowLeft size={20} /></Pressable><Text className="text-white font-bold text-xl">Résultats</Text></View><View className="flex-1 overflow-y-auto px-4 pb-6 space-y-5">{}<View initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring" as const, stiffness: 200 }} className="flex flex-col items-center py-6"><View className="relative w-32 h-32"><svg className="w-full h-full -rotate-90" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" /><circle cx="50" cy="50" r="40" fill="none" stroke={pct >= 80 ? "#10B981" : pct >= 60 ? "#F59E0B" : "#EF4444"} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${pct * 2.51} 251`} style={{  }} /></svg><View className="absolute inset-0 flex flex-col items-center justify-center"><Text className="text-white font-black text-3xl">{pct}%</Text><Text className="text-white/40 text-xs">{score}/{questions.length}</Text></View></View><View className="mt-3 text-white font-semibold text-lg">{pct >= 80 ? "Excellent travail !" : pct >= 60 ? "Bien joué !" : "Continuez à pratiquer"}</View><View className="flex gap-2 mt-2">{badges.map((b) => b && (
+              <Text key={b.label} className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${b.color}22`, color: b.color }}>{b.icon}{b.label}</Text>
+            ))}</View></View>{}<View><Text className="text-white/70 text-sm font-semibold mb-3 uppercase tracking-wider">Détail des réponses</Text><View className="space-y-2">{answers.map((a, i) => {
               const q = questions.find((q) => q.id === a.questionId);
               if (!q) return null;
               return (
-                <View key={i} className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
-                  <View className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg mt-0.5"
-                    style={{ backgroundColor: a.correct ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)" }}>
-                    {a.correct ? <CheckCircle size={14} color="#10B981" /> : <XCircle size={14} color="#EF4444" />}
-                  </View>
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-white/80 text-sm leading-snug">{q.question}</Text>
-                    {!a.correct && (
+                <View key={i} className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><View className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg mt-0.5" style={{ backgroundColor: a.correct ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)" }}>{a.correct ? <CheckCircle size={14} color="#10B981" /> : <XCircle size={14} color="#EF4444" />}</View><View className="flex-1 min-w-0"><Text className="text-white/80 text-sm leading-snug">{q.question}</Text>{!a.correct && (
                       <Text className="text-emerald-400 text-xs mt-1">Bonne réponse : {q.options[q.correct]}</Text>
-                    )}
-                    <Text className="text-white/30 text-xs mt-0.5">{(a.timeMs / 1000).toFixed(1)}s</Text>
-                  </View>
-                </View>
+                    )}<Text className="text-white/30 text-xs mt-0.5">{(a.timeMs / 1000).toFixed(1)}s</Text></View></View>
               );
-            })}
-          </View>
-        </View>
-
-        {/* Badges earned */}
-        <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(99,102,241,0.1)", borderWidth: 1, borderColor: "rgba(99,102,241,0.2)", borderStyle: "solid" }}>
-          <View className="flex items-center gap-2 mb-3">
-            <Award size={16} className="text-indigo-400" />
-            <Text className="text-white font-semibold text-sm">Badges débloqués</Text>
-          </View>
-          <View className="flex flex-wrap gap-2">
-            {pct >= 60 && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#10B98133", color: "#10B981" }}>🎯 Vainqueur</Text>}
-            {pct === 100 && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#F59E0B33", color: "#F59E0B" }}>💯 Perfect Score</Text>}
-            {selectedMode === "challenge" && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#F59E0B33", color: "#F59E0B" }}>⚡ Speed Runner</Text>}
-            {selectedMode === "exam" && pct >= 70 && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#6366F133", color: "#6366F1" }}>📋 Certifié</Text>}
-            {streak >= 3 && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#EF444433", color: "#EF4444" }}>🔥 En série</Text>}
-          </View>
-        </View>
-
-        {/* Actions */}
-        <View className="gap-3">
-          <Button onPress={restartQuiz} className="flex items-center gap-2" style={{ backgroundColor: "rgba(99,102,241,0.3)", color: "white" }}>
-            <RotateCcw size={16} /> <Text>Rejouer</Text></Button>
-          <Button onPress={() => setState("menu")} className="flex items-center gap-2" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "white" }}>
-            <Play size={16} /> <Text>Autre quiz</Text></Button>
-        </View>
-      </View>
-    </View>
+            })}</View></View>{}<View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(99,102,241,0.1)", borderWidth: 1, borderColor: "rgba(99,102,241,0.2)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-3"><Award size={16} className="text-indigo-400" /><Text className="text-white font-semibold text-sm">Badges débloqués</Text></View><View className="flex flex-wrap gap-2">{pct >= 60 && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#10B98133", color: "#10B981" }}>🎯 Vainqueur</Text>}{pct === 100 && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#F59E0B33", color: "#F59E0B" }}>💯 Perfect Score</Text>}{selectedMode === "challenge" && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#F59E0B33", color: "#F59E0B" }}>⚡ Speed Runner</Text>}{selectedMode === "exam" && pct >= 70 && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#6366F133", color: "#6366F1" }}>📋 Certifié</Text>}{streak >= 3 && <Text className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "#EF444433", color: "#EF4444" }}>🔥 En série</Text>}</View></View>{}<View className="gap-3"><Button onPress={restartQuiz} className="flex items-center gap-2" style={{ backgroundColor: "rgba(99,102,241,0.3)" }}><RotateCcw size={16} />Rejouer
+          </Button><Button onPress={() => setState("menu")} className="flex items-center gap-2" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><Play size={16} />Autre quiz
+          </Button></View></View></View>
   );
 }

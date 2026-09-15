@@ -26,9 +26,7 @@ export function VoyageGalleryGrid({
 
   if (!images || images.length === 0) {
     return (
-      <View
-        className={`rounded-2xl bg-white/5 border border-white/10 p-8 text-center text-white/40 ${className}`}
-      >
+      <View className={`rounded-2xl bg-white/5 border border-white/10 p-8 text-center text-white/40 ${className}`}>
         <ImageIcon size={32} className="mx-auto mb-3 opacity-30" />
         <Text>Aucune photo disponible</Text>
       </View>
@@ -59,25 +57,12 @@ export function VoyageGalleryGrid({
 
   return (
     <>
-      <View
-        className={`grid gap-1.5 rounded-2xl overflow-hidden ${getLayoutClass(displayImages.length)} ${className}`}
-      >
+      <View className={`grid gap-1.5 rounded-2xl overflow-hidden ${getLayoutClass(displayImages.length)} ${className}`}>
         {displayImages.map((src, index) => (
-          <Pressable
-            key={`${src}-${index}`}
-            onPress={() => handleImageClick(index)}
-            className={`relative overflow-hidden bg-white/5 hover:opacity-90 transition-opacity cursor-pointer ${getImageSpan(index, displayImages.length)}`}
-            style={{ aspectRatio: displayImages.length === 1 ? "16/9" : "1/1" }}
-          >
-            <Image
-              className="w-full h-full object-cover"
-              loading={index === 0 ? "eager" : "lazy"}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }} source={{ uri: src }} accessibilityLabel={`${alt} ${index + 1}`}
-            />
+          <Pressable key={`${src}-${index}`} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.05 }} onPress={() => handleImageClick(index)} className={`relative overflow-hidden bg-white/5 hover:opacity-90 transition-opacity cursor-pointer ${getImageSpan(index, displayImages.length)}`} style={{ aspectRatio: displayImages.length === 1 ? "16/9" : "1/1" }}>
+            <Image className="w-full h-full object-cover"  source={{ uri: src }} accessibilityLabel={`${alt} ${index + 1}`} />
             {hasMore && index === maxDisplay - 1 && (
-              <View className="absolute inset-0 flex items-center justify-center bg-black/60">
+              <View className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                 <Text className="text-white text-xl font-bold">
                   +{remaining}
                 </Text>

@@ -129,18 +129,6 @@ export function CreateRestaurantForm({
   };
 
   return (
-    <View className="flex flex-col">
-      <StepIndicator steps={steps} currentStep={step} />
-
-      <View className="mt-6">
-        <>
-          <View
-            key={step}
-          >
-            {renderStep()}
-          </View>
-        </>
-      </View>
-    </View>
+    <View className="flex flex-col"><StepIndicator steps={steps} currentStep={step} /><View className="mt-6"><View><View key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>{renderStep()}</View></View></View></View>
   );
 }

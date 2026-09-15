@@ -33,32 +33,13 @@ export const AccommodationRooms: React.FC<AccommodationRoomsProps> = ({
   const data = roomsList || defaultRooms;
 
   return (
-    <View className="p-4 md:p-6 border-b border-white/5">
-      <Text className="text-white font-semibold text-sm mb-3">
-        Configuration des lits
-      </Text>
-      <View className="gap-3">
-        {data.map((room) => (
-          <View
-            key={room.id}
-            className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3"
-          >
-            <View className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0">
-              <Bed size={18} />
-            </View>
-            <View>
-              <Text className="text-sm font-semibold text-white">{room.name}</Text>
-              <View className="flex flex-col gap-0.5 mt-1">
-                {room.beds.map((b, i) => (
+    <View className="p-4 md:p-6 border-b border-white/5"><Text className="text-white font-semibold text-sm mb-3">Configuration des lits
+      </Text><View className="gap-3">{data.map((room) => (
+          <View key={room.id} className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3"><View className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0"><Bed size={18} /></View><View><Text className="text-sm font-semibold text-white">{room.name}</Text><View className="flex flex-col gap-0.5 mt-1">{room.beds.map((b, i) => (
                   <Text key={i} className="text-xs text-white/50">
-                    {b.count}<Text>x</Text>{b.type}
+                    {b.count}x {b.type}
                   </Text>
-                ))}
-              </View>
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
+                ))}</View></View></View>
+        ))}</View></View>
   );
 };

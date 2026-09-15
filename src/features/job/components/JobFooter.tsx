@@ -59,11 +59,7 @@ export function JobFooter({
         isBookmarked={isBookmarked}
       />
 
-      <Pressable
-        onPress={onApply}
-        className="w-full mt-2 py-2.5 rounded-2xl text-xs font-bold text-white"
-        style={{  }}
-      >
+      <Pressable onPress={onApply} className="w-full mt-2 py-2.5 rounded-2xl text-xs font-bold text-white active:scale-95 transition-transform" style={{  }}>
         Postuler
       </Pressable>
     </>

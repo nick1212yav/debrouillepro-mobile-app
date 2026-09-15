@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateShuttleForm.tsx
 import { useForm } from "react-hook-form";
@@ -58,13 +58,9 @@ export function CreateShuttleForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="serviceName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="serviceName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom du service de navette *</Text></FormLabel>
+              <FormLabel>Nom du service de navette *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Navette Staff DébrouillePro"
@@ -73,59 +69,33 @@ export function CreateShuttleForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone de contact *</Text></FormLabel>
+              <FormLabel>Téléphone de contact *</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: +243 890 000 000" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="vehicleModel"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="vehicleModel" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Modèle du minibus *</Text></FormLabel>
+                <FormLabel>Modèle du minibus *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Toyota Coaster, HiAce" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="licensePlate"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="licensePlate" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Plaque d'immatriculation *</Text></FormLabel>
+                <FormLabel>Plaque d'immatriculation *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: 5678AB03" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="shuttleType"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="shuttleType" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Type de service *</Text></FormLabel>
+                <FormLabel>Type de service *</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -145,43 +115,25 @@ export function CreateShuttleForm({
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="capacity"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="capacity" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Capacité totale (sièges) *</Text></FormLabel>
+                <FormLabel>Capacité totale (sièges) *</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="pricePerMonth"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="pricePerMonth" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prix de l'abonnement mensuel *</Text></FormLabel>
+                <FormLabel>Prix de l'abonnement mensuel *</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -192,23 +144,17 @@ export function CreateShuttleForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="operatingRoute"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="operatingRoute" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Itinéraire desservi (Arrêts clés du matin/soir) *</Text></FormLabel>
+                Itinéraire desservi (Arrêts clés du matin/soir) *
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Limete (7h30) → Kasa-Vubu (8h00) → Gombe (8h30)"
@@ -217,16 +163,8 @@ export function CreateShuttleForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-11 rounded-xl bg-violet-600 text-white font-bold"
-          disabled={isLoading}
-        >
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          <Text>Enregistrer le service de Navette [2]</Text></Button>
-      </View>
+          )} /><Button  className="w-full h-11 rounded-xl bg-violet-600 text-white font-bold" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer le service de Navette [2]
+        </Button></View>
     </Form>
   );
 }

@@ -12,7 +12,7 @@ const MAX_MESSAGES = 1000;
 
 function isBrowser(): boolean {
   return (
-    typeof undefined !== "undefined" && typeof undefined !== "undefined"
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
   );
 }
 
@@ -40,7 +40,7 @@ function readSnapshot(): OfflineStorageSnapshot {
   }
 
   try {
-    const raw = undefined.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEY);
 
     if (!raw) {
       return emptySnapshot();
@@ -69,7 +69,7 @@ function writeSnapshot(snapshot: OfflineStorageSnapshot): void {
   }
 
   try {
-    undefined.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
   } catch {
     // Le stockage offline est optionnel.
   }
@@ -83,8 +83,8 @@ export function isOfflineStorageAvailable(): boolean {
   try {
     const testKey = "__debrouillepro_offline_test__";
 
-    undefined.setItem(testKey, "1");
-    undefined.removeItem(testKey);
+    window.localStorage.setItem(testKey, "1");
+    window.localStorage.removeItem(testKey);
 
     return true;
   } catch {
@@ -296,7 +296,7 @@ export function clearOfflineStorage(): void {
   }
 
   try {
-    undefined.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(STORAGE_KEY);
   } catch {
     // Ignorer les erreurs de stockage.
   }

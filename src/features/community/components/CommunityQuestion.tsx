@@ -1,4 +1,4 @@
-import { Pressable, View, Text, TextInput } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
 import { useState } from "react";
 import { HelpCircle, Send, Loader2 } from "lucide-react-native";
 
@@ -52,49 +52,23 @@ export function CommunityQuestion({
   };
 
   return (
-    <View className="space-y-3">
-      <View className="flex items-center gap-2">
-        <HelpCircle size={16} className="text-white/30" />
-        <Text className="text-sm font-medium text-white/50">Question</Text>
-        {isAnswered && (
+    <View className="space-y-3"><View className="flex items-center gap-2"><HelpCircle size={16} className="text-white/30" /><Text className="text-sm font-medium text-white/50">Question</Text>{isAnswered && (
           <Text className="text-xs text-green-400">✓ Répondu</Text>
-        )}
-      </View>
-
-      <View className="p-4 rounded-xl bg-white/5 border border-white/10">
-        <Text className="text-white/80 text-sm">{question}</Text>
-      </View>
-
-      {isAnswered && answer && (
+        )}</View><View className="p-4 rounded-xl bg-white/5 border border-white/10"><Text className="text-white/80 text-sm">{question}</Text></View>{isAnswered && answer && (
         <View className="p-4 rounded-xl bg-green-500/5 border border-green-500/20">
-          <Text className="text-sm font-medium text-green-400"><Text>Réponse</Text></Text>
+          <Text className="text-sm font-medium text-green-400">Réponse</Text>
           <Text className="text-white/70 text-sm mt-1">{answer}</Text>
         </View>
-      )}
-
-      {!isAnswered && canAsk && (
+      )}{!isAnswered && canAsk && (
         <View className="space-y-2">
           {!showAskForm ? (
-            <Pressable
-              onPress={() => setShowAskForm(true)}
-              className="w-full py-2 rounded-xl text-sm font-medium text-purple-400 bg-purple-500/10"
-            >
-              <Text>Répondre à cette question</Text></Pressable>
+            <Pressable onPress={() => setShowAskForm(true)} className="w-full py-2 rounded-xl text-sm font-medium text-purple-400 bg-purple-500/10 transition-colors">
+              Répondre à cette question
+            </Pressable>
           ) : (
             <View className="flex gap-2">
-              <TextInput
-                value={newAnswer}
-                onChangeText={(text) => setNewAnswer(text)}
-                placeholder="Votre réponse..."
-                className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none placeholder:text-white/30"
-                onKeyDown={(e) => e.key === "Enter" && handleAnswer()}
-              />
-              <Pressable
-                onPress={handleAnswer}
-                disabled={!newAnswer.trim() || isSubmitting}
-                className="px-4 py-2 rounded-xl text-white font-medium disabled:opacity-40"
-                style={{  }}
-              >
+              <TextInput value={newAnswer} onChangeText={(value) => setNewAnswer(value)} placeholder="Votre réponse..." className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none focus:border-purple-400 transition-colors placeholder:text-white/30" onKeyPress={(e) => e.nativeEvent.key === "Enter" && handleAnswer()} />
+              <Pressable onPress={handleAnswer} disabled={!newAnswer.trim() || isSubmitting} className="px-4 py-2 rounded-xl text-white font-medium disabled:opacity-40 active:scale-95 transition-transform" style={{  }}>
                 {isSubmitting ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
@@ -104,31 +78,15 @@ export function CommunityQuestion({
             </View>
           )}
         </View>
-      )}
-
-      {canAsk && onAskQuestion && (
+      )}{canAsk && onAskQuestion && (
         <View className="space-y-2">
-          <Pressable
-            onPress={() => setShowAskForm(!showAskForm)}
-            className="text-xs text-white/40"
-          >
+          <Pressable onPress={() => setShowAskForm(!showAskForm)} className="text-xs text-white/40 transition-colors">
             {showAskForm ? "Annuler" : "Poser une question"}
           </Pressable>
           {showAskForm && (
             <View className="flex gap-2">
-              <TextInput
-                value={newQuestion}
-                onChangeText={(text) => setNewQuestion(text)}
-                placeholder="Votre question..."
-                className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none placeholder:text-white/30"
-                onKeyDown={(e) => e.key === "Enter" && handleAskQuestion()}
-              />
-              <Pressable
-                onPress={handleAskQuestion}
-                disabled={!newQuestion.trim() || isSubmitting}
-                className="px-4 py-2 rounded-xl text-white font-medium disabled:opacity-40"
-                style={{  }}
-              >
+              <TextInput value={newQuestion} onChangeText={(value) => setNewQuestion(value)} placeholder="Votre question..." className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none focus:border-purple-400 transition-colors placeholder:text-white/30" onKeyPress={(e) => e.nativeEvent.key === "Enter" && handleAskQuestion()} />
+              <Pressable onPress={handleAskQuestion} disabled={!newQuestion.trim() || isSubmitting} className="px-4 py-2 rounded-xl text-white font-medium disabled:opacity-40 active:scale-95 transition-transform" style={{  }}>
                 {isSubmitting ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
@@ -138,7 +96,6 @@ export function CommunityQuestion({
             </View>
           )}
         </View>
-      )}
-    </View>
+      )}</View>
   );
 }

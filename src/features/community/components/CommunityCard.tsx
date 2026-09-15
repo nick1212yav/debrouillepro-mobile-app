@@ -1,8 +1,8 @@
-import { useRouter } from "expo-router";
-import { View, Image, Text, Pressable, GestureResponderEvent } from "react-native";
+import { View, Image, Pressable, Text, GestureResponderEvent } from "react-native";
 
 // src/features/community/components/CommunityCard.tsx
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Heart,
   MessageCircle,
@@ -66,53 +66,23 @@ function ImageGallery({ images }: { images: string[] }) {
 
   return (
     <>
-      <View className="gap-1 rounded-xl overflow-hidden mt-3">
-        {displayImages.map((url, idx) => (
-          <Pressable
-            key={idx}
-            onPress={(e) => {
+      <View className="gap-1 rounded-xl overflow-hidden mt-3">{displayImages.map((url, idx) => (
+          <Pressable key={idx} onPress={(e) => {
               setSelected(url);
-            }}
-            className="relative aspect-square bg-black/20 overflow-hidden group"
-          >
-            <Image
-             
-             
-              className="w-full h-full object-cover"
-              loading="lazy"
-             source={{ uri: url }} accessibilityLabel={`Image ${idx + 1}`}/>
-            {idx === 3 && remaining > 0 && (
-              <View className="absolute inset-0 flex items-center justify-center bg-black/50">
-                <Text className="text-white font-bold text-lg">
-                  +{remaining}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        ))}
-      </View>
+            }} className="relative aspect-square bg-black/20 overflow-hidden group"><Image className="w-full h-full object-cover transition-transform duration-300" source={{ uri: url }} accessibilityLabel={`Image ${idx + 1}`} />{idx === 3 && remaining > 0 && (
+              <View className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm"><Text className="text-white font-bold text-lg">+{remaining}</Text></View>
+            )}</Pressable>
+        ))}</View>
 
       {/* Lightbox */}
-      <>
+<View>
         {selected && (
-          <Pressable
-            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-            onPress={() => setSelected(null)}
-          >
-            <Image
-              src={selected}
-              alt=""
-              className="max-w-full max-h-[80vh] object-contain rounded-xl"
-            />
-            <Pressable
-              onPress={() => setSelected(null)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"
-            >
-              <Text className="text-white text-xl">✕</Text>
-            </Pressable>
-          </Pressable>
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onPress={() => setSelected(null)}>
+            <Image initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} src={selected} alt="" className="max-w-full max-h-[80vh] object-contain rounded-xl" />
+            <Pressable onPress={() => setSelected(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center transition-colors"><Text className="text-white text-xl">✕</Text></Pressable>
+          </View>
         )}
-      </>
+      </View>
     </>
   );
 }
@@ -121,26 +91,9 @@ function VideoGallery({ videos }: { videos: string[] }) {
   if (!videos.length) return null;
 
   return (
-    <View className="gap-1 mt-3">
-      {videos.slice(0, 2).map((url, idx) => (
-        <Pressable
-          key={idx}
-          className="relative aspect-video rounded-xl overflow-hidden bg-black/20 group"
-          onPress={(e) => e.stopPropagation()}
-        >
-          <View
-            src={url}
-            className="w-full h-full object-cover"
-            controls={false}
-            muted
-            playsInline
-          />
-          <View className="absolute inset-0 flex items-center justify-center bg-black/30">
-            <Play size={28} className="text-white/90" />
-          </View>
-        </Pressable>
-      ))}
-    </View>
+    <View className="gap-1 mt-3">{videos.slice(0, 2).map((url, idx) => (
+        <View key={idx} className="relative aspect-video rounded-xl overflow-hidden bg-black/20 group" onPress={(e) => e.stopPropagation()}><video src={url} className="w-full h-full object-cover" controls={false} muted playsInline /><View className="absolute inset-0 flex items-center justify-center bg-black/30 transition-opacity"><Play size={28} className="text-white/90" /></View></View>
+      ))}</View>
   );
 }
 
@@ -148,10 +101,7 @@ function AudioPlayer({ audio }: { audio: string }) {
   if (!audio) return null;
 
   return (
-    <View className="mt-3 p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-3">
-      <Volume2 size={16} className="text-white/60" />
-      <View controls className="w-full h-8" src={audio} />
-    </View>
+    <View className="mt-3 p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-3"><Volume2 size={16} className="text-white/60" /><audio controls className="w-full h-8" src={audio} /></View>
   );
 }
 
@@ -169,35 +119,16 @@ function PollDisplay({
   if (!options.length) return null;
 
   return (
-    <View className="mt-3 space-y-2 bg-white/5 rounded-xl p-4">
-      {options.map((opt) => {
+    <View className="mt-3 space-y-2 bg-white/5 rounded-xl p-4">{options.map((opt) => {
         const pct = totalVotes > 0 ? (opt.votes / totalVotes) * 100 : 0;
         const isVoted = votedId === opt.id;
 
         return (
-          <Pressable
-            key={opt.id}
-            onPress={() => onVote?.(opt.id)}
-            disabled={!!votedId}
-            className={`relative w-full rounded-lg overflow-hidden transition-all ${
+          <Pressable key={opt.id} onPress={() => onVote?.(opt.id)} disabled={!!votedId} className={`relative w-full rounded-lg overflow-hidden transition-all ${
               isVoted ? "ring-2 ring-purple-400 ring-offset-1" : ""
-            }`}
-          >
-            <View
-              className="h-9 bg-purple-500/20"
-              style={{ width: `${Math.max(pct, 2)}%` }}
-            />
-            <View className="absolute inset-0 flex items-center justify-between px-3 text-sm">
-              <Text className="text-white/80 font-medium">{opt.text}</Text>
-              <Text className="text-white/50 text-xs">{Math.round(pct)}%</Text>
-            </View>
-          </Pressable>
+            }`}><View className="h-9 bg-purple-500/20 transition-all duration-500" style={{ width: `${Math.max(pct, 2)}%` }} /><View className="absolute inset-0 flex items-center justify-between px-3 text-sm"><Text className="text-white/80 font-medium">{opt.text}</Text><Text className="text-white/50 text-xs">{Math.round(pct)}%</Text></View></Pressable>
         );
-      })}
-      <Text className="text-[10px] text-white/30 text-right">
-        {totalVotes} vote{totalVotes > 1 ? "s" : ""}
-      </Text>
-    </View>
+      })}<Text className="text-[10px] text-white/30 text-right">{totalVotes}vote{totalVotes > 1 ? "s" : ""}</Text></View>
   );
 }
 
@@ -215,20 +146,13 @@ function ActionButton({
   count?: number;
 }) {
   return (
-    <Pressable
-      onPress={onClick}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+    <Pressable onPress={onClick} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200 ${
         active
           ? "text-red-400 bg-red-500/10"
           : "text-white/60 hover:text-white hover:bg-white/5"
-      }`}
-    >
-      <Icon size={16} className={active ? "fill-red-400 text-red-400" : ""} />
-      <Text>{label}</Text>
-      {count !== undefined && count > 0 && (
+      }`}><Icon size={16} className={active ? "fill-red-400 text-red-400" : ""} /><Text>{label}</Text>{count !== undefined && count > 0 && (
         <Text className="text-[10px] opacity-60">{count}</Text>
-      )}
-    </Pressable>
+      )}</Pressable>
   );
 }
 
@@ -244,7 +168,7 @@ export function CommunityCard({
   onVote,
   onNavigate,
 }: Props) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const meta = post.meta || {};
 
   // Médias
@@ -271,7 +195,7 @@ export function CommunityCard({
     if (onNavigate) {
       onNavigate();
     } else {
-      router.push(`/community/${post._id}`);
+      navigate(`/community/${post._id}`);
     }
   };
 
@@ -280,67 +204,25 @@ export function CommunityCard({
   const moodEmoji = mood ? MOOD_EMOJI[mood] : null;
 
   return (
-    <Pressable
-      onPress={handleCardClick}
-      className="rounded-2xl overflow-hidden"
-      style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-    >
+    <View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + index * 0.05, type: "spring", stiffness: 300 }} onPress={handleCardClick} className="rounded-2xl overflow-hidden transition-all duration-300" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}>
       {/* En-tête */}
-      <View className="px-4 pt-4 pb-2 flex items-start gap-3">
-        {/* Avatar */}
-        <View className="flex-shrink-0">
-          {post.authorAvatar ? (
-            <Image
-             
-             
-              className="w-11 h-11 rounded-full object-cover ring-1 ring-white/10"
-             source={{ uri: post.authorAvatar }} accessibilityLabel=""/>
+      <View className="px-4 pt-4 pb-2 flex items-start gap-3">{}<View className="flex-shrink-0">{post.authorAvatar ? (
+            <Image className="w-11 h-11 rounded-full object-cover ring-1 ring-white/10" source={{ uri: post.authorAvatar }} accessibilityLabel="" />
           ) : (
-            <View className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-500/30 to-indigo-500/30 flex items-center justify-center text-purple-400 font-bold text-sm ring-1 ring-white/10">
-              {post.authorName?.charAt(0).toUpperCase() || "?"}
-            </View>
-          )}
-        </View>
-
-        {/* Infos auteur */}
-        <View className="flex-1 min-w-0">
-          <View className="flex items-center gap-1.5 flex-wrap">
-            <Text className="text-white font-semibold text-sm truncate">
-              {post.authorName || "Anonyme"}
-            </Text>
-            <Text className="text-[10px] text-white/40">·</Text>
-            <Text className="text-[10px] text-white/40">{timeAgo}</Text>
-          </View>
-          <View className="flex items-center gap-1 text-[10px] text-white/30">
-            <AudienceIcon size={10} />
-            <Text className="capitalize">
-              {audience === "public"
+            <View className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-500/30 to-indigo-500/30 flex items-center justify-center text-purple-400 font-bold text-sm ring-1 ring-white/10">{post.authorName?.charAt(0).toUpperCase() || "?"}</View>
+          )}</View>{}<View className="flex-1 min-w-0"><View className="flex items-center gap-1.5 flex-wrap"><Text className="text-white font-semibold text-sm truncate">{post.authorName || "Anonyme"}</Text><Text className="text-[10px] text-white/40">·</Text><Text className="text-[10px] text-white/40">{timeAgo}</Text></View><View className="flex items-center gap-1 text-[10px] text-white/30"><AudienceIcon size={10} /><Text className="capitalize">{audience === "public"
                 ? "Public"
                 : audience === "friends"
                   ? "Amis"
-                  : "Privé"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Actions supplémentaires */}
-        <Pressable
-          onPress={(e) => {
+                  : "Privé"}</Text></View></View>{}<Pressable onPress={(e) => {
             // Menu contextuel (à implémenter plus tard)
             console.log("More options");
-          }}
-          className="text-white/30"
-        >
-          <MoreHorizontal size={18} />
-        </Pressable>
-      </View>
+          }} className="text-white/30 transition-colors"><MoreHorizontal size={18} /></Pressable></View>
 
       {/* Contenu principal */}
       <View className="px-4 pb-2 space-y-2">
         {post.title && (
-          <Text className="text-white font-bold text-base leading-tight">
-            {post.title}
-          </Text>
+          <Text className="text-white font-bold text-base leading-tight">{post.title}</Text>
         )}
         <Text className="text-white/80 text-sm leading-relaxed">
           {post.description}
@@ -350,11 +232,7 @@ export function CommunityCard({
         {mentions.length > 0 && (
           <View className="flex flex-wrap gap-1 mt-1">
             {mentions.map((user) => (
-              <Text
-                key={user}
-                className="text-purple-400 text-xs font-medium"
-                onPress={(e) => e.stopPropagation()}
-              >
+              <Text key={user} className="text-purple-400 text-xs font-medium" onPress={(e) => e.stopPropagation()}>
                 @{user}
               </Text>
             ))}
@@ -386,13 +264,9 @@ export function CommunityCard({
         {post.tags.length > 0 && (
           <View className="flex flex-wrap gap-1.5 mt-2">
             {post.tags.map((tag) => (
-              <Text
-                key={tag}
-                className="text-purple-400 text-xs font-medium"
-                onPress={(e) => {
-                  router.push(`/?search=${tag.replace("#", "")}`);
-                }}
-              >
+              <Text key={tag} className="text-purple-400 text-xs font-medium transition-colors" onPress={(e) => {
+                  navigate(`/?search=${tag.replace("#", "")}`);
+                }}>
                 {tag}
               </Text>
             ))}
@@ -444,15 +318,11 @@ export function CommunityCard({
           }}
           count={post.shareCount}
         />
-        <Pressable
-          onPress={(e) => {
+        <Pressable onPress={(e) => {
             onBookmark();
-          }}
-          className="p-2 rounded-xl text-white/30"
-          accessibilityLabel={
+          }} className="p-2 rounded-xl text-white/30 transition-colors" accessibilityLabel={
             post.bookmarkedByMe ? "Retirer des favoris" : "Ajouter aux favoris"
-          }
-        >
+          }>
           <Bookmark
             size={16}
             className={
@@ -461,6 +331,6 @@ export function CommunityCard({
           />
         </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
 }

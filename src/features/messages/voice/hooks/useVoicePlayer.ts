@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useVoicePlayer(source?: string | null) {
-  const audioRef = useRef<Audio | null>(null);
+  const audioRef = useRef<unknown | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
 

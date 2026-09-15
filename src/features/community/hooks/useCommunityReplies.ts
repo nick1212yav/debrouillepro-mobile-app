@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityReplies.ts
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import { adaptCommunityComment } from "../adapter";
 
@@ -23,22 +22,22 @@ export function useCommunityReplies() {
       try {
         const reply = await addReply({ postId, parentId, text });
         if (!reply) {
-          UIService.openToast("Erreur lors de l'ajout de la réponse", "error");
+          toast.error("Erreur lors de l'ajout de la réponse");
           return;
         }
-        UIService.openToast("Réponse ajoutée", "success");
+        toast.success("Réponse ajoutée");
         return adaptCommunityComment(reply);
       } catch (error) {
-        UIService.openToast("Erreur lors de l'ajout de la réponse", "error");
+        toast.error("Erreur lors de l'ajout de la réponse");
         throw error;
       }
     },
     deleteReply: async (replyId: Id<"comments">) => {
       try {
         await deleteReply({ commentId: replyId });
-        UIService.openToast("Réponse supprimée", "success");
+        toast.success("Réponse supprimée");
       } catch (error) {
-        UIService.openToast("Erreur lors de la suppression", "error");
+        toast.error("Erreur lors de la suppression");
         throw error;
       }
     },

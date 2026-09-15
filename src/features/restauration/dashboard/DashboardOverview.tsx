@@ -1,4 +1,4 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { TrendingUp, ShoppingBag, Calendar, Star } from "lucide-react-native";
 
 interface DashboardOverviewProps {
@@ -61,35 +61,12 @@ export function DashboardOverview({
   ];
 
   return (
-    <View className="gap-4 text-left">
-      {cards.map((card) => {
+    <View className="gap-4 text-left">{cards.map((card) => {
         const Icon = card.icon;
         return (
-          <View
-            key={card.id}
-            className={`p-4 rounded-2xl border flex flex-col justify-between h-36 ${card.bg}`}
-          >
-            <View className="flex justify-between items-start">
-              <Text className="text-[10px] text-white/50 uppercase font-black tracking-wider leading-snug">
-                {card.label}
-              </Text>
-              <Icon size={16} className={card.color} />
-            </View>
-
-            <View className="my-2">
-              <Text className="text-xl font-black text-white">
-                {card.value}
-              </Text>
-            </View>
-
-            <Pressable
-              onPress={() => onNavigateToSection(card.section)}
-              className="text-[10px] font-black uppercase tracking-wider text-orange-400 text-left w-fit"
-            >
-              {card.actionLabel} <Text>➔</Text></Pressable>
-          </View>
+          <View key={card.id} className={`p-4 rounded-2xl border flex flex-col justify-between h-36 ${card.bg}`}><View className="flex justify-between items-start"><Text className="text-[10px] text-white/50 uppercase font-black tracking-wider leading-snug">{card.label}</Text><Icon size={16} className={card.color} /></View><View className="my-2"><Text className="text-xl font-black text-white">{card.value}</Text></View><Pressable onPress={() => onNavigateToSection(card.section)} className="text-[10px] font-black uppercase tracking-wider text-orange-400 transition-colors text-left w-fit">{card.actionLabel}➔
+            </Pressable></View>
         );
-      })}
-    </View>
+      })}</View>
   );
 }

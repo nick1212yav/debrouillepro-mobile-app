@@ -33,7 +33,7 @@ const BLOCKED_USERS_STORAGE_KEY =
 
 function isBrowser(): boolean {
   return (
-    typeof undefined !== "undefined" && typeof undefined !== "undefined"
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
   );
 }
 
@@ -54,7 +54,7 @@ function readReports(): MessageReport[] {
   }
 
   try {
-    const raw = undefined.getItem(REPORTS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(REPORTS_STORAGE_KEY);
 
     if (!raw) {
       return [];
@@ -74,7 +74,7 @@ function writeReports(reports: MessageReport[]): void {
   }
 
   try {
-    undefined.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
+    window.localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
   } catch {
     // Le stockage local est optionnel.
   }
@@ -86,7 +86,7 @@ function readBlockedUsers(): BlockedUser[] {
   }
 
   try {
-    const raw = undefined.getItem(BLOCKED_USERS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(BLOCKED_USERS_STORAGE_KEY);
 
     if (!raw) {
       return [];
@@ -106,7 +106,7 @@ function writeBlockedUsers(users: BlockedUser[]): void {
   }
 
   try {
-    undefined.setItem(
+    window.localStorage.setItem(
       BLOCKED_USERS_STORAGE_KEY,
       JSON.stringify(users),
     );
@@ -123,8 +123,8 @@ export function isSecurityStorageAvailable(): boolean {
   try {
     const key = "__debrouillepro_security_test__";
 
-    undefined.setItem(key, "1");
-    undefined.removeItem(key);
+    window.localStorage.setItem(key, "1");
+    window.localStorage.removeItem(key);
 
     return true;
   } catch {
@@ -235,9 +235,9 @@ export function clearSecurityStorage(): void {
   }
 
   try {
-    undefined.removeItem(REPORTS_STORAGE_KEY);
+    window.localStorage.removeItem(REPORTS_STORAGE_KEY);
 
-    undefined.removeItem(BLOCKED_USERS_STORAGE_KEY);
+    window.localStorage.removeItem(BLOCKED_USERS_STORAGE_KEY);
   } catch {
     // Ignorer les erreurs de stockage.
   }

@@ -1,33 +1,25 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Text, PressableProps, TextProps, ViewProps } from "react-native";
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { ChevronRight, MoreHorizontal } from "lucide-react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
-function Breadcrumb({ ...props }: React.ComponentProps<typeof View>) {
+function Breadcrumb({ ...props }: ViewProps) {
   return <View accessibilityLabel="breadcrumb" data-slot="breadcrumb" {...props} />;
 }
 
-function BreadcrumbList({ className, ...props }: React.ComponentProps<typeof View>) {
+function BreadcrumbList({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="breadcrumb-list"
-      className={cn(
+    <View data-slot="breadcrumb-list" className={cn(
         "text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm wrap-break-word sm:gap-2.5",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function BreadcrumbItem({ className, ...props }: React.ComponentProps<typeof View>) {
+function BreadcrumbItem({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="breadcrumb-item"
-      className={cn("inline-flex items-center gap-1.5", className)}
-      {...props}
-    />
+    <View data-slot="breadcrumb-item" className={cn("inline-flex items-center gap-1.5", className)} {...props} />
   );
 }
 
@@ -35,7 +27,7 @@ function BreadcrumbLink({
   asChild,
   className,
   ...props
-}: React.ComponentProps<typeof Pressable> & {
+}: PressableProps & {
   asChild?: boolean;
 }) {
   const Comp = asChild ? Slot : "a";
@@ -52,16 +44,9 @@ function BreadcrumbLink({
   );
 }
 
-function BreadcrumbPage({ className, ...props }: React.ComponentProps<typeof Text>) {
+function BreadcrumbPage({ className, ...props }: TextProps) {
   return (
-    <Text
-      data-slot="breadcrumb-page"
-      accessibilityRole="link"
-     
-      aria-current="page"
-      className={cn("text-foreground font-normal", className)}
-      {...props}
-     accessibilityState={{ disabled: true }}/>
+    <Text data-slot="breadcrumb-page" accessibilityRole="link" aria-current="page" className={cn("text-foreground font-normal", className)} {...props} accessibilityState={{ disabled: true }} />
   );
 }
 
@@ -69,35 +54,18 @@ function BreadcrumbSeparator({
   children,
   className,
   ...props
-}: React.ComponentProps<typeof View>) {
+}: ViewProps) {
   return (
-    <View
-      data-slot="breadcrumb-separator"
-      accessibilityRole="presentation"
-     
-      className={cn("[&>svg]:size-3.5", className)}
-      {...props}
-    >
-      {children ?? <ChevronRight />}
-    </View>
+    <View data-slot="breadcrumb-separator" accessibilityRole="none" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" className={cn("[&>svg]:size-3.5", className)} {...props}>{children ?? <ChevronRight />}</View>
   );
 }
 
 function BreadcrumbEllipsis({
   className,
   ...props
-}: React.ComponentProps<typeof Text>) {
+}: TextProps) {
   return (
-    <Text
-      data-slot="breadcrumb-ellipsis"
-      accessibilityRole="presentation"
-     
-      className={cn("flex size-9 items-center justify-center", className)}
-      {...props}
-    >
-      <MoreHorizontal className="size-4" />
-      <Text className="sr-only">More</Text>
-    </Text>
+    <Text data-slot="breadcrumb-ellipsis" accessibilityRole="none" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" className={cn("flex size-9 items-center justify-center", className)} {...props}><MoreHorizontal className="size-4" /><Text className="sr-only">More</Text></Text>
   );
 }
 

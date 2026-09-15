@@ -1,4 +1,5 @@
-import { Pressable, View, Text, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { View, Text, Pressable, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+
 // src/features/messages/payments/components/PaymentMessage.tsx
 
 import React from "react";
@@ -36,42 +37,16 @@ export function PaymentMessage({
     payment.status === "pending" && !!payment.paymentIntentId && !!onConfirm;
 
   return (
-    <View
-      style={{
+    <View style={{
         ...containerStyle,
         alignSelf: isOwn ? "flex-end" : "flex-start",
-      }}
-    >
-      <View style={headerStyle}>
-        <Text style={iconStyle}>€</Text>
-
-        <View>
-          <strong><Text>Paiement</Text></strong>
-
-          <View style={statusStyle}>{STATUS_LABELS[payment.status]}</View>
-        </View>
-      </View>
-
-      <View style={amountStyle}>
-        {payment.amount.toFixed(2)} {payment.currency.toUpperCase()}
-      </View>
-
-      {payment.description && (
+      }}><View style={headerStyle}><Text style={iconStyle}>€</Text><View><strong><Text>Paiement</Text></strong><View style={statusStyle}>{STATUS_LABELS[payment.status]}</View></View></View><View style={amountStyle}>{payment.amount.toFixed(2)}{payment.currency.toUpperCase()}</View>{payment.description && (
         <Text style={descriptionStyle}>{payment.description}</Text>
-      )}
-
-      {canConfirm && (
-        <Pressable
-          disabled={isLoading}
-          onPress={() => onConfirm?.(payment.paymentIntentId!)}
-          style={confirmButtonStyle}
-        >
+      )}{canConfirm && (
+        <Pressable disabled={isLoading} onPress={() => onConfirm?.(payment.paymentIntentId!)} style={confirmButtonStyle}>
           {isLoading ? "Confirmation…" : "Confirmer le paiement"}
         </Pressable>
-      )}
-
-      {payment.id && <small style={referenceStyle}><Text>Réf.</Text>{payment.id}</small>}
-    </View>
+      )}{payment.id && <small style={referenceStyle}>Réf. {payment.id}</small>}</View>
   );
 }
 
@@ -132,7 +107,7 @@ const confirmButtonStyle: ViewStyle | TextStyle | ImageStyle = {
 };
 
 const referenceStyle: ViewStyle | TextStyle | ImageStyle = {
-  display: "flex",
+  display: "block",
   marginTop: 10,
   opacity: 0.45,
 };

@@ -1,9 +1,10 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { Text, Pressable, View, Linking } from "react-native";
 
 // src/features/community/components/CommunityShare.tsx
 import { useState } from "react";
 import { Share2, Copy, X, Check, Mail, Send, Link2 } from "lucide-react-native";
+import { toast } from "sonner";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 interface Props {
   url: string;
@@ -33,12 +34,12 @@ export function CommunityShare({
 
   const handleCopy = async () => {
     try {
-      await undefined.writeText(url);
+      await Clipboard.setString(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      UIService.openToast("Lien copié !", "success");
+      toast.success("Lien copié !");
     } catch {
-      UIService.openToast("Impossible de copier le lien", "error");
+      toast.error("Impossible de copier le lien");
     }
   };
 
@@ -51,7 +52,7 @@ export function CommunityShare({
     const shareUrl = shareUrls[platform];
     if (shareUrl) {
       if (platform === "email") {
-        undefined.href = shareUrl;
+        Linking.openURL(shareUrl);
       } else {
         Linking.openURL(String(shareUrl));
       }
@@ -73,68 +74,51 @@ export function CommunityShare({
 
   return (
     <View className="relative">
-      <Pressable
-        onPress={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1.5 ${padding} rounded-xl ${text} font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer active:scale-95`}
-      >
+      <Pressable onPress={() => setIsOpen(!isOpen)} className={`flex items-center gap-1.5 ${padding} rounded-xl ${text} font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer active:scale-95`}>
         <Share2 size={icon} />
         Partager
       </Pressable>
 
-      <>
+<View>
         {isOpen && (
-          <View
-            className="absolute right-0 top-full mt-2 w-56 p-3 rounded-2xl bg-[#0D1117] border border-white/10 z-50"
-          >
+          <View initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -10 }} className="absolute right-0 top-full mt-2 w-56 p-3 rounded-2xl bg-[#0D1117] border border-white/10 z-50">
             <View className="flex items-center justify-between mb-3">
               <Text className="text-white/70 text-sm font-medium">
                 Partager
               </Text>
-              <Pressable
-                onPress={() => {
+              <Pressable onPress={() => {
                   setIsOpen(false);
                   onClose?.();
-                }}
-                className="text-white/40"
-              >
+                }} className="text-white/40 transition-colors">
                 <X size={14} />
               </Pressable>
             </View>
 
             <View className="space-y-1">
               {SHARE_OPTIONS.map((opt) => (
-                <Pressable
-                  key={opt.id}
-                  onPress={() => handleShare(opt.id)}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg"
-                >
-                  <opt.icon size={18} style={{ color: opt.color }} />
+                <Pressable key={opt.id} onPress={() => handleShare(opt.id)} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors">
+                  <opt.icon size={18} style={{  }} />
                   <Text className="text-white/70 text-sm">{opt.label}</Text>
                 </Pressable>
               ))}
-              <Pressable
-                onPress={handleCopy}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg"
-              >
+              <Pressable onPress={handleCopy} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors">
                 {copied ? (
                   <Check size={18} className="text-emerald-400" />
                 ) : (
                   <Copy size={18} className="text-white/40" />
                 )}
-                <Text
-                  className={
+                <Text className={
                     copied
                       ? "text-emerald-400 text-sm"
                       : "text-white/70 text-sm"
-                  }
-                >
+                  }>
                   {copied ? "Copié !" : "Copier le lien"}
                 </Text>
               </Pressable>
             </View>
           </View>
         )}
-      </>
+      </View>
     </View>
   );
 }

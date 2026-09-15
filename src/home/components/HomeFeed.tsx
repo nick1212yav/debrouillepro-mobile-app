@@ -149,22 +149,11 @@ export function HomeFeed({
 
   if (isLoading) {
     return (
-      <View className={`space-y-6 ${className}`}>
-        {Array.from({ length: 4 }).map((_, index) => (
-          <View key={`home-feed-skeleton-${index}`} className="space-y-4">
-            <View className="h-6 w-40 animate-pulse rounded-lg bg-white/5" />
-
-            <View className="gap-3">
-              {Array.from({ length: 3 }).map((_, cardIndex) => (
-                <View
-                  key={`home-card-skeleton-${index}-${cardIndex}`}
-                  className="h-32 animate-pulse rounded-2xl border border-white/10 bg-white/5"
-                />
-              ))}
-            </View>
-          </View>
-        ))}
-      </View>
+      <View className={`space-y-6 ${className}`} accessibilityState={{ busy: true }}>{Array.from({ length: 4 }).map((_, index) => (
+          <View key={`home-feed-skeleton-${index}`} className="space-y-4"><View className="h-6 w-40 animate-pulse rounded-lg bg-white/5" /><View className="gap-3">{Array.from({ length: 3 }).map((_, cardIndex) => (
+                <View key={`home-card-skeleton-${index}-${cardIndex}`} className="h-32 animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+              ))}</View></View>
+        ))}</View>
     );
   }
 
@@ -176,12 +165,7 @@ export function HomeFeed({
 
   if (error) {
     return (
-      <View
-        className={`rounded-2xl border border-red-400/20 bg-red-500/10 p-5 text-sm text-red-200 ${className}`}
-        accessibilityRole="alert"
-      >
-        {error}
-      </View>
+      <View className={`rounded-2xl border border-red-400/20 bg-red-500/10 p-5 text-sm text-red-200 ${className}`} accessibilityRole="alert">{error}</View>
     );
   }
 
@@ -209,13 +193,7 @@ export function HomeFeed({
 
   if (visibleSections.length === 0 && items.length > 0) {
     return (
-      <View className={`space-y-4 ${className}`}>
-        <LegacyItems
-          items={items}
-          onItemClick={onItemClick}
-          onAction={onAction}
-        />
-      </View>
+      <View className={`space-y-4 ${className}`}><LegacyItems items={items} onItemClick={onItemClick} onAction={onAction} /></View>
     );
   }
 
@@ -227,14 +205,7 @@ export function HomeFeed({
 
   if (visibleSections.length === 0) {
     return (
-      <View
-        className={`rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center ${className}`}
-      >
-        <View className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-xl">
-          <Text>✨</Text></View>
-
-        <Text className="text-sm text-gray-400">{emptyMessage}</Text>
-      </View>
+      <View className={`rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center ${className}`}><View className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-xl"><Text>✨</Text></View><Text className="text-sm text-gray-400">{emptyMessage}</Text></View>
     );
   }
 
@@ -245,8 +216,7 @@ export function HomeFeed({
    */
 
   return (
-    <View className={`space-y-8 ${className}`}>
-      {visibleSections.map((section) => {
+    <View className={`space-y-8 ${className}`}>{visibleSections.map((section) => {
         const sectionData = normalizeSectionData(section);
 
         /**
@@ -266,8 +236,7 @@ export function HomeFeed({
             className="w-full"
           />
         );
-      })}
-    </View>
+      })}</View>
   );
 }
 
@@ -293,8 +262,7 @@ interface LegacyItemsProps {
 
 function LegacyItems({ items, onItemClick, onAction }: LegacyItemsProps) {
   return (
-    <View className="space-y-3">
-      {items.map((item, index) => {
+    <View className="space-y-3">{items.map((item, index) => {
         const key = getItemKey(item, index);
 
         return (
@@ -305,8 +273,7 @@ function LegacyItems({ items, onItemClick, onAction }: LegacyItemsProps) {
             onAction={(action) => onAction?.(action, item)}
           />
         );
-      })}
-    </View>
+      })}</View>
   );
 }
 
@@ -371,39 +338,13 @@ function LegacyRecommendation({
   onClick?: () => void;
 }) {
   return (
-    <Pressable
-     
-      onPress={onClick}
-      className="group w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-left"
-    >
-      <View className="flex gap-4">
-        {item.image ? (
-          <Image
-           
-           
-            className="h-20 w-20 shrink-0 rounded-xl object-cover"
-            loading="lazy"
-           source={{ uri: item.image }} accessibilityLabel=""/>
+    <Pressable onPress={onClick} className="group w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-left backdrop-blur-xl transition"><View className="flex gap-4">{item.image ? (
+          <Image className="h-20 w-20 shrink-0 rounded-xl object-cover" source={{ uri: item.image }} accessibilityLabel="" />
         ) : (
-          <View className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl">
-            <Text>✨</Text></View>
-        )}
-
-        <View className="min-w-0 flex-1">
-          <Text className="text-xs font-medium text-blue-300">Recommandé</Text>
-
-          <Text className="mt-1 text-sm font-semibold text-white">
-            {item.title}
-          </Text>
-
-          {item.description && (
-            <Text className="mt-1 text-xs text-gray-400">
-              {item.description}
-            </Text>
-          )}
-        </View>
-      </View>
-    </Pressable>
+          <View className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl"><Text>✨</Text></View>
+        )}<View className="min-w-0 flex-1"><Text className="text-xs font-medium text-blue-300">Recommandé</Text><Text className="mt-1 text-sm font-semibold text-white">{item.title}</Text>{item.description && (
+            <Text className="mt-1 text-xs text-gray-400">{item.description}</Text>
+          )}</View></View></Pressable>
   );
 }
 
@@ -428,33 +369,10 @@ function LegacyModule({
   };
 
   return (
-    <Pressable
-     
-      onPress={onClick}
-      className="group w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-left"
-    >
-      <View className="flex items-center gap-4">
-        <View className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-xl">
-          {value.icon ?? "◈"}
-        </View>
-
-        <View className="min-w-0 flex-1">
-          <Text className="truncate text-sm font-bold text-white">
-            {value.label ?? value.title ?? "Module"}
-          </Text>
-
-          {value.description && (
-            <Text className="mt-1 text-xs text-gray-400">
-              {value.description}
-            </Text>
-          )}
-        </View>
-
-        <Text className="text-gray-500">
-          →
-        </Text>
-      </View>
-    </Pressable>
+    <Pressable onPress={onClick} className="group w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-left backdrop-blur-xl transition"><View className="flex items-center gap-4"><View className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-xl">{value.icon ?? "◈"}</View><View className="min-w-0 flex-1"><Text className="truncate text-sm font-bold text-white">{value.label ?? value.title ?? "Module"}</Text>{value.description && (
+            <Text className="mt-1 text-xs text-gray-400">{value.description}</Text>
+          )}</View><Text className="text-gray-500 transition">→
+        </Text></View></Pressable>
   );
 }
 
@@ -472,41 +390,15 @@ function LegacyFeed({
   onClick?: () => void;
 }) {
   return (
-    <Pressable
-     
-      onPress={onClick}
-      className="group w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-left"
-    >
-      <View className="flex gap-4">
-        {item.image ? (
-          <Image
-           
-           
-            className="h-20 w-20 shrink-0 rounded-xl object-cover"
-            loading="lazy"
-           source={{ uri: item.image }} accessibilityLabel=""/>
+    <Pressable onPress={onClick} className="group w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-left backdrop-blur-xl transition"><View className="flex gap-4">{item.image ? (
+          <Image className="h-20 w-20 shrink-0 rounded-xl object-cover" source={{ uri: item.image }} accessibilityLabel="" />
         ) : (
-          <View className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl">
-            <Text>◈</Text></View>
-        )}
-
-        <View className="min-w-0 flex-1">
-          <Text className="text-xs font-medium text-blue-300">
-            {item.moduleId ?? item.type}
-          </Text>
-
-          <Text className="mt-1 text-sm font-semibold text-white">
-            {item.title ?? "Contenu"}
-          </Text>
-
-          {item.description && (
+          <View className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl"><Text>◈</Text></View>
+        )}<View className="min-w-0 flex-1"><Text className="text-xs font-medium text-blue-300">{item.moduleId ?? item.type}</Text><Text className="mt-1 text-sm font-semibold text-white">{item.title ?? "Contenu"}</Text>{item.description && (
             <Text className="mt-1 text-xs text-gray-400">
               {item.description}
             </Text>
-          )}
-        </View>
-      </View>
-    </Pressable>
+          )}</View></View></Pressable>
   );
 }
 

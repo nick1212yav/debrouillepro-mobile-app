@@ -22,12 +22,7 @@ export function AddToCartButton({ onAdd, disabled = false }: Props) {
   };
 
   return (
-    <Pressable
-      onPress={handleClick}
-      disabled={disabled || loading}
-      className="flex-1 py-3.5 rounded-2xl font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-      style={{  }}
-    >
+    <Pressable onPress={handleClick} disabled={disabled || loading} className="flex-1 py-3.5 rounded-2xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-50" style={{ boxShadow: "0 6px 20px rgba(249,115,22,0.4)" }}>
       {loading ? (
         <Loader2 size={16} className="animate-spin" />
       ) : (

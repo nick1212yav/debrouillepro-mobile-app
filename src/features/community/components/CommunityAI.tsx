@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { Pressable, View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { useState } from "react";
 import { Brain, Sparkles, Loader2, Send } from "lucide-react-native";
 
@@ -70,87 +70,53 @@ export function CommunityAI({
   };
 
   return (
-    <View className="space-y-3">
-      <View className="flex items-center gap-2">
-        <Brain size={16} className="text-purple-400" />
-        <Text className="text-sm font-medium text-white/50">Assistant IA</Text>
-      </View>
-
-      {/* Actions */}
-      <View className="flex flex-wrap gap-2">
-        {onGenerateSummary && (
-          <Pressable
-            onPress={handleGenerateSummary}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-400 bg-purple-500/10 disabled:opacity-50"
-          >
+    <View className="space-y-3"><View className="flex items-center gap-2"><Brain size={16} className="text-purple-400" /><Text className="text-sm font-medium text-white/50">Assistant IA</Text></View>{}<View className="flex flex-wrap gap-2">{onGenerateSummary && (
+          <Pressable onPress={handleGenerateSummary} disabled={isLoading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-400 bg-purple-500/10 transition-colors disabled:opacity-50">
             {isLoading ? (
               <Loader2 size={12} className="animate-spin" />
             ) : (
               <Sparkles size={12} />
             )}
-            <Text>Résumer</Text></Pressable>
-        )}
-        {onSuggestReply && (
-          <Pressable
-            onPress={handleSuggestReply}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-400 bg-purple-500/10 disabled:opacity-50"
-          >
+            Résumer
+          </Pressable>
+        )}{onSuggestReply && (
+          <Pressable onPress={handleSuggestReply} disabled={isLoading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-400 bg-purple-500/10 transition-colors disabled:opacity-50">
             {isLoading ? (
               <Loader2 size={12} className="animate-spin" />
             ) : (
               <Sparkles size={12} />
             )}
-            <Text>Suggérer une réponse</Text></Pressable>
-        )}
-        {onTranslate && (
+            Suggérer une réponse
+          </Pressable>
+        )}{onTranslate && (
           <View className="flex items-center gap-1">
-            <Picker
-             
-              onValueChange={(val) => setSelectedLanguage(val)}
-              className="px-2 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white outline-none"
-             selectedValue={selectedLanguage}>
-              {LANGUAGES.map((lang) => (
-                <Picker.Item label={`${lang.label}`} value={lang.code} />
-              ))}
-            </Picker>
-            <Pressable
-              onPress={handleTranslate}
-              disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-400 bg-purple-500/10 disabled:opacity-50"
-            >
+            <Picker onValueChange={(value) => setSelectedLanguage(value)} className="px-2 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white outline-none" selectedValue={selectedLanguage}>{LANGUAGES.map((lang) => (
+                <Picker.Item label={lang.label} value={lang.code} />
+              ))}</Picker>
+            <Pressable onPress={handleTranslate} disabled={isLoading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-400 bg-purple-500/10 transition-colors disabled:opacity-50">
               {isLoading ? (
                 <Loader2 size={12} className="animate-spin" />
               ) : (
                 <Sparkles size={12} />
               )}
-              <Text>Traduire</Text></Pressable>
+              Traduire
+            </Pressable>
           </View>
-        )}
-      </View>
-
-      {/* Résultats */}
-      {summary && (
-        <View
-          className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20"
-        >
-          <Text className="text-sm font-medium text-purple-400"><Text>Résumé</Text></Text>
+        )}</View>{}{summary && (
+        <View initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+          <Text className="text-sm font-medium text-purple-400">Résumé</Text>
           <Text className="text-white/70 text-sm mt-1">{summary}</Text>
         </View>
-      )}
-
-      {suggestedReply && (
-        <View
-          className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20"
-        >
+      )}{suggestedReply && (
+        <View initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
           <Text className="text-sm font-medium text-purple-400">
-            <Text>Réponse suggérée</Text></Text>
+            Réponse suggérée
+          </Text>
           <Text className="text-white/70 text-sm mt-1">{suggestedReply}</Text>
-          <Pressable className="mt-2 flex items-center gap-1 text-xs text-purple-400">
-            <Send size={12} /> <Text>Utiliser</Text></Pressable>
+          <Pressable className="mt-2 flex items-center gap-1 text-xs text-purple-400 transition-colors">
+            <Send size={12} /> Utiliser
+          </Pressable>
         </View>
-      )}
-    </View>
+      )}</View>
   );
 }

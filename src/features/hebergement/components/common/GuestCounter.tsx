@@ -1,4 +1,4 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import React from "react";
 import { Minus, Plus } from "lucide-react-native";
 
@@ -34,30 +34,6 @@ export const GuestCounter: React.FC<GuestCounterProps> = ({
   };
 
   return (
-    <View className={`flex items-center justify-between py-3 ${className}`}>
-      <View>
-        <Text className="text-sm font-medium text-white">{label}</Text>
-        {subtitle && <Text className="text-xs text-white/40">{subtitle}</Text>}
-      </View>
-      <View className="flex items-center gap-4">
-        <Pressable
-          onPress={handleDecrement}
-          disabled={value <= min}
-          className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 disabled:opacity-40 disabled:pointer-events-none"
-        >
-          <Minus size={14} className="text-white" />
-        </Pressable>
-        <Text className="text-sm font-semibold text-white w-4 text-center">
-          {value}
-        </Text>
-        <Pressable
-          onPress={handleIncrement}
-          disabled={value >= max}
-          className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 disabled:opacity-40 disabled:pointer-events-none"
-        >
-          <Plus size={14} className="text-white" />
-        </Pressable>
-      </View>
-    </View>
+    <View className={`flex items-center justify-between py-3 ${className}`}><View><Text className="text-sm font-medium text-white">{label}</Text>{subtitle && <Text className="text-xs text-white/40">{subtitle}</Text>}</View><View className="flex items-center gap-4"><Pressable onPress={handleDecrement} disabled={value <= min} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Minus size={14} className="text-white" /></Pressable><Text className="text-sm font-semibold text-white w-4 text-center">{value}</Text><Pressable onPress={handleIncrement} disabled={value >= max} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Plus size={14} className="text-white" /></Pressable></View></View>
   );
 };

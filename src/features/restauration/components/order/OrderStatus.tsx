@@ -61,9 +61,7 @@ export function OrderStatus({ status }: OrderStatusProps) {
   const Icon = current.icon;
 
   return (
-    <Text
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${current.color}`}
-    >
+    <Text className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${current.color}`}>
       <Icon size={12} />
       {current.label}
     </Text>

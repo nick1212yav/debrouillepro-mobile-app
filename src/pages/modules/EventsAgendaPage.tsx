@@ -1,5 +1,4 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Text, Image, Pressable, NativeSyntheticEvent } from "react-native";
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useConvexAuth } from "@/lib/convex-auth-compat";
@@ -14,15 +13,16 @@ import {
 } from "lucide-react-native";
 import { format, formatDistanceToNow, isPast, parseISO, differenceInDays, differenceInHours, differenceInMinutes } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Skeleton } from "@/components/ui/skeleton";
-import { SignInButton } from "@/components/ui/signin";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils.ts";
 
 // ── Types & constants ──────────────────────────────────────────────────────
 
@@ -51,12 +51,11 @@ function Countdown({ startDate }: { startDate: string }) {
   const mins = differenceInMinutes(date, new Date()) % 60;
 
   if (days > 0) return (
-    <Text className="text-xs font-bold text-amber-400">
-      Dans {days}j {hours}h
+    <Text className="text-xs font-bold text-amber-400">Dans {days}j {hours}h
     </Text>
   );
   if (hours > 0) return <Text className="text-xs font-bold text-orange-400">Dans {hours}h {mins}min</Text>;
-  return <Text className="text-xs font-bold text-red-400">Dans {mins} min</Text>;
+  return <Text className="text-xs font-bold text-red-400">Dans {mins}min</Text>;
 }
 
 // ── Event card ─────────────────────────────────────────────────────────────
@@ -85,63 +84,20 @@ function EventCard({ event, onClick }: { event: EventItem; onClick: () => void }
   const CatIcon = cfg.icon;
 
   return (
-    <Pressable
-      onPress={onClick}
-      className="rounded-2xl overflow-hidden"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
+    <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} onPress={onClick} className="rounded-2xl overflow-hidden active:scale-[0.98] transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
       {/* Cover */}
       {event.coverImage ? (
-        <Image className="w-full h-36 object-cover"  source={{ uri: event.coverImage }} accessibilityLabel={event.title}/>
+        <Image className="w-full h-36 object-cover" source={{ uri: event.coverImage }} accessibilityLabel={event.title} />
       ) : (
-        <View
-          className="w-full h-24 flex items-center justify-center"
-          style={{  }}
-        >
-          <CatIcon className="w-10 h-10 opacity-40" style={{ color: cfg.color }} />
-        </View>
+        <View className="w-full h-24 flex items-center justify-center" style={{  }}><CatIcon className="w-10 h-10 opacity-40" style={{  }} /></View>
       )}
 
-      <View className="p-4">
-        {/* Category + status */}
-        <View className="flex items-center gap-2 mb-2">
-          <Text
-            className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full text-white"
-            style={{ backgroundColor: cfg.color }}
-          >
-            <CatIcon className="w-3 h-3" />
-            {cfg.label}
-          </Text>
-          {event.isFree ? (
-            <Badge variant="secondary" className="text-xs bg-emerald-500/20 text-emerald-300 border-emerald-500/20"><Text>Gratuit</Text></Badge>
+      <View className="p-4">{}<View className="flex items-center gap-2 mb-2"><Text className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: cfg.color }}><CatIcon className="w-3 h-3" />{cfg.label}</Text>{event.isFree ? (
+            <Badge variant="secondary" className="text-xs bg-emerald-500/20 text-emerald-300 border-emerald-500/20">Gratuit</Badge>
           ) : (
             <Badge variant="secondary" className="text-xs">{event.price}</Badge>
-          )}
-        </View>
-
-        <Text className="font-semibold text-white text-sm leading-tight mb-1">{event.title}</Text>
-        <Text className="text-xs text-white/50 mb-3">{event.description}</Text>
-
-        <View className="flex flex-col gap-1 mb-3">
-          <View className="flex items-center gap-1.5 text-xs text-white/60">
-            <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            {format(parseISO(event.startDate), "EEE d MMM yyyy · HH:mm", { locale: fr })}
-          </View>
-          <View className="flex items-center gap-1.5 text-xs text-white/60">
-            <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-            {event.location}
-          </View>
-        </View>
-
-        <View className="flex items-center justify-between">
-          <View className="flex items-center gap-3 text-xs text-white/50">
-            <Text className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />{event.attendingCount}</Text>
-            <Text className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-400" />{event.interestedCount}</Text>
-          </View>
-          <Countdown startDate={event.startDate} />
-        </View>
-      </View>
-    </Pressable>
+          )}</View><Text className="font-semibold text-white text-sm leading-tight mb-1">{event.title}</Text><Text className="text-xs text-white/50 mb-3">{event.description}</Text><View className="flex flex-col gap-1 mb-3"><View className="flex items-center gap-1.5 text-xs text-white/60"><Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />{format(parseISO(event.startDate), "EEE d MMM yyyy · HH:mm", { locale: fr })}</View><View className="flex items-center gap-1.5 text-xs text-white/60"><MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />{event.location}</View></View><View className="flex items-center justify-between"><View className="flex items-center gap-3 text-xs text-white/50"><Text className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />{event.attendingCount}</Text><Text className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-400" />{event.interestedCount}</Text></View><Countdown startDate={event.startDate} /></View></View>
+    </View>
   );
 }
 
@@ -156,47 +112,29 @@ function RsvpButtons({ eventId }: { eventId: Id<"events"> }) {
     setLoading(true);
     try {
       await rsvpMutation({ eventId, status });
-      UIService.openToast(status === "attending" ? "Vous participez !" :
-        status === "interested" ? "Intéressé !" : "RSVP annulé", "success");
+      toast.success(
+        status === "attending" ? "Vous participez !" :
+        status === "interested" ? "Intéressé !" : "RSVP annulé"
+      );
     } catch {
-      UIService.openToast("Erreur RSVP", "error");
+      toast.error("Erreur RSVP");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View className="flex gap-2">
-      <Button
-        size="sm"
-        disabled={loading}
-        onPress={() => handle("attending")}
-        className={cn(
+    <View className="flex gap-2"><Button size="sm" disabled={loading} onPress={() => handle("attending")} className={cn(
           "flex-1 gap-1.5 cursor-pointer",
           myRsvp === "attending"
             ? "bg-emerald-500 hover:bg-emerald-600 text-white"
             : "bg-white/10 hover:bg-white/15 text-white"
-        )}
-      >
-        <Check className="w-3.5 h-3.5" />
-        {myRsvp === "attending" ? "Je participe ✓" : "Je participe"}
-      </Button>
-      <Button
-        size="sm"
-        disabled={loading}
-        onPress={() => handle("interested")}
-        variant="ghost"
-        className={cn(
+        )}><Check className="w-3.5 h-3.5" />{myRsvp === "attending" ? "Je participe ✓" : "Je participe"}</Button><Button size="sm" disabled={loading} onPress={() => handle("interested")} variant="ghost" className={cn(
           "gap-1.5 cursor-pointer border",
           myRsvp === "interested"
             ? "border-amber-500 text-amber-400"
             : "border-white/10 text-white/60"
-        )}
-      >
-        <Star className="w-3.5 h-3.5" />
-        {myRsvp === "interested" ? "Intéressé ✓" : "Intéressé"}
-      </Button>
-    </View>
+        )}><Star className="w-3.5 h-3.5" />{myRsvp === "interested" ? "Intéressé ✓" : "Intéressé"}</Button></View>
   );
 }
 
@@ -207,158 +145,46 @@ function EventDetail({ eventId, onClose }: { eventId: Id<"events">; onClose: () 
   const { isAuthenticated } = useConvexAuth();
 
   if (!event) return (
-    <View className="p-6 space-y-4">
-      {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8 w-full rounded-xl" />)}
-    </View>
+    <View className="p-6 space-y-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8 w-full rounded-xl" />)}</View>
   );
 
   const cfg = getCatConfig(event.category);
   const CatIcon = cfg.icon;
 
   return (
-    <View
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{  }}
-    >
+    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex flex-col" style={{  }}>
       {/* Cover / header */}
-      <View className="relative">
-        {event.coverImage ? (
-          <Image className="w-full h-52 object-cover"  source={{ uri: event.coverImage }} accessibilityLabel={event.title}/>
+      <View className="relative">{event.coverImage ? (
+          <Image className="w-full h-52 object-cover" source={{ uri: event.coverImage }} accessibilityLabel={event.title} />
         ) : (
-          <View
-            className="w-full h-52 flex items-center justify-center"
-            style={{  }}
-          >
-            <CatIcon className="w-20 h-20 opacity-30" style={{ color: cfg.color }} />
-          </View>
-        )}
-        <View className="absolute inset-0 bg-gradient-to-b from-transparent to-[#020617]" />
-        <Pressable
-          onPress={onClose}
-          className="absolute top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
-        >
-          <ArrowLeft className="w-5 h-5 text-white" />
-        </Pressable>
-      </View>
+          <View className="w-full h-52 flex items-center justify-center" style={{  }}><CatIcon className="w-20 h-20 opacity-30" style={{  }} /></View>
+        )}<View className="absolute inset-0 bg-gradient-to-b from-transparent to-[#020617]" /><Pressable onPress={onClose} className="absolute top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}><ArrowLeft className="w-5 h-5 text-white" /></Pressable></View>
 
-      <View className="flex-1 overflow-y-auto px-5 pb-8" style={{  }}>
-        {/* Category + free */}
-        <View className="flex items-center gap-2 mb-3">
-          <Text
-            className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full text-white"
-            style={{ backgroundColor: cfg.color }}
-          >
-            <CatIcon className="w-3 h-3" />
-            {cfg.label}
-          </Text>
-          {event.isFree ? (
-            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/20"><Text>Gratuit</Text></Badge>
+      <View className="flex-1 overflow-y-auto px-5 pb-8" style={{  }}>{}<View className="flex items-center gap-2 mb-3"><Text className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: cfg.color }}><CatIcon className="w-3 h-3" />{cfg.label}</Text>{event.isFree ? (
+            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/20">Gratuit</Badge>
           ) : (
             <Badge variant="secondary">{event.price}</Badge>
-          )}
-          {event.status === "cancelled" && (
-            <Badge variant="destructive"><Text>Annulé</Text></Badge>
-          )}
-        </View>
-
-        <Text className="text-2xl font-bold text-white mb-2">{event.title}</Text>
-        <Text className="text-sm text-white/60 mb-5 leading-relaxed">{event.description}</Text>
-
-        {/* Info rows */}
-        <View className="space-y-3 mb-5">
-          <View className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
-            <Calendar className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-            <View>
-              <Text className="text-sm text-white font-medium">
-                {format(parseISO(event.startDate), "EEEE d MMMM yyyy", { locale: fr })}
-              </Text>
-              <Text className="text-xs text-white/50">
-                {format(parseISO(event.startDate), "HH:mm", { locale: fr })}
-                {event.endDate && ` → ${format(parseISO(event.endDate), "HH:mm", { locale: fr })}`}
-              </Text>
-              <Text className="text-xs mt-1"><Countdown startDate={event.startDate} /></Text>
-            </View>
-          </View>
-
-          <View className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
-            <MapPin className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-            <View>
-              <Text className="text-sm text-white font-medium">{event.location}</Text>
-              {event.address && <Text className="text-xs text-white/50">{event.address}</Text>}
-            </View>
-          </View>
-
-          <View className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
-            <Users className="w-5 h-5 text-emerald-400 shrink-0" />
-            <View className="flex gap-4">
-              <Text className="text-sm text-white">
-                <strong className="text-emerald-400">{event.attendingCount}</strong>
-                <Text className="text-white/50 text-xs ml-1">participants</Text>
-              </Text>
-              <Text className="text-sm text-white">
-                <strong className="text-amber-400">{event.interestedCount}</strong>
-                <Text className="text-white/50 text-xs ml-1">intéressés</Text>
-              </Text>
-            </View>
-          </View>
-
-          <View className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
-            <Flame className="w-5 h-5 text-orange-400 shrink-0" />
-            <Text className="text-sm text-white/60">Organisé par <strong className="text-white">{event.authorName}</strong></Text>
-          </View>
-        </View>
-
-        {/* Tags */}
-        {event.tags.length > 0 && (
-          <View className="flex flex-wrap gap-2 mb-5">
-            {event.tags.map((t) => (
-              <Text key={t} className="text-xs px-2.5 py-1 rounded-full bg-white/10 text-white/60">
-                #{t}
-              </Text>
-            ))}
-          </View>
-        )}
-
-        {/* Attendee avatars */}
-        {event.attendees.length > 0 && (
-          <View className="mb-5">
-            <Text className="text-xs text-white/40 mb-2">Participants</Text>
-            <View className="flex -space-x-2">
-              {event.attendees.slice(0, 8).map((a, i) => (
+          )}{event.status === "cancelled" && (
+            <Badge variant="destructive">Annulé</Badge>
+          )}</View><Text className="text-2xl font-bold text-white mb-2">{event.title}</Text><Text className="text-sm text-white/60 mb-5 leading-relaxed">{event.description}</Text>{}<View className="space-y-3 mb-5"><View className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}><Calendar className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" /><View><Text className="text-sm text-white font-medium">{format(parseISO(event.startDate), "EEEE d MMMM yyyy", { locale: fr })}</Text><Text className="text-xs text-white/50">{format(parseISO(event.startDate), "HH:mm", { locale: fr })}{event.endDate && ` → ${format(parseISO(event.endDate), "HH:mm", { locale: fr })}`}</Text><Text className="text-xs mt-1"><Countdown startDate={event.startDate} /></Text></View></View><View className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}><MapPin className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" /><View><Text className="text-sm text-white font-medium">{event.location}</Text>{event.address && <Text className="text-xs text-white/50">{event.address}</Text>}</View></View><View className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}><Users className="w-5 h-5 text-emerald-400 shrink-0" /><View className="flex gap-4"><Text className="text-sm text-white"><strong className="text-emerald-400">{event.attendingCount}</strong><Text className="text-white/50 text-xs ml-1">participants</Text></Text><Text className="text-sm text-white"><strong className="text-amber-400">{event.interestedCount}</strong><Text className="text-white/50 text-xs ml-1">intéressés</Text></Text></View></View><View className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}><Flame className="w-5 h-5 text-orange-400 shrink-0" /><Text className="text-sm text-white/60">Organisé par <strong className="text-white">{event.authorName}</strong></Text></View></View>{}{event.tags.length > 0 && (
+          <View className="flex flex-wrap gap-2 mb-5">{event.tags.map((t) => (
+              <Text key={t} className="text-xs px-2.5 py-1 rounded-full bg-white/10 text-white/60">#{t}</Text>
+            ))}</View>
+        )}{}{event.attendees.length > 0 && (
+          <View className="mb-5"><Text className="text-xs text-white/40 mb-2">Participants</Text><View className="flex -space-x-2">{event.attendees.slice(0, 8).map((a, i) => (
                 a.avatar ? (
-                  <Image key={i}
-                    className="w-8 h-8 rounded-full border-2 border-[#020617] object-cover"  source={{ uri: a.avatar }} accessibilityLabel={a.name}/>
+                  <Image key={i} className="w-8 h-8 rounded-full border-2 border-[#020617] object-cover" source={{ uri: a.avatar }} accessibilityLabel={a.name} />
                 ) : (
-                  <View key={i}
-                    className="w-8 h-8 rounded-full border-2 border-[#020617] flex items-center justify-center text-xs font-bold text-white"
-                    style={{ backgroundColor: `hsl(${i * 47}, 60%, 35%)` }}>
-                    {a.name[0]}
-                  </View>
+                  <View key={i} className="w-8 h-8 rounded-full border-2 border-[#020617] flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: `hsl(${i * 47}, 60%, 35%)` }}>{a.name[0]}</View>
                 )
-              ))}
-              {event.attendingCount > 8 && (
-                <View className="w-8 h-8 rounded-full border-2 border-[#020617] bg-white/10 flex items-center justify-center text-xs text-white/60">
-                  <Text>+</Text>{event.attendingCount - 8}
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* RSVP */}
-        {event.status !== "cancelled" && !isPast(parseISO(event.endDate ?? event.startDate)) && (
+              ))}{event.attendingCount > 8 && (
+                <View className="w-8 h-8 rounded-full border-2 border-[#020617] bg-white/10 flex items-center justify-center text-xs text-white/60"><Text>+</Text>{event.attendingCount - 8}</View>
+              )}</View></View>
+        )}{}{event.status !== "cancelled" && !isPast(parseISO(event.endDate ?? event.startDate)) && (
           <Authenticated>
             <RsvpButtons eventId={eventId} />
           </Authenticated>
-        )}
-        <Unauthenticated>
-          <View className="text-center py-3">
-            <Text className="text-xs text-white/40 mb-2">Connectez-vous pour participer</Text>
-            <SignInButton />
-          </View>
-        </Unauthenticated>
-      </View>
+        )}<Unauthenticated><View className="text-center py-3"><Text className="text-xs text-white/40 mb-2">Connectez-vous pour participer</Text><SignInButton /></View></Unauthenticated></View>
     </View>
   );
 }
@@ -381,9 +207,10 @@ function CreateEventForm({ onClose, onCreated }: { onClose: () => void; onCreate
     tags: "",
   });
 
-  const handleSubmit = async (e: unknown) => {
+  const handleSubmit = async (e: NativeSyntheticEvent<any>) => {
+    e.preventDefault();
     if (!form.title || !form.startDate || !form.location) {
-      UIService.openToast("Remplissez les champs obligatoires", "error");
+      toast.error("Remplissez les champs obligatoires");
       return;
     }
     setLoading(true);
@@ -400,157 +227,32 @@ function CreateEventForm({ onClose, onCreated }: { onClose: () => void; onCreate
         price: !form.isFree && form.price ? form.price : undefined,
         tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       });
-      UIService.openToast("Événement créé !", "success");
+      toast.success("Événement créé !");
       onCreated();
     } catch {
-      UIService.openToast("Erreur lors de la création", "error");
+      toast.error("Erreur lors de la création");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{  }}
-    >
-      <View className="flex items-center gap-3 px-5 pt-12 pb-4 border-b border-white/8 shrink-0">
-        <Pressable
-          onPress={onClose}
-          className="w-10 h-10 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-        >
-          <X className="w-5 h-5 text-white" />
-        </Pressable>
-        <Text className="text-lg font-bold text-white flex-1">Créer un événement</Text>
-        <Button size="sm" onPress={handleSubmit} disabled={loading} className="bg-indigo-600">
-          {loading ? "Création…" : "Publier"}
-        </Button>
-      </View>
+    <View initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }} className="fixed inset-0 z-50 flex flex-col" style={{  }}>
+      <View className="flex items-center gap-3 px-5 pt-12 pb-4 border-b border-white/8 shrink-0"><Pressable onPress={onClose} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><X className="w-5 h-5 text-white" /></Pressable><Text className="text-lg font-bold text-white flex-1">Créer un événement</Text><Button size="sm" onPress={handleSubmit} disabled={loading} className="bg-indigo-600">{loading ? "Création…" : "Publier"}</Button></View>
 
-      <View className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{  }}>
-        <View>
-          <Label className="text-white/70 text-xs mb-1 block"><Text>Titre *</Text></Label>
-          <Input
-            value={form.title}
-            onChange={(text) => setForm((f) => ({ ...f, title: text }))}
-            placeholder="Nom de l'événement"
-            className="bg-white/8 border-white/10 text-white placeholder:text-white/30"
-          />
-        </View>
-
-        <View>
-          <Label className="text-white/70 text-xs mb-1 block"><Text>Description</Text></Label>
-          <Textarea
-            value={form.description}
-            onChange={(text) => setForm((f) => ({ ...f, description: text }))}
-            placeholder="Décrivez l'événement…"
-            rows={3}
-            className="bg-white/8 border-white/10 text-white placeholder:text-white/30"
-          />
-        </View>
-
-        {/* Category picker */}
-        <View>
-          <Label className="text-white/70 text-xs mb-2 block"><Text>Catégorie</Text></Label>
-          <View className="gap-2">
-            {CATEGORIES.map((cat) => {
+      <View className="flex-1 overflow-y-auto px-5 py-4 space-y-4" style={{  }}><View><Label className="text-white/70 text-xs mb-1 block">Titre *</Label><Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Nom de l'événement" className="bg-white/8 border-white/10 text-white placeholder:text-white/30" /></View><View><Label className="text-white/70 text-xs mb-1 block">Description</Label><Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Décrivez l'événement…" rows={3} className="bg-white/8 border-white/10 text-white placeholder:text-white/30" /></View>{}<View><Label className="text-white/70 text-xs mb-2 block">Catégorie</Label><View className="gap-2">{CATEGORIES.map((cat) => {
               const Icon = cat.icon;
               return (
-                <Pressable
-                  key={cat.id}
-                 
-                  onPress={() => setForm((f) => ({ ...f, category: cat.id }))}
-                  className={cn(
+                <Pressable key={cat.id} onPress={() => setForm((f) => ({ ...f, category: cat.id }))} className={cn(
                     "flex flex-col items-center gap-1 p-2 rounded-xl border cursor-pointer transition-all text-xs",
                     form.category === cat.id
                       ? "border-transparent text-white"
                       : "border-white/10 text-white/40 bg-white/5"
-                  )}
-                  style={form.category === cat.id ? { backgroundColor: cat.color + "33", borderColor: cat.color } : {}}
-                >
-                  <Icon className="w-4 h-4" style={form.category === cat.id ? { color: cat.color } : {}} />
-                  {cat.label}
-                </Pressable>
+                  )} style={form.category === cat.id ? { backgroundColor: cat.color + "33", borderColor: cat.color } : {}}><Icon className="w-4 h-4" style={form.category === cat.id ? {  } : {}} />{cat.label}</Pressable>
               );
-            })}
-          </View>
-        </View>
-
-        <View className="gap-3">
-          <View>
-            <Label className="text-white/70 text-xs mb-1 block"><Text>Date début *</Text></Label>
-            <Input
-              type="datetime-local"
-              value={form.startDate}
-              onChange={(text) => setForm((f) => ({ ...f, startDate: text }))}
-              className="bg-white/8 border-white/10 text-white"
-            />
-          </View>
-          <View>
-            <Label className="text-white/70 text-xs mb-1 block"><Text>Date fin</Text></Label>
-            <Input
-              type="datetime-local"
-              value={form.endDate}
-              onChange={(text) => setForm((f) => ({ ...f, endDate: text }))}
-              className="bg-white/8 border-white/10 text-white"
-            />
-          </View>
-        </View>
-
-        <View>
-          <Label className="text-white/70 text-xs mb-1 block"><Text>Lieu *</Text></Label>
-          <Input
-            value={form.location}
-            onChange={(text) => setForm((f) => ({ ...f, location: text }))}
-            placeholder="Ville, quartier…"
-            className="bg-white/8 border-white/10 text-white placeholder:text-white/30"
-          />
-        </View>
-
-        <View>
-          <Label className="text-white/70 text-xs mb-1 block"><Text>Adresse précise</Text></Label>
-          <Input
-            value={form.address}
-            onChange={(text) => setForm((f) => ({ ...f, address: text }))}
-            placeholder="Rue, numéro…"
-            className="bg-white/8 border-white/10 text-white placeholder:text-white/30"
-          />
-        </View>
-
-        <View className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
-          <View>
-            <Text className="text-sm text-white font-medium">Entrée gratuite</Text>
-            <Text className="text-xs text-white/40">Désactivez pour indiquer un prix</Text>
-          </View>
-          <Switch
-            checked={form.isFree}
-            onCheckedChange={(v) => setForm((f) => ({ ...f, isFree: v }))}
-          />
-        </View>
-
-        {!form.isFree && (
-          <View>
-            <Label className="text-white/70 text-xs mb-1 block"><Text>Prix</Text></Label>
-            <Input
-              value={form.price}
-              onChange={(text) => setForm((f) => ({ ...f, price: text }))}
-              placeholder="ex: 2000 FCFA"
-              className="bg-white/8 border-white/10 text-white placeholder:text-white/30"
-            />
-          </View>
-        )}
-
-        <View>
-          <Label className="text-white/70 text-xs mb-1 block"><Text>Tags (séparés par des virgules)</Text></Label>
-          <Input
-            value={form.tags}
-            onChange={(text) => setForm((f) => ({ ...f, tags: text }))}
-            placeholder="musique, culture, gratuit…"
-            className="bg-white/8 border-white/10 text-white placeholder:text-white/30"
-          />
-        </View>
-      </View>
+            })}</View></View><View className="gap-3"><View><Label className="text-white/70 text-xs mb-1 block">Date début *</Label><Input type="datetime-local" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} className="bg-white/8 border-white/10 text-white" /></View><View><Label className="text-white/70 text-xs mb-1 block">Date fin</Label><Input type="datetime-local" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} className="bg-white/8 border-white/10 text-white" /></View></View><View><Label className="text-white/70 text-xs mb-1 block">Lieu *</Label><Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} placeholder="Ville, quartier…" className="bg-white/8 border-white/10 text-white placeholder:text-white/30" /></View><View><Label className="text-white/70 text-xs mb-1 block">Adresse précise</Label><Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="Rue, numéro…" className="bg-white/8 border-white/10 text-white placeholder:text-white/30" /></View><View className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}><View><Text className="text-sm text-white font-medium">Entrée gratuite</Text><Text className="text-xs text-white/40">Désactivez pour indiquer un prix</Text></View><Switch  onCheckedChange={(v) => setForm((f) => ({ ...f, isFree: v }))} /></View>{!form.isFree && (
+          <View><Label className="text-white/70 text-xs mb-1 block">Prix</Label><Input value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} placeholder="ex: 2000 FCFA" className="bg-white/8 border-white/10 text-white placeholder:text-white/30" /></View>
+        )}<View><Label className="text-white/70 text-xs mb-1 block">Tags (séparés par des virgules)</Label><Input value={form.tags} onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))} placeholder="musique, culture, gratuit…" className="bg-white/8 border-white/10 text-white placeholder:text-white/30" /></View></View>
     </View>
   );
 }
@@ -569,68 +271,20 @@ function AgendaView({ events, onSelect }: { events: EventItem[]; onSelect: (id: 
 
   if (sortedDates.length === 0) {
     return (
-      <View className="flex flex-col items-center justify-center py-16 px-6 text-center">
-        <Calendar className="w-12 h-12 text-white/20 mb-3" />
-        <Text className="text-white/40 text-sm">Aucun événement à venir</Text>
-        <Text className="text-white/25 text-xs mt-1">Créez le premier !</Text>
-      </View>
+      <View className="flex flex-col items-center justify-center py-16 px-6 text-center"><Calendar className="w-12 h-12 text-white/20 mb-3" /><Text className="text-white/40 text-sm">Aucun événement à venir</Text><Text className="text-white/25 text-xs mt-1">Créez le premier !</Text></View>
     );
   }
 
   return (
-    <View className="space-y-6 px-5 pb-8">
-      {sortedDates.map((date) => (
-        <View key={date}>
-          {/* Date header */}
-          <View className="flex items-center gap-3 mb-3">
-            <View className="flex flex-col items-center w-10">
-              <Text className="text-xs text-white/40 uppercase">
-                {format(parseISO(date), "MMM", { locale: fr })}
-              </Text>
-              <Text className="text-2xl font-bold text-white leading-none">
-                {format(parseISO(date), "d")}
-              </Text>
-            </View>
-            <View className="flex-1 h-px bg-white/10" />
-            <Text className="text-xs text-white/30">
-              {format(parseISO(date), "EEEE", { locale: fr })}
-            </Text>
-          </View>
-          {/* Events on this date */}
-          <View className="space-y-2 pl-12">
-            {byDate[date].map((event) => {
+    <View className="space-y-6 px-5 pb-8">{sortedDates.map((date) => (
+        <View key={date}>{}<View className="flex items-center gap-3 mb-3"><View className="flex flex-col items-center w-10"><Text className="text-xs text-white/40 uppercase">{format(parseISO(date), "MMM", { locale: fr })}</Text><Text className="text-2xl font-bold text-white leading-none">{format(parseISO(date), "d")}</Text></View><View className="flex-1 h-px bg-white/10" /><Text className="text-xs text-white/30">{format(parseISO(date), "EEEE", { locale: fr })}</Text></View>{}<View className="space-y-2 pl-12">{byDate[date].map((event) => {
               const cfg = getCatConfig(event.category);
               const CatIcon = cfg.icon;
               return (
-                <Pressable
-                  key={event._id}
-                  onPress={() => onSelect(event._id)}
-                  className="w-full text-left flex items-center gap-3 p-3 rounded-xl"
-                  style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                >
-                  <View
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: cfg.color + "22" }}
-                  >
-                    <CatIcon className="w-5 h-5" style={{ color: cfg.color }} />
-                  </View>
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-sm font-medium text-white truncate">{event.title}</Text>
-                    <Text className="text-xs text-white/40 truncate">
-                      {format(parseISO(event.startDate), "HH:mm")} · {event.location}
-                    </Text>
-                  </View>
-                  <View className="flex flex-col items-end gap-1 shrink-0">
-                    <Countdown startDate={event.startDate} />
-                    <Text className="text-xs text-white/30">{event.attendingCount} part.</Text>
-                  </View>
-                </Pressable>
+                <Pressable key={event._id} onPress={() => onSelect(event._id)} className="w-full text-left flex items-center gap-3 p-3 rounded-xl active:scale-[0.98] transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: cfg.color + "22" }}><CatIcon className="w-5 h-5" style={{  }} /></View><View className="flex-1 min-w-0"><Text className="text-sm font-medium text-white truncate">{event.title}</Text><Text className="text-xs text-white/40 truncate">{format(parseISO(event.startDate), "HH:mm")}· {event.location}</Text></View><View className="flex flex-col items-end gap-1 shrink-0"><Countdown startDate={event.startDate} /><Text className="text-xs text-white/30">{event.attendingCount}part.</Text></View></Pressable>
               );
-            })}
-          </View>
-        </View>
-      ))}
-    </View>
+            })}</View></View>
+      ))}</View>
   );
 }
 
@@ -640,52 +294,21 @@ function MyAgenda({ onSelect }: { onSelect: (id: Id<"events">) => void }) {
   const myEvents = useQuery(api.events.listAttending, {});
 
   if (!myEvents) return (
-    <View className="space-y-3 px-5">
-      {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
-    </View>
+    <View className="space-y-3 px-5">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</View>
   );
 
   if (myEvents.length === 0) return (
-    <View className="flex flex-col items-center justify-center py-16 px-6 text-center">
-      <Ticket className="w-12 h-12 text-white/20 mb-3" />
-      <Text className="text-white/40 text-sm">Aucun événement dans votre agenda</Text>
-      <Text className="text-white/25 text-xs mt-1">Participez à des événements pour les retrouver ici</Text>
-    </View>
+    <View className="flex flex-col items-center justify-center py-16 px-6 text-center"><Ticket className="w-12 h-12 text-white/20 mb-3" /><Text className="text-white/40 text-sm">Aucun événement dans votre agenda</Text><Text className="text-white/25 text-xs mt-1">Participez à des événements pour les retrouver ici</Text></View>
   );
 
   return (
-    <View className="space-y-2 px-5 pb-8">
-      {myEvents.map((event) => {
+    <View className="space-y-2 px-5 pb-8">{myEvents.map((event) => {
         const cfg = getCatConfig(event.category);
         const CatIcon = cfg.icon;
         return (
-          <Pressable
-            key={event._id}
-            onPress={() => onSelect(event._id)}
-            className="w-full text-left flex items-center gap-3 p-3 rounded-xl"
-            style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-          >
-            <View
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-              style={{ backgroundColor: cfg.color + "22" }}
-            >
-              <CatIcon className="w-5 h-5" style={{ color: cfg.color }} />
-            </View>
-            <View className="flex-1 min-w-0">
-              <Text className="text-sm font-medium text-white truncate">{event.title}</Text>
-              <View className="flex items-center gap-2 text-xs text-white/40">
-                <Calendar className="w-3 h-3" />
-                {format(parseISO(event.startDate), "d MMM · HH:mm", { locale: fr })}
-                <Text>·</Text>
-                <MapPin className="w-3 h-3" />
-                {event.location}
-              </View>
-            </View>
-            <Countdown startDate={event.startDate} />
-          </Pressable>
+          <Pressable key={event._id} onPress={() => onSelect(event._id)} className="w-full text-left flex items-center gap-3 p-3 rounded-xl active:scale-[0.98] transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: cfg.color + "22" }}><CatIcon className="w-5 h-5" style={{  }} /></View><View className="flex-1 min-w-0"><Text className="text-sm font-medium text-white truncate">{event.title}</Text><View className="flex items-center gap-2 text-xs text-white/40"><Calendar className="w-3 h-3" />{format(parseISO(event.startDate), "d MMM · HH:mm", { locale: fr })}<Text>·</Text><MapPin className="w-3 h-3" />{event.location}</View></View><Countdown startDate={event.startDate} /></Pressable>
         );
-      })}
-    </View>
+      })}</View>
   );
 }
 
@@ -715,106 +338,37 @@ export default function EventsAgendaPage({ onBack }: EventsAgendaPageProps) {
   }) ?? [];
 
   return (
-    <View
-      className="h-full w-full flex flex-col overflow-hidden"
-      style={{  }}
-    >
-      {/* Header */}
-      <View className="shrink-0 px-5 pt-12 pb-3">
-        <View className="flex items-center gap-3 mb-4">
-          <Pressable
-            onPress={onBack}
-            className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-          >
-            <ArrowLeft className="w-5 h-5 text-white" />
-          </Pressable>
-          <View className="flex-1">
-            <Text className="text-xl font-bold text-white">Événements</Text>
-            <Text className="text-xs text-white/40">Agenda communautaire</Text>
-          </View>
-          <Pressable
-            onPress={() => setShowFilters((v) => !v)}
-            className={cn(
+    <View className="h-full w-full flex flex-col overflow-hidden" style={{  }}>{}<View className="shrink-0 px-5 pt-12 pb-3"><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft className="w-5 h-5 text-white" /></Pressable><View className="flex-1"><Text className="text-xl font-bold text-white">Événements</Text><Text className="text-xs text-white/40">Agenda communautaire</Text></View><Pressable onPress={() => setShowFilters((v) => !v)} className={cn(
               "w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer transition-all",
               showFilters ? "bg-indigo-500/30" : "bg-white/8"
-            )}
-          >
-            <Filter className="w-4 h-4 text-white" />
-          </Pressable>
-          {isAuthenticated && (
-            <Pressable
-              onPress={() => setShowCreate(true)}
-              className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{  }}
-            >
-              <Plus className="w-5 h-5 text-white" />
-            </Pressable>
-          )}
-        </View>
-
-        {/* Category filters */}
-        <>
-          {showFilters && (
-            <View
-              className="overflow-hidden mb-3"
-            >
-              <View className="flex gap-2 overflow-x-auto pb-2" style={{  }}>
-                <Pressable
-                  onPress={() => setFilterCat(null)}
-                  className={cn(
+            )}><Filter className="w-4 h-4 text-white" /></Pressable>{isAuthenticated && (
+            <Pressable onPress={() => setShowCreate(true)} className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90 transition-transform" style={{ boxShadow: "0 4px 20px rgba(99,102,241,0.4)" }}><Plus className="w-5 h-5 text-white" /></Pressable>
+          )}</View>{}<View>{showFilters && (
+            <View initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-3">
+              <View className="flex gap-2 overflow-x-auto pb-2" style={{  }}><Pressable onPress={() => setFilterCat(null)} className={cn(
                     "shrink-0 text-xs px-3 py-1.5 rounded-full border cursor-pointer transition-all",
                     !filterCat ? "bg-white/15 border-white/30 text-white" : "border-white/10 text-white/40 bg-white/5"
-                  )}
-                >
-                  <Text>Tous</Text></Pressable>
-                {CATEGORIES.map((cat) => {
+                  )}><Text>Tous</Text></Pressable>{CATEGORIES.map((cat) => {
                   const Icon = cat.icon;
                   return (
-                    <Pressable
-                      key={cat.id}
-                      onPress={() => setFilterCat(filterCat === cat.id ? null : cat.id)}
-                      className={cn(
+                    <Pressable key={cat.id} onPress={() => setFilterCat(filterCat === cat.id ? null : cat.id)} className={cn(
                         "shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border cursor-pointer transition-all",
                         filterCat === cat.id ? "text-white border-transparent" : "border-white/10 text-white/40 bg-white/5"
-                      )}
-                      style={filterCat === cat.id ? { backgroundColor: cat.color, borderColor: cat.color } : {}}
-                    >
-                      <Icon className="w-3 h-3" />
-                      {cat.label}
-                    </Pressable>
+                      )} style={filterCat === cat.id ? { backgroundColor: cat.color, borderColor: cat.color } : {}}><Icon className="w-3 h-3" />{cat.label}</Pressable>
                   );
-                })}
-              </View>
+                })}</View>
             </View>
-          )}
-        </>
-
-        {/* Tabs */}
-        <View className="flex gap-1 p-1 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
-          {TABS.map((t) => (
-            <Pressable
-              key={t.id}
-              onPress={() => setTab(t.id as typeof tab)}
-              className={cn(
+          )}</View>{}<View className="flex gap-1 p-1 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>{TABS.map((t) => (
+            <Pressable key={t.id} onPress={() => setTab(t.id as typeof tab)} className={cn(
                 "flex-1 text-xs py-2 rounded-xl cursor-pointer transition-all font-medium",
                 tab === t.id ? "bg-indigo-600 text-white" : "text-white/50 hover:text-white/80"
-              )}
-            >
-              {t.label}
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Content */}
-      <View className="flex-1 overflow-y-auto" style={{  }}>
-        {tab === "upcoming" && (
+              )}>{t.label}</Pressable>
+          ))}</View></View>{}<View className="flex-1 overflow-y-auto" style={{  }}>{tab === "upcoming" && (
           <View className="px-5 pb-8 space-y-4 pt-3">
             {!events.length ? (
               <View className="flex flex-col items-center justify-center py-16 text-center">
                 <Calendar className="w-12 h-12 text-white/20 mb-3" />
-                <Text className="text-white/40 text-sm"><Text>Aucun événement à venir</Text></Text>
+                <Text className="text-white/40 text-sm">Aucun événement à venir</Text>
               </View>
             ) : (
               events.map((event) => (
@@ -822,15 +376,11 @@ export default function EventsAgendaPage({ onBack }: EventsAgendaPageProps) {
               ))
             )}
           </View>
-        )}
-
-        {tab === "agenda" && (
+        )}{tab === "agenda" && (
           <View className="pt-3">
             <AgendaView events={events} onSelect={setSelectedEvent} />
           </View>
-        )}
-
-        {tab === "mine" && (
+        )}{tab === "mine" && (
           <View className="pt-3">
             <Authenticated>
               <MyAgenda onSelect={setSelectedEvent} />
@@ -838,30 +388,18 @@ export default function EventsAgendaPage({ onBack }: EventsAgendaPageProps) {
             <Unauthenticated>
               <View className="flex flex-col items-center justify-center py-16 gap-3">
                 <Ticket className="w-12 h-12 text-white/20" />
-                <Text className="text-white/40 text-sm"><Text>Connectez-vous pour voir votre agenda</Text></Text>
+                <Text className="text-white/40 text-sm">Connectez-vous pour voir votre agenda</Text>
                 <SignInButton />
               </View>
             </Unauthenticated>
           </View>
-        )}
-      </View>
-
-      {/* Event detail */}
-      <>
-        {selectedEvent && (
+        )}</View>{}<View>{selectedEvent && (
           <EventDetail eventId={selectedEvent} onClose={() => setSelectedEvent(null)} />
-        )}
-      </>
-
-      {/* Create form */}
-      <>
-        {showCreate && (
+        )}</View>{}<View>{showCreate && (
           <CreateEventForm
             onClose={() => setShowCreate(false)}
             onCreated={() => setShowCreate(false)}
           />
-        )}
-      </>
-    </View>
+        )}</View></View>
   );
 }

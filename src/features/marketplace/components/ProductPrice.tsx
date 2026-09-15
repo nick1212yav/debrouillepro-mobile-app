@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/marketplace/components/ProductPrice.tsx
 import { formatPrice } from "../utils/formatter";
 import { applyDiscount, discountAmount } from "../utils/pricing";
@@ -22,30 +23,22 @@ export function ProductPrice({
   const hasDiscount = discountPercent > 0;
 
   return (
-    <View className="space-y-1">
-      <View className="flex items-end gap-3">
-        <Text className="text-3xl font-black text-white">
-          {formatPrice(finalPrice, product.currency)}
-        </Text>
-        {hasDiscount && showOriginal && (
+    <View className="space-y-1"><View className="flex items-end gap-3"><Text className="text-3xl font-black text-white">{formatPrice(finalPrice, product.currency)}</Text>{hasDiscount && showOriginal && (
           <Text className="text-sm text-white/40 line-through">
             {formatPrice(product.price, product.currency)}
           </Text>
-        )}
-        {hasDiscount && (
+        )}{hasDiscount && (
           <Text className="text-sm font-bold text-green-400">
-            <Text>-</Text>{discountPercent}<Text>%</Text></Text>
-        )}
-      </View>
-      {hasDiscount && (
+            -{discountPercent}%
+          </Text>
+        )}</View>{hasDiscount && (
         <Text className="text-xs text-white/40">
-          <Text>Économisez</Text>{" "}
+          Économisez{" "}
           {formatPrice(
             discountAmount(product.price, discountPercent),
             product.currency,
           )}
         </Text>
-      )}
-    </View>
+      )}</View>
   );
 }

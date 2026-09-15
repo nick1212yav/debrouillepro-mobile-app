@@ -19,17 +19,13 @@ export const AccommodationDescription: React.FC<
 
   return (
     <View className="p-4 md:p-6 border-b border-white/5 flex flex-col gap-3">
-      <Text className="text-white font-semibold text-sm">
-        À propos de ce logement
+      <Text className="text-white font-semibold text-sm">À propos de ce logement
       </Text>
       <Text className="text-sm leading-relaxed text-white/70">
         {isLong ? displayDescription : description}
       </Text>
       {isLong && (
-        <Pressable
-          onPress={() => setIsExpanded(!isExpanded)}
-          className="self-start inline-flex items-center gap-1 text-xs font-semibold text-indigo-400 mt-1"
-        >
+        <Pressable onPress={() => setIsExpanded(!isExpanded)} className="self-start inline-flex items-center gap-1 text-xs font-semibold text-indigo-400 mt-1">
           {isExpanded ? (
             <>
               <Text>Voir moins</Text>

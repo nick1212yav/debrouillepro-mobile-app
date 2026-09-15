@@ -15,9 +15,7 @@ export function AgriRating({
   className = "",
 }: AgriRatingProps) {
   return (
-    <View
-      className={`flex items-center gap-1 text-[10px] text-white/60 ${className}`}
-    >
+    <View className={`flex items-center gap-1 text-[10px] text-white/60 ${className}`}>
       <Star
         size={11}
         className="fill-yellow-500 text-yellow-500 flex-shrink-0"

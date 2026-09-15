@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/sante/hooks/useDoctorBooking.ts
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Appointment } from "../types/appointment.types";
 import type { Id } from "@/convex/_generated/dataModel";
 import { appointmentSchema } from "../validators/appointment.validator";
@@ -24,10 +23,10 @@ export function useDoctorBooking() {
         date: data.date?.toISOString(),
         notes: data.notes,
       });
-      UIService.openToast("Rendez-vous confirmé !", "success");
+      toast.success("Rendez-vous confirmé !");
       return appointmentSchema.parse(result);
     } catch (e) {
-      UIService.openToast(e instanceof Error ? e.message : "Erreur", "error");
+      toast.error(e instanceof Error ? e.message : "Erreur");
       throw e;
     }
   };

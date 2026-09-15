@@ -1,5 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/services/profile.service.ts
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -9,6 +7,7 @@ import type {
   ProfileUpdatePayload,
   ProfileVisibility,
 } from "../types/profile.types";
+import { toast } from "sonner";
 
 /**
  * Service pour la gestion des profils utilisateur.
@@ -52,10 +51,10 @@ export class ProfileService {
     try {
       // ✅ Correction : retrait de 'email' dans le payload de mise à jour [1]
       await updateFn(payload);
-      UIService.openToast("Profil mis à jour", "success");
+      toast.success("Profil mis à jour");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la mise à jour du profil", "error");
+      toast.error("Erreur lors de la mise à jour du profil");
       return false;
     }
   }
@@ -69,10 +68,10 @@ export class ProfileService {
   ): Promise<boolean> {
     try {
       await updateFn({ visibility });
-      UIService.openToast("Visibilité mise à jour", "success");
+      toast.success("Visibilité mise à jour");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la mise à jour de la visibilité", "error");
+      toast.error("Erreur lors de la mise à jour de la visibilité");
       return false;
     }
   }
@@ -87,10 +86,10 @@ export class ProfileService {
   ): Promise<string | null> {
     try {
       const result = await uploadFn({ file, type });
-      UIService.openToast("Image mise à jour", "success");
+      toast.success("Image mise à jour");
       return result.url;
     } catch {
-      UIService.openToast("Erreur lors du téléchargement", "error");
+      toast.error("Erreur lors du téléchargement");
       return null;
     }
   }

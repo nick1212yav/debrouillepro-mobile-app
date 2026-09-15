@@ -19,12 +19,7 @@ export function PhoneCountrySelector({
 
   return (
     <View className="relative">
-      <Pressable
-        onPress={() => setOpen(!open)}
-        disabled={disabled}
-        className="flex items-center gap-2 px-3 py-3 rounded-2xl text-white text-sm font-medium"
-        style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-      >
+      <Pressable onPress={() => setOpen(!open)} disabled={disabled} className="flex items-center gap-2 px-3 py-3 rounded-2xl text-white text-sm font-medium transition-all active:scale-95" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
         <Text className="text-lg">{selected.flag}</Text>
         <Text>{selected.code}</Text>
         <ChevronDown size={14} className="text-white/40" />
@@ -32,20 +27,13 @@ export function PhoneCountrySelector({
 
       {open && (
         <>
-          <Pressable className="fixed inset-0 z-40" onPress={() => setOpen(false)} />
-          <View
-            className="absolute top-full left-0 z-50 mt-1 w-64 max-h-60 overflow-y-auto rounded-2xl p-1"
-            style={{ backgroundColor: "#1a1a2e", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-          >
+          <View className="fixed inset-0 z-40" onPress={() => setOpen(false)} />
+          <View className="absolute top-full left-0 z-50 mt-1 w-64 max-h-60 overflow-y-auto rounded-2xl p-1" style={{ backgroundColor: "#1a1a2e", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
             {COUNTRIES.map((c) => (
-              <Pressable
-                key={c.iso}
-                onPress={() => {
+              <Pressable key={c.iso} onPress={() => {
                   onChange(c.code);
                   setOpen(false);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left text-sm text-white/80"
-              >
+                }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left text-sm text-white/80 transition-colors">
                 <Text className="text-lg">{c.flag}</Text>
                 <Text>{c.label}</Text>
                 <Text className="text-white/40">{c.code}</Text>

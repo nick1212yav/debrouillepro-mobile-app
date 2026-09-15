@@ -1,6 +1,6 @@
 import { SvgProps } from "react-native-svg";
 import { Loader2Icon } from "lucide-react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 function Spinner({ className, ...props }: SvgProps) {
   return (

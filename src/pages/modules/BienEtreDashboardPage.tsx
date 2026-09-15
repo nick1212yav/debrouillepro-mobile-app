@@ -1,574 +1,753 @@
-import { Pressable, View, Text } from "react-native";
-import { useState, useMemo } from "react";
+import React, { memo, useMemo, useState } from "react";
 import {
-  ArrowLeft, Dumbbell, Salad, Moon, Heart, TrendingUp,
-  Flame, Target, ChevronRight, Sparkles, CheckCircle2,
-  BarChart2, Calendar, Award, Zap, Sun, Wind,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import {
+  ArrowLeft,
+  Award,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Dumbbell,
+  Flame,
+  Heart,
+  Moon,
+  Ruler,
+  Salad,
+  Sparkles,
+  Target,
+  TrendingUp,
+  Wind,
+  Zap,
 } from "lucide-react-native";
-import {
-  RadialBarChart, RadialBar, ResponsiveContainer,
-  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
-  AreaChart, Area,
-} from "recharts";
 import { useQuery } from "convex/react";
+
 import { api } from "@/convex/_generated/api.js";
-import { Authenticated, Unauthenticated } from "@/lib/convex-auth-compat";
-import { SignInButton } from "@/components/ui/signin";
 
-// ─── Types & helpers ──────────────────────────────────────────────────────────
+type TabId = "overview" | "progress" | "goals" | "recs";
 
-type GoalStatus = "on_track" | "behind" | "done";
+type Props = {
+  onBack: () => void;
+  onNavigate: (page: string) => void;
+};
 
-interface SmartGoal {
-  id: string;
+type HealthSummary = {
+  workoutCount?: number;
+  meditationCount?: number;
+  [key: string]: unknown;
+};
+
+type MetricConfig = {
   label: string;
-  target: number;
-  current: number;
-  unit: string;
-  color: string;
-  module: "fitness" | "nutrition" | "meditation";
-  status: GoalStatus;
-}
+  value: string;
+  icon: typeof Dumbbell;
+  accent: string;
+  available: boolean;
+};
 
-interface DayData {
-  day: string;
-  fitness: number;
-  nutrition: number;
-  meditation: number;
-  score: number;
-}
-
-// Read data from localStorage written by fitness/nutrition/meditation pages
-function readFitnessData() {
-  try {
-    const raw = localStorage.getItem("fitness_data");
-    if (raw) return JSON.parse(raw) as { completedWorkouts?: string[]; streak?: number; totalCalories?: number };
-  } catch { /* empty */ }
-  return { completedWorkouts: [], streak: 5, totalCalories: 2340 };
-}
-
-function readNutritionData() {
-  try {
-    const raw = localStorage.getItem("nutrition_data");
-    if (raw) return JSON.parse(raw) as { streak?: number; waterGlasses?: number; mealLog?: unknown[] };
-  } catch { /* empty */ }
-  return { streak: 4, waterGlasses: 6, mealLog: [] };
-}
-
-function readMeditationData() {
-  try {
-    const raw = localStorage.getItem("meditation_data");
-    if (raw) return JSON.parse(raw) as { streak?: number; totalMinutes?: number; completedSessions?: string[] };
-  } catch { /* empty */ }
-  return { streak: 3, totalMinutes: 95, completedSessions: [] };
-}
-
-function scoreFor(v: number, max: number) {
-  return Math.min(100, Math.round((v / max) * 100));
-}
-
-// Fake 30-day history for chart (seeded from current streaks)
-function build30Days(fStreak: number, nStreak: number, mStreak: number): DayData[] {
-  const labels = ["1/5","2/5","3/5","4/5","5/5","6/5","7/5","8/5","9/5","10/5",
-    "11/5","12/5","13/5","14/5","15/5","16/5","17/5","18/5","19/5","20/5",
-    "21/5","22/5","23/5","24/5","25/5","26/5","27/5","28/5","29/5","30/5"];
-  return labels.map((day, i) => {
-    const base = i / 30;
-    const f = Math.min(100, Math.round(20 + base * 60 + (fStreak * 3) + Math.sin(i) * 10));
-    const n = Math.min(100, Math.round(30 + base * 50 + (nStreak * 3) + Math.cos(i) * 8));
-    const m = Math.min(100, Math.round(15 + base * 55 + (mStreak * 3) + Math.sin(i * 1.3) * 12));
-    return { day, fitness: f, nutrition: n, meditation: m, score: Math.round((f + n + m) / 3) };
-  });
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function ScoreRing({ score, color, size = 100 }: { score: number; color: string; size?: number }) {
-  const r = size / 2 - 10;
-  const circ = 2 * Math.PI * r;
-  return (
-    <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={8} />
-      <motion.circle
-        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={8}
-        strokeLinecap="round"
-        strokeDasharray={`${circ}`}
-      />
-    </svg>
-  );
-}
-
-function ModuleCard({
-  icon: Icon, label, color, streak, score, detail, onClick,
-}: {
-  icon: typeof Dumbbell; label: string; color: string; streak: number; score: number; detail: string; onClick: () => void;
-}) {
-  return (
-    <Pressable onPress={onClick}
-      className="flex-1 rounded-2xl p-4 flex flex-col gap-3 text-left relative overflow-hidden"
-      style={{ borderStyle: "solid" }}>
-      <View className="flex items-center justify-between">
-        <View className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}25` }}>
-          <Icon size={18} style={{ color }} />
-        </View>
-        <View className="relative" style={{ width: 44, height: 44 }}>
-          <ScoreRing score={score} color={color} size={44} />
-          <Text className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">{score}</Text>
-        </View>
-      </View>
-      <View>
-        <Text className="text-white font-semibold text-sm">{label}</Text>
-        <Text className="text-white/50 text-xs">{detail}</Text>
-      </View>
-      <View className="flex items-center gap-1">
-        <Flame size={11} className="text-orange-400" />
-        <Text className="text-orange-300 text-xs font-medium">{streak}j</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-// ─── Recommendation card ─────────────────────────────────────────────────────
-
-const AI_RECS = [
-  { emoji: "💧", text: "Buvez encore 2 verres d'eau pour atteindre votre objectif d'hydratation.", color: "#3B82F6", tag: "Nutrition" },
-  { emoji: "🧘", text: "Une session de méditation de 10 min avant le coucher améliorera votre récupération.", color: "#8B5CF6", tag: "Méditation" },
-  { emoji: "🏃", text: "30 min de marche rapide aujourd'hui compléterait votre semaine fitness.", color: "#E17055", tag: "Fitness" },
-  { emoji: "🥗", text: "Votre apport en protéines est un peu faible — pensez aux légumineuses.", color: "#10B981", tag: "Nutrition" },
-  { emoji: "🌬️", text: "2 cycles de cohérence cardiaque peuvent réduire votre niveau de stress perçu.", color: "#6366F1", tag: "Respiration" },
+const TABS: Array<{
+  id: TabId;
+  label: string;
+  icon: typeof BarChart3;
+}> = [
+  {
+    id: "overview",
+    label: "Vue d'ensemble",
+    icon: BarChart3,
+  },
+  {
+    id: "progress",
+    label: "Progression",
+    icon: TrendingUp,
+  },
+  {
+    id: "goals",
+    label: "Objectifs",
+    icon: Target,
+  },
+  {
+    id: "recs",
+    label: "Conseils",
+    icon: Sparkles,
+  },
 ];
 
-// ─── SMART Goals ─────────────────────────────────────────────────────────────
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
 
-function GoalBar({ goal }: { goal: SmartGoal }) {
-  const pct = Math.min(100, Math.round((goal.current / goal.target) * 100));
-  const statusColor = goal.status === "done" ? "#10B981" : goal.status === "on_track" ? goal.color : "#EF4444";
+  return null;
+}
+
+function formatNumber(value: number | null): string {
+  if (value === null) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("fr-FR").format(value);
+}
+
+function getScore(values: Array<number | null>): number | null {
+  const available = values.filter(
+    (value): value is number =>
+      typeof value === "number" && Number.isFinite(value),
+  );
+
+  if (available.length === 0) {
+    return null;
+  }
+
+  return Math.round(
+    available.reduce((sum, value) => sum + value, 0) / available.length,
+  );
+}
+
+function getScorePresentation(score: number | null) {
+  if (score === null) {
+    return {
+      label: "Données insuffisantes",
+      accent: "#64748B",
+    };
+  }
+
+  if (score >= 80) {
+    return {
+      label: "Excellent",
+      accent: "#10B981",
+    };
+  }
+
+  if (score >= 60) {
+    return {
+      label: "Bien",
+      accent: "#8B5CF6",
+    };
+  }
+
+  if (score >= 40) {
+    return {
+      label: "À améliorer",
+      accent: "#F59E0B",
+    };
+  }
+
+  return {
+    label: "À améliorer",
+    accent: "#EF4444",
+  };
+}
+
+const EmptyState = memo(function EmptyState({
+  title,
+  description,
+  icon: Icon = ActivityIndicator,
+}: {
+  title: string;
+  description: string;
+  icon?: typeof ActivityIndicator;
+}) {
   return (
-    <View className="rounded-xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-      <View className="flex items-center justify-between mb-2">
-        <Text className="text-white text-sm font-medium">{goal.label}</Text>
-        <Text className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: `${statusColor}20`, color: statusColor }}>
-          {goal.status === "done" ? "Atteint ✓" : goal.status === "on_track" ? "En cours" : "En retard"}
+    <View className="items-center rounded-2xl border border-white/10 bg-white/[0.035] px-5 py-8">
+      <View className="mb-3 h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.06]">
+        <Icon size={20} color="rgba(255,255,255,0.55)" />
+      </View>
+
+      <Text className="text-center text-sm font-semibold text-white">
+        {title}
+      </Text>
+
+      <Text className="mt-1 text-center text-xs leading-5 text-white/40">
+        {description}
+      </Text>
+    </View>
+  );
+});
+
+const Section = memo(function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View className="mb-4">
+      <View className="mb-3">
+        <Text className="text-base font-bold text-white">{title}</Text>
+
+        {subtitle ? (
+          <Text className="mt-1 text-xs text-white/40">{subtitle}</Text>
+        ) : null}
+      </View>
+
+      {children}
+    </View>
+  );
+});
+
+const MetricCard = memo(function MetricCard({
+  metric,
+}: {
+  metric: MetricConfig;
+}) {
+  const Icon = metric.icon;
+
+  return (
+    <View className="flex-1 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+      <View
+        className="mb-3 h-9 w-9 items-center justify-center rounded-xl"
+        style={{
+          backgroundColor: `${metric.accent}18`,
+        }}
+      >
+        <Icon size={17} color={metric.accent} />
+      </View>
+
+      <Text className="text-[10px] font-medium uppercase tracking-wider text-white/35">
+        {metric.label}
+      </Text>
+
+      <Text className="mt-1 text-xl font-black text-white">{metric.value}</Text>
+
+      {!metric.available ? (
+        <Text className="mt-1 text-[9px] text-white/25">
+          Donnée indisponible
         </Text>
-      </View>
-      <View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
+      ) : null}
+    </View>
+  );
+});
+
+const ScoreCard = memo(function ScoreCard({ score }: { score: number | null }) {
+  const presentation = getScorePresentation(score);
+
+  return (
+    <View
+      className="overflow-hidden rounded-3xl border p-5"
+      style={{
+        borderColor: `${presentation.accent}45`,
+        backgroundColor: "rgba(255,255,255,0.035)",
+      }}
+    >
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1 pr-4">
+          <Text className="text-xs font-medium uppercase tracking-wider text-white/40">
+            Score bien-être
+          </Text>
+
+          <Text
+            className="mt-1 text-3xl font-black"
+            style={{
+              color: presentation.accent,
+            }}
+          >
+            {score === null ? "—" : score}
+          </Text>
+
+          <Text className="mt-1 text-sm font-semibold text-white">
+            {presentation.label}
+          </Text>
+
+          <Text className="mt-2 text-xs leading-5 text-white/40">
+            Le score est calculé uniquement à partir des données disponibles
+            dans votre compte.
+          </Text>
+        </View>
+
         <View
-          className="h-full rounded-full" style={{ backgroundColor: goal.color }} />
-      </View>
-      <View className="flex justify-between mt-1">
-        <Text className="text-xs text-white/40">{goal.current} {goal.unit}</Text>
-        <Text className="text-xs text-white/40">/{goal.target} {goal.unit}</Text>
+          className="h-24 w-24 items-center justify-center rounded-full border"
+          style={{
+            borderColor: `${presentation.accent}55`,
+            backgroundColor: `${presentation.accent}12`,
+          }}
+        >
+          <Heart size={28} color={presentation.accent} />
+
+          {score !== null ? (
+            <Text
+              className="mt-1 text-[10px] font-bold"
+              style={{
+                color: presentation.accent,
+              }}
+            >
+              / 100
+            </Text>
+          ) : null}
+        </View>
       </View>
     </View>
   );
-}
+});
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
-export default function BienEtreDashboardPage({
-  onBack, onNavigate,
+const NavigationTabs = memo(function NavigationTabs({
+  activeTab,
+  onChange,
 }: {
-  onBack: () => void;
-  onNavigate: (page: string) => void;
+  activeTab: TabId;
+  onChange: (tab: TabId) => void;
 }) {
-  const [tab, setTab] = useState<"overview" | "progress" | "goals" | "recs">("overview");
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{
+        paddingHorizontal: 16,
+        gap: 8,
+      }}
+    >
+      {TABS.map((tab) => {
+        const Icon = tab.icon;
+        const active = activeTab === tab.id;
 
-  // Real Convex data
-  const healthSummary = useQuery(api.health.getHealthSummary, {});
+        return (
+          <Pressable
+            key={tab.id}
+            onPress={() => onChange(tab.id)}
+            accessibilityRole="tab"
+            accessibilityState={{
+              selected: active,
+            }}
+            className="flex-row items-center gap-2 rounded-xl px-3.5 py-2.5"
+            style={{
+              backgroundColor: active
+                ? "rgba(139,92,246,0.18)"
+                : "rgba(255,255,255,0.05)",
+              borderWidth: 1,
+              borderColor: active
+                ? "rgba(139,92,246,0.35)"
+                : "rgba(255,255,255,0.06)",
+            }}
+          >
+            <Icon
+              size={14}
+              color={active ? "#A78BFA" : "rgba(255,255,255,0.45)"}
+            />
 
-  // Fall back to localStorage data when Convex isn't available or user not authenticated
-  const fitness = readFitnessData();
-  const nutrition = readNutritionData();
-  const meditation = readMeditationData();
+            <Text
+              className="text-xs font-semibold"
+              style={{
+                color: active ? "#C4B5FD" : "rgba(255,255,255,0.55)",
+              }}
+            >
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+});
 
-  const fitnessStreak = (healthSummary?.workoutCount ?? 0) > 0 ? Math.min(healthSummary!.workoutCount, 14) : (fitness.streak ?? 5);
-  const nutritionStreak = nutrition.streak ?? 4;
-  const meditationStreak = (healthSummary?.meditationCount ?? 0) > 0 ? Math.min(healthSummary!.meditationCount, 10) : (meditation.streak ?? 3);
+const ActionRow = memo(function ActionRow({
+  label,
+  icon: Icon,
+  accent,
+  onPress,
+}: {
+  label: string;
+  icon: typeof Dumbbell;
+  accent: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="mb-2 flex-row items-center rounded-2xl border border-white/10 bg-white/[0.035] p-3.5"
+      accessibilityRole="button"
+    >
+      <View
+        className="mr-3 h-9 w-9 items-center justify-center rounded-xl"
+        style={{
+          backgroundColor: `${accent}18`,
+        }}
+      >
+        <Icon size={16} color={accent} />
+      </View>
 
-  const fitnessScore = scoreFor(fitnessStreak, 14);
-  const nutritionScore = scoreFor(nutritionStreak + (nutrition.waterGlasses ?? 0), 20);
-  const meditationScore = scoreFor((meditation.totalMinutes ?? 0), 120);
+      <Text className="flex-1 text-sm font-medium text-white/80">{label}</Text>
 
-  const globalScore = Math.round((fitnessScore + nutritionScore + meditationScore) / 3);
+      <ChevronRight size={16} color="rgba(255,255,255,0.3)" />
+    </Pressable>
+  );
+});
 
-  const days = useMemo(() => build30Days(fitnessStreak, nutritionStreak, meditationStreak), [fitnessStreak, nutritionStreak, meditationStreak]);
-  const last7 = days.slice(-7);
+export default function BienEtreDashboardPage({ onBack, onNavigate }: Props) {
+  const [tab, setTab] = useState<TabId>("overview");
 
-  const goals: SmartGoal[] = [
-    { id: "g1", label: "Séances fitness / semaine", target: 5, current: Math.min(5, fitnessStreak), unit: "séances", color: "#E17055", module: "fitness", status: fitnessStreak >= 5 ? "done" : fitnessStreak >= 3 ? "on_track" : "behind" },
-    { id: "g2", label: "Eau quotidienne", target: 8, current: nutrition.waterGlasses ?? 6, unit: "verres", color: "#3B82F6", module: "nutrition", status: (nutrition.waterGlasses ?? 6) >= 8 ? "done" : "on_track" },
-    { id: "g3", label: "Minutes méditées / semaine", target: 70, current: Math.min(70, meditation.totalMinutes ?? 0), unit: "min", color: "#8B5CF6", module: "meditation", status: (meditation.totalMinutes ?? 0) >= 70 ? "done" : "on_track" },
-    { id: "g4", label: "Streak méditation", target: 7, current: meditationStreak, unit: "jours", color: "#6366F1", module: "meditation", status: meditationStreak >= 7 ? "done" : meditationStreak >= 4 ? "on_track" : "behind" },
-  ];
+  /*
+   * SOURCE UNIQUE DE VÉRITÉ :
+   * les données viennent du backend Convex.
+   *
+   * Aucune donnée locale fictive.
+   * Aucune valeur inventée.
+   */
+  const healthSummary = useQuery(api.health.getHealthSummary, {}) as
+    | HealthSummary
+    | undefined;
 
-  const scoreGrade = globalScore >= 80 ? { label: "Excellent", color: "#10B981" }
-    : globalScore >= 60 ? { label: "Bien", color: "#8B5CF6" }
-    : globalScore >= 40 ? { label: "Moyen", color: "#F59E0B" }
-    : { label: "À améliorer", color: "#EF4444" };
+  const isLoading = healthSummary === undefined;
 
-  const tabs = [
-    { id: "overview" as const, label: "Vue d'ensemble", icon: BarChart2 },
-    { id: "progress" as const, label: "Progression", icon: TrendingUp },
-    { id: "goals" as const, label: "Objectifs", icon: Target },
-    { id: "recs" as const, label: "IA & Conseils", icon: Sparkles },
-  ];
+  const workoutCount = useMemo(
+    () => asNumber(healthSummary?.workoutCount),
+    [healthSummary],
+  );
+
+  const meditationCount = useMemo(
+    () => asNumber(healthSummary?.meditationCount),
+    [healthSummary],
+  );
+
+  /*
+   * Les métriques nutritionnelles restent volontairement
+   * indisponibles tant qu'une source backend réelle ne les
+   * fournit pas.
+   */
+  const nutritionWater = useMemo(
+    () => asNumber(healthSummary?.waterGlasses),
+    [healthSummary],
+  );
+
+  const meditationMinutes = useMemo(
+    () => asNumber(healthSummary?.totalMinutes),
+    [healthSummary],
+  );
+
+  const fitnessScore = useMemo(() => {
+    if (workoutCount === null) {
+      return null;
+    }
+
+    return Math.min(100, Math.round((workoutCount / 5) * 100));
+  }, [workoutCount]);
+
+  const nutritionScore = useMemo(() => {
+    if (nutritionWater === null) {
+      return null;
+    }
+
+    return Math.min(100, Math.round((nutritionWater / 8) * 100));
+  }, [nutritionWater]);
+
+  const meditationScore = useMemo(() => {
+    if (meditationMinutes === null) {
+      return null;
+    }
+
+    return Math.min(100, Math.round((meditationMinutes / 70) * 100));
+  }, [meditationMinutes]);
+
+  const globalScore = useMemo(
+    () => getScore([fitnessScore, nutritionScore, meditationScore]),
+    [fitnessScore, nutritionScore, meditationScore],
+  );
+
+  const metrics: MetricConfig[] = useMemo(
+    () => [
+      {
+        label: "Fitness",
+        value: formatNumber(workoutCount),
+        icon: Dumbbell,
+        accent: "#E17055",
+        available: workoutCount !== null,
+      },
+      {
+        label: "Hydratation",
+        value:
+          nutritionWater === null
+            ? "—"
+            : `${formatNumber(nutritionWater)} verres`,
+        icon: Salad,
+        accent: "#3B82F6",
+        available: nutritionWater !== null,
+      },
+      {
+        label: "Méditation",
+        value: formatNumber(meditationMinutes),
+        icon: Moon,
+        accent: "#8B5CF6",
+        available: meditationMinutes !== null,
+      },
+    ],
+    [workoutCount, nutritionWater, meditationMinutes],
+  );
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-[#050812]">
+        <View className="items-center">
+          <View className="mb-4 h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
+            <ActivityIndicator size="small" color="#A78BFA" />
+          </View>
+
+          <Text className="text-sm font-semibold text-white">
+            Chargement de vos données
+          </Text>
+
+          <Text className="mt-1 text-xs text-white/40">
+            Synchronisation avec votre espace personnel
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
-    <View className="h-full flex flex-col" style={{  }}>
+    <View className="flex-1 bg-[#050812]">
       {/* Header */}
-      <View className="flex items-center gap-3 px-4 pt-4 pb-3">
-        <Pressable onPress={onBack} className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-          <ArrowLeft size={20} className="text-white" />
-        </Pressable>
-        <View className="flex-1">
-          <Text className="text-lg font-bold text-white">Tableau de Bord Bien-être</Text>
-          <Text className="text-xs text-white/50">Vue complète de votre santé</Text>
-        </View>
-        <View className="flex items-center gap-1 px-3 py-1.5 rounded-xl"
-          style={{ backgroundColor: `${scoreGrade.color}20`, borderStyle: "solid" }}>
-          <Heart size={13} style={{ color: scoreGrade.color }} />
-          <Text className="text-sm font-bold" style={{ color: scoreGrade.color }}>{globalScore}</Text>
+      <View className="border-b border-white/5 px-4 pb-3 pt-4">
+        <View className="flex-row items-center">
+          <Pressable
+            onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+            className="mr-3 h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06]"
+          >
+            <ArrowLeft size={20} color="#FFFFFF" />
+          </Pressable>
+
+          <View className="flex-1">
+            <Text className="text-lg font-bold text-white">Bien-être</Text>
+
+            <Text className="mt-0.5 text-xs text-white/40">
+              Votre espace personnel
+            </Text>
+          </View>
+
+          <View
+            className="items-center rounded-xl border px-3 py-1.5"
+            style={{
+              borderColor: `${getScorePresentation(globalScore).accent}35`,
+              backgroundColor: `${getScorePresentation(globalScore).accent}12`,
+            }}
+          >
+            <Text
+              className="text-sm font-black"
+              style={{
+                color: getScorePresentation(globalScore).accent,
+              }}
+            >
+              {globalScore === null ? "—" : globalScore}
+            </Text>
+          </View>
         </View>
       </View>
 
-      {/* Tabs */}
-      <View className="px-4 pb-2 overflow-x-auto">
-        <View className="flex gap-2">
-          {tabs.map(t => {
-            const Icon = t.icon;
-            const active = tab === t.id;
-            return (
-              <Pressable key={t.id} onPress={() => setTab(t.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium"
-                style={active
-                  ? {  }
-                  : { backgroundColor: "rgba(255,255,255,0.06)" }}>
-                <Icon size={14} />
-                {t.label}
-              </Pressable>
-            );
-          })}
-        </View>
+      {/* Navigation */}
+      <View className="py-3">
+        <NavigationTabs activeTab={tab} onChange={setTab} />
       </View>
 
       {/* Content */}
-      <View className="flex-1 overflow-y-auto px-4 pb-6">
-        <>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: 40,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {tab === "overview" ? (
+          <>
+            <Section
+              title="Vue d'ensemble"
+              subtitle="Données actuellement disponibles"
+            >
+              <ScoreCard score={globalScore} />
+            </Section>
 
-          {/* ── OVERVIEW ── */}
-          {tab === "overview" && (
-            <View key="overview" className="space-y-4 pt-2">
-
-              {/* Global score hero */}
-              <View className="rounded-2xl p-5 flex items-center gap-5 relative overflow-hidden"
-                style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.3)", borderStyle: "solid" }}>
-                <View className="absolute top-0 right-0 w-32 h-32 rounded-full"
-                  style={{  }} />
-                <View className="relative flex-shrink-0" style={{ width: 100, height: 100 }}>
-                  <ScoreRing score={globalScore} color={scoreGrade.color} size={100} />
-                  <View className="absolute inset-0 flex flex-col items-center justify-center">
-                    <Text className="text-2xl font-black text-white">{globalScore}</Text>
-                    <Text className="text-[9px] text-white/50">/ 100</Text>
-                  </View>
-                </View>
-                <View>
-                  <Text className="text-white/60 text-xs mb-1">Score Bien-être Global</Text>
-                  <Text className="text-2xl font-black" style={{ color: scoreGrade.color }}>{scoreGrade.label}</Text>
-                  <Text className="text-white/50 text-xs mt-1">Basé sur fitness, nutrition et méditation</Text>
-                  <View className="flex gap-3 mt-3">
-                    {[
-                      { label: "Fitness", score: fitnessScore, color: "#E17055" },
-                      { label: "Nutri", score: nutritionScore, color: "#00B894" },
-                      { label: "Médit.", score: meditationScore, color: "#8B5CF6" },
-                    ].map(m => (
-                      <View key={m.label} className="text-center">
-                        <Text className="text-sm font-bold" style={{ color: m.color }}>{m.score}</Text>
-                        <Text className="text-[10px] text-white/40">{m.label}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              </View>
-
-              {/* Module cards */}
-              <View className="flex gap-3">
-                <ModuleCard icon={Dumbbell} label="Fitness" color="#E17055" streak={fitnessStreak}
-                  score={fitnessScore} detail={`${fitness.completedWorkouts?.length ?? 0} séances`}
-                  onPress={() => onNavigate("fitness")} />
-                <ModuleCard icon={Salad} label="Nutrition" color="#00B894" streak={nutritionStreak}
-                  score={nutritionScore} detail={`${nutrition.waterGlasses ?? 0}/8 verres`}
-                  onPress={() => onNavigate("nutrition")} />
-                <ModuleCard icon={Moon} label="Médit." color="#8B5CF6" streak={meditationStreak}
-                  score={meditationScore} detail={`${meditation.totalMinutes ?? 0} min`}
-                  onPress={() => onNavigate("meditation")} />
-              </View>
-
-              {/* Streak summary */}
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(249,115,22,0.1)", borderWidth: 1, borderColor: "rgba(249,115,22,0.2)", borderStyle: "solid" }}>
-                <View className="flex items-center gap-2 mb-3">
-                  <Flame size={16} className="text-orange-400" />
-                  <Text className="text-white font-semibold text-sm">Streaks actifs</Text>
-                </View>
-                <View className="flex gap-3">
-                  {[
-                    { label: "Fitness", streak: fitnessStreak, color: "#E17055", icon: Dumbbell },
-                    { label: "Nutrition", streak: nutritionStreak, color: "#00B894", icon: Salad },
-                    { label: "Méditation", streak: meditationStreak, color: "#8B5CF6", icon: Moon },
-                  ].map(s => {
-                    const Icon = s.icon;
-                    return (
-                      <View key={s.label} className="flex-1 flex flex-col items-center gap-1 rounded-xl py-3"
-                        style={{ backgroundColor: `${s.color}10`, borderStyle: "solid" }}>
-                        <Icon size={14} style={{ color: s.color }} />
-                        <Text className="text-lg font-black text-white">{s.streak}</Text>
-                        <Text className="text-[10px] text-white/40">jours</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Today summary */}
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <View className="flex items-center gap-2 mb-3">
-                  <Sun size={16} className="text-yellow-400" />
-                  <Text className="text-white font-semibold text-sm">Aujourd'hui</Text>
-                </View>
-                <View className="space-y-2">
-                  {[
-                    { label: "Séance fitness complète", done: fitnessStreak > 0, color: "#E17055" },
-                    { label: "Journal repas rempli", done: (nutrition.mealLog as unknown[])?.length > 0, color: "#00B894" },
-                    { label: "Session méditation", done: (meditation.completedSessions?.length ?? 0) > 0, color: "#8B5CF6" },
-                    { label: "Objectif eau", done: (nutrition.waterGlasses ?? 0) >= 8, color: "#3B82F6" },
-                  ].map(item => (
-                    <View key={item.label} className="flex items-center gap-3">
-                      <View className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={item.done ? { backgroundColor: `${item.color}30`, borderStyle: "solid" } : { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                        {item.done && <CheckCircle2 size={12} style={{ color: item.color }} />}
-                      </View>
-                      <Text className={`text-sm ${item.done ? "text-white" : "text-white/40 line-through"}`}>{item.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* ── PROGRESS ── */}
-          {tab === "progress" && (
-            <View key="progress" className="space-y-4 pt-2">
-
-              {/* Score 7 days area chart */}
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <Text className="text-white font-semibold mb-1">Score global — 7 derniers jours</Text>
-                <Text className="text-white/40 text-xs mb-3">Tendance du bien-être</Text>
-                <ResponsiveContainer width="100%" height={140}>
-                  <AreaChart data={last7}>
-                    <defs>
-                      <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="day" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "white", fontSize: 12 }} />
-                    <Area type="monotone" dataKey="score" stroke="#8B5CF6" strokeWidth={2} fill="url(#scoreGrad)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </View>
-
-              {/* 3 modules line chart */}
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <Text className="text-white font-semibold mb-1">Comparaison modules — 30 jours</Text>
-                <View className="flex gap-3 mb-3">
-                  {[["#E17055", "Fitness"], ["#00B894", "Nutrition"], ["#8B5CF6", "Méditation"]].map(([c, l]) => (
-                    <View key={l} className="flex items-center gap-1.5">
-                      <View className="w-2 h-2 rounded-full" style={{ backgroundColor: c }} />
-                      <Text className="text-xs text-white/50">{l}</Text>
-                    </View>
-                  ))}
-                </View>
-                <ResponsiveContainer width="100%" height={160}>
-                  <LineChart data={days}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="day" tick={false} axisLine={false} tickLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "white", fontSize: 12 }} />
-                    <Line type="monotone" dataKey="fitness" stroke="#E17055" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="nutrition" stroke="#00B894" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="meditation" stroke="#8B5CF6" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </View>
-
-              {/* Stats row */}
-              <View className="gap-3">
-                {[
-                  { label: "Calories brûlées", value: `${fitness.totalCalories ?? 2340}`, unit: "kcal", color: "#E17055", icon: "🔥" },
-                  { label: "Eau consommée", value: `${(nutrition.waterGlasses ?? 6) * 250}`, unit: "ml", color: "#3B82F6", icon: "💧" },
-                  { label: "Minutes méditées", value: `${meditation.totalMinutes ?? 95}`, unit: "min", color: "#8B5CF6", icon: "🧘" },
-                  { label: "Meilleur streak", value: `${Math.max(fitnessStreak, nutritionStreak, meditationStreak)}`, unit: "jours", color: "#F59E0B", icon: "⭐" },
-                ].map(s => (
-                  <View key={s.label} className="rounded-2xl p-4" style={{ backgroundColor: `${s.color}10`, borderStyle: "solid" }}>
-                    <Text className="text-2xl mb-1">{s.icon}</Text>
-                    <Text className="text-xl font-black text-white">{s.value}<Text className="text-xs text-white/40 ml-1">{s.unit}</Text></Text>
-                    <Text className="text-xs text-white/50">{s.label}</Text>
-                  </View>
+            <Section
+              title="Vos indicateurs"
+              subtitle="Synchronisés avec vos données réelles"
+            >
+              <View className="flex-row gap-3">
+                {metrics.map((metric) => (
+                  <MetricCard key={metric.label} metric={metric} />
                 ))}
               </View>
+            </Section>
 
-              {/* Radial chart */}
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <Text className="text-white font-semibold mb-3">Répartition du bien-être</Text>
-                <ResponsiveContainer width="100%" height={180}>
-                  <RadialBarChart cx="50%" cy="50%" innerRadius="30%" outerRadius="90%"
-                    data={[
-                      { name: "Fitness", value: fitnessScore, fill: "#E17055" },
-                      { name: "Nutrition", value: nutritionScore, fill: "#00B894" },
-                      { name: "Méditation", value: meditationScore, fill: "#8B5CF6" },
-                    ]}>
-                    <RadialBar dataKey="value" cornerRadius={6} label={{ position: "insideStart", fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
-                    <Tooltip contentStyle={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "white", fontSize: 12 }} />
-                  </RadialBarChart>
-                </ResponsiveContainer>
+            <Section
+              title="Activité"
+              subtitle="Accédez directement à vos modules"
+            >
+              <ActionRow
+                label="Ouvrir Fitness"
+                icon={Dumbbell}
+                accent="#E17055"
+                onPress={() => onNavigate("fitness")}
+              />
+
+              <ActionRow
+                label="Ouvrir Nutrition"
+                icon={Salad}
+                accent="#3B82F6"
+                onPress={() => onNavigate("nutrition")}
+              />
+
+              <ActionRow
+                label="Ouvrir Méditation"
+                icon={Moon}
+                accent="#8B5CF6"
+                onPress={() => onNavigate("meditation")}
+              />
+            </Section>
+
+            <Section title="Activité récente">
+              <EmptyState
+                title="Historique détaillé indisponible"
+                description="Aucun historique détaillé n'est exposé par la source de données actuelle."
+                icon={CalendarDays}
+              />
+            </Section>
+          </>
+        ) : null}
+
+        {tab === "progress" ? (
+          <>
+            <Section
+              title="Progression"
+              subtitle="Analyse basée uniquement sur les données synchronisées"
+            >
+              <EmptyState
+                title="Historique insuffisant"
+                description="L'historique temporel n'est pas généré artificiellement. Il apparaîtra lorsqu'une source backend réelle fournira les événements nécessaires."
+                icon={TrendingUp}
+              />
+            </Section>
+
+            <Section title="Indicateurs disponibles">
+              <View className="gap-3">
+                <MetricCard
+                  metric={{
+                    label: "Séances fitness",
+                    value: formatNumber(workoutCount),
+                    icon: Dumbbell,
+                    accent: "#E17055",
+                    available: workoutCount !== null,
+                  }}
+                />
+
+                <MetricCard
+                  metric={{
+                    label: "Sessions méditation",
+                    value: formatNumber(meditationCount),
+                    icon: Moon,
+                    accent: "#8B5CF6",
+                    available: meditationCount !== null,
+                  }}
+                />
               </View>
-            </View>
-          )}
+            </Section>
+          </>
+        ) : null}
 
-          {/* ── GOALS ── */}
-          {tab === "goals" && (
-            <View key="goals" className="space-y-4 pt-2">
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <View className="flex items-center gap-2 mb-1">
-                  <Target size={16} className="text-purple-400" />
-                  <Text className="text-white font-semibold">Objectifs SMART</Text>
-                </View>
-                <Text className="text-white/40 text-xs">Suivi de vos objectifs hebdomadaires</Text>
-              </View>
+        {tab === "goals" ? (
+          <>
+            <Section
+              title="Objectifs"
+              subtitle="Aucun objectif fictif n'est affiché"
+            >
+              <EmptyState
+                title="Objectifs personnalisés non disponibles"
+                description="Les objectifs seront affichés lorsqu'ils seront fournis par le backend de votre compte."
+                icon={Target}
+              />
+            </Section>
 
-              <View className="space-y-3">
-                {goals.map(g => <GoalBar key={g.id} goal={g} />)}
-              </View>
+            <Section title="Modules">
+              <ActionRow
+                label="Gérer mes objectifs Fitness"
+                icon={Dumbbell}
+                accent="#E17055"
+                onPress={() => onNavigate("fitness")}
+              />
 
-              {/* Weekly plan */}
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <View className="flex items-center gap-2 mb-3">
-                  <Calendar size={16} className="text-blue-400" />
-                  <Text className="text-white font-semibold text-sm">Plan de la semaine</Text>
-                </View>
-                <View className="space-y-2">
-                  {[
-                    { day: "Lun", fitness: true, nutrition: true, meditation: false },
-                    { day: "Mar", fitness: true, nutrition: true, meditation: true },
-                    { day: "Mer", fitness: false, nutrition: true, meditation: true },
-                    { day: "Jeu", fitness: true, nutrition: false, meditation: true },
-                    { day: "Ven", fitness: true, nutrition: true, meditation: false },
-                    { day: "Sam", fitness: false, nutrition: true, meditation: true },
-                    { day: "Dim", fitness: false, nutrition: false, meditation: true },
-                  ].map(d => (
-                    <View key={d.day} className="flex items-center gap-3">
-                      <Text className="text-white/40 text-xs w-8">{d.day}</Text>
-                      <View className="flex gap-2 flex-1">
-                        {[
-                          { key: "fitness" as const, color: "#E17055", icon: Dumbbell },
-                          { key: "nutrition" as const, color: "#00B894", icon: Salad },
-                          { key: "meditation" as const, color: "#8B5CF6", icon: Moon },
-                        ].map(m => {
-                          const Icon = m.icon;
-                          return (
-                            <View key={m.key} className="w-7 h-7 rounded-lg flex items-center justify-center"
-                              style={d[m.key] ? { backgroundColor: `${m.color}25`, borderStyle: "solid" } : { backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}>
-                              <Icon size={12} style={{ color: d[m.key] ? m.color : "rgba(255,255,255,0.2)" }} />
-                            </View>
-                          );
-                        })}
-                      </View>
-                      {(d.fitness && d.nutrition && d.meditation) && <Award size={14} className="text-yellow-400" />}
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-          )}
+              <ActionRow
+                label="Gérer mes objectifs Nutrition"
+                icon={Salad}
+                accent="#3B82F6"
+                onPress={() => onNavigate("nutrition")}
+              />
 
-          {/* ── RECS ── */}
-          {tab === "recs" && (
-            <View key="recs" className="space-y-4 pt-2">
-              {/* IA header */}
-              <View className="rounded-2xl p-4 relative overflow-hidden"
-                style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.3)", borderStyle: "solid" }}>
-                <View className="absolute -top-4 -right-4 w-24 h-24 rounded-full"
-                  style={{  }} />
-                <View className="flex items-center gap-3">
-                  <View className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{  }}>
-                    <Sparkles size={18} className="text-white" />
-                  </View>
-                  <View>
-                    <Text className="text-white font-bold">Coach IA Bien-être</Text>
-                    <Text className="text-white/50 text-xs">Recommandations personnalisées</Text>
-                  </View>
-                </View>
-                <Text className="text-white/70 text-sm mt-3">
-                  Basé sur votre score de {globalScore}/100 et vos habitudes récentes, voici vos recommandations du jour :
-                </Text>
-              </View>
+              <ActionRow
+                label="Gérer mes objectifs Méditation"
+                icon={Moon}
+                accent="#8B5CF6"
+                onPress={() => onNavigate("meditation")}
+              />
+            </Section>
+          </>
+        ) : null}
 
-              {AI_RECS.map((rec, i) => (
-                <View key={i}
-                  className="rounded-2xl p-4 flex gap-3"
-                  style={{ backgroundColor: `${rec.color}10`, borderStyle: "solid" }}>
-                  <Text className="text-2xl flex-shrink-0">{rec.emoji}</Text>
-                  <View className="flex-1">
-                    <Text className="text-xs px-2 py-0.5 rounded-full mb-2 inline-block" style={{ backgroundColor: `${rec.color}20`, color: rec.color }}>{rec.tag}</Text>
-                    <Text className="text-white/80 text-sm">{rec.text}</Text>
-                  </View>
-                </View>
-              ))}
+        {tab === "recs" ? (
+          <>
+            <Section
+              title="Conseils personnalisés"
+              subtitle="Aucune recommandation inventée"
+            >
+              <EmptyState
+                title="Conseils IA en attente de données"
+                description="Les recommandations personnalisées seront générées à partir des données réelles disponibles dans votre espace."
+                icon={Sparkles}
+              />
+            </Section>
 
-              {/* Quick links */}
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <Text className="text-white font-semibold text-sm mb-3">Accès rapides</Text>
-                <View className="space-y-2">
-                  {[
-                    { label: "Lancer une séance fitness", icon: Dumbbell, color: "#E17055", page: "fitness" },
-                    { label: "Journaliser un repas", icon: Salad, color: "#00B894", page: "nutrition" },
-                    { label: "Session de méditation", icon: Moon, color: "#8B5CF6", page: "meditation" },
-                    { label: "Exercice de respiration", icon: Wind, color: "#6366F1", page: "meditation" },
-                  ].map(link => {
-                    const Icon = link.icon;
-                    return (
-                      <Pressable key={link.label} onPress={() => onNavigate(link.page)}
-                        className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5"
-                        style={{ backgroundColor: `${link.color}10`, borderStyle: "solid" }}>
-                        <View className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${link.color}20` }}>
-                          <Icon size={15} style={{ color: link.color }} />
-                        </View>
-                        <Text className="text-white/80 text-sm flex-1 text-left">{link.label}</Text>
-                        <ChevronRight size={14} className="text-white/30" />
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
+            <Section title="Actions rapides">
+              <ActionRow
+                label="Lancer une séance Fitness"
+                icon={Dumbbell}
+                accent="#E17055"
+                onPress={() => onNavigate("fitness")}
+              />
 
-              {/* Wellness tip of the day */}
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,215,0,0.08)", borderWidth: 1, borderColor: "rgba(255,215,0,0.2)", borderStyle: "solid" }}>
-                <View className="flex items-center gap-2 mb-2">
-                  <Zap size={14} className="text-yellow-400" />
-                  <Text className="text-yellow-300 text-sm font-semibold"><Text>Conseil du jour</Text></Text>
-                </View>
-                <Text className="text-white/70 text-sm">
-                  {"La régularité prime sur l'intensité. 20 minutes de mouvement quotidien valent mieux qu'une heure hebdomadaire. Construisez des habitudes durables, pas des performances ponctuelles."}
-                </Text>
-              </View>
-            </View>
-          )}
-        </>
-      </View>
+              <ActionRow
+                label="Journaliser un repas"
+                icon={Salad}
+                accent="#10B981"
+                onPress={() => onNavigate("nutrition")}
+              />
+
+              <ActionRow
+                label="Démarrer une méditation"
+                icon={Moon}
+                accent="#8B5CF6"
+                onPress={() => onNavigate("meditation")}
+              />
+
+              <ActionRow
+                label="Exercice de respiration"
+                icon={Wind}
+                accent="#6366F1"
+                onPress={() => onNavigate("meditation")}
+              />
+            </Section>
+          </>
+        ) : null}
+
+        {/* Backend status */}
+        <View className="mt-2 rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.04] p-4">
+          <View className="flex-row items-center">
+            <CheckCircle2 size={16} color="#34D399" />
+
+            <Text className="ml-2 text-xs font-semibold text-emerald-300">
+              Données synchronisées
+            </Text>
+          </View>
+
+          <Text className="mt-2 text-[10px] leading-4 text-white/35">
+            Ce tableau de bord n'utilise aucune donnée fictive. Une métrique
+            absente du backend reste volontairement indisponible.
+          </Text>
+        </View>
+      </ScrollView>
     </View>
   );
 }

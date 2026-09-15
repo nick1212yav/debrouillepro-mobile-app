@@ -58,9 +58,7 @@ export const AmenityBadge: React.FC<AmenityBadgeProps> = ({
   const Icon = config.icon;
 
   return (
-    <View
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/80 ${className}`}
-    >
+    <View className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/80 ${className}`}>
       <Icon size={14} className="text-indigo-400" />
       {showLabel && <Text className="text-xs font-medium">{config.label}</Text>}
     </View>

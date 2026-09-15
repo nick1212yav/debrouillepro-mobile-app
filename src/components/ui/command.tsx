@@ -1,8 +1,8 @@
-import { View, Text } from "react-native";
+import { View, Text, TextProps } from "react-native";
 import * as React from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 import {
   Dialog,
   DialogContent,
@@ -63,10 +63,7 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    <View
-      data-slot="command-input-wrapper"
-      className="flex h-9 items-center gap-2 border-b px-3"
-    >
+    <View data-slot="command-input-wrapper" className="flex h-9 items-center gap-2 border-b px-3">
       <SearchIcon className="size-4 shrink-0 opacity-50" />
       <CommandPrimitive.Input
         data-slot="command-input"
@@ -156,16 +153,12 @@ function CommandItem({
 function CommandShortcut({
   className,
   ...props
-}: React.ComponentProps<typeof Text>) {
+}: TextProps) {
   return (
-    <Text
-      data-slot="command-shortcut"
-      className={cn(
+    <Text data-slot="command-shortcut" className={cn(
         "text-muted-foreground ml-auto text-xs tracking-widest",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 

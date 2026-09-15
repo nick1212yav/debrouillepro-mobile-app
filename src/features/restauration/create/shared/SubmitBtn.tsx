@@ -1,27 +1,11 @@
-// src/features/restauration/create/shared/SubmitBtn.tsx
+import { Pressable } from "react-native";
+import { Loader2, ShieldCheck } from "lucide-react-native";
 
-import * as React from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  Text,
-  type PressableProps,
-} from "react-native";
-import { ShieldCheck } from "lucide-react-native";
-
-type IconComponent = React.ComponentType<{
-  size?: number;
-  color?: string;
-  strokeWidth?: number;
-}>;
-
-interface SubmitBtnProps extends Omit<PressableProps, "children" | "disabled"> {
+interface SubmitBtnProps extends React.ButtonHTMLAttributes<Pressable> {
   isSubmitting: boolean;
   label: string;
   loadingLabel?: string;
-  icon?: IconComponent;
-  disabled?: boolean;
-  className?: string;
+  icon?: React.ComponentType<any>;
 }
 
 export function SubmitBtn({
@@ -29,48 +13,22 @@ export function SubmitBtn({
   label,
   loadingLabel = "Enregistrement en cours...",
   icon: Icon = ShieldCheck,
-  disabled = false,
   className = "",
-  accessibilityLabel,
   ...props
 }: SubmitBtnProps) {
-  const isDisabled = isSubmitting || disabled;
-
   return (
-    <Pressable
-      {...props}
-      disabled={isDisabled}
-      accessibilityRole="button"
-      accessibilityLabel={
-        accessibilityLabel ?? (isSubmitting ? loadingLabel : label)
-      }
-      accessibilityState={{
-        disabled: isDisabled,
-        busy: isSubmitting,
-      }}
-      className={`w-full flex-row items-center justify-center gap-2 rounded-xl bg-orange-500 py-4 ${
-        isDisabled ? "bg-slate-800 opacity-60" : ""
-      } ${className}`}
-    >
+    <Pressable disabled={isSubmitting || props.disabled} className={`w-full py-4 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-slate-800 disabled:text-white/20 text-slate-950 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-orange-500/10 ${className}`} {...props}>
       {isSubmitting ? (
         <>
-          <ActivityIndicator size="small" color="#f8fafc" />
-
-          <Text className="text-xs font-black uppercase tracking-wider text-white">
-            {loadingLabel}
-          </Text>
+          <Loader2 size={14} className="animate-spin" />
+          {loadingLabel}
         </>
       ) : (
         <>
-          <Icon size={14} color="#020617" />
-
-          <Text className="text-xs font-black uppercase tracking-wider text-slate-950">
-            {label}
-          </Text>
+          <Icon size={14} />
+          {label}
         </>
       )}
     </Pressable>
   );
 }
-
-export default SubmitBtn;

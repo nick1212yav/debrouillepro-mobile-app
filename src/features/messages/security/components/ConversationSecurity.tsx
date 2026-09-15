@@ -1,4 +1,4 @@
-import { Pressable, View, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { Pressable, View, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
 
 // src/features/messages/security/components/ConversationSecurity.tsx
 
@@ -76,22 +76,15 @@ export function ConversationSecurity({
   return (
     <>
       <View style={containerStyle} accessibilityLabel="Sécurité de la conversation">
-        <Pressable
-          onPress={() => setBlockDialogOpen(true)}
-          style={buttonStyle}
-        >
+        <Pressable onPress={() => setBlockDialogOpen(true)} style={buttonStyle}>
           {blocked ? "Débloquer" : "Bloquer"}
         </Pressable>
 
         {messageId && (
-          <Pressable
-            onPress={() => setReportDialogOpen(true)}
-            disabled={alreadyReported}
-            style={{
+          <Pressable onPress={() => setReportDialogOpen(true)} disabled={alreadyReported} style={{
               ...buttonStyle,
               ...(alreadyReported ? disabledButtonStyle : {}),
-            }}
-          >
+            }}>
             {alreadyReported ? "Message signalé" : "Signaler"}
           </Pressable>
         )}

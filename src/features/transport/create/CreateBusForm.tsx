@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateBusForm.tsx
 import { useForm } from "react-hook-form";
@@ -108,13 +108,9 @@ export function CreateBusForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="companyName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="companyName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom de la compagnie *</Text></FormLabel>
+              <FormLabel>Nom de la compagnie *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: TransCoop, STUC"
@@ -124,15 +120,9 @@ export function CreateBusForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="routeNumber"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="routeNumber" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Numéro / Nom de la ligne *</Text></FormLabel>
+              <FormLabel>Numéro / Nom de la ligne *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Ligne 1, Kintambo-Lemba"
@@ -142,16 +132,9 @@ export function CreateBusForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="origin"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="origin" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Départ *</Text></FormLabel>
+                <FormLabel>Départ *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Gare Centrale"
@@ -161,14 +144,9 @@ export function CreateBusForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="destination"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="destination" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Arrivée *</Text></FormLabel>
+                <FormLabel>Arrivée *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Aéroport de N'djili"
@@ -178,17 +156,9 @@ export function CreateBusForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="departureTime"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="departureTime" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Heure de départ *</Text></FormLabel>
+                <FormLabel>Heure de départ *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 07:00"
@@ -198,14 +168,9 @@ export function CreateBusForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="arrivalTime"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="arrivalTime" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Heure d'arrivée estimée</Text></FormLabel>
+                <FormLabel>Heure d'arrivée estimée</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 09:30"
@@ -215,17 +180,11 @@ export function CreateBusForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="stops"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="stops" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Arrêts intermédiaires (séparés par des virgules)</Text></FormLabel>
+                Arrêts intermédiaires (séparés par des virgules)
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Pont Matete, Debonhomme, Limete"
@@ -234,19 +193,13 @@ export function CreateBusForm({
                 />
               </FormControl>
               <FormDescription className="text-white/40 text-xs">
-                <Text>Ces arrêts seront affichés dans la description du trajet</Text></FormDescription>
+                Ces arrêts seront affichés dans la description du trajet
+              </FormDescription>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="totalSeats"
-            render={({ field }) => (
+          )} /><View className="gap-2"><FormField control={form.control} name="totalSeats" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Places totales *</Text></FormLabel>
+                <FormLabel>Places totales *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -254,11 +207,11 @@ export function CreateBusForm({
                     max={MAX_SEATS_PER_VEHICLE}
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
+                    onChange={(e) =>
                       field.onChange(
                         Math.min(
                           MAX_SEATS_PER_VEHICLE,
-                          Math.max(10, Number(text) || 30),
+                          Math.max(10, Number(e.target.value) || 30),
                         ),
                       )
                     }
@@ -266,34 +219,24 @@ export function CreateBusForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="pricePerSeat"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="pricePerSeat" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prix du ticket *</Text></FormLabel>
+                <FormLabel>Prix du ticket *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -304,23 +247,16 @@ export function CreateBusForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                    <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="busModel"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="busModel" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Modèle de Bus</Text></FormLabel>
+              <FormLabel>Modèle de Bus</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Mercedes Benz, Fuso"
@@ -330,16 +266,11 @@ export function CreateBusForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="description" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Informations additionnelles (Confort, bagages, etc.)</Text></FormLabel>
+                Informations additionnelles (Confort, bagages, etc.)
+              </FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Ex: Bus climatisé, Wi-Fi gratuit, bagages autorisés jusqu'à 20kg..."
@@ -350,22 +281,14 @@ export function CreateBusForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+          )} /><Button  className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Enregistrement...</Text></>
+              Enregistrement...
+            </>
           ) : (
             "🚌 Enregistrer l'itinéraire de Bus"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

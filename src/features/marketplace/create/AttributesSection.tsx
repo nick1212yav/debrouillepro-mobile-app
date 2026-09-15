@@ -1,8 +1,4 @@
-function NativePrompt(message: string): string | null {
-  Alert.alert(message, "Saisie requise");
-  return null;
-}
-import { Pressable, Text, View, TextInput, Alert } from "react-native";
+import { Pressable, Text, View, TextInput } from "react-native";
 
 // src/features/marketplace/create/AttributesSection.tsx
 import { FieldInput } from "./shared";
@@ -15,9 +11,9 @@ interface Props {
 
 export function AttributesSection({ attributes, onChange, color }: Props) {
   const addAttribute = () => {
-    const key = NativePrompt("Nom de l'attribut :");
+    const key = prompt("Nom de l'attribut :");
     if (key && key.trim()) {
-      const value = NativePrompt(String(`Valeur pour "${key}" :`));
+      const value = prompt(`Valeur pour "${key}" :`);
       if (value !== null) {
         onChange({ ...attributes, [key.trim()]: value.trim() });
       }
@@ -42,24 +38,13 @@ export function AttributesSection({ attributes, onChange, color }: Props) {
       {Object.entries(attributes).map(([key, value]) => (
         <View key={key} className="flex items-center gap-2">
           <Text className="text-white/40 text-sm flex-shrink-0">{key}</Text>
-          <TextInput
-            value={value}
-            onChangeText={(text) => updateValue(key, text)}
-            className="flex-1 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none"
-            placeholder="Valeur"
-          />
-          <Pressable
-            onPress={() => removeAttribute(key)}
-            className="text-white/20"
-          >
+          <TextInput value={value} onChangeText={(value) => updateValue(key, value)} className="flex-1 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none" placeholder="Valeur" />
+          <Pressable onPress={() => removeAttribute(key)} className="text-white/20 transition-colors">
             ✕
           </Pressable>
         </View>
       ))}
-      <Pressable
-        onPress={addAttribute}
-        className="px-3 py-1.5 rounded-xl text-sm text-purple-400 border border-purple-400/30"
-      >
+      <Pressable onPress={addAttribute} className="px-3 py-1.5 rounded-xl text-sm text-purple-400 border border-purple-400/30 transition-colors">
         + Ajouter un attribut
       </Pressable>
     </View>

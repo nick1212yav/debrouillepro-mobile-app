@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/sante/services/prescription.service.ts
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useCreatePrescription() {
@@ -10,10 +9,10 @@ export function useCreatePrescription() {
   return async (data: any) => {
     try {
       const result = await mutate(data);
-      UIService.openToast("Ordonnance créée", "success");
+      toast.success("Ordonnance créée");
       return result;
     } catch (e) {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
       throw e;
     }
   };
@@ -24,10 +23,10 @@ export function useUpdatePrescription() {
   return async (data: any) => {
     try {
       const result = await mutate(data);
-      UIService.openToast("Ordonnance mise à jour", "success");
+      toast.success("Ordonnance mise à jour");
       return result;
     } catch (e) {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
       throw e;
     }
   };
@@ -35,7 +34,7 @@ export function useUpdatePrescription() {
 
 // Ajout de la fonction download utilisée dans actions.ts
 export async function download(prescriptionId: string) {
-  UIService.openToast("Téléchargement de l'ordonnance...", "info");
+  toast.info("Téléchargement de l'ordonnance...");
   // Implémentez ici la logique de téléchargement (PDF, etc.)
   return new Promise((resolve) => setTimeout(resolve, 500));
 }

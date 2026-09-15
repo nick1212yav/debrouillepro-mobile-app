@@ -48,52 +48,10 @@ export const BookingPriceBreakdown: React.FC<BookingPriceBreakdownProps> = ({
   };
 
   return (
-    <View
-      className={`p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-3 ${className}`}
-    >
-      <Text className="text-sm font-semibold text-white">Détail du prix</Text>
-
-      <View className="flex flex-col gap-2 text-xs text-white/70">
-        <View className="flex justify-between">
-          <Text>
-            {formatPrice(amountPerPeriod)} {currency} x {periodCount}{" "}
-            {periodLabel[period] || period}
-            {periodCount > 1 && period === "night" ? "s" : ""}
-          </Text>
-          <Text className="text-white font-medium">
-            {formatPrice(subtotal)} {currency}
-          </Text>
-        </View>
-        {cleaningFee > 0 && (
-          <View className="flex justify-between">
-            <Text>Frais de ménage</Text>
-            <Text className="text-white font-medium">
-              {formatPrice(cleaningFee)} {currency}
-            </Text>
-          </View>
-        )}
-        <View className="flex justify-between">
-          <Text>Frais de service DébrouillePro</Text>
-          <Text className="text-white font-medium">
-            {formatPrice(serviceFee)} {currency}
-          </Text>
-        </View>
-        {deposit > 0 && (
-          <View className="flex justify-between">
-            <Text>Dépôt de garantie (remboursable)</Text>
-            <Text className="text-white font-medium">
-              {formatPrice(deposit)} {currency}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      <View className="border-t border-white/10 pt-3 flex justify-between items-baseline mt-1">
-        <Text className="text-sm font-bold text-white"><Text>Total</Text></Text>
-        <Text className="text-lg font-black text-indigo-400">
-          {formatPrice(total)} {currency}
-        </Text>
-      </View>
-    </View>
+    <View className={`p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-3 ${className}`}><Text className="text-sm font-semibold text-white">Détail du prix</Text><View className="flex flex-col gap-2 text-xs text-white/70"><View className="flex justify-between"><Text>{formatPrice(amountPerPeriod)}{currency}x {periodCount}{" "}{periodLabel[period] || period}{periodCount > 1 && period === "night" ? "s" : ""}</Text><Text className="text-white font-medium">{formatPrice(subtotal)}{currency}</Text></View>{cleaningFee > 0 && (
+          <View className="flex justify-between"><Text>Frais de ménage</Text><Text className="text-white font-medium">{formatPrice(cleaningFee)}{currency}</Text></View>
+        )}<View className="flex justify-between"><Text>Frais de service DébrouillePro</Text><Text className="text-white font-medium">{formatPrice(serviceFee)}{currency}</Text></View>{deposit > 0 && (
+          <View className="flex justify-between"><Text>Dépôt de garantie (remboursable)</Text><Text className="text-white font-medium">{formatPrice(deposit)}{currency}</Text></View>
+        )}</View><View className="border-t border-white/10 pt-3 flex justify-between items-baseline mt-1"><Text className="text-sm font-bold text-white">Total</Text><Text className="text-lg font-black text-indigo-400">{formatPrice(total)}{currency}</Text></View></View>
   );
 };

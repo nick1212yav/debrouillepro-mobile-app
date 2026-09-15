@@ -1,4 +1,4 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { FileText, Download, Eye } from "lucide-react-native";
 
 interface Props {
@@ -27,28 +27,17 @@ export function PropertyDocuments({ documents = [] }: Props) {
   };
 
   return (
-    <View className="bg-white/5 rounded-2xl p-4">
-      <Text className="text-sm font-medium text-white/70 mb-2">Documents</Text>
-      <View className="space-y-2">
-        {documents.map((doc) => (
-          <View
-            key={doc.id}
-            className="flex items-center gap-3 p-2 rounded-xl bg-white/5"
-          >
+    <View className="bg-white/5 rounded-2xl p-4"><Text className="text-sm font-medium text-white/70 mb-2">Documents</Text><View className="space-y-2">{documents.map((doc) => (
+          <View key={doc.id} className="flex items-center gap-3 p-2 rounded-xl bg-white/5 transition-colors">
             <FileText size={16} className="text-white/30" />
             <Text className="text-xs text-white/60 flex-1">{doc.title}</Text>
             <Text className="text-[10px] text-white/30">
               {formatSize(doc.size)}
             </Text>
-            <Pressable
-              download
-              className="text-white/40" accessibilityHint={doc.url}
-            >
+            <Pressable  className="text-white/40 transition-colors" accessibilityHint={doc.url}>
               <Download size={14} />
             </Pressable>
           </View>
-        ))}
-      </View>
-    </View>
+        ))}</View></View>
   );
 }

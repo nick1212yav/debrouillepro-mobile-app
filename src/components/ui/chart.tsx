@@ -1,8 +1,9 @@
-import { View, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { View, Text, ViewProps, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+
 "use client";
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
@@ -39,7 +40,7 @@ function ChartContainer({
   children,
   config,
   ...props
-}: React.ComponentProps<typeof View> & {
+}: ViewProps & {
   config: ChartConfig;
   children: React.ComponentProps<
     typeof RechartsPrimitive.ResponsiveContainer
@@ -50,20 +51,10 @@ function ChartContainer({
 
   return (
     <ChartContext.Provider value={{ config }}>
-      <View
-        data-slot="chart"
-        data-chart={chartId}
-        className={cn(
+      <View data-slot="chart" data-chart={chartId} className={cn(
           "[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border flex aspect-video justify-center text-xs [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
           className,
-        )}
-        {...props}
-      >
-        <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
-      </View>
+        )} {...props}><ChartStyle id={chartId} config={config} /><RechartsPrimitive.ResponsiveContainer>{children}</RechartsPrimitive.ResponsiveContainer></View>
     </ChartContext.Provider>
   );
 }
@@ -118,7 +109,7 @@ function ChartTooltipContent({
   nameKey,
   labelKey,
 }: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-  React.ComponentProps<typeof View> & {
+  ViewProps & {
     hideLabel?: boolean;
     hideIndicator?: boolean;
     indicator?: "line" | "dot" | "dashed";
@@ -142,9 +133,7 @@ function ChartTooltipContent({
 
     if (labelFormatter) {
       return (
-        <View className={cn("font-medium", labelClassName)}>
-          {labelFormatter(value, payload)}
-        </View>
+        <View className={cn("font-medium", labelClassName)}>{labelFormatter(value, payload)}</View>
       );
     }
 
@@ -170,15 +159,10 @@ function ChartTooltipContent({
   const nestLabel = payload.length === 1 && indicator !== "dot";
 
   return (
-    <View
-      className={cn(
+    <View className={cn(
         "border-border/50 bg-background grid min-w-[8rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl",
         className,
-      )}
-    >
-      {!nestLabel ? tooltipLabel : null}
-      <View className="gap-1.5">
-        {payload
+      )}>{!nestLabel ? tooltipLabel : null}<View className="gap-1.5">{payload
           .filter((item) => item.type !== "none")
           .map((item, index) => {
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
@@ -186,14 +170,10 @@ function ChartTooltipContent({
             const indicatorColor = color || item.payload.fill || item.color;
 
             return (
-              <View
-                key={item.dataKey}
-                className={cn(
+              <View key={item.dataKey} className={cn(
                   "[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5",
                   indicator === "dot" && "items-center",
-                )}
-              >
-                {formatter && item?.value !== undefined && item.name ? (
+                )}>{formatter && item?.value !== undefined && item.name ? (
                   formatter(item.value, item.name, item, index, item.payload)
                 ) : (
                   <>
@@ -201,8 +181,7 @@ function ChartTooltipContent({
                       <itemConfig.icon />
                     ) : (
                       !hideIndicator && (
-                        <View
-                          className={cn(
+                        <View className={cn(
                             "shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)",
                             {
                               "h-2.5 w-2.5": indicator === "dot",
@@ -211,41 +190,24 @@ function ChartTooltipContent({
                                 indicator === "dashed",
                               "my-0.5": nestLabel && indicator === "dashed",
                             },
-                          )}
-                          style={
-                            {
+                          )} style={{
                               "--color-bg": indicatorColor,
                               "--color-border": indicatorColor,
-                            } as ViewStyle | TextStyle | ImageStyle
-                          }
-                        />
+                            } as ViewStyle | TextStyle | ImageStyle} />
                       )
                     )}
-                    <View
-                      className={cn(
+                    <View className={cn(
                         "flex flex-1 justify-between leading-none",
                         nestLabel ? "items-end" : "items-center",
-                      )}
-                    >
-                      <View className="gap-1.5">
-                        {nestLabel ? tooltipLabel : null}
-                        <Text className="text-muted-foreground">
-                          {itemConfig?.label || item.name}
-                        </Text>
-                      </View>
-                      {item.value && (
+                      )}><View className="gap-1.5">{nestLabel ? tooltipLabel : null}<Text className="text-muted-foreground">{itemConfig?.label || item.name}</Text></View>{item.value && (
                         <Text className="text-foreground font-mono font-medium tabular-nums">
                           {item.value.toLocaleString()}
                         </Text>
-                      )}
-                    </View>
+                      )}</View>
                   </>
-                )}
-              </View>
+                )}</View>
             );
-          })}
-      </View>
-    </View>
+          })}</View></View>
   );
 }
 
@@ -257,7 +219,7 @@ function ChartLegendContent({
   payload,
   verticalAlign = "bottom",
   nameKey,
-}: React.ComponentProps<typeof View> &
+}: ViewProps &
   Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
     hideIcon?: boolean;
     nameKey?: string;
@@ -269,13 +231,11 @@ function ChartLegendContent({
   }
 
   return (
-    <View
-      className={cn(
+    <View className={cn(
         "flex items-center justify-center gap-4",
         verticalAlign === "top" ? "pb-3" : "pt-3",
         className,
-      )}
-    >
+      )}>
       {payload
         .filter((item) => item.type !== "none")
         .map((item) => {
@@ -283,21 +243,15 @@ function ChartLegendContent({
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
 
           return (
-            <View
-              key={item.value}
-              className={cn(
+            <View key={item.value} className={cn(
                 "[&>svg]:text-muted-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3",
-              )}
-            >
+              )}>
               {itemConfig?.icon && !hideIcon ? (
                 <itemConfig.icon />
               ) : (
-                <View
-                  className="h-2 w-2 shrink-0 rounded-[2px]"
-                  style={{
+                <View className="h-2 w-2 shrink-0 rounded-[2px]" style={{
                     backgroundColor: item.color,
-                  }}
-                />
+                  }} />
               )}
               {itemConfig?.label}
             </View>

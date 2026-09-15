@@ -19,11 +19,7 @@ export function DoctorWhatsApp({ phone, onWhatsApp }: DoctorWhatsAppProps) {
   };
 
   return (
-    <Pressable
-      onPress={handleClick}
-      disabled={!phone}
-      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
-    >
+    <Pressable onPress={handleClick} disabled={!phone} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium transition-colors bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 disabled:opacity-40">
       <MessageCircle size={14} />
       WhatsApp
     </Pressable>

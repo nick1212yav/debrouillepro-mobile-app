@@ -1,42 +1,24 @@
+// src/pages/home/_components/SwipeableCard.tsx
+import React from "react";
+import { View, Text, StyleSheet, Platform, type ViewStyle } from "react-native";
+import Animated, {
+  interpolate,
+  runOnJS,
+  useAnimatedGestureHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
+import {
+  PanGestureHandler,
+  type PanGestureHandlerGestureEvent,
+} from "react-native-gesture-handler";
+import { LinearGradient } from "expo-linear-gradient";
+import { Bookmark, X, Sparkles } from "lucide-react-native";
 
-type NativeMotionValue<T> = {
-  get: () => T;
-  set: (value: T) => void;
-};
-
-function useMotionValue<T>(initial: T): NativeMotionValue<T> {
-  const ref = useRef<NativeMotionValue<T> | null>(null);
-  if (ref.current === null) {
-    let current = initial;
-    ref.current = {
-      get: () => current,
-      set: (value: T) => { current = value; },
-    };
-  }
-  return ref.current;
-}
-
-function useTransform<T, R>(
-  value: NativeMotionValue<T>,
-  transform: ((value: T) => R) | readonly R[],
-): R {
-  const current = value.get();
-  return typeof transform === "function"
-    ? transform(current)
-    : transform[0];
-}
-
-function animate(..._args: unknown[]): { stop: () => void } {
-  return { stop: () => undefined };
-}
-
-function useSpring<T>(value: T): T { return value; }
-function useScroll(): Record<string, unknown> { return {}; }
-function useVelocity<T>(value: T): T { return value; }
-function useTime(): number { return 0; }
-import { Text, View } from "react-native";
-import { useRef, useMemo } from "react";
-import { Bookmark, X, Check, Sparkles } from "lucide-react-native";
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 interface SwipeableCardProps {
   children: React.ReactNode;
@@ -46,297 +28,597 @@ interface SwipeableCardProps {
   disabled?: boolean;
 }
 
+/* ============================================================================
+ * CONSTANTS
+ * ========================================================================== */
+
 const SWIPE_THRESHOLD = 100;
 const EXIT_DISTANCE = 520;
 const MAX_ROTATION = 8;
+
+/* ============================================================================
+ * COMPONENT
+ * ========================================================================== */
 
 export default function SwipeableCard({
   children,
   onSwipeLeft,
   onSwipeRight,
-  className = "",
   disabled = false,
 }: SwipeableCardProps) {
-  const x = useMotionValue(0);
-  const didTrigger = useRef(false);
-
-  /*
-   * ─────────────────────────────────────────────────────────────
-   * POSITION / ROTATION
-   * ─────────────────────────────────────────────────────────────
+  /**
+   * Position horizontale de la carte.
+   *
+   * IMPORTANT : Toutes les écritures dans x.value se font uniquement
+   * dans les worklets Reanimated, jamais pendant le rendu React.
    */
+  const x = useSharedValue(0);
 
-  const rotate = useTransform(
-    x,
-    [-SWIPE_THRESHOLD * 2, 0, SWIPE_THRESHOLD * 2],
-    [-MAX_ROTATION, 0, MAX_ROTATION],
-  );
-
-  const scale = useTransform(
-    x,
-    [-SWIPE_THRESHOLD * 2, 0, SWIPE_THRESHOLD * 2],
-    [0.97, 1, 0.97],
-  );
-
-  /*
-   * ─────────────────────────────────────────────────────────────
-   * ACTION PROGRESS
-   * ─────────────────────────────────────────────────────────────
+  /**
+   * Style principal de la carte (translate + rotate + scale + shadow).
    */
+  const cardStyle = useAnimatedStyle(() => {
+    const rotation = interpolate(
+      x.value,
+      [-SWIPE_THRESHOLD * 2, 0, SWIPE_THRESHOLD * 2],
+      [-MAX_ROTATION, 0, MAX_ROTATION],
+    );
 
-  const leftProgress = useTransform(
-    x,
-    [-SWIPE_THRESHOLD * 1.8, -SWIPE_THRESHOLD, 0],
-    [1, 0.85, 0],
-  );
+    const scale = interpolate(
+      x.value,
+      [-SWIPE_THRESHOLD * 2, 0, SWIPE_THRESHOLD * 2],
+      [0.97, 1, 0.97],
+    );
 
-  const rightProgress = useTransform(
-    x,
-    [0, SWIPE_THRESHOLD, SWIPE_THRESHOLD * 1.8],
-    [0, 0.85, 1],
-  );
+    const shadowOpacity = interpolate(
+      x.value,
+      [-SWIPE_THRESHOLD * 2, 0, SWIPE_THRESHOLD * 2],
+      [0.28, 0.12, 0.28],
+    );
 
-  const leftOpacity = useTransform(
-    x,
-    [-SWIPE_THRESHOLD * 1.5, -30, 0],
-    [1, 0.25, 0],
-  );
+    return {
+      transform: [
+        { translateX: x.value },
+        { rotate: `${rotation}deg` },
+        { scale },
+      ],
+      shadowColor: "#000000",
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity,
+      shadowRadius: 40,
+      elevation: 8,
+    };
+  });
 
-  const rightOpacity = useTransform(
-    x,
-    [0, 30, SWIPE_THRESHOLD * 1.5],
-    [0, 0.25, 1],
-  );
+  /* ─── Ambient backgrounds ─── */
 
-  const leftScale = useTransform(
-    x,
-    [-SWIPE_THRESHOLD * 1.5, -SWIPE_THRESHOLD, 0],
-    [1.15, 1, 0.8],
-  );
+  const leftAmbientStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      x.value,
+      [-SWIPE_THRESHOLD * 1.5, -30, 0],
+      [1, 0.35, 0],
+    );
+    return { opacity };
+  });
 
-  const rightScale = useTransform(
-    x,
-    [0, SWIPE_THRESHOLD, SWIPE_THRESHOLD * 1.5],
-    [0.8, 1, 1.15],
-  );
+  const rightAmbientStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      x.value,
+      [0, 30, SWIPE_THRESHOLD * 1.5],
+      [0, 0.35, 1],
+    );
+    return { opacity };
+  });
 
-  /*
-   * ─────────────────────────────────────────────────────────────
-   * CARD SHADOW / GLOW
-   * ─────────────────────────────────────────────────────────────
-   */
+  /* ─── Icon indicators ─── */
 
-  const shadowOpacity = useTransform(
-    x,
-    [-SWIPE_THRESHOLD * 2, 0, SWIPE_THRESHOLD * 2],
-    [0.28, 0.12, 0.28],
-  );
+  const leftIndicatorStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      x.value,
+      [-SWIPE_THRESHOLD * 1.5, -30, 0],
+      [1, 0.25, 0],
+    );
+    const scale = interpolate(
+      x.value,
+      [-SWIPE_THRESHOLD * 1.5, -SWIPE_THRESHOLD, 0],
+      [1.15, 1, 0.8],
+    );
+    return { opacity, transform: [{ scale }] };
+  });
 
-  /*
-   * ─────────────────────────────────────────────────────────────
-   * SWIPE HANDLER
-   * ─────────────────────────────────────────────────────────────
-   */
+  const rightIndicatorStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      x.value,
+      [0, 30, SWIPE_THRESHOLD * 1.5],
+      [0, 0.25, 1],
+    );
+    const scale = interpolate(
+      x.value,
+      [0, SWIPE_THRESHOLD, SWIPE_THRESHOLD * 1.5],
+      [0.8, 1, 1.15],
+    );
+    return { opacity, transform: [{ scale }] };
+  });
 
-  const handleDragEnd = () => {
-    if (disabled || didTrigger.current) {
-      animate(x, 0, {
-        type: "spring",
-        stiffness: 420,
-        damping: 32,
-      });
+  /* ─── Ring progress ─── */
 
-      return;
-    }
+  const leftProgressStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(
+        x.value,
+        [-SWIPE_THRESHOLD * 1.8, -SWIPE_THRESHOLD, 0],
+        [1, 0.85, 0],
+      ),
+    };
+  });
 
-    const current = x.get();
+  const rightProgressStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(
+        x.value,
+        [0, SWIPE_THRESHOLD, SWIPE_THRESHOLD * 1.8],
+        [0, 0.85, 1],
+      ),
+    };
+  });
 
-    /*
-     * Swipe gauche
-     * = ignorer / dismiss
-     */
-    if (current < -SWIPE_THRESHOLD && onSwipeLeft) {
-      didTrigger.current = true;
+  /* ─── Labels ─── */
 
-      animate(x, -EXIT_DISTANCE, {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-      }).then(() => {
-        onSwipeLeft();
-        didTrigger.current = false;
-      });
+  const leftLabelStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(
+        x.value,
+        [-SWIPE_THRESHOLD * 1.5, -30, 0],
+        [1, 0.25, 0],
+      ),
+    };
+  });
 
-      return;
-    }
+  const rightLabelStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(
+        x.value,
+        [0, 30, SWIPE_THRESHOLD * 1.5],
+        [0, 0.25, 1],
+      ),
+    };
+  });
 
-    /*
-     * Swipe droite
-     * = sauvegarder
-     */
-    if (current > SWIPE_THRESHOLD && onSwipeRight) {
-      didTrigger.current = true;
+  /* ─── Gesture handler ─── */
 
-      animate(x, EXIT_DISTANCE, {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-      }).then(() => {
-        onSwipeRight();
-        didTrigger.current = false;
-      });
+  const gestureHandler = useAnimatedGestureHandler<
+    PanGestureHandlerGestureEvent,
+    { startX: number }
+  >({
+    onStart: (_, context) => {
+      context.startX = x.value;
+    },
+    onActive: (event, context) => {
+      x.value = context.startX + event.translationX;
+    },
+    onEnd: () => {
+      /* Désactivé → retour immédiat */
+      if (disabled) {
+        x.value = withSpring(0, { stiffness: 420, damping: 32 });
+        return;
+      }
 
-      return;
-    }
+      const current = x.value;
 
-    /*
-     * Pas assez loin :
-     * retour magnétique au centre.
-     */
-    animate(x, 0, {
-      type: "spring",
-      stiffness: 500,
-      damping: 35,
-    });
-  };
+      /* ─── SWIPE GAUCHE — IGNORER ─── */
+      if (current < -SWIPE_THRESHOLD && onSwipeLeft) {
+        x.value = withSpring(
+          -EXIT_DISTANCE,
+          { stiffness: 300, damping: 30 },
+          (finished) => {
+            "worklet";
+            if (!finished) return;
+            x.value = 0;
+            runOnJS(onSwipeLeft)();
+          },
+        );
+        return;
+      }
+
+      /* ─── SWIPE DROITE — SAUVEGARDER ─── */
+      if (current > SWIPE_THRESHOLD && onSwipeRight) {
+        x.value = withSpring(
+          EXIT_DISTANCE,
+          { stiffness: 300, damping: 30 },
+          (finished) => {
+            "worklet";
+            if (!finished) return;
+            x.value = 0;
+            runOnJS(onSwipeRight)();
+          },
+        );
+        return;
+      }
+
+      /* ─── PAS ASSEZ LOIN — CENTRE ─── */
+      x.value = withSpring(0, { stiffness: 500, damping: 35 });
+    },
+  });
+
+  /* ========================================================================
+   * RENDER
+   * ====================================================================== */
 
   return (
-    <View className={`relative overflow-hidden rounded-3xl ${className}`}>
-      {/* ========================================================
-          AMBIENT BACKGROUND
-          ======================================================== */}
-
-      <View
-        style={{ opacity: leftOpacity }}
-        className="absolute inset-0 z-0 overflow-hidden rounded-3xl"
+    <View style={styles.root}>
+      {/* ═══════════ AMBIENT — GAUCHE (IGNORER) ═══════════ */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, styles.ambientWrap, leftAmbientStyle]}
       >
-        <View className="absolute inset-0 bg-gradient-to-r from-red-500/20 via-red-500/5 to-transparent" />
+        <LinearGradient
+          colors={[
+            "rgba(239,68,68,0.28)",
+            "rgba(239,68,68,0.08)",
+            "rgba(239,68,68,0)",
+          ]}
+          start={{ x: 1, y: 0.5 }}
+          end={{ x: 0, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.leftOrb} />
+      </Animated.View>
 
-        <View className="absolute right-6 top-1/2 -translate-y-1/2 h-32 w-32 rounded-full bg-red-500/20" />
-      </View>
-
-      <View
-        style={{ opacity: rightOpacity }}
-        className="absolute inset-0 z-0 overflow-hidden rounded-3xl"
+      {/* ═══════════ AMBIENT — DROITE (SAUVEGARDER) ═══════════ */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, styles.ambientWrap, rightAmbientStyle]}
       >
-        <View className="absolute inset-0 bg-gradient-to-l from-yellow-400/20 via-yellow-400/5 to-transparent" />
+        <LinearGradient
+          colors={[
+            "rgba(250,204,21,0.28)",
+            "rgba(250,204,21,0.08)",
+            "rgba(250,204,21,0)",
+          ]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.rightOrb} />
+      </Animated.View>
 
-        <View className="absolute left-6 top-1/2 -translate-y-1/2 h-32 w-32 rounded-full bg-yellow-400/20" />
-      </View>
-
-      {/* ========================================================
-          LEFT ACTION — DISMISS
-          ======================================================== */}
-
-      <View
-        style={{
-          opacity: leftOpacity,
-          scale: leftScale,
-        }}
-        className="absolute inset-y-0 right-5 z-[1] flex items-center"
+      {/* ═══════════ LEFT ACTION — X ═══════════ */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.leftIndicator, leftIndicatorStyle]}
       >
-        <View className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-red-400/30 bg-red-500/15 shadow-[0_0_30px_rgba(239,68,68,0.18)]">
-          <X size={22} strokeWidth={2.5} className="text-red-300" />
-
-          <View
-            style={{ opacity: leftProgress }}
-            className="absolute inset-0 rounded-2xl border border-red-400/30"
+        <View style={styles.xIconWrap}>
+          <LinearGradient
+            colors={["rgba(239,68,68,0.24)", "rgba(239,68,68,0.08)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.xIconBorder} pointerEvents="none" />
+          <X size={22} color="#FCA5A5" strokeWidth={2.6} />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.iconProgressRing,
+              styles.xRingBorder,
+              leftProgressStyle,
+            ]}
           />
         </View>
-      </View>
+      </Animated.View>
 
-      {/* ========================================================
-          RIGHT ACTION — BOOKMARK
-          ======================================================== */}
-
-      <View
-        style={{
-          opacity: rightOpacity,
-          scale: rightScale,
-        }}
-        className="absolute inset-y-0 left-5 z-[1] flex items-center"
+      {/* ═══════════ RIGHT ACTION — BOOKMARK ═══════════ */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.rightIndicator, rightIndicatorStyle]}
       >
-        <View className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-yellow-400/30 bg-yellow-400/15 shadow-[0_0_30px_rgba(250,204,21,0.18)]">
-          <Bookmark size={21} strokeWidth={2.4} className="text-yellow-300" />
-
-          <View
-            style={{ opacity: rightProgress }}
-            className="absolute inset-0 rounded-2xl border border-yellow-300/40"
+        <View style={styles.bookmarkIconWrap}>
+          <LinearGradient
+            colors={["rgba(250,204,21,0.24)", "rgba(250,204,21,0.08)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.bookmarkIconBorder} pointerEvents="none" />
+          <Bookmark size={21} color="#FDE047" strokeWidth={2.4} />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.iconProgressRing,
+              styles.bookmarkRingBorder,
+              rightProgressStyle,
+            ]}
           />
         </View>
-      </View>
+      </Animated.View>
 
-      {/* ========================================================
-          SWIPE LABELS
-          ======================================================== */}
-
-      <View
-        style={{ opacity: leftOpacity }}
-        className="absolute right-5 top-5 z-[2]"
+      {/* ═══════════ LABEL — IGNORER ═══════════ */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.leftLabel, leftLabelStyle]}
       >
-        <View className="flex items-center gap-1.5 rounded-full border border-red-400/20 bg-red-500/10 px-2.5 py-1">
-          <X size={11} className="text-red-300" />
-
-          <Text className="text-[9px] font-bold uppercase tracking-wider text-red-300">
-            Ignorer
-          </Text>
+        <View style={styles.labelChipRed}>
+          <LinearGradient
+            colors={["rgba(239,68,68,0.2)", "rgba(239,68,68,0.06)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.labelChipRedBorder} pointerEvents="none" />
+          <X size={11} color="#FCA5A5" strokeWidth={2.6} />
+          <Text style={styles.labelRedText}>IGNORER</Text>
         </View>
-      </View>
+      </Animated.View>
 
-      <View
-        style={{ opacity: rightOpacity }}
-        className="absolute left-5 top-5 z-[2]"
+      {/* ═══════════ LABEL — SAUVEGARDER ═══════════ */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.rightLabel, rightLabelStyle]}
       >
-        <View className="flex items-center gap-1.5 rounded-full border border-yellow-300/20 bg-yellow-400/10 px-2.5 py-1">
-          <Bookmark size={10} className="text-yellow-300" />
-
-          <Text className="text-[9px] font-bold uppercase tracking-wider text-yellow-300">
-            Sauvegarder
-          </Text>
+        <View style={styles.labelChipYellow}>
+          <LinearGradient
+            colors={["rgba(250,204,21,0.2)", "rgba(250,204,21,0.06)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.labelChipYellowBorder} pointerEvents="none" />
+          <Bookmark size={10} color="#FDE047" strokeWidth={2.4} />
+          <Text style={styles.labelYellowText}>SAUVEGARDER</Text>
         </View>
-      </View>
+      </Animated.View>
 
-      {/* ========================================================
-          MAIN CARD
-          ======================================================== */}
-
-      <View
-        style={{
-          x,
-          rotate,
-          scale
-        }}
-        className={[
-          "relative z-10",
-          "cursor-grab active:cursor-grabbing",
-          "touch-pan-y",
-          "will-change-transform",
-          disabled ? "cursor-default" : "",
-        ].join(" ")}
-      >
-        {/* Premium top highlight */}
-        <View className="absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-        {children}
-
-        {/* ======================================================
-            MICRO SWIPE HINT
-            ====================================================== */}
-
-        {!disabled && (
-          <View className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2">
-            <View
-              className="flex items-center gap-1 rounded-full border border-white/10 bg-black/20 px-2.5 py-1"
-            >
-              <Sparkles size={9} className="text-white/50" />
-
-              <Text className="text-[8px] font-medium text-white/40">
-                Glisser pour agir
-              </Text>
-            </View>
+      {/* ═══════════ MAIN CARD (gesture) ═══════════ */}
+      <PanGestureHandler onGestureEvent={gestureHandler} enabled={!disabled}>
+        <Animated.View style={[styles.card, cardStyle]}>
+          {/* Top highlight */}
+          <View style={styles.topHighlight} pointerEvents="none">
+            <LinearGradient
+              colors={[
+                "rgba(255,255,255,0)",
+                "rgba(255,255,255,0.22)",
+                "rgba(255,255,255,0)",
+              ]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={{ flex: 1 }}
+            />
           </View>
-        )}
-      </View>
+
+          {children}
+
+          {/* Micro swipe hint */}
+          {!disabled ? (
+            <View pointerEvents="none" style={styles.swipeHintWrap}>
+              <View style={styles.swipeHintChip}>
+                <LinearGradient
+                  colors={["rgba(0,0,0,0.35)", "rgba(0,0,0,0.2)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={styles.swipeHintBorder} pointerEvents="none" />
+                <Sparkles
+                  size={9}
+                  color="rgba(255,255,255,0.6)"
+                  strokeWidth={2.4}
+                />
+                <Text style={styles.swipeHintText}>Glisser pour agir</Text>
+              </View>
+            </View>
+          ) : null}
+        </Animated.View>
+      </PanGestureHandler>
     </View>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  root: {
+    position: "relative",
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+
+  /* ── Ambient ────────────────────────────────────── */
+  ambientWrap: {
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+  leftOrb: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -64,
+    right: 24,
+    width: 128,
+    height: 128,
+    borderRadius: 9999,
+    backgroundColor: "rgba(239,68,68,0.22)",
+  },
+  rightOrb: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -64,
+    left: 24,
+    width: 128,
+    height: 128,
+    borderRadius: 9999,
+    backgroundColor: "rgba(250,204,21,0.22)",
+  },
+
+  /* ── Left indicator (X) ────────────────────────── */
+  leftIndicator: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    right: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  xIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: "#EF4444",
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  xIconBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.4)",
+  },
+  iconProgressRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    borderWidth: 2,
+  },
+  xRingBorder: {
+    borderColor: "rgba(248,113,113,0.55)",
+  },
+
+  /* ── Right indicator (Bookmark) ────────────────── */
+  rightIndicator: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  bookmarkIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: "#FACC15",
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  bookmarkIconBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(250,204,21,0.4)",
+  },
+  bookmarkRingBorder: {
+    borderColor: "rgba(253,224,71,0.55)",
+  },
+
+  /* ── Labels ─────────────────────────────────────── */
+  leftLabel: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+    zIndex: 2,
+  },
+  rightLabel: {
+    position: "absolute",
+    top: 20,
+    left: 20,
+    zIndex: 2,
+  },
+  labelChipRed: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  labelChipRedBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.3)",
+  },
+  labelRedText: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    color: "#FCA5A5",
+    textTransform: "uppercase",
+  },
+  labelChipYellow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  labelChipYellowBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(253,224,71,0.3)",
+  },
+  labelYellowText: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    color: "#FDE047",
+    textTransform: "uppercase",
+  },
+
+  /* ── Main card ──────────────────────────────────── */
+  card: {
+    position: "relative",
+    zIndex: 10,
+  },
+  topHighlight: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    zIndex: 20,
+  },
+
+  /* ── Swipe hint ─────────────────────────────────── */
+  swipeHintWrap: {
+    position: "absolute",
+    bottom: 12,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 20,
+  },
+  swipeHintChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  swipeHintBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  swipeHintText: {
+    fontSize: 8.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: 0.3,
+  },
+});

@@ -1,7 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { Pressable, View, Linking } from "react-native";
 import { useState } from "react";
 import { Share2, Link2, Check } from "lucide-react-native";
+import { toast } from "sonner";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 interface Props {
   url: string;
@@ -32,61 +33,46 @@ export function PropertyShare({ url, title }: Props) {
 
   const handleCopy = async () => {
     try {
-      await undefined.writeText(url);
+      await Clipboard.setString(url);
       setCopied(true);
-      UIService.openToast("Lien copié !", "success");
+      toast.success("Lien copié !");
       setTimeout(() => setCopied(false), 3000);
     } catch {
-      UIService.openToast("Impossible de copier le lien", "error");
+      toast.error("Impossible de copier le lien");
     }
   };
 
   const handleShare = () => {
-    if (undefined) {
-      undefined.catch(() => {});
+    if (navigator.share) {
+      navigator.share({ title, url }).catch(() => {});
     }
   };
 
   return (
     <View className="flex flex-wrap gap-2">
-      <Pressable
-        onPress={handleShare}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-white/5 text-white/60"
-      >
+      <Pressable onPress={handleShare} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-white/5 text-white/60 transition-colors">
         <Share2 size={14} /> Partager
       </Pressable>
 
-      <Pressable
-        onPress={() =>
+      <Pressable onPress={() =>
           Linking.openURL(String(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`))
-        }
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#1877F2]/20 text-[#1877F2]"
-      >
+        } className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#1877F2]/20 text-[#1877F2] transition-colors">
         <FacebookIcon size={14} />
       </Pressable>
 
-      <Pressable
-        onPress={() =>
+      <Pressable onPress={() =>
           Linking.openURL(String(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`))
-        }
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#1DA1F2]/20 text-[#1DA1F2]"
-      >
+        } className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#1DA1F2]/20 text-[#1DA1F2] transition-colors">
         <TwitterIcon size={14} />
       </Pressable>
 
-      <Pressable
-        onPress={() =>
+      <Pressable onPress={() =>
           Linking.openURL(String(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`))
-        }
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#0A66C2]/20 text-[#0A66C2]"
-      >
+        } className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#0A66C2]/20 text-[#0A66C2] transition-colors">
         <LinkedinIcon size={14} />
       </Pressable>
 
-      <Pressable
-        onPress={handleCopy}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-white/5 text-white/60"
-      >
+      <Pressable onPress={handleCopy} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-white/5 text-white/60 transition-colors">
         {copied ? (
           <Check size={14} className="text-green-400" />
         ) : (

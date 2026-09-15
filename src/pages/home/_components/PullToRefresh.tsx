@@ -1,42 +1,20 @@
+// src/pages/home/_components/PullToRefresh.tsx
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Easing,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { RefreshCw, Sparkles } from "lucide-react-native";
 
-type NativeMotionValue<T> = {
-  get: () => T;
-  set: (value: T) => void;
-};
-
-function useMotionValue<T>(initial: T): NativeMotionValue<T> {
-  const ref = useRef<NativeMotionValue<T> | null>(null);
-  if (ref.current === null) {
-    let current = initial;
-    ref.current = {
-      get: () => current,
-      set: (value: T) => { current = value; },
-    };
-  }
-  return ref.current;
-}
-
-function useTransform<T, R>(
-  value: NativeMotionValue<T>,
-  transform: ((value: T) => R) | readonly R[],
-): R {
-  const current = value.get();
-  return typeof transform === "function"
-    ? transform(current)
-    : transform[0];
-}
-
-function animate(..._args: unknown[]): { stop: () => void } {
-  return { stop: () => undefined };
-}
-
-function useSpring<T>(value: T): T { return value; }
-function useScroll(): Record<string, unknown> { return {}; }
-function useVelocity<T>(value: T): T { return value; }
-function useTime(): number { return 0; }
-import { View, Text } from "react-native";
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { Check, RefreshCw } from "lucide-react-native";
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<void>;
@@ -44,391 +22,267 @@ interface PullToRefreshProps {
   className?: string;
 }
 
-const PULL_THRESHOLD = 76;
-const MAX_PULL = 118;
-const INDICATOR_HEIGHT = 76;
+/* ============================================================================
+ * CUSTOM REFRESH OVERLAY
+ * ========================================================================== */
 
-function getPullResistance(distance: number): number {
-  if (distance <= 0) return 0;
+function RefreshOverlay({ active }: { active: boolean }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(-14)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
 
-  if (distance <= 40) {
-    return distance * 0.72;
-  }
+  useEffect(() => {
+    if (active) {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateY, {
+          toValue: 0,
+          stiffness: 340,
+          damping: 26,
+          useNativeDriver: true,
+        }),
+      ]).start();
 
-  if (distance <= PULL_THRESHOLD) {
-    return 28.8 + (distance - 40) * 0.52;
-  }
+      rotate.setValue(0);
+      Animated.loop(
+        Animated.timing(rotate, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ).start();
 
-  return Math.min(47.52 + (distance - PULL_THRESHOLD) * 0.28, MAX_PULL);
+      pulse.setValue(0);
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse, {
+            toValue: 1,
+            duration: 1400,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulse, {
+            toValue: 0,
+            duration: 1400,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 260,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: -14,
+          duration: 260,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [active, opacity, translateY, rotate, pulse]);
+
+  const rotation = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  const glowScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.08],
+  });
+
+  const glowOpacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 0.85],
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.overlayWrapper,
+        {
+          opacity,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
+      <View style={styles.overlayCard}>
+        <LinearGradient
+          colors={[
+            "rgba(167,139,250,0.22)",
+            "rgba(15,7,32,0.85)",
+            "rgba(10,6,24,0.95)",
+          ]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.overlayBorder} pointerEvents="none" />
+
+        {/* Pulsing glow behind */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.overlayGlow,
+            {
+              opacity: glowOpacity,
+              transform: [{ scale: glowScale }],
+            },
+          ]}
+        />
+
+        {/* Spinner */}
+        <Animated.View
+          style={[styles.spinnerWrap, { transform: [{ rotate: rotation }] }]}
+        >
+          <RefreshCw size={14} color="#C4B5FD" strokeWidth={2.4} />
+        </Animated.View>
+
+        {/* Text */}
+        <Text style={styles.overlayText}>Actualisation…</Text>
+
+        {/* Sparkle */}
+        <Sparkles size={11} color="#A78BFA" strokeWidth={2.4} />
+      </View>
+    </Animated.View>
+  );
 }
+
+/* ============================================================================
+ * MAIN COMPONENT
+ * ========================================================================== */
 
 export default function PullToRefresh({
   onRefresh,
   children,
-  className = "",
+  className,
 }: PullToRefreshProps) {
   const [refreshing, setRefreshing] = useState(false);
-  const [triggered, setTriggered] = useState(false);
 
-  const scrollRef = useRef<View>(null);
-
-  const startY = useRef<number | null>(null);
-  const tracking = useRef(false);
-  const triggeredRef = useRef(false);
-  const mounted = useRef(true);
-
-  /**
-   * Motion uniquement pour l'indicateur.
-   * Le contenu Home n'est jamais transformé.
-   */
-  const pullY = useMotionValue(0);
-
-  const progress = useTransform(pullY, [0, PULL_THRESHOLD], [0, 1]);
-
-  const iconOpacity = useTransform(
-    pullY,
-    [0, 12, 32, PULL_THRESHOLD],
-    [0, 0.25, 0.65, 1],
-  );
-
-  const iconRotate = useTransform(pullY, [0, PULL_THRESHOLD], [0, 300]);
-
-  const indicatorScale = useTransform(pullY, [0, PULL_THRESHOLD], [0.82, 1]);
-
-  const textOpacity = useTransform(
-    pullY,
-    [0, 25, PULL_THRESHOLD],
-    [0, 0.35, 1],
-  );
-
-  const progressStroke = useTransform(progress, [0, 1], [0, 100]);
-
-  /* ============================================================
-   * LIFECYCLE
-   * ============================================================ */
-
-  useEffect(() => {
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  /* ============================================================
-   * RESET
-   * ============================================================ */
-
-  const resetPull = useCallback(() => {
-    startY.current = null;
-    tracking.current = false;
-    triggeredRef.current = false;
-
-    if (mounted.current) {
-      setTriggered(false);
-    }
-
-    pullY.stop();
-    pullY.set(0);
-  }, [pullY]);
-
-  /* ============================================================
-   * TOUCH START
-   * ============================================================ */
-
-  const handleTouchStart = useCallback(
-    (event: React.TouchEvent<View>) => {
-      if (refreshing) return;
-
-      const element = scrollRef.current;
-
-      if (!element) return;
-
-      /**
-       * Pull-to-refresh uniquement au sommet.
-       */
-      if (element.scrollTop > 0) {
-        startY.current = null;
-        tracking.current = false;
-        return;
-      }
-
-      const touch = event.touches[0];
-
-      if (!touch) return;
-
-      startY.current = touch.clientY;
-      tracking.current = true;
-    },
-    [refreshing],
-  );
-
-  /* ============================================================
-   * TOUCH MOVE
-   * ============================================================ */
-
-  const handleTouchMove = useCallback(
-    (event: React.TouchEvent<View>) => {
-      if (refreshing || !tracking.current || startY.current === null) {
-        return;
-      }
-
-      const element = scrollRef.current;
-
-      if (!element) {
-        resetPull();
-        return;
-      }
-
-      /**
-       * Dès que le scroll natif reprend,
-       * on abandonne le pull-to-refresh.
-       */
-      if (element.scrollTop > 0) {
-        resetPull();
-        return;
-      }
-
-      const touch = event.touches[0];
-
-      if (!touch) return;
-
-      const distance = touch.clientY - startY.current;
-
-      /**
-       * Mouvement vers le haut :
-       * ne jamais bloquer le navigateur.
-       */
-      if (distance <= 0) {
-        if (pullY.get() !== 0) {
-          pullY.set(0);
-        }
-
-        if (triggeredRef.current) {
-          triggeredRef.current = false;
-          setTriggered(false);
-        }
-
-        return;
-      }
-
-      const resisted = getPullResistance(distance);
-
-      pullY.set(resisted);
-
-      const reachedThreshold = resisted >= PULL_THRESHOLD;
-
-      if (reachedThreshold !== triggeredRef.current) {
-        triggeredRef.current = reachedThreshold;
-        setTriggered(reachedThreshold);
-      }
-    },
-    [pullY, refreshing, resetPull],
-  );
-
-  /* ============================================================
-   * REFRESH
-   * ============================================================ */
-
-  const executeRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(async () => {
     if (refreshing) return;
 
     setRefreshing(true);
-    setTriggered(true);
-    triggeredRef.current = true;
-
-    pullY.stop();
-    pullY.set(PULL_THRESHOLD * 0.72);
-
     try {
       await onRefresh();
     } catch (error) {
       console.error("[PullToRefresh] Refresh failed:", error);
     } finally {
-      if (!mounted.current) return;
-
       setRefreshing(false);
-      setTriggered(false);
-      triggeredRef.current = false;
-
-      pullY.stop();
-      pullY.set(0);
     }
-  }, [onRefresh, pullY, refreshing]);
-
-  /* ============================================================
-   * TOUCH END
-   * ============================================================ */
-
-  const handleTouchEnd = useCallback(() => {
-    if (refreshing || !tracking.current) {
-      return;
-    }
-
-    tracking.current = false;
-
-    const currentPull = pullY.get();
-
-    startY.current = null;
-
-    if (currentPull >= PULL_THRESHOLD) {
-      void executeRefresh();
-      return;
-    }
-
-    triggeredRef.current = false;
-    setTriggered(false);
-
-    pullY.stop();
-    pullY.set(0);
-  }, [executeRefresh, pullY, refreshing]);
-
-  /* ============================================================
-   * TOUCH CANCEL
-   * ============================================================ */
-
-  const handleTouchCancel = useCallback(() => {
-    if (refreshing) return;
-
-    resetPull();
-  }, [refreshing, resetPull]);
-
-  /* ============================================================
-   * RENDER
-   * ============================================================ */
+  }, [onRefresh, refreshing]);
 
   return (
-    <View
-      className={`
-        relative
-        flex
-        flex-1
-        min-h-0
-        min-w-0
-        w-full
-        overflow-hidden
-        bg-transparent
-        ${className}
-      `}
-    >
-      {/* ======================================================
-          PULL INDICATOR
-          ====================================================== */}
-
-      <View
-        className="absolute inset-x-0 top-0 z-30 flex items-center justify-center"
-        style={{
-          height: INDICATOR_HEIGHT,
-        }}
-       
-      >
-        <View
-          style={{
-            opacity: iconOpacity,
-            scale: indicatorScale,
-          }}
-          className="relative flex flex-col items-center"
-        >
-          {/* Glow */}
-
-          <View
-            className="absolute h-14 w-14 rounded-full"
-            style={{ opacity: progress }}
+    <View style={styles.root}>
+      <ScrollView
+        style={[styles.scrollView, className ? { flex: 1 } : undefined]}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#A78BFA"
+            colors={["#A78BFA", "#7C3AED"]}
+            progressBackgroundColor="#0A0616"
+            title="Tirer pour actualiser"
+            titleColor="rgba(255,255,255,0.45)"
           />
-
-          {/* Ring */}
-
-          <View className="relative h-10 w-10">
-            <svg
-              viewBox="0 0 40 40"
-              className="absolute inset-0 h-10 w-10 -rotate-90"
-            >
-              <circle
-                cx="20"
-                cy="20"
-                r="15"
-                fill="none"
-                stroke="rgba(255,255,255,.08)"
-                strokeWidth="2"
-              />
-
-              <motion.circle
-                cx="20"
-                cy="20"
-                r="15"
-                fill="none"
-                stroke="rgba(167,139,250,.9)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                pathLength="100"
-                style={{
-                  pathLength: progressStroke,
-                }}
-              />
-            </svg>
-
-            <View
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                rotate: iconRotate,
-              }}
-            >
-              {refreshing ? (
-                <RefreshCw
-                  size={17}
-                  strokeWidth={2.2}
-                  className="text-violet-300"
-                />
-              ) : triggered ? (
-                <Check
-                  size={18}
-                  strokeWidth={2.4}
-                  className="text-violet-300"
-                />
-              ) : (
-                <RefreshCw
-                  size={17}
-                  strokeWidth={2}
-                  className="text-white/45"
-                />
-              )}
-            </View>
-          </View>
-
-          {/* Label */}
-
-          <View
-            style={{
-              opacity: textOpacity,
-            }}
-            className="mt-1.5 rounded-full px-2.5 py-1"
-          >
-            <Text
-              className="text-[9px] font-semibold tracking-wide text-white/45"
-            >
-              {refreshing
-                ? "Actualisation…"
-                : triggered
-                  ? "Relâcher pour actualiser"
-                  : "Tirer pour actualiser"}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* ======================================================
-          TRUE NATIVE SCROLL AREA
-          ====================================================== */}
-
-      <View
-        ref={scrollRef}
-        className="relative flex-1 min-h-0 min-w-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain bg-transparent"
-        style={{ touchAction: refreshing ? "none" : "pan-y", overscrollBehaviorY: "contain" }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchCancel}
+        }
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentInsetAdjustmentBehavior="automatic"
       >
         {children}
-      </View>
+      </ScrollView>
+
+      {/* Custom overlay on top when refreshing */}
+      <RefreshOverlay active={refreshing} />
     </View>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    width: "100%",
+    backgroundColor: "transparent",
+  },
+  scrollView: {
+    flex: 1,
+    width: "100%",
+    backgroundColor: "transparent",
+  },
+  content: {
+    flexGrow: 1,
+    paddingBottom: 24,
+  },
+
+  /* ── Overlay ────────────────────────────────────── */
+  overlayWrapper: {
+    position: "absolute",
+    top: 12,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 50,
+  },
+  overlayCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    overflow: "hidden",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
+  },
+  overlayBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.32)",
+  },
+  overlayGlow: {
+    position: "absolute",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(167,139,250,0.35)",
+    left: 12,
+  },
+  spinnerWrap: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  overlayText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+});

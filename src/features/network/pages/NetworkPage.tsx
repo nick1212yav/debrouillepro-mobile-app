@@ -1,4 +1,5 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text } from "react-native";
+
 // src/features/network/pages/NetworkPage.tsx
 import { useState, useCallback, useEffect } from "react";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
@@ -144,22 +145,16 @@ export default function NetworkPage({
         );
       case "companies":
         return (
-          <View className="text-white/40 text-sm text-center py-8">
-            <Text>Les entreprises apparaîtront ici.</Text></View>
+          <View className="text-white/40 text-sm text-center py-8"><Text>Les entreprises apparaîtront ici.</Text></View>
         );
       case "opportunities":
         return (
-          <View className="text-white/40 text-sm text-center py-8">
-            <Text>Les opportunités (emplois, services) apparaîtront ici.</Text></View>
+          <View className="text-white/40 text-sm text-center py-8"><Text>Les opportunités (emplois, services) apparaîtront ici.</Text></View>
         );
       case "analytics":
         return (
-          <View className="space-y-4">
-            <View className="text-white/40 text-sm text-center py-8">
-              {analyticsLoading ? "Chargement..." : "Statistiques du réseau"}
-            </View>
-            {analytics && (
-              <View className="gap-3">
+          <View className="space-y-4"><View className="text-white/40 text-sm text-center py-8">{analyticsLoading ? "Chargement..." : "Statistiques du réseau"}</View>{analytics && (
+              <div className="gap-3">
                 <StatCard
                   label="Vues de profil"
                   value={analytics.profileViews}
@@ -181,9 +176,8 @@ export default function NetworkPage({
                   value={analytics.opportunitiesGenerated}
                   change={analytics.opportunitiesGeneratedChange}
                 />
-              </View>
-            )}
-          </View>
+              </div>
+            )}</View>
         );
       default:
         return null;
@@ -191,73 +185,46 @@ export default function NetworkPage({
   };
 
   return (
-    <View
-      className="h-full flex flex-col overflow-hidden"
-      style={{  }}
-    >
-      {/* Header */}
-      <NetworkHeader
+    <View className="h-full flex flex-col overflow-hidden" style={{
+}}>{/* Header */}<NetworkHeader
         onBack={onBack}
         title="Réseau"
         subtitle="Suggestions · Abonnés · Abonnements"
         showSearch
         onSearch={() => setFilterSheetOpen(true)}
         rightElement={
-          <Pressable
+          <div
             className="w-9 h-9 rounded-xl flex items-center justify-center bg-indigo-500/15"
             onPress={() => setFilterSheetOpen(true)}
           >
-            <Text className="text-indigo-400 text-sm">🔍</Text>
-          </Pressable>
+            <span className="text-indigo-400 text-sm">🔍</span>
+          </div>
         }
-      />
-
-      {/* Stats */}
-      <NetworkStats
+      />{/* Stats */}<NetworkStats
         followerCount={followers?.length || 0}
         followingCount={following?.length || 0}
         isLoading={followersLoading || followingLoading}
-      />
-
-      {/* Search bar */}
-      <View className="px-4 mb-4">
-        <NetworkSearch
+      />{/* Search bar */}<View className="px-4 mb-4"><NetworkSearch
           value={searchQuery}
-          onChange={setSearchQuery}
+          onChangeText={setSearchQuery}
           placeholder="Rechercher un profil, une entreprise..."
           onSearch={() => {}}
-        />
-      </View>
-
-      {/* Tabs */}
-      <NetworkTabs
+        /></View>{/* Tabs */}<NetworkTabs
         activeTab={activeTab}
-        onChange={setActiveTab}
+        onChangeText={setActiveTab}
         counts={{
           suggestions: suggestions?.length || 0,
           followers: followers?.length || 0,
           following: following?.length || 0,
         }}
-      />
-
-      {/* Content */}
-      <View
-        className="flex-1 overflow-y-auto px-4 pb-6"
-        style={{  }}
-      >
-        {renderContent()}
-      </View>
-
-      {/* Filter Sheet */}
-      <NetworkFiltersSheet
+      />{/* Content */}<View className="flex-1 overflow-y-auto px-4 pb-6" style={{ }}>{renderContent()}</View>{/* Filter Sheet */}<NetworkFiltersSheet
         isOpen={filterSheetOpen}
         onClose={() => setFilterSheetOpen(false)}
         onApply={(filters) => {
           console.log("Filtres appliqués:", filters);
           setFilterSheetOpen(false);
         }}
-      />
-    </View>
+      /></View>
   );
 }
 
@@ -284,9 +251,7 @@ function StatCard({
         {suffix}
       </Text>
       {change !== 0 && (
-        <Text
-          className={`text-xs font-semibold ${isPositive ? "text-emerald-400" : "text-red-400"}`}
-        >
+        <Text className={`text-xs font-semibold ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
           {isPositive ? "↑" : "↓"} {Math.abs(change)}%
         </Text>
       )}

@@ -1,5 +1,6 @@
-import { Linking } from "react-native";
 import type { ActionConfig } from "@/core/sdk/types";
+import { Linking, Share } from "react-native";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 interface ImmoMeta {
   propertyId?: string;
@@ -85,10 +86,10 @@ export const actions: ActionConfig[] = [
     variant: "ghost",
     order: 3,
     execute: async (context) => {
-      if (undefined) {
-        await undefined;
+      if (navigator.share) {
+        await Share.share({ message: String(context.publication.description) + "\n" + "\n" + String(window.location.href), title: context.publication.title });
       } else {
-        await undefined.writeText(undefined.href);
+        await Clipboard.setString(window.location.href);
         context.ui.openToast("Lien copié !", "success");
       }
     },
@@ -127,7 +128,7 @@ export const actions: ActionConfig[] = [
     execute: async (context) => {
       const meta = parseImmoMeta(context.publication.meta);
       if (meta.phone) {
-        undefined.href = `tel:${meta.phone}`;
+        Linking.openURL(`tel:${meta.phone}`);
       }
     },
   },

@@ -1,10 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/hooks/useNetworkCertifications.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { NetworkCertification } from "../types";
+import { toast } from "sonner";
 
 interface UseNetworkCertificationsOptions {
   userId: Id<"users">;
@@ -30,10 +29,10 @@ export function useNetworkCertifications({
     try {
       // ✅ Conforme : retrait de 'userId' car l'authentification est résolue côté serveur Convex
       const id = await addCertification(data);
-      UIService.openToast("Certification ajoutée", "success");
+      toast.success("Certification ajoutée");
       return id;
     } catch {
-      UIService.openToast("Erreur lors de l'ajout", "error");
+      toast.error("Erreur lors de l'ajout");
       return null;
     }
   };
@@ -44,10 +43,10 @@ export function useNetworkCertifications({
   ) => {
     try {
       await updateCertification({ id: certificationId, ...data });
-      UIService.openToast("Certification mise à jour", "success");
+      toast.success("Certification mise à jour");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la mise à jour", "error");
+      toast.error("Erreur lors de la mise à jour");
       return false;
     }
   };
@@ -56,10 +55,10 @@ export function useNetworkCertifications({
     // ✅ Typé Id<"networkCertifications"> pour la sécurité des types
     try {
       await deleteCertification({ id: certificationId });
-      UIService.openToast("Certification supprimée", "success");
+      toast.success("Certification supprimée");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
       return false;
     }
   };

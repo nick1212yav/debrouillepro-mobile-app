@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditDoctorSheet.tsx
@@ -13,6 +12,7 @@ import { DoctorForm } from "../forms/DoctorForm";
 import type { DoctorFormValues } from "../forms/DoctorForm"; // ✅ correction
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Doctor } from "../types/doctor.types";
 
 interface EditDoctorSheetProps {
@@ -47,11 +47,11 @@ export function EditDoctorSheet({
             .map((s: string) => s.trim())
             .filter(Boolean) || [],
       });
-      UIService.openToast("Médecin mis à jour", "success");
+      toast.success("Médecin mis à jour");
       onOpenChange(false);
       onSuccess?.();
     } catch (e) {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
 

@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreateLaboratorySheet.tsx
@@ -13,6 +12,7 @@ import { LaboratoryForm } from "../forms/LaboratoryForm";
 import type { LaboratoryFormValues } from "../forms/LaboratoryForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface CreateLaboratorySheetProps {
   open: boolean;
@@ -38,13 +38,13 @@ export function CreateLaboratorySheet({
             .filter(Boolean) || [],
         images: [],
       });
-      UIService.openToast("Laboratoire créé avec succès !", "success");
+      toast.success("Laboratoire créé avec succès !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erreur lors de la création";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

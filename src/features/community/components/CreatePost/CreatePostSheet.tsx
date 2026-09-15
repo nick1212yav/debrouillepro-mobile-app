@@ -1,11 +1,11 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, TextInput, Pressable } from "react-native";
+import { View, TextInput } from "react-native";
 
 // src/features/community/components/CreatePost/CreatePostSheet.tsx
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { toast } from "sonner";
 import { useCreatePost } from "../../hooks/useCreatePost";
 import { PostHeader } from "./PostHeader";
 import { PostTypeSelector } from "./PostTypeSelector";
@@ -115,21 +115,21 @@ export function CreatePostSheet({ isOpen, onClose, onSuccess }: Props) {
 
   const handleSubmit = async () => {
     if (!user) {
-      UIService.openToast("Connectez-vous pour publier", "error");
+      toast.error("Connectez-vous pour publier");
       return;
     }
     if (postType !== "poll" && !postContent.trim()) {
-      UIService.openToast("Veuillez écrire un contenu", "error");
+      toast.error("Veuillez écrire un contenu");
       return;
     }
     if (postType === "poll") {
       const validOptions = pollOptions.filter((o) => o.trim());
       if (validOptions.length < 2) {
-        UIService.openToast("Ajoutez au moins 2 options", "error");
+        toast.error("Ajoutez au moins 2 options");
         return;
       }
       if (!postTitle.trim()) {
-        UIService.openToast("Donnez un titre au sondage", "error");
+        toast.error("Donnez un titre au sondage");
         return;
       }
     }
@@ -183,14 +183,14 @@ export function CreatePostSheet({ isOpen, onClose, onSuccess }: Props) {
         audience,
         mood,
       });
-      UIService.openToast("Post publié !", "success");
+      toast.success("Post publié !");
       if (draftId) await deleteDraft();
       resetForm();
       onClose();
       onSuccess?.();
     } catch (error) {
       console.error("Erreur publication:", error);
-      UIService.openToast("Erreur lors de la publication", "error");
+      toast.error("Erreur lors de la publication");
     } finally {
       setIsSubmitting(false);
     }
@@ -216,66 +216,22 @@ export function CreatePostSheet({ isOpen, onClose, onSuccess }: Props) {
   if (!isOpen) return null;
 
   return (
-    <>
-      <Pressable
-        className="fixed inset-0 z-50 flex items-end justify-center"
-        style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-        onPress={(e) => e.target === e.currentTarget && onClose()}
-      >
-        <View
-          className="w-full max-w-lg rounded-t-3xl overflow-hidden flex flex-col"
-          style={{ backgroundColor: "rgba(15,15,30,0.98)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", maxHeight: "90vh" }}
-        >
+<View>
+      <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={(e) => e.target === e.currentTarget && onClose()}>
+        <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="w-full max-w-lg rounded-t-3xl overflow-hidden flex flex-col" style={{ backgroundColor: "rgba(15,15,30,0.98)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", maxHeight: "90vh" }}>
           <PostHeader onClose={onClose} />
 
-          <View
-            className="flex-1 overflow-y-auto px-5 pt-4 pb-32 flex flex-col gap-3"
-            style={{  }}
-          >
-            <PostAudience audience={audience} onChange={setAudience} />
-            <PostTypeSelector value={postType} onChange={setPostType} />
-            <View className="flex items-start gap-3">
-              <PostEmojiPicker
-                emoji={postEmoji}
-                onChange={setPostEmoji}
-                show={showEmojiPicker}
-                onToggle={() => setShowEmojiPicker(!showEmojiPicker)}
-              />
-              <TextInput
-                value={postTitle}
-                onChangeText={(text) => setPostTitle(text)}
-                placeholder={
-                  postType === "question"
+          <View className="flex-1 overflow-y-auto px-5 pt-4 pb-32 flex flex-col gap-3" style={{  }}><PostAudience audience={audience} onChange={setAudience} /><PostTypeSelector value={postType} onChange={setPostType} /><View className="flex items-start gap-3"><PostEmojiPicker emoji={postEmoji} onChange={setPostEmoji} show={showEmojiPicker} onToggle={() => setShowEmojiPicker(!showEmojiPicker)} /><TextInput value={postTitle} onChangeText={(value) => setPostTitle(value)} placeholder={postType === "question"
                     ? "Votre question..."
                     : postType === "poll"
                       ? "Titre du sondage..."
-                      : "Titre (optionnel)"
-                }
-                className="flex-1 bg-transparent text-white placeholder:text-white/25 font-bold text-base outline-none pt-2"
-              />
-            </View>
-            <PostEditor
-              value={postContent}
-              onChange={setPostContent}
-              placeholder="Partagez quelque chose avec la communauté..."
-              onMention={(user) => setMentions((prev) => [...prev, user])}
-              onHashtag={(tag) => setPostTags((prev) => [...prev, tag])}
-            />
-            {postType === "poll" && (
+                      : "Titre (optionnel)"} className="flex-1 bg-transparent text-white placeholder:text-white/25 font-bold text-base outline-none pt-2" /></View><PostEditor value={postContent} onChange={setPostContent} placeholder="Partagez quelque chose avec la communauté..." onMention={(user) => setMentions((prev) => [...prev, user])} onHashtag={(tag) => setPostTags((prev) => [...prev, tag])} />{postType === "poll" && (
               <PostPoll
                 options={pollOptions}
                 onChange={setPollOptions}
                 color="#8B5CF6"
               />
-            )}
-            <PostAttachments
-              attachments={attachments}
-              onChange={setAttachments}
-              onUpload={uploadAttachment}
-              isUploading={isUploading}
-              onGiphyToggle={() => setShowGiphy(!showGiphy)}
-            />
-            {showGiphy && (
+            )}<PostAttachments attachments={attachments} onChange={setAttachments} onUpload={uploadAttachment} isUploading={isUploading} onGiphyToggle={() => setShowGiphy(!showGiphy)} />{showGiphy && (
               <PostGiphyPicker
                 onSelect={(gif) =>
                   setAttachments((prev) => [
@@ -289,20 +245,7 @@ export function CreatePostSheet({ isOpen, onClose, onSuccess }: Props) {
                   ])
                 }
               />
-            )}
-            <PostLocation location={location} onChange={setLocation} />
-            <PostSchedule value={scheduleDate} onChange={setScheduleDate} />
-            <PostMoodSelector value={mood} onChange={setMood} />
-            <PostTags tags={postTags} onChange={setPostTags} />
-            <PostHashtags
-              content={postContent}
-              onSelect={(tags) => setPostTags((prev) => [...prev, ...tags])}
-            />
-            <PostMentions
-              content={postContent}
-              onSelect={(user) => setMentions((prev) => [...prev, user])}
-            />
-          </View>
+            )}<PostLocation location={location} onChange={setLocation} /><PostSchedule value={scheduleDate} onChange={setScheduleDate} /><PostMoodSelector value={mood} onChange={setMood} /><PostTags tags={postTags} onChange={setPostTags} /><PostHashtags content={postContent} onSelect={(tags) => setPostTags((prev) => [...prev, ...tags])} /><PostMentions content={postContent} onSelect={(user) => setMentions((prev) => [...prev, user])} /></View>
 
           <View className="sticky bottom-0 z-20 bg-[#11111f] border-t border-white/10 p-4">
             <PostSubmit
@@ -317,7 +260,7 @@ export function CreatePostSheet({ isOpen, onClose, onSuccess }: Props) {
             />
           </View>
         </View>
-      </Pressable>
-    </>
+      </View>
+    </View>
   );
 }

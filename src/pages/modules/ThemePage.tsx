@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Pressable, Text } from "react-native";
 import {
   ArrowLeft,
@@ -18,14 +17,15 @@ import {
   Smartphone,
   Save,
 } from "lucide-react-native";
-import { useAppearance, ACCENT_PALETTES } from "@/hooks/use-appearance";
+import { useAppearance, ACCENT_PALETTES } from "@/hooks/use-appearance.ts";
 import type {
   AccentColor,
   ColorMode,
   TextSize,
   Density,
   ColorBlindMode,
-} from "@/hooks/use-appearance";
+} from "@/hooks/use-appearance.ts";
+import { toast } from "sonner";
 import { useMemo, useState } from "react";
 
 interface ThemePageProps {
@@ -34,12 +34,7 @@ interface ThemePageProps {
 
 function SectionLabel({ label, sub }: { label: string; sub?: string }) {
   return (
-    <View className="mb-3 px-1">
-      <Text className="text-[10px] font-black text-white/30 uppercase tracking-[0.18em]">
-        {label}
-      </Text>
-      {sub && <Text className="text-xs text-white/35 mt-1">{sub}</Text>}
-    </View>
+    <View className="mb-3 px-1"><Text className="text-[10px] font-black text-white/30 uppercase tracking-[0.18em]">{label}</Text>{sub && <Text className="text-xs text-white/35 mt-1">{sub}</Text>}</View>
   );
 }
 
@@ -66,41 +61,13 @@ function LivePreview({
   const pad = isCompact ? "8px 10px" : "12px 14px";
 
   return (
-    <View
-      className="relative rounded-[24px] overflow-hidden"
-      style={{ backgroundColor: bg, borderStyle: "solid" }}
-    >
-      <View
-        className="absolute -top-16 -right-12 w-44 h-44 rounded-full"
-        style={{  }}
-      />
+    <View layout className="relative rounded-[24px] overflow-hidden" style={{ backgroundColor: bg, borderStyle: "solid", boxShadow: `0 18px 50px ${p.glow}` }}>
+      <View className="absolute -top-16 -right-12 w-44 h-44 rounded-full pointer-events-none" style={{  }} />
 
-      <View
-        className="relative flex items-center gap-2 px-3.5 py-3"
-        style={{ backgroundColor: `${p.hex}18`, }}
-      >
-        <View
-          className="w-7 h-7 rounded-xl flex items-center justify-center"
-          style={{  }}
-        >
-          <Sparkles size={13} className="text-white" />
-        </View>
-        <Text
-          className="font-black"
-          style={{ color: textPrimary, fontSize: fontSize + 1 }}
-        >
-          Débrouille Pro
-        </Text>
-        <View className="ml-auto flex gap-1.5">
-          {[p.gradFrom, p.gradTo, `${p.hex}66`].map((c, i) => (
-            <View
-              key={i}
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: c }}
-            />
-          ))}
-        </View>
-      </View>
+      <View className="relative flex items-center gap-2 px-3.5 py-3" style={{ backgroundColor: `${p.hex}18` }}><View className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ boxShadow: `0 6px 16px ${p.glow}` }}><Sparkles size={13} className="text-white" /></View><Text className="font-black" style={{ color: textPrimary, fontSize: fontSize + 1 }}>Débrouille Pro
+        </Text><View className="ml-auto flex gap-1.5">{[p.gradFrom, p.gradTo, `${p.hex}66`].map((c, i) => (
+            <View key={i} className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c }} />
+          ))}</View></View>
 
       {[
         {
@@ -122,59 +89,15 @@ function LivePreview({
           tag: "Événement",
         },
       ].map((item, i) => (
-        <View
-          key={item.title}
-          className="flex items-center gap-2 border-b"
-          style={{ padding: pad, backgroundColor: i % 2 === 0 ? cardBg : `${cardBg}cc`, borderColor: `${p.hex}18` }}
-        >
-          <View
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
-            style={{ backgroundColor: `${p.hex}18` }}
-          >
-            {item.emoji}
-          </View>
-
-          <View className="flex-1 min-w-0">
-            <Text
-              className="font-bold truncate"
-              style={{ color: textPrimary, fontSize }}
-            >
-              {item.title}
-            </Text>
-            <Text
-              className="truncate"
-              style={{
+        <View key={item.title} className="flex items-center gap-2 border-b" style={{ padding: pad, backgroundColor: i % 2 === 0 ? cardBg : `${cardBg}cc`, borderColor: `${p.hex}18` }}><View className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0" style={{ backgroundColor: `${p.hex}18` }}>{item.emoji}</View><View className="flex-1 min-w-0"><Text className="font-bold truncate" style={{ color: textPrimary, fontSize }}>{item.title}</Text><Text className="truncate" style={{
                 color: textSecondary,
                 fontSize: Math.max(fontSize - 1, 9),
-              }}
-            >
-              {item.sub}
-            </Text>
-          </View>
-
-          <View
-            className="shrink-0 px-2 py-1 rounded-full text-white font-bold"
-            style={{  }}
-          >
-            {item.tag}
-          </View>
-        </View>
+              }}>{item.sub}</Text></View><View className="shrink-0 px-2 py-1 rounded-full text-white font-bold" style={{ fontSize: Math.max(fontSize - 2, 8) }}>{item.tag}</View></View>
       ))}
 
-      <View
-        className="flex justify-around px-2 py-2.5"
-        style={{ backgroundColor: cardBg }}
-      >
-        {["🏠", "🔍", "➕", "💬", "👤"].map((icon, i) => (
-          <View
-            key={i}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
-            style={{ backgroundColor: i === 0 ? `${p.hex}25` : "transparent" }}
-          >
-            {icon}
-          </View>
-        ))}
-      </View>
+      <View className="flex justify-around px-2 py-2.5" style={{ backgroundColor: cardBg }}>{["🏠", "🔍", "➕", "💬", "👤"].map((icon, i) => (
+          <View key={i} className="w-8 h-8 rounded-xl flex items-center justify-center text-sm" style={{ backgroundColor: i === 0 ? `${p.hex}25` : "transparent" }}>{icon}</View>
+        ))}</View>
     </View>
   );
 }
@@ -191,36 +114,20 @@ function AccentSwatch({
   onClick: () => void;
 }) {
   return (
-    <Pressable
-      aria-pressed={isActive}
-      onPress={onClick}
-      className="relative flex flex-col items-center gap-2 p-3 rounded-2xl"
-      style={{ backgroundColor: isActive ? `${palette.hex}18` : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-    >
-      <View
-        className="w-full h-11 rounded-xl"
-        style={{  }}
-      />
+    <Pressable aria-pressed={isActive} onPress={onClick} whileTap={{ scale: 0.94 }} whileHover={{ y: -2 }} className="relative flex flex-col items-center gap-2 p-3 rounded-2xl" style={{ backgroundColor: isActive ? `${palette.hex}18` : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid", boxShadow: isActive ? `0 0 22px ${palette.glow}` : "none" }}>
+      <View className="w-full h-11 rounded-xl" style={{ boxShadow: `inset 0 1px 0 rgba(255,255,255,.18)` }} />
 
-      <Text
-        className="text-xs font-bold"
-        style={{
+      <Text className="text-xs font-bold" style={{
           color: isActive ? palette.hex : "rgba(255,255,255,0.45)",
-        }}
-      >
-        {palette.label}
-      </Text>
+        }}>{palette.label}</Text>
 
-      <>
+<View>
         {isActive && (
-          <View
-            className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: palette.hex }}
-          >
+          <View initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: palette.hex, boxShadow: `0 4px 12px ${palette.glow}` }}>
             <Check size={10} className="text-white" />
           </View>
         )}
-      </>
+      </View>
     </Pressable>
   );
 }
@@ -241,26 +148,13 @@ function ChoiceButton({
   onClick: () => void;
 }) {
   return (
-    <Pressable
-      aria-pressed={active}
-      onPress={onClick}
-      className="flex flex-col items-center gap-2 p-4 rounded-2xl"
-      style={{ backgroundColor: active ? `${accent}18` : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-    >
+    <Pressable aria-pressed={active} onPress={onClick} whileTap={{ scale: 0.96 }} className="flex flex-col items-center gap-2 p-4 rounded-2xl" style={{ backgroundColor: active ? `${accent}18` : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid", boxShadow: active ? `0 0 18px ${accent}18` : "none" }}>
       <Icon
         size={21}
-        style={{ color: active ? accent : "rgba(255,255,255,0.35)" }}
+        style={{  }}
       />
-      <View className="text-center">
-        <View
-          className="text-xs font-bold"
-          style={{  }}
-        >
-          {label}
-        </View>
-        <View className="text-[10px] text-white/25 mt-0.5">{description}</View>
-      </View>
-      {active && <Check size={12} style={{ color: accent }} />}
+      <View className="text-center"><View className="text-xs font-bold" style={{  }}>{label}</View><View className="text-[10px] text-white/25 mt-0.5">{description}</View></View>
+      {active && <Check size={12} style={{  }} />}
     </Pressable>
   );
 }
@@ -287,112 +181,16 @@ export default function ThemePage({ onBack }: ThemePageProps) {
 
   const handleReset = () => {
     reset();
-    UIService.openToast("Apparence réinitialisée", "success");
+    toast.success("Apparence réinitialisée");
   };
 
   return (
-    <View
-      className="flex flex-col h-full min-h-0 overflow-hidden"
-      style={{  }}
-    >
-      <View
-        className="flex items-center gap-3 px-5 pt-safe-or-4 pb-4 border-b shrink-0"
-        style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(2,6,23,0.72)" }}
-      >
-        <Pressable
-         
-          onPress={onBack}
-          accessibilityLabel="Retour"
-          className="w-10 h-10 rounded-2xl flex items-center justify-center"
-          style={{ backgroundColor: "rgba(255,255,255,0.055)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-        >
-          <ArrowLeft className="w-5 h-5 text-white/80" />
-        </Pressable>
-
-        <View className="flex-1 min-w-0">
-          <Text className="text-base sm:text-lg font-black text-white flex items-center gap-2 truncate">
-            <Palette
-              className="w-4 h-4 shrink-0"
-              style={{ color: accentHex }}
-            />
-            Thème & Personnalisation
-          </Text>
-          <Text className="text-xs text-white/35 truncate">
-            Ton interface, ton confort, tes préférences
-          </Text>
-        </View>
-
-        <Pressable
-         
-          onPress={handleReset}
-         
-          accessibilityLabel="Réinitialiser les préférences d'apparence"
-          className="w-10 h-10 rounded-2xl flex items-center justify-center"
-          style={{ backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-        >
-          <RotateCcw className="w-4 h-4 text-white/40" />
-        </Pressable>
-      </View>
-
-      <View
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-7"
-        style={{  }}
-      >
-        <View
-          className="relative overflow-hidden rounded-[28px] p-5 sm:p-6"
-          style={{ borderStyle: "solid" }}
-        >
-          <View
-            className="absolute -right-20 -top-24 w-64 h-64 rounded-full"
-            style={{  }}
-          />
-
-          <View className="relative z-10 flex items-start gap-4">
-            <View
-              className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
-              style={{  }}
-            >
-              <WandSparkles size={24} className="text-white" />
-            </View>
-
-            <View className="min-w-0">
-              <View
-                className="text-[9px] uppercase tracking-[0.2em] font-black mb-1"
-                style={{  }}
-              >
-                <Text>Personnalisation</Text></View>
-              <Text className="text-2xl font-black text-white leading-tight">
-                Fais de Débrouille Pro
-                <Text style={{ color: accentHex }}> ton espace.</Text>
-              </Text>
-              <Text className="text-xs sm:text-sm text-white/40 leading-relaxed mt-2 max-w-xl">
-                Ajuste les couleurs, la lisibilité et la densité. Les
+    <View className="flex flex-col h-full min-h-0 overflow-hidden" style={{  }}><View initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 px-5 pt-safe-or-4 pb-4 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(2,6,23,0.72)" }}><Pressable onPress={onBack} accessibilityLabel="Retour" className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.055)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><ArrowLeft className="w-5 h-5 text-white/80" /></Pressable><View className="flex-1 min-w-0"><Text className="text-base sm:text-lg font-black text-white flex items-center gap-2 truncate"><Palette className="w-4 h-4 shrink-0" style={{  }} />Thème & Personnalisation
+          </Text><Text className="text-xs text-white/35 truncate">Ton interface, ton confort, tes préférences
+          </Text></View><Pressable onPress={handleReset} accessibilityLabel="Réinitialiser les préférences d'apparence" className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><RotateCcw className="w-4 h-4 text-white/40" /></Pressable></View><View className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-7" style={{  }}><View initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-[28px] p-5 sm:p-6" style={{ borderStyle: "solid" }}><View className="absolute -right-20 -top-24 w-64 h-64 rounded-full pointer-events-none" style={{  }} /><View className="relative z-10 flex items-start gap-4"><View className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ boxShadow: `0 14px 35px ${accent.glow}` }}><WandSparkles size={24} className="text-white" /></View><View className="min-w-0"><View className="text-[9px] uppercase tracking-[0.2em] font-black mb-1" style={{  }}><Text>Personnalisation</Text></View><Text className="text-2xl font-black text-white leading-tight">Fais de Débrouille Pro
+                <Text style={{ color: accentHex }}>ton espace.</Text></Text><Text className="text-xs sm:text-sm text-white/40 leading-relaxed mt-2 max-w-xl">Ajuste les couleurs, la lisibilité et la densité. Les
                 modifications sont appliquées immédiatement.
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View>
-          <SectionLabel
-            label="Aperçu en temps réel"
-            sub="Voici comment ton interface évolue"
-          />
-          <LivePreview
-            accent={prefs.accent}
-            colorMode={prefs.colorMode}
-            textSize={prefs.textSize}
-            density={prefs.density}
-          />
-        </View>
-
-        <View>
-          <SectionLabel
-            label="Couleur d'accent"
-            sub="Boutons, badges, actions et éléments mis en avant"
-          />
-          <View className="gap-2">
-            {(
+              </Text></View></View></View><View><SectionLabel label="Aperçu en temps réel" sub="Voici comment ton interface évolue" /><LivePreview accent={prefs.accent} colorMode={prefs.colorMode} textSize={prefs.textSize} density={prefs.density} /></View><View><SectionLabel label="Couleur d'accent" sub="Boutons, badges, actions et éléments mis en avant" /><View className="gap-2">{(
               Object.entries(ACCENT_PALETTES) as [
                 AccentColor,
                 (typeof ACCENT_PALETTES)[AccentColor],
@@ -405,17 +203,7 @@ export default function ThemePage({ onBack }: ThemePageProps) {
                 isActive={prefs.accent === key}
                 onPress={() => update("accent", key)}
               />
-            ))}
-          </View>
-        </View>
-
-        <View>
-          <SectionLabel
-            label="Mode couleur"
-            sub="Choisis l'ambiance qui te convient"
-          />
-          <View className="gap-2">
-            {colorModes.map(({ key, label, Icon, desc }) => (
+            ))}</View></View><View><SectionLabel label="Mode couleur" sub="Choisis l'ambiance qui te convient" /><View className="gap-2">{colorModes.map(({ key, label, Icon, desc }) => (
               <ChoiceButton
                 key={key}
                 active={prefs.colorMode === key}
@@ -425,20 +213,7 @@ export default function ThemePage({ onBack }: ThemePageProps) {
                 description={desc}
                 onPress={() => update("colorMode", key)}
               />
-            ))}
-          </View>
-        </View>
-
-        <View>
-          <SectionLabel
-            label="Taille du texte"
-            sub="Une interface plus petite ou plus confortable"
-          />
-          <View
-            className="rounded-[24px] overflow-hidden"
-            style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-          >
-            {[
+            ))}</View></View><View><SectionLabel label="Taille du texte" sub="Une interface plus petite ou plus confortable" /><View className="rounded-[24px] overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>{[
               {
                 key: "petit" as TextSize,
                 label: "Petit",
@@ -464,62 +239,23 @@ export default function ThemePage({ onBack }: ThemePageProps) {
               const active = prefs.textSize === key;
 
               return (
-                <Pressable
-                  key={key}
-                  onPress={() => update("textSize", key)}
-                  aria-pressed={active}
-                  className="w-full flex items-center gap-3 px-4 py-3.5"
-                  style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: active ? `${accentHex}10` : "transparent" }}
-                >
-                  <View
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: active
-                                            ? `${accentHex}20`
-                                            : "rgba(255,255,255,0.06)" }}
-                  >
-                    <Type
-                      size={16}
-                      style={{
-                        color: active ? accentHex : "rgba(255,255,255,0.4)",
-                      }}
-                    />
-                  </View>
+                <Pressable key={key} onPress={() => update("textSize", key)} whileTap={{ scale: 0.99 }} aria-pressed={active} className="w-full flex items-center gap-3 px-4 py-3.5" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: active ? `${accentHex}10` : "transparent" }}>
+                  <View className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: active
+                                          ? `${accentHex}20`
+                                          : "rgba(255,255,255,0.06)" }}><Type size={16} style={{  }} /></View>
 
-                  <View className="flex-1 text-left">
-                    <Text
-                      className="text-sm font-bold"
-                      style={{
+                  <View className="flex-1 text-left"><Text className="text-sm font-bold" style={{
                         color: active ? "white" : "rgba(255,255,255,0.6)",
-                      }}
-                    >
-                      {label}
-                    </Text>
-                    <Text className="text-xs text-white/25 ml-2">{desc}</Text>
-                  </View>
+                      }}>{label}</Text><Text className="text-xs text-white/25 ml-2">{desc}</Text></View>
 
-                  <Text
-                    className={`font-black ${size} mr-2`}
-                    style={{
+                  <Text className={`font-black ${size} mr-2`} style={{
                       color: active ? accentHex : "rgba(255,255,255,0.2)",
-                    }}
-                  >
-                    {sample}
-                  </Text>
+                    }}>{sample}</Text>
 
-                  {active && <Check size={14} style={{ color: accentHex }} />}
+                  {active && <Check size={14} style={{  }} />}
                 </Pressable>
               );
-            })}
-          </View>
-        </View>
-
-        <View>
-          <SectionLabel
-            label="Densité d'affichage"
-            sub="Plus de contenu ou plus d'espace entre les éléments"
-          />
-          <View className="gap-3">
-            {[
+            })}</View></View><View><SectionLabel label="Densité d'affichage" sub="Plus de contenu ou plus d'espace entre les éléments" /><View className="gap-3">{[
               {
                 key: "compact" as Density,
                 label: "Compact",
@@ -538,125 +274,30 @@ export default function ThemePage({ onBack }: ThemePageProps) {
               const active = prefs.density === key;
 
               return (
-                <Pressable
-                  key={key}
-                  onPress={() => update("density", key)}
-                  aria-pressed={active}
-                  className="flex flex-col items-center gap-3 p-4 rounded-[24px]"
-                  style={{ backgroundColor: active
-                                        ? `${accentHex}18`
-                                        : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                >
-                  <View className="w-full flex flex-col gap-1.5">
-                    {Array.from({ length: rows }).map((_, i) => (
-                      <View
-                        key={i}
-                        className="rounded-full"
-                        style={{ height: key === "compact" ? 6 : 10, backgroundColor: active
-                                                    ? `${accentHex}${i === 0 ? "66" : "28"}`
-                                                    : "rgba(255,255,255,0.1)" }}
-                      />
-                    ))}
-                  </View>
+                <Pressable key={key} onPress={() => update("density", key)} whileTap={{ scale: 0.96 }} aria-pressed={active} className="flex flex-col items-center gap-3 p-4 rounded-[24px]" style={{ backgroundColor: active
+                                      ? `${accentHex}18`
+                                      : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid", boxShadow: active ? `0 0 20px ${accentHex}12` : "none" }}>
+                  <View className="w-full flex flex-col gap-1.5">{Array.from({ length: rows }).map((_, i) => (
+                      <View key={i} className="rounded-full" style={{ height: key === "compact" ? 6 : 10, backgroundColor: active
+                                                  ? `${accentHex}${i === 0 ? "66" : "28"}`
+                                                  : "rgba(255,255,255,0.1)" }} />
+                    ))}</View>
 
-                  <View className="text-center">
-                    <View
-                      className="text-sm font-black flex items-center justify-center gap-1.5"
-                      style={{  }}
-                    >
-                      <Icon size={14} />
-                      {label}
-                    </View>
-                    <View className="text-[10px] text-white/30 mt-1">{desc}</View>
-                  </View>
+                  <View className="text-center"><View className="text-sm font-black flex items-center justify-center gap-1.5" style={{  }}><Icon size={14} />{label}</View><View className="text-[10px] text-white/30 mt-1">{desc}</View></View>
 
-                  {active && <Check size={13} style={{ color: accentHex }} />}
+                  {active && <Check size={13} style={{  }} />}
                 </Pressable>
               );
-            })}
-          </View>
-        </View>
-
-        <View>
-          <Pressable
-           
-            onPress={() => setShowAdvanced((value) => !value)}
-            className="w-full flex items-center gap-3 text-left"
-          >
-            <View
-              className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: `${accentHex}12`, borderStyle: "solid" }}
-            >
-              <Accessibility size={17} style={{ color: accentHex }} />
-            </View>
-
-            <View className="flex-1">
-              <Text className="text-sm font-black text-white">Accessibilité</Text>
-              <Text className="text-[11px] text-white/30">
-                Contraste élevé et modes daltonisme
-              </Text>
-            </View>
-
-            <View
-            >
-              <Check
-                size={15}
-                className={showAdvanced ? "opacity-100" : "opacity-20"}
-                style={{ color: accentHex }}
-              />
-            </View>
-          </Pressable>
-
-          <>
-            {showAdvanced && (
-              <View
-                className="overflow-hidden"
-              >
-                <View className="pt-4">
-                  <Pressable
-                    onPress={() => update("highContrast", !prefs.highContrast)}
-                    aria-pressed={prefs.highContrast}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl mb-3"
-                    style={{ backgroundColor: prefs.highContrast
-                                            ? `${accentHex}18`
-                                            : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                  >
-                    <View
-                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: prefs.highContrast
-                                                ? `${accentHex}22`
-                                                : "rgba(255,255,255,0.06)" }}
-                    >
-                      <Contrast
-                        size={18}
-                        style={{
-                          color: prefs.highContrast
-                            ? accentHex
-                            : "rgba(255,255,255,0.4)",
-                        }}
-                      />
-                    </View>
-
-                    <View className="flex-1 text-left">
-                      <View
-                        className="text-sm font-bold"
-                        style={{  }}
-                      >
-                        <Text>Contraste élevé</Text></View>
-                      <View className="text-[11px] text-white/30">
-                        <Text>Améliore la lisibilité</Text></View>
-                    </View>
-
-                    {prefs.highContrast && (
-                      <Check size={14} style={{ color: accentHex }} />
-                    )}
-                  </Pressable>
-
-                  <View
-                    className="rounded-2xl overflow-hidden"
-                    style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                  >
-                    {[
+            })}</View></View><View><Pressable onPress={() => setShowAdvanced((value) => !value)} className="w-full flex items-center gap-3 text-left"><View className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${accentHex}12`, borderStyle: "solid" }}><Accessibility size={17} style={{  }} /></View><View className="flex-1"><Text className="text-sm font-black text-white">Accessibilité</Text><Text className="text-[11px] text-white/30">Contraste élevé et modes daltonisme
+              </Text></View><View animate={{ rotate: showAdvanced ? 180 : 0 }} transition={{ duration: 0.2 }}><Check size={15} className={showAdvanced ? "opacity-100" : "opacity-20"} style={{  }} /></View></Pressable><View>{showAdvanced && (
+              <View initial={{ opacity: 0, height: 0, y: -6 }} animate={{ opacity: 1, height: "auto", y: 0 }} exit={{ opacity: 0, height: 0, y: -6 }} className="overflow-hidden">
+                <View className="pt-4"><Pressable onPress={() => update("highContrast", !prefs.highContrast)} whileTap={{ scale: 0.98 }} aria-pressed={prefs.highContrast} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl mb-3" style={{ backgroundColor: prefs.highContrast
+                                        ? `${accentHex}18`
+                                        : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: prefs.highContrast
+                                              ? `${accentHex}22`
+                                              : "rgba(255,255,255,0.06)" }}><Contrast size={18} style={{  }} /></View><View className="flex-1 text-left"><View className="text-sm font-bold" style={{  }}><Text>Contraste élevé</Text></View><View className="text-[11px] text-white/30"><Text>Améliore la lisibilité</Text></View></View>{prefs.highContrast && (
+                      <Check size={14} style={{  }} />
+                    )}</Pressable><View className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>{[
                       {
                         key: "none" as ColorBlindMode,
                         label: "Normal",
@@ -686,80 +327,26 @@ export default function ThemePage({ onBack }: ThemePageProps) {
                       const active = prefs.colorBlindMode === key;
 
                       return (
-                        <Pressable
-                          key={key}
-                          onPress={() => update("colorBlindMode", key)}
-                          aria-pressed={active}
-                          className="w-full flex items-center gap-3 px-4 py-3"
-                          style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: active
-                                                        ? `${accentHex}10`
-                                                        : "transparent" }}
-                        >
-                          <View
-                            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                            style={{ backgroundColor: active
-                                                            ? `${accentHex}22`
-                                                            : "rgba(255,255,255,0.06)" }}
-                          >
-                            <Eye
-                              size={15}
-                              style={{
-                                color: active
-                                  ? accentHex
-                                  : "rgba(255,255,255,0.4)",
-                              }}
-                            />
-                          </View>
+                        <Pressable key={key} onPress={() => update("colorBlindMode", key)} whileTap={{ scale: 0.99 }} aria-pressed={active} className="w-full flex items-center gap-3 px-4 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: active
+                                                      ? `${accentHex}10`
+                                                      : "transparent" }}>
+                          <View className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: active
+                                                          ? `${accentHex}22`
+                                                          : "rgba(255,255,255,0.06)" }}><Eye size={15} style={{  }} /></View>
 
-                          <View className="flex-1 text-left">
-                            <View
-                              className="text-sm font-bold"
-                              style={{  }}
-                            >
-                              {label}
-                            </View>
-                            <View className="text-[11px] text-white/30">
-                              {desc}
-                            </View>
-                          </View>
+                          <View className="flex-1 text-left"><View className="text-sm font-bold" style={{  }}>{label}</View><View className="text-[11px] text-white/30">{desc}</View></View>
 
                           {active && (
-                            <Check size={13} style={{ color: accentHex }} />
+                            <Check size={13} style={{  }} />
                           )}
                         </Pressable>
                       );
-                    })}
-                  </View>
-                </View>
+                    })}</View></View>
               </View>
-            )}
-          </>
-        </View>
-
-        <View
-          className="rounded-[24px] px-4 py-3.5 flex items-center gap-3"
-          style={{ backgroundColor: `${accentHex}0d`, borderStyle: "solid" }}
-        >
-          <View
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ backgroundColor: `${accentHex}18` }}
-          >
-            <Save size={15} style={{ color: accentHex }} />
-          </View>
-
-          <View className="flex-1">
-            <Text className="text-xs font-bold text-white/65">
-              <Text>Préférences synchronisées</Text></Text>
-            <Text className="text-[10px] text-white/30 mt-0.5">
-              <Text>Tes choix sont sauvegardés automatiquement et suivent ton expérience Débrouille Pro.</Text></Text>
-          </View>
-
-          <Sparkles size={15} style={{ color: accentHex }} />
-        </View>
-
-        <Text className="text-center text-[10px] text-white/15 pb-5">
-          <Text>Personnalise ton expérience à tout moment.</Text></Text>
-      </View>
-    </View>
+            )}</View></View><View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-[24px] px-4 py-3.5 flex items-center gap-3" style={{ backgroundColor: `${accentHex}0d`, borderStyle: "solid" }}><View className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${accentHex}18` }}><Save size={15} style={{  }} /></View><View className="flex-1"><Text className="text-xs font-bold text-white/65">Préférences synchronisées
+            </Text><Text className="text-[10px] text-white/30 mt-0.5">Tes choix sont sauvegardés automatiquement et suivent ton
+              expérience Débrouille Pro.
+            </Text></View><Sparkles size={15} style={{  }} /></View><Text className="text-center text-[10px] text-white/15 pb-5">Personnalise ton expérience à tout moment.
+        </Text></View></View>
   );
 }

@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/events/hooks/useEventRSVP.ts
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useEventRSVP() {
@@ -14,10 +13,10 @@ export function useEventRSVP() {
   ) => {
     try {
       const result = await rsvpMutation({ eventId, status });
-      UIService.openToast("Inscription mise à jour", "success");
+      toast.success("Inscription mise à jour");
       return result;
     } catch (error) {
-      UIService.openToast("Erreur lors de l'inscription", "error");
+      toast.error("Erreur lors de l'inscription");
       throw error;
     }
   };

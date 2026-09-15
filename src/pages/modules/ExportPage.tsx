@@ -1,51 +1,35 @@
-// src/pages/modules/ExportPage.tsx
-
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-
-import { useRef, useState } from "react";
-
+import { View, Text, Pressable, Image } from "react-native";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-
-import * as Clipboard from "expo-clipboard";
-import * as FileSystem from "expo-file-system/legacy";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
-
-import QRCode from "react-native-qrcode-svg";
-
+import { toast } from "sonner";
+import QRCode from "qrcode";
 import {
-  Activity,
   ArrowLeft,
-  BarChart2,
-  CheckCircle2,
-  Copy,
   Download,
-  FileDown,
-  FileText,
-  QrCode,
   Share2,
+  QrCode,
+  FileText,
+  BarChart2,
+  Activity,
+  CheckCircle2,
+  Loader2,
+  FileDown,
+  Copy,
 } from "lucide-react-native";
-
+import { Button } from "@/components/ui/button.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { cn } from "@/lib/utils.ts";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 interface ExportPageProps {
   onBack: () => void;
 }
 
-type QrCodeRef = {
-  toDataURL: (callback: (data: string) => void) => void;
-};
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", {
@@ -59,71 +43,23 @@ function arrayToCsv(rows: string[][], separator = ";") {
   return rows
     .map((row) =>
       row
-        .map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`)
+        .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
         .join(separator),
     )
     .join("\n");
 }
 
-function escapeHtml(value: unknown) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+function downloadBlob(content: string, filename: string, mimeType: string) {
+  const blob = new Blob(["\uFEFF" + content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-async function shareFile(uri: string, dialogTitle?: string) {
-  const available = await Sharing.isAvailableAsync();
-
-  if (!available) {
-    Alert.alert(
-      "Partage indisponible",
-      "Le partage de fichiers n'est pas disponible sur cet appareil.",
-    );
-    return false;
-  }
-
-  await Sharing.shareAsync(uri, {
-    dialogTitle,
-  });
-
-  return true;
-}
-
-async function exportTextFile(
-  content: string,
-  filename: string,
-  mimeType: string,
-) {
-  const directory = FileSystem.cacheDirectory;
-
-  if (!directory) {
-    throw new Error("Le stockage temporaire est indisponible.");
-  }
-
-  const fileUri = `${directory}${filename}`;
-
-  await FileSystem.writeAsStringAsync(fileUri, `\uFEFF${content}`, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-
-  const shared = await shareFile(fileUri, `Exporter ${filename}`);
-
-  if (!shared) {
-    throw new Error("Impossible de partager le fichier exporté.");
-  }
-
-  return {
-    uri: fileUri,
-    mimeType,
-  };
-}
-
-function SectionTitle({ children }: { children: string }) {
-  return <Text style={styles.sectionTitle}>{children}</Text>;
-}
+// ─── Export Card ───────────────────────────────────────────────────────────────
 
 function ExportCard({
   icon,
@@ -143,214 +79,115 @@ function ExportCard({
   color: string;
 }) {
   return (
-    <Pressable
-      onPress={() => {
-        if (!loading) {
-          onExport();
-        }
-      }}
-      disabled={loading}
-      style={({ pressed }) => [
-        styles.exportCard,
-        pressed && !loading && styles.pressed,
-        loading && styles.disabled,
-      ]}
-    >
-      <View
-        style={[
-          styles.exportIconContainer,
-          {
-            backgroundColor: `${color}22`,
-          },
-        ]}
-      >
-        {icon}
-      </View>
-
-      <View style={styles.exportContent}>
-        <View style={styles.exportTitleRow}>
-          <Text style={styles.exportTitle}>{title}</Text>
-
-          {badge ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{badge}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <Text style={styles.exportDescription}>{description}</Text>
-      </View>
-
-      <View
-        style={[
-          styles.downloadButton,
-          {
-            backgroundColor: `${color}33`,
-          },
-        ]}
-      >
-        {loading ? (
-          <ActivityIndicator size="small" color={color} />
+    <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-4 flex items-center gap-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={!loading ? onExport : undefined}>
+      <View className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}22` }}><Text style={{ color }}>{icon}</Text></View>
+      <View className="flex-1 min-w-0"><View className="flex items-center gap-2"><Text className="text-sm font-semibold text-white">{title}</Text>{badge && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              {badge}
+            </Badge>
+          )}</View><Text className="text-xs text-white/50 mt-0.5">{description}</Text></View>
+      <Pressable className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all" style={{ backgroundColor: `${color}33` }} disabled={loading}>{loading ? (
+          <Loader2 className="w-4 h-4 animate-spin" style={{ color }} />
         ) : (
-          <Download size={18} color={color} />
-        )}
-      </View>
-    </Pressable>
-  );
-}
-
-function LoadingCard() {
-  return (
-    <View style={styles.loadingCard}>
-      <ActivityIndicator color="#818cf8" size="small" />
+          <Download className="w-4 h-4" style={{ color }} />
+        )}</Pressable>
     </View>
   );
 }
 
-function QrModal({
-  url,
-  visible,
-  onClose,
-}: {
-  url: string;
-  visible: boolean;
-  onClose: () => void;
-}) {
-  const qrRef = useRef<QrCodeRef | null>(null);
-  const [saving, setSaving] = useState(false);
+// ─── QR Code Modal ─────────────────────────────────────────────────────────────
 
-  const copyLink = async () => {
+function QrModal({ url, onClose }: { url: string; onClose: () => void }) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+
+  const generateQr = async () => {
     try {
-      await Clipboard.setStringAsync(url);
-
-      Alert.alert(
-        "Lien copié",
-        "Le lien du profil a été copié dans le presse-papiers.",
-      );
+      const result = await QRCode.toDataURL(url, {
+        width: 256,
+        margin: 2,
+        color: { dark: "#ffffff", light: "#0a0a1a" },
+      });
+      setDataUrl(result);
     } catch {
-      Alert.alert("Erreur", "Impossible de copier le lien.");
+      toast.error("Erreur génération QR code");
     }
   };
 
-  const downloadQr = async () => {
-    if (!qrRef.current) {
-      return;
-    }
+  useEffect(() => {
+    void generateQr();
+  }, [url]);
 
-    setSaving(true);
+  const copyLink = async () => {
+    await Clipboard.setString(url);
+    toast.success("Lien copié !");
+  };
 
-    try {
-      qrRef.current.toDataURL(async (base64) => {
-        try {
-          const directory = FileSystem.cacheDirectory;
-
-          if (!directory) {
-            throw new Error("Le stockage temporaire est indisponible.");
-          }
-
-          const fileUri = `${directory}profil-qrcode.png`;
-
-          await FileSystem.writeAsStringAsync(fileUri, base64, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-
-          await shareFile(fileUri, "QR Code du profil");
-        } catch {
-          Alert.alert("Erreur", "Impossible d'exporter le QR Code.");
-        } finally {
-          setSaving(false);
-        }
-      });
-    } catch {
-      setSaving(false);
-
-      Alert.alert("Erreur", "Impossible de générer le QR Code.");
-    }
+  const downloadQr = () => {
+    if (!dataUrl) return;
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = "profil-qrcode.png";
+    a.click();
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable
-          style={styles.modalContent}
-          onPress={(event) => event.stopPropagation()}
-        >
-          <Text style={styles.modalTitle}>QR Code Profil</Text>
-
-          <View style={styles.qrContainer}>
-            <QRCode
-              value={url}
-              size={220}
-              color="#ffffff"
-              backgroundColor="#0f1123"
-              getRef={(ref) => {
-                qrRef.current = ref as unknown as QrCodeRef;
-              }}
-            />
-          </View>
-
-          <Text selectable numberOfLines={4} style={styles.qrUrl}>
-            {url}
-          </Text>
-
-          <View style={styles.modalActions}>
-            <Pressable
-              onPress={() => {
-                void copyLink();
-              }}
-              style={styles.secondaryAction}
-            >
-              <Copy size={16} color="#ffffff" />
-
-              <Text style={styles.secondaryActionText}>Copier</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                void downloadQr();
-              }}
-              disabled={saving}
-              style={[styles.primaryAction, saving && styles.disabled]}
-            >
-              {saving ? (
-                <ActivityIndicator color="#ffffff" size="small" />
-              ) : (
-                <Download size={16} color="#ffffff" />
-              )}
-
-              <Text style={styles.primaryActionText}>Exporter</Text>
-            </Pressable>
-          </View>
-
-          <Pressable onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>Fermer</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
+<View>
+      <View key="qr-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={onClose}>
+        <View initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="rounded-3xl p-6 w-full max-w-xs flex flex-col items-center gap-4" style={{ backgroundColor: "#0f1123", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid" }} onPress={(e) => e.stopPropagation()}>
+          <Text className="text-base font-bold text-white">QR Code Profil</Text>
+          {dataUrl ? (
+            <Image className="rounded-2xl w-48 h-48" source={{ uri: dataUrl }} accessibilityLabel="QR Code" />
+          ) : (
+            <Skeleton className="w-48 h-48 rounded-2xl" />
+          )}
+          <Text className="text-xs text-white/40 text-center">{url}</Text>
+          <View className="flex gap-2 w-full"><Button size="sm" className="flex-1 gap-1.5" variant="secondary" onPress={copyLink}><Copy className="w-3.5 h-3.5" />Copier le lien
+            </Button><Button size="sm" className="flex-1 gap-1.5" onPress={downloadQr} disabled={!dataUrl}><Download className="w-3.5 h-3.5" />Télécharger
+            </Button></View>
+          <Pressable onPress={onClose} className="text-xs text-white/30 transition-colors"><Text>Fermer</Text></Pressable>
+        </View>
+      </View>
+    </View>
   );
 }
+
+// ─── Share Modal ───────────────────────────────────────────────────────────────
+
+async function nativeShare(title: string, text: string, url: string) {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text, url });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  // fallback: copy
+  try {
+    await Clipboard.setString(url);
+    toast.success("Lien copié dans le presse-papiers");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────────
 
 function ExportInner({ onBack }: ExportPageProps) {
   const { isAuthenticated } = useFirebaseAuth();
 
+  // ✅ analytics.getMyAnalytics utilise isAuthenticated
   const analytics = useQuery(
     api.analytics.getMyAnalytics,
     isAuthenticated ? {} : "skip",
   );
 
   const publications = useQuery(api.publications.listFeed, {
-    paginationOpts: {
-      numItems: 100,
-      cursor: null,
-    },
+    paginationOpts: { numItems: 100, cursor: null },
   });
 
+  // ✅ activity.list a été migré vers ctx.auth.getUserIdentity() → on envoie {}
   const activity = useQuery(api.activity.list, isAuthenticated ? {} : "skip");
 
   const currentUser = useQuery(api.users.getCurrentUser, {});
@@ -358,30 +195,25 @@ function ExportInner({ onBack }: ExportPageProps) {
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>(
     {},
   );
-
   const [showQr, setShowQr] = useState(false);
-
   const [exportedFiles, setExportedFiles] = useState<string[]>([]);
+  const canvasRef = useRef<View>(null);
 
   const setLoading = (key: string, value: boolean) => {
-    setLoadingStates((previous) => ({
-      ...previous,
-      [key]: value,
-    }));
+    setLoadingStates((prev) => ({ ...prev, [key]: value }));
   };
 
   const markDone = (label: string) => {
-    setExportedFiles((previous) => [label, ...previous].slice(0, 10));
+    setExportedFiles((prev) => [label, ...prev].slice(0, 10));
   };
 
+  // ── Export: Publications CSV ─────────────────────────────────────────────────
   const exportPublicationsCsv = async () => {
     if (!publications) {
-      Alert.alert("Chargement", "Les données ne sont pas encore disponibles.");
+      toast.error("Données non chargées");
       return;
     }
-
     setLoading("pub-csv", true);
-
     try {
       const headers = [
         "Titre",
@@ -392,569 +224,304 @@ function ExportInner({ onBack }: ExportPageProps) {
         "Commentaires",
         "Date création",
       ];
-
-      const rows = publications.page.map((publication) => [
-        publication.title ?? "",
-        publication.type ?? "",
-        publication.location ?? "",
-        String(publication.viewCount ?? 0),
-        String(publication.likeCount ?? 0),
-        String(publication.commentCount ?? 0),
-        new Date(publication._creationTime).toISOString(),
+      const rows = publications.page.map((p) => [
+        p.title,
+        p.type,
+        p.location ?? "",
+        String(p.viewCount),
+        String(p.likeCount),
+        String(p.commentCount),
+        new Date(p._creationTime).toISOString(),
       ]);
-
-      await exportTextFile(
+      downloadBlob(
         arrayToCsv([headers, ...rows]),
         "publications-debrouille.csv",
-        "text/csv",
+        "text/csv;charset=utf-8;",
       );
-
       markDone("publications-debrouille.csv");
-
-      Alert.alert("Export terminé", "Les publications ont été exportées.");
-    } catch (error) {
-      console.error(error);
-
-      Alert.alert("Erreur", "Impossible d'exporter les publications.");
+      toast.success("Publications exportées !");
     } finally {
       setLoading("pub-csv", false);
     }
   };
 
+  // ── Export: Activity CSV ─────────────────────────────────────────────────────
   const exportActivityCsv = async () => {
     if (!activity) {
-      Alert.alert("Chargement", "Les données ne sont pas encore disponibles.");
+      toast.error("Données non chargées");
       return;
     }
-
     setLoading("activity-csv", true);
-
     try {
       const headers = ["Type", "Label", "Date"];
-
       const rows = (
-        activity as Array<{
-          type: string;
-          label: string;
-          _creationTime: number;
-        }>
-      ).map((item) => [
-        item.type,
-        item.label,
-        new Date(item._creationTime).toISOString(),
-      ]);
-
-      await exportTextFile(
+        activity as { type: string; label: string; _creationTime: number }[]
+      ).map((a) => [a.type, a.label, new Date(a._creationTime).toISOString()]);
+      downloadBlob(
         arrayToCsv([headers, ...rows]),
         "activite-debrouille.csv",
-        "text/csv",
+        "text/csv;charset=utf-8;",
       );
-
       markDone("activite-debrouille.csv");
-
-      Alert.alert("Export terminé", "L'historique d'activité a été exporté.");
-    } catch (error) {
-      console.error(error);
-
-      Alert.alert("Erreur", "Impossible d'exporter l'historique.");
+      toast.success("Historique exporté !");
     } finally {
       setLoading("activity-csv", false);
     }
   };
 
+  // ── Export: Analytics PDF ────────────────────────────────────────────────────
   const exportAnalyticsPdf = async () => {
     if (!analytics || !currentUser) {
-      Alert.alert(
-        "Chargement",
-        "Les données analytics ne sont pas encore disponibles.",
-      );
+      toast.error("Données non chargées");
       return;
     }
-
     setLoading("analytics-pdf", true);
-
     try {
-      const topRows = analytics.topPublications
-        .slice(0, 5)
-        .map(
-          (publication) => `
-              <tr>
-                <td>${escapeHtml(publication.title)}</td>
-                <td>${escapeHtml(publication.type)}</td>
-                <td>${escapeHtml(publication.views)}</td>
-                <td>${escapeHtml(publication.likes)}</td>
-              </tr>
-            `,
-        )
-        .join("");
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      const pageW = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      const col = margin;
+      let y = 20;
 
-      const html = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                color: #1e1e3c;
-                padding: 28px;
-              }
+      // ── Header ──
+      doc.setFillColor(10, 10, 26);
+      doc.rect(0, 0, pageW, 40, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("Rapport Analytics", col, y + 4);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(160, 160, 200);
+      doc.text(
+        `Débrouille Pro  •  ${currentUser.name ?? "Utilisateur"}`,
+        col,
+        y + 12,
+      );
+      doc.text(
+        `Généré le ${formatDate(new Date().toISOString())}`,
+        col,
+        y + 19,
+      );
+      y = 50;
 
-              .header {
-                background: #0a0a1a;
-                color: white;
-                padding: 24px;
-                border-radius: 14px;
-                margin-bottom: 28px;
-              }
+      // ── KPIs ──
+      doc.setTextColor(30, 30, 60);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text("Statistiques clés", col, y);
+      y += 8;
 
-              .header h1 {
-                margin: 0 0 8px;
-                font-size: 24px;
-              }
+      const kpis = [
+        ["Publications totales", String(analytics.totalPublications)],
+        ["Vues totales", String(analytics.totalViews)],
+        ["Likes reçus", String(analytics.totalLikes)],
+        ["Commentaires", String(analytics.totalComments)],
+        ["Abonnés", String(analytics.totalFollowers)],
+        ["Taux d'engagement", `${analytics.engagementRate}%`],
+      ];
 
-              .muted {
-                color: #9ca3af;
-                font-size: 12px;
-              }
+      doc.setFontSize(10);
+      kpis.forEach(([label, value], i) => {
+        const x = col + (i % 2) * 90;
+        const rowY = y + Math.floor(i / 2) * 14;
+        doc.setFillColor(245, 245, 255);
+        doc.roundedRect(x, rowY, 85, 11, 2, 2, "F");
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80, 80, 120);
+        doc.text(label, x + 4, rowY + 7);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 30, 80);
+        doc.text(value, x + 81, rowY + 7, { align: "right" });
+      });
+      y += Math.ceil(kpis.length / 2) * 14 + 12;
 
-              h2 {
-                margin-top: 26px;
-              }
+      // ── Top Publications ──
+      if (analytics.topPublications.length > 0) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(30, 30, 60);
+        doc.text("Top 5 publications", col, y);
+        y += 8;
+        doc.setFontSize(9);
+        const th = ["Titre", "Type", "Vues", "Likes"];
+        const tw = [90, 30, 20, 20];
+        doc.setFillColor(10, 10, 26);
+        doc.rect(col, y, pageW - 2 * margin, 7, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        let tx = col + 2;
+        th.forEach((h, i) => {
+          doc.text(h, tx, y + 5);
+          tx += tw[i];
+        });
+        y += 7;
 
-              .grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 12px;
-              }
+        analytics.topPublications.forEach((pub, idx) => {
+          doc.setFillColor(
+            idx % 2 === 0 ? 250 : 243,
+            idx % 2 === 0 ? 250 : 243,
+            idx % 2 === 0 ? 255 : 252,
+          );
+          doc.rect(col, y, pageW - 2 * margin, 8, "F");
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(40, 40, 70);
+          tx = col + 2;
+          const cells = [
+            pub.title.slice(0, 40),
+            pub.type,
+            String(pub.views),
+            String(pub.likes),
+          ];
+          cells.forEach((c, i) => {
+            doc.text(c, tx, y + 5.5);
+            tx += tw[i];
+          });
+          y += 8;
+        });
+        y += 10;
+      }
 
-              .card {
-                background: #f5f5ff;
-                padding: 14px;
-                border-radius: 10px;
-              }
+      // ── Week summary ──
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(30, 30, 60);
+      doc.text("Cette semaine", col, y);
+      y += 7;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(60, 60, 100);
+      doc.text(
+        `Vues : ${analytics.weekSummary.views}  •  Likes : ${analytics.weekSummary.likes}`,
+        col,
+        y,
+      );
+      y += 12;
 
-              .label {
-                font-size: 11px;
-                color: #666;
-              }
-
-              .value {
-                font-size: 20px;
-                font-weight: bold;
-                margin-top: 6px;
-              }
-
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 12px;
-              }
-
-              th {
-                background: #0a0a1a;
-                color: white;
-                text-align: left;
-              }
-
-              th,
-              td {
-                padding: 9px;
-                border: 1px solid #e5e7eb;
-                font-size: 11px;
-              }
-
-              tr:nth-child(even) {
-                background: #f8fafc;
-              }
-
-              .footer {
-                margin-top: 30px;
-                text-align: center;
-                color: #6b7280;
-                font-size: 10px;
-              }
-            </style>
-          </head>
-
-          <body>
-            <div class="header">
-              <h1>Rapport Analytics</h1>
-
-              <div>
-                Débrouille Pro •
-                ${escapeHtml(currentUser.name ?? "Utilisateur")}
-              </div>
-
-              <div class="muted">
-                Généré le
-                ${escapeHtml(formatDate(new Date().toISOString()))}
-              </div>
-            </div>
-
-            <h2>Statistiques clés</h2>
-
-            <div class="grid">
-              <div class="card">
-                <div class="label">
-                  Publications totales
-                </div>
-                <div class="value">
-                  ${escapeHtml(analytics.totalPublications)}
-                </div>
-              </div>
-
-              <div class="card">
-                <div class="label">
-                  Vues totales
-                </div>
-                <div class="value">
-                  ${escapeHtml(analytics.totalViews)}
-                </div>
-              </div>
-
-              <div class="card">
-                <div class="label">
-                  Likes reçus
-                </div>
-                <div class="value">
-                  ${escapeHtml(analytics.totalLikes)}
-                </div>
-              </div>
-
-              <div class="card">
-                <div class="label">
-                  Commentaires
-                </div>
-                <div class="value">
-                  ${escapeHtml(analytics.totalComments)}
-                </div>
-              </div>
-
-              <div class="card">
-                <div class="label">
-                  Abonnés
-                </div>
-                <div class="value">
-                  ${escapeHtml(analytics.totalFollowers)}
-                </div>
-              </div>
-
-              <div class="card">
-                <div class="label">
-                  Taux d'engagement
-                </div>
-                <div class="value">
-                  ${escapeHtml(`${analytics.engagementRate}%`)}
-                </div>
-              </div>
-            </div>
-
-            ${
-              analytics.topPublications.length > 0
-                ? `
-                  <h2>
-                    Top 5 publications
-                  </h2>
-
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Titre</th>
-                        <th>Type</th>
-                        <th>Vues</th>
-                        <th>Likes</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      ${topRows}
-                    </tbody>
-                  </table>
-                `
-                : ""
-            }
-
-            <h2>Cette semaine</h2>
-
-            <p>
-              Vues :
-              <strong>
-                ${escapeHtml(analytics.weekSummary.views)}
-              </strong>
-              • Likes :
-              <strong>
-                ${escapeHtml(analytics.weekSummary.likes)}
-              </strong>
-            </p>
-
-            <div class="footer">
-              Débrouille Pro
-            </div>
-          </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({
-        html,
-        base64: false,
+      // ── Footer ──
+      const pageH = doc.internal.pageSize.getHeight();
+      doc.setFillColor(10, 10, 26);
+      doc.rect(0, pageH - 14, pageW, 14, "F");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 150);
+      doc.text("Débrouille Pro  •  débrouille.app", pageW / 2, pageH - 5, {
+        align: "center",
       });
 
-      await shareFile(uri, "Rapport Analytics Débrouille Pro");
-
+      doc.save("analytics-debrouille.pdf");
       markDone("analytics-debrouille.pdf");
-
-      Alert.alert("Rapport généré", "Le rapport PDF est prêt.");
-    } catch (error) {
-      console.error(error);
-
-      Alert.alert("Erreur", "Impossible de générer le rapport PDF.");
+      toast.success("Rapport PDF généré !");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erreur lors de la génération du PDF");
     } finally {
       setLoading("analytics-pdf", false);
     }
   };
 
-  const profileUrl = currentUser
-    ? `https://debrouille.app/profile/${currentUser._id}`
-    : "https://debrouille.app";
-
+  // ── Native Share on a publication ───────────────────────────────────────────
   const shareProfile = async () => {
-    if (!currentUser) {
-      return;
-    }
-
-    try {
-      await Sharing.shareAsync(
-        `https://debrouille.app/profile/${currentUser._id}`,
-        {
-          dialogTitle: "Partager mon profil",
-          mimeType: "text/plain",
-        },
-      );
-    } catch {
-      try {
-        await Clipboard.setStringAsync(profileUrl);
-
-        Alert.alert(
-          "Lien copié",
-          "Le lien du profil a été copié dans le presse-papiers.",
-        );
-      } catch {
-        Alert.alert("Erreur", "Le partage du profil est indisponible.");
-      }
-    }
+    if (!currentUser) return;
+    const url = `${window.location.origin}?profile=${currentUser._id}`;
+    const shared = await nativeShare(
+      `${currentUser.name ?? "Mon profil"} sur Débrouille Pro`,
+      "Découvre mon profil sur Débrouille Pro, la super-app africaine 🌍",
+      url,
+    );
+    if (!shared) toast.error("Partage non disponible");
   };
+
+  const profileUrl = currentUser
+    ? `${window.location.origin}?profile=${currentUser._id}`
+    : window.location.origin;
 
   const isReady = !!analytics && !!publications && !!activity && !!currentUser;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={onBack}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <ArrowLeft size={22} color="#ffffff" />
-        </Pressable>
-
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Export & Partage</Text>
-
-          <Text style={styles.headerSubtitle}>
-            Télécharge tes données et partage ton profil
-          </Text>
-        </View>
-
-        {isReady ? (
-          <View style={styles.readyContainer}>
-            <CheckCircle2 size={16} color="#34d399" />
-
-            <Text style={styles.readyText}>Prêt</Text>
-          </View>
-        ) : null}
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View>
-          <SectionTitle>Partager mon profil</SectionTitle>
-
-          <View style={styles.cardsColumn}>
-            <Pressable
-              onPress={() => setShowQr(true)}
-              style={({ pressed }) => [
-                styles.exportCard,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View
-                style={[
-                  styles.exportIconContainer,
-                  {
-                    backgroundColor: "#6366f122",
-                  },
-                ]}
-              >
-                <QrCode size={22} color="#818cf8" />
-              </View>
-
-              <View style={styles.exportContent}>
-                <Text style={styles.exportTitle}>QR Code de profil</Text>
-
-                <Text style={styles.exportDescription}>
-                  Génère un QR Code avec ton lien public
-                </Text>
-              </View>
-
-              <QrCode size={20} color="#818cf8" />
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                void shareProfile();
-              }}
-              style={({ pressed }) => [
-                styles.exportCard,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View
-                style={[
-                  styles.exportIconContainer,
-                  {
-                    backgroundColor: "#10b98122",
-                  },
-                ]}
-              >
-                <Share2 size={22} color="#34d399" />
-              </View>
-
-              <View style={styles.exportContent}>
-                <Text style={styles.exportTitle}>Partager mon profil</Text>
-
-                <Text style={styles.exportDescription}>
-                  Via WhatsApp, SMS, email ou lien direct
-                </Text>
-              </View>
-
-              <Share2 size={20} color="#34d399" />
-            </Pressable>
-          </View>
-        </View>
-
-        <View>
-          <SectionTitle>Exporter mes données</SectionTitle>
-
-          <View style={styles.cardsColumn}>
-            {!isReady ? (
-              <>
-                <LoadingCard />
-                <LoadingCard />
-                <LoadingCard />
-              </>
+    <View className="flex flex-col h-full" style={{  }}>{}<View className="flex items-center gap-3 px-5 pt-safe-or-4 pb-4 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"><ArrowLeft className="w-5 h-5 text-white/70" /></Pressable><View><Text className="text-base font-bold text-white">Export & Partage</Text><Text className="text-xs text-white/40">Télécharge tes données, partage ton profil
+          </Text></View>{isReady && (
+          <View className="ml-auto flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /><Text className="text-xs text-emerald-400">Données prêtes</Text></View>
+        )}</View><View className="flex-1 overflow-y-auto px-5 py-5 space-y-6">{}<View><Text className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Partager mon profil
+          </Text><View className="space-y-3">{}<View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-4 flex items-center gap-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={() => setShowQr(true)}><View className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#6366f122" }}><QrCode className="w-5 h-5 text-indigo-400" /></View><View className="flex-1 min-w-0"><Text className="text-sm font-semibold text-white">QR Code de profil
+                </Text><Text className="text-xs text-white/50 mt-0.5">Génère un QR code avec ton lien public
+                </Text></View><View className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#6366f133" }}><QrCode className="w-4 h-4 text-indigo-400" /></View></View>{}<View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="rounded-2xl p-4 flex items-center gap-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={shareProfile}><View className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#10b98122" }}><Share2 className="w-5 h-5 text-emerald-400" /></View><View className="flex-1 min-w-0"><Text className="text-sm font-semibold text-white">Partager mon profil
+                </Text><Text className="text-xs text-white/50 mt-0.5">Via WhatsApp, SMS, email ou lien direct
+                </Text></View><View className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#10b98133" }}><Share2 className="w-4 h-4 text-emerald-400" /></View></View></View></View>{}<View><Text className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Exporter mes données
+          </Text><View className="space-y-3">{!isReady ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+              ))
             ) : (
               <>
                 <ExportCard
-                  icon={<FileText size={22} color="#818cf8" />}
+                  icon={<FileText className="w-5 h-5" />}
                   title="Mes publications (CSV)"
-                  description={`${publications.page.length} publications · Compatible Excel et Google Sheets`}
+                  description={`${publications.page.length} publications · Excel, Google Sheets`}
                   badge="CSV"
-                  onExport={() => {
-                    void exportPublicationsCsv();
-                  }}
+                  onExport={exportPublicationsCsv}
                   loading={!!loadingStates["pub-csv"]}
                   color="#6366f1"
                 />
-
                 <ExportCard
-                  icon={<Activity size={22} color="#fbbf24" />}
+                  icon={<Activity className="w-5 h-5" />}
                   title="Historique d'activité (CSV)"
-                  description="Toutes mes actions dans l'application"
+                  description="Toutes mes actions dans l'app"
                   badge="CSV"
-                  onExport={() => {
-                    void exportActivityCsv();
-                  }}
+                  onExport={exportActivityCsv}
                   loading={!!loadingStates["activity-csv"]}
                   color="#f59e0b"
                 />
-
                 <ExportCard
-                  icon={<BarChart2 size={22} color="#34d399" />}
+                  icon={<BarChart2 className="w-5 h-5" />}
                   title="Rapport analytics (PDF)"
-                  description="Statistiques, vues, likes et top publications"
+                  description="Stats, vues, likes, top publications"
                   badge="PDF"
-                  onExport={() => {
-                    void exportAnalyticsPdf();
-                  }}
+                  onExport={exportAnalyticsPdf}
                   loading={!!loadingStates["analytics-pdf"]}
                   color="#10b981"
                 />
               </>
-            )}
-          </View>
-        </View>
-
-        {exportedFiles.length > 0 ? (
-          <View>
-            <SectionTitle>Exports récents</SectionTitle>
-
-            <View style={styles.recentExports}>
-              {exportedFiles.map((file, index) => (
-                <View key={`${file}-${index}`} style={styles.recentExport}>
-                  <CheckCircle2 size={18} color="#34d399" />
-
-                  <Text numberOfLines={1} style={styles.recentExportText}>
-                    {file}
-                  </Text>
-
-                  <FileDown size={18} color="#34d399" />
-                </View>
-              ))}
+            )}</View></View>{}<View>{exportedFiles.length > 0 && (
+            <View initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+              <Text className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Exports récents
+              </Text>
+              <View className="space-y-2">
+                {exportedFiles.map((f, i) => (
+                  <View key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ backgroundColor: "rgba(16,185,129,0.08)", borderWidth: 1, borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <Text className="text-sm text-white/80">{f}</Text>
+                    <FileDown className="w-4 h-4 text-emerald-400 ml-auto shrink-0" />
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
-        ) : null}
-
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            Tes données t'appartiennent. Les fichiers exportés sont générés
-            localement sur ton appareil avant d'être partagés via les options
-            natives disponibles.
-          </Text>
-        </View>
-      </ScrollView>
-
-      <QrModal
-        url={profileUrl}
-        visible={showQr}
-        onClose={() => setShowQr(false)}
-      />
-    </View>
+          )}</View>{}<View initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(99,102,241,0.06)", borderWidth: 1, borderColor: "rgba(99,102,241,0.15)", borderStyle: "solid" }}><Text className="text-xs text-white/50 leading-relaxed">Tes données t'appartiennent. Les fichiers exportés sont générés
+            localement et ne sont jamais envoyés à nos serveurs.
+          </Text></View><canvas ref={canvasRef} className="hidden" /></View>{}{showQr && <QrModal url={profileUrl} onClose={() => setShowQr(false)} />}</View>
   );
 }
+
+// ─── ExportPage ────────────────────────────────────────────────────────────────
 
 export default function ExportPage({ onBack }: ExportPageProps) {
   const { isAuthenticated } = useFirebaseAuth();
 
   if (!isAuthenticated) {
     return (
-      <View style={styles.authContainer}>
-        <Pressable onPress={onBack} style={styles.authBackButton}>
-          <ArrowLeft size={24} color="#ffffff" />
+      <View className="flex flex-col h-full items-center justify-center gap-4 px-6" style={{  }}>
+        <Pressable onPress={onBack} className="self-start mb-4">
+          <ArrowLeft className="w-5 h-5 text-white/60" />
         </Pressable>
-
-        <Share2 size={52} color="#818cf8" />
-
-        <Text style={styles.authTitle}>Export & Partage</Text>
-
-        <Text style={styles.authDescription}>
+        <Share2 className="w-12 h-12 text-indigo-400" />
+        <Text className="text-white font-semibold text-lg">Export & Partage</Text>
+        <Text className="text-white/50 text-sm text-center">
           Connecte-toi pour exporter tes données et partager ton profil.
         </Text>
-
         <SignInButton />
       </View>
     );
@@ -962,326 +529,3 @@ export default function ExportPage({ onBack }: ExportPageProps) {
 
   return <ExportInner onBack={onBack} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#080817",
-  },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
-  },
-
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-
-  headerContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-
-  headerTitle: {
-    color: "#ffffff",
-    fontSize: 17,
-    fontWeight: "700",
-  },
-
-  headerSubtitle: {
-    marginTop: 3,
-    color: "rgba(255,255,255,0.45)",
-    fontSize: 12,
-  },
-
-  readyContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-
-  readyText: {
-    color: "#34d399",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 22,
-    paddingBottom: 40,
-    gap: 28,
-  },
-
-  sectionTitle: {
-    marginBottom: 12,
-    color: "rgba(255,255,255,0.42)",
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-  },
-
-  cardsColumn: {
-    gap: 12,
-  },
-
-  exportCard: {
-    minHeight: 86,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.045)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-
-  exportIconContainer: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  exportContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-
-  exportTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-
-  exportTitle: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "700",
-    flexShrink: 1,
-  },
-
-  exportDescription: {
-    marginTop: 4,
-    color: "rgba(255,255,255,0.48)",
-    fontSize: 11,
-    lineHeight: 16,
-  },
-
-  badge: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-
-  badgeText: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-
-  downloadButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  loadingCard: {
-    height: 86,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.035)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-  },
-
-  recentExports: {
-    gap: 8,
-  },
-
-  recentExport: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 14,
-    backgroundColor: "rgba(16,185,129,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(16,185,129,0.2)",
-  },
-
-  recentExportText: {
-    flex: 1,
-    color: "rgba(255,255,255,0.82)",
-    fontSize: 13,
-  },
-
-  infoCard: {
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: "rgba(99,102,241,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(99,102,241,0.18)",
-  },
-
-  infoText: {
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 12,
-    lineHeight: 19,
-  },
-
-  modalOverlay: {
-    flex: 1,
-    padding: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.78)",
-  },
-
-  modalContent: {
-    width: "100%",
-    maxWidth: 360,
-    alignItems: "center",
-    padding: 24,
-    borderRadius: 26,
-    backgroundColor: "#0f1123",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-
-  modalTitle: {
-    color: "#ffffff",
-    fontSize: 17,
-    fontWeight: "700",
-  },
-
-  qrContainer: {
-    marginVertical: 22,
-    padding: 14,
-    borderRadius: 20,
-    backgroundColor: "#0a0a1a",
-  },
-
-  qrUrl: {
-    width: "100%",
-    color: "rgba(255,255,255,0.45)",
-    fontSize: 11,
-    textAlign: "center",
-    lineHeight: 16,
-  },
-
-  modalActions: {
-    width: "100%",
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 22,
-  },
-
-  primaryAction: {
-    flex: 1,
-    minHeight: 46,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    borderRadius: 12,
-    backgroundColor: "#6366f1",
-  },
-
-  primaryActionText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  secondaryAction: {
-    flex: 1,
-    minHeight: 46,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.09)",
-  },
-
-  secondaryActionText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  closeButton: {
-    marginTop: 18,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-  },
-
-  closeButtonText: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 12,
-  },
-
-  authContainer: {
-    flex: 1,
-    paddingHorizontal: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#080817",
-  },
-
-  authBackButton: {
-    position: "absolute",
-    top: 24,
-    left: 20,
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-
-  authTitle: {
-    marginTop: 18,
-    color: "#ffffff",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-
-  authDescription: {
-    marginTop: 10,
-    marginBottom: 22,
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: "center",
-  },
-
-  pressed: {
-    opacity: 0.75,
-  },
-
-  disabled: {
-    opacity: 0.55,
-  },
-});

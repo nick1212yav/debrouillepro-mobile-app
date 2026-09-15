@@ -120,17 +120,10 @@ function ToolbarButton({
   children,
 }: ToolbarButtonProps) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{
         disabled,
         selected: active,
-      }}
-      disabled={disabled}
-      onPress={onPress}
-      hitSlop={4}
-      style={({ pressed }) => [
+      }} disabled={disabled} onPress={onPress} hitSlop={4} style={({ pressed }) => [
         styles.toolbarButton,
         active && {
           backgroundColor: `${color}20`,
@@ -138,8 +131,7 @@ function ToolbarButton({
         },
         pressed && !disabled && styles.toolbarButtonPressed,
         disabled && styles.toolbarButtonDisabled,
-      ]}
-    >
+      ]}>
       {children}
     </Pressable>
   );
@@ -207,6 +199,10 @@ export default function ArticleEditor({
 
       stack.push(html);
 
+      /*
+       * Empêche l'historique de croître indéfiniment
+       * pendant une longue session d'édition.
+       */
       if (stack.length > 100) {
         stack.shift();
       }
@@ -217,6 +213,14 @@ export default function ArticleEditor({
     [updateHistoryAvailability],
   );
 
+  /*
+   * Synchronisation si le parent remplace réellement le contenu
+   * après le montage.
+   *
+   * EnrichedTextInput est volontairement uncontrolled.
+   * setValue() est donc utilisé uniquement lorsqu'une nouvelle
+   * valeur externe arrive.
+   */
   useEffect(() => {
     if (content === lastExternalContentRef.current) {
       return;
@@ -284,6 +288,11 @@ export default function ArticleEditor({
 
     editorRef.current?.setValue(previous);
 
+    /*
+     * onChangeHtml sera également émis par l'éditeur.
+     * On informe néanmoins immédiatement le parent afin que
+     * son état reste synchronisé avec Undo.
+     */
     onChange(previous);
 
     updateHistoryAvailability();
@@ -314,6 +323,10 @@ export default function ArticleEditor({
   }, [onChange, updateHistoryAvailability]);
 
   const openLinkDialog = useCallback(() => {
+    /*
+     * Si le curseur est déjà sur un lien, on édite ce lien.
+     * Sinon on travaille avec la sélection courante.
+     */
     if (detectedLink) {
       setLinkText(detectedLink.text);
       setLinkUrl(detectedLink.url);
@@ -348,6 +361,10 @@ export default function ArticleEditor({
 
     const normalizedUrl = normalizeUrl(linkUrl);
 
+    /*
+     * URL vide sur un lien existant = suppression du lien,
+     * mais conservation du texte.
+     */
     if (!normalizedUrl) {
       if (target.end > target.start) {
         editor.removeLink(target.start, target.end);
@@ -396,6 +413,11 @@ export default function ArticleEditor({
       return;
     }
 
+    /*
+     * L'API native demande explicitement largeur + hauteur.
+     * On récupère donc les dimensions de l'image distante puis
+     * on les réduit à une taille adaptée à un écran mobile.
+     */
     RNImage.getSize(
       normalizedUrl,
       (width, height) => {
@@ -413,6 +435,10 @@ export default function ArticleEditor({
         editor.focus();
       },
       () => {
+        /*
+         * Fallback si React Native ne peut pas déterminer
+         * les dimensions distantes.
+         */
         editor.setImage(normalizedUrl, 320, 180);
 
         closeDialog();
@@ -457,7 +483,10 @@ export default function ArticleEditor({
 
   return (
     <View style={styles.container}>
-      {/* Toolbar */}
+      {/* ======================================================
+          TOOLBAR MOBILE
+          ====================================================== */}
+
       <View style={styles.toolbarContainer}>
         <ScrollView
           horizontal
@@ -681,8 +710,16 @@ export default function ArticleEditor({
         </ScrollView>
       </View>
 
-      {/* Editor Area */}
-      <View style={[styles.editorShell, { borderColor: `${color}35` }]}>
+      {/* ======================================================
+          ÉDITEUR NATIF
+          ====================================================== */}
+
+      <View style={[
+          styles.editorShell,
+          {
+            borderColor: `${color}35`,
+          },
+        ]}>
         <EnrichedTextInput
           ref={editorRef}
           defaultValue={initialValue}
@@ -798,11 +835,21 @@ export default function ArticleEditor({
               url: event.url,
             });
           }}
-          onFocus={() => {}}
+          onFocus={() => {
+            /*
+             * Un lien détecté précédemment peut ne plus être
+             * pertinent lorsque l'utilisateur revient dans
+             * l'éditeur. onChangeState/onLinkDetected vont
+             * rétablir l'état utile.
+             */
+          }}
         />
       </View>
 
-      {/* Stats */}
+      {/* ======================================================
+          STATISTIQUES
+          ====================================================== */}
+
       <View style={styles.stats}>
         <Text style={styles.statText}>
           {wordCount} {wordCount === 1 ? "mot" : "mots"}
@@ -819,7 +866,10 @@ export default function ArticleEditor({
         </Text>
       </View>
 
-      {/* Link Modal */}
+      {/* ======================================================
+          MODALE LIEN
+          ====================================================== */}
+
       <Modal
         visible={dialogMode === "link"}
         transparent
@@ -839,57 +889,32 @@ export default function ArticleEditor({
                 </Text>
               </View>
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Fermer"
-                hitSlop={8}
-                onPress={closeDialog}
-                style={styles.closeButton}
-              >
+              <Pressable accessibilityRole="button" accessibilityLabel="Fermer" hitSlop={8} onPress={closeDialog} style={styles.closeButton}>
                 <X size={20} color={stylesConstants.iconColor} />
               </Pressable>
             </View>
 
             <Text style={styles.inputLabel}>Texte affiché</Text>
 
-            <TextInput
-              value={linkText}
-              onChangeText={setLinkText}
-              placeholder="Texte du lien"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="sentences"
-              style={[
+            <TextInput value={linkText} onChangeText={setLinkText} placeholder="Texte du lien" placeholderTextColor="#94A3B8" autoCapitalize="sentences" style={[
                 styles.dialogInput,
                 {
                   borderColor: `${color}45`,
                 },
-              ]}
-            />
+              ]} />
 
             <Text style={styles.inputLabel}>Adresse</Text>
 
-            <TextInput
-              value={linkUrl}
-              onChangeText={setLinkUrl}
-              placeholder="https://exemple.com"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              style={[
+            <TextInput value={linkUrl} onChangeText={setLinkUrl} placeholder="https://exemple.com" placeholderTextColor="#94A3B8" autoCapitalize="none" autoCorrect={false} keyboardType="url" style={[
                 styles.dialogInput,
                 {
                   borderColor: `${color}45`,
                 },
-              ]}
-            />
+              ]} />
 
             <View style={styles.dialogActions}>
               {detectedLink || isActive("link") ? (
-                <Pressable
-                  onPress={removeCurrentLink}
-                  style={[styles.secondaryAction, styles.removeAction]}
-                >
+                <Pressable onPress={removeCurrentLink} style={[styles.secondaryAction, styles.removeAction]}>
                   <Text style={styles.removeActionText}>Supprimer</Text>
                 </Pressable>
               ) : null}
@@ -900,17 +925,13 @@ export default function ArticleEditor({
                 <Text style={styles.secondaryActionText}>Annuler</Text>
               </Pressable>
 
-              <Pressable
-                onPress={applyLink}
-                disabled={!linkUrl.trim()}
-                style={[
+              <Pressable onPress={applyLink} disabled={!linkUrl.trim()} style={[
                   styles.primaryAction,
                   {
                     backgroundColor: color,
                   },
                   !linkUrl.trim() && styles.primaryActionDisabled,
-                ]}
-              >
+                ]}>
                 <Text style={styles.primaryActionText}>Appliquer</Text>
               </Pressable>
             </View>
@@ -918,7 +939,10 @@ export default function ArticleEditor({
         </View>
       </Modal>
 
-      {/* Image Modal */}
+      {/* ======================================================
+          MODALE IMAGE
+          ====================================================== */}
+
       <Modal
         visible={dialogMode === "image"}
         transparent
@@ -936,36 +960,19 @@ export default function ArticleEditor({
                 </Text>
               </View>
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Fermer"
-                hitSlop={8}
-                onPress={closeDialog}
-                style={styles.closeButton}
-              >
+              <Pressable accessibilityRole="button" accessibilityLabel="Fermer" hitSlop={8} onPress={closeDialog} style={styles.closeButton}>
                 <X size={20} color={stylesConstants.iconColor} />
               </Pressable>
             </View>
 
             <Text style={styles.inputLabel}>URL de l'image</Text>
 
-            <TextInput
-              value={imageUrl}
-              onChangeText={setImageUrl}
-              placeholder="https://exemple.com/image.jpg"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              returnKeyType="done"
-              onSubmitEditing={applyImage}
-              style={[
+            <TextInput value={imageUrl} onChangeText={setImageUrl} placeholder="https://exemple.com/image.jpg" placeholderTextColor="#94A3B8" autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="done" onSubmitEditing={applyImage} style={[
                 styles.dialogInput,
                 {
                   borderColor: `${color}45`,
                 },
-              ]}
-            />
+              ]} />
 
             <View style={styles.dialogActions}>
               <View style={styles.dialogActionSpacer} />
@@ -974,17 +981,13 @@ export default function ArticleEditor({
                 <Text style={styles.secondaryActionText}>Annuler</Text>
               </Pressable>
 
-              <Pressable
-                onPress={applyImage}
-                disabled={!imageUrl.trim()}
-                style={[
+              <Pressable onPress={applyImage} disabled={!imageUrl.trim()} style={[
                   styles.primaryAction,
                   {
                     backgroundColor: color,
                   },
                   !imageUrl.trim() && styles.primaryActionDisabled,
-                ]}
-              >
+                ]}>
                 <Text style={styles.primaryActionText}>Insérer</Text>
               </Pressable>
             </View>

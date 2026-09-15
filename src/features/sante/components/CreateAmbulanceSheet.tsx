@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreateAmbulanceSheet.tsx
@@ -13,6 +12,7 @@ import { AmbulanceForm } from "../forms/AmbulanceForm";
 import type { AmbulanceFormValues } from "../forms/AmbulanceForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface CreateAmbulanceSheetProps {
   open: boolean;
@@ -34,13 +34,13 @@ export function CreateAmbulanceSheet({
         ...data,
         // Champs supplémentaires
       });
-      UIService.openToast("Service d'ambulance créé avec succès !", "success");
+      toast.success("Service d'ambulance créé avec succès !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erreur lors de la création";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

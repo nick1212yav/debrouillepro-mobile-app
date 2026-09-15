@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditMedicalRecordSheet.tsx
@@ -13,6 +12,7 @@ import { MedicalRecordForm } from "../forms/MedicalRecordForm";
 import type { MedicalRecordFormValues } from "../forms/MedicalRecordForm";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface EditMedicalRecordSheetProps {
   open: boolean;
@@ -51,7 +51,7 @@ export function EditMedicalRecordSheet({
             .filter(Boolean) || [],
         // doctorId: data.doctorId, // si le schéma le permet
       });
-      UIService.openToast("Enregistrement mis à jour !", "success");
+      toast.success("Enregistrement mis à jour !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -59,7 +59,7 @@ export function EditMedicalRecordSheet({
         error instanceof Error
           ? error.message
           : "Erreur lors de la mise à jour";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

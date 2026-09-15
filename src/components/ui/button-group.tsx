@@ -1,8 +1,8 @@
-import { View } from "react-native";
+import { View, ViewProps } from "react-native";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
-import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils.ts";
+import { Separator } from "@/components/ui/separator.tsx";
 
 const buttonGroupVariants = cva(
   "flex w-fit items-stretch [&>*]:focus-visible:z-10 [&>*]:focus-visible:relative [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1 has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-md has-[>[data-slot=button-group]]:gap-2",
@@ -25,15 +25,9 @@ function ButtonGroup({
   className,
   orientation,
   ...props
-}: React.ComponentProps<typeof View> & VariantProps<typeof buttonGroupVariants>) {
+}: ViewProps & VariantProps<typeof buttonGroupVariants>) {
   return (
-    <View
-      accessibilityRole="group"
-      data-slot="button-group"
-      data-orientation={orientation}
-      className={cn(buttonGroupVariants({ orientation }), className)}
-      {...props}
-    />
+    <View accessibilityRole="group" data-slot="button-group" data-orientation={orientation} className={cn(buttonGroupVariants({ orientation }), className)} {...props} />
   );
 }
 
@@ -41,7 +35,7 @@ function ButtonGroupText({
   className,
   asChild = false,
   ...props
-}: React.ComponentProps<typeof View> & {
+}: ViewProps & {
   asChild?: boolean;
 }) {
   const Comp = asChild ? Slot : "div";

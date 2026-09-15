@@ -7,7 +7,7 @@ export interface Seat {
   available: boolean;
   selected?: boolean;
   premium?: boolean;
-  undefined?: boolean;
+  window?: boolean;
   aisle?: boolean;
 }
 
@@ -35,7 +35,7 @@ export function useVoyageSeats(totalSeats: number = 30) {
         available,
         selected: false,
         premium: i < 4,
-        undefined: col === 1 || col === 4,
+        window: col === 1 || col === 4,
         aisle: col === 2 || col === 3,
       });
     }

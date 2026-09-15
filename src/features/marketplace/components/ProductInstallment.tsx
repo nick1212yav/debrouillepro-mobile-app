@@ -19,10 +19,7 @@ export function ProductInstallment({
   const monthly = (price / installments) * (1 + interestRate / 100);
 
   return (
-    <View
-      className="p-3 rounded-xl"
-      style={{ backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.15)", borderStyle: "solid" }}
-    >
+    <View className="p-3 rounded-xl" style={{ backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.15)", borderStyle: "solid" }}>
       <Text className="text-white/60 text-xs font-semibold uppercase tracking-wider">
         Paiement en plusieurs fois
       </Text>

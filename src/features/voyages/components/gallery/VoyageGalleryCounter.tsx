@@ -17,12 +17,10 @@ export function VoyageGalleryCounter({
   if (total <= 1) return null;
 
   return (
-    <View
-      className={cn(
+    <View className={cn(
         "px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-xs font-medium",
         className,
-      )}
-    >
+      )}>
       {current} / {total}
     </View>
   );

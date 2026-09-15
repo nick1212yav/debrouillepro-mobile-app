@@ -31,24 +31,11 @@ export const AccommodationNearby: React.FC<AccommodationNearbyProps> = () => {
   ];
 
   return (
-    <View className="p-4 md:p-6 border-b border-white/5">
-      <Text className="text-white font-semibold text-sm mb-3">À proximité</Text>
-      <View className="flex flex-col gap-3">
-        {items.map((item, i) => {
+    <View className="p-4 md:p-6 border-b border-white/5"><Text className="text-white font-semibold text-sm mb-3">À proximité</Text><View className="flex flex-col gap-3">{items.map((item, i) => {
           const Icon = item.icon;
           return (
-            <View key={i} className="flex items-start gap-3">
-              <View className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/60 shrink-0">
-                <Icon size={14} className="text-indigo-400" />
-              </View>
-              <View className="flex flex-col gap-0.5">
-                <Text className="text-xs font-semibold text-white">{item.label}</Text>
-                <Text className="text-[10px] text-white/40">{item.dist}</Text>
-              </View>
-            </View>
+            <View key={i} className="flex items-start gap-3"><View className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/60 shrink-0"><Icon size={14} className="text-indigo-400" /></View><View className="flex flex-col gap-0.5"><Text className="text-xs font-semibold text-white">{item.label}</Text><Text className="text-[10px] text-white/40">{item.dist}</Text></View></View>
           );
-        })}
-      </View>
-    </View>
+        })}</View></View>
   );
 };

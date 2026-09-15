@@ -1,22 +1,24 @@
-// src/hooks/use-mobile.ts
-
-import { useMemo } from "react";
-import { useWindowDimensions } from "react-native";
+import { useEffect, useState } from "react";
+import { Dimensions } from "react-native";
 
 const MOBILE_BREAKPOINT = 768;
 
 /**
- * Vérifie si la largeur actuelle de l'écran correspond
- * à une interface mobile.
- *
- * Le breakpoint est aligné sur Tailwind `md` :
- * - mobile : largeur < 768
- * - tablette / desktop : largeur >= 768
+ * Checks if the screen is mobile (equivalent to md in tailwind)
+ * @returns Whether the screen is mobile
  */
-export function useIsMobile(): boolean {
-  const { width } = useWindowDimensions();
+export function useIsMobile() {
+  const [isMobile, setIsMobile] = useState<boolean | undefined>(undefined);
 
-  return useMemo(() => width < MOBILE_BREAKPOINT, [width]);
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const onChange = () => {
+      setIsMobile(Dimensions.get("window").width < MOBILE_BREAKPOINT);
+    };
+    mql.addEventListener("change", onChange);
+    setIsMobile(Dimensions.get("window").width < MOBILE_BREAKPOINT);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  return !!isMobile;
 }
-
-export default useIsMobile;

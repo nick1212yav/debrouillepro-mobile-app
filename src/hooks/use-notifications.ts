@@ -2,8 +2,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import type { Id } from "@/convex/_generated/dataModel.d";
-import type { Doc } from "@/convex/_generated/dataModel.d";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

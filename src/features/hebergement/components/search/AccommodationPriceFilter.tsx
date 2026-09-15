@@ -15,30 +15,8 @@ export const AccommodationPriceFilter: React.FC<
   };
 
   return (
-    <View className={`flex flex-col gap-2 ${className}`}>
-      <View className="flex justify-between items-baseline">
-        <Text className="text-[10px] font-bold text-white/30 uppercase tracking-wider block">
-          Budget maximum
-        </Text>
-        <Text className="text-xs font-black text-indigo-400">
-          {formatValue(maxPrice)} FCFA
-        </Text>
-      </View>
-
-      <TextInput
-       
-        min={30000}
-        max={1000000}
-        step={10000}
-        value={maxPrice}
-        onChangeText={(text) => onPriceChange(Number(text))}
-        className="w-full h-1 bg-white/5 rounded-lg"
-      />
-
-      <View className="flex justify-between text-[9px] text-white/20 font-bold mt-0.5">
-        <Text><Text>30 000 FCFA</Text></Text>
-        <Text><Text>1 000 000 FCFA+</Text></Text>
-      </View>
-    </View>
+    <View className={`flex flex-col gap-2 ${className}`}><View className="flex justify-between items-baseline"><Text className="text-[10px] font-bold text-white/30 uppercase tracking-wider block">Budget maximum
+        </Text><Text className="text-xs font-black text-indigo-400">{formatValue(maxPrice)}FCFA
+        </Text></View><TextInput value={maxPrice} onChangeText={(value) => onPriceChange(Number(value))} className="w-full h-1 bg-white/5 rounded-lg accent-indigo-500" /><View className="flex justify-between text-[9px] text-white/20 font-bold mt-0.5"><Text>30 000 FCFA</Text><Text>1 000 000 FCFA+</Text></View></View>
   );
 };

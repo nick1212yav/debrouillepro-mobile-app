@@ -1,10 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/hooks/useNetworkSkills.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { NetworkSkill } from "../types/skill.types";
+import { toast } from "sonner";
 
 interface UseNetworkSkillsOptions {
   userId: Id<"users">;
@@ -24,10 +23,10 @@ export function useNetworkSkills({ userId }: UseNetworkSkillsOptions) {
     try {
       // ✅ Correction : retrait de 'userId' car l'authentification est déduite côté serveur Convex
       const id = await addSkill({ name });
-      UIService.openToast("Compétence ajoutée", "success");
+      toast.success("Compétence ajoutée");
       return id;
     } catch {
-      UIService.openToast("Erreur lors de l'ajout", "error");
+      toast.error("Erreur lors de l'ajout");
       return null;
     }
   };
@@ -36,10 +35,10 @@ export function useNetworkSkills({ userId }: UseNetworkSkillsOptions) {
     // ✅ Correction : typé Id<"networkSkills"> au lieu de string
     try {
       await deleteSkill({ id: skillId });
-      UIService.openToast("Compétence supprimée", "success");
+      toast.success("Compétence supprimée");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
       return false;
     }
   };
@@ -48,10 +47,10 @@ export function useNetworkSkills({ userId }: UseNetworkSkillsOptions) {
     // ✅ Correction : typé Id<"networkSkills"> au lieu de string
     try {
       await endorseSkill({ skillId });
-      UIService.openToast("Recommandation ajoutée", "success");
+      toast.success("Recommandation ajoutée");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la recommandation", "error");
+      toast.error("Erreur lors de la recommandation");
       return false;
     }
   };

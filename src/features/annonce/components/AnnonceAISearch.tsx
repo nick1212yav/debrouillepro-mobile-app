@@ -1,99 +1,66 @@
-import { Pressable, View, TextInput, Text, Alert } from "react-native";
-import { useState } from "react";
+import { Pressable, View, TextInput, NativeSyntheticEvent, TextInputChangeEventData } from "react-native";
+import { useState, useRef } from "react";
 import { Search, Camera, Mic, X } from "lucide-react-native";
-import * as ImagePicker from "expo-image-picker";
-
-// Remplacement de sonner par l'abstraction native UIService
-import { UIService } from "@/core/sdk/ui/UIService";
+import { toast } from "sonner";
 
 interface Props {
-  onSearch: (query: string | string) => void; // URI ou mot-clé
+  onSearch: (query: string | File) => void;
   onClose?: () => void;
 }
 
 export function AnnonceAISearch({ onSearch, onClose }: Props) {
   const [query, setQuery] = useState("");
+  const [mode, setMode] = useState<"text" | "image" | "voice">("text");
+  const fileInputRef = useRef<TextInput>(null);
   const [recording, setRecording] = useState(false);
 
-  // 1. Recherche par image (Appareil photo / Galerie)
-  const handleImageSearch = async () => {
-    // Demander l'autorisation d'accès aux photos
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const handleImageUpload = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onSearch(file);
+      toast.info("Recherche par image en cours...");
+    }
+  };
 
-    if (permissionResult.granted === false) {
-      Alert.alert(
-        "Permission requise",
-        "Vous devez autoriser l'accès à vos photos pour rechercher par image.",
-      );
+  const handleVoiceSearch = () => {
+    if (!("webkitSpeechRecognition" in window)) {
+      toast.error("La reconnaissance vocale n'est pas supportée");
       return;
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const imageUri = result.assets[0].uri;
-      onSearch(imageUri);
-      UIService.openToast("Recherche par image en cours...", "info");
-    }
+    const recognition = new (window as any).webkitSpeechRecognition();
+    recognition.lang = "fr-FR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    setRecording(true);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setQuery(transcript);
+      onSearch(transcript);
+      setRecording(false);
+    };
+    recognition.onerror = () => {
+      setRecording(false);
+      toast.error("Erreur de reconnaissance vocale");
+    };
+    recognition.start();
   };
 
-  // 2. Reconnaissance vocale (Dictée native)
-  const handleVoiceSearch = () => {
-    Alert.alert(
-      "Dictée Vocale",
-      "Pour saisir votre recherche à la voix, veuillez utiliser la touche microphone intégrée directement sur votre clavier virtuel iOS ou Android.",
-    );
-  };
-
-  // 3. Soumission de la recherche textuelle
-  const handleSubmit = () => {
-    if (query.trim()) {
-      onSearch(query.trim());
-    }
+  const handleSubmit = (e: NativeSyntheticEvent<any>) => {
+    e.preventDefault();
+    if (query.trim()) onSearch(query.trim());
   };
 
   return (
     <View className="bg-white/5 rounded-xl p-3 border border-white/10">
-      <View className="flex flex-row items-center gap-2">
-        <Search size={16} className="text-white/30 flex-shrink-0" />
-
-        <TextInput
-          value={query}
-          onChangeText={(text) => setQuery(text)}
-          placeholder="Rechercher par mot-clé, description..."
-          placeholderTextColor="rgba(255, 255, 255, 0.3)"
-          className="flex-1 bg-transparent text-white text-sm"
-          returnKeyType="search"
-          onSubmitEditing={handleSubmit}
-        />
-
-        {query.length > 0 && (
-          <Pressable onPress={() => setQuery("")} className="p-1">
-            <X size={14} className="text-white/30" />
+      <View className="flex items-center gap-2"><Search size={16} className="text-white/30 flex-shrink-0" /><TextInput value={query} onChangeText={(value) => setQuery(value)} placeholder="Rechercher par mot-clé, description..." className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/30" />{query && (
+          <Pressable onPress={() => setQuery("")} className="text-white/30 transition-colors">
+            <X size={14} />
           </Pressable>
-        )}
-
-        <View className="flex flex-row items-center gap-1">
-          <Pressable onPress={handleImageSearch} className="p-1.5 rounded-lg">
-            <Camera size={16} className="text-white/40" />
-          </Pressable>
-
-          <Pressable
-            onPress={handleVoiceSearch}
-            className={`p-1.5 rounded-lg ${recording ? "bg-red-500/10" : ""}`}
-          >
-            <Mic
-              size={16}
-              className={recording ? "text-red-400" : "text-white/40"}
-            />
-          </Pressable>
-        </View>
-      </View>
+        )}<View className="flex items-center gap-1"><Pressable onPress={() => fileInputRef.current?.click()} className="p-1.5 rounded-lg text-white/40 transition-colors"><Camera size={16} /></Pressable><TextInput ref={fileInputRef}  className="hidden" onChangeText={handleImageUpload} /><Pressable onPress={handleVoiceSearch} className={`p-1.5 rounded-lg transition-colors ${
+              recording
+                ? "text-red-400 bg-red-500/10"
+                : "text-white/40 hover:text-white/60 hover:bg-white/5"
+            }`}><Mic size={16} className={recording ? "animate-pulse" : ""} /></Pressable></View></View>
     </View>
   );
 }

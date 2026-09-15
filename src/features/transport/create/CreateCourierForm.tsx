@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateCourierForm.tsx
 import { useForm } from "react-hook-form";
@@ -102,13 +102,9 @@ export function CreateCourierForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="courierName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="courierName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom complet du livreur *</Text></FormLabel>
+              <FormLabel>Nom complet du livreur *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Marc Ndongala"
@@ -118,15 +114,9 @@ export function CreateCourierForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone direct *</Text></FormLabel>
+              <FormLabel>Téléphone direct *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: +243 890 000 000"
@@ -136,16 +126,9 @@ export function CreateCourierForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="transportMode"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="transportMode" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Moyen de locomotion *</Text></FormLabel>
+                <FormLabel>Moyen de locomotion *</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -156,44 +139,32 @@ export function CreateCourierForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="moto"><Text>Moto</Text></SelectItem>
-                    <SelectItem value="velo"><Text>Vélo</Text></SelectItem>
-                    <SelectItem value="voiture"><Text>Voiture</Text></SelectItem>
-                    <SelectItem value="marche"><Text>À pied</Text></SelectItem>
+                    <SelectItem value="moto">Moto</SelectItem>
+                    <SelectItem value="velo">Vélo</SelectItem>
+                    <SelectItem value="voiture">Voiture</SelectItem>
+                    <SelectItem value="marche">À pied</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="maxWeightKg"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="maxWeightKg" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Capacité max (kg) *</Text></FormLabel>
+                <FormLabel>Capacité max (kg) *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="licenseNumber"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="licenseNumber" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Numéro de permis (Optionnel)</Text></FormLabel>
+              <FormLabel>Numéro de permis (Optionnel)</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: PER-98765-A"
@@ -203,56 +174,39 @@ export function CreateCourierForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="basePrice"
-            render={({ field }) => (
+          )} /><View className="gap-2"><FormField control={form.control} name="basePrice" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prise en charge *</Text></FormLabel>
+                <FormLabel>Prise en charge *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="pricePerKm"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="pricePerKm" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Tarif par km *</Text></FormLabel>
+                <FormLabel>Tarif par km *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -263,23 +217,16 @@ export function CreateCourierForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                    <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="operatingZone"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="operatingZone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Zone de livraison habituelle *</Text></FormLabel>
+              <FormLabel>Zone de livraison habituelle *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Limete, Gombe, Bandalungwa"
@@ -289,22 +236,14 @@ export function CreateCourierForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+          )} /><Button  className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Enregistrement...</Text></>
+              Enregistrement...
+            </>
           ) : (
             "📦 Enregistrer mon profil de Coursier"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

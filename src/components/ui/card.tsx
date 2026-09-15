@@ -1,83 +1,55 @@
-import { View } from "react-native";
+import { View, ViewProps } from "react-native";
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
-function Card({ className, ...props }: React.ComponentProps<typeof View>) {
+function Card({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="card"
-      className={cn(
+    <View data-slot="card" className={cn(
         "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function CardHeader({ className, ...props }: React.ComponentProps<typeof View>) {
+function CardHeader({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="card-header"
-      className={cn(
+    <View data-slot="card-header" className={cn(
         "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<typeof View>) {
+function CardTitle({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="card-title"
-      className={cn("leading-none font-semibold", className)}
-      {...props}
-    />
+    <View data-slot="card-title" className={cn("leading-none font-semibold", className)} {...props} />
   );
 }
 
-function CardDescription({ className, ...props }: React.ComponentProps<typeof View>) {
+function CardDescription({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="card-description"
-      className={cn("text-muted-foreground text-sm", className)}
-      {...props}
-    />
+    <View data-slot="card-description" className={cn("text-muted-foreground text-sm", className)} {...props} />
   );
 }
 
-function CardAction({ className, ...props }: React.ComponentProps<typeof View>) {
+function CardAction({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="card-action"
-      className={cn(
+    <View data-slot="card-action" className={cn(
         "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function CardContent({ className, ...props }: React.ComponentProps<typeof View>) {
+function CardContent({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="card-content"
-      className={cn("px-6", className)}
-      {...props}
-    />
+    <View data-slot="card-content" className={cn("px-6", className)} {...props} />
   );
 }
 
-function CardFooter({ className, ...props }: React.ComponentProps<typeof View>) {
+function CardFooter({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="card-footer"
-      className={cn("flex items-center px-6 [.border-t]:pt-6", className)}
-      {...props}
-    />
+    <View data-slot="card-footer" className={cn("flex items-center px-6 [.border-t]:pt-6", className)} {...props} />
   );
 }
 

@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Text, Pressable, TextInput, Linking } from "react-native";
 
 // src/features/voyages/sheets/VoyageShareSheet.tsx
@@ -14,8 +13,10 @@ import {
   Send, // ✅ Utilisé pour Twitter (envoi) [1]
   Globe, // ✅ Utilisé pour LinkedIn (réseau public) [1]
 } from "lucide-react-native"; // ✅ Correction : 'Twitter', 'Facebook', 'Linkedin' retirés [1]
+import { toast } from "sonner";
 import { useState } from "react";
 import { useVoyageShare } from "../hooks/useVoyageShare";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 interface VoyageShareSheetProps {
   isOpen: boolean;
@@ -81,7 +82,7 @@ export function VoyageShareSheet({
       label: "QR Code",
       icon: QrCode,
       color: "#6366F1",
-      action: () => UIService.openToast("QR Code généré (fonctionnalité à venir)", "info"),
+      action: () => toast.info("QR Code généré (fonctionnalité à venir)"),
     },
   ];
 
@@ -106,17 +107,17 @@ export function VoyageShareSheet({
   const shareViaEmail = () => {
     const subject = `Voyage ${trip.from} → ${trip.to}`;
     const body = `Je vous recommande ce voyage : ${url}\n\n${trip.operator} • ${trip.price} ${trip.currency}`;
-    undefined.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    Linking.openURL(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
   };
 
   const handleCopyLink = async () => {
     try {
-      await undefined.writeText(url);
+      await Clipboard.setString(url);
       setCopied(true);
-      UIService.openToast("Lien copié dans le presse-papier", "success");
+      toast.success("Lien copié dans le presse-papier");
       setTimeout(() => setCopied(false), 3000);
     } catch {
-      UIService.openToast("Impossible de copier le lien", "error");
+      toast.error("Impossible de copier le lien");
     }
   };
 
@@ -128,87 +129,29 @@ export function VoyageShareSheet({
         url,
       });
     } catch {
-      UIService.openToast("Impossible de partager", "error");
+      toast.error("Impossible de partager");
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <>
-      <Pressable
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/70"
-        onPress={onClose}
-      >
-        <Pressable
-          className="w-full max-w-md rounded-t-[32px] overflow-hidden flex flex-col"
-          style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", maxHeight: "calc(90vh - 40px)" }}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <View className="flex justify-center pt-3 pb-1 flex-shrink-0">
-            <View className="w-10 h-1 rounded-full bg-white/20" />
-          </View>
+<View>
+      <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm" onPress={onClose}>
+        <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }} className="w-full max-w-md rounded-t-[32px] overflow-hidden flex flex-col" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", maxHeight: "calc(90vh - 40px)" }} onPress={(e) => e.stopPropagation()}>
+          <View className="flex justify-center pt-3 pb-1 flex-shrink-0"><View className="w-10 h-1 rounded-full bg-white/20" /></View>
 
-          <View className="flex items-center justify-between px-5 py-3 border-b border-white/5 flex-shrink-0">
-            <Text className="text-white font-bold text-lg">Partager ce voyage</Text>
-            <Pressable
-              onPress={onClose}
-              className="w-9 h-9 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-            >
-              <X size={18} className="text-white/60" />
-            </Pressable>
-          </View>
+          <View className="flex items-center justify-between px-5 py-3 border-b border-white/5 flex-shrink-0"><Text className="text-white font-bold text-lg">Partager ce voyage</Text><Pressable onPress={onClose} className="w-9 h-9 rounded-2xl flex items-center justify-center transition" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><X size={18} className="text-white/60" /></Pressable></View>
 
-          <View
-            className="flex-1 overflow-y-auto px-5 py-4"
-            style={{  }}
-          >
-            {/* Informations du voyage */}
-            <View className="mb-4 p-4 rounded-2xl bg-white/5 border border-white/10">
-              <Text className="text-white font-semibold text-sm">
-                {trip.from} → {trip.to}
-              </Text>
-              <Text className="text-white/40 text-xs">{trip.operator}</Text>
-              <Text className="text-indigo-400 font-bold text-sm mt-1">
-                {trip.price.toLocaleString()} {trip.currency}
-              </Text>
-            </View>
-
-            {/* Lien */}
-            <View className="flex items-center gap-2 mb-6">
-              <TextInput
-               
-                value={url}
-                readOnly
-                className="flex-1 rounded-xl px-3 py-2 text-xs bg-white/5 border border-white/10 text-white/60 outline-none"
-              />
-              <Pressable
-                onPress={handleCopyLink}
-                className="p-2 rounded-xl bg-white/10 text-white/70"
-              >
-                {copied ? (
+          <View className="flex-1 overflow-y-auto px-5 py-4" style={{  }}>{}<View className="mb-4 p-4 rounded-2xl bg-white/5 border border-white/10"><Text className="text-white font-semibold text-sm">{trip.from}→ {trip.to}</Text><Text className="text-white/40 text-xs">{trip.operator}</Text><Text className="text-indigo-400 font-bold text-sm mt-1">{trip.price.toLocaleString()}{trip.currency}</Text></View>{}<View className="flex items-center gap-2 mb-6"><TextInput value={url} readOnly className="flex-1 rounded-xl px-3 py-2 text-xs bg-white/5 border border-white/10 text-white/60 outline-none" /><Pressable onPress={handleCopyLink} className="p-2 rounded-xl bg-white/10 transition text-white/70">{copied ? (
                   <Check size={16} className="text-emerald-400" />
                 ) : (
                   <Copy size={16} />
-                )}
-              </Pressable>
-            </View>
-
-            {/* Grille de partage */}
-            <View className="gap-3">
-              {shareOptions.map((option) => {
+                )}</Pressable></View>{}<View className="gap-3">{shareOptions.map((option) => {
                 const Icon = option.icon;
                 return (
-                  <Pressable
-                    key={option.id}
-                    onPress={option.action}
-                    className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white/5 border border-white/10"
-                  >
-                    <View
-                      className="w-12 h-12 rounded-xl flex items-center justify-center"
-                      style={{ backgroundColor: `${option.color}20` }}
-                    >
+                  <Pressable key={option.id} onPress={option.action} className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 transition">
+                    <View className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${option.color}20` }}>
                       <Icon size={20} />
                     </View>
                     <Text className="text-white/60 text-[10px]">
@@ -216,22 +159,14 @@ export function VoyageShareSheet({
                     </Text>
                   </Pressable>
                 );
-              })}
-            </View>
-
-            {/* Bouton partage natif */}
-            {/* ✅ Correction : contrôle de type non-undefined explicite pour satisfaire TS2774 [1] */}
-            {typeof undefined !== "undefined" && (
-              <Pressable
-                onPress={handleNativeShare}
-                className="w-full mt-4 py-3 rounded-2xl flex items-center justify-center gap-2 bg-white/10 text-white font-semibold text-sm"
-              >
+              })}</View>{}{}{typeof navigator.share !== "undefined" && (
+              <Pressable onPress={handleNativeShare} className="w-full mt-4 py-3 rounded-2xl flex items-center justify-center gap-2 bg-white/10 text-white font-semibold text-sm transition">
                 <Share2 size={16} />
-                <Text>Partager via l'application</Text></Pressable>
-            )}
-          </View>
-        </Pressable>
-      </Pressable>
-    </>
+                Partager via l'application
+              </Pressable>
+            )}</View>
+        </View>
+      </View>
+    </View>
   );
 }

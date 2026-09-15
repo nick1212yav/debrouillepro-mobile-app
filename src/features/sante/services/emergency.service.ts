@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/sante/services/emergency.service.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import { EMERGENCY_NUMBERS } from "../constants/emergency";
 import type { EmergencyNumber } from "../types/emergency.types";
 
@@ -19,9 +18,9 @@ export function useShareEmergencyLocation() {
   return async (lat: number, lng: number) => {
     try {
       await mutate({ lat, lng });
-      UIService.openToast("Position partagée", "success");
+      toast.success("Position partagée");
     } catch (e) {
-      UIService.openToast(e instanceof Error ? e.message : "Erreur", "error");
+      toast.error(e instanceof Error ? e.message : "Erreur");
       throw e;
     }
   };

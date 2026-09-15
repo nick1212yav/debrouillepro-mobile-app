@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateTowTruckForm.tsx
 import { useForm } from "react-hook-form";
@@ -52,111 +52,65 @@ export function CreateTowTruckForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="providerName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="providerName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom de l'entreprise d'assistance *</Text></FormLabel>
+              <FormLabel>Nom de l'entreprise d'assistance *</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: SOS Dépannage Rapide" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Numéro de téléphone d'urgence direct *</Text></FormLabel>
+              <FormLabel>Numéro de téléphone d'urgence direct *</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: +243 890 999 119" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="vehicleModel"
-            render={({ field }) => (
+          )} /><View className="gap-2"><FormField control={form.control} name="vehicleModel" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Modèle du camion-grue *</Text></FormLabel>
+                <FormLabel>Modèle du camion-grue *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Iveco Daily Plateau" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="maxTonnage"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="maxTonnage" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Levage (tonnes) *</Text></FormLabel>
+                <FormLabel>Levage (tonnes) *</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="licensePlate"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="licensePlate" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Plaque d'immatriculation *</Text></FormLabel>
+              <FormLabel>Plaque d'immatriculation *</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: 9012CD01" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="basePrice"
-            render={({ field }) => (
+          )} /><View className="gap-2"><FormField control={form.control} name="basePrice" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Prise en charge *</Text></FormLabel>
+                <FormLabel>Prise en charge *</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="pricePerKm"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="pricePerKm" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Tarif de remorquage/km *</Text></FormLabel>
+                <FormLabel>Tarif de remorquage/km *</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem className="">
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -167,23 +121,17 @@ export function CreateTowTruckForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="operatingZone"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="operatingZone" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Zone de patrouille / intervention d'urgence *</Text></FormLabel>
+                Zone de patrouille / intervention d'urgence *
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Kinshasa-Kongo Central, Autoroute 1"
@@ -192,16 +140,8 @@ export function CreateTowTruckForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-11 rounded-xl bg-violet-600 text-white font-bold"
-          disabled={isLoading}
-        >
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          <Text>Enregistrer le service de Dépannage [2]</Text></Button>
-      </View>
+          )} /><Button  className="w-full h-11 rounded-xl bg-violet-600 text-white font-bold" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enregistrer le service de Dépannage [2]
+        </Button></View>
     </Form>
   );
 }

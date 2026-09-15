@@ -48,24 +48,16 @@ export function CommunityInsights({
   ];
 
   return (
-    <View className="space-y-2">
-      <Text className="text-sm font-medium text-white/50">Insights</Text>
-      <View className="gap-1.5">
-        {insights.map((insight) => (
-          <View
-            key={insight.label}
-            className="text-center p-2 rounded-xl bg-white/5 border border-white/5"
-          >
+    <View className="space-y-2"><Text className="text-sm font-medium text-white/50">Insights</Text><View className="gap-1.5">{insights.map((insight) => (
+          <View key={insight.label} className="text-center p-2 rounded-xl bg-white/5 border border-white/5">
             <insight.icon
               size={14}
-              style={{ color: insight.color }}
+              style={{  }}
               className="mx-auto"
             />
             <Text className="text-white font-bold text-sm mt-1">{insight.value}</Text>
             <Text className="text-white/30 text-[10px]">{insight.label}</Text>
           </View>
-        ))}
-      </View>
-    </View>
+        ))}</View></View>
   );
 }

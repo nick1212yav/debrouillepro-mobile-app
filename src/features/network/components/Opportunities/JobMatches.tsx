@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/network/components/Opportunities/JobMatches.tsx
 import { Briefcase, MapPin, DollarSign, Calendar } from "lucide-react-native";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -46,25 +47,16 @@ export function JobMatches({
 }: JobMatchesProps) {
   if (isLoading) {
     return (
-      <View className="space-y-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <View
-            key={i}
-            className="h-32 rounded-3xl bg-white/[0.02] border border-white/5 animate-pulse"
-          />
-        ))}
-      </View>
+      <View className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (
+          <View key={i} className="h-32 rounded-3xl bg-white/[0.02] border border-white/5 animate-pulse" />
+        ))}</View>
     );
   }
 
   if (jobs.length === 0) {
     return (
-      <View className="flex flex-col items-center justify-center py-12 text-center">
-        <Briefcase size={36} className="text-white/10 mb-3" />
-        <Text className="text-white/40 text-xs">
-          Aucune offre d'emploi correspondante pour le moment
-        </Text>
-      </View>
+      <View className="flex flex-col items-center justify-center py-12 text-center"><Briefcase size={36} className="text-white/10 mb-3" /><Text className="text-white/40 text-xs">Aucune offre d'emploi correspondante pour le moment
+        </Text></View>
     );
   }
 
@@ -77,8 +69,7 @@ export function JobMatches({
   };
 
   return (
-    <View className="flex flex-col gap-3">
-      {jobs.map((job) => (
+    <View className="flex flex-col gap-3">{jobs.map((job) => (
         <OpportunityCard
           key={job._id}
           // ✅ Correction : transtypé 'as any' pour bypasser l'absence de la propriété 'logo' du SDK [1]
@@ -101,26 +92,17 @@ export function JobMatches({
                 : undefined,
           } as any)}
           extraInfo={
-            <View className="gap-2 mt-2 pt-2 border-t border-white/5 text-[10px] text-white/40">
-              <View className="flex items-center gap-1">
-                <DollarSign size={10} />
-                <Text>
-                  {formatSalary(job.salaryMin, job.salaryMax, job.currency)}
-                </Text>
-              </View>
-              {job.deadline && (
+            <View className="gap-2 mt-2 pt-2 border-t border-white/5 text-[10px] text-white/40"><View className="flex items-center gap-1"><DollarSign size={10} /><Text>{formatSalary(job.salaryMin, job.salaryMax, job.currency)}</Text></View>{job.deadline && (
                 <View className="flex items-center gap-1">
                   <Calendar size={10} />
                   <Text>
-                    <Text>Limite :</Text>{" "}
+                    Limite :{" "}
                     {new Date(job.deadline).toLocaleDateString("fr-FR")}
                   </Text>
                 </View>
-              )}
-            </View>
+              )}</View>
           }
         />
-      ))}
-    </View>
+      ))}</View>
   );
 }

@@ -1,7 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 import { EventOrganizer } from "@/features/events/components/EventOrganizer";
 import type { Event } from "@/features/events/types";
+import { toast } from "sonner";
 
 interface Props {
   event: Event;
@@ -13,7 +13,7 @@ export function OrganizerSection({ event }: Props) {
       <EventOrganizer
         event={event}
         onContact={() => {
-          UIService.openToast("Contacter l'organisateur", "info");
+          toast.info("Contacter l'organisateur");
         }}
       />
     </View>

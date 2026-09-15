@@ -15,17 +15,13 @@ export function AgriDescription({ description }: AgriDescriptionProps) {
 
   return (
     <View className="rounded-[24px] p-4 bg-white/[0.02] border border-white/5 space-y-2">
-      <Text className="text-xs font-bold text-white/40 uppercase tracking-widest">
-        Description
+      <Text className="text-xs font-bold text-white/40 uppercase tracking-widest">Description
       </Text>
       <Text className="text-white/80 text-xs leading-relaxed">
         {displayDescription}
       </Text>
       {isLong && (
-        <Pressable
-          onPress={() => setExpanded(!expanded)}
-          className="text-xs font-semibold text-green-400 pt-1 block text-left"
-        >
+        <Pressable onPress={() => setExpanded(!expanded)} className="text-xs font-semibold text-green-400 transition-colors pt-1 block text-left">
           {expanded ? "Voir moins" : "Lire la suite"}
         </Pressable>
       )}

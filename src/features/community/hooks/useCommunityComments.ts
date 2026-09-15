@@ -1,9 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityComments.ts
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import { adaptCommunityComment } from "../adapter";
 import type { CommunityComment } from "../types";
@@ -30,15 +29,15 @@ export function useCommunityComments(postId?: Id<"publications">) {
     try {
       const newComment = await addCommentMutation({ postId, text });
       if (!newComment) {
-        UIService.openToast("Erreur lors de l'ajout du commentaire", "error");
+        toast.error("Erreur lors de l'ajout du commentaire");
         return;
       }
       const adapted = adaptCommunityComment(newComment);
       setComments((prev) => [...prev, adapted]);
-      UIService.openToast("Commentaire ajouté", "success");
+      toast.success("Commentaire ajouté");
       return adapted;
     } catch (error) {
-      UIService.openToast("Erreur lors de l'ajout du commentaire", "error");
+      toast.error("Erreur lors de l'ajout du commentaire");
       throw error;
     }
   };
@@ -48,7 +47,7 @@ export function useCommunityComments(postId?: Id<"publications">) {
     try {
       const reply = await addReplyMutation({ postId, parentId, text });
       if (!reply) {
-        UIService.openToast("Erreur lors de l'ajout de la réponse", "error");
+        toast.error("Erreur lors de l'ajout de la réponse");
         return;
       }
       const adapted = adaptCommunityComment(reply);
@@ -60,10 +59,10 @@ export function useCommunityComments(postId?: Id<"publications">) {
           return c;
         }),
       );
-      UIService.openToast("Réponse ajoutée", "success");
+      toast.success("Réponse ajoutée");
       return adapted;
     } catch (error) {
-      UIService.openToast("Erreur lors de l'ajout de la réponse", "error");
+      toast.error("Erreur lors de l'ajout de la réponse");
       throw error;
     }
   };

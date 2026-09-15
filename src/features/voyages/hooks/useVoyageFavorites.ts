@@ -1,9 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/voyages/hooks/useVoyageFavorites.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 
 /**
  * Gère les favoris pour les voyages (destinations).
@@ -24,10 +23,10 @@ export function useVoyageFavorites() {
   const toggle = async (destinationId: Id<"destinations">) => {
     try {
       const added = await toggleFavorite({ destinationId });
-      UIService.openToast(added ? "Ajouté aux favoris" : "Retiré des favoris", "success");
+      toast.success(added ? "Ajouté aux favoris" : "Retiré des favoris");
       return added;
     } catch {
-      UIService.openToast("Erreur lors de la modification des favoris", "error");
+      toast.error("Erreur lors de la modification des favoris");
       return false;
     }
   };

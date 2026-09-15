@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Text, Pressable, Image } from "react-native";
 import { useState } from "react";
 import {
@@ -15,6 +14,8 @@ import {
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Authenticated, Unauthenticated } from "@/lib/convex-auth-compat";
+import { toast } from "sonner";
+
 const CLUBS = [
   {
     id: 1,
@@ -122,9 +123,9 @@ function SportContent() {
     try {
       // ✅ Correction : cast temporaire pour le build (backend mock)
       await joinClubMut({ clubId: clubId as any });
-      UIService.openToast("Club rejoint !", "success");
+      toast.success("Club rejoint !");
     } catch {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
 
@@ -132,18 +133,18 @@ function SportContent() {
     try {
       // ✅ Correction : cast temporaire pour le build (backend mock)
       await leaveClubMut({ clubId: clubId as any });
-      UIService.openToast("Club quitté", "success");
+      toast.success("Club quitté");
     } catch {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
 
   const handleRegister = async (name: string, sport: string) => {
     try {
       await registerTournament({ tournamentName: name, sport });
-      UIService.openToast("Inscription confirmée !", "success");
+      toast.success("Inscription confirmée !");
     } catch {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
 
@@ -156,9 +157,9 @@ function SportContent() {
         tournamentName: name,
         sport: tournament?.sport || "Football",
       });
-      UIService.openToast("Inscription annulée", "success");
+      toast.success("Inscription annulée");
     } catch {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
 
@@ -181,204 +182,56 @@ function SportContent() {
 
   return (
     <>
-      <View className="flex gap-2 px-4 mb-4">
-        {stats.map(({ label, value, icon: Icon, color }) => (
-          <View
-            key={label}
-            className="flex-1 p-2 rounded-xl text-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-          >
-            <Icon size={14} color={color} className="mx-auto mb-1" />
-            <Text className="text-white font-bold text-sm">{value}</Text>
-            <Text className="text-gray-500 text-xs leading-tight">{label}</Text>
-          </View>
-        ))}
-      </View>
+      <View className="flex gap-2 px-4 mb-4">{stats.map(({ label, value, icon: Icon, color }) => (
+          <View key={label} className="flex-1 p-2 rounded-xl text-center" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Icon size={14} color={color} className="mx-auto mb-1" /><Text className="text-white font-bold text-sm">{value}</Text><Text className="text-gray-500 text-xs leading-tight">{label}</Text></View>
+        ))}</View>
 
-      <View
-        className="flex gap-1 mx-4 mb-3 p-1 rounded-xl"
-        style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
-      >
-        {["Clubs", "Tournois", "Classement"].map((tab) => (
-          <Pressable
-            key={tab}
-            onPress={() => setActiveTab(tab)}
-            className="flex-1 py-2 rounded-lg text-xs font-medium"
-            style={{ backgroundColor: activeTab === tab ? "rgba(255,255,255,0.1)" : "transparent" }}
-          >
-            {tab}
-          </Pressable>
-        ))}
-      </View>
+      <View className="flex gap-1 mx-4 mb-3 p-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>{["Clubs", "Tournois", "Classement"].map((tab) => (
+          <Pressable key={tab} onPress={() => setActiveTab(tab)} className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: activeTab === tab ? "rgba(255,255,255,0.1)" : "transparent" }}>{tab}</Pressable>
+        ))}</View>
 
-      <View
-        className="flex-1 overflow-y-auto px-4 pb-6 space-y-4"
-        style={{  }}
-      >
-        {activeTab === "Clubs" && (
+      <View className="flex-1 overflow-y-auto px-4 pb-6 space-y-4" style={{  }}>{activeTab === "Clubs" && (
           <>
-            <View
-              className="flex gap-2 overflow-x-auto pb-1"
-              style={{  }}
-            >
-              {sports.map((s) => (
-                <Pressable
-                  key={s}
-                  onPress={() => setFilterSport(s)}
-                  className="px-3 py-1.5 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: filterSport === s ? "#6366F1" : "rgba(255,255,255,0.06)" }}
-                >
-                  {s}
-                </Pressable>
-              ))}
-            </View>
+            <View className="flex gap-2 overflow-x-auto pb-1" style={{  }}>{sports.map((s) => (
+                <Pressable key={s} onPress={() => setFilterSport(s)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={{ backgroundColor: filterSport === s ? "#6366F1" : "rgba(255,255,255,0.06)" }}>{s}</Pressable>
+              ))}</View>
             {filtered.map((club, i) => (
-              <View
-                key={club.id}
-                className="rounded-2xl overflow-hidden"
-                style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-              >
-                <View className="relative">
-                  <Image
-                   
-                   
-                    className="w-full h-32 object-cover"
-                   source={{ uri: club.img }} accessibilityLabel={club.name}/>
-                  <View
-                    className="absolute inset-0"
-                    style={{  }}
-                  />
-                  <Text
-                    className="absolute top-3 right-3 text-xs px-2 py-1 rounded-full font-medium"
-                    style={{ backgroundColor: `${club.color}CC`, color: "white" }}
-                  >
-                    {club.sport}
-                  </Text>
-                </View>
-                <View className="p-3">
-                  <View className="flex items-center justify-between mb-2">
-                    <Text className="text-white font-bold text-sm">{club.name}</Text>
-                    <View className="flex items-center gap-1">
-                      <Star size={10} color="#F59E0B" fill="#F59E0B" />
-                      <Text className="text-white text-xs">{club.rating}</Text>
-                    </View>
-                  </View>
-                  <View className="flex items-center gap-3 mb-3">
-                    <View className="flex items-center gap-1">
-                      <MapPin size={10} color="#9CA3AF" />
-                      <Text className="text-gray-400 text-xs">
-                        {club.location}
-                      </Text>
-                    </View>
-                    <View className="flex items-center gap-1">
-                      <Users size={10} color="#9CA3AF" />
-                      <Text className="text-gray-400 text-xs">
-                        {club.members} membres
-                      </Text>
-                    </View>
-                    <Text
-                      className="text-xs px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#9CA3AF" }}
-                    >
-                      {club.level}
-                    </Text>
-                  </View>
-                  {isJoined(club.id) ? (
-                    <Pressable
-                      onPress={() => handleLeave(club.id)}
-                      className="w-full py-2 rounded-xl text-sm font-bold"
-                      style={{ backgroundColor: "rgba(16,185,129,0.15)" }}
-                    >
-                      <Text>✓ Membre · Quitter</Text></Pressable>
+              <View key={club.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+                <View className="relative"><Image className="w-full h-32 object-cover" source={{ uri: club.img }} accessibilityLabel={club.name} /><View className="absolute inset-0" style={{  }} /><Text className="absolute top-3 right-3 text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: `${club.color}CC`, color: "white" }}>{club.sport}</Text></View>
+                <View className="p-3"><View className="flex items-center justify-between mb-2"><Text className="text-white font-bold text-sm">{club.name}</Text><View className="flex items-center gap-1"><Star size={10} color="#F59E0B" fill="#F59E0B" /><Text className="text-white text-xs">{club.rating}</Text></View></View><View className="flex items-center gap-3 mb-3"><View className="flex items-center gap-1"><MapPin size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{club.location}</Text></View><View className="flex items-center gap-1"><Users size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{club.members}membres
+                      </Text></View><Text className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#9CA3AF" }}>{club.level}</Text></View>{isJoined(club.id) ? (
+                    <Pressable onPress={() => handleLeave(club.id)} className="w-full py-2 rounded-xl text-sm font-bold" style={{ backgroundColor: "rgba(16,185,129,0.15)" }}><Text>✓ Membre · Quitter</Text></Pressable>
                   ) : (
-                    <Pressable
-                      onPress={() => handleJoin(club.id)}
-                      className="w-full py-2 rounded-xl text-sm font-bold"
-                      style={{ backgroundColor: club.color }}
-                    >
-                      <Text>Rejoindre le club</Text></Pressable>
-                  )}
-                </View>
+                    <Pressable onPress={() => handleJoin(club.id)} className="w-full py-2 rounded-xl text-sm font-bold" style={{ backgroundColor: club.color }}><Text>Rejoindre le club</Text></Pressable>
+                  )}</View>
               </View>
             ))}
           </>
-        )}
-
-        {activeTab === "Tournois" && (
+        )}{activeTab === "Tournois" && (
           <>
             {TOURNAMENTS.map((t, i) => (
-              <View
-                key={i}
-                className="p-4 rounded-2xl"
-                style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-              >
-                <View className="flex items-start justify-between gap-2 mb-3">
-                  <Text className="text-white font-bold text-sm flex-1">
-                    {t.name}
-                  </Text>
-                  <Text
-                    className="text-xs px-2 py-1 rounded-full"
-                    style={{ backgroundColor: t.status === "Inscriptions ouvertes"
-                                              ? "rgba(16,185,129,0.15)"
-                                              : "rgba(245,158,11,0.15)", color:
-                                            t.status === "Inscriptions ouvertes"
-                                              ? "#10B981"
-                                              : "#F59E0B" }}
-                  >
-                    {t.status}
-                  </Text>
-                </View>
-                <View className="gap-2 mb-3">
-                  <View className="flex items-center gap-1">
-                    <Calendar size={10} color="#9CA3AF" />
-                    <Text className="text-gray-400 text-xs">{t.date}</Text>
-                  </View>
-                  <View className="flex items-center gap-1">
-                    <MapPin size={10} color="#9CA3AF" />
-                    <Text className="text-gray-400 text-xs">{t.location}</Text>
-                  </View>
-                  <View className="flex items-center gap-1">
-                    <Users size={10} color="#9CA3AF" />
-                    <Text className="text-gray-400 text-xs">
-                      {t.teams} équipes
-                    </Text>
-                  </View>
-                  <View className="flex items-center gap-1">
-                    <Trophy size={10} color="#F59E0B" />
-                    <Text className="text-yellow-400 text-xs">{t.prize}</Text>
-                  </View>
-                </View>
+              <View key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className="p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+                <View className="flex items-start justify-between gap-2 mb-3"><Text className="text-white font-bold text-sm flex-1">{t.name}</Text><Text className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: t.status === "Inscriptions ouvertes"
+                                          ? "rgba(16,185,129,0.15)"
+                                          : "rgba(245,158,11,0.15)", color:
+                                        t.status === "Inscriptions ouvertes"
+                                          ? "#10B981"
+                                          : "#F59E0B" }}>{t.status}</Text></View>
+                <View className="gap-2 mb-3"><View className="flex items-center gap-1"><Calendar size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{t.date}</Text></View><View className="flex items-center gap-1"><MapPin size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{t.location}</Text></View><View className="flex items-center gap-1"><Users size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{t.teams}équipes
+                    </Text></View><View className="flex items-center gap-1"><Trophy size={10} color="#F59E0B" /><Text className="text-yellow-400 text-xs">{t.prize}</Text></View></View>
                 {t.status === "Inscriptions ouvertes" &&
                   (isRegistered(t.name) ? (
-                    <Pressable
-                      onPress={() => handleUnregister(t.name)}
-                      className="w-full py-2 rounded-xl text-sm font-bold"
-                      style={{ backgroundColor: "rgba(16,185,129,0.15)" }}
-                    >
-                      <Text>✓ Inscrit · Annuler</Text></Pressable>
+                    <Pressable onPress={() => handleUnregister(t.name)} className="w-full py-2 rounded-xl text-sm font-bold" style={{ backgroundColor: "rgba(16,185,129,0.15)" }}><Text>✓ Inscrit · Annuler</Text></Pressable>
                   ) : (
-                    <Pressable
-                      onPress={() => handleRegister(t.name, t.sport)}
-                      className="w-full py-2 rounded-xl text-sm font-bold"
-                      style={{ backgroundColor: "#F59E0B" }}
-                    >
-                      <Text>S'inscrire</Text></Pressable>
+                    <Pressable onPress={() => handleRegister(t.name, t.sport)} className="w-full py-2 rounded-xl text-sm font-bold" style={{ backgroundColor: "#F59E0B" }}><Text>S'inscrire</Text></Pressable>
                   ))}
               </View>
             ))}
           </>
-        )}
-
-        {activeTab === "Classement" && (
+        )}{activeTab === "Classement" && (
           <>
-            <View
-              className="p-3 rounded-xl"
-              style={{ backgroundColor: "rgba(245,158,11,0.08)", borderWidth: 1, borderColor: "rgba(245,158,11,0.2)", borderStyle: "solid" }}
-            >
-              <Text className="text-yellow-400 text-xs text-center font-medium">
-                Classement régional Football – Juin 2025
-              </Text>
-            </View>
+            <View className="p-3 rounded-xl" style={{ backgroundColor: "rgba(245,158,11,0.08)", borderWidth: 1, borderColor: "rgba(245,158,11,0.2)", borderStyle: "solid" }}><Text className="text-yellow-400 text-xs text-center font-medium">Classement régional Football – Juin 2025
+              </Text></View>
             {[
               {
                 rank: 1,
@@ -421,97 +274,33 @@ function SportContent() {
                 emoji: "⭐",
               },
             ].map((team, i) => (
-              <View
-                key={team.rank}
-                className="flex items-center gap-3 p-3 rounded-xl"
-                style={{ backgroundColor: team.rank <= 3
-                                      ? "rgba(245,158,11,0.06)"
-                                      : "rgba(255,255,255,0.04)", borderWidth: 3, borderColor: "rgba(245,158,11,0.2)", borderStyle: "solid" }}
-              >
-                <Text className="text-lg w-8 text-center">
-                  {team.emoji || team.rank}
-                </Text>
-                <View className="flex-1">
-                  <Text className="text-white font-semibold text-sm">
-                    {team.name}
-                  </Text>
-                  <Text className="text-gray-400 text-xs">
-                    {team.w}V · {team.l}D
-                  </Text>
-                </View>
-                <Text className="text-white font-bold">{team.pts} pts</Text>
+              <View key={team.rank} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: team.rank <= 3
+                                    ? "rgba(245,158,11,0.06)"
+                                    : "rgba(255,255,255,0.04)", borderWidth: 3, borderColor: "rgba(245,158,11,0.2)", borderStyle: "solid" }}>
+                <Text className="text-lg w-8 text-center">{team.emoji || team.rank}</Text>
+                <View className="flex-1"><Text className="text-white font-semibold text-sm">{team.name}</Text><Text className="text-gray-400 text-xs">{team.w}V · {team.l}D
+                  </Text></View>
+                <Text className="text-white font-bold">{team.pts}pts</Text>
               </View>
             ))}
           </>
-        )}
-      </View>
+        )}</View>
     </>
   );
 }
 
 export default function SportPage({ onBack }: { onBack: () => void }) {
   return (
-    <View
-      className="h-full flex flex-col overflow-hidden"
-      style={{  }}
-    >
-      <View className="flex items-center gap-3 px-4 pt-12 pb-4">
-        <Pressable
-          onPress={onBack}
-          className="p-2 rounded-full"
-          style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-        >
-          <ArrowLeft size={18} color="white" />
-        </Pressable>
-        <View className="flex-1">
-          <Text className="text-white font-bold text-lg">Sport & Clubs</Text>
-          <Text className="text-gray-400 text-xs">
-            Clubs · Tournois · Performances
-          </Text>
-        </View>
-        <Pressable
-          className="p-2 rounded-full"
-          style={{ backgroundColor: "rgba(99,102,241,0.2)" }}
-        >
-          <Plus size={18} color="#6366F1" />
-        </Pressable>
-      </View>
-
-      <Authenticated>
-        <SportContent />
-      </Authenticated>
-      <Unauthenticated>
-        <View className="flex-1 flex flex-col">
-          <View className="flex gap-2 px-4 mb-4">
-            {[
+    <View className="h-full flex flex-col overflow-hidden" style={{  }}><View className="flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={onBack} className="p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} color="white" /></Pressable><View className="flex-1"><Text className="text-white font-bold text-lg">Sport & Clubs</Text><Text className="text-gray-400 text-xs">Clubs · Tournois · Performances
+          </Text></View><Pressable className="p-2 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.2)" }}><Plus size={18} color="#6366F1" /></Pressable></View><Authenticated><SportContent /></Authenticated><Unauthenticated><View className="flex-1 flex flex-col"><View className="flex gap-2 px-4 mb-4">{[
               { label: "Clubs", value: "4+", color: "#10B981" },
               { label: "Tournois", value: "3", color: "#EC4899" },
               { label: "Sports", value: "5", color: "#6366F1" },
               { label: "Membres", value: "500+", color: "#F59E0B" },
             ].map(({ label, value, color }) => (
-              <View
-                key={label}
-                className="flex-1 p-2 rounded-xl text-center"
-                style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-              >
-                <Text className="text-white font-bold text-sm" style={{ color }}>
-                  {value}
-                </Text>
-                <Text className="text-gray-500 text-xs leading-tight">{label}</Text>
-              </View>
-            ))}
-          </View>
-          <View className="flex-1 flex items-center justify-center px-4">
-            <View className="text-center">
-              <Trophy size={48} className="mx-auto mb-3 text-yellow-400/30" />
-              <Text className="text-white/60 text-sm mb-1">
-                <Text>Connectez-vous pour rejoindre des clubs et tournois</Text></Text>
-              <Text className="text-gray-500 text-xs">
-                <Text>Suivez vos performances et compétitions</Text></Text>
-            </View>
-          </View>
-        </View>
-      </Unauthenticated>
-    </View>
+              <View key={label} className="flex-1 p-2 rounded-xl text-center" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-white font-bold text-sm" style={{ color }}>{value}</Text><Text className="text-gray-500 text-xs leading-tight">{label}</Text></View>
+            ))}</View><View className="flex-1 flex items-center justify-center px-4"><View className="text-center"><Trophy size={48} className="mx-auto mb-3 text-yellow-400/30" /><Text className="text-white/60 text-sm mb-1">Connectez-vous pour rejoindre des clubs et tournois
+              </Text><Text className="text-gray-500 text-xs">Suivez vos performances et compétitions
+              </Text></View></View></View></Unauthenticated></View>
   );
 }

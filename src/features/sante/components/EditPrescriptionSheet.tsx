@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditPrescriptionSheet.tsx
@@ -13,6 +12,7 @@ import { PrescriptionForm } from "../forms/PrescriptionForm";
 import type { PrescriptionFormValues } from "../forms/PrescriptionForm";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface EditPrescriptionSheetProps {
   open: boolean;
@@ -44,7 +44,7 @@ export function EditPrescriptionSheet({
         notes: data.notes,
         medications: data.medications,
       });
-      UIService.openToast("Ordonnance mise à jour !", "success");
+      toast.success("Ordonnance mise à jour !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -52,7 +52,7 @@ export function EditPrescriptionSheet({
         error instanceof Error
           ? error.message
           : "Erreur lors de la mise à jour";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

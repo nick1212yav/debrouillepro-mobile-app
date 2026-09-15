@@ -1,8 +1,4 @@
-function NativePrompt(message: string): string | null {
-  Alert.alert(message, "Saisie requise");
-  return null;
-}
-import { View, Alert, GestureResponderEvent } from "react-native";
+import { View, GestureResponderEvent } from "react-native";
 import type { Id } from "@/convex/_generated/dataModel";
 
 import type { Message } from "../services/chat.service";
@@ -25,7 +21,12 @@ export function MessageContextMenu({
   onForward,
 }: MessageContextMenuProps) {
   const handleContextMenu = (event: GestureResponderEvent) => {
-    const action = NativePrompt("Action : répondre, transférer ou annuler");
+    event.preventDefault();
+
+    const action = window.prompt(
+      "Action : répondre, transférer ou annuler",
+      "répondre",
+    );
 
     if (action === "répondre" && chatService.canReply(message)) {
       onReply?.(message);
@@ -36,7 +37,7 @@ export function MessageContextMenu({
     }
   };
 
-  return <View onContextMenu={handleContextMenu}>{children}</View>;
+  return <View>{children}</View>;
 }
 
 export default MessageContextMenu;

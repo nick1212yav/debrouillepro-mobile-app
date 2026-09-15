@@ -1,4 +1,4 @@
-import { Pressable, View, Text, Image } from "react-native";
+import { View, Text, Image, Pressable } from "react-native";
 import { useState } from "react";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -61,36 +61,18 @@ export function CreateGroup({
   };
 
   return (
-    <View className="space-y-4">
-      <View>
-        <Text className="text-sm font-semibold text-white">
-          Ajouter des membres
-        </Text>
-
-        <Text className="mt-1 text-xs text-white/50">
-          Sélectionnez les utilisateurs à inviter dans le groupe.
-        </Text>
-      </View>
-
-      <View className="max-h-64 space-y-1 overflow-y-auto">
-        {users.map((user) => {
+    <View className="space-y-4"><View><Text className="text-sm font-semibold text-white">Ajouter des membres
+        </Text><Text className="mt-1 text-xs text-white/50">Sélectionnez les utilisateurs à inviter dans le groupe.
+        </Text></View><View className="max-h-64 space-y-1 overflow-y-auto">{users.map((user) => {
           const selected = selectedUsers.includes(user._id);
 
           return (
-            <Pressable
-              key={String(user._id)}
-              onPress={() => toggleUser(user._id)}
-              className={`flex w-full items-center gap-3 rounded-xl p-2 text-left ${
+            <Pressable key={String(user._id)} onPress={() => toggleUser(user._id)} className={`flex w-full items-center gap-3 rounded-xl p-2 text-left ${
                 selected ? "bg-white/10" : "hover:bg-white/5"
-              }`}
-            >
+              }`}>
               <View className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white/10">
                 {user.avatar ? (
-                  <Image
-                   
-                   
-                    className="h-full w-full object-cover"
-                   source={{ uri: user.avatar }} accessibilityLabel={user.name ?? "Utilisateur"}/>
+                  <Image className="h-full w-full object-cover" source={{ uri: user.avatar }} accessibilityLabel={user.name ?? "Utilisateur"} />
                 ) : (
                   <Text>{(user.name ?? "U").charAt(0).toUpperCase()}</Text>
                 )}
@@ -103,23 +85,11 @@ export function CreateGroup({
               <Text>{selected ? "✓" : ""}</Text>
             </Pressable>
           );
-        })}
-      </View>
-
-      {error && <Text className="text-sm text-red-400">{error}</Text>}
-
-      <Pressable
-        disabled={isSubmitting || selectedUsers.length === 0}
-        onPress={handleSubmit}
-        className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {isSubmitting
+        })}</View>{error && <Text className="text-sm text-red-400">{error}</Text>}<Pressable disabled={isSubmitting || selectedUsers.length === 0} onPress={handleSubmit} className="w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-50">{isSubmitting
           ? "Ajout..."
           : `Ajouter ${selectedUsers.length} membre${
               selectedUsers.length > 1 ? "s" : ""
-            }`}
-      </Pressable>
-    </View>
+            }`}</Pressable></View>
   );
 }
 

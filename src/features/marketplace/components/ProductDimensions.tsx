@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/marketplace/components/ProductDimensions.tsx
 
 interface Dimensions {
@@ -24,43 +25,35 @@ export function ProductDimensions({ dimensions }: Props) {
   const unit = dimensions.unit || "cm";
 
   return (
-    <View className="space-y-2">
-      <Text className="text-xs text-white/40 font-semibold uppercase tracking-wider">
-        Dimensions
-      </Text>
-      <View className="gap-2">
-        {dimensions.length && (
+    <View className="space-y-2"><Text className="text-xs text-white/40 font-semibold uppercase tracking-wider">Dimensions
+      </Text><View className="gap-2">{dimensions.length && (
           <View className="p-2 rounded-xl bg-white/5">
-            <Text className="text-white/40 text-[10px]"><Text>Longueur</Text></Text>
+            <Text className="text-white/40 text-[10px]">Longueur</Text>
             <Text className="text-white font-medium text-sm">
               {dimensions.length} {unit}
             </Text>
           </View>
-        )}
-        {dimensions.width && (
+        )}{dimensions.width && (
           <View className="p-2 rounded-xl bg-white/5">
-            <Text className="text-white/40 text-[10px]"><Text>Largeur</Text></Text>
+            <Text className="text-white/40 text-[10px]">Largeur</Text>
             <Text className="text-white font-medium text-sm">
               {dimensions.width} {unit}
             </Text>
           </View>
-        )}
-        {dimensions.height && (
+        )}{dimensions.height && (
           <View className="p-2 rounded-xl bg-white/5">
-            <Text className="text-white/40 text-[10px]"><Text>Hauteur</Text></Text>
+            <Text className="text-white/40 text-[10px]">Hauteur</Text>
             <Text className="text-white font-medium text-sm">
               {dimensions.height} {unit}
             </Text>
           </View>
-        )}
-        {dimensions.weight && (
+        )}{dimensions.weight && (
           <View className="p-2 rounded-xl bg-white/5">
-            <Text className="text-white/40 text-[10px]"><Text>Poids</Text></Text>
+            <Text className="text-white/40 text-[10px]">Poids</Text>
             <Text className="text-white font-medium text-sm">
-              {dimensions.weight} <Text>kg</Text></Text>
+              {dimensions.weight} kg
+            </Text>
           </View>
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }

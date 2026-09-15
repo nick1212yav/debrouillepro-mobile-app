@@ -1,10 +1,10 @@
-import { useRouter } from "expo-router";
+import { useNavigate } from "react-router-dom";
 
 export function useServiceChat(userId?: string) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const openChat = () => {
     if (userId) {
-      router.push(`/messages/new?userId=${userId}`);
+      navigate(`/messages/new?userId=${userId}`);
     }
   };
   return { openChat };

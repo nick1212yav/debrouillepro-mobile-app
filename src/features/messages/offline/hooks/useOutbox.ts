@@ -65,13 +65,13 @@ export function useOutbox(): UseOutboxResult {
       refresh();
     };
 
-    if (typeof undefined !== "undefined") {
-      undefined;
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", handleStorage);
     }
 
     return () => {
-      if (typeof undefined !== "undefined") {
-        undefined;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", handleStorage);
       }
     };
   }, [refresh]);

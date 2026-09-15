@@ -69,20 +69,14 @@ export function CommunityReactions({
       {totalReactions > 0 && (
         <View className="flex flex-wrap gap-1.5">
           {topReactions.map((r) => (
-            <Pressable
-              key={r.emoji}
-              onPress={() => handleReact(r.emoji)}
-              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-colors ${
+            <Pressable key={r.emoji} onPress={() => handleReact(r.emoji)} className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-colors ${
                 userReaction === r.emoji
                   ? "bg-purple-500/20 border-purple-400/30"
                   : "bg-white/5 border-white/5 hover:bg-white/10"
-              } border`}
-            >
+              } border`}>
               <Text>{r.emoji}</Text>
               {r.count > 0 && (
-                <Text
-                  className={`${userReaction === r.emoji ? "text-purple-400" : "text-white/40"}`}
-                >
+                <Text className={`${userReaction === r.emoji ? "text-purple-400" : "text-white/40"}`}>
                   {r.count}
                 </Text>
               )}
@@ -93,29 +87,20 @@ export function CommunityReactions({
               +{reactions.length - maxDisplay}
             </Text>
           )}
-          <Pressable
-            onPress={() => setShowPicker(!showPicker)}
-            className="flex items-center justify-center w-7 h-7 rounded-full bg-white/5 border border-white/5"
-          >
+          <Pressable onPress={() => setShowPicker(!showPicker)} className="flex items-center justify-center w-7 h-7 rounded-full bg-white/5 border border-white/5 transition-colors">
             <Plus size={12} className="text-white/40" />
           </Pressable>
         </View>
       )}
 
       {/* Sélecteur de réactions */}
-      <>
+<View>
         {showPicker && (
-          <View
-            className="flex flex-wrap gap-1 p-2 rounded-xl bg-[#0D1117] border border-white/10"
-          >
+          <View initial={{ opacity: 0, scale: 0.9, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: -10 }} className="flex flex-wrap gap-1 p-2 rounded-xl bg-[#0D1117] border border-white/10">
             {REACTION_EMOJIS.map((re) => (
-              <Pressable
-                key={re.emoji}
-                onPress={() => handleReact(re.emoji)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm transition-colors hover:bg-white/10 ${
+              <Pressable key={re.emoji} onPress={() => handleReact(re.emoji)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm transition-colors hover:bg-white/10 ${
                   userReaction === re.emoji ? "bg-purple-500/20" : ""
-                }`}
-              >
+                }`}>
                 <Text>{re.emoji}</Text>
                 <re.icon
                   size={14}
@@ -128,16 +113,13 @@ export function CommunityReactions({
               </Pressable>
             ))}
             {userReaction && (
-              <Pressable
-                onPress={onRemoveReaction}
-                className="px-2.5 py-1.5 rounded-lg text-xs text-red-400"
-              >
+              <Pressable onPress={onRemoveReaction} className="px-2.5 py-1.5 rounded-lg text-xs text-red-400 transition-colors">
                 Retirer
               </Pressable>
             )}
           </View>
         )}
-      </>
+      </View>
     </View>
   );
 }

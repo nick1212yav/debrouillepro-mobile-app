@@ -32,10 +32,7 @@ export function CommunityLikes({
   const { icon, text, gap } = sizes[size];
 
   return (
-    <Pressable
-      onPress={handleClick}
-      className={`flex items-center ${gap} transition-all active:scale-90 cursor-pointer`}
-    >
+    <Pressable onPress={handleClick} className={`flex items-center ${gap} transition-all active:scale-90 cursor-pointer`}>
       <Heart
         size={icon}
         className={`transition-all duration-200 ${

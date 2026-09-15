@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreateDoctorSheet.tsx
@@ -13,6 +12,7 @@ import { DoctorForm } from "../forms/DoctorForm";
 import type { DoctorFormValues } from "../forms/DoctorForm"; // ✅ correction
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface CreateDoctorSheetProps {
@@ -52,11 +52,11 @@ export function CreateDoctorSheet({
         badges: [],
         images: [],
       });
-      UIService.openToast("Médecin créé", "success");
+      toast.success("Médecin créé");
       onOpenChange(false);
       onSuccess?.();
     } catch (e) {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
 

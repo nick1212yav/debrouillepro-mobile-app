@@ -38,9 +38,7 @@ export const RoomBadge: React.FC<RoomBadgeProps> = ({
   const displayLabel = `${value} ${config.unit}${suffix}`;
 
   return (
-    <View
-      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/60 text-xs font-medium ${className}`}
-    >
+    <View className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/60 text-xs font-medium ${className}`}>
       <Icon size={12} className="text-indigo-400" />
       <Text>{displayLabel}</Text>
     </View>

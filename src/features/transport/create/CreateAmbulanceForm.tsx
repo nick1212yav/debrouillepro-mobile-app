@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateAmbulanceForm.tsx
 import { useForm } from "react-hook-form";
@@ -88,14 +88,11 @@ export function CreateAmbulanceForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="hospitalName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="hospitalName" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Nom de la structure hospitalière ou du service d'assistance *</Text></FormLabel>
+                Nom de la structure hospitalière ou du service d'assistance *
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: CHU de Kinshasa, Clinique Ngaliema"
@@ -105,15 +102,9 @@ export function CreateAmbulanceForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Numéro de téléphone d'urgence direct *</Text></FormLabel>
+              <FormLabel>Numéro de téléphone d'urgence direct *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: +243 890 112 112"
@@ -123,16 +114,9 @@ export function CreateAmbulanceForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="vehicleModel"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="vehicleModel" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Modèle du véhicule d'urgence *</Text></FormLabel>
+                <FormLabel>Modèle du véhicule d'urgence *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Toyota HiAce Ambulance"
@@ -142,14 +126,9 @@ export function CreateAmbulanceForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="licensePlate"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="licensePlate" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Numéro de plaque *</Text></FormLabel>
+                <FormLabel>Numéro de plaque *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 5678AB02"
@@ -159,17 +138,11 @@ export function CreateAmbulanceForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="operatingZone"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="operatingZone" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Zone de couverture et d'intervention d'urgence *</Text></FormLabel>
+                Zone de couverture et d'intervention d'urgence *
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Province de Kinshasa, Inter-urbain"
@@ -179,15 +152,9 @@ export function CreateAmbulanceForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="equipmentList"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="equipmentList" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Liste du matériel médical à bord *</Text></FormLabel>
+              <FormLabel>Liste du matériel médical à bord *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Défibrillateur, Oxygène, Civière de traumatologie"
@@ -197,45 +164,33 @@ export function CreateAmbulanceForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Personnel médical à bord */}
-        <FormField
-          control={form.control}
-          name="hasParamedics"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="hasParamedics" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-3 bg-white/5">
               <View className="space-y-0.5">
                 <FormLabel className="text-white/90">
-                  <Text>Médecins / Secouristes qualifiés d'urgence à bord *</Text></FormLabel>
+                  Médecins / Secouristes qualifiés d'urgence à bord *
+                </FormLabel>
                 <FormDescription className="text-white/40 text-xs">
-                  <Text>Garantit la présence constante de personnel médicalisé certifié</Text></FormDescription>
+                  Garantit la présence constante de personnel médicalisé
+                  certifié
+                </FormDescription>
               </View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                   className="data-[state=checked]:bg-red-600"
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-12 rounded-xl bg-red-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+          )} /><Button  className="w-full h-12 rounded-xl bg-red-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Enregistrement...</Text></>
+              Enregistrement...
+            </>
           ) : (
             "🚑 Enregistrer le service d'Ambulance"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

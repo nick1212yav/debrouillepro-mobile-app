@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/transport/dashboard/TripHistoryTable.tsx
 import { Car, CheckCircle2, ChevronRight } from "lucide-react-native";
 import { formatMobilityPrice } from "../utils/distance";
@@ -49,52 +50,13 @@ export function TripHistoryTable() {
   ];
 
   return (
-    <View className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] space-y-4 text-white">
-      <View className="flex items-center gap-2">
-        <Car size={16} className="text-violet-400" />
-        <Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest">
-          Historique Récent des Courses [2]
-        </Text>
-      </View>
-
-      <View className="space-y-2.5">
-        {history.map((row) => (
-          <View
-            key={row.id}
-            className="p-4 rounded-2xl border border-white/5 bg-white/[0.01] flex items-center justify-between gap-4"
-          >
-            <View className="flex items-center gap-3">
-              <View className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/50 flex-shrink-0">
-                <Text className="text-[10px] font-bold">#{row.id}</Text>
-              </View>
-              <View>
-                <Text className="text-xs font-bold text-white">{row.route}</Text>
-                <Text className="text-[10px] text-white/40 mt-0.5">
-                  Passager : {row.passenger} • {row.date}
-                </Text>
-              </View>
-            </View>
-
-            <View className="text-right flex items-center gap-3">
-              <View>
-                <Text className="text-xs font-black text-white">
-                  {formatMobilityPrice(row.amount, "FCFA")}
-                </Text>
-                <Text
-                  className={`text-[8px] font-bold px-2 py-0.2 rounded-full inline-block mt-0.5 ${
+    <View className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] space-y-4 text-white"><View className="flex items-center gap-2"><Car size={16} className="text-violet-400" /><Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest">Historique Récent des Courses [2]
+        </Text></View><View className="space-y-2.5">{history.map((row) => (
+          <View key={row.id} className="p-4 rounded-2xl border border-white/5 bg-white/[0.01] flex items-center justify-between gap-4"><View className="flex items-center gap-3"><View className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/50 flex-shrink-0"><Text className="text-[10px] font-bold">#{row.id}</Text></View><View><Text className="text-xs font-bold text-white">{row.route}</Text><Text className="text-[10px] text-white/40 mt-0.5">Passager : {row.passenger}• {row.date}</Text></View></View><View className="text-right flex items-center gap-3"><View><Text className="text-xs font-black text-white">{formatMobilityPrice(row.amount, "FCFA")}</Text><Text className={`text-[8px] font-bold px-2 py-0.2 rounded-full inline-block mt-0.5 ${
                     row.status === "completed"
                       ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15"
                       : "bg-red-500/10 text-red-400 border border-red-500/15"
-                  }`}
-                >
-                  {row.status === "completed" ? "Terminée" : "Annulée [2]"}
-                </Text>
-              </View>
-              <ChevronRight size={14} className="text-white/20" />
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
+                  }`}>{row.status === "completed" ? "Terminée" : "Annulée [2]"}</Text></View><ChevronRight size={14} className="text-white/20" /></View></View>
+        ))}</View></View>
   );
 }

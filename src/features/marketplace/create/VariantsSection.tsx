@@ -13,6 +13,7 @@ export function VariantsSection({ variants, onChange, color }: Props) {
   return (
     <View className="pt-2">
       <VariantEditor
+        variants={variants}
         onChange={onChange}
         label="Variantes du produit"
       />

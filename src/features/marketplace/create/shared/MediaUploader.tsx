@@ -1,9 +1,8 @@
-// src/features/marketplace/create/shared/MediaUploader.tsx
+import { View, Text, Image, TextInput, NativeSyntheticEvent, Pressable, TextInputChangeEventData } from "react-native";
 
-import { useState } from "react";
-import { Image as RNImage, Pressable, Text, View } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react-native";
+// src/features/marketplace/create/shared/MediaUploader.tsx
+import { useState, useRef } from "react";
+import { Upload, X, Video, Loader2 } from "lucide-react-native";
 import { toast } from "sonner";
 
 interface Props {
@@ -22,140 +21,59 @@ export function MediaUploader({
   maxFiles = 10,
 }: Props) {
   const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
-  const handleUpload = async () => {
-    if (images.length >= maxFiles) {
+  const handleUpload = async (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    if (images.length + files.length > maxFiles) {
       toast.error(`Maximum ${maxFiles} images`);
       return;
     }
-
     setUploading(true);
-
     try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permission.granted) {
-        toast.error(
-          "Autorisez l'accès à votre galerie pour sélectionner des images",
-        );
-        return;
-      }
-
-      const remainingSlots = maxFiles - images.length;
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsMultipleSelection: remainingSlots > 1,
-        selectionLimit: remainingSlots,
-        quality: 1,
-      });
-
-      if (result.canceled || !result.assets?.length) {
-        return;
-      }
-
-      const selectedImages = result.assets.slice(0, remainingSlots);
-
-      /*
-       * Les URI locales sont utilisées comme previews.
-       *
-       * Lorsque la mutation Convex d'upload sera branchée ici,
-       * chaque URI pourra être uploadée puis remplacée par
-       * son URL/storageId distant.
-       */
-      const newUrls = selectedImages.map((asset) => asset.uri).filter(Boolean);
-
-      if (newUrls.length === 0) {
-        return;
-      }
-
+      // Simuler l'upload (à remplacer par une vraie mutation Convex)
+      const newUrls = files.map(
+        (f) =>
+          `https://via.placeholder.com/400?text=${encodeURIComponent(f.name)}`,
+      );
       onChange([...images, ...newUrls]);
-
-      toast.success(`${newUrls.length} image(s) ajoutée(s)`);
-    } catch (error) {
-      console.error("Erreur lors de la sélection des images:", error);
-
-      toast.error("Erreur lors de la sélection des images");
+      toast.success(`${files.length} image(s) ajoutée(s)`);
+    } catch {
+      toast.error("Erreur lors de l'upload");
     } finally {
       setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
     }
   };
 
   const removeImage = (index: number) => {
-    onChange(images.filter((_, currentIndex) => currentIndex !== index));
-  };
-
-  const isImageUri = (uri: string) => {
-    return (
-      uri.startsWith("http://") ||
-      uri.startsWith("https://") ||
-      uri.startsWith("file://") ||
-      uri.startsWith("content://") ||
-      uri.startsWith("data:image/")
-    );
+    onChange(images.filter((_, i) => i !== index));
   };
 
   return (
-    <View className="gap-2">
-      <Text className="text-xs font-medium text-white/60">{label}</Text>
-
-      <View className="flex-row flex-wrap gap-2">
-        {images.map((url, index) => (
-          <View
-            key={`${url}-${index}`}
-            className="relative h-20 w-20 overflow-hidden rounded-xl border border-white/10 bg-white/5"
-          >
-            {isImageUri(url) ? (
-              <RNImage
-                source={{ uri: url }}
-                className="h-full w-full"
-                resizeMode="cover"
-                accessibilityLabel={`Image ${index + 1}`}
-              />
+    <View className="space-y-2"><Text className="text-xs text-white/60 font-medium">{label}</Text><View className="flex flex-wrap gap-2">{images.map((url, index) => (
+          <View key={index} className="relative w-20 h-20 rounded-xl overflow-hidden bg-white/5 border border-white/10">
+            {url.startsWith("data:image") || url.startsWith("http") ? (
+              <Image className="w-full h-full object-cover" source={{ uri: url }} accessibilityLabel={`Image ${index + 1}`} />
             ) : (
-              <View className="h-full w-full items-center justify-center">
-                <ImageIcon size={24} color="rgba(255,255,255,0.2)" />
+              <View className="w-full h-full flex items-center justify-center">
+                <Image size={24} className="text-white/20" />
               </View>
             )}
-
-            <Pressable
-              onPress={() => removeImage(index)}
-              disabled={uploading}
-              accessibilityRole="button"
-              accessibilityLabel={`Supprimer l'image ${index + 1}`}
-              className="absolute right-1 top-1 h-6 w-6 items-center justify-center rounded-full bg-black/70"
-            >
-              <X size={12} color="rgba(255,255,255,0.85)" />
+            <Pressable onPress={() => removeImage(index)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-white/60 transition-colors">
+              <X size={10} />
             </Pressable>
           </View>
-        ))}
-
-        {images.length < maxFiles && (
-          <Pressable
-            onPress={handleUpload}
-            disabled={uploading}
-            accessibilityRole="button"
-            accessibilityLabel="Ajouter des images"
-            className="h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-white/20"
-            style={{
-              borderColor: `${color}66`,
-              backgroundColor: `${color}12`,
-              opacity: uploading ? 0.4 : 1,
-            }}
-          >
+        ))}{images.length < maxFiles && (
+          <Pressable onPress={() => inputRef.current?.click()} disabled={uploading} className="w-20 h-20 rounded-xl border-2 border-dashed border-white/10 flex items-center justify-center transition-colors disabled:opacity-40">
             {uploading ? (
-              <Loader2 size={20} color="rgba(255,255,255,0.55)" />
+              <Loader2 size={20} className="animate-spin text-white/40" />
             ) : (
-              <Upload size={20} color="rgba(255,255,255,0.45)" />
+              <Upload size={20} className="text-white/30" />
             )}
           </Pressable>
-        )}
-      </View>
-
-      <Text className="text-[10px] text-white/30">
-        {images.length}/{maxFiles} images · JPG, PNG, WEBP
-      </Text>
-    </View>
+        )}</View><TextInput ref={inputRef} onChangeText={handleUpload} className="hidden" /><Text className="text-[10px] text-white/30">{images.length}/{maxFiles}images · JPG, PNG, WEBP
+      </Text></View>
   );
 }

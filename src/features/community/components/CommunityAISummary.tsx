@@ -40,11 +40,7 @@ export function CommunityAISummary({
 
   return (
     <View className="space-y-2">
-      <Pressable
-        onPress={handleGenerate}
-        disabled={isLoading}
-        className="flex items-center gap-1.5 text-xs font-medium text-purple-400"
-      >
+      <Pressable onPress={handleGenerate} disabled={isLoading} className="flex items-center gap-1.5 text-xs font-medium text-purple-400 transition-colors">
         {isLoading ? (
           <Loader2 size={12} className="animate-spin" />
         ) : (

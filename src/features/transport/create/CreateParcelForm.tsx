@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateParcelForm.tsx
 import { useForm } from "react-hook-form";
@@ -49,75 +49,41 @@ export function CreateParcelForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        {/* Infos Expéditeur */}
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="senderName"
-            render={({ field }) => (
+      <View className="space-y-4">{}<View className="gap-4"><FormField control={form.control} name="senderName" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Nom Expéditeur *</Text></FormLabel>
+                <FormLabel>Nom Expéditeur *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Jean Mukendi" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="senderPhone"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="senderPhone" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Téléphone Expéditeur *</Text></FormLabel>
+                <FormLabel>Téléphone Expéditeur *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: +243 890 000 001" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        {/* Infos Destinataire */}
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="recipientName"
-            render={({ field }) => (
+            )} /></View>{}<View className="gap-4"><FormField control={form.control} name="recipientName" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Nom Destinataire *</Text></FormLabel>
+                <FormLabel>Nom Destinataire *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Marc Ndongala" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="recipientPhone"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="recipientPhone" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Téléphone Destinataire *</Text></FormLabel>
+                <FormLabel>Téléphone Destinataire *</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: +243 890 000 002" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        {/* Adresses */}
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="origin"
-            render={({ field }) => (
+            )} /></View>{}<View className="gap-4"><FormField control={form.control} name="origin" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Adresse d'expédition *</Text></FormLabel>
+                <FormLabel>Adresse d'expédition *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 34 Avenue de la Science, Kinshasa"
@@ -126,14 +92,9 @@ export function CreateParcelForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="destination"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="destination" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Adresse de livraison *</Text></FormLabel>
+                <FormLabel>Adresse de livraison *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 12 Avenue Lumumba, Matadi"
@@ -142,47 +103,27 @@ export function CreateParcelForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        {/* Poids et Valeur déclarée */}
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="weightKg"
-            render={({ field }) => (
+            )} /></View>{}<View className="gap-4"><FormField control={form.control} name="weightKg" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Poids estimé (kg) *</Text></FormLabel>
+                <FormLabel>Poids estimé (kg) *</FormLabel>
                 <FormControl>
                   <Input type="number" step="0.1" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="insuranceDeclaredValue"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="insuranceDeclaredValue" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Valeur déclarée (Garantie FCFA)</Text></FormLabel>
+                <FormLabel>Valeur déclarée (Garantie FCFA)</FormLabel>
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="description" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Description du contenu (Précisez les objets) *</Text></FormLabel>
+                Description du contenu (Précisez les objets) *
+              </FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Ex: Ordinateur portable Dell, chargeur et câbles..."
@@ -191,37 +132,23 @@ export function CreateParcelForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Fragile */}
-        <FormField
-          control={form.control}
-          name="isFragile"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="isFragile" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
               <View className="space-y-0.5">
-                <FormLabel><Text>Contenu fragile *</Text></FormLabel>
+                <FormLabel>Contenu fragile *</FormLabel>
                 <FormDescription>
-                  <Text>Ajoute des consignes de manipulation délicates [2]</Text></FormDescription>
+                  Ajoute des consignes de manipulation délicates [2]
+                </FormDescription>
               </View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-11 rounded-xl bg-violet-600 text-white font-bold"
-          disabled={isLoading}
-        >
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          <Text>Valider et Enregistrer le colis [2]</Text></Button>
-      </View>
+          )} /><Button  className="w-full h-11 rounded-xl bg-violet-600 text-white font-bold" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Valider et Enregistrer le colis [2]
+        </Button></View>
     </Form>
   );
 }

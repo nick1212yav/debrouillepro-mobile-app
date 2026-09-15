@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateCarRentalForm.tsx
 import { useForm } from "react-hook-form";
@@ -109,13 +109,9 @@ export function CreateCarRentalForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="agencyName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="agencyName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom de l'agence / du propriétaire *</Text></FormLabel>
+              <FormLabel>Nom de l'agence / du propriétaire *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Congo Car Rental"
@@ -125,15 +121,9 @@ export function CreateCarRentalForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone de contact *</Text></FormLabel>
+              <FormLabel>Téléphone de contact *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: +243 890 000 000"
@@ -143,16 +133,9 @@ export function CreateCarRentalForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="vehicleModel"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="vehicleModel" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Marque et modèle du véhicule *</Text></FormLabel>
+                <FormLabel>Marque et modèle du véhicule *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Toyota Prado, 2015"
@@ -162,14 +145,9 @@ export function CreateCarRentalForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="vehiclePlate"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="vehiclePlate" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Plaque d'immatriculation *</Text></FormLabel>
+                <FormLabel>Plaque d'immatriculation *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 1234AB01"
@@ -179,57 +157,39 @@ export function CreateCarRentalForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="dailyPrice"
-            render={({ field }) => (
+            )} /></View><View className="gap-2"><FormField control={form.control} name="dailyPrice" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prix journalier *</Text></FormLabel>
+                <FormLabel>Prix journalier *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="securityDeposit"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="securityDeposit" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Caution de garantie *</Text></FormLabel>
+                <FormLabel>Caution de garantie *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -240,23 +200,16 @@ export function CreateCarRentalForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                    <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="fuelPolicy"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="fuelPolicy" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Politique de carburant *</Text></FormLabel>
+              <FormLabel>Politique de carburant *</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger className="bg-white/5 border-white/10 text-white">
@@ -273,39 +226,30 @@ export function CreateCarRentalForm({
               </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Option avec chauffeur */}
-        <FormField
-          control={form.control}
-          name="hasDriver"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="hasDriver" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-3 bg-white/5">
               <View className="space-y-0.5">
                 <FormLabel className="text-white/90">
-                  <Text>Location avec chauffeur professionnel *</Text></FormLabel>
+                  Location avec chauffeur professionnel *
+                </FormLabel>
                 <FormDescription className="text-white/40 text-xs">
-                  <Text>Chauffeur attitré inclus dans le tarif d'exploitation</Text></FormDescription>
+                  Chauffeur attitré inclus dans le tarif d'exploitation
+                </FormDescription>
               </View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                   className="data-[state=checked]:bg-blue-600"
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="description" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Description détaillée du véhicule (Options, climatisation, boîte de vitesse, etc.)</Text></FormLabel>
+                Description détaillée du véhicule (Options, climatisation, boîte
+                de vitesse, etc.)
+              </FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Ex: Boîte automatique, climatisation tri-zone, 7 places assises, toit ouvrant..."
@@ -316,22 +260,14 @@ export function CreateCarRentalForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-12 rounded-xl bg-blue-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+          )} /><Button  className="w-full h-12 rounded-xl bg-blue-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Enregistrement...</Text></>
+              Enregistrement...
+            </>
           ) : (
             "🚗 Enregistrer le véhicule de location"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

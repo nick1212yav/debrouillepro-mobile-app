@@ -1,11 +1,11 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Share } from "react-native";
 
 // src/features/restauration/pages/RestaurationDetailPage.tsx
 import { useState, useCallback, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
+import { toast } from "sonner";
 import {
   X,
   Calendar,
@@ -59,6 +59,7 @@ import { ReservationConfirmation } from "../components/reservation/ReservationCo
 import { PaymentMethods } from "../components/payment/PaymentMethods";
 import { OrderSummary } from "../components/order/OrderSummary";
 import { PaymentForm } from "../forms/PaymentForm";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 // Utilitaire pour parser les métadonnées
 function parseMeta(meta: any): any {
@@ -113,8 +114,8 @@ function publicationToRestaurant(pub: any) {
 }
 
 export default function RestaurationDetailPage() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   // ✅ Correction du type de l'ID pour Convex
   const publicationId = id as Id<"publications"> | undefined;
@@ -155,24 +156,26 @@ export default function RestaurationDetailPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<string>("mobile_money");
 
-  const handleBack = useCallback(() => router.back(), [router]);
+  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const handleToggleFav = useCallback(async () => {
     if (!restaurant) return;
     // ✅ Cast de l'ID (les hooks attendent un nombre, mais nous avons un string)
     const isAdded = await toggleFavorite(restaurant._id as any);
-    UIService.openToast(isAdded
+    toast.success(
+      isAdded
         ? "Restaurant ajouté à vos favoris"
-        : "Restaurant retiré de vos favoris", "success");
+        : "Restaurant retiré de vos favoris",
+    );
   }, [restaurant, toggleFavorite]);
 
   const handleShare = useCallback(() => {
-    if (undefined && restaurant) {
-      undefined
-        .catch(() => UIService.openToast("Lien partagé !", "success"));
+    if (navigator.share && restaurant) {
+      Share.share({ message: String(restaurant.description) + "\n" + "\n" + String(window.location.href), title: restaurant.name })
+        .catch(() => toast.success("Lien partagé !"));
     } else {
-      undefined.writeText(undefined.href);
-      UIService.openToast("Lien copié !", "success");
+      Clipboard.setString(window.location.href);
+      toast.success("Lien copié !");
     }
   }, [restaurant]);
 
@@ -191,7 +194,7 @@ export default function RestaurationDetailPage() {
     if (response.success && response.reservation) {
       setConfirmedBooking(response.reservation);
     } else {
-      UIService.openToast("Échec de la réservation.", "error");
+      toast.error("Échec de la réservation.");
     }
   };
 
@@ -213,114 +216,32 @@ export default function RestaurationDetailPage() {
       paymentDetails,
     });
     if (response.success) {
-      UIService.openToast("Commande payée avec succès !", "success");
+      toast.success("Commande payée avec succès !");
       clearCart();
       setShowCheckoutModal(false);
     } else {
-      UIService.openToast(response.errorMessage || "Erreur de paiement.", "error");
+      toast.error(response.errorMessage || "Erreur de paiement.");
     }
   };
 
   if (isLoading) {
     return (
-      <View className="h-full flex items-center justify-center text-white/50 text-xs">
-        <Text>Chargement du restaurant...</Text></View>
+      <View className="h-full flex items-center justify-center text-white/50 text-xs"><Text>Chargement du restaurant...</Text></View>
     );
   }
 
   if (error || !restaurant) {
     return (
-      <View className="h-full flex flex-col items-center justify-center gap-4 text-white/50 text-xs px-4">
-        <UtensilsCrossed size={48} className="text-white/20" />
-        <Text>{error || "Restaurant introuvable."}</Text>
-        <Pressable
-          onPress={handleBack}
-          className="px-4 py-2 bg-white/5 rounded-xl text-white"
-        >
-          <Text>Retour</Text></Pressable>
-      </View>
+      <View className="h-full flex flex-col items-center justify-center gap-4 text-white/50 text-xs px-4"><UtensilsCrossed size={48} className="text-white/20" /><Text>{error || "Restaurant introuvable."}</Text><Pressable onPress={handleBack} className="px-4 py-2 bg-white/5 rounded-xl text-white"><Text>Retour</Text></Pressable></View>
     );
   }
 
   return (
-    <View className="h-full flex flex-col relative overflow-hidden bg-[#020617]">
-      <RestaurantHeader
-        onBack={handleBack}
-        // ✅ Cast pour isFavorite
-        isFavorite={isFavorite(restaurant._id as any)}
-        onToggleFavorite={handleToggleFav}
-        onShare={handleShare}
-      />
-
-      <View className="flex-1 overflow-y-auto pb-28 no-scrollbar">
-        <RestaurantHero
-          image={restaurant.image}
-          name={restaurant.name}
-          tags={restaurant.tags}
-          open={restaurant.open}
-        />
-
-        <RestaurantInfo
-          name={restaurant.name}
-          cuisine={restaurant.cuisine}
-          description={restaurant.description}
-          rating={restaurant.rating}
-          reviewsCount={restaurant.reviewsCount}
-        />
-
-        <RestaurantSocialActions />
-        <RestaurantStories />
-        <RestaurantLive />
-        <RestaurantPromotions />
-        <RestaurantLocation location={restaurant.location} />
-        <RestaurantHours
-          openingHours={restaurant.openingHours}
-          schedules={restaurant.schedules}
-        />
-
-        <RestaurantReservation
-          onOpenBooking={() => {
+    <View className="h-full flex flex-col relative overflow-hidden bg-[#020617]"><RestaurantHeader onBack={handleBack} isFavorite={isFavorite(restaurant._id as any)} onToggleFavorite={handleToggleFav} onShare={handleShare} /><View className="flex-1 overflow-y-auto pb-28 no-scrollbar"><RestaurantHero image={restaurant.image} name={restaurant.name} tags={restaurant.tags} open={restaurant.open} /><RestaurantInfo name={restaurant.name} cuisine={restaurant.cuisine} description={restaurant.description} rating={restaurant.rating} reviewsCount={restaurant.reviewsCount} /><RestaurantSocialActions /><RestaurantStories /><RestaurantLive /><RestaurantPromotions /><RestaurantLocation location={restaurant.location} /><RestaurantHours openingHours={restaurant.openingHours} schedules={restaurant.schedules} /><RestaurantReservation onOpenBooking={() => {
             setConfirmedBooking(null);
             setShowBookingModal(true);
-          }}
-        />
-
-        <RestaurantMap location={restaurant.location} />
-
-        <RestaurantMenu
-          categories={restaurant.menu}
-          cart={cart}
-          onAddToCart={addToCart}
-          onRemoveFromCart={removeFromCart}
-        />
-
-        <RestaurantGallery images={restaurant.gallery} />
-        <RestaurantVideos />
-        <RestaurantEvents />
-        <RestaurantChef chef={restaurant.chef} />
-        <RestaurantTeam />
-        <RestaurantDeliveryTracking />
-        <RestaurantReviews />
-        <RestaurantQuestions />
-        <RestaurantSimilar />
-        <RestaurantNearby />
-      </View>
-
-      <RestaurantStickyBar
-        totalAmount={cartTotal + (restaurant.deliveryFee || 0)}
-        itemsCount={cartItemsCount}
-        onCheckout={() => setShowCheckoutModal(true)}
-      />
-
-      {/* Modales réservation et paiement (inchangées) */}
-      <>
-        {showBookingModal && (
-          <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70">
-            <View
-              className="w-full max-w-lg rounded-t-[32px] p-6 text-white flex flex-col max-h-[85vh] overflow-y-auto no-scrollbar"
-              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", }}
-            >
-              {confirmedBooking ? (
+          }} /><RestaurantMap location={restaurant.location} /><RestaurantMenu categories={restaurant.menu} cart={cart} onAddToCart={addToCart} onRemoveFromCart={removeFromCart} /><RestaurantGallery images={restaurant.gallery} /><RestaurantVideos /><RestaurantEvents /><RestaurantChef chef={restaurant.chef} /><RestaurantTeam /><RestaurantDeliveryTracking /><RestaurantReviews /><RestaurantQuestions /><RestaurantSimilar /><RestaurantNearby /></View><RestaurantStickyBar totalAmount={cartTotal + (restaurant.deliveryFee || 0)} itemsCount={cartItemsCount} onCheckout={() => setShowCheckoutModal(true)} />{}<View>{showBookingModal && (
+          <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-xs"><View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25 }} className="w-full max-w-lg rounded-t-[32px] p-6 text-white flex flex-col max-h-[85vh] overflow-y-auto no-scrollbar" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)" }}>{confirmedBooking ? (
                 <ReservationConfirmation
                   bookingId={confirmedBooking.id}
                   tableNumber={confirmedBooking.tableNumber}
@@ -332,85 +253,24 @@ export default function RestaurationDetailPage() {
                   onClose={() => setShowBookingModal(false)}
                 />
               ) : (
-                <View className="space-y-4">
-                  <View className="flex items-center justify-between">
-                    <View className="flex items-center gap-2 text-emerald-400">
-                      <Calendar />
-                      <Text className="font-extrabold text-sm uppercase tracking-wider">
-                        Planifier une table
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => setShowBookingModal(false)}
-                      className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50"
-                    >
-                      <X size={15} />
-                    </Pressable>
-                  </View>
-                  <ReservationForm
-                    onSubmit={handleBookingSubmit}
-                    isSubmitting={isReserving}
-                  />
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-      </>
-
-      <>
-        {showCheckoutModal && (
-          <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/75">
-            <View
-              className="w-full max-w-lg rounded-t-[32px] p-6 text-white flex flex-col max-h-[90vh] overflow-y-auto no-scrollbar"
-              style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)", }}
-            >
-              <View className="flex items-center justify-between mb-4">
-                <View className="flex items-center gap-2 text-orange-500">
-                  <ShoppingBag />
-                  <Text className="font-black text-sm uppercase tracking-wider">
-                    Finaliser ma commande
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => setShowCheckoutModal(false)}
-                  className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50"
-                >
-                  <X size={15} />
-                </Pressable>
-              </View>
-
-              <View className="mb-4">
-                <OrderSummary
-                  items={Object.values(cart).map((i) => ({
+                <View className="space-y-4"><View className="flex items-center justify-between"><View className="flex items-center gap-2 text-emerald-400"><Calendar /><Text className="font-extrabold text-sm uppercase tracking-wider">Planifier une table
+                      </Text></View><Pressable onPress={() => setShowBookingModal(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50"><X size={15} /></Pressable></View><ReservationForm onSubmit={handleBookingSubmit} isSubmitting={isReserving} /></View>
+              )}</View></View>
+        )}</View><View>{showCheckoutModal && (
+          <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 backdrop-blur-xs"><View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25 }} className="w-full max-w-lg rounded-t-[32px] p-6 text-white flex flex-col max-h-[90vh] overflow-y-auto no-scrollbar" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.12)" }}><View className="flex items-center justify-between mb-4"><View className="flex items-center gap-2 text-orange-500"><ShoppingBag /><Text className="font-black text-sm uppercase tracking-wider">Finaliser ma commande
+                  </Text></View><Pressable onPress={() => setShowCheckoutModal(false)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50"><X size={15} /></Pressable></View><View className="mb-4"><OrderSummary items={Object.values(cart).map((i) => ({
                     name: i.name,
                     quantity: i.quantity,
                     unitPrice: i.price,
-                  }))}
-                  subtotal={cartTotal}
-                  deliveryFee={restaurant.deliveryFee || 0}
-                  tax={Math.round(cartTotal * 0.05)}
-                  total={
+                  }))} subtotal={cartTotal} deliveryFee={restaurant.deliveryFee || 0} tax={Math.round(cartTotal * 0.05)} total={
                     cartTotal +
                     (restaurant.deliveryFee || 0) +
                     Math.round(cartTotal * 0.05)
-                  }
-                />
-              </View>
-
-              <View className="mb-4">
-                <PaymentMethods
-                  selectedMethod={selectedPaymentMethod}
-                  onChange={setSelectedPaymentMethod}
-                  totalAmount={
+                  } /></View><View className="mb-4"><PaymentMethods selectedMethod={selectedPaymentMethod} onChange={setSelectedPaymentMethod} totalAmount={
                     cartTotal +
                     (restaurant.deliveryFee || 0) +
                     Math.round(cartTotal * 0.05)
-                  }
-                />
-              </View>
-
-              {selectedPaymentMethod !== "cash" && (
+                  } /></View>{selectedPaymentMethod !== "cash" && (
                 <View className="mb-2">
                   <PaymentForm
                     gateway={selectedPaymentMethod as any}
@@ -423,23 +283,12 @@ export default function RestaurationDetailPage() {
                     isSubmitting={isPaying}
                   />
                 </View>
-              )}
-
-              {selectedPaymentMethod === "cash" && (
-                <Pressable
-                  onPress={() => handlePaymentSubmit({})}
-                  disabled={isPaying}
-                  className="w-full py-4 rounded-xl text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-orange-500/10"
-                  style={{  }}
-                >
+              )}{selectedPaymentMethod === "cash" && (
+                <Pressable onPress={() => handlePaymentSubmit({})} disabled={isPaying} className="w-full py-4 rounded-xl text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md shadow-orange-500/10" style={{  }}>
                   <ShieldCheck size={14} />
                   {isPaying ? "Traitement..." : "Confirmer et Payer en Espèces"}
                 </Pressable>
-              )}
-            </View>
-          </View>
-        )}
-      </>
-    </View>
+              )}</View></View>
+        )}</View></View>
   );
 }

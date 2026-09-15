@@ -1,29 +1,32 @@
-// src/pages/modules/CartePage.tsx
-
-import { useCallback, useMemo, useState } from "react";
+import MapView, {
+  Marker,
+  PROVIDER_GOOGLE,
+  type Region,
+} from "react-native-maps";
 import {
+  Alert,
   ActivityIndicator,
-  FlatList,
-  Modal,
+  Platform,
   Pressable,
   ScrollView,
-  StatusBar,
-  StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import { useMemo, useRef, useState } from "react";
 import * as Location from "expo-location";
 import {
   ArrowLeft,
-  Briefcase,
+  BriefcaseBusiness,
   Bus,
+  ChevronRight,
   Filter,
-  Heart,
-  Home,
-  Locate,
+  HeartPulse,
+  LocateFixed,
   MapPin,
   Navigation,
+  Package,
+  Search,
   ShoppingBag,
   Users,
   X,
@@ -41,26 +44,23 @@ type Category =
 type MapMarker = {
   id: string;
   category: Exclude<Category, "Tout">;
-  lat: number;
-  lng: number;
+  latitude: number;
+  longitude: number;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   price?: string;
-  emoji: string;
-  color: string;
   module: string;
 };
 
-interface CartePageProps {
+type UserLocation = {
+  latitude: number;
+  longitude: number;
+};
+
+type Props = {
   onBack: () => void;
   onNavigate?: (page: string) => void;
-}
-
-const KINSHASA_REGION = {
-  latitude: -4.3217,
-  longitude: 15.3222,
-  latitudeDelta: 0.12,
-  longitudeDelta: 0.12,
+  markers?: MapMarker[];
 };
 
 const CATEGORY_COLORS: Record<Exclude<Category, "Tout">, string> = {
@@ -72,218 +72,6 @@ const CATEGORY_COLORS: Record<Exclude<Category, "Tout">, string> = {
   Livraison: "#F59E0B",
 };
 
-const MARKERS: MapMarker[] = [
-  {
-    id: "i1",
-    category: "Immo",
-    lat: -4.3217,
-    lng: 15.3222,
-    title: "Appartement F3",
-    subtitle: "Gombe, Kinshasa",
-    price: "450$/mois",
-    emoji: "🏠",
-    color: CATEGORY_COLORS.Immo,
-    module: "immo",
-  },
-  {
-    id: "i2",
-    category: "Immo",
-    lat: -4.34,
-    lng: 15.33,
-    title: "Villa standing",
-    subtitle: "Lingwala, Kinshasa",
-    price: "1200$/mois",
-    emoji: "🏡",
-    color: CATEGORY_COLORS.Immo,
-    module: "immo",
-  },
-  {
-    id: "i3",
-    category: "Immo",
-    lat: -4.295,
-    lng: 15.29,
-    title: "Bureau commercial",
-    subtitle: "Bandalungwa",
-    price: "800$/mois",
-    emoji: "🏢",
-    color: CATEGORY_COLORS.Immo,
-    module: "immo",
-  },
-  {
-    id: "i4",
-    category: "Immo",
-    lat: -4.36,
-    lng: 15.35,
-    title: "Studio meublé",
-    subtitle: "Kalamu, Kinshasa",
-    price: "250$/mois",
-    emoji: "🛋️",
-    color: CATEGORY_COLORS.Immo,
-    module: "immo",
-  },
-
-  {
-    id: "s1",
-    category: "Santé",
-    lat: -4.325,
-    lng: 15.305,
-    title: "Clinique Ngaliema",
-    subtitle: "Ngaliema, Kinshasa",
-    price: "Ouvert 24h",
-    emoji: "🏥",
-    color: CATEGORY_COLORS.Santé,
-    module: "sante",
-  },
-  {
-    id: "s2",
-    category: "Santé",
-    lat: -4.31,
-    lng: 15.335,
-    title: "Pharmacie Centrale",
-    subtitle: "Gombe",
-    price: "Disponible",
-    emoji: "💊",
-    color: CATEGORY_COLORS.Santé,
-    module: "sante",
-  },
-  {
-    id: "s3",
-    category: "Santé",
-    lat: -4.345,
-    lng: 15.295,
-    title: "Dr. Mbeki – Cardio",
-    subtitle: "Kintambo",
-    price: "RDV disponible",
-    emoji: "👨‍⚕️",
-    color: CATEGORY_COLORS.Santé,
-    module: "sante",
-  },
-
-  {
-    id: "t1",
-    category: "Transport",
-    lat: -4.318,
-    lng: 15.314,
-    title: "Station Taxi-bus",
-    subtitle: "Rond-point Victoire",
-    price: "Départ 5 min",
-    emoji: "🚌",
-    color: CATEGORY_COLORS.Transport,
-    module: "transport",
-  },
-  {
-    id: "t2",
-    category: "Transport",
-    lat: -4.331,
-    lng: 15.342,
-    title: "Mobi-Vélo Gombe",
-    subtitle: "Gombe, Avenue Batetela",
-    price: "500 FC/h",
-    emoji: "🚲",
-    color: CATEGORY_COLORS.Transport,
-    module: "transport",
-  },
-  {
-    id: "t3",
-    category: "Transport",
-    lat: -4.305,
-    lng: 15.298,
-    title: "Terminal bus Limite",
-    subtitle: "Ngaba, Kinshasa",
-    price: "Fréquent",
-    emoji: "🚍",
-    color: CATEGORY_COLORS.Transport,
-    module: "transport",
-  },
-
-  {
-    id: "j1",
-    category: "Jobs",
-    lat: -4.323,
-    lng: 15.326,
-    title: "StartupHub DRC",
-    subtitle: "Gombe – 3 offres",
-    price: "Recrutement ouvert",
-    emoji: "💼",
-    color: CATEGORY_COLORS.Jobs,
-    module: "jobs",
-  },
-  {
-    id: "j2",
-    category: "Jobs",
-    lat: -4.338,
-    lng: 15.308,
-    title: "BTP Kinshasanaise",
-    subtitle: "Lingwala – Maçons",
-    price: "Urgent",
-    emoji: "🔨",
-    color: CATEGORY_COLORS.Jobs,
-    module: "jobs",
-  },
-  {
-    id: "j3",
-    category: "Jobs",
-    lat: -4.35,
-    lng: 15.36,
-    title: "Centre IT Lemba",
-    subtitle: "Lemba – Dev Web",
-    price: "CDI",
-    emoji: "💻",
-    color: CATEGORY_COLORS.Jobs,
-    module: "jobs",
-  },
-
-  {
-    id: "c1",
-    category: "Communauté",
-    lat: -4.316,
-    lng: 15.287,
-    title: "Espace Jeunesse",
-    subtitle: "Kintambo",
-    price: "Gratuit",
-    emoji: "🤝",
-    color: CATEGORY_COLORS.Communauté,
-    module: "community",
-  },
-  {
-    id: "c2",
-    category: "Communauté",
-    lat: -4.342,
-    lng: 15.318,
-    title: "Marché Artisans",
-    subtitle: "Matete",
-    price: "Ouvert sam-dim",
-    emoji: "🛖",
-    color: CATEGORY_COLORS.Communauté,
-    module: "community",
-  },
-
-  {
-    id: "l1",
-    category: "Livraison",
-    lat: -4.328,
-    lng: 15.338,
-    title: "Coursier Express",
-    subtitle: "En route – 8 min",
-    price: "Disponible",
-    emoji: "📦",
-    color: CATEGORY_COLORS.Livraison,
-    module: "livraison",
-  },
-  {
-    id: "l2",
-    category: "Livraison",
-    lat: -4.307,
-    lng: 15.315,
-    title: "Hub Colis Nord",
-    subtitle: "Barumbu – Dépôt",
-    price: "Prise en charge",
-    emoji: "🏪",
-    color: CATEGORY_COLORS.Livraison,
-    module: "livraison",
-  },
-];
-
 const CATEGORIES: Category[] = [
   "Tout",
   "Immo",
@@ -294,50 +82,311 @@ const CATEGORIES: Category[] = [
   "Livraison",
 ];
 
-const CATEGORY_ICONS = {
-  Tout: MapPin,
-  Immo: Home,
-  Santé: Heart,
-  Transport: Bus,
-  Jobs: Briefcase,
-  Communauté: Users,
-  Livraison: ShoppingBag,
-} as const;
+const CATEGORY_LABELS: Record<Category, string> = {
+  Tout: "Tout",
+  Immo: "Immo",
+  Santé: "Santé",
+  Transport: "Transport",
+  Jobs: "Jobs",
+  Communauté: "Communauté",
+  Livraison: "Livraison",
+};
 
-export default function CartePage({ onBack, onNavigate }: CartePageProps) {
+function CategoryIcon({
+  category,
+  size = 15,
+  color = "#ffffff",
+}: {
+  category: Category;
+  size?: number;
+  color?: string;
+}) {
+  switch (category) {
+    case "Immo":
+      return <ShoppingBag size={size} color={color} />;
+
+    case "Santé":
+      return <HeartPulse size={size} color={color} />;
+
+    case "Transport":
+      return <Bus size={size} color={color} />;
+
+    case "Jobs":
+      return <BriefcaseBusiness size={size} color={color} />;
+
+    case "Communauté":
+      return <Users size={size} color={color} />;
+
+    case "Livraison":
+      return <Package size={size} color={color} />;
+
+    default:
+      return <MapPin size={size} color={color} />;
+  }
+}
+
+function getCategoryColor(category: Category) {
+  if (category === "Tout") {
+    return "#6366F1";
+  }
+
+  return CATEGORY_COLORS[category];
+}
+
+function MapPinMarker({
+  category,
+  selected,
+}: {
+  category: Exclude<Category, "Tout">;
+  selected: boolean;
+}) {
+  const color = CATEGORY_COLORS[category];
+
+  return (
+    <View className="items-center">
+      <View
+        className="h-11 w-11 items-center justify-center rounded-full border-2"
+        style={{
+          backgroundColor: color,
+          borderColor: "#ffffff",
+          shadowColor: color,
+          shadowOpacity: selected ? 0.75 : 0.35,
+          shadowRadius: selected ? 12 : 6,
+          shadowOffset: {
+            width: 0,
+            height: 3,
+          },
+          elevation: selected ? 10 : 5,
+        }}
+      >
+        <CategoryIcon category={category} size={18} color="#ffffff" />
+      </View>
+
+      <View
+        className="-mt-2 h-3 w-3 rotate-45"
+        style={{
+          backgroundColor: color,
+        }}
+      />
+    </View>
+  );
+}
+
+function UserPositionMarker() {
+  return (
+    <View className="items-center justify-center">
+      <View className="h-10 w-10 items-center justify-center rounded-full bg-indigo-500/20">
+        <View
+          className="h-5 w-5 rounded-full border-2 border-white bg-indigo-500"
+          style={{
+            shadowColor: "#6366F1",
+            shadowOpacity: 0.9,
+            shadowRadius: 10,
+            elevation: 8,
+          }}
+        />
+      </View>
+    </View>
+  );
+}
+
+function EmptyMapState({
+  search,
+  onClear,
+}: {
+  search: string;
+  onClear: () => void;
+}) {
+  return (
+    <View className="absolute inset-x-5 bottom-8 items-center rounded-3xl border border-white/10 bg-[#0b1020]/95 px-6 py-7">
+      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06]">
+        <MapPin size={26} color="rgba(255,255,255,0.3)" />
+      </View>
+
+      <Text className="mt-4 text-center text-base font-bold text-white">
+        Aucun résultat cartographique
+      </Text>
+
+      <Text className="mt-2 text-center text-sm leading-5 text-gray-400">
+        {search.trim()
+          ? "Aucun élément réel ne correspond à votre recherche."
+          : "Aucune donnée cartographique réelle n'est disponible pour le moment."}
+      </Text>
+
+      {search.trim() ? (
+        <Pressable
+          onPress={onClear}
+          className="mt-4 rounded-xl bg-white px-4 py-2.5 active:opacity-70"
+        >
+          <Text className="text-xs font-bold text-[#050812]">
+            Effacer la recherche
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function SelectedMarkerSheet({
+  marker,
+  onClose,
+  onNavigate,
+  onCenter,
+}: {
+  marker: MapMarker;
+  onClose: () => void;
+  onNavigate?: (page: string) => void;
+  onCenter: () => void;
+}) {
+  const color = CATEGORY_COLORS[marker.category];
+
+  return (
+    <View className="absolute bottom-0 left-0 right-0 rounded-t-[30px] border border-white/10 bg-[#0a0e1d] px-5 pb-8 pt-4">
+      <View className="mb-4 items-center">
+        <View className="h-1 w-12 rounded-full bg-white/15" />
+      </View>
+
+      <View className="flex-row items-start gap-3">
+        <View
+          className="h-14 w-14 items-center justify-center rounded-2xl"
+          style={{
+            backgroundColor: `${color}20`,
+            borderWidth: 1,
+            borderColor: `${color}40`,
+          }}
+        >
+          <CategoryIcon category={marker.category} size={22} color={color} />
+        </View>
+
+        <View className="flex-1">
+          <Text numberOfLines={2} className="text-base font-bold text-white">
+            {marker.title}
+          </Text>
+
+          {marker.subtitle ? (
+            <Text numberOfLines={2} className="mt-1 text-sm text-gray-400">
+              {marker.subtitle}
+            </Text>
+          ) : null}
+
+          {marker.price ? (
+            <Text className="mt-1.5 text-sm font-bold" style={{ color }}>
+              {marker.price}
+            </Text>
+          ) : null}
+
+          <View
+            className="mt-2 self-start rounded-full px-2.5 py-1"
+            style={{
+              backgroundColor: `${color}18`,
+            }}
+          >
+            <Text className="text-[10px] font-bold" style={{ color }}>
+              {marker.category}
+            </Text>
+          </View>
+        </View>
+
+        <Pressable
+          onPress={onClose}
+          className="h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] active:opacity-70"
+        >
+          <X size={16} color="rgba(255,255,255,0.65)" />
+        </Pressable>
+      </View>
+
+      <View className="mt-5 flex-row gap-3">
+        {onNavigate ? (
+          <Pressable
+            onPress={() => {
+              onClose();
+              onNavigate(marker.module);
+            }}
+            className="flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-white py-3.5 active:opacity-80"
+          >
+            <Text className="text-sm font-bold text-[#050812]">Ouvrir</Text>
+
+            <ChevronRight size={16} color="#050812" />
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          onPress={onCenter}
+          className="h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] active:opacity-70"
+        >
+          <Navigation size={18} color="rgba(255,255,255,0.8)" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+export default function CartePage({ onBack, onNavigate, markers = [] }: Props) {
+  const mapRef = useRef<MapView | null>(null);
+
   const [activeCategory, setActiveCategory] = useState<Category>("Tout");
 
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
 
-  const [userPosition, setUserPosition] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
 
+  const [search, setSearch] = useState("");
   const [locating, setLocating] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
-  const [mapRegion, setMapRegion] = useState(KINSHASA_REGION);
+  const initialRegion: Region | undefined =
+    markers.length > 0
+      ? {
+          latitude: markers[0].latitude,
+          longitude: markers[0].longitude,
+          latitudeDelta: 0.08,
+          longitudeDelta: 0.08,
+        }
+      : undefined;
 
   const filteredMarkers = useMemo(() => {
-    if (activeCategory === "Tout") {
-      return MARKERS;
-    }
+    const normalizedSearch = search.trim().toLocaleLowerCase();
 
-    return MARKERS.filter((marker) => marker.category === activeCategory);
-  }, [activeCategory]);
+    return markers.filter((marker) => {
+      const categoryMatch =
+        activeCategory === "Tout" || marker.category === activeCategory;
 
-  const handleLocate = useCallback(async () => {
+      if (!categoryMatch) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const searchable = [
+        marker.title,
+        marker.subtitle ?? "",
+        marker.category,
+        marker.module,
+      ]
+        .join(" ")
+        .toLocaleLowerCase();
+
+      return searchable.includes(normalizedSearch);
+    });
+  }, [activeCategory, markers, search]);
+
+  const handleLocate = async () => {
     if (locating) {
       return;
     }
 
-    setLocating(true);
-
     try {
+      setLocating(true);
+
       const permission = await Location.requestForegroundPermissionsAsync();
 
       if (permission.status !== "granted") {
-        setMapRegion(KINSHASA_REGION);
+        Alert.alert(
+          "Localisation",
+          "L'autorisation de localisation est nécessaire pour afficher votre position sur la carte.",
+        );
         return;
       }
 
@@ -345,143 +394,171 @@ export default function CartePage({ onBack, onNavigate }: CartePageProps) {
         accuracy: Location.Accuracy.Balanced,
       });
 
-      const nextPosition = {
+      const nextPosition: UserLocation = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
       };
 
-      setUserPosition(nextPosition);
+      setUserLocation(nextPosition);
 
-      setMapRegion({
-        ...nextPosition,
-        latitudeDelta: 0.025,
-        longitudeDelta: 0.025,
-      });
+      mapRef.current?.animateToRegion(
+        {
+          ...nextPosition,
+          latitudeDelta: 0.025,
+          longitudeDelta: 0.025,
+        },
+        700,
+      );
     } catch {
-      setMapRegion(KINSHASA_REGION);
+      Alert.alert(
+        "Localisation indisponible",
+        "Votre position n'a pas pu être déterminée.",
+      );
     } finally {
       setLocating(false);
     }
-  }, [locating]);
+  };
 
-  const handleCategoryPress = useCallback((category: Category) => {
-    setActiveCategory(category);
-  }, []);
+  const handleMarkerPress = (marker: MapMarker) => {
+    setSelectedMarker(marker);
 
-  const handleOpenModule = useCallback(() => {
+    mapRef.current?.animateToRegion(
+      {
+        latitude: marker.latitude,
+        longitude: marker.longitude,
+        latitudeDelta: 0.025,
+        longitudeDelta: 0.025,
+      },
+      500,
+    );
+  };
+
+  const handleCenterSelected = () => {
     if (!selectedMarker) {
       return;
     }
 
-    const module = selectedMarker.module;
+    mapRef.current?.animateToRegion(
+      {
+        latitude: selectedMarker.latitude,
+        longitude: selectedMarker.longitude,
+        latitudeDelta: 0.025,
+        longitudeDelta: 0.025,
+      },
+      500,
+    );
+  };
 
-    setSelectedMarker(null);
-
-    onNavigate?.(module);
-  }, [onNavigate, selectedMarker]);
-
-  const handleFocusMarker = useCallback(() => {
-    if (!selectedMarker) {
-      return;
-    }
-
-    setMapRegion({
-      latitude: selectedMarker.lat,
-      longitude: selectedMarker.lng,
-      latitudeDelta: 0.02,
-      longitudeDelta: 0.02,
-    });
-
-    setSelectedMarker(null);
-  }, [selectedMarker]);
+  const handleResetFilters = () => {
+    setActiveCategory("Tout");
+    setSearch("");
+    setShowFilters(false);
+  };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#020617" />
+    <View className="flex-1 bg-[#050812]">
+      {/* HEADER */}
+      <View className="absolute left-0 right-0 top-0 z-30 px-4 pt-12">
+        <View className="flex-row items-center gap-3">
+          <Pressable
+            onPress={onBack}
+            className="h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-[#050812]/90 active:opacity-70"
+          >
+            <ArrowLeft size={20} color="#ffffff" />
+          </Pressable>
 
-      <View style={styles.header}>
-        <Pressable
-          onPress={onBack}
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-          style={({ pressed }) => [
-            styles.headerButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <ArrowLeft size={20} color="#FFFFFF" />
-        </Pressable>
+          <View className="flex-1 overflow-hidden rounded-2xl border border-white/10 bg-[#050812]/90 px-4 py-2.5">
+            <View className="flex-row items-center gap-2">
+              <MapPin size={15} color="#818cf8" />
 
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>Carte Interactive</Text>
+              <Text className="text-base font-bold text-white">Carte</Text>
+            </View>
 
-          <Text style={styles.subtitle}>
-            {filteredMarkers.length} points à proximité
-          </Text>
+            <Text
+              numberOfLines={1}
+              className="mt-0.5 text-[10px] text-gray-500"
+            >
+              {filteredMarkers.length} élément
+              {filteredMarkers.length === 1 ? "" : "s"} disponible
+              {filteredMarkers.length === 1 ? "" : "s"}
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={handleLocate}
+            className="h-11 w-11 items-center justify-center rounded-2xl border border-indigo-400/30 bg-indigo-500/20 active:opacity-70"
+          >
+            {locating ? (
+              <ActivityIndicator size="small" color="#818cf8" />
+            ) : (
+              <LocateFixed size={19} color="#818cf8" />
+            )}
+          </Pressable>
         </View>
 
-        <Pressable
-          onPress={() => void handleLocate()}
-          disabled={locating}
-          accessibilityRole="button"
-          accessibilityLabel="Trouver ma position"
-          style={({ pressed }) => [
-            styles.locateButton,
-            pressed && !locating && styles.pressed,
-            locating && styles.disabled,
-          ]}
-        >
-          {locating ? (
-            <ActivityIndicator size="small" color="#818CF8" />
-          ) : (
-            <Locate size={19} color="#818CF8" />
-          )}
-        </Pressable>
-      </View>
+        {/* SEARCH */}
+        <View className="mt-3 flex-row items-center gap-2 rounded-2xl border border-white/10 bg-[#050812]/90 px-4">
+          <Search size={17} color="#6b7280" />
 
-      <View style={styles.categoriesContainer}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Rechercher un lieu, service, emploi..."
+            placeholderTextColor="#6b7280"
+            className="h-12 flex-1 text-sm text-white"
+            returnKeyType="search"
+          />
+
+          {search.length > 0 ? (
+            <Pressable
+              onPress={() => setSearch("")}
+              className="h-7 w-7 items-center justify-center rounded-full bg-white/10"
+            >
+              <X size={13} color="#9ca3af" />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* CATEGORIES */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesContent}
+          contentContainerStyle={{
+            paddingVertical: 10,
+            gap: 8,
+          }}
         >
           {CATEGORIES.map((category) => {
-            const isActive = activeCategory === category;
+            const active = activeCategory === category;
 
-            const color =
-              category === "Tout" ? "#6366F1" : CATEGORY_COLORS[category];
-
-            const Icon = CATEGORY_ICONS[category];
+            const color = getCategoryColor(category);
 
             return (
               <Pressable
                 key={category}
-                onPress={() => handleCategoryPress(category)}
-                style={({ pressed }) => [
-                  styles.categoryButton,
-                  {
-                    backgroundColor: isActive
-                      ? color
-                      : "rgba(255,255,255,0.06)",
-                    borderColor: isActive ? color : "rgba(255,255,255,0.10)",
-                  },
-                  pressed && styles.pressed,
-                ]}
+                onPress={() => {
+                  setActiveCategory(category);
+                  setSelectedMarker(null);
+                }}
+                className="flex-row items-center gap-1.5 rounded-full border px-3.5 py-2.5 active:opacity-70"
+                style={{
+                  backgroundColor: active ? color : "rgba(5,8,18,0.90)",
+                  borderColor: active ? color : "rgba(255,255,255,0.10)",
+                }}
               >
-                <Icon
+                <CategoryIcon
+                  category={category}
                   size={14}
-                  color={isActive ? "#FFFFFF" : "rgba(255,255,255,0.55)"}
+                  color={active ? "#ffffff" : "rgba(255,255,255,0.58)"}
                 />
 
                 <Text
-                  style={[
-                    styles.categoryText,
-                    {
-                      color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.55)",
-                    },
-                  ]}
+                  className="text-xs font-semibold"
+                  style={{
+                    color: active ? "#ffffff" : "rgba(255,255,255,0.62)",
+                  }}
                 >
-                  {category}
+                  {CATEGORY_LABELS[category]}
                 </Text>
               </Pressable>
             );
@@ -489,496 +566,177 @@ export default function CartePage({ onBack, onNavigate }: CartePageProps) {
         </ScrollView>
       </View>
 
-      <View style={styles.mapContainer}>
+      {/* MAP */}
+      {Platform.OS === "web" ? (
+        <View className="flex-1 items-center justify-center bg-[#050812] px-6">
+          <View className="h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
+            <MapPin size={28} color="rgba(255,255,255,0.28)" />
+          </View>
+
+          <Text className="mt-5 text-center text-base font-bold text-white">
+            Carte native
+          </Text>
+
+          <Text className="mt-2 max-w-sm text-center text-sm leading-5 text-gray-400">
+            Cette interface utilise la cartographie native sur Android et iOS.
+          </Text>
+        </View>
+      ) : initialRegion ? (
         <MapView
-          provider={PROVIDER_DEFAULT}
-          style={StyleSheet.absoluteFillObject}
-          region={mapRegion}
-          onRegionChangeComplete={setMapRegion}
+          ref={mapRef}
+          provider={PROVIDER_GOOGLE}
+          initialRegion={initialRegion}
+          className="flex-1"
           showsUserLocation={false}
-          showsCompass
+          showsMyLocationButton={false}
+          showsCompass={false}
           showsScale={false}
-          showsBuildings
-          showsTraffic={false}
+          toolbarEnabled={false}
+          rotateEnabled
+          pitchEnabled
+          zoomEnabled
+          zoomControlEnabled={false}
+          mapType="standard"
         >
-          {userPosition && (
+          {userLocation ? (
             <Marker
-              coordinate={userPosition}
-              title="Votre position"
-              description="Position actuelle"
+              coordinate={userLocation}
+              tracksViewChanges={false}
+              anchor={{
+                x: 0.5,
+                y: 0.5,
+              }}
             >
-              <View style={styles.userMarkerOuter}>
-                <View style={styles.userMarkerInner} />
-              </View>
+              <UserPositionMarker />
             </Marker>
-          )}
+          ) : null}
 
           {filteredMarkers.map((marker) => (
             <Marker
               key={marker.id}
               coordinate={{
-                latitude: marker.lat,
-                longitude: marker.lng,
+                latitude: marker.latitude,
+                longitude: marker.longitude,
               }}
-              title={marker.title}
-              description={marker.subtitle}
-              onPress={() => setSelectedMarker(marker)}
+              onPress={() => handleMarkerPress(marker)}
+              tracksViewChanges={false}
+              anchor={{
+                x: 0.5,
+                y: 0.85,
+              }}
             >
-              <View
-                style={[
-                  styles.customMarker,
-                  {
-                    backgroundColor: marker.color,
-                  },
-                ]}
-              >
-                <Text style={styles.markerEmoji}>{marker.emoji}</Text>
-              </View>
+              <MapPinMarker
+                category={marker.category}
+                selected={selectedMarker?.id === marker.id}
+              />
             </Marker>
           ))}
         </MapView>
+      ) : (
+        <View className="flex-1 bg-[#050812]">
+          <EmptyMapState search={search} onClear={() => setSearch("")} />
+        </View>
+      )}
 
-        {activeCategory === "Tout" && (
-          <View style={styles.legend}>
-            <View style={styles.legendTitleRow}>
-              <Filter size={11} color="rgba(255,255,255,0.45)" />
+      {/* EMPTY DATA OVERLAY */}
+      {Platform.OS !== "web" &&
+      initialRegion &&
+      filteredMarkers.length === 0 ? (
+        <EmptyMapState search={search} onClear={() => setSearch("")} />
+      ) : null}
 
-              <Text style={styles.legendTitle}>Légende</Text>
-            </View>
+      {/* FILTER BUTTON */}
+      <View className="absolute bottom-6 left-5 z-20">
+        <Pressable
+          onPress={() => setShowFilters((value) => !value)}
+          className="flex-row items-center gap-2 rounded-2xl border border-white/10 bg-[#0a0e1d]/95 px-4 py-3.5 active:opacity-70"
+        >
+          <Filter size={16} color="#ffffff" />
 
-            {(
-              Object.entries(CATEGORY_COLORS) as [
-                Exclude<Category, "Tout">,
-                string,
-              ][]
-            ).map(([category, color]) => (
-              <View key={category} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: color }]} />
-
-                <Text style={styles.legendText}>{category}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+          <Text className="text-xs font-bold text-white">Filtres</Text>
+        </Pressable>
       </View>
 
-      <Modal
-        visible={selectedMarker !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedMarker(null)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setSelectedMarker(null)}
-          />
+      {/* FILTER PANEL */}
+      {showFilters ? (
+        <View className="absolute bottom-20 left-5 right-5 z-30 rounded-3xl border border-white/10 bg-[#0a0e1d]/98 p-4">
+          <View className="mb-3 flex-row items-center justify-between">
+            <Text className="text-sm font-bold text-white">
+              Filtrer la carte
+            </Text>
 
-          {selectedMarker && (
-            <View style={styles.bottomSheet}>
-              <View style={styles.sheetHandle} />
+            <Pressable
+              onPress={() => setShowFilters(false)}
+              className="h-8 w-8 items-center justify-center rounded-full bg-white/10"
+            >
+              <X size={14} color="#ffffff" />
+            </Pressable>
+          </View>
 
-              <View style={styles.markerHeader}>
-                <View
-                  style={[
-                    styles.markerEmojiContainer,
-                    {
-                      backgroundColor: `${selectedMarker.color}22`,
-                      borderColor: `${selectedMarker.color}66`,
-                    },
-                  ]}
+          <View className="flex-row flex-wrap gap-2">
+            {CATEGORIES.map((category) => {
+              const active = activeCategory === category;
+
+              const color = getCategoryColor(category);
+
+              return (
+                <Pressable
+                  key={category}
+                  onPress={() => {
+                    setActiveCategory(category);
+                    setSelectedMarker(null);
+                  }}
+                  className="flex-row items-center gap-1.5 rounded-xl border px-3 py-2.5"
+                  style={{
+                    backgroundColor: active
+                      ? `${color}25`
+                      : "rgba(255,255,255,0.04)",
+                    borderColor: active
+                      ? `${color}60`
+                      : "rgba(255,255,255,0.08)",
+                  }}
                 >
-                  <Text style={styles.sheetEmoji}>{selectedMarker.emoji}</Text>
-                </View>
+                  <CategoryIcon
+                    category={category}
+                    size={14}
+                    color={active ? color : "#9ca3af"}
+                  />
 
-                <View style={styles.markerInfo}>
-                  <Text numberOfLines={1} style={styles.markerTitle}>
-                    {selectedMarker.title}
-                  </Text>
-
-                  <Text style={styles.markerSubtitle}>
-                    {selectedMarker.subtitle}
-                  </Text>
-
-                  {selectedMarker.price && (
-                    <Text
-                      style={[
-                        styles.markerPrice,
-                        {
-                          color: selectedMarker.color,
-                        },
-                      ]}
-                    >
-                      {selectedMarker.price}
-                    </Text>
-                  )}
-
-                  <View
-                    style={[
-                      styles.categoryBadge,
-                      {
-                        backgroundColor: `${selectedMarker.color}22`,
-                      },
-                    ]}
+                  <Text
+                    className="text-xs font-medium"
+                    style={{
+                      color: active ? color : "#9ca3af",
+                    }}
                   >
-                    <Text
-                      style={[
-                        styles.categoryBadgeText,
-                        {
-                          color: selectedMarker.color,
-                        },
-                      ]}
-                    >
-                      {selectedMarker.category}
-                    </Text>
-                  </View>
-                </View>
-
-                <Pressable
-                  onPress={() => setSelectedMarker(null)}
-                  style={({ pressed }) => [
-                    styles.closeButton,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Fermer"
-                >
-                  <X size={17} color="rgba(255,255,255,0.65)" />
-                </Pressable>
-              </View>
-
-              <View style={styles.actions}>
-                <Pressable
-                  onPress={handleOpenModule}
-                  style={({ pressed }) => [
-                    styles.openModuleButton,
-                    {
-                      backgroundColor: selectedMarker.color,
-                    },
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text style={styles.openModuleButtonText}>
-                    Ouvrir le module
+                    {CATEGORY_LABELS[category]}
                   </Text>
                 </Pressable>
+              );
+            })}
+          </View>
 
-                <Pressable
-                  onPress={handleFocusMarker}
-                  style={({ pressed }) => [
-                    styles.navigationButton,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Voir sur la carte"
-                >
-                  <Navigation size={19} color="rgba(255,255,255,0.75)" />
-                </Pressable>
-              </View>
-            </View>
+          {(activeCategory !== "Tout" || search.trim()) && (
+            <Pressable
+              onPress={handleResetFilters}
+              className="mt-3 items-center rounded-xl border border-white/10 bg-white/[0.04] py-3"
+            >
+              <Text className="text-xs font-semibold text-gray-300">
+                Réinitialiser les filtres
+              </Text>
+            </Pressable>
           )}
         </View>
-      </Modal>
+      ) : null}
+
+      {/* SELECTED MARKER */}
+      {selectedMarker ? (
+        <SelectedMarkerSheet
+          marker={selectedMarker}
+          onClose={() => setSelectedMarker(null)}
+          onNavigate={onNavigate}
+          onCenter={handleCenterSelected}
+        />
+      ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#020617",
-  },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-    backgroundColor: "#020617",
-  },
-
-  headerButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-
-  headerContent: {
-    flex: 1,
-  },
-
-  title: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "900",
-  },
-
-  subtitle: {
-    marginTop: 3,
-    color: "rgba(255,255,255,0.45)",
-    fontSize: 12,
-  },
-
-  locateButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(99,102,241,0.18)",
-    borderWidth: 1,
-    borderColor: "rgba(99,102,241,0.40)",
-  },
-
-  categoriesContainer: {
-    backgroundColor: "#020617",
-    paddingBottom: 12,
-  },
-
-  categoriesContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-
-  categoryButton: {
-    minHeight: 36,
-    paddingHorizontal: 13,
-    borderRadius: 999,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  categoryText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  mapContainer: {
-    flex: 1,
-    overflow: "hidden",
-  },
-
-  customMarker: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 3,
-    borderColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 8,
-    shadowColor: "#000000",
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-  },
-
-  markerEmoji: {
-    fontSize: 18,
-  },
-
-  userMarkerOuter: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(99,102,241,0.30)",
-  },
-
-  userMarkerInner: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#6366F1",
-    borderWidth: 3,
-    borderColor: "#FFFFFF",
-  },
-
-  legend: {
-    position: "absolute",
-    top: 14,
-    right: 14,
-    padding: 12,
-    borderRadius: 18,
-    backgroundColor: "rgba(2,6,23,0.92)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    gap: 7,
-  },
-
-  legendTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginBottom: 3,
-  },
-
-  legendTitle: {
-    color: "rgba(255,255,255,0.45)",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
-
-  legendDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-  },
-
-  legendText: {
-    color: "rgba(255,255,255,0.65)",
-    fontSize: 10,
-  },
-
-  modalContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-
-  bottomSheet: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 28,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    backgroundColor: "#0A0A1A",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-
-  sheetHandle: {
-    alignSelf: "center",
-    width: 42,
-    height: 5,
-    borderRadius: 99,
-    marginBottom: 18,
-    backgroundColor: "rgba(255,255,255,0.18)",
-  },
-
-  markerHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
-  },
-
-  markerEmojiContainer: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  sheetEmoji: {
-    fontSize: 25,
-  },
-
-  markerInfo: {
-    flex: 1,
-  },
-
-  markerTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-
-  markerSubtitle: {
-    marginTop: 3,
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 13,
-  },
-
-  markerPrice: {
-    marginTop: 6,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
-  categoryBadge: {
-    alignSelf: "flex-start",
-    marginTop: 7,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-
-  categoryBadgeText: {
-    fontSize: 10,
-    fontWeight: "800",
-  },
-
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-
-  actions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 22,
-  },
-
-  openModuleButton: {
-    flex: 1,
-    minHeight: 50,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  openModuleButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
-  navigationButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-  },
-
-  pressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.97 }],
-  },
-
-  disabled: {
-    opacity: 0.65,
-  },
-});

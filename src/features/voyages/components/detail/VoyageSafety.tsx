@@ -24,9 +24,7 @@ export function VoyageSafety({ trip }: VoyageSafetyProps) {
   ];
 
   return (
-    <View
-      className="rounded-3xl p-6 bg-white/5 border border-white/10"
-    >
+    <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl p-6 bg-white/5 border border-white/10">
       <View className="flex items-center gap-2 mb-4">
         <Shield size={16} className="text-emerald-400" />
         <Text className="text-white font-bold text-base">Sécurité</Text>
@@ -34,15 +32,11 @@ export function VoyageSafety({ trip }: VoyageSafetyProps) {
 
       <View className="gap-2">
         {safetyItems.map(({ icon: Icon, label, active }) => (
-          <View
-            key={label}
-            className={`flex items-center gap-2 p-2 rounded-xl text-xs ${
+          <View key={label} className={`flex items-center gap-2 p-2 rounded-xl text-xs ${
               active ? "text-white/80" : "text-white/30"
-            }`}
-            style={{ backgroundColor: active
+            }`} style={{ backgroundColor: active
                             ? "rgba(16,185,129,0.1)"
-                            : "rgba(255,255,255,0.05)" }}
-          >
+                            : "rgba(255,255,255,0.05)" }}>
             <Icon
               size={14}
               className={active ? "text-emerald-400" : "text-white/20"}

@@ -24,27 +24,17 @@ export function ServiceFooter({
 }: Props) {
   return (
     <View className="flex items-center gap-4 p-3 rounded-xl bg-white/5 border border-white/5">
-      <Pressable
-        onPress={onLike}
-        className="flex items-center gap-1.5 text-xs"
-        style={{  }}
-      >
+      <Pressable onPress={onLike} className="flex items-center gap-1.5 text-xs transition-colors" style={{  }}>
         <Heart size={16} className={isLiked ? "fill-red-500" : ""} />{" "}
         {likeCount > 0 && likeCount}
       </Pressable>
       <Pressable className="flex items-center gap-1.5 text-xs text-white/40">
         <MessageCircle size={16} /> {commentCount > 0 && commentCount}
       </Pressable>
-      <Pressable
-        onPress={onShare}
-        className="flex items-center gap-1.5 text-xs text-white/40"
-      >
+      <Pressable onPress={onShare} className="flex items-center gap-1.5 text-xs text-white/40">
         <Share2 size={16} /> {shareCount > 0 && shareCount}
       </Pressable>
-      <Pressable
-        onPress={onBookmark}
-        className="flex items-center gap-1.5 text-xs text-white/40"
-      >
+      <Pressable onPress={onBookmark} className="flex items-center gap-1.5 text-xs text-white/40">
         <Bookmark
           size={16}
           className={isBookmarked ? "fill-amber-400 text-amber-400" : ""}

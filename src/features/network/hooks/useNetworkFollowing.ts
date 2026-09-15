@@ -1,10 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/hooks/useNetworkFollowing.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { Following } from "../components/Network/FollowingList";
+import { toast } from "sonner";
 
 interface UseNetworkFollowingOptions {
   userId: Id<"users">;
@@ -25,12 +24,12 @@ export function useNetworkFollowing({ userId }: UseNetworkFollowingOptions) {
     try {
       if (toggleFollow) {
         await toggleFollow({ targetUserId });
-        UIService.openToast("Désabonné avec succès", "success");
+        toast.success("Désabonné avec succès");
         return true;
       }
       return false;
     } catch {
-      UIService.openToast("Impossible de se désabonner", "error");
+      toast.error("Impossible de se désabonner");
       return false;
     }
   };

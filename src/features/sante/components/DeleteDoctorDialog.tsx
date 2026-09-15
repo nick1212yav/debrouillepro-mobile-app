@@ -1,5 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/sante/components/DeleteDoctorDialog.tsx
 import {
   Dialog,
@@ -12,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react-native";
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -35,7 +34,7 @@ export function DeleteDoctorDialog({
   const handleDelete = async () => {
     try {
       await deleteDoctor({ id: doctorId });
-      UIService.openToast("Médecin supprimé", "success");
+      toast.success("Médecin supprimé");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -43,7 +42,7 @@ export function DeleteDoctorDialog({
         error instanceof Error
           ? error.message
           : "Erreur lors de la suppression";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

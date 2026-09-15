@@ -1,6 +1,7 @@
-import { cn } from "@/lib/utils";
+import { TextProps, ViewProps } from "react-native";
+import { cn } from "@/lib/utils.ts";
 
-function Kbd({ className, ...props }: React.ComponentProps<typeof Text>) {
+function Kbd({ className, ...props }: TextProps) {
   return (
     <kbd
       data-slot="kbd"
@@ -15,7 +16,7 @@ function Kbd({ className, ...props }: React.ComponentProps<typeof Text>) {
   );
 }
 
-function KbdGroup({ className, ...props }: React.ComponentProps<typeof View>) {
+function KbdGroup({ className, ...props }: ViewProps) {
   return (
     <kbd
       data-slot="kbd-group"

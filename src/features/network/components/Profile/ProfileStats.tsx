@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { View, Text } from "react-native";
 
 // src/features/network/components/Profile/ProfileStats.tsx
 import {
@@ -39,11 +39,9 @@ export function ProfileStats({
 }: ProfileStatsProps) {
   if (isLoading) {
     return (
-      <View className={cn("grid grid-cols-2 md:grid-cols-3 gap-2", className)}>
-        {Array.from({ length: 4 }).map((_, i) => (
+      <View className={cn("grid grid-cols-2 md:grid-cols-3 gap-2", className)}>{Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-20 rounded-xl" />
-        ))}
-      </View>
+        ))}</View>
     );
   }
 
@@ -119,31 +117,12 @@ export function ProfileStats({
   };
 
   return (
-    <View className={cn("grid grid-cols-2 md:grid-cols-3 gap-2", className)}>
-      {stats.map((stat, index) => (
-        <View
-          key={stat.label}
-          className="p-3 rounded-xl"
-          style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-        >
-          <View className="flex items-center gap-2">
-            <View
-              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: `${stat.color}15` }}
-            >
-              <stat.icon size={13} />
-            </View>
-            <View className="min-w-0">
-              <Text className="text-white font-bold text-sm truncate">
-                {typeof stat.value === "number"
+    <View className={cn("grid grid-cols-2 md:grid-cols-3 gap-2", className)}>{stats.map((stat, index) => (
+        <View key={stat.label} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: index * 0.04 }} className="p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}>
+          <View className="flex items-center gap-2"><View className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${stat.color}15` }}><stat.icon size={13} /></View><View className="min-w-0"><Text className="text-white font-bold text-sm truncate">{typeof stat.value === "number"
                   ? formatValue(stat.value)
-                  : stat.value}
-              </Text>
-              <Text className="text-white/30 text-[10px] truncate">{stat.label}</Text>
-            </View>
-          </View>
+                  : stat.value}</Text><Text className="text-white/30 text-[10px] truncate">{stat.label}</Text></View></View>
         </View>
-      ))}
-    </View>
+      ))}</View>
   );
 }

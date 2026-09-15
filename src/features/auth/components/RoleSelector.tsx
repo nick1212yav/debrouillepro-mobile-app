@@ -83,49 +83,20 @@ export function RoleSelector({
   };
 
   return (
-    <View className="space-y-3">
-      <Text className="block text-xs font-medium text-white/60">{label}</Text>
-
-      <View className="gap-3">
-        {ROLES.map((role) => {
+    <View className="space-y-3"><Text className="block text-xs font-medium text-white/60">{label}</Text><View className="gap-3">{ROLES.map((role) => {
           const active = selected.includes(role.value);
 
           return (
-            <Pressable
-              key={role.value}
-             
-              onPress={() => toggleRole(role.value)}
-              className="rounded-2xl p-3 text-left"
-              style={{ backgroundColor: active
-                                ? "rgba(139,92,246,.18)"
-                                : "rgba(255,255,255,.05)", borderColor: "rgba(139,92,246,.6)", borderStyle: "solid" }}
-            >
-              <View className="flex items-start gap-3">
-                <Text className="text-xl leading-none">{role.emoji}</Text>
-
-                <View className="min-w-0">
-                  <Text
-                    className={`text-sm font-semibold ${
+            <Pressable key={role.value} onPress={() => toggleRole(role.value)} className="rounded-2xl p-3 text-left transition-all duration-200 active:scale-95" style={{ backgroundColor: active
+                              ? "rgba(139,92,246,.18)"
+                              : "rgba(255,255,255,.05)", borderColor: "rgba(139,92,246,.6)", borderStyle: "solid" }}><View className="flex items-start gap-3"><Text className="text-xl leading-none">{role.emoji}</Text><View className="min-w-0"><Text className={`text-sm font-semibold ${
                       active ? "text-white" : "text-white/80"
-                    }`}
-                  >
-                    {role.label}
-                  </Text>
-
-                  <Text className="mt-1 text-[11px] leading-4 text-white/40">
-                    {role.description}
-                  </Text>
-                </View>
-              </View>
-            </Pressable>
+                    }`}>{role.label}</Text><Text className="mt-1 text-[11px] leading-4 text-white/40">{role.description}</Text></View></View></Pressable>
           );
-        })}
-      </View>
-
-      {multiple && (
+        })}</View>{multiple && (
         <Text className="text-xs text-white/35">
-          <Text>Vous pouvez sélectionner plusieurs rôles.</Text></Text>
-      )}
-    </View>
+          Vous pouvez sélectionner plusieurs rôles.
+        </Text>
+      )}</View>
   );
 }

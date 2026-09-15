@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/sante/services/telemedicine.service.ts
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 /**
  * Démarrer une téléconsultation
@@ -12,10 +11,10 @@ export function useStartTeleconsultation() {
   return async (id: string) => {
     try {
       const result = await mutate({ id: id as any });
-      UIService.openToast("Téléconsultation démarrée", "success");
+      toast.success("Téléconsultation démarrée");
       return result;
     } catch (e) {
-      UIService.openToast(e instanceof Error ? e.message : "Erreur", "error");
+      toast.error(e instanceof Error ? e.message : "Erreur");
       throw e;
     }
   };
@@ -32,9 +31,9 @@ export function useCompleteTeleconsultation() {
     try {
       // On ne passe que l'ID, car le type Convex n'accepte peut-être pas 'notes'
       await mutate({ id: id as any });
-      UIService.openToast("Téléconsultation terminée", "success");
+      toast.success("Téléconsultation terminée");
     } catch (e) {
-      UIService.openToast(e instanceof Error ? e.message : "Erreur", "error");
+      toast.error(e instanceof Error ? e.message : "Erreur");
       throw e;
     }
   };

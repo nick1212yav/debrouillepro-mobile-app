@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Pressable, Text, TextInput } from "react-native";
 import { useState, useMemo } from "react";
 import {
@@ -7,6 +6,7 @@ import {
   BookOpen, Check, Trash2, ChevronRight, Apple,
   Calendar, TrendingUp, Info,
 } from "lucide-react-native";
+import { toast } from "sonner";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 
@@ -192,15 +192,7 @@ function MacroBar({ label, value, goal, color }: { label: string; value: number;
   const pct = Math.min(100, goal > 0 ? (value / goal) * 100 : 0);
   const over = value > goal;
   return (
-    <View>
-      <View className="flex justify-between text-xs mb-1">
-        <Text className="text-gray-400">{label}</Text>
-        <Text className={over ? "text-red-400" : "text-white"}>{Math.round(value)}<Text className="text-gray-500">/{goal}g</Text></Text>
-      </View>
-      <View className="h-1.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-        <View className="h-full rounded-full" style={{ backgroundColor: over ? "#EF4444" : color }} />
-      </View>
-    </View>
+    <View><View className="flex justify-between text-xs mb-1"><Text className="text-gray-400">{label}</Text><Text className={over ? "text-red-400" : "text-white"}>{Math.round(value)}<Text className="text-gray-500">/{goal}g</Text></Text></View><View className="h-1.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><View className="h-full rounded-full" style={{ backgroundColor: over ? "#EF4444" : color }} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} /></View></View>
   );
 }
 
@@ -231,108 +223,44 @@ function AddFoodSheet({ meal, onAdd, onClose }: { meal: Meal; onAdd: (entry: Omi
   };
 
   return (
-    <Pressable className="fixed inset-0 z-50 flex items-end"
-      style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-      onPress={onClose}>
-      <Pressable className="w-full max-w-md mx-auto rounded-t-3xl flex flex-col"
-        style={{ backgroundColor: "#12122a", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", maxHeight: "90vh" }}
-        onPress={e => e.stopPropagation()}>
-        <View className="p-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-          <View className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-3" />
-          <View className="flex items-center justify-between mb-3">
-            <Text className="text-white font-bold">Ajouter un aliment</Text>
-            <Pressable onPress={onClose}><X size={18} className="text-gray-400" /></Pressable>
-          </View>
-          <View className="flex items-center gap-2 px-3 py-2 rounded-xl mb-3" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>
-            <Search size={14} className="text-gray-500" />
-            <TextInput className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
-              placeholder="Rechercher un aliment..." value={search} onChangeText={text => setSearch(text)} />
-          </View>
-          <View className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-            {FOOD_CATS.map(c => (
-              <Pressable key={c} className="flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold"
-                style={cat === c ? { backgroundColor: "#E17055" } : { backgroundColor: "rgba(255,255,255,0.07)" }}
-                onPress={() => setCat(c)}>{c}</Pressable>
-            ))}
-          </View>
-        </View>
+    <View className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={onClose}>
+      <View className="w-full max-w-md mx-auto rounded-t-3xl flex flex-col" style={{ backgroundColor: "#12122a", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", maxHeight: "90vh" }} initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} onPress={e => e.stopPropagation()}>
+        <View className="p-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}><View className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-3" /><View className="flex items-center justify-between mb-3"><Text className="text-white font-bold">Ajouter un aliment</Text><Pressable onPress={onClose}><X size={18} className="text-gray-400" /></Pressable></View><View className="flex items-center gap-2 px-3 py-2 rounded-xl mb-3" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><Search size={14} className="text-gray-500" /><TextInput className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none" placeholder="Rechercher un aliment..." value={search} onChangeText={value => setSearch(value)} /></View><View className="flex gap-1.5 overflow-x-auto">{FOOD_CATS.map(c => (
+              <Pressable key={c} className="flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold" style={cat === c ? { backgroundColor: "#E17055" } : { backgroundColor: "rgba(255,255,255,0.07)" }} onPress={() => setCat(c)}>{c}</Pressable>
+            ))}</View></View>
 
-        <View className="overflow-y-auto flex-1 p-3">
-          {selected ? (
-            <View>
-              <View className="flex items-center gap-2 mb-4 p-3 rounded-xl" style={{ backgroundColor: "rgba(225,112,85,0.1)", borderWidth: 1, borderColor: "rgba(225,112,85,0.2)", borderStyle: "solid" }}>
-                <Text className="text-2xl">{selected.emoji}</Text>
-                <View className="flex-1">
-                  <Text className="text-white font-semibold text-sm">{selected.name}</Text>
-                  <Text className="text-gray-400 text-xs">{selected.cal100g} kcal/100g</Text>
-                </View>
-                <Pressable onPress={() => setSelected(null)}><X size={14} className="text-gray-400" /></Pressable>
-              </View>
-              <View className="mb-4">
-                <Text className="text-gray-400 text-xs mb-2">Quantité (grammes)</Text>
-                <View className="flex items-center gap-3">
-                  <Pressable className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
-                    style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-                    onPress={() => setGrams(g => Math.max(10, g - 25))}><Text>−</Text></Pressable>
-                  <TextInput className="flex-1 text-center bg-transparent text-white text-2xl font-bold outline-none"
-                    value={grams} onChangeText={text => setGrams(Math.max(1, parseInt(text) || 1))}  keyboardType="numeric"/>
-                  <Pressable className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg"
-                    style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-                    onPress={() => setGrams(g => g + 25)}><Text>+</Text></Pressable>
-                </View>
-                <View className="flex gap-2 mt-2 justify-center">
-                  {[50, 100, 150, 200].map(g => (
-                    <Pressable key={g} className="px-2.5 py-1 rounded-full text-xs"
-                      style={grams === g ? { backgroundColor: "#E17055" } : { backgroundColor: "rgba(255,255,255,0.07)" }}
-                      onPress={() => setGrams(g)}>{g}<Text>g</Text></Pressable>
-                  ))}
-                </View>
-              </View>
+        <View className="overflow-y-auto flex-1 p-3">{selected ? (
+            <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <View className="flex items-center gap-2 mb-4 p-3 rounded-xl" style={{ backgroundColor: "rgba(225,112,85,0.1)", borderWidth: 1, borderColor: "rgba(225,112,85,0.2)", borderStyle: "solid" }}><Text className="text-2xl">{selected.emoji}</Text><View className="flex-1"><Text className="text-white font-semibold text-sm">{selected.name}</Text><Text className="text-gray-400 text-xs">{selected.cal100g}kcal/100g</Text></View><Pressable onPress={() => setSelected(null)}><X size={14} className="text-gray-400" /></Pressable></View>
+              <View className="mb-4"><Text className="text-gray-400 text-xs mb-2">Quantité (grammes)</Text><View className="flex items-center gap-3"><Pressable className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }} onPress={() => setGrams(g => Math.max(10, g - 25))}>−</Pressable><TextInput className="flex-1 text-center bg-transparent text-white text-2xl font-bold outline-none" value={grams} onChangeText={value => setGrams(Math.max(1, parseInt(value) || 1))} keyboardType="numeric" /><Pressable className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }} onPress={() => setGrams(g => g + 25)}>+</Pressable></View><View className="flex gap-2 mt-2 justify-center">{[50, 100, 150, 200].map(g => (
+                    <Pressable key={g} className="px-2.5 py-1 rounded-full text-xs" style={grams === g ? { backgroundColor: "#E17055" } : { backgroundColor: "rgba(255,255,255,0.07)" }} onPress={() => setGrams(g)}>{g}<Text>g</Text></Pressable>
+                  ))}</View></View>
               {preview && (
-                <View className="gap-2 mb-5">
-                  {[
+                <View className="gap-2 mb-5">{[
                     { label: "Calories", value: `${preview.cal}`, unit: "kcal", color: "#E17055" },
                     { label: "Protéines", value: `${preview.protein}`, unit: "g", color: "#6C5CE7" },
                     { label: "Glucides", value: `${preview.carbs}`, unit: "g", color: "#FDCB6E" },
                     { label: "Lipides", value: `${preview.fat}`, unit: "g", color: "#00B894" },
                   ].map(s => (
-                    <View key={s.label} className="rounded-xl p-2 text-center" style={{ backgroundColor: `${s.color}15` }}>
-                      <Text className="font-bold text-sm" style={{ color: s.color }}>{s.value}</Text>
-                      <Text className="text-gray-500 text-[9px]">{s.unit}</Text>
-                      <Text className="text-gray-500 text-[9px]">{s.label}</Text>
-                    </View>
-                  ))}
-                </View>
+                    <View key={s.label} className="rounded-xl p-2 text-center" style={{ backgroundColor: `${s.color}15` }}><Text className="font-bold text-sm" style={{ color: s.color }}>{s.value}</Text><Text className="text-gray-500 text-[9px]">{s.unit}</Text><Text className="text-gray-500 text-[9px]">{s.label}</Text></View>
+                  ))}</View>
               )}
-              <Pressable className="w-full py-3 rounded-xl font-bold text-white"
-                style={{  }}
-                onPress={handleAdd}>
-                <Text>Ajouter au</Text>{MEAL_LABELS[meal]}
+              <Pressable className="w-full py-3 rounded-xl font-bold text-white" style={{  }} whileTap={{ scale: 0.97 }} onPress={handleAdd}>
+                Ajouter au {MEAL_LABELS[meal]}
               </Pressable>
             </View>
           ) : (
-            <View className="space-y-1.5">
-              {filtered.map(f => (
-                <Pressable key={f.id} className="w-full flex items-center gap-3 p-3 rounded-xl text-left"
-                  style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                  onPress={() => setSelected(f)}>
+            <View className="space-y-1.5">{filtered.map(f => (
+                <Pressable key={f.id} className="w-full flex items-center gap-3 p-3 rounded-xl text-left" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onPress={() => setSelected(f)}>
                   <Text className="text-xl w-8 text-center">{f.emoji}</Text>
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-white text-sm font-medium truncate">{f.name}</Text>
-                    <Text className="text-gray-500 text-xs">{f.category}</Text>
-                  </View>
-                  <View className="text-right">
-                    <Text className="text-xs font-semibold" style={{ color: "#E17055" }}>{f.cal100g}</Text>
-                    <Text className="text-gray-600 text-[10px]">kcal/100g</Text>
-                  </View>
+                  <View className="flex-1 min-w-0"><Text className="text-white text-sm font-medium truncate">{f.name}</Text><Text className="text-gray-500 text-xs">{f.category}</Text></View>
+                  <View className="text-right"><Text className="text-xs font-semibold" style={{ color: "#E17055" }}>{f.cal100g}</Text><Text className="text-gray-600 text-[10px]">kcal/100g</Text></View>
                   <ChevronRight size={14} className="text-gray-600" />
                 </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
-      </Pressable>
-    </Pressable>
+              ))}</View>
+          )}</View>
+      </View>
+    </View>
   );
 }
 
@@ -341,85 +269,36 @@ function RecipeCard({ r }: { r: Recipe }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Pressable className="rounded-2xl overflow-hidden"
-        style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={() => setOpen(true)}>
-        <View className="h-24 flex items-center justify-center text-5xl"
-          style={{  }}>
-          {r.emoji}
-        </View>
-        <View className="p-3">
-          <Text className="text-white font-bold text-sm">{r.name}</Text>
-          <View className="flex gap-2 mt-1.5 flex-wrap">
-            {r.tags.map(t => <Text key={t} className="px-1.5 py-0.5 rounded text-[10px]" style={{ backgroundColor: "rgba(225,112,85,0.15)", color: "#E17055" }}>#{t}</Text>)}
-          </View>
-          <View className="flex justify-between mt-2 text-xs">
-            <Text style={{ color: "#E17055" }}>{r.cal} kcal</Text>
-            <Text className="text-gray-500">{r.prepMin} min · {r.servings} pers.</Text>
-          </View>
-          <View className="flex gap-2 mt-2">
-            {[{ l: "P", v: r.protein, c: "#6C5CE7" }, { l: "G", v: r.carbs, c: "#FDCB6E" }, { l: "L", v: r.fat, c: "#00B894" }].map(m => (
+      <View className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} whileHover={{ scale: 1.01 }} onPress={() => setOpen(true)}>
+        <View className="h-24 flex items-center justify-center text-5xl" style={{  }}>{r.emoji}</View>
+        <View className="p-3"><Text className="text-white font-bold text-sm">{r.name}</Text><View className="flex gap-2 mt-1.5 flex-wrap">{r.tags.map(t => <Text key={t} className="px-1.5 py-0.5 rounded text-[10px]" style={{ backgroundColor: "rgba(225,112,85,0.15)", color: "#E17055" }}>#{t}</Text>)}</View><View className="flex justify-between mt-2 text-xs"><Text style={{ color: "#E17055" }}>{r.cal}kcal</Text><Text className="text-gray-500">{r.prepMin}min · {r.servings}pers.</Text></View><View className="flex gap-2 mt-2">{[{ l: "P", v: r.protein, c: "#6C5CE7" }, { l: "G", v: r.carbs, c: "#FDCB6E" }, { l: "L", v: r.fat, c: "#00B894" }].map(m => (
               <Text key={m.l} className="text-[10px] font-semibold" style={{ color: m.c }}>{m.l}: {m.v}g</Text>
-            ))}
-          </View>
-        </View>
-      </Pressable>
+            ))}</View></View>
+      </View>
 
-      <>
+<View>
         {open && (
-          <Pressable className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={() => setOpen(false)}>
-            <Pressable className="w-full max-w-md mx-auto rounded-t-3xl overflow-y-auto"
-              style={{ backgroundColor: "#12122a", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", maxHeight: "85vh" }}
-              onPress={e => e.stopPropagation()}>
-              <View className="p-5">
-                <View className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-4" />
-                <View className="text-5xl text-center mb-3">{r.emoji}</View>
-                <Text className="text-white text-xl font-bold text-center mb-1">{r.name}</Text>
-                <Text className="text-gray-500 text-sm text-center mb-4">{r.prepMin} min · {r.servings} personne{r.servings > 1 ? "s" : ""}</Text>
-                <View className="gap-2 mb-5">
-                  {[
+          <View className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setOpen(false)}>
+            <View className="w-full max-w-md mx-auto rounded-t-3xl overflow-y-auto" style={{ backgroundColor: "#12122a", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", maxHeight: "85vh" }} initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} onPress={e => e.stopPropagation()}>
+              <View className="p-5"><View className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-4" /><View className="text-5xl text-center mb-3">{r.emoji}</View><Text className="text-white text-xl font-bold text-center mb-1">{r.name}</Text><Text className="text-gray-500 text-sm text-center mb-4">{r.prepMin}min · {r.servings}personne{r.servings > 1 ? "s" : ""}</Text><View className="gap-2 mb-5">{[
                     { label: "Calories", value: r.cal, unit: "kcal", color: "#E17055" },
                     { label: "Protéines", value: r.protein, unit: "g", color: "#6C5CE7" },
                     { label: "Glucides", value: r.carbs, unit: "g", color: "#FDCB6E" },
                     { label: "Lipides", value: r.fat, unit: "g", color: "#00B894" },
                   ].map(s => (
-                    <View key={s.label} className="rounded-xl p-2 text-center" style={{ backgroundColor: `${s.color}15` }}>
-                      <Text className="font-bold text-sm" style={{ color: s.color }}>{s.value}</Text>
-                      <Text className="text-gray-500 text-[9px]">{s.unit}</Text>
-                      <Text className="text-gray-500 text-[9px]">{s.label}</Text>
-                    </View>
-                  ))}
-                </View>
-                <Text className="text-white font-bold text-sm mb-2 flex items-center gap-2">
-                  <Apple size={14} style={{ color: "#E17055" }} />Ingrédients
-                </Text>
-                <View className="space-y-1.5 mb-4">
-                  {r.ingredients.map((ing, i) => (
-                    <View key={i} className="flex items-center gap-2">
-                      <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#E17055" }} />
-                      <Text className="text-gray-300 text-sm">{ing}</Text>
-                    </View>
-                  ))}
-                </View>
-                <Text className="text-white font-bold text-sm mb-2 flex items-center gap-2">
-                  <BookOpen size={14} style={{ color: "#FDCB6E" }} />Préparation
-                </Text>
-                <View className="space-y-2 mb-5">
-                  {r.steps.map((step, i) => (
-                    <View key={i} className="flex gap-3">
-                      <Text className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold" style={{ backgroundColor: "rgba(225,112,85,0.2)", color: "#E17055" }}>{i + 1}</Text>
-                      <Text className="text-gray-300 text-sm leading-relaxed">{step}</Text>
-                    </View>
-                  ))}
-                </View>
-                <Pressable className="w-full py-3 rounded-xl font-bold text-white"
-                  style={{  }}
-                  onPress={() => { UIService.openToast("Recette sauvegardée !", "success"); setOpen(false); }}>
-                  <Text>Sauvegarder la recette</Text></Pressable>
-              </View>
-            </Pressable>
-          </Pressable>
+                    <View key={s.label} className="rounded-xl p-2 text-center" style={{ backgroundColor: `${s.color}15` }}><Text className="font-bold text-sm" style={{ color: s.color }}>{s.value}</Text><Text className="text-gray-500 text-[9px]">{s.unit}</Text><Text className="text-gray-500 text-[9px]">{s.label}</Text></View>
+                  ))}</View><Text className="text-white font-bold text-sm mb-2 flex items-center gap-2"><Apple size={14} style={{  }} />Ingrédients
+                </Text><View className="space-y-1.5 mb-4">{r.ingredients.map((ing, i) => (
+                    <View key={i} className="flex items-center gap-2"><View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#E17055" }} /><Text className="text-gray-300 text-sm">{ing}</Text></View>
+                  ))}</View><Text className="text-white font-bold text-sm mb-2 flex items-center gap-2"><BookOpen size={14} style={{  }} />Préparation
+                </Text><View className="space-y-2 mb-5">{r.steps.map((step, i) => (
+                    <View key={i} className="flex gap-3"><Text className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold" style={{ backgroundColor: "rgba(225,112,85,0.2)", color: "#E17055" }}>{i + 1}</Text><Text className="text-gray-300 text-sm leading-relaxed">{step}</Text></View>
+                  ))}</View><Pressable className="w-full py-3 rounded-xl font-bold text-white" style={{  }} whileTap={{ scale: 0.97 }} onPress={() => { toast.success("Recette sauvegardée !"); setOpen(false); }}>Sauvegarder la recette
+                </Pressable></View>
+            </View>
+          </View>
         )}
-      </>
+      </View>
     </>
   );
 }
@@ -468,7 +347,7 @@ export default function NutritionPage({ onBack }: { onBack: () => void }) {
     const updated = [newEntry, ...journal];
     setJournal(updated);
     saveJournal(updated);
-    UIService.openToast(`${entry.foodName} ajouté (${entry.cal} kcal)`, "success");
+    toast.success(`${entry.foodName} ajouté (${entry.cal} kcal)`);
     // Sync to Convex
     const dayEntries = updated.filter(e => e.date === selectedDate);
     const totalCal = dayEntries.reduce((s, e) => s + e.cal, 0);
@@ -489,7 +368,7 @@ export default function NutritionPage({ onBack }: { onBack: () => void }) {
     const updated = journal.filter(e => e.id !== id);
     setJournal(updated);
     saveJournal(updated);
-    UIService.openToast("Aliment supprimé", "info");
+    toast("Aliment supprimé");
   };
 
   const handleWater = (delta: number) => {
@@ -502,7 +381,7 @@ export default function NutritionPage({ onBack }: { onBack: () => void }) {
     setGoals(draftGoals);
     saveGoals(draftGoals);
     setEditGoals(false);
-    UIService.openToast("Objectifs enregistrés !", "success");
+    toast.success("Objectifs enregistrés !");
   };
 
   const filteredRecipes = RECIPES.filter(r =>
@@ -522,120 +401,32 @@ export default function NutritionPage({ onBack }: { onBack: () => void }) {
   const maxWeekCal = Math.max(...weekDays.map(d => d.cal), goals.calories);
 
   return (
-    <View className="min-h-screen text-white" style={{  }}>
-      {/* Add food sheet */}
-      <>
-        {addMeal && <AddFoodSheet meal={addMeal} onAdd={addEntry} onClose={() => setAddMeal(null)} />}
-      </>
-
-      {/* Goals edit sheet */}
-      <>
-        {editGoals && (
-          <Pressable className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={() => setEditGoals(false)}>
-            <Pressable className="w-full max-w-md mx-auto rounded-t-3xl p-5 pb-10"
-              style={{ backgroundColor: "#12122a", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-              onPress={e => e.stopPropagation()}>
+    <View className="min-h-screen text-white" style={{  }}>{}<View>{addMeal && <AddFoodSheet meal={addMeal} onAdd={addEntry} onClose={() => setAddMeal(null)} />}</View>{}<View>{editGoals && (
+          <View className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setEditGoals(false)}>
+            <View className="w-full max-w-md mx-auto rounded-t-3xl p-5 pb-10" style={{ backgroundColor: "#12122a", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} onPress={e => e.stopPropagation()}>
               <View className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-4" />
               <Text className="text-white font-bold text-lg mb-4">Mes objectifs nutritionnels</Text>
               {(["calories", "protein", "carbs", "fat", "water"] as (keyof Goals)[]).map(k => (
-                <View key={k} className="mb-4">
-                  <Text className="text-gray-400 text-xs block mb-1 capitalize">
-                    {k === "calories" ? "Calories (kcal/jour)" : k === "protein" ? "Protéines (g/jour)" : k === "carbs" ? "Glucides (g/jour)" : k === "fat" ? "Lipides (g/jour)" : "Eau (verres/jour)"}
-                  </Text>
-                  <View className="flex items-center gap-3">
-                    <Pressable className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-                      onPress={() => setDraftGoals(g => ({ ...g, [k]: Math.max(0, g[k] - (k === "calories" ? 100 : k === "water" ? 1 : 5)) }))}><Text>−</Text></Pressable>
-                    <TextInput className="flex-1 text-center bg-transparent text-white text-xl font-bold outline-none py-2 rounded-xl"
-                      style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
-                      value={draftGoals[k]} onChangeText={text => setDraftGoals(g => ({ ...g, [k]: parseInt(text) || 0 }))}  keyboardType="numeric"/>
-                    <Pressable className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-                      onPress={() => setDraftGoals(g => ({ ...g, [k]: g[k] + (k === "calories" ? 100 : k === "water" ? 1 : 5) }))}><Text>+</Text></Pressable>
-                  </View>
-                </View>
+                <View key={k} className="mb-4"><Text className="text-gray-400 text-xs block mb-1 capitalize">{k === "calories" ? "Calories (kcal/jour)" : k === "protein" ? "Protéines (g/jour)" : k === "carbs" ? "Glucides (g/jour)" : k === "fat" ? "Lipides (g/jour)" : "Eau (verres/jour)"}</Text><View className="flex items-center gap-3"><Pressable className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }} onPress={() => setDraftGoals(g => ({ ...g, [k]: Math.max(0, g[k] - (k === "calories" ? 100 : k === "water" ? 1 : 5)) }))}>−</Pressable><TextInput className="flex-1 text-center bg-transparent text-white text-xl font-bold outline-none py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }} value={draftGoals[k]} onChangeText={value => setDraftGoals(g => ({ ...g, [k]: parseInt(value) || 0 }))} keyboardType="numeric" /><Pressable className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }} onPress={() => setDraftGoals(g => ({ ...g, [k]: g[k] + (k === "calories" ? 100 : k === "water" ? 1 : 5) }))}>+</Pressable></View></View>
               ))}
-              <Pressable className="w-full py-3 rounded-xl font-bold text-white mt-2"
-                style={{  }}
-                onPress={saveGoalsDraft}><Text>Enregistrer</Text></Pressable>
-            </Pressable>
-          </Pressable>
-        )}
-      </>
-
-      {/* Header */}
-      <View className="sticky top-0 z-30 px-4 pt-12 pb-3" style={{ backgroundColor: "rgba(10,10,26,0.95)" }}>
-        <View className="flex items-center gap-3 mb-4">
-          <Pressable className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} onPress={onBack}>
-            <ArrowLeft size={20} />
-          </Pressable>
-          <View>
-            <Text className="text-xl font-bold">Nutrition & Repas</Text>
-            <Text className="text-xs text-gray-400">{new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</Text>
+              <Pressable className="w-full py-3 rounded-xl font-bold text-white mt-2" style={{  }} whileTap={{ scale: 0.97 }} onPress={saveGoalsDraft}>Enregistrer</Pressable>
+            </View>
           </View>
-          <Pressable className="ml-auto p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} onPress={() => { setDraftGoals(goals); setEditGoals(true); }}>
-            <Target size={18} />
-          </Pressable>
-        </View>
-        <View className="flex gap-1 p-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
-          {(["journal", "aliments", "recettes", "objectifs"] as Tab[]).map(t => (
-            <Pressable key={t} className="flex-1 py-2 rounded-lg text-xs font-semibold"
-              style={tab === t ? {  } : {  }} onPress={() => setTab(t)}>
+        )}</View>{}<View className="sticky top-0 z-30 px-4 pt-12 pb-3" style={{ backgroundColor: "rgba(10,10,26,0.95)" }}><View className="flex items-center gap-3 mb-4"><Pressable className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }} onPress={onBack}><ArrowLeft size={20} /></Pressable><View><Text className="text-xl font-bold">Nutrition & Repas</Text><Text className="text-xs text-gray-400">{new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</Text></View><Pressable className="ml-auto p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }} onPress={() => { setDraftGoals(goals); setEditGoals(true); }}><Target size={18} /></Pressable></View><View className="flex gap-1 p-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>{(["journal", "aliments", "recettes", "objectifs"] as Tab[]).map(t => (
+            <Pressable key={t} className="flex-1 py-2 rounded-lg text-xs font-semibold" style={tab === t ? {  } : {  }} whileTap={{ scale: 0.95 }} onPress={() => setTab(t)}>
               {t === "journal" ? "Journal" : t === "aliments" ? "Aliments" : t === "recettes" ? "Recettes" : "Objectifs"}
             </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View className="px-4 pb-24">
-        {/* ── JOURNAL ───────────────────────────────────────────────────── */}
-        {tab === "journal" && (
-          <View>
+          ))}</View></View><View className="px-4 pb-24">{}{tab === "journal" && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {/* Calorie ring */}
-            <View className="my-4 rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-              <View className="flex items-center gap-4">
-                {/* Ring */}
-                <View className="relative w-20 h-20 flex-shrink-0">
-                  <svg className="w-20 h-20 -rotate-90" viewBox="0 0 36 36">
-                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-                    <circle cx="18" cy="18" r="15.9" fill="none" stroke={totals.cal > goals.calories ? "#EF4444" : "#E17055"}
-                      strokeWidth="3" strokeDasharray={`${calPct} ${100 - calPct}`} strokeLinecap="round" />
-                  </svg>
-                  <View className="absolute inset-0 flex flex-col items-center justify-center">
-                    <Text className="text-white font-black text-base leading-none">{totals.cal}</Text>
-                    <Text className="text-gray-500 text-[9px]">kcal</Text>
-                  </View>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-white font-bold">{remaining} kcal restantes</Text>
-                  <Text className="text-gray-400 text-xs mb-2">Objectif : {goals.calories} kcal</Text>
-                  <View className="space-y-1.5">
-                    <MacroBar label="Protéines" value={totals.protein} goal={goals.protein} color="#6C5CE7" />
-                    <MacroBar label="Glucides"  value={totals.carbs}   goal={goals.carbs}   color="#FDCB6E" />
-                    <MacroBar label="Lipides"   value={totals.fat}     goal={goals.fat}     color="#00B894" />
-                  </View>
-                </View>
-              </View>
-            </View>
+            <View className="my-4 rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-4">{}<View className="relative w-20 h-20 flex-shrink-0"><svg className="w-20 h-20 -rotate-90" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" /><circle cx="18" cy="18" r="15.9" fill="none" stroke={totals.cal > goals.calories ? "#EF4444" : "#E17055"} strokeWidth="3" strokeDasharray={`${calPct} ${100 - calPct}`} strokeLinecap="round" /></svg><View className="absolute inset-0 flex flex-col items-center justify-center"><Text className="text-white font-black text-base leading-none">{totals.cal}</Text><Text className="text-gray-500 text-[9px]">kcal</Text></View></View><View className="flex-1"><Text className="text-white font-bold">{remaining}kcal restantes</Text><Text className="text-gray-400 text-xs mb-2">Objectif : {goals.calories}kcal</Text><View className="space-y-1.5"><MacroBar label="Protéines" value={totals.protein} goal={goals.protein} color="#6C5CE7" /><MacroBar label="Glucides" value={totals.carbs} goal={goals.carbs} color="#FDCB6E" /><MacroBar label="Lipides" value={totals.fat} goal={goals.fat} color="#00B894" /></View></View></View></View>
 
             {/* Water tracker */}
-            <View className="rounded-2xl p-4 mb-4" style={{ backgroundColor: "rgba(0,180,216,0.08)", borderWidth: 1, borderColor: "rgba(0,180,216,0.2)", borderStyle: "solid" }}>
-              <View className="flex items-center justify-between mb-2">
-                <View className="flex items-center gap-2">
-                  <Droplets size={16} style={{ color: "#00B4D8" }} />
-                  <Text className="text-white text-sm font-semibold">Hydratation</Text>
-                </View>
-                <Text className="text-xs" style={{ color: "#00B4D8" }}>{water}/{goals.water} verres</Text>
-              </View>
-              <View className="flex gap-1.5 flex-wrap">
-                {Array.from({ length: goals.water }).map((_, i) => (
-                  <Pressable key={i}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-base"
-                    style={i < water ? { backgroundColor: "rgba(0,180,216,0.3)" } : { backgroundColor: "rgba(255,255,255,0.06)" }}
-                    onPress={() => handleWater(i < water ? -1 : 1)}>
+            <View className="rounded-2xl p-4 mb-4" style={{ backgroundColor: "rgba(0,180,216,0.08)", borderWidth: 1, borderColor: "rgba(0,180,216,0.2)", borderStyle: "solid" }}><View className="flex items-center justify-between mb-2"><View className="flex items-center gap-2"><Droplets size={16} style={{  }} /><Text className="text-white text-sm font-semibold">Hydratation</Text></View><Text className="text-xs" style={{ color: "#00B4D8" }}>{water}/{goals.water}verres</Text></View><View className="flex gap-1.5 flex-wrap">{Array.from({ length: goals.water }).map((_, i) => (
+                  <Pressable key={i} whileTap={{ scale: 0.85 }} className="w-7 h-7 rounded-lg flex items-center justify-center text-base" style={i < water ? { backgroundColor: "rgba(0,180,216,0.3)" } : { backgroundColor: "rgba(255,255,255,0.06)" }} onPress={() => handleWater(i < water ? -1 : 1)}>
                     {i < water ? "💧" : "○"}
                   </Pressable>
-                ))}
-              </View>
-            </View>
+                ))}</View></View>
 
             {/* Meals */}
             {MEALS.map(meal => {
@@ -643,154 +434,68 @@ export default function NutritionPage({ onBack }: { onBack: () => void }) {
               const mt = mealTotals[meal];
               const isOpen = expandedMeal === meal;
               return (
-                <View key={meal} className="rounded-2xl overflow-hidden mb-3"
-                  style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                  <Pressable className="w-full flex items-center gap-3 p-3" onPress={() => setExpandedMeal(isOpen ? null : meal)}>
-                    <Text className="text-xl">{MEAL_EMOJIS[meal]}</Text>
-                    <View className="flex-1 text-left">
-                      <Text className="text-white text-sm font-semibold">{MEAL_LABELS[meal]}</Text>
-                      {mt.cal > 0 && <Text className="text-gray-500 text-xs">{Math.round(mt.cal)} kcal · P:{Math.round(mt.protein)}g G:{Math.round(mt.carbs)}g L:{Math.round(mt.fat)}g</Text>}
-                    </View>
-                    <Text className="text-xs font-semibold" style={{ color: "#E17055" }}>{Math.round(mt.cal)} kcal</Text>
-                    {isOpen ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
-                  </Pressable>
-                  <>
+                <View key={meal} className="rounded-2xl overflow-hidden mb-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+                  <Pressable className="w-full flex items-center gap-3 p-3" onPress={() => setExpandedMeal(isOpen ? null : meal)}><Text className="text-xl">{MEAL_EMOJIS[meal]}</Text><View className="flex-1 text-left"><Text className="text-white text-sm font-semibold">{MEAL_LABELS[meal]}</Text>{mt.cal > 0 && <Text className="text-gray-500 text-xs">{Math.round(mt.cal)}kcal · P:{Math.round(mt.protein)}g G:{Math.round(mt.carbs)}g L:{Math.round(mt.fat)}g</Text>}</View><Text className="text-xs font-semibold" style={{ color: "#E17055" }}>{Math.round(mt.cal)}kcal</Text>{isOpen ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}</Pressable>
+<View>
                     {isOpen && (
-                      <View
-                        className="border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-                        <View className="p-3 pt-2 space-y-1.5">
-                          {entries.length === 0 ? (
+                      <View initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                        <View className="p-3 pt-2 space-y-1.5">{entries.length === 0 ? (
                             <Text className="text-gray-600 text-xs text-center py-2">Aucun aliment ajouté</Text>
                           ) : entries.map(e => (
-                            <View key={e.id} className="flex items-center gap-2">
-                              <Text className="text-sm">{FOOD_MAP[e.foodId]?.emoji ?? "🍽️"}</Text>
-                              <View className="flex-1 min-w-0">
-                                <Text className="text-white text-xs font-medium truncate">{e.foodName}</Text>
-                                <Text className="text-gray-600 text-[10px]">{e.grams}g</Text>
-                              </View>
-                              <Text className="text-xs" style={{ color: "#E17055" }}>{e.cal} kcal</Text>
-                              <Pressable onPress={() => removeEntry(e.id)}>
-                                <Trash2 size={12} className="text-gray-600" />
-                              </Pressable>
-                            </View>
-                          ))}
-                          <Pressable className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold mt-1"
-                            style={{ backgroundColor: "rgba(225,112,85,0.1)", borderWidth: 1, borderColor: "rgba(225,112,85,0.3)", borderStyle: "dashed" }} onPress={() => setAddMeal(meal)}>
-                            <Plus size={13} /><Text>Ajouter un aliment</Text></Pressable>
-                        </View>
+                            <View key={e.id} className="flex items-center gap-2"><Text className="text-sm">{FOOD_MAP[e.foodId]?.emoji ?? "🍽️"}</Text><View className="flex-1 min-w-0"><Text className="text-white text-xs font-medium truncate">{e.foodName}</Text><Text className="text-gray-600 text-[10px]">{e.grams}g</Text></View><Text className="text-xs" style={{ color: "#E17055" }}>{e.cal}kcal</Text><Pressable whileTap={{ scale: 0.85 }} onPress={() => removeEntry(e.id)}><Trash2 size={12} className="text-gray-600" /></Pressable></View>
+                          ))}<Pressable className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold mt-1" style={{ backgroundColor: "rgba(225,112,85,0.1)", borderWidth: 1, borderColor: "rgba(225,112,85,0.3)", borderStyle: "dashed" }} whileTap={{ scale: 0.97 }} onPress={() => setAddMeal(meal)}><Plus size={13} />Ajouter un aliment
+                          </Pressable></View>
                       </View>
                     )}
-                  </>
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* ── ALIMENTS ──────────────────────────────────────────────────── */}
-        {tab === "aliments" && (
-          <View>
-            <Text className="text-gray-400 text-xs my-4">{FOODS.length} aliments · Afrique francophone & international</Text>
-            {FOOD_CATS.filter(c => c !== "Tous").map(cat => {
-              const foods = FOODS.filter(f => f.category === cat);
-              return (
-                <View key={cat} className="mb-5">
-                  <Text className="text-white font-bold text-sm mb-2">{cat}</Text>
-                  <View className="space-y-1.5">
-                    {foods.map(f => (
-                      <View key={f.id} className="flex items-center gap-3 rounded-xl p-3"
-                        style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-                        <Text className="text-xl">{f.emoji}</Text>
-                        <View className="flex-1 min-w-0">
-                          <Text className="text-white text-sm font-medium truncate">{f.name}</Text>
-                          <View className="flex gap-2 mt-0.5">
-                            <Text className="text-[10px]" style={{ color: "#6C5CE7" }}>P:{f.protein}g</Text>
-                            <Text className="text-[10px]" style={{ color: "#FDCB6E" }}>G:{f.carbs}g</Text>
-                            <Text className="text-[10px]" style={{ color: "#00B894" }}>L:{f.fat}g</Text>
-                          </View>
-                        </View>
-                        <View className="text-right">
-                          <Text className="text-sm font-bold" style={{ color: "#E17055" }}>{f.cal100g}</Text>
-                          <Text className="text-gray-600 text-[10px]">kcal/100g</Text>
-                        </View>
-                        <Pressable className="p-1.5 rounded-lg" style={{ backgroundColor: "rgba(225,112,85,0.1)" }}
-                          onPress={() => { setAddMeal("déjeuner"); UIService.openToast(`Sélectionne un repas pour ajouter ${f.name}`, "info"); }}>
-                          <Plus size={14} style={{ color: "#E17055" }} />
-                        </Pressable>
-                      </View>
-                    ))}
                   </View>
                 </View>
               );
             })}
           </View>
-        )}
-
-        {/* ── RECETTES ──────────────────────────────────────────────────── */}
-        {tab === "recettes" && (
-          <View>
-            <View className="flex items-center gap-2 my-4 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>
-              <Search size={14} className="text-gray-500" />
-              <TextInput className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
-                placeholder="Rechercher une recette..." value={recipeSearch} onChangeText={text => setRecipeSearch(text)} />
-              {recipeSearch && <Pressable onPress={() => setRecipeSearch("")}><X size={13} className="text-gray-500" /></Pressable>}
-            </View>
-            <View className="gap-3">
-              {filteredRecipes.map((r, i) => (
-                <View key={r.id}>
+        )}{}{tab === "aliments" && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <Text className="text-gray-400 text-xs my-4">{FOODS.length}aliments · Afrique francophone & international</Text>
+            {FOOD_CATS.filter(c => c !== "Tous").map(cat => {
+              const foods = FOODS.filter(f => f.category === cat);
+              return (
+                <View key={cat} className="mb-5"><Text className="text-white font-bold text-sm mb-2">{cat}</Text><View className="space-y-1.5">{foods.map(f => (
+                      <View key={f.id} className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><Text className="text-xl">{f.emoji}</Text><View className="flex-1 min-w-0"><Text className="text-white text-sm font-medium truncate">{f.name}</Text><View className="flex gap-2 mt-0.5"><Text className="text-[10px]" style={{ color: "#6C5CE7" }}>P:{f.protein}g</Text><Text className="text-[10px]" style={{ color: "#FDCB6E" }}>G:{f.carbs}g</Text><Text className="text-[10px]" style={{ color: "#00B894" }}>L:{f.fat}g</Text></View></View><View className="text-right"><Text className="text-sm font-bold" style={{ color: "#E17055" }}>{f.cal100g}</Text><Text className="text-gray-600 text-[10px]">kcal/100g</Text></View><Pressable className="p-1.5 rounded-lg" style={{ backgroundColor: "rgba(225,112,85,0.1)" }} whileTap={{ scale: 0.9 }} onPress={() => { setAddMeal("déjeuner"); toast(`Sélectionne un repas pour ajouter ${f.name}`); }}><Plus size={14} style={{  }} /></Pressable></View>
+                    ))}</View></View>
+              );
+            })}
+          </View>
+        )}{}{tab === "recettes" && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <View className="flex items-center gap-2 my-4 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><Search size={14} className="text-gray-500" /><TextInput className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none" placeholder="Rechercher une recette..." value={recipeSearch} onChangeText={value => setRecipeSearch(value)} />{recipeSearch && <Pressable onPress={() => setRecipeSearch("")}><X size={13} className="text-gray-500" /></Pressable>}</View>
+            <View className="gap-3">{filteredRecipes.map((r, i) => (
+                <View key={r.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
                   <RecipeCard r={r} />
                 </View>
-              ))}
-            </View>
+              ))}</View>
           </View>
-        )}
-
-        {/* ── OBJECTIFS ─────────────────────────────────────────────────── */}
-        {tab === "objectifs" && (
-          <View>
+        )}{}{tab === "objectifs" && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {/* Current goals */}
-            <View className="mt-4 rounded-2xl p-4 mb-5" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-              <View className="flex items-center justify-between mb-3">
-                <Text className="text-white font-bold">Mes objectifs du jour</Text>
-                <Pressable className="px-3 py-1.5 rounded-xl text-xs font-semibold"
-                  style={{ backgroundColor: "rgba(225,112,85,0.15)" }}
-                  onPress={() => { setDraftGoals(goals); setEditGoals(true); }}>
-                  <Text>Modifier</Text></Pressable>
-              </View>
-              <View className="space-y-3">
-                <MacroBar label={`Calories (${totals.cal}/${goals.calories} kcal)`} value={totals.cal} goal={goals.calories} color="#E17055" />
-                <MacroBar label={`Protéines (${Math.round(totals.protein)}/${goals.protein}g)`} value={totals.protein} goal={goals.protein} color="#6C5CE7" />
-                <MacroBar label={`Glucides (${Math.round(totals.carbs)}/${goals.carbs}g)`} value={totals.carbs} goal={goals.carbs} color="#FDCB6E" />
-                <MacroBar label={`Lipides (${Math.round(totals.fat)}/${goals.fat}g)`} value={totals.fat} goal={goals.fat} color="#00B894" />
-                <MacroBar label={`Eau (${water}/${goals.water} verres)`} value={water} goal={goals.water} color="#00B4D8" />
-              </View>
-            </View>
+            <View className="mt-4 rounded-2xl p-4 mb-5" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center justify-between mb-3"><Text className="text-white font-bold">Mes objectifs du jour</Text><Pressable className="px-3 py-1.5 rounded-xl text-xs font-semibold" style={{ backgroundColor: "rgba(225,112,85,0.15)" }} whileTap={{ scale: 0.95 }} onPress={() => { setDraftGoals(goals); setEditGoals(true); }}>Modifier
+                </Pressable></View><View className="space-y-3"><MacroBar label={`Calories (${totals.cal}/${goals.calories} kcal)`} value={totals.cal} goal={goals.calories} color="#E17055" /><MacroBar label={`Protéines (${Math.round(totals.protein)}/${goals.protein}g)`} value={totals.protein} goal={goals.protein} color="#6C5CE7" /><MacroBar label={`Glucides (${Math.round(totals.carbs)}/${goals.carbs}g)`} value={totals.carbs} goal={goals.carbs} color="#FDCB6E" /><MacroBar label={`Lipides (${Math.round(totals.fat)}/${goals.fat}g)`} value={totals.fat} goal={goals.fat} color="#00B894" /><MacroBar label={`Eau (${water}/${goals.water} verres)`} value={water} goal={goals.water} color="#00B4D8" /></View></View>
 
             {/* Weekly chart */}
-            <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-              <TrendingUp size={14} style={{ color: "#E17055" }} />Calories sur 7 jours
+            <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2"><TrendingUp size={14} style={{  }} />Calories sur 7 jours
             </Text>
-            <View className="rounded-2xl p-4 mb-5" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-              <View className="flex items-end gap-2 h-24">
-                {weekDays.map(d => {
+            <View className="rounded-2xl p-4 mb-5" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-end gap-2 h-24">{weekDays.map(d => {
                   const pct = maxWeekCal > 0 ? (d.cal / maxWeekCal) * 100 : 0;
                   const isToday = d.key === selectedDate;
                   return (
                     <View key={d.key} className="flex-1 flex flex-col items-center gap-1">
                       <Text className="text-[9px] text-gray-600">{d.cal > 0 ? d.cal : ""}</Text>
-                      <View className="w-full rounded-t-lg" style={{ height: `${Math.max(4, pct)}%`, backgroundColor: isToday ? "#E17055" : "rgba(225,112,85,0.3)" }} />
+                      <View className="w-full rounded-t-lg transition-all" style={{ height: `${Math.max(4, pct)}%`, backgroundColor: isToday ? "#E17055" : "rgba(225,112,85,0.3)" }} />
                       <Text className="text-[10px]" style={{ color: isToday ? "#E17055" : "#666" }}>{d.label}</Text>
                     </View>
                   );
-                })}
-              </View>
-              {/* Goal line label */}
-              <Text className="text-gray-600 text-[10px] mt-2 text-center"><Text>Objectif :</Text>{goals.calories} <Text>kcal/jour</Text></Text>
-            </View>
+                })}</View>{}<Text className="text-gray-600 text-[10px] mt-2 text-center">Objectif : {goals.calories}kcal/jour</Text></View>
 
             {/* Tips */}
-            <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-              <Info size={14} style={{ color: "#FDCB6E" }} />Conseils nutritionnels
+            <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2"><Info size={14} style={{  }} />Conseils nutritionnels
             </Text>
             <View className="space-y-2">
               {[
@@ -799,16 +504,13 @@ export default function NutritionPage({ onBack }: { onBack: () => void }) {
                 { tip: "Bois un verre d'eau avant chaque repas pour réduire les portions.", color: "#00B4D8" },
                 { tip: "Limite les huiles en excès — 1 c.s. suffit pour la cuisson.", color: "#FDCB6E" },
               ].map((t, i) => (
-                <View key={i} className="flex gap-3 rounded-xl p-3"
-                  style={{ backgroundColor: `${t.color}0d`, borderStyle: "solid" }}>
-                  <Check size={14} className="flex-shrink-0 mt-0.5" style={{ color: t.color }} />
+                <View key={i} className="flex gap-3 rounded-xl p-3" style={{ backgroundColor: `${t.color}0d`, borderStyle: "solid" }} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }}>
+                  <Check size={14} className="flex-shrink-0 mt-0.5" style={{  }} />
                   <Text className="text-gray-300 text-sm">{t.tip}</Text>
                 </View>
               ))}
             </View>
           </View>
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }

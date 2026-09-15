@@ -1,17 +1,18 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Pressable, Text, Image, TextInput } from "react-native";
+import { View, Pressable, Text, TextInput, Image } from "react-native";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Authenticated } from "@/lib/convex-auth-compat";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { toast } from "sonner";
 import {
   ArrowLeft, Search, Download, Heart, Star, Bookmark,
-  LayoutTemplate, Image as ImageIcon, Palette, Clock,
+  LayoutTemplate, Palette, Clock,
   TrendingUp, Eye, Share2, Filter, Grid3X3, List,
   ChevronRight, Plus, Sparkles, Package, FolderOpen,
   BarChart2, Check, X, ExternalLink,
 } from "lucide-react-native";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type TemplateCategory = "all" | "business" | "promo" | "lifestyle" | "event" | "social";
@@ -174,110 +175,37 @@ function TemplateCard({ t, onUse }: { t: Template; onUse: (id: string) => void }
 
   return (
     <>
-      <Pressable
-        className="relative rounded-xl overflow-hidden group"
-        style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        onPress={() => setShowDetail(true)}
-      >
+      <View className="relative rounded-xl overflow-hidden group" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} whileHover={{ scale: 1.02 }} onPress={() => setShowDetail(true)}>
         {/* Thumbnail */}
-        <View
-          className="w-full relative"
-          style={{ paddingBottom: `${(t.height / t.width) * 100}%`, backgroundColor: THUMB_GRADIENTS[t.thumbnail] }}
-        >
-          <View className="absolute inset-0 flex items-center justify-center opacity-0"
-            style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
-            <View className="flex gap-2">
-              <Pressable
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-                style={{ backgroundColor: "#6C5CE7" }}
-                onPress={(e) => { onUse(t.id); }}
-              ><Text>Utiliser</Text></Pressable>
-              <Pressable
-                className="p-1.5 rounded-lg"
-                style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
-                onPress={(e) => { setShowDetail(true); }}
-              ><Eye size={14} className="text-white" /></Pressable>
-            </View>
-          </View>
-          {/* Badges */}
-          <View className="absolute top-2 left-2 flex gap-1">
-            {t.isNew && (
+        <View className="w-full relative" style={{ paddingBottom: `${(t.height / t.width) * 100}%`, backgroundColor: THUMB_GRADIENTS[t.thumbnail] }}><View className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}><View className="flex gap-2"><Pressable className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ backgroundColor: "#6C5CE7" }} whileHover={{ scale: 1.05 }} onPress={(e) => { onUse(t.id); }}>Utiliser</Pressable><Pressable className="p-1.5 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.2)" }} whileHover={{ scale: 1.05 }} onPress={(e) => { setShowDetail(true); }}><Eye size={14} className="text-white" /></Pressable></View></View>{}<View className="absolute top-2 left-2 flex gap-1">{t.isNew && (
               <Text className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: "#00B894", color: "#fff" }}>NEW</Text>
-            )}
-            {t.isPremium && (
+            )}{t.isPremium && (
               <Text className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: "#FDCB6E", color: "#2D3436" }}>PRO</Text>
-            )}
-          </View>
-          <View className="absolute top-2 right-2 flex gap-1">
-            <Pressable
-              className="p-1 rounded-lg"
-              style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-              onPress={(e) => { setLiked(!liked); UIService.openToast(liked ? "Retiré des favoris" : "Ajouté aux favoris", "info"); }}
-            >
-              <Heart size={12} className={liked ? "fill-red-400 text-red-400" : "text-white"} />
-            </Pressable>
-            <Pressable
-              className="p-1 rounded-lg"
-              style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-              onPress={(e) => { setBookmarked(!bookmarked); UIService.openToast(bookmarked ? "Retiré" : "Sauvegardé", "info"); }}
-            >
-              <Bookmark size={12} className={bookmarked ? "fill-yellow-400 text-yellow-400" : "text-white"} />
-            </Pressable>
-          </View>
-        </View>
+            )}</View><View className="absolute top-2 right-2 flex gap-1"><Pressable className="p-1 rounded-lg" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} whileHover={{ scale: 1.1 }} onPress={(e) => { setLiked(!liked); toast(liked ? "Retiré des favoris" : "Ajouté aux favoris"); }}><Heart size={12} className={liked ? "fill-red-400 text-red-400" : "text-white"} /></Pressable><Pressable className="p-1 rounded-lg" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} whileHover={{ scale: 1.1 }} onPress={(e) => { setBookmarked(!bookmarked); toast(bookmarked ? "Retiré" : "Sauvegardé"); }}><Bookmark size={12} className={bookmarked ? "fill-yellow-400 text-yellow-400" : "text-white"} /></Pressable></View></View>
         {/* Info */}
-        <View className="p-2.5">
-          <Text className="text-white text-xs font-semibold truncate">{t.title}</Text>
-          <View className="flex items-center justify-between mt-1">
-            <View className="flex items-center gap-1">
-              <Star size={10} className="fill-yellow-400 text-yellow-400" />
-              <Text className="text-gray-400 text-[10px]">{t.rating}</Text>
-            </View>
-            <Text className="text-gray-500 text-[10px]">{t.uses.toLocaleString()} utilisations</Text>
-          </View>
-          <View className="flex gap-1 mt-1.5 flex-wrap">
-            {t.colors.map((c, i) => (
+        <View className="p-2.5"><Text className="text-white text-xs font-semibold truncate">{t.title}</Text><View className="flex items-center justify-between mt-1"><View className="flex items-center gap-1"><Star size={10} className="fill-yellow-400 text-yellow-400" /><Text className="text-gray-400 text-[10px]">{t.rating}</Text></View><Text className="text-gray-500 text-[10px]">{t.uses.toLocaleString()}utilisations</Text></View><View className="flex gap-1 mt-1.5 flex-wrap">{t.colors.map((c, i) => (
               <Text key={i} className="w-3 h-3 rounded-full border border-white/10 inline-block" style={{ backgroundColor: c }} />
-            ))}
-          </View>
-        </View>
-      </Pressable>
+            ))}</View></View>
+      </View>
 
       {/* Detail Modal */}
-      <>
+<View>
         {showDetail && (
-          <Pressable
-            className="fixed inset-0 z-50 flex items-end justify-center"
-            style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-            onPress={() => setShowDetail(false)}
-          >
-            <Pressable
-              className="w-full max-w-md rounded-t-3xl p-6 pb-10"
-              style={{ backgroundColor: "#1a1a2e", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-              onPress={(e) => e.stopPropagation()}
-            >
+          <View className="fixed inset-0 z-50 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setShowDetail(false)}>
+            <View className="w-full max-w-md rounded-t-3xl p-6 pb-10" style={{ backgroundColor: "#1a1a2e", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} initial={{ y: 300 }} animate={{ y: 0 }} exit={{ y: 300 }} onPress={(e) => e.stopPropagation()}>
               <View className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-4" />
               <View className="w-full h-40 rounded-xl mb-4" style={{ backgroundColor: THUMB_GRADIENTS[t.thumbnail] }} />
               <Text className="text-white font-bold text-lg">{t.title}</Text>
-              <Text className="text-gray-400 text-sm mt-1">{t.width} × {t.height} px</Text>
-              <View className="flex gap-3 mt-3">
-                <View className="flex items-center gap-1"><Star size={14} className="fill-yellow-400 text-yellow-400" /><Text className="text-white text-sm">{t.rating}</Text></View>
-                <View className="flex items-center gap-1"><Eye size={14} className="text-gray-400" /><Text className="text-gray-400 text-sm">{t.uses.toLocaleString()} uses</Text></View>
-              </View>
-              <View className="flex gap-2 flex-wrap mt-3">
-                {t.tags.map(tag => (
+              <Text className="text-gray-400 text-sm mt-1">{t.width}× {t.height}px</Text>
+              <View className="flex gap-3 mt-3"><View className="flex items-center gap-1"><Star size={14} className="fill-yellow-400 text-yellow-400" /><Text className="text-white text-sm">{t.rating}</Text></View><View className="flex items-center gap-1"><Eye size={14} className="text-gray-400" /><Text className="text-gray-400 text-sm">{t.uses.toLocaleString()}uses</Text></View></View>
+              <View className="flex gap-2 flex-wrap mt-3">{t.tags.map(tag => (
                   <Text key={tag} className="px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: "rgba(108,92,231,0.2)", color: "#a29bfe" }}>#{tag}</Text>
-                ))}
-              </View>
-              <Pressable
-                className="w-full py-3 rounded-xl font-bold text-white mt-5"
-                style={{  }}
-                onPress={() => { onUse(t.id); setShowDetail(false); }}
-              >Utiliser ce template</Pressable>
-            </Pressable>
-          </Pressable>
+                ))}</View>
+              <Pressable className="w-full py-3 rounded-xl font-bold text-white mt-5" style={{  }} whileTap={{ scale: 0.97 }} onPress={() => { onUse(t.id); setShowDetail(false); }}>Utiliser ce template</Pressable>
+            </View>
+          </View>
         )}
-      </>
+      </View>
     </>
   );
 }
@@ -285,25 +213,9 @@ function TemplateCard({ t, onUse }: { t: Template; onUse: (id: string) => void }
 function AssetCard({ a }: { a: Asset }) {
   const [fav, setFav] = useState(a.isFavorite);
   return (
-    <View
-      className="rounded-xl overflow-hidden"
-      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
-      <View className="w-full h-24 relative" style={{ backgroundColor: THUMB_GRADIENTS[a.thumbnail] }}>
-        <Pressable
-          className="absolute top-2 right-2 p-1.5 rounded-lg"
-          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-          onPress={() => { setFav(!fav); UIService.openToast(fav ? "Retiré des favoris" : "Favori ajouté", "info"); }}
-        >
-          <Heart size={12} className={fav ? "fill-red-400 text-red-400" : "text-white"} />
-        </Pressable>
-      </View>
-      <View className="p-2">
-        <Text className="text-white text-xs font-medium truncate">{a.title}</Text>
-        <View className="flex gap-1 mt-1 flex-wrap">
-          {a.tags.map(t => <Text key={t} className="text-[9px] text-gray-500">#{t}</Text>)}
-        </View>
-      </View>
+    <View className="rounded-xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} whileHover={{ scale: 1.03 }}>
+      <View className="w-full h-24 relative" style={{ backgroundColor: THUMB_GRADIENTS[a.thumbnail] }}><Pressable className="absolute top-2 right-2 p-1.5 rounded-lg" style={{ backgroundColor: "rgba(0,0,0,0.4)" }} whileHover={{ scale: 1.1 }} onPress={() => { setFav(!fav); toast(fav ? "Retiré des favoris" : "Favori ajouté"); }}><Heart size={12} className={fav ? "fill-red-400 text-red-400" : "text-white"} /></Pressable></View>
+      <View className="p-2"><Text className="text-white text-xs font-medium truncate">{a.title}</Text><View className="flex gap-1 mt-1 flex-wrap">{a.tags.map(t => <Text key={t} className="text-[9px] text-gray-500">#{t}</Text>)}</View></View>
     </View>
   );
 }
@@ -337,7 +249,7 @@ export default function TemplatesPage({ onBack, onNavigate }: { onBack: () => vo
 
   const handleUseTemplate = (id: string) => {
     const t = TEMPLATES.find(x => x.id === id);
-    UIService.openToast(`Template "${t?.title}" ouvert dans Studio Photo`, "success");
+    toast.success(`Template "${t?.title}" ouvert dans Studio Photo`);
     setTimeout(() => onNavigate?.("studio"), 500);
   };
 
@@ -345,22 +257,22 @@ export default function TemplatesPage({ onBack, onNavigate }: { onBack: () => vo
     setExportingId(id);
     setTimeout(() => {
       setExportingId(null);
-      UIService.openToast("Création exportée en haute résolution !", "success");
+      toast.success("Création exportée en haute résolution !");
     }, 1500);
   };
 
   const copyColor = (hex: string) => {
-    undefined.writeText(hex).catch(() => {});
+    Clipboard.setString(hex).catch(() => {});
     setCopiedColor(hex);
-    UIService.openToast(`Couleur ${hex} copiée !`, "success");
+    toast.success(`Couleur ${hex} copiée !`);
     setTimeout(() => setCopiedColor(null), 2000);
   };
 
   const toggleFavPalette = (id: string) => {
     setFavoritePalettes(prev => {
       const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); UIService.openToast("Palette retirée", "info"); }
-      else { next.add(id); UIService.openToast("Palette sauvegardée !", "success"); }
+      if (next.has(id)) { next.delete(id); toast("Palette retirée"); }
+      else { next.add(id); toast.success("Palette sauvegardée !"); }
       return next;
     });
   };
@@ -374,296 +286,132 @@ export default function TemplatesPage({ onBack, onNavigate }: { onBack: () => vo
   };
 
   return (
-    <View className="min-h-screen text-white" style={{  }}>
-      {/* Header */}
-      <View className="sticky top-0 z-40 px-4 pt-12 pb-3" style={{ backgroundColor: "rgba(10,10,26,0.95)" }}>
-        <View className="flex items-center gap-3 mb-4">
-          <Pressable className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} onPress={onBack}>
-            <ArrowLeft size={20} />
-          </Pressable>
-          <View>
-            <Text className="text-xl font-bold text-white">Templates & Assets</Text>
-            <Text className="text-xs text-gray-400">Bibliothèque créative complète</Text>
-          </View>
-          <View className="ml-auto flex gap-2">
-            <Pressable className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-              onPress={() => setViewMode(v => v === "grid" ? "list" : "grid")}>
-              {viewMode === "grid" ? <List size={18} /> : <Grid3X3 size={18} />}
-            </Pressable>
-            <Pressable className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-              <Filter size={18} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Tabs */}
-        <View className="flex gap-1 p-1 rounded-xl mb-3" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
-          {(["templates", "assets", "mes-creations", "stats"] as Tab[]).map(t => (
-            <Pressable
-              key={t}
-              className="flex-1 py-2 rounded-lg text-xs font-semibold"
-              style={tab === t ? {  } : {  }}
-              onPress={() => setTab(t)}
-            >
+    <View className="min-h-screen text-white" style={{  }}>{}<View className="sticky top-0 z-40 px-4 pt-12 pb-3" style={{ backgroundColor: "rgba(10,10,26,0.95)" }}><View className="flex items-center gap-3 mb-4"><Pressable className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }} onPress={onBack}><ArrowLeft size={20} /></Pressable><View><Text className="text-xl font-bold text-white">Templates & Assets</Text><Text className="text-xs text-gray-400">Bibliothèque créative complète</Text></View><View className="ml-auto flex gap-2"><Pressable className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }} onPress={() => setViewMode(v => v === "grid" ? "list" : "grid")}>{viewMode === "grid" ? <List size={18} /> : <Grid3X3 size={18} />}</Pressable><Pressable className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }}><Filter size={18} /></Pressable></View></View>{}<View className="flex gap-1 p-1 rounded-xl mb-3" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>{(["templates", "assets", "mes-creations", "stats"] as Tab[]).map(t => (
+            <Pressable key={t} className="flex-1 py-2 rounded-lg text-xs font-semibold transition-colors" style={tab === t ? {  } : {  }} whileTap={{ scale: 0.95 }} onPress={() => setTab(t)}>
               {t === "templates" ? "Templates" : t === "assets" ? "Assets" : t === "mes-creations" ? "Mes Créations" : "Stats"}
             </Pressable>
-          ))}
-        </View>
-
-        {/* Search */}
-        {(tab === "templates" || tab === "assets") && (
-          <View className="flex items-center gap-2 px-3 py-2 rounded-xl mb-2" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>
-            <Search size={16} className="text-gray-500" />
-            <TextInput
-              className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
-              placeholder={tab === "templates" ? "Rechercher un template..." : "Rechercher un asset..."}
-              value={searchQuery}
-              onChangeText={text => setSearchQuery(text)}
-            />
-            {searchQuery && <Pressable onPress={() => setSearchQuery("")}><X size={14} className="text-gray-500" /></Pressable>}
-          </View>
-        )}
-      </View>
-
-      <View className="px-4 pb-24">
-        {/* ── TEMPLATES TAB ─────────────────────────────────────────────── */}
-        {tab === "templates" && (
-          <View>
+          ))}</View>{}{(tab === "templates" || tab === "assets") && (
+          <View className="flex items-center gap-2 px-3 py-2 rounded-xl mb-2" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><Search size={16} className="text-gray-500" /><TextInput className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none" placeholder={tab === "templates" ? "Rechercher un template..." : "Rechercher un asset..."} value={searchQuery} onChangeText={value => setSearchQuery(value)} />{searchQuery && <Pressable onPress={() => setSearchQuery("")}><X size={14} className="text-gray-500" /></Pressable>}</View>
+        )}</View><View className="px-4 pb-24">{}{tab === "templates" && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {/* Category filter */}
-            <View className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-              {TEMPLATE_CATS.map(c => (
-                <Pressable
-                  key={c.id}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={templateCat === c.id
+            <View className="flex gap-2 overflow-x-auto pb-2 mb-4">{TEMPLATE_CATS.map(c => (
+                <Pressable key={c.id} className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold" style={templateCat === c.id
                     ? { backgroundColor: "#6C5CE7" }
-                    : { backgroundColor: "rgba(255,255,255,0.07)" }}
-                  onPress={() => setTemplateCat(c.id)}
-                >{c.label}</Pressable>
-              ))}
-            </View>
+                    : { backgroundColor: "rgba(255,255,255,0.07)" }} whileTap={{ scale: 0.95 }} onPress={() => setTemplateCat(c.id)}>{c.label}</Pressable>
+              ))}</View>
 
             {/* Count */}
-            <Text className="text-gray-500 text-xs mb-3">{filteredTemplates.length} template{filteredTemplates.length !== 1 ? "s" : ""}</Text>
+            <Text className="text-gray-500 text-xs mb-3">{filteredTemplates.length}template{filteredTemplates.length !== 1 ? "s" : ""}</Text>
 
             {/* Grid */}
-            <View className={`grid gap-3 ${viewMode === "grid" ? "grid-cols-2" : "grid-cols-1"}`}>
-              {filteredTemplates.map((t, i) => (
-                <View key={t.id}>
+            <View className={`grid gap-3 ${viewMode === "grid" ? "grid-cols-2" : "grid-cols-1"}`}>{filteredTemplates.map((t, i) => (
+                <View key={t.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                   {viewMode === "grid" ? (
                     <TemplateCard t={t} onUse={handleUseTemplate} />
                   ) : (
-                    <Pressable
-                      className="flex gap-3 rounded-xl p-3"
-                      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-                      onPress={() => handleUseTemplate(t.id)}
-                    >
+                    <View className="flex gap-3 rounded-xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} whileHover={{ scale: 1.01 }} onPress={() => handleUseTemplate(t.id)}>
                       <View className="w-16 h-16 rounded-xl flex-shrink-0" style={{ backgroundColor: THUMB_GRADIENTS[t.thumbnail] }} />
-                      <View className="flex-1 min-w-0">
-                        <View className="flex items-center gap-1.5">
-                          <Text className="text-white text-sm font-semibold truncate">{t.title}</Text>
-                          {t.isPremium && <Text className="px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0" style={{ backgroundColor: "#FDCB6E", color: "#2D3436" }}>PRO</Text>}
-                        </View>
-                        <Text className="text-gray-500 text-xs mt-0.5">{t.width}×{t.height}px</Text>
-                        <View className="flex items-center gap-3 mt-1">
-                          <View className="flex items-center gap-1"><Star size={10} className="fill-yellow-400 text-yellow-400" /><Text className="text-xs text-gray-400">{t.rating}</Text></View>
-                          <Text className="text-xs text-gray-500">{t.uses.toLocaleString()} uses</Text>
-                        </View>
-                      </View>
+                      <View className="flex-1 min-w-0"><View className="flex items-center gap-1.5"><Text className="text-white text-sm font-semibold truncate">{t.title}</Text>{t.isPremium && <Text className="px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0" style={{ backgroundColor: "#FDCB6E", color: "#2D3436" }}>PRO</Text>}</View><Text className="text-gray-500 text-xs mt-0.5">{t.width}×{t.height}px</Text><View className="flex items-center gap-3 mt-1"><View className="flex items-center gap-1"><Star size={10} className="fill-yellow-400 text-yellow-400" /><Text className="text-xs text-gray-400">{t.rating}</Text></View><Text className="text-xs text-gray-500">{t.uses.toLocaleString()}uses</Text></View></View>
                       <ChevronRight size={16} className="text-gray-600 self-center" />
-                    </Pressable>
+                    </View>
                   )}
                 </View>
-              ))}
-            </View>
+              ))}</View>
           </View>
-        )}
-
-        {/* ── ASSETS TAB ────────────────────────────────────────────────── */}
-        {tab === "assets" && (
-          <View>
+        )}{}{tab === "assets" && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {/* Category filter */}
-            <View className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-              {ASSET_CATS.map(c => (
-                <Pressable
-                  key={c.id}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={assetCat === c.id
+            <View className="flex gap-2 overflow-x-auto pb-2 mb-4">{ASSET_CATS.map(c => (
+                <Pressable key={c.id} className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold" style={assetCat === c.id
                     ? { backgroundColor: "#6C5CE7" }
-                    : { backgroundColor: "rgba(255,255,255,0.07)" }}
-                  onPress={() => setAssetCat(c.id)}
-                >{c.label}</Pressable>
-              ))}
-            </View>
+                    : { backgroundColor: "rgba(255,255,255,0.07)" }} whileTap={{ scale: 0.95 }} onPress={() => setAssetCat(c.id)}>{c.label}</Pressable>
+              ))}</View>
 
             {/* Assets grid */}
             {(assetCat === "all" || assetCat !== "palettes") && (
-              <View className="gap-3 mb-6">
-                {filteredAssets.filter(a => a.category !== "palettes").map((a, i) => (
-                  <View key={a.id}>
+              <View className="gap-3 mb-6">{filteredAssets.filter(a => a.category !== "palettes").map((a, i) => (
+                  <View key={a.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                     <AssetCard a={a} />
                   </View>
-                ))}
-              </View>
+                ))}</View>
             )}
 
             {/* Palettes section */}
             {(assetCat === "all" || assetCat === "palettes") && (
               <>
-                <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2"><Palette size={16} style={{ color: "#6C5CE7" }} />Palettes de couleurs</Text>
-                <View className="space-y-3">
-                  {PALETTES.map((pal, i) => (
-                    <View
-                      key={pal.id}
-                      className="rounded-xl p-3"
-                      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-                    >
-                      <View className="flex items-center justify-between mb-2">
-                        <Text className="text-white text-sm font-semibold">{pal.name}</Text>
-                        <View className="flex items-center gap-2">
-                          <Text className="text-gray-500 text-xs">{pal.likes} ♥</Text>
-                          <Pressable
-                            className="p-1 rounded-lg"
-                            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-                            onPress={() => toggleFavPalette(pal.id)}
-                          >
-                            <Bookmark size={12} className={favoritePalettes.has(pal.id) ? "fill-yellow-400 text-yellow-400" : "text-gray-400"} />
-                          </Pressable>
-                        </View>
-                      </View>
-                      <View className="flex gap-1.5">
-                        {pal.colors.map(hex => (
-                          <Pressable
-                            key={hex}
-                            className="flex-1 h-10 rounded-lg relative group"
-                            style={{ backgroundColor: hex }}
-                            onPress={() => copyColor(hex)}
-                          >
-                            <>
+                <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2"><Palette size={16} style={{  }} />Palettes de couleurs</Text>
+                <View className="space-y-3">{PALETTES.map((pal, i) => (
+                    <View key={pal.id} className="rounded-xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}>
+                      <View className="flex items-center justify-between mb-2"><Text className="text-white text-sm font-semibold">{pal.name}</Text><View className="flex items-center gap-2"><Text className="text-gray-500 text-xs">{pal.likes}♥</Text><Pressable className="p-1 rounded-lg" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} whileTap={{ scale: 0.9 }} onPress={() => toggleFavPalette(pal.id)}><Bookmark size={12} className={favoritePalettes.has(pal.id) ? "fill-yellow-400 text-yellow-400" : "text-gray-400"} /></Pressable></View></View>
+                      <View className="flex gap-1.5">{pal.colors.map(hex => (
+                          <Pressable key={hex} className="flex-1 h-10 rounded-lg relative group" style={{ backgroundColor: hex }} whileHover={{ scale: 1.05 }} onPress={() => copyColor(hex)}>
+<View>
                               {copiedColor === hex && (
-                                <View className="absolute inset-0 flex items-center justify-center rounded-lg"
-                                  style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+                                <View className="absolute inset-0 flex items-center justify-center rounded-lg" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                                   <Check size={14} className="text-white" />
                                 </View>
                               )}
-                            </>
+                            </View>
                           </Pressable>
-                        ))}
-                      </View>
+                        ))}</View>
                       <Text className="text-gray-600 text-[10px] mt-1.5">Cliquer sur une couleur pour la copier</Text>
                     </View>
-                  ))}
-                </View>
+                  ))}</View>
               </>
             )}
           </View>
-        )}
-
-        {/* ── MES CRÉATIONS TAB ─────────────────────────────────────────── */}
-        {tab === "mes-creations" && (
+        )}{}{tab === "mes-creations" && (
           <Authenticated>
             <MesCreationsTab onNavigate={onNavigate} />
           </Authenticated>
-        )}
-
-        {/* ── STATS TAB ─────────────────────────────────────────────────── */}
-        {tab === "stats" && (
-          <View>
+        )}{}{tab === "stats" && (
+          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {/* KPIs */}
-            <View className="gap-3 mb-6">
-              {[
+            <View className="gap-3 mb-6">{[
                 { label: "Templates disponibles", value: totalStats.templates, icon: LayoutTemplate, color: "#6C5CE7" },
                 { label: "Assets disponibles", value: totalStats.assets, icon: Package, color: "#00B894" },
                 { label: "Mes créations", value: totalStats.creations, icon: FolderOpen, color: "#FDCB6E" },
                 { label: "Vues totales", value: totalStats.totalViews.toLocaleString(), icon: TrendingUp, color: "#E17055" },
               ].map(s => (
-                <View
-                  key={s.label}
-                  className="rounded-2xl p-4"
-                  style={{ backgroundColor: `${s.color}11`, borderStyle: "solid" }}
-                >
-                  <s.icon size={20} style={{ color: s.color }} className="mb-2" />
+                <View key={s.label} className="rounded-2xl p-4" style={{ backgroundColor: `${s.color}11`, borderStyle: "solid" }} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                  <s.icon size={20} style={{  }} className="mb-2" />
                   <Text className="text-white font-bold text-2xl">{s.value}</Text>
                   <Text className="text-gray-400 text-xs mt-0.5">{s.label}</Text>
                 </View>
-              ))}
-            </View>
+              ))}</View>
 
             {/* Top templates */}
-            <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-              <TrendingUp size={16} style={{ color: "#6C5CE7" }} />Templates les plus utilisés
+            <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2"><TrendingUp size={16} style={{  }} />Templates les plus utilisés
             </Text>
-            <View className="space-y-2 mb-6">
-              {[...TEMPLATES].sort((a, b) => b.uses - a.uses).slice(0, 5).map((t, i) => (
-                <View
-                  key={t.id}
-                  className="flex items-center gap-3 rounded-xl p-3"
-                  style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                >
+            <View className="space-y-2 mb-6">{[...TEMPLATES].sort((a, b) => b.uses - a.uses).slice(0, 5).map((t, i) => (
+                <View key={t.id} className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }}>
                   <Text className="text-gray-500 font-bold text-sm w-5">#{i + 1}</Text>
                   <View className="w-8 h-8 rounded-lg flex-shrink-0" style={{ backgroundColor: THUMB_GRADIENTS[t.thumbnail] }} />
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-white text-xs font-semibold truncate">{t.title}</Text>
-                    <View className="flex items-center gap-1">
-                      <View
-                        className="h-1 rounded-full mt-0.5"
-                        style={{ width: `${(t.uses / TEMPLATES[0].uses) * 100}%`, backgroundColor: "#6C5CE7", minWidth: 20 }}
-                      />
-                      <Text className="text-gray-500 text-[10px] ml-1">{t.uses.toLocaleString()}</Text>
-                    </View>
-                  </View>
-                  <View className="flex items-center gap-1">
-                    <Star size={10} className="fill-yellow-400 text-yellow-400" />
-                    <Text className="text-gray-400 text-[10px]">{t.rating}</Text>
-                  </View>
+                  <View className="flex-1 min-w-0"><Text className="text-white text-xs font-semibold truncate">{t.title}</Text><View className="flex items-center gap-1"><View className="h-1 rounded-full mt-0.5" style={{ width: `${(t.uses / TEMPLATES[0].uses) * 100}%`, backgroundColor: "#6C5CE7", minWidth: 20 }} /><Text className="text-gray-500 text-[10px] ml-1">{t.uses.toLocaleString()}</Text></View></View>
+                  <View className="flex items-center gap-1"><Star size={10} className="fill-yellow-400 text-yellow-400" /><Text className="text-gray-400 text-[10px]">{t.rating}</Text></View>
                 </View>
-              ))}
-            </View>
+              ))}</View>
 
             {/* Performance mes créations */}
-            <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2">
-              <BarChart2 size={16} style={{ color: "#00B894" }} />Performance de mes créations
+            <Text className="text-white font-bold text-sm mb-3 flex items-center gap-2"><BarChart2 size={16} style={{  }} />Performance de mes créations
             </Text>
-            <View className="space-y-2">
-              {MY_CREATIONS.sort((a, b) => b.views - a.views).map((c, i) => (
-                <View
-                  key={c.id}
-                  className="flex items-center gap-3 rounded-xl p-3"
-                  style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                >
+            <View className="space-y-2">{MY_CREATIONS.sort((a, b) => b.views - a.views).map((c, i) => (
+                <View key={c.id} className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }}>
                   <View className="w-8 h-8 rounded-lg flex-shrink-0" style={{ backgroundColor: THUMB_GRADIENTS[c.thumbnail] }} />
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-white text-xs font-semibold truncate">{c.title}</Text>
-                    <View className="flex items-center gap-2 mt-0.5">
-                      <View className="flex items-center gap-1"><Eye size={9} className="text-gray-500" /><Text className="text-gray-400 text-[10px]">{c.views}</Text></View>
-                      <View className="flex items-center gap-1"><Download size={9} className="text-gray-500" /><Text className="text-gray-400 text-[10px]">{c.exports}</Text></View>
-                    </View>
-                  </View>
-                  <Text className="px-2 py-0.5 rounded text-[9px] font-bold"
-                    style={{ backgroundColor: `${TYPE_COLORS[c.type]}22`, color: TYPE_COLORS[c.type] }}>
-                    {TYPE_LABELS[c.type]}
-                  </Text>
+                  <View className="flex-1 min-w-0"><Text className="text-white text-xs font-semibold truncate">{c.title}</Text><View className="flex items-center gap-2 mt-0.5"><View className="flex items-center gap-1"><Eye size={9} className="text-gray-500" /><Text className="text-gray-400 text-[10px]">{c.views}</Text></View><View className="flex items-center gap-1"><Download size={9} className="text-gray-500" /><Text className="text-gray-400 text-[10px]">{c.exports}</Text></View></View></View>
+                  <Text className="px-2 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: `${TYPE_COLORS[c.type]}22`, color: TYPE_COLORS[c.type] }}>{TYPE_LABELS[c.type]}</Text>
                 </View>
-              ))}
-            </View>
+              ))}</View>
 
             {/* Explore more */}
-            <Pressable
-              className="mt-6 rounded-2xl p-4 flex items-center gap-3"
-              style={{ borderWidth: 1, borderColor: "rgba(108,92,231,0.3)", borderStyle: "solid" }}
-              onPress={() => setTab("templates")}
-            >
-              <Sparkles size={24} style={{ color: "#6C5CE7" }} />
-              <View>
-                <Text className="text-white font-semibold text-sm">Explorer plus de templates</Text>
-                <Text className="text-gray-400 text-xs">Découvre notre bibliothèque complète</Text>
-              </View>
+            <View className="mt-6 rounded-2xl p-4 flex items-center gap-3" style={{ borderWidth: 1, borderColor: "rgba(108,92,231,0.3)", borderStyle: "solid" }} whileHover={{ scale: 1.01 }} onPress={() => setTab("templates")}>
+              <Sparkles size={24} style={{  }} />
+              <View><Text className="text-white font-semibold text-sm">Explorer plus de templates</Text><Text className="text-gray-400 text-xs">Découvre notre bibliothèque complète</Text></View>
               <ExternalLink size={16} className="text-gray-500 ml-auto" />
-            </Pressable>
+            </View>
           </View>
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }
 
@@ -678,89 +426,53 @@ function MesCreationsTab({ onNavigate }: { onNavigate?: (page: string) => void }
   const [saving, setSaving] = useState(false);
 
   const handleCreate = async () => {
-    if (!newTitle.trim()) { UIService.openToast("Titre requis", "error"); return; }
+    if (!newTitle.trim()) { toast.error("Titre requis"); return; }
     setSaving(true);
     try {
       await createProject({ title: newTitle, description: newDesc || newTitle, category: "création", tags: [] });
-      UIService.openToast("Projet créé !", "success");
+      toast.success("Projet créé !");
       setShowCreate(false);
       setNewTitle(""); setNewDesc("");
-    } catch { UIService.openToast("Erreur", "error"); }
+    } catch { toast.error("Erreur"); }
     finally { setSaving(false); }
   };
 
   return (
-    <View>
-      <View className="flex gap-2 mb-5">
-        {[
+    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <View className="flex gap-2 mb-5">{[
           { label: "Éditeur", page: "editeur", color: "#8B5CF6" },
           { label: "Studio", page: "studio", color: "#EC4899" },
           { label: "Projet", page: "project", color: "#F59E0B" },
         ].map((btn) => (
-          <Pressable
-            key={btn.page}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold text-white"
-            style={{ backgroundColor: `${btn.color}22`, borderStyle: "solid" }}
-            onPress={() => btn.page === "project" ? setShowCreate(true) : onNavigate?.(btn.page)}
-          >
-            <Plus size={14} style={{ color: btn.color }} />{btn.label}
+          <Pressable key={btn.page} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold text-white" style={{ backgroundColor: `${btn.color}22`, borderStyle: "solid" }} whileTap={{ scale: 0.95 }} onPress={() => btn.page === "project" ? setShowCreate(true) : onNavigate?.(btn.page)}>
+            <Plus size={14} style={{  }} />{btn.label}
           </Pressable>
-        ))}
-      </View>
+        ))}</View>
 
-      <>
+<View>
         {showCreate && (
-          <View
-            className="mb-4 p-4 rounded-2xl space-y-3"
-            style={{ backgroundColor: "rgba(108,92,231,0.08)", borderWidth: 1, borderColor: "rgba(108,92,231,0.2)", borderStyle: "solid" }}>
+          <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-4 p-4 rounded-2xl space-y-3" style={{ backgroundColor: "rgba(108,92,231,0.08)", borderWidth: 1, borderColor: "rgba(108,92,231,0.2)", borderStyle: "solid" }}>
             <Text className="text-white font-bold text-sm">Nouveau projet collaboratif</Text>
-            <TextInput value={newTitle} onChangeText={(text) => setNewTitle(text)} placeholder="Titre..."
-              className="w-full px-3 py-2 rounded-xl text-white text-sm outline-none"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} />
-            <TextInput value={newDesc} onChangeText={(text) => setNewDesc(text)} placeholder="Description..."
-              className="w-full px-3 py-2 rounded-xl text-white text-sm outline-none"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}  multiline textAlignVertical="top"/>
-            <View className="flex gap-2">
-              <Pressable onPress={() => setShowCreate(false)} className="flex-1 py-2 rounded-xl text-sm" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><Text>Annuler</Text></Pressable>
-              <Pressable onPress={() => { void handleCreate(); }} disabled={saving}
-                className="flex-1 py-2 rounded-xl text-sm font-bold" style={{ backgroundColor: "#6C5CE7" }}>
-                {saving ? "…" : "Créer"}
-              </Pressable>
-            </View>
+            <TextInput value={newTitle} onChangeText={(value) => setNewTitle(value)} placeholder="Titre..." className="w-full px-3 py-2 rounded-xl text-white text-sm outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} />
+            <TextInput value={newDesc} onChangeText={(value) => setNewDesc(value)} placeholder="Description..." className="w-full px-3 py-2 rounded-xl text-white text-sm outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} multiline textAlignVertical="top" />
+            <View className="flex gap-2"><Pressable onPress={() => setShowCreate(false)} className="flex-1 py-2 rounded-xl text-sm" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><Text>Annuler</Text></Pressable><Pressable onPress={() => { void handleCreate(); }} disabled={saving} className="flex-1 py-2 rounded-xl text-sm font-bold" style={{ backgroundColor: "#6C5CE7" }}>{saving ? "…" : "Créer"}</Pressable></View>
           </View>
         )}
-      </>
+      </View>
 
       {projects === undefined ? (
-        <View className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.06)" }} />)}
-        </View>
+        <View className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.06)" }} />)}</View>
       ) : projects.length === 0 ? (
-        <View className="flex flex-col items-center justify-center py-12 gap-3">
-          <FolderOpen size={36} className="text-white/20" />
-          <Text className="text-gray-500 text-sm">Aucune création. Commencez maintenant !</Text>
-        </View>
+        <View className="flex flex-col items-center justify-center py-12 gap-3"><FolderOpen size={36} className="text-white/20" /><Text className="text-gray-500 text-sm">Aucune création. Commencez maintenant !</Text></View>
       ) : (
-        <View className="space-y-3">
-          {projects.map((p, i) => (
-            <View key={p._id} className="flex gap-3 rounded-xl p-3"
-              style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-              <View className="w-14 h-14 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: "rgba(108,92,231,0.15)" }}>
-                {p.coverImage
-                  ? <Image className="w-full h-full object-cover rounded-xl"  source={{ uri: p.coverImage }} accessibilityLabel={p.title}/>
-                  : <FolderOpen size={20} style={{ color: "#6C5CE7" }} />}
-              </View>
-              <View className="flex-1 min-w-0">
-                <View className="flex items-center gap-2">
-                  <Text className="text-white text-sm font-semibold truncate">{p.title}</Text>
-                  <Text className="px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0" style={{ backgroundColor: "rgba(108,92,231,0.2)", color: "#a29bfe" }}>{p.status}</Text>
-                </View>
-                <Text className="text-gray-500 text-xs mt-0.5">{p.description}</Text>
-                <Text className="text-xs text-gray-400">{p.contributorCount} <Text>contributeur</Text>{p.contributorCount > 1 ? "s" : ""}</Text>
-              </View>
+        <View className="space-y-3">{projects.map((p, i) => (
+            <View key={p._id} className="flex gap-3 rounded-xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
+              <View className="w-14 h-14 rounded-xl flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: "rgba(108,92,231,0.15)" }}>{p.coverImage
+                  ? <Image className="w-full h-full object-cover rounded-xl" source={{ uri: p.coverImage }} accessibilityLabel={p.title} />
+                  : <FolderOpen size={20} style={{  }} />}</View>
+              <View className="flex-1 min-w-0"><View className="flex items-center gap-2"><Text className="text-white text-sm font-semibold truncate">{p.title}</Text><Text className="px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0" style={{ backgroundColor: "rgba(108,92,231,0.2)", color: "#a29bfe" }}>{p.status}</Text></View><Text className="text-gray-500 text-xs mt-0.5">{p.description}</Text><Text className="text-xs text-gray-400">{p.contributorCount}contributeur{p.contributorCount > 1 ? "s" : ""}</Text></View>
             </View>
-          ))}
-        </View>
+          ))}</View>
       )}
     </View>
   );

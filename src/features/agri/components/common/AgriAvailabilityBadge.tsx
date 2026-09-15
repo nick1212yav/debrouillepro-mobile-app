@@ -32,9 +32,7 @@ export function AgriAvailabilityBadge({
   const active = config[status] || config.available;
 
   return (
-    <View
-      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold border ${active.styles} ${className}`}
-    >
+    <View className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold border ${active.styles} ${className}`}>
       {active.label}
     </View>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Platform } from "react-native";
 import { EventBus } from "../events/EventBus";
 import { UIRegistry } from "../registry/UIRegistry";
 import type { DomainEvent } from "../types";
@@ -13,7 +14,7 @@ export function UIBridge() {
   const [openUI, setOpenUI] = useState<UIState | null>(null);
 
   useEffect(() => {
-    // Écoute des événements UI via EventBus
+    // ── Écoute des événements UI via EventBus ───────────────────────
     const unsubscribe = EventBus.subscribe(
       "ui.sheet.open",
       (event: DomainEvent) => {
@@ -31,30 +32,44 @@ export function UIBridge() {
       setOpenUI(null);
     });
 
-    // ✅ Écoute des événements custom pour job-apply (compatibilité)
-    const handleJobApply = (e: Event) => {
-      const custom = e as CustomEvent;
-      const { publication } = custom.detail;
-      if (publication) {
-        // On ouvre directement ApplySheet via EventBus
-        EventBus.publish({
-          type: "ui.sheet.open",
-          moduleId: "job",
-          payload: {
-            id: "job.apply",
-            props: { publication },
-          },
-          timestamp: Date.now(),
-        });
-      }
-    };
+    // ── Écoute d'événement custom "job-apply" — WEB UNIQUEMENT ──────
+    // window.addEventListener n'existe pas sur RN natif (Android/iOS)
+    let handleJobApply: ((e: Event) => void) | null = null;
 
-    undefined;
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      handleJobApply = (e: Event) => {
+        const custom = e as CustomEvent;
+        const { publication } = custom.detail;
+        if (publication) {
+          EventBus.publish({
+            type: "ui.sheet.open",
+            moduleId: "job",
+            payload: {
+              id: "job.apply",
+              props: { publication },
+            },
+            timestamp: Date.now(),
+          });
+        }
+      };
+
+      window.addEventListener("job-apply", handleJobApply as EventListener);
+    }
 
     return () => {
       if (typeof unsubscribe === "function") unsubscribe();
       if (typeof unsubscribeClose === "function") unsubscribeClose();
-      undefined;
+
+      if (
+        Platform.OS === "web" &&
+        typeof window !== "undefined" &&
+        handleJobApply
+      ) {
+        window.removeEventListener(
+          "job-apply",
+          handleJobApply as EventListener,
+        );
+      }
     };
   }, []);
 

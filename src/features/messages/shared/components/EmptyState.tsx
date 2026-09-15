@@ -1,4 +1,5 @@
-import { Pressable, View, ViewProps, PressableProps } from "react-native";
+import { View, Pressable, PressableProps, ViewProps } from "react-native";
+
 // src/features/messages/shared/components/EmptyState.tsx
 
 import type { ReactNode } from "react";
@@ -24,43 +25,29 @@ export function EmptyState({
   ...props
 }: EmptyStateProps) {
   return (
-    <View
-      {...props}
-      className={className}
-      style={{ minHeight: 180, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24 }}
-    >
-      {icon && (
-        <View
-         
-          style={{ marginBottom: 4 }}
-        >
-          {icon}
-        </View>
-      )}
-
-      <View
-        style={{  }}
-      >
-        {title}
-      </View>
-
-      {description && (
-        <View
-          style={{ maxWidth: 420, opacity: 0.7 }}
-        >
+    <View {...props} className={className} style={{ minHeight: 180, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24, textAlign: "center" }}>{icon && (
+        <View accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" style={{
+            fontSize: 32,
+            lineHeight: 1,
+            marginBottom: 4,
+          }}>{icon}</View>
+      )}<View style={{
+          fontSize: 16,
+          fontWeight: 600,
+        }}>{title}</View>{description && (
+        <View style={{
+            maxWidth: 420,
+            fontSize: 14,
+            lineHeight: 1.5,
+            opacity: 0.7,
+          }}>
           {description}
         </View>
-      )}
-
-      {actionLabel && onAction && (
-        <Pressable
-          onPress={onAction}
-          style={{ marginTop: 6, borderWidth: 0, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 16 }}
-        >
+      )}{actionLabel && onAction && (
+        <Pressable onPress={onAction} style={{ marginTop: 6, borderWidth: 0, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 16, fontWeight: 600 }}>
           {actionLabel}
         </Pressable>
-      )}
-    </View>
+      )}</View>
   );
 }
 

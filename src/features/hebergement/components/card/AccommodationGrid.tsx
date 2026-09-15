@@ -25,9 +25,7 @@ export const AccommodationGrid: React.FC<AccommodationGridProps> = ({
 }) => {
   if (loading) {
     return (
-      <View
-        className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}
-      >
+      <View className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}>
         {Array.from({ length: skeletonCount }).map((_, index) => (
           <AccommodationCardSkeleton key={index} />
         ))}
@@ -44,9 +42,7 @@ export const AccommodationGrid: React.FC<AccommodationGridProps> = ({
   }
 
   return (
-    <View
-      className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}
-    >
+    <View className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${className}`}>
       {accommodations.map((accommodation) => (
         <AccommodationCard
           key={accommodation.id}

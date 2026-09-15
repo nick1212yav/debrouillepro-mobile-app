@@ -1,3 +1,5 @@
+import { View } from "react-native";
+
 // src/features/transport/tracking/MapboxProvider.ts
 import type { Coordinates } from "../types";
 
@@ -14,14 +16,14 @@ export class MapboxProvider {
     accessToken: string,
     zoom = 12,
   ): void {
-    if (typeof undefined === "undefined" || !(undefined as any).mapboxgl) {
+    if (typeof window === "undefined" || !(window as any).mapboxgl) {
       console.warn(
         "L'API Mapbox GL JS n'est pas chargée globalement sur la fenêtre [2].",
       );
       return;
     }
 
-    const mapboxgl = (undefined as any).mapboxgl;
+    const mapboxgl = (window as any).mapboxgl;
     mapboxgl.accessToken = accessToken;
 
     this.map = new mapboxgl.Map({
@@ -77,9 +79,9 @@ export class MapboxProvider {
    * Mettre à jour le marqueur GPS de position véhicule [2]
    */
   static updateMarker(coords: Coordinates): void {
-    if (!this.map || typeof undefined === "undefined") return;
+    if (!this.map || typeof window === "undefined") return;
 
-    const mapboxgl = (undefined as any).mapboxgl;
+    const mapboxgl = (window as any).mapboxgl;
     if (!mapboxgl) return;
 
     const coordinates: [number, number] = [coords.lng, coords.lat];
@@ -88,7 +90,7 @@ export class MapboxProvider {
       this.marker.setLngLat(coordinates);
     } else {
       // Création d'un élément d'icône personnalisé stylisé
-      const el = undefined("div");
+      const el = document.createElement("div");
       el.className = "custom-vehicle-marker";
       el.style.width = "16px";
       el.style.height = "16px";

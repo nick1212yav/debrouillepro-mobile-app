@@ -1,9 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/hooks/useNetworkServices.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 
 export interface NetworkService {
   _id: Id<"networkServices">; // ✅ Correction : typé Id<"networkServices"> pour la cohérence des jointures
@@ -37,10 +36,10 @@ export function useNetworkServices({ userId }: UseNetworkServicesOptions) {
     try {
       // ✅ Correction : retrait de 'userId' car l'authentification est déduite côté serveur Convex
       const id = await addService(data);
-      UIService.openToast("Service ajouté", "success");
+      toast.success("Service ajouté");
       return id;
     } catch {
-      UIService.openToast("Erreur lors de l'ajout", "error");
+      toast.error("Erreur lors de l'ajout");
       return null;
     }
   };
@@ -51,10 +50,10 @@ export function useNetworkServices({ userId }: UseNetworkServicesOptions) {
   ) => {
     try {
       await updateService({ id: serviceId, ...data });
-      UIService.openToast("Service mis à jour", "success");
+      toast.success("Service mis à jour");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la mise à jour", "error");
+      toast.error("Erreur lors de la mise à jour");
       return false;
     }
   };
@@ -63,10 +62,10 @@ export function useNetworkServices({ userId }: UseNetworkServicesOptions) {
     // ✅ Correction : typé Id<"networkServices"> au lieu de string
     try {
       await deleteService({ id: serviceId });
-      UIService.openToast("Service supprimé", "success");
+      toast.success("Service supprimé");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
       return false;
     }
   };

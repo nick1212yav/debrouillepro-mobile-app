@@ -47,10 +47,13 @@ export function CommunityMentions({
 
   const handleKeyDown = (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
     if (e.key === "ArrowDown") {
+      e.preventDefault();
       setSelectedIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
     } else if (e.key === "ArrowUp") {
+      e.preventDefault();
       setSelectedIndex((prev) => Math.max(prev - 1, 0));
     } else if (e.key === "Enter" && suggestions.length > 0) {
+      e.preventDefault();
       const selected = suggestions[selectedIndex];
       if (selected) {
         addMention(selected);
@@ -74,65 +77,23 @@ export function CommunityMentions({
   };
 
   return (
-    <View className="space-y-2">
-      <View className="flex flex-wrap gap-1.5">
-        {mentions.map((user) => (
-          <Text
-            key={user}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-medium"
-          >
-            <AtSign size={10} />
-            {user}
-            <Pressable
-              onPress={() => removeMention(user)}
-              className="text-purple-400/50"
-            >
-              <X size={12} />
-            </Pressable>
-          </Text>
-        ))}
-      </View>
-
-      <View className="relative">
-        <View className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
-          <AtSign size={16} className="text-white/30" />
-          <TextInput
-            ref={inputRef}
-           
-            value={input}
-            onChangeText={(text) => setInput(text)}
-            onKeyDown={handleKeyDown}
-            placeholder="Mentionner quelqu'un (@username)"
-            className="flex-1 bg-transparent text-white placeholder:text-white/25 text-sm outline-none"
-          />
-        </View>
-
-        <>
-          {showSuggestions && suggestions.length > 0 && (
-            <View
-              className="absolute left-0 right-0 top-full mt-1 p-1 rounded-xl bg-[#0D1117] border border-white/10 max-h-48 overflow-y-auto z-10"
-            >
+    <View className="space-y-2"><View className="flex flex-wrap gap-1.5">{mentions.map((user) => (
+          <Text key={user} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-medium"><AtSign size={10} />{user}<Pressable onPress={() => removeMention(user)} className="text-purple-400/50 transition-colors"><X size={12} /></Pressable></Text>
+        ))}</View><View className="relative"><View className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus-within:border-purple-400/50 transition-colors"><AtSign size={16} className="text-white/30" /><TextInput ref={inputRef} value={input} onChangeText={(value) => setInput(value)} onKeyPress={handleKeyDown} placeholder="Mentionner quelqu'un (@username)" className="flex-1 bg-transparent text-white placeholder:text-white/25 text-sm outline-none" /></View><View>{showSuggestions && suggestions.length > 0 && (
+            <View initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute left-0 right-0 top-full mt-1 p-1 rounded-xl bg-[#0D1117] border border-white/10 max-h-48 overflow-y-auto z-10">
               {suggestions.map((user, idx) => (
-                <Pressable
-                  key={user}
-                  onPress={() => addMention(user)}
-                  className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                <Pressable key={user} onPress={() => addMention(user)} className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     idx === selectedIndex
                       ? "bg-purple-500/20 text-purple-400"
                       : "text-white/70 hover:bg-white/5"
-                  }`}
-                  ref={(el) => {
+                  }`} ref={(el) => {
                     suggestionRefs.current[idx] = el;
-                  }}
-                >
+                  }}>
                   <User size={14} />
                   {user}
                 </Pressable>
               ))}
             </View>
-          )}
-        </>
-      </View>
-    </View>
+          )}</View></View></View>
   );
 }

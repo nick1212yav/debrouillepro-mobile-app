@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunity.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
   adaptCommunityPost,
@@ -41,7 +40,7 @@ export function useCommunity(search?: string) {
       meta: string;
     }) => {
       const result = await createPost(data);
-      UIService.openToast("Post créé !", "success");
+      toast.success("Post créé !");
       return result;
     },
     likePost: async ({
@@ -57,7 +56,7 @@ export function useCommunity(search?: string) {
       publicationId: Id<"publications">;
     }) => {
       await deletePost({ publicationId });
-      UIService.openToast("Post supprimé", "success");
+      toast.success("Post supprimé");
     },
     votePoll: async ({
       publicationId,
@@ -67,13 +66,15 @@ export function useCommunity(search?: string) {
       optionId: string;
     }) => {
       await votePoll({ publicationId, optionId });
-      UIService.openToast("Vote enregistré !", "success");
+      toast.success("Vote enregistré !");
     },
     joinGroup: async ({ groupId }: { groupId: Id<"groups"> }) => {
       const result = await joinGroup({ groupId });
-      UIService.openToast(result.joined
+      toast.success(
+        result.joined
           ? "Vous avez rejoint le groupe"
-          : "Vous avez quitté le groupe", "success");
+          : "Vous avez quitté le groupe",
+      );
       return result;
     },
   };

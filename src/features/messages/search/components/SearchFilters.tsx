@@ -32,16 +32,12 @@ export function SearchFilters({ value, onChange }: SearchFiltersProps) {
       <Search size={14} className="mr-1 shrink-0 text-white/25" />
 
       {filters.map((filter) => (
-        <Pressable
-          key={filter.value}
-          onPress={() => onChange(filter.value)}
-          className={[
+        <Pressable key={filter.value} onPress={() => onChange(filter.value)} className={[
             "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition",
             value === filter.value
               ? "bg-violet-500/15 text-violet-300"
               : "text-white/35 hover:bg-white/5 hover:text-white/60",
-          ].join(" ")}
-        >
+          ].join(" ")}>
           {filter.label}
         </Pressable>
       ))}

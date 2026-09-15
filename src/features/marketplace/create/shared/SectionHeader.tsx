@@ -1,4 +1,4 @@
-import { Text, View, Pressable, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { Text, View, Pressable, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
 
 // src/features/marketplace/create/shared/SectionHeader.tsx
 import { ChevronDown, ChevronUp } from "lucide-react-native";
@@ -21,11 +21,7 @@ export function SectionHeader({
   badge,
 }: Props) {
   return (
-    <Pressable
-      onPress={onToggle}
-      className="w-full flex items-center justify-between py-3 px-4 rounded-2xl"
-      style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}
-    >
+    <Pressable onPress={onToggle} className="w-full flex items-center justify-between py-3 px-4 rounded-2xl transition-colors" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}>
       <View className="flex items-center gap-2.5">
         <Icon size={18} style={{ color }} />
         <Text className="text-white font-semibold text-sm">{title}</Text>

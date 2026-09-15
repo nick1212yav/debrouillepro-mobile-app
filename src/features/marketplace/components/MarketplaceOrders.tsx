@@ -47,13 +47,10 @@ export function MarketplaceOrders({
   return (
     <View className="gap-2">
       {stats.map((stat) => (
-        <View
-          key={stat.label}
-          className="p-3 rounded-xl text-center bg-white/5 border border-white/5"
-        >
+        <View key={stat.label} className="p-3 rounded-xl text-center bg-white/5 border border-white/5">
           <stat.icon
             size={14}
-            style={{ color: stat.color }}
+            style={{  }}
             className="mx-auto mb-0.5"
           />
           <Text className="text-white font-bold text-sm">{stat.value}</Text>

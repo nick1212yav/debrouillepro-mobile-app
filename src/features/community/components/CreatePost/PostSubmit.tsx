@@ -18,12 +18,7 @@ export function PostSubmit({
 }: Props) {
   return (
     <View className="px-5 pb-5">
-      <Pressable
-        onPress={onClick}
-        disabled={disabled || loading}
-        className="w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-        style={{  }}
-      >
+      <Pressable onPress={onClick} disabled={disabled || loading} className="w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-98 disabled:opacity-40" style={{  }}>
         {loading ? (
           <>
             <Loader2 size={15} className="animate-spin text-white" />

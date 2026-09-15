@@ -51,11 +51,7 @@ export function PostHashtags({ content, onSelect }: Props) {
         Hashtags suggérés
       </Text>
       {suggestions.map((tag) => (
-        <Pressable
-          key={tag}
-          onPress={() => handleSelect(tag)}
-          className="flex items-center gap-2 w-full px-2 py-1 text-sm text-white/70 rounded-lg"
-        >
+        <Pressable key={tag} onPress={() => handleSelect(tag)} className="flex items-center gap-2 w-full px-2 py-1 text-sm text-white/70 rounded-lg">
           <Hash size={12} className="text-purple-400" />
           {tag}
         </Pressable>

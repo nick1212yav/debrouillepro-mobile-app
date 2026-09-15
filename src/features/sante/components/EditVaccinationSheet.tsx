@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditVaccinationSheet.tsx
@@ -13,6 +12,7 @@ import { VaccinationForm } from "../forms/VaccinationForm";
 import type { VaccinationFormValues } from "../forms/VaccinationForm";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface EditVaccinationSheetProps {
   open: boolean;
@@ -45,7 +45,7 @@ export function EditVaccinationSheet({
         batchNumber: data.batchNumber,
         sideEffects: data.sideEffects,
       });
-      UIService.openToast("Vaccination mise à jour !", "success");
+      toast.success("Vaccination mise à jour !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -53,7 +53,7 @@ export function EditVaccinationSheet({
         error instanceof Error
           ? error.message
           : "Erreur lors de la mise à jour";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

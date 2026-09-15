@@ -1,8 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Text, TextInput, Pressable } from "react-native";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import { X } from "lucide-react-native";
 import type { Doc } from "@/convex/_generated/dataModel";
 
@@ -53,19 +53,9 @@ export default function ApplySheet(props: ApplySheetProps | null) {
   if (!publication) {
     return (
       <>
-        <Pressable
-          className="fixed inset-0 z-40"
-          style={{ backgroundColor: "rgba(0,0,0,.7)" }}
-          onPress={onClose}
-        />
-        <View
-          className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl p-8"
-          style={{ backgroundColor: "#111827" }}
-        >
-          <Text className="text-center text-white/70">
-            Impossible de charger cette offre.
-          </Text>
-        </View>
+        <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,.7)" }} onPress={onClose} />
+        <View className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl p-8" style={{ backgroundColor: "#111827" }}><Text className="text-center text-white/70">Impossible de charger cette offre.
+          </Text></View>
       </>
     );
   }
@@ -135,19 +125,9 @@ export default function ApplySheet(props: ApplySheetProps | null) {
     );
     return (
       <>
-        <Pressable
-          className="fixed inset-0 z-40"
-          style={{ backgroundColor: "rgba(0,0,0,.7)" }}
-          onPress={onClose}
-        />
-        <View
-          className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl p-8"
-          style={{ backgroundColor: "#111827" }}
-        >
-          <Text className="text-center text-white/70">
-            Offre d'emploi non trouvée.
-          </Text>
-        </View>
+        <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,.7)" }} onPress={onClose} />
+        <View className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl p-8" style={{ backgroundColor: "#111827" }}><Text className="text-center text-white/70">Offre d'emploi non trouvée.
+          </Text></View>
       </>
     );
   }
@@ -163,10 +143,12 @@ export default function ApplySheet(props: ApplySheetProps | null) {
         jobId: job.jobId,
         coverLetter: coverLetter || undefined,
       });
-      UIService.openToast("Candidature envoyée !", "success");
+      toast.success("Candidature envoyée !");
       onClose();
     } catch (err) {
-      UIService.openToast(err instanceof Error ? err.message : "Erreur lors de la candidature", "error");
+      toast.error(
+        err instanceof Error ? err.message : "Erreur lors de la candidature",
+      );
     } finally {
       setLoading(false);
     }
@@ -174,50 +156,19 @@ export default function ApplySheet(props: ApplySheetProps | null) {
 
   return (
     <>
-      <Pressable
-        className="fixed inset-0 z-40"
-        style={{ backgroundColor: "rgba(0,0,0,.7)" }}
-        onPress={onClose}
-      />
+      <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,.7)" }} onPress={onClose} />
 
-      <View
-        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl flex flex-col"
-        style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid", maxHeight: "80vh" }}
-      >
-        <View className="flex justify-center pt-3">
-          <View className="w-10 h-1 rounded-full bg-white/20" />
-        </View>
+      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl flex flex-col" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid", maxHeight: "80vh" }}>
+        <View className="flex justify-center pt-3"><View className="w-10 h-1 rounded-full bg-white/20" /></View>
 
-        <View className="flex items-center justify-between px-5 py-3">
-          <View>
-            <Text className="text-white font-black">{job.title}</Text>
-            <Text className="text-xs text-white/40">{job.company}</Text>
-          </View>
-          <Pressable
-            onPress={onClose}
-            className="w-9 h-9 rounded-xl flex items-center justify-center"
-          >
-            <X size={16} />
-          </Pressable>
-        </View>
+        <View className="flex items-center justify-between px-5 py-3"><View><Text className="text-white font-black">{job.title}</Text><Text className="text-xs text-white/40">{job.company}</Text></View><Pressable onPress={onClose} className="w-9 h-9 rounded-xl flex items-center justify-center"><X size={16} /></Pressable></View>
 
         <View className="flex-1 overflow-y-auto px-5 pb-8">
           <Text className="text-white/50 mb-4">{job.description}</Text>
 
-          <TextInput
-           
-            value={coverLetter}
-            onChangeText={(text) => setCoverLetter(text)}
-            placeholder="Présentez-vous brièvement..."
-            className="w-full rounded-2xl p-4 bg-white/5 text-white"
-           multiline textAlignVertical="top"/>
+          <TextInput value={coverLetter} onChangeText={(value) => setCoverLetter(value)} placeholder="Présentez-vous brièvement..." className="w-full rounded-2xl p-4 bg-white/5 text-white" multiline textAlignVertical="top" />
 
-          <Pressable
-            disabled={loading}
-            onPress={handleApply}
-            className="w-full mt-5 py-4 rounded-3xl font-bold text-white"
-            style={{  }}
-          >
+          <Pressable disabled={loading} onPress={handleApply} className="w-full mt-5 py-4 rounded-3xl font-bold text-white" style={{  }}>
             {loading ? "Envoi..." : "Envoyer ma candidature"}
           </Pressable>
         </View>

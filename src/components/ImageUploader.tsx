@@ -1,15 +1,23 @@
-import { Pressable, View, Image, Text, Alert } from "react-native";
-import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { ImagePlus, X, Loader2 } from "lucide-react-native";
+// src/components/ImageUploader.tsx
+import React, { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from "react-native";
 import * as ImagePicker from "expo-image-picker";
-
-// Remplacement local de toast.error/success pour correspondre à votre abstraction native
-import { UIService } from "@/core/sdk/ui/UIService";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { ImagePlus, X } from "lucide-react-native";
 
 interface ImageUploaderProps {
-  images: string[]; // current list of storage IDs or CDN URLs
+  /** Liste courante de storageId ou URLs CDN */
+  images: string[];
   onChange: (images: string[]) => void;
   maxImages?: number;
   color?: string;
@@ -24,123 +32,127 @@ export default function ImageUploader({
   label = "Ajouter des photos",
 }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
+
   const generateUploadUrl = useMutation(
     api.publications.generatePublicationUploadUrl,
   );
 
-  const handleImagePicker = async () => {
+  const pickAndUpload = useCallback(async () => {
     const remaining = maxImages - images.length;
+
     if (remaining <= 0) {
-      UIService.openToast(`Maximum ${maxImages} photos autorisées`, "error");
+      Alert.alert("Limite atteinte", `Maximum ${maxImages} photos autorisées`);
       return;
     }
 
-    // Demander la permission d'accès à la galerie
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.granted === false) {
+    // Demande de permission
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
       Alert.alert(
-        "Permission requise",
-        "Vous devez autoriser l'accès à vos photos pour ajouter des images.",
+        "Permission refusée",
+        "Autorisez l'accès à votre galerie pour ajouter des photos.",
       );
       return;
     }
 
-    // Lancer la sélection d'images (permet la sélection multiple si configuré)
+    // Sélection multiple (limité au nombre restant)
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: remaining > 1,
+      allowsMultipleSelection: true,
       selectionLimit: remaining,
-      quality: 0.8,
+      quality: 0.85,
     });
 
-    if (result.canceled || !result.assets || result.assets.length === 0) {
-      return;
-    }
+    if (result.canceled || !result.assets?.length) return;
 
+    const selected = result.assets.slice(0, remaining);
     setUploading(true);
+
     try {
       const uploaded: string[] = [];
-      for (const asset of result.assets) {
+
+      for (const asset of selected) {
         const uploadUrl = await generateUploadUrl();
 
-        // Résolution du binaire local vers un Blob compatible avec React Native/Convex
-        const localFileResponse = await fetch(asset.uri);
-        const blob = await localFileResponse.blob();
+        // Récupère le blob depuis l'URI local
+        const blob = await (await fetch(asset.uri)).blob();
+        const mimeType = asset.mimeType ?? "image/jpeg";
 
         const res = await fetch(uploadUrl, {
           method: "POST",
-          headers: { "Content-Type": asset.mimeType ?? "image/jpeg" },
+          headers: { "Content-Type": mimeType },
           body: blob,
         });
 
-        if (!res.ok) throw new Error("Upload failed");
+        if (!res.ok) {
+          throw new Error(`Upload failed (${res.status})`);
+        }
+
         const { storageId } = (await res.json()) as { storageId: string };
         uploaded.push(storageId);
       }
 
       onChange([...images, ...uploaded]);
-      UIService.openToast(`${uploaded.length} photo(s) ajoutée(s)`, "success");
+      Alert.alert("Succès", `${uploaded.length} photo(s) ajoutée(s)`);
     } catch (error) {
-      UIService.openToast("Erreur lors de l'upload des photos", "error");
+      console.error("Upload error:", error);
+      Alert.alert("Erreur", "Erreur lors de l'upload des photos");
     } finally {
       setUploading(false);
     }
-  };
+  }, [generateUploadUrl, images, maxImages, onChange]);
 
-  const remove = (idx: number) => {
-    const next = [...images];
-    next.splice(idx, 1);
-    onChange(next);
-  };
+  const remove = useCallback(
+    (idx: number) => {
+      const next = [...images];
+      next.splice(idx, 1);
+      onChange(next);
+    },
+    [images, onChange],
+  );
 
   return (
-    <View className="mb-2">
+    <View style={styles.container}>
       {/* Preview strip */}
       {images.length > 0 && (
-        <View className="flex flex-row gap-2 mb-2 flex-wrap">
+        <View style={styles.previewStrip}>
           {images.map((id, i) => (
-            <View
-              key={id}
-              className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0"
-              style={{
-                borderWidth: 1,
-                borderColor: `${color}44`,
-                borderStyle: "solid",
-              }}
-            >
+            <View key={`${id}-${i}`} style={styles.thumbnailWrapper}>
               <StorageImage storageId={id} />
               <Pressable
                 onPress={() => remove(i)}
-                className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+                style={styles.removeButton}
+                hitSlop={6}
+                accessibilityLabel="Supprimer la photo"
               >
-                <X size={10} className="text-white" />
+                <X size={10} color="#FFFFFF" />
               </Pressable>
             </View>
           ))}
         </View>
       )}
 
-      {/* Upload button */}
+      {/* Bouton upload */}
       {images.length < maxImages && (
         <Pressable
           disabled={uploading}
-          onPress={handleImagePicker}
-          className="flex flex-row items-center gap-2 px-3 py-2 rounded-2xl text-xs font-semibold disabled:opacity-50"
-          style={{
-            backgroundColor: `${color}18`,
-            borderWidth: 1,
-            borderColor: `${color}55`,
-            borderStyle: "dashed",
-          }}
+          onPress={pickAndUpload}
+          style={({ pressed }) => [
+            styles.uploadButton,
+            {
+              backgroundColor: `${color}18`,
+              borderColor: `${color}60`,
+            },
+            uploading && styles.disabled,
+            pressed && styles.pressed,
+          ]}
         >
           {uploading ? (
-            <Loader2 size={14} className="animate-spin" />
+            <ActivityIndicator size="small" color={color} />
           ) : (
-            <ImagePlus size={14} style={{ color }} />
+            <ImagePlus size={14} color={color} />
           )}
-          <Text style={{ color }}>
+          <Text style={[styles.uploadButtonText, { color }]}>
             {uploading ? "Upload en cours..." : label}
           </Text>
         </Pressable>
@@ -149,14 +161,14 @@ export default function ImageUploader({
   );
 }
 
-// Sub-component: resolves a storageId to a URL for display
+// ── StorageImage : résout un storageId en URL et l'affiche ──────────────
 export function StorageImage({ storageId }: { storageId: string }) {
   if (storageId.startsWith("http")) {
     return (
       <Image
-        className="w-full h-full object-cover"
+        style={styles.image}
         source={{ uri: storageId }}
-        accessibilityLabel=""
+        resizeMode="cover"
       />
     );
   }
@@ -165,14 +177,71 @@ export function StorageImage({ storageId }: { storageId: string }) {
 
 function StorageImageResolved({ storageId }: { storageId: string }) {
   const url = useQuery(api.publications.getStorageUrl, { storageId });
+
   if (!url) {
-    return <View className="w-full h-full bg-white/10" />;
+    return <View style={[styles.image, styles.placeholder]} />;
   }
+
   return (
-    <Image
-      className="w-full h-full object-cover"
-      source={{ uri: url }}
-      accessibilityLabel=""
-    />
+    <Image style={styles.image} source={{ uri: url }} resizeMode="cover" />
   );
 }
+
+// ── Styles ──────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 8,
+  },
+  previewStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 8,
+  },
+  thumbnailWrapper: {
+    position: "relative",
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  placeholder: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  removeButton: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  uploadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    alignSelf: "flex-start",
+  },
+  uploadButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  pressed: {
+    transform: [{ scale: 0.96 }],
+  },
+});

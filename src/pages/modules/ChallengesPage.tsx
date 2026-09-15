@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Text, Pressable, TextInput } from "react-native";
 import { useState } from "react";
 import { useMutation, useQuery, usePaginatedQuery } from "convex/react";
@@ -10,9 +9,10 @@ import {
   ChevronRight, Plus, X, Heart, TrendingUp, Crown, Award,
 } from "lucide-react-native";
 import { Authenticated, Unauthenticated } from "@/lib/convex-auth-compat";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ function CreateChallengeModal({ onClose }: { onClose: () => void }) {
   const createChallenge = useMutation(api.challenges.createChallenge);
 
   const submit = async () => {
-    if (!title.trim() || !hashtag.trim()) return UIService.openToast("Titre et hashtag requis", "error");
+    if (!title.trim() || !hashtag.trim()) return toast.error("Titre et hashtag requis");
     setLoading(true);
     try {
       const now = new Date();
@@ -63,10 +63,10 @@ function CreateChallengeModal({ onClose }: { onClose: () => void }) {
         endsAt: end.toISOString(),
         isOfficial: false,
       });
-      UIService.openToast("Défi créé !", "success");
+      toast.success("Défi créé !");
       onClose();
     } catch {
-      UIService.openToast("Erreur lors de la création", "error");
+      toast.error("Erreur lors de la création");
     } finally {
       setLoading(false);
     }
@@ -74,50 +74,12 @@ function CreateChallengeModal({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <Pressable
-        className="fixed inset-0 z-50 bg-black/70" onPress={onClose} />
-      <View
-        className="fixed inset-x-4 bottom-0 z-50 rounded-t-3xl p-6 pb-10 max-h-[85vh] overflow-auto"
-        style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}
-      >
-        <View className="flex items-center justify-between mb-5">
-          <Text className="text-white font-black text-lg">Lancer un défi</Text>
-          <Pressable onPress={onClose} className=""><X size={18} className="text-white/40" /></Pressable>
-        </View>
-        <View className="space-y-3">
-          <Input value={title} onChange={(text) => setTitle(text)} placeholder="Titre du défi…" className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
-          <TextInput
-            value={desc} onChangeText={(text) => setDesc(text)}
-            placeholder="Description du défi…"
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white/85 text-sm placeholder:text-white/30 outline-none"
-           multiline textAlignVertical="top"/>
-          <View className="relative">
-            <Hash size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-400" />
-            <Input value={hashtag} onChange={(text) => setHashtag(text)} placeholder="Hashtag (ex: MonDefi)" className="pl-7 bg-white/5 border-white/10 text-white placeholder:text-white/30" />
-          </View>
-          <View className="flex gap-2 flex-wrap">
-            {CATEGORIES.map((c) => (
-              <Pressable key={c} onPress={() => setCat(c)}
-                className="text-xs px-3 py-1.5 rounded-full font-semibold"
-                style={{ backgroundColor: cat === c ? `${catColor(c)}30` : "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                {c}
-              </Pressable>
-            ))}
-          </View>
-          <View className="gap-2">
-            <View>
-              <Text className="text-[10px] text-white/30 mb-1 block">Récompense XP</Text>
-              <Input value={xp} onChange={(text) => setXp(text)} type="number" className="bg-white/5 border-white/10 text-white" />
-            </View>
-            <View>
-              <Text className="text-[10px] text-white/30 mb-1 block">Durée (jours)</Text>
-              <Input value={days} onChange={(text) => setDays(text)} type="number" className="bg-white/5 border-white/10 text-white" />
-            </View>
-          </View>
-          <Button onPress={submit} disabled={loading} className="w-full font-black" style={{  }}>
-            {loading ? "Création…" : "Lancer le défi 🔥"}
-          </Button>
-        </View>
+      <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" onPress={onClose} />
+      <View initial={{ opacity: 0, y: 80 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 80 }} transition={{ type: "spring", stiffness: 380, damping: 30 }} className="fixed inset-x-4 bottom-0 z-50 rounded-t-3xl p-6 pb-10 max-h-[85vh] overflow-auto" style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}>
+        <View className="flex items-center justify-between mb-5"><Text className="text-white font-black text-lg">Lancer un défi</Text><Pressable onPress={onClose} className=""><X size={18} className="text-white/40" /></Pressable></View>
+        <View className="space-y-3"><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre du défi…" className="bg-white/5 border-white/10 text-white placeholder:text-white/30" /><TextInput value={desc} onChangeText={(value) => setDesc(value)} placeholder="Description du défi…" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white/85 text-sm placeholder:text-white/30 outline-none focus:border-violet-500/50" multiline textAlignVertical="top" /><View className="relative"><Hash size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-violet-400" /><Input value={hashtag} onChange={(e) => setHashtag(e.target.value)} placeholder="Hashtag (ex: MonDefi)" className="pl-7 bg-white/5 border-white/10 text-white placeholder:text-white/30" /></View><View className="flex gap-2 flex-wrap">{CATEGORIES.map((c) => (
+              <Pressable key={c} onPress={() => setCat(c)} className="text-xs px-3 py-1.5 rounded-full font-semibold transition-all" style={{ backgroundColor: cat === c ? `${catColor(c)}30` : "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>{c}</Pressable>
+            ))}</View><View className="gap-2"><View><Text className="text-[10px] text-white/30 mb-1 block">Récompense XP</Text><Input value={xp} onChange={(e) => setXp(e.target.value)} type="number" className="bg-white/5 border-white/10 text-white" /></View><View><Text className="text-[10px] text-white/30 mb-1 block">Durée (jours)</Text><Input value={days} onChange={(e) => setDays(e.target.value)} type="number" className="bg-white/5 border-white/10 text-white" /></View></View><Button onPress={submit} disabled={loading} className="w-full font-black" style={{  }}>{loading ? "Création…" : "Lancer le défi 🔥"}</Button></View>
       </View>
     </>
   );
@@ -132,11 +94,7 @@ function ChallengeDetail({ challengeId, onBack }: { challengeId: Id<"challenges"
   const [joining, setJoining] = useState(false);
 
   if (!data) return (
-    <View className="p-5 space-y-4">
-      <Skeleton className="h-40 w-full rounded-3xl" />
-      <Skeleton className="h-6 w-2/3 rounded-xl" />
-      {[0,1,2].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
-    </View>
+    <View className="p-5 space-y-4"><Skeleton className="h-40 w-full rounded-3xl" /><Skeleton className="h-6 w-2/3 rounded-xl" />{[0,1,2].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}</View>
   );
 
   const color = catColor(data.category);
@@ -145,126 +103,47 @@ function ChallengeDetail({ challengeId, onBack }: { challengeId: Id<"challenges"
     setJoining(true);
     try {
       await joinChallenge({ challengeId });
-      UIService.openToast("Tu participes au défi !", "success");
-    } catch { UIService.openToast("Erreur", "error"); }
+      toast.success("Tu participes au défi !");
+    } catch { toast.error("Erreur"); }
     finally { setJoining(false); }
   };
 
   const handleVote = async (entryId: Id<"challengeEntries">) => {
     try {
       await vote({ entryId, challengeId });
-      UIService.openToast("Vote enregistré !", "success");
-    } catch { UIService.openToast("Erreur", "error"); }
+      toast.success("Vote enregistré !");
+    } catch { toast.error("Erreur"); }
   };
 
   return (
-    <View className="flex flex-col h-full overflow-auto pb-6">
-      <View className="px-5 pt-5">
-        <Pressable onPress={onBack} className="flex items-center gap-2 text-white/50 mb-4">
-          <ArrowLeft size={16} /> <Text>Retour</Text></Pressable>
-        {/* Hero */}
-        <View className="rounded-3xl p-5 mb-5 relative overflow-hidden"
-          style={{ borderStyle: "solid" }}>
-          <View className="absolute -top-6 -right-6 w-36 h-36"
-            style={{  }} />
-          <View className="relative">
-            {data.isOfficial && (
-              <View className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full mb-2"
-                style={{ backgroundColor: "rgba(245,158,11,0.2)", borderWidth: 1, borderColor: "rgba(245,158,11,0.3)", borderStyle: "solid" }}>
-                <Crown size={10} style={{ color: "#F59E0B" }} />
-                <Text className="text-[9px] font-black text-amber-400">DÉFI OFFICIEL</Text>
-              </View>
-            )}
-            <Text className="text-white font-black text-xl mb-1 text-balance">{data.title}</Text>
-            <Text className="text-white/50 text-sm mb-4">{data.description}</Text>
-            <View className="flex flex-wrap gap-3 mb-4">
-              <View className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
-                style={{ backgroundColor: `${color}15`, borderStyle: "solid" }}>
-                <Hash size={12} style={{ color }} />
-                <Text className="text-xs font-bold" style={{ color }}>{data.hashtag}</Text>
-              </View>
-              <View className="flex items-center gap-1 text-xs text-white/40">
-                <Users size={12} /> {data.participantCount} <Text>participant</Text>{data.participantCount > 1 ? "s" : ""}
-              </View>
-              <View className="flex items-center gap-1 text-xs text-white/40">
-                <Zap size={12} className="text-amber-400" /> <Text>+</Text>{data.xpReward} <Text>XP</Text></View>
-              <View className="flex items-center gap-1 text-xs text-white/40">
-                <Clock size={12} /> {timeLeft(data.endsAt)}
-              </View>
-            </View>
-            <Authenticated>
-              {!data.myEntry ? (
-                <Pressable onPress={handleJoin} disabled={joining || data.status === "ended"}
-                  className="px-5 py-2.5 rounded-2xl text-sm font-black text-white disabled:opacity-50"
-                  style={{  }}>
-                  {joining ? "Participation…" : data.status === "ended" ? "Terminé" : "Participer 🔥"}
-                </Pressable>
+    <View className="flex flex-col h-full overflow-auto pb-6"><View className="px-5 pt-5"><Pressable onPress={onBack} className="flex items-center gap-2 text-white/50 mb-4"><ArrowLeft size={16} /><Text>Retour</Text></Pressable>{}<View className="rounded-3xl p-5 mb-5 relative overflow-hidden" style={{ borderStyle: "solid" }}><View className="absolute -top-6 -right-6 w-36 h-36 pointer-events-none" style={{  }} /><View className="relative">{data.isOfficial && (
+              <View className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full mb-2" style={{ backgroundColor: "rgba(245,158,11,0.2)", borderWidth: 1, borderColor: "rgba(245,158,11,0.3)", borderStyle: "solid" }}><Crown size={10} style={{  }} /><Text className="text-[9px] font-black text-amber-400">DÉFI OFFICIEL</Text></View>
+            )}<Text className="text-white font-black text-xl mb-1 text-balance">{data.title}</Text><Text className="text-white/50 text-sm mb-4">{data.description}</Text><View className="flex flex-wrap gap-3 mb-4"><View className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl" style={{ backgroundColor: `${color}15`, borderStyle: "solid" }}><Hash size={12} style={{ color }} /><Text className="text-xs font-bold" style={{ color }}>{data.hashtag}</Text></View><View className="flex items-center gap-1 text-xs text-white/40"><Users size={12} />{data.participantCount}<Text>participant</Text>{data.participantCount > 1 ? "s" : ""}</View><View className="flex items-center gap-1 text-xs text-white/40"><Zap size={12} className="text-amber-400" /><Text>+</Text>{data.xpReward}<Text>XP</Text></View><View className="flex items-center gap-1 text-xs text-white/40"><Clock size={12} />{timeLeft(data.endsAt)}</View></View><Authenticated>{!data.myEntry ? (
+                <Pressable onPress={handleJoin} disabled={joining || data.status === "ended"} className="px-5 py-2.5 rounded-2xl text-sm font-black text-white active:scale-95 transition-transform disabled:opacity-50" style={{ boxShadow: `0 4px 14px ${color}40` }}>{joining ? "Participation…" : data.status === "ended" ? "Terminé" : "Participer 🔥"}</Pressable>
               ) : (
-                <View className="flex items-center gap-2 px-4 py-2.5 rounded-2xl"
-                  style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                  <Award size={14} className="text-amber-400" />
-                  <Text className="text-sm text-white/70 font-semibold">Tu participes à ce défi</Text>
-                </View>
-              )}
-            </Authenticated>
-            <Unauthenticated>
-              <Text className="text-white/35 text-xs">Connecte-toi pour participer</Text>
-            </Unauthenticated>
-          </View>
-        </View>
-
-        {/* Leaderboard */}
-        <Text className="text-white/50 text-[11px] font-black uppercase tracking-widest mb-3">
-          Classement ({data.topEntries.length})
-        </Text>
-      </View>
-
-      <View className="px-5 space-y-2">
-        {data.topEntries.length === 0 ? (
-          <View className="flex flex-col items-center py-10 text-center">
-            <Flame size={32} className="text-white/15 mb-3" />
-            <Text className="text-white/40 text-sm">Aucune participation pour l'instant</Text>
-            <Text className="text-white/25 text-[11px] mt-1">Sois le premier à participer !</Text>
-          </View>
+                <View className="flex items-center gap-2 px-4 py-2.5 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Award size={14} className="text-amber-400" /><Text className="text-sm text-white/70 font-semibold">Tu participes à ce défi</Text></View>
+              )}</Authenticated><Unauthenticated><Text className="text-white/35 text-xs">Connecte-toi pour participer</Text></Unauthenticated></View></View>{}<Text className="text-white/50 text-[11px] font-black uppercase tracking-widest mb-3">Classement ({data.topEntries.length})
+        </Text></View><View className="px-5 space-y-2">{data.topEntries.length === 0 ? (
+          <View className="flex flex-col items-center py-10 text-center"><Flame size={32} className="text-white/15 mb-3" /><Text className="text-white/40 text-sm">Aucune participation pour l'instant</Text><Text className="text-white/25 text-[11px] mt-1">Sois le premier à participer !</Text></View>
         ) : (
           data.topEntries.map((p, i) => {
             const isVoted = data.hasVotedFor === p._id;
             const rankColors = ["#F59E0B", "#94A3B8", "#CD7F32"];
             const rankColor = rankColors[i] ?? "rgba(255,255,255,0.2)";
             return (
-              <View key={p._id}
-                className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-                style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-                <View className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0"
-                  style={{ backgroundColor: i < 3 ? `${rankColor}25` : "rgba(255,255,255,0.06)" }}>
-                  {i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}
-                </View>
-                <View className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0"
-                  style={{ backgroundColor: "rgba(139,92,246,0.2)" }}>
-                  {(p.user?.name ?? "?")[0]}
-                </View>
-                <View className="flex-1 min-w-0">
-                  <Text className="text-white/80 text-sm font-semibold truncate">{p.user?.name ?? "Anonyme"}</Text>
-                  <Text className="text-white/30 text-[10px]">{p.voteCount} vote{p.voteCount > 1 ? "s" : ""}</Text>
-                </View>
+              <View key={p._id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
+                <View className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0" style={{ backgroundColor: i < 3 ? `${rankColor}25` : "rgba(255,255,255,0.06)" }}>{i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</View>
+                <View className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.2)" }}>{(p.user?.name ?? "?")[0]}</View>
+                <View className="flex-1 min-w-0"><Text className="text-white/80 text-sm font-semibold truncate">{p.user?.name ?? "Anonyme"}</Text><Text className="text-white/30 text-[10px]">{p.voteCount}vote{p.voteCount > 1 ? "s" : ""}</Text></View>
                 <Authenticated>
-                  <Pressable onPress={() => handleVote(p._id)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl"
-                    style={isVoted
+                  <Pressable onPress={() => handleVote(p._id)} className="flex items-center gap-1 px-3 py-1.5 rounded-xl active:scale-95 transition-transform" style={isVoted
                       ? { backgroundColor: "rgba(239,68,68,0.2)", borderWidth: 1, borderColor: "rgba(239,68,68,0.4)", borderStyle: "solid" }
-                      : { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                    <Heart size={11} style={{ color: isVoted ? "#f87171" : "rgba(255,255,255,0.3)", fill: isVoted ? "#f87171" : "none" }} />
-                    <Text className="text-[10px] font-bold" style={{ color: isVoted ? "#f87171" : "rgba(255,255,255,0.4)" }}>
-                      {isVoted ? "Voté" : "Voter"}
-                    </Text>
-                  </Pressable>
+                      : { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Heart size={11} style={{ fill: isVoted ? "#f87171" : "none" }} /><Text className="text-[10px] font-bold" style={{ color: isVoted ? "#f87171" : "rgba(255,255,255,0.4)" }}>{isVoted ? "Voté" : "Voter"}</Text></Pressable>
                 </Authenticated>
               </View>
             );
           })
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }
 
@@ -293,47 +172,12 @@ type ChallengeWithMeta = {
 function ChallengeCard({ c, onClick }: { c: ChallengeWithMeta; onClick: () => void }) {
   const color = catColor(c.category);
   return (
-    <Pressable
-      className="rounded-3xl p-4"
-      style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-      onPress={onClick}>
-      <View className="flex items-start gap-3">
-        <View className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl"
-          style={{ backgroundColor: `${color}15` }}>
-          <Flame size={20} style={{ color }} />
-        </View>
-        <View className="flex-1 min-w-0">
-          <View className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-            {c.isOfficial && (
-              <Text className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
-                style={{ backgroundColor: "rgba(245,158,11,0.2)", color: "#F59E0B" }}>
-                OFFICIEL
+    <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl p-4 active:scale-[0.98] transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }} onPress={onClick}>
+      <View className="flex items-start gap-3"><View className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl" style={{ backgroundColor: `${color}15` }}><Flame size={20} style={{ color }} /></View><View className="flex-1 min-w-0"><View className="flex items-center gap-1.5 mb-0.5 flex-wrap">{c.isOfficial && (
+              <Text className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(245,158,11,0.2)", color: "#F59E0B" }}>OFFICIEL
               </Text>
-            )}
-            <Text className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full"
-              style={{ backgroundColor: `${color}20`, color }}>
-              {c.category}
-            </Text>
-          </View>
-          <Text className="text-white/85 font-bold text-sm leading-tight mb-1 truncate">{c.title}</Text>
-          <View className="flex items-center gap-2 text-[10px] text-white/35">
-            <Text className="flex items-center gap-0.5"><Hash size={9} />{c.hashtag}</Text>
-            <Text>·</Text>
-            <Text className="flex items-center gap-0.5"><Users size={9} />{c.participantCount}</Text>
-            <Text>·</Text>
-            <Text className="flex items-center gap-0.5 text-amber-400"><Zap size={9} />+{c.xpReward} XP</Text>
-          </View>
-        </View>
-        <View className="flex flex-col items-end gap-1 flex-shrink-0">
-          <Text className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: c.status === "active" ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: c.status === "active" ? "#34d399" : "rgba(255,255,255,0.3)" }}>
-            {timeLeft(c.endsAt)}
-          </Text>
-          {c.joinedByMe && <Award size={11} className="text-amber-400" />}
-          <ChevronRight size={13} className="text-white/20" />
-        </View>
-      </View>
-    </Pressable>
+            )}<Text className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${color}20`, color }}>{c.category}</Text></View><Text className="text-white/85 font-bold text-sm leading-tight mb-1 truncate">{c.title}</Text><View className="flex items-center gap-2 text-[10px] text-white/35"><Text className="flex items-center gap-0.5"><Hash size={9} />{c.hashtag}</Text><Text>·</Text><Text className="flex items-center gap-0.5"><Users size={9} />{c.participantCount}</Text><Text>·</Text><Text className="flex items-center gap-0.5 text-amber-400"><Zap size={9} />+{c.xpReward}XP</Text></View></View><View className="flex flex-col items-end gap-1 flex-shrink-0"><Text className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: c.status === "active" ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", color: c.status === "active" ? "#34d399" : "rgba(255,255,255,0.3)" }}>{timeLeft(c.endsAt)}</Text>{c.joinedByMe && <Award size={11} className="text-amber-400" />}<ChevronRight size={13} className="text-white/20" /></View></View>
+    </View>
   );
 }
 
@@ -363,84 +207,29 @@ export default function ChallengesPage({ onBack }: Props) {
   }
 
   if (selectedId) return (
-    <View className="h-full overflow-hidden flex flex-col"
-      style={{  }}>
-      <ChallengeDetail challengeId={selectedId} onBack={() => setSelectedId(null)} />
-    </View>
+    <View className="h-full overflow-hidden flex flex-col" style={{  }}><ChallengeDetail challengeId={selectedId} onBack={() => setSelectedId(null)} /></View>
   );
 
   return (
-    <View className="h-full overflow-hidden flex flex-col"
-      style={{  }}>
-      {/* Header */}
-      <View className="px-5 pt-5 pb-3 flex-shrink-0">
-        <View className="flex items-center gap-3 mb-4">
-          <Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-            <ArrowLeft size={16} className="text-white/70" />
-          </Pressable>
-          <View className="flex-1">
-            <Text className="text-white font-black text-lg">Défis & Tendances</Text>
-            <Text className="text-white/35 text-xs">Challenges créateurs et hashtags viraux</Text>
-          </View>
-          <Authenticated>
-            <Pressable onPress={() => setShowCreate(true)}
-              className="w-9 h-9 rounded-2xl flex items-center justify-center"
-              style={{  }}>
-              <Plus size={16} className="text-white" />
-            </Pressable>
-          </Authenticated>
-        </View>
-
-        {/* Trending hashtags */}
-        {trending && trending.length > 0 && (
-          <View className="mb-4">
-            <View className="flex items-center gap-1.5 mb-2">
-              <TrendingUp size={11} className="text-white/30" />
-              <Text className="text-[10px] font-black text-white/30 uppercase tracking-widest">Tendances cette semaine</Text>
-            </View>
-            <View className="flex gap-2 overflow-x-auto pb-1" style={{  }}>
-              {trending.map((t) => (
-                <View key={t._id}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                  style={{ backgroundColor: "rgba(139,92,246,0.12)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}>
-                  <Hash size={9} className="text-violet-400" />
-                  <Text className="text-violet-300 text-xs font-bold">{t.hashtag.replace("#", "")}</Text>
-                  <Text className="text-white/25 text-[9px]">{t.count}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Tabs */}
-        <View className="flex gap-2">
-          {(["active", "upcoming", "ended"] as const).map((tab) => (
-            <Pressable key={tab} onPress={() => setActiveTab(tab)}
-              className="flex-1 py-2 rounded-xl text-xs font-bold"
-              style={activeTab === tab
+    <View className="h-full overflow-hidden flex flex-col" style={{  }}>{}<View className="px-5 pt-5 pb-3 flex-shrink-0"><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ArrowLeft size={16} className="text-white/70" /></Pressable><View className="flex-1"><Text className="text-white font-black text-lg">Défis & Tendances</Text><Text className="text-white/35 text-xs">Challenges créateurs et hashtags viraux</Text></View><Authenticated><Pressable onPress={() => setShowCreate(true)} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{  }}><Plus size={16} className="text-white" /></Pressable></Authenticated></View>{}{trending && trending.length > 0 && (
+          <View className="mb-4"><View className="flex items-center gap-1.5 mb-2"><TrendingUp size={11} className="text-white/30" /><Text className="text-[10px] font-black text-white/30 uppercase tracking-widest">Tendances cette semaine</Text></View><View className="flex gap-2 overflow-x-auto pb-1" style={{  }}>{trending.map((t) => (
+                <View key={t._id} className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ backgroundColor: "rgba(139,92,246,0.12)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}><Hash size={9} className="text-violet-400" /><Text className="text-violet-300 text-xs font-bold">{t.hashtag.replace("#", "")}</Text><Text className="text-white/25 text-[9px]">{t.count}</Text></View>
+              ))}</View></View>
+        )}{}<View className="flex gap-2">{(["active", "upcoming", "ended"] as const).map((tab) => (
+            <Pressable key={tab} onPress={() => setActiveTab(tab)} className="flex-1 py-2 rounded-xl text-xs font-bold transition-all" style={activeTab === tab
                 ? {  }
-                : { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-              {tab === "active" ? "Actifs" : tab === "upcoming" ? "À venir" : "Terminés"}
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* List */}
-      <View className="flex-1 overflow-auto px-5 pb-6 space-y-3">
-        {status === "LoadingFirstPage" ? (
+                : { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>{tab === "active" ? "Actifs" : tab === "upcoming" ? "À venir" : "Terminés"}</Pressable>
+          ))}</View></View>{}<View className="flex-1 overflow-auto px-5 pb-6 space-y-3">{status === "LoadingFirstPage" ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-3xl" />)
         ) : results.length === 0 ? (
           <View className="flex flex-col items-center py-16 text-center">
             <Trophy size={40} className="text-white/15 mb-3" />
-            <Text className="text-white/40 text-sm font-semibold"><Text>Aucun défi</Text>{activeTab === "active" ? "actif" : activeTab === "upcoming" ? "à venir" : "terminé"}</Text>
-            <Text className="text-white/25 text-xs mt-1"><Text>Lance le premier défi de la communauté !</Text></Text>
+            <Text className="text-white/40 text-sm font-semibold">Aucun défi {activeTab === "active" ? "actif" : activeTab === "upcoming" ? "à venir" : "terminé"}</Text>
+            <Text className="text-white/25 text-xs mt-1">Lance le premier défi de la communauté !</Text>
             <Authenticated>
-              <Pressable onPress={() => setShowCreate(true)}
-                className="mt-4 px-5 py-2.5 rounded-2xl text-sm font-black text-white"
-                style={{  }}>
-                <Text>Créer un défi 🔥</Text></Pressable>
+              <Pressable onPress={() => setShowCreate(true)} className="mt-4 px-5 py-2.5 rounded-2xl text-sm font-black text-white" style={{  }}>
+                Créer un défi 🔥
+              </Pressable>
             </Authenticated>
           </View>
         ) : (
@@ -450,15 +239,10 @@ export default function ChallengesPage({ onBack }: Props) {
             ))}
             {status === "CanLoadMore" && (
               <Pressable onPress={() => loadMore(10)} className="w-full py-3 text-sm text-white/40 font-semibold">
-                <Text>Charger plus</Text></Pressable>
+                Charger plus
+              </Pressable>
             )}
           </>
-        )}
-      </View>
-
-      <>
-        {showCreate && <CreateChallengeModal onClose={() => setShowCreate(false)} />}
-      </>
-    </View>
+        )}</View><View>{showCreate && <CreateChallengeModal onClose={() => setShowCreate(false)} />}</View></View>
   );
 }

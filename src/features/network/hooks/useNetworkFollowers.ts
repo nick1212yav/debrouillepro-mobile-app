@@ -1,10 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/hooks/useNetworkFollowers.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { Follower } from "../components/Network/FollowersList";
+import { toast } from "sonner";
 
 interface UseNetworkFollowersOptions {
   userId: Id<"users">;
@@ -25,12 +24,12 @@ export function useNetworkFollowers({ userId }: UseNetworkFollowersOptions) {
     try {
       if (toggleFollow) {
         await toggleFollow({ targetUserId: followerId });
-        UIService.openToast("Abonné retiré", "success");
+        toast.success("Abonné retiré");
         return true;
       }
       return false;
     } catch {
-      UIService.openToast("Impossible de retirer l'abonné", "error");
+      toast.error("Impossible de retirer l'abonné");
       return false;
     }
   };

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateBoatForm.tsx
 import { useForm } from "react-hook-form";
@@ -114,13 +114,9 @@ export function CreateBoatForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="operatorName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="operatorName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom de la compagnie ou de l'exploitant *</Text></FormLabel>
+              <FormLabel>Nom de la compagnie ou de l'exploitant *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Majestic Fleuve, STF"
@@ -130,15 +126,9 @@ export function CreateBoatForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone d'embarquement *</Text></FormLabel>
+              <FormLabel>Téléphone d'embarquement *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: +243 890 000 000"
@@ -148,16 +138,9 @@ export function CreateBoatForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="boatName"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="boatName" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Nom du bateau / de l'embarcation *</Text></FormLabel>
+                <FormLabel>Nom du bateau / de l'embarcation *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: M/S Kivu Queen, Rapide-1"
@@ -167,14 +150,9 @@ export function CreateBoatForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="boatType"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="boatType" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Type d'embarcation *</Text></FormLabel>
+                <FormLabel>Type d'embarcation *</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -194,17 +172,9 @@ export function CreateBoatForm({
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="originPort"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="originPort" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Port de départ *</Text></FormLabel>
+                <FormLabel>Port de départ *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Beach Ngobila, Kinshasa"
@@ -214,14 +184,9 @@ export function CreateBoatForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="destinationPort"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="destinationPort" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Port d'arrivée *</Text></FormLabel>
+                <FormLabel>Port d'arrivée *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Port de Brazzaville"
@@ -231,57 +196,39 @@ export function CreateBoatForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="capacity"
-            render={({ field }) => (
+            )} /></View><View className="gap-2"><FormField control={form.control} name="capacity" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Places disponibles *</Text></FormLabel>
+                <FormLabel>Places disponibles *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseInt(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseInt(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="pricePerSeat"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="pricePerSeat" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prix de la traversée *</Text></FormLabel>
+                <FormLabel>Prix de la traversée *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -292,23 +239,16 @@ export function CreateBoatForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                    <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="departureTime"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="departureTime" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Heure de départ de la navette *</Text></FormLabel>
+              <FormLabel>Heure de départ de la navette *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: 09:15"
@@ -318,39 +258,30 @@ export function CreateBoatForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Gilets de sauvetage */}
-        <FormField
-          control={form.control}
-          name="lifeJacketsProvided"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="lifeJacketsProvided" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border border-white/10 p-3 bg-white/5">
               <View className="space-y-0.5">
                 <FormLabel className="text-white/90">
-                  <Text>Gilets de sauvetage individuels fournis *</Text></FormLabel>
+                  Gilets de sauvetage individuels fournis *
+                </FormLabel>
                 <FormDescription className="text-white/40 text-xs">
-                  <Text>Obligatoire pour l'ensemble des passagers à bord</Text></FormDescription>
+                  Obligatoire pour l'ensemble des passagers à bord
+                </FormDescription>
               </View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                   className="data-[state=checked]:bg-blue-600"
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="description" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Description / Informations additionnelles (tonnage de bagages autorisés, etc.)</Text></FormLabel>
+                Description / Informations additionnelles (tonnage de bagages
+                autorisés, etc.)
+              </FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Ex: Vedette climatisée, limite de bagages à 20kg par personne, cabine VIP disponible..."
@@ -361,22 +292,14 @@ export function CreateBoatForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-12 rounded-xl bg-blue-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+          )} /><Button  className="w-full h-12 rounded-xl bg-blue-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Enregistrement...</Text></>
+              Enregistrement...
+            </>
           ) : (
             "⛴️ Enregistrer le service Fluvial / Lacustre"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

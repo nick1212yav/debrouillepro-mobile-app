@@ -1,4 +1,4 @@
-import { View, Text, TextInput } from "react-native";
+import { View, TextInput } from "react-native";
 import { useState } from "react";
 import type { MenuItem, MenuCategory } from "../../types/menu.types";
 import { RestaurantMenuCategory } from "./RestaurantMenuCategory";
@@ -33,36 +33,7 @@ export function RestaurantMenu({
   );
 
   return (
-    <View className="py-4">
-      {/* Barre de filtrage par texte */}
-      <View className="px-4 mb-4">
-        <View
-          className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          <Search size={15} className="text-white/40" />
-          <TextInput
-           
-            placeholder="Rechercher une grillade, boisson, plat..."
-            value={search}
-            onChangeText={(text) => setSearch(text)}
-            className="flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/30"
-          />
-        </View>
-      </View>
-
-      {/* Choix des onglets catégories */}
-      <View className="mb-4">
-        <RestaurantMenuCategory
-          categories={categories.map((c) => c.category)}
-          activeCategory={activeCategory}
-          onSelectCategory={setActiveCategory}
-        />
-      </View>
-
-      {/* Liste de rendu des articles culinaires */}
-      <View className="px-4 space-y-3">
-        {filteredItems.length > 0 ? (
+    <View className="py-4">{}<View className="px-4 mb-4"><View className="flex items-center gap-2.5 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={15} className="text-white/40" /><TextInput placeholder="Rechercher une grillade, boisson, plat..." value={search} onChangeText={(value) => setSearch(value)} className="flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/30" /></View></View>{}<View className="mb-4"><RestaurantMenuCategory categories={categories.map((c) => c.category)} activeCategory={activeCategory} onSelectCategory={setActiveCategory} /></View>{}<View className="px-4 space-y-3">{filteredItems.length > 0 ? (
           filteredItems.map((item) => (
             <RestaurantMenuItem
               key={item.name}
@@ -74,9 +45,8 @@ export function RestaurantMenu({
           ))
         ) : (
           <View className="text-center py-8 text-white/30 text-xs">
-            <Text>Aucun plat trouvé dans cette catégorie.</Text></View>
-        )}
-      </View>
-    </View>
+            Aucun plat trouvé dans cette catégorie.
+          </View>
+        )}</View></View>
   );
 }

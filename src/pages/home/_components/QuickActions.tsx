@@ -1,4 +1,25 @@
-import { View, Pressable, Text, TextInput } from "react-native";
+// src/pages/home/_components/QuickActions.tsx
+import {
+  View,
+  Pressable,
+  Text,
+  TextInput,
+  ScrollView,
+  Animated,
+  Easing,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   Wallet,
   Bus,
@@ -19,7 +40,8 @@ import {
   RotateCcw,
   X,
   Check,
-  GripVertical,
+  ChevronUp,
+  ChevronDown,
   BookOpen,
   Gift,
   ShoppingBag,
@@ -68,13 +90,12 @@ import {
   ShieldAlert,
   Box,
 } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   type ActionId,
   ALL_ACTIONS,
   useQuickActions,
-} from "@/hooks/use-quick-actions";
+} from "@/hooks/use-quick-actions.ts";
 
 /* ============================================================
  * ICON SYSTEM
@@ -175,27 +196,625 @@ interface QuickActionsProps {
  * ============================================================ */
 
 const MAX_VISIBLE_ACTIONS = 7;
+const isBrowser = typeof window !== "undefined";
+
+/* ============================================================
+ * FADE UP WRAPPER
+ * ============================================================ */
+
+function FadeUp({
+  delay = 0,
+  distance = 14,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: any;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 460,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================
+ * ANIMATED HEADER ICON
+ * ============================================================ */
+
+function AnimatedHeaderIcon() {
+  const rotate = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
+  const halo = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(rotate, {
+          toValue: 1,
+          duration: 4000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotate, {
+          toValue: -1,
+          duration: 4000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    Animated.loop(
+      Animated.timing(halo, {
+        toValue: 1,
+        duration: 2400,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, [rotate, pulse, halo]);
+
+  const rotation = rotate.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ["-8deg", "8deg"],
+  });
+  const glowScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.06],
+  });
+  const haloScale = halo.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.9, 1.7],
+  });
+  const haloOpacity = halo.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.6, 0],
+  });
+
+  return (
+    <View style={styles.headerIconWrap}>
+      <Animated.View
+        style={[
+          styles.headerIconHalo,
+          { opacity: haloOpacity, transform: [{ scale: haloScale }] },
+        ]}
+      />
+      <Animated.View
+        style={[styles.headerIconGlow, { transform: [{ scale: glowScale }] }]}
+      />
+      <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+        <LinearGradient
+          colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerIconGradient}
+        >
+          <Zap size={13} color="#fff" strokeWidth={2.4} fill="#fff" />
+        </LinearGradient>
+      </Animated.View>
+    </View>
+  );
+}
+
+/* ============================================================
+ * ACTIVE ACTION TILE
+ * ============================================================ */
+
+function ActiveActionTile({
+  action,
+  index,
+  focused,
+  onPress,
+}: {
+  action: any;
+  index: number;
+  focused: boolean;
+  onPress: () => void;
+}) {
+  const Icon = ICON_MAP[action.id as ActionId];
+  const scale = useRef(new Animated.Value(1)).current;
+  const anim = useRef(new Animated.Value(0)).current;
+  const auraAnim = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const pressPulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!Icon) return;
+    Animated.spring(anim, {
+      toValue: 1,
+      delay: Math.min(index * 45, 320),
+      stiffness: 420,
+      damping: 24,
+      useNativeDriver: true,
+    }).start();
+  }, [anim, index, Icon]);
+
+  useEffect(() => {
+    Animated.timing(auraAnim, {
+      toValue: focused ? 1 : 0,
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [focused, auraAnim]);
+
+  if (!Icon) return null;
+
+  const onPressIn = () => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 0.88,
+        useNativeDriver: true,
+        speed: 40,
+      }),
+      Animated.timing(pressPulse, {
+        toValue: 1,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+  const onPressOut = () => {
+    Animated.parallel([
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+      Animated.timing(pressPulse, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const tileScale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.65, 1],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.tileWrap,
+        {
+          opacity: anim,
+          transform: [{ scale: tileScale }],
+        },
+      ]}
+    >
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        accessibilityLabel={action.label}
+        style={styles.tilePress}
+      >
+        <Animated.View style={{ transform: [{ scale }] }}>
+          {/* Aura */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.tileAura,
+              {
+                backgroundColor: action.color,
+                opacity: auraAnim,
+                transform: [
+                  {
+                    scale: auraAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.85, 1.15],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+
+          {/* Press pulse ring */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.tilePressRing,
+              {
+                borderColor: action.color,
+                opacity: pressPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 0.6],
+                }),
+                transform: [
+                  {
+                    scale: pressPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.9, 1.35],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+
+          {/* Icon tile */}
+          <LinearGradient
+            colors={[`${action.color}26`, action.bg, `${action.color}10`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.tileGradient,
+              {
+                borderColor: `${action.color}44`,
+                shadowColor: action.color,
+              },
+              focused && {
+                shadowOpacity: 0.45,
+                shadowRadius: 18,
+                shadowOffset: { width: 0, height: 8 },
+              },
+            ]}
+          >
+            <Icon size={19} color={action.color} strokeWidth={1.9} />
+          </LinearGradient>
+        </Animated.View>
+
+        <Text style={styles.tileLabel} numberOfLines={1}>
+          {action.label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================
+ * PROGRESS RING (header counter)
+ * ============================================================ */
+
+function ProgressRing({ count, max }: { count: number; max: number }) {
+  const fillAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fillAnim, {
+      toValue: Math.min(count / max, 1),
+      duration: 480,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [count, max, fillAnim]);
+
+  const width = fillAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
+
+  const full = count >= max;
+
+  return (
+    <View style={styles.progressRing}>
+      <View style={styles.progressTrack}>
+        <Animated.View
+          style={[
+            styles.progressFill,
+            {
+              width,
+              backgroundColor: full ? "#FBBF24" : "#A78BFA",
+              shadowColor: full ? "#FBBF24" : "#A78BFA",
+            },
+          ]}
+        />
+      </View>
+      <Text
+        style={[styles.progressText, { color: full ? "#FCD34D" : "#C4B5FD" }]}
+      >
+        {count}
+      </Text>
+    </View>
+  );
+}
+
+/* ============================================================
+ * REORDER ROW (customizer)
+ * ============================================================ */
+
+function ReorderRow({
+  action,
+  index,
+  total,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
+}: {
+  action: any;
+  index: number;
+  total: number;
+  onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}) {
+  const Icon = ICON_MAP[action.id as ActionId];
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.99,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  if (!Icon) return null;
+
+  const canMoveUp = index > 0;
+  const canMoveDown = index < total - 1;
+
+  return (
+    <FadeUp delay={index * 40} distance={10}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          style={styles.row}
+        >
+          <LinearGradient
+            colors={[`${action.color}14`, "rgba(255,255,255,0)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+
+          {/* Position */}
+          <View style={styles.rowPosition}>
+            <Text style={styles.rowPositionText}>
+              {String(index + 1).padStart(2, "0")}
+            </Text>
+          </View>
+
+          {/* Icon */}
+          <LinearGradient
+            colors={[`${action.color}2E`, `${action.color}0E`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.rowIcon, { borderColor: `${action.color}55` }]}
+          >
+            <Icon size={17} color={action.color} />
+          </LinearGradient>
+
+          {/* Label */}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.rowLabel} numberOfLines={1}>
+              {action.label}
+            </Text>
+            <Text style={styles.rowDesc} numberOfLines={1}>
+              {action.description}
+            </Text>
+          </View>
+
+          {/* Reorder buttons */}
+          <View style={styles.reorderCol}>
+            <Pressable
+              onPress={onMoveUp}
+              disabled={!canMoveUp}
+              hitSlop={4}
+              style={[
+                styles.reorderBtn,
+                !canMoveUp && styles.reorderBtnDisabled,
+              ]}
+            >
+              <ChevronUp
+                size={11}
+                color={
+                  canMoveUp ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.15)"
+                }
+                strokeWidth={2.8}
+              />
+            </Pressable>
+            <Pressable
+              onPress={onMoveDown}
+              disabled={!canMoveDown}
+              hitSlop={4}
+              style={[
+                styles.reorderBtn,
+                !canMoveDown && styles.reorderBtnDisabled,
+              ]}
+            >
+              <ChevronDown
+                size={11}
+                color={
+                  canMoveDown
+                    ? "rgba(255,255,255,0.7)"
+                    : "rgba(255,255,255,0.15)"
+                }
+                strokeWidth={2.8}
+              />
+            </Pressable>
+          </View>
+
+          {/* Remove */}
+          <Pressable
+            onPress={onRemove}
+            hitSlop={6}
+            accessibilityLabel={`Retirer ${action.label}`}
+            style={({ pressed }) => [
+              styles.removeBtn,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <X size={13} color="#FCA5A5" strokeWidth={2.6} />
+          </Pressable>
+        </Pressable>
+      </Animated.View>
+    </FadeUp>
+  );
+}
+
+/* ============================================================
+ * AVAILABLE ROW (search results)
+ * ============================================================ */
+
+function AvailableRow({
+  action,
+  index,
+  disabled,
+  onPress,
+}: {
+  action: any;
+  index: number;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const Icon = ICON_MAP[action.id as ActionId];
+  const scale = useRef(new Animated.Value(1)).current;
+
+  if (!Icon) return null;
+
+  const onPressIn = () => {
+    if (disabled) return;
+    Animated.spring(scale, {
+      toValue: 0.985,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  return (
+    <FadeUp delay={Math.min(index * 25, 300)} distance={8}>
+      <Animated.View
+        style={{ transform: [{ scale }], opacity: disabled ? 0.35 : 1 }}
+      >
+        <Pressable
+          onPress={onPress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          disabled={disabled}
+          style={styles.availableRow}
+        >
+          <LinearGradient
+            colors={[`${action.color}10`, "rgba(255,255,255,0)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+
+          <LinearGradient
+            colors={[`${action.color}26`, `${action.color}0A`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.availableIcon, { borderColor: `${action.color}44` }]}
+          >
+            <Icon size={17} color={action.color} />
+          </LinearGradient>
+
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.availableLabel} numberOfLines={1}>
+              {action.label}
+            </Text>
+            <Text style={styles.availableDesc} numberOfLines={1}>
+              {action.description}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.availableAddBtn,
+              {
+                backgroundColor: disabled
+                  ? "rgba(255,255,255,0.025)"
+                  : `${action.color}22`,
+                borderColor: disabled
+                  ? "rgba(255,255,255,0.06)"
+                  : `${action.color}55`,
+              },
+            ]}
+          >
+            <Check
+              size={13}
+              color={disabled ? "rgba(255,255,255,0.25)" : action.color}
+              strokeWidth={3}
+            />
+          </View>
+        </Pressable>
+      </Animated.View>
+    </FadeUp>
+  );
+}
 
 /* ============================================================
  * MAIN COMPONENT
  * ============================================================ */
 
 export default function QuickActions({ onNavigate }: QuickActionsProps) {
-  const shouldReduceMotion = useReducedMotion();
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
 
   const [customizing, setCustomizing] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [focusedAction, setFocusedAction] = useState<ActionId | null>(null);
 
   const searchRef = useRef<TextInput>(null);
 
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const sheetAnim = useRef(new Animated.Value(0)).current;
+  const headerAnim = useRef(new Animated.Value(0)).current;
+
   const { activeIds, activeActions, canAdd, toggle, reorder, reset } =
     useQuickActions();
 
-  /* ==========================================================
-   * AVAILABLE ACTIONS
-   * ========================================================== */
-
+  /* ───── available ───── */
   const available = useMemo(
     () => ALL_ACTIONS.filter((action) => !activeIds.includes(action.id)),
     [activeIds],
@@ -204,22 +823,88 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
   const normalizedSearch = searchQuery.trim().toLowerCase();
 
   const filteredAvailable = useMemo(() => {
-    if (!normalizedSearch) {
-      return available;
-    }
-
-    return available.filter((action) => {
-      return (
+    if (!normalizedSearch) return available;
+    return available.filter(
+      (action) =>
         action.label.toLowerCase().includes(normalizedSearch) ||
-        action.description.toLowerCase().includes(normalizedSearch)
-      );
-    });
+        action.description.toLowerCase().includes(normalizedSearch),
+    );
   }, [available, normalizedSearch]);
 
-  /* ==========================================================
-   * OPEN CUSTOMIZER
-   * ========================================================== */
+  /* ───── header entrance ───── */
+  useEffect(() => {
+    Animated.timing(headerAnim, {
+      toValue: 1,
+      duration: 460,
+      delay: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [headerAnim]);
 
+  /* ───── sheet mount/unmount ───── */
+  useEffect(() => {
+    if (customizing) {
+      setMounted(true);
+      backdropAnim.setValue(0);
+      sheetAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 1,
+          duration: 240,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(sheetAnim, {
+          toValue: 1,
+          stiffness: 320,
+          damping: 32,
+          mass: 0.85,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetAnim, {
+          toValue: 0,
+          duration: 260,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start(() => setMounted(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customizing]);
+
+  /* ───── web shortcuts ───── */
+  useEffect(() => {
+    if (!isBrowser) return;
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCustomizing(true);
+        setSearchQuery("");
+        setTimeout(() => searchRef.current?.focus(), 400);
+        return;
+      }
+      if (e.key === "Escape" && customizing) {
+        e.preventDefault();
+        closeCustomizer();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customizing]);
+
+  /* ───── actions ───── */
   const openCustomizer = useCallback(() => {
     setCustomizing(true);
     setSearchQuery("");
@@ -231,108 +916,85 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
     setFocusedAction(null);
   }, []);
 
-  /* ==========================================================
-   * KEYBOARD EXPERIENCE
-   * ========================================================== */
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const modifier = event.metaKey || event.ctrlKey;
-
-      if (modifier && event.key.toLowerCase() === "k") {
-        openCustomizer();
-
-        requestAnimationFrame(() => {
-          searchRef.current?.focus();
-        });
-
-        return;
-      }
-
-      if (event.key === "Escape" && customizing) {
-        closeCustomizer();
-      }
-    };
-
-    undefined;
-
-    return () => {
-      undefined;
-    };
-  }, [closeCustomizer, customizing, openCustomizer]);
-
-  /* ==========================================================
-   * RESET
-   * ========================================================== */
-
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     reset();
     setFocusedAction(null);
-  };
+  }, [reset]);
 
-  /* ==========================================================
-   * NAVIGATION
-   * ========================================================== */
+  const handleNavigate = useCallback(
+    (route: string, id: ActionId) => {
+      setFocusedAction(id);
+      onNavigate(route);
+    },
+    [onNavigate],
+  );
 
-  const handleNavigate = (route: string, id: ActionId) => {
-    setFocusedAction(id);
-    onNavigate(route);
-  };
+  const moveItem = useCallback(
+    (index: number, direction: -1 | 1) => {
+      const next = [...activeIds];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return;
+      [next[index], next[target]] = [next[target], next[index]];
+      reorder(next as ActionId[]);
+    },
+    [activeIds, reorder],
+  );
 
-  /* ==========================================================
+  const sheetTranslateY = sheetAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_HEIGHT, 0],
+  });
+
+  const sheetScale = sheetAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.96, 1],
+  });
+
+  const headerTranslateY = headerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 0],
+  });
+
+  const visibleActions = useMemo(
+    () => activeActions.slice(0, MAX_VISIBLE_ACTIONS),
+    [activeActions],
+  );
+
+  /* ========================================================================
    * RENDER
-   * ========================================================== */
+   * ====================================================================== */
 
   return (
     <>
-      {/* ======================================================
-          ACTION CENTER
-          ====================================================== */}
-
-      <View
-        className="relative mt-5 px-5"
+      {/* ═══════════ ACTION CENTER ═══════════ */}
+      <Animated.View
+        style={[
+          styles.root,
+          {
+            opacity: headerAnim,
+            transform: [{ translateY: headerTranslateY }],
+          },
+        ]}
         accessibilityLabel="Actions rapides"
       >
-        {/* Decorative ambient glow */}
-
-        <View
-         
-          className="absolute -left-10 top-10 h-32 w-32 rounded-full opacity-20"
-          style={{  }}
-        />
-
-        <View
-         
-          className="absolute -right-10 top-0 h-24 w-24 rounded-full opacity-10"
-          style={{  }}
-        />
+        {/* Ambient orbs */}
+        <View style={styles.orbLeft} pointerEvents="none" />
+        <View style={styles.orbRight} pointerEvents="none" />
 
         {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <AnimatedHeaderIcon />
 
-        <View className="relative mb-4 flex items-center justify-between">
-          <View className="flex items-center gap-2.5">
-            <View
-              className="flex h-7 w-7 items-center justify-center rounded-lg"
-              style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.2)", borderStyle: "solid" }}
-            >
-              <Zap size={13} strokeWidth={2.4} className="text-violet-300" />
-            </View>
-
-            <View>
-              <View className="flex items-center gap-2">
-                <Text className="text-sm font-bold tracking-tight text-white">
-                  Actions rapides
-                </Text>
-
-                <Text
-                  className="rounded-full px-1.5 py-0.5 text-[8px] font-bold"
-                  style={{ color: "rgba(196,181,253,.9)", backgroundColor: "rgba(139,92,246,.1)", borderWidth: 1, borderColor: "rgba(139,92,246,.15)", borderStyle: "solid" }}
-                >
-                  {activeIds.length}
-                </Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <View style={styles.headerTitleRow}>
+                <Text style={styles.headerTitle}>Actions rapides</Text>
+                <ProgressRing
+                  count={activeIds.length}
+                  max={MAX_VISIBLE_ACTIONS}
+                />
               </View>
-
-              <Text className="mt-0.5 text-[9px] text-white/25">
+              <Text style={styles.headerSub}>
                 Votre espace d'accès instantané
               </Text>
             </View>
@@ -340,504 +1002,1044 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
 
           <Pressable
             onPress={openCustomizer}
-            className="group flex items-center gap-1.5 rounded-xl px-2.5 py-2"
-            style={{ backgroundColor: "rgba(139,92,246,.07)", borderWidth: 1, borderColor: "rgba(139,92,246,.14)", borderStyle: "solid" }}
             accessibilityLabel="Personnaliser les actions rapides"
+            style={({ pressed }) => [
+              styles.customizeBtn,
+              pressed && { opacity: 0.85 },
+            ]}
           >
-            <Settings2
-              size={12}
-              className="text-violet-400"
-            />
-
-            <Text className="text-[10px] font-semibold text-violet-300">
-              Personnaliser
-            </Text>
+            <Settings2 size={12} color="#C4B5FD" />
+            <Text style={styles.customizeBtnText}>Personnaliser</Text>
           </Pressable>
         </View>
 
-        {/* Active action grid */}
-
-        {activeActions.length > 0 ? (
-          <View className="relative gap-1.5">
-            <>
-              {activeActions
-                .slice(0, MAX_VISIBLE_ACTIONS)
-                .map((action, index) => {
-                  const Icon = ICON_MAP[action.id];
-
-                  if (!Icon) {
-                    return null;
-                  }
-
-                  const isFocused = focusedAction === action.id;
-
-                  return (
-                    <Pressable
-                      key={action.id}
-                      onPress={() => handleNavigate(action.route, action.id)}
-                      className="group relative flex min-w-0 flex-col items-center gap-1.5 outline-none"
-                      accessibilityLabel={action.label}
-                    >
-                      {/* Aura */}
-
-                      <View
-                        className="absolute top-0 h-11 w-11 rounded-2xl"
-                        style={{ backgroundColor: action.color }}
-                      />
-
-                      {/* Icon tile */}
-
-                      <View
-                        className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-[15px]"
-                        style={{ backgroundColor: action.bg, borderStyle: "solid" }}
-                      >
-                        {/* shine */}
-
-                        <View
-                         
-                          className="absolute inset-0 opacity-0"
-                          style={{  }}
-                        />
-
-                        <Icon
-                          size={19}
-                          strokeWidth={1.9}
-                          style={{
-                            color: action.color,
-                          }}
-                          className="relative z-10"
-                        />
-                      </View>
-
-                      {/* Label */}
-
-                      <Text className="w-full truncate text-center text-[8.5px] font-semibold leading-tight text-white/55">
-                        {action.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-            </>
+        {/* Active grid */}
+        {visibleActions.length > 0 ? (
+          <View style={styles.grid}>
+            {visibleActions.map((action, index) => (
+              <ActiveActionTile
+                key={action.id}
+                action={action}
+                index={index}
+                focused={focusedAction === action.id}
+                onPress={() => handleNavigate(action.route, action.id)}
+              />
+            ))}
           </View>
         ) : (
-          <Pressable
-            onPress={openCustomizer}
-            className="flex w-full items-center gap-3 rounded-2xl p-4 text-left"
-            style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.14)", borderStyle: "solid" }}
-          >
-            <View className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
-              <Sparkles size={18} className="text-violet-300" />
-            </View>
-
-            <View className="min-w-0 flex-1">
-              <Text className="text-xs font-bold text-white/75">
-                Créez votre espace express
-              </Text>
-
-              <Text className="mt-0.5 text-[10px] text-white/30">
-                Ajoutez vos services les plus utilisés.
-              </Text>
-            </View>
-
-            <Text className="rounded-lg bg-violet-500/10 px-2 py-1 text-[9px] font-bold text-violet-300">
-              Configurer
-            </Text>
-          </Pressable>
+          <FadeUp delay={80}>
+            <Pressable
+              onPress={openCustomizer}
+              style={({ pressed }) => [
+                styles.emptyCta,
+                pressed && { opacity: 0.9 },
+              ]}
+            >
+              <LinearGradient
+                colors={["rgba(139,92,246,0.14)", "rgba(255,255,255,0.02)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <LinearGradient
+                colors={["rgba(167,139,250,0.32)", "rgba(99,102,241,0.08)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emptyCtaIcon}
+              >
+                <Sparkles size={18} color="#C4B5FD" />
+              </LinearGradient>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.emptyCtaTitle}>
+                  Créez votre espace express
+                </Text>
+                <Text style={styles.emptyCtaSub}>
+                  Ajoutez vos services les plus utilisés.
+                </Text>
+              </View>
+              <Text style={styles.emptyCtaAction}>Configurer</Text>
+            </Pressable>
+          </FadeUp>
         )}
-      </View>
+      </Animated.View>
 
-      {/* ======================================================
-          CUSTOMIZATION COMMAND CENTER
-          ====================================================== */}
-
-      <>
-        {customizing && (
-          <>
-            {/* Backdrop */}
-
+      {/* ═══════════ CUSTOMIZER SHEET ═══════════ */}
+      {mounted ? (
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          {/* Backdrop */}
+          <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
             <Pressable
               onPress={closeCustomizer}
-              className="fixed inset-0 z-40"
-              style={{ backgroundColor: "rgba(0,0,0,.78)" }}
+              style={StyleSheet.absoluteFill}
+              accessibilityLabel="Fermer"
+            />
+          </Animated.View>
+
+          {/* Sheet */}
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                maxHeight: SCREEN_HEIGHT * 0.92,
+                transform: [
+                  { translateY: sheetTranslateY },
+                  { scale: sheetScale },
+                ],
+              },
+            ]}
+            accessibilityLabel="Personnaliser les actions rapides"
+          >
+            <LinearGradient
+              colors={["#0C0A1F", "#0A0818", "#070512"]}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFill}
             />
 
-            {/* Sheet */}
-
-            <View
-              className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col overflow-hidden rounded-t-[30px]"
-              style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.09)", borderStyle: "solid" }}
-              accessibilityRole="dialog"
-              aria-modal="true"
-              accessibilityLabel="Personnaliser les actions rapides"
-            >
-              {/* Ambient top glow */}
-
-              <View
-               
-                className="absolute left-1/2 top-0 h-24 w-64 -translate-x-1/2 rounded-full opacity-20"
-                style={{  }}
+            {/* Top glow */}
+            <View style={styles.sheetTopGlow} pointerEvents="none">
+              <LinearGradient
+                colors={["rgba(167,139,250,0.35)", "rgba(167,139,250,0)"]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={{ flex: 1, borderRadius: 999 }}
               />
+            </View>
 
-              {/* Drag handle */}
+            <View style={styles.sheetTopLine} pointerEvents="none" />
+            <View style={styles.sheetBorder} pointerEvents="none" />
 
-              <View className="relative flex justify-center pb-1 pt-3">
-                <View className="h-1 w-10 rounded-full bg-white/15" />
+            {/* Handle */}
+            <View style={styles.handleWrap}>
+              <View style={styles.handleBar} />
+            </View>
+
+            {/* Sheet header */}
+            <View style={styles.sheetHeader}>
+              <View style={styles.sheetHeaderLeft}>
+                <LinearGradient
+                  colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.sheetHeaderIcon}
+                >
+                  <Sparkles size={18} color="#fff" />
+                </LinearGradient>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.sheetTitle} numberOfLines={1}>
+                    Votre Command Center
+                  </Text>
+                  <Text style={styles.sheetSub} numberOfLines={1}>
+                    {activeIds.length} raccourci
+                    {activeIds.length !== 1 ? "s" : ""} actif
+                    {activeIds.length !== 1 ? "s" : ""}
+                  </Text>
+                </View>
               </View>
 
-              {/* Header */}
+              <View style={styles.sheetHeaderActions}>
+                <Pressable
+                  onPress={handleReset}
+                  hitSlop={6}
+                  accessibilityLabel="Réinitialiser les actions"
+                  style={({ pressed }) => [
+                    styles.sheetIconBtn,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <RotateCcw size={14} color="rgba(255,255,255,0.6)" />
+                </Pressable>
+                <Pressable
+                  onPress={closeCustomizer}
+                  hitSlop={6}
+                  accessibilityLabel="Fermer"
+                  style={({ pressed }) => [
+                    styles.sheetIconBtn,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <X size={15} color="rgba(255,255,255,0.65)" />
+                </Pressable>
+              </View>
+            </View>
 
-              <View
-                className="relative flex flex-shrink-0 items-center justify-between px-5 py-4"
-                style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,.055)", }}
-              >
-                <View className="flex items-center gap-3">
+            {/* Sheet content */}
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.sheetScroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Active section */}
+              <View>
+                <View style={styles.sectionHeader}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.sectionEyebrow}>VOS RACCOURCIS</Text>
+                    <Text style={styles.sectionSub}>
+                      Utilisez ↑↓ pour réorganiser
+                    </Text>
+                  </View>
                   <View
-                    className="flex h-10 w-10 items-center justify-center rounded-xl"
-                    style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.2)", borderStyle: "solid" }}
+                    style={[
+                      styles.counterBadge,
+                      {
+                        backgroundColor: !canAdd
+                          ? "rgba(251,191,36,0.14)"
+                          : "rgba(139,92,246,0.14)",
+                        borderColor: !canAdd
+                          ? "rgba(251,191,36,0.3)"
+                          : "rgba(167,139,250,0.3)",
+                      },
+                    ]}
                   >
-                    <Sparkles size={18} className="text-violet-300" />
-                  </View>
-
-                  <View>
-                    <Text className="text-base font-black tracking-tight text-white">
-                      Votre Command Center
-                    </Text>
-
-                    <Text className="mt-0.5 text-[10px] text-white/30">
-                      {activeIds.length} raccourci
-                      {activeIds.length !== 1 ? "s" : ""} actif
-                      {activeIds.length !== 1 ? "s" : ""}
-                    </Text>
-                  </View>
-                </View>
-
-                <View className="flex items-center gap-1.5">
-                  {/* Reset */}
-
-                  <Pressable
-                    onPress={handleReset}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-                    accessibilityLabel="Réinitialiser les actions"
-                    title="Réinitialiser"
-                  >
-                    <RotateCcw size={14} className="text-white/40" />
-                  </Pressable>
-
-                  {/* Close */}
-
-                  <Pressable
-                    onPress={closeCustomizer}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-                    accessibilityLabel="Fermer"
-                  >
-                    <X size={15} className="text-white/45" />
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Scroll area */}
-
-              <View
-                className="relative flex-1 overflow-y-auto px-5 pb-10"
-                style={{  }}
-              >
-                {/* ==================================================
-                    ACTIVE
-                    ================================================== */}
-
-                <View className="pt-5">
-                  <View className="mb-3 flex items-center justify-between">
-                    <View>
-                      <Text className="text-[9px] font-black uppercase tracking-[.18em] text-white/25">
-                        Vos raccourcis
-                      </Text>
-
-                      <Text className="mt-1 text-[10px] text-white/20">
-                        Maintenez puis glissez pour réorganiser
-                      </Text>
-                    </View>
-
-                    <Text className="rounded-full bg-violet-500/10 px-2 py-1 text-[9px] font-bold text-violet-300">
+                    <Text
+                      style={[
+                        styles.counterBadgeText,
+                        { color: !canAdd ? "#FCD34D" : "#C4B5FD" },
+                      ]}
+                    >
                       {activeIds.length}/{MAX_VISIBLE_ACTIONS}
                     </Text>
                   </View>
+                </View>
 
-                  {activeIds.length > 0 ? (
-                    <Reorder.Group
-                      axis="y"
-                      values={activeIds}
-                      onReorder={(newIds) => reorder(newIds as ActionId[])}
-                      className="flex flex-col gap-2"
-                    >
-                      {activeIds.map((id) => {
-                        const action = ALL_ACTIONS.find(
-                          (item) => item.id === id,
-                        );
-
-                        const Icon = ICON_MAP[id];
-
-                        if (!action || !Icon) {
-                          return null;
-                        }
-
-                        return (
-                          <Reorder.Item
-                            key={id}
-                            value={id}
-                            className="group flex items-center gap-3 rounded-2xl p-3"
-                            style={{ backgroundColor: "rgba(255,255,255,.038)", borderWidth: 1, borderColor: "rgba(255,255,255,.065)", borderStyle: "solid" }}
-                          >
-                            <GripVertical
-                              size={16}
-                              className="flex-shrink-0 text-white/15"
-                            />
-
-                            <View
-                              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl"
-                              style={{ backgroundColor: action.bg, borderStyle: "solid" }}
-                            >
-                              <Icon
-                                size={17}
-                                style={{
-                                  color: action.color,
-                                }}
-                              />
-                            </View>
-
-                            <View className="min-w-0 flex-1">
-                              <Text className="truncate text-xs font-bold text-white/75">
-                                {action.label}
-                              </Text>
-
-                              <Text className="mt-0.5 truncate text-[9px] text-white/25">
-                                {action.description}
-                              </Text>
-                            </View>
-
-                            <Pressable
-                              onPointerDown={(event) => event.stopPropagation()}
-                              onPress={(event) => {
-                                toggle(id);
-                              }}
-                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl"
-                              style={{ backgroundColor: "rgba(239,68,68,.08)", borderWidth: 1, borderColor: "rgba(239,68,68,.15)", borderStyle: "solid" }}
-                              accessibilityLabel={`Retirer ${action.label}`}
-                            >
-                              <X size={13} className="text-red-400/70" />
-                            </Pressable>
-                          </Reorder.Item>
-                        );
-                      })}
-                    </Reorder.Group>
-                  ) : (
-                    <View
-                      className="rounded-2xl p-6 text-center"
-                      style={{ backgroundColor: "rgba(255,255,255,.025)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "dashed" }}
-                    >
-                      <View className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[.04]">
-                        <Zap size={18} className="text-white/25" />
-                      </View>
-
-                      <Text className="text-xs font-semibold text-white/45">
+                {activeIds.length > 0 ? (
+                  <View style={{ gap: 8, marginTop: 12 }}>
+                    {activeIds.map((id, index) => {
+                      const action = ALL_ACTIONS.find((a) => a.id === id);
+                      if (!action) return null;
+                      return (
+                        <ReorderRow
+                          key={id}
+                          action={action}
+                          index={index}
+                          total={activeIds.length}
+                          onRemove={() => toggle(id)}
+                          onMoveUp={() => moveItem(index, -1)}
+                          onMoveDown={() => moveItem(index, 1)}
+                        />
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <FadeUp>
+                    <View style={styles.emptyState}>
+                      <LinearGradient
+                        colors={[
+                          "rgba(167,139,250,0.22)",
+                          "rgba(99,102,241,0.06)",
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.emptyStateIcon}
+                      >
+                        <Zap size={18} color="#C4B5FD" />
+                      </LinearGradient>
+                      <Text style={styles.emptyStateTitle}>
                         Aucun raccourci
                       </Text>
-
-                      <Text className="mx-auto mt-1 max-w-[230px] text-[10px] leading-relaxed text-white/20">
+                      <Text style={styles.emptyStateSub}>
                         Ajoutez vos actions favorites pour construire votre
                         espace personnel.
                       </Text>
                     </View>
-                  )}
-                </View>
+                  </FadeUp>
+                )}
+              </View>
 
-                {/* Divider */}
+              {/* Divider */}
+              <View style={styles.divider} />
 
-                <View className="my-6 h-px bg-white/[.05]" />
-
-                {/* ==================================================
-                    SEARCH
-                    ================================================== */}
-
-                <View>
-                  <View className="mb-3 flex items-center justify-between">
-                    <View>
-                      <Text className="text-[9px] font-black uppercase tracking-[.18em] text-white/25">
-                        Explorer
-                      </Text>
-
-                      <Text className="mt-1 text-[10px] text-white/20">
-                        Découvrez toutes vos possibilités
-                      </Text>
-                    </View>
-
-                    <Text className="text-[9px] text-white/20">
-                      {filteredAvailable.length}
+              {/* Available section */}
+              <View>
+                <View style={styles.sectionHeader}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.sectionEyebrow}>EXPLORER</Text>
+                    <Text style={styles.sectionSub}>
+                      Découvrez toutes vos possibilités
                     </Text>
                   </View>
-
-                  <View
-                    className="group mb-4 flex h-11 items-center gap-2.5 rounded-2xl px-3.5"
-                    style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-                  >
-                    <Search
-                      size={14}
-                      className="flex-shrink-0 text-white/25 group-focus-within:text-violet-300"
-                    />
-
-                    <TextInput
-                      ref={searchRef}
-                      value={searchQuery}
-                      onChangeText={(text) => setSearchQuery(text)}
-                      placeholder="Rechercher une action..."
-                      className="min-w-0 flex-1 bg-transparent text-xs font-medium text-white/80 outline-none placeholder:text-white/20"
-                     
-                     
-                      accessibilityLabel="Rechercher une action"
-                    />
-
-                    <AnimatePresence>
-                      {searchQuery && (
-                        <Pressable
-                          onPress={() => setSearchQuery("")}
-                          className=""
-                          accessibilityLabel="Effacer"
-                        >
-                          <X size={13} className="text-white/30" />
-                        </Pressable>
-                      )}
-                    </AnimatePresence>
-                  </View>
-
-                  {/* Max reached */}
-
-                  <AnimatePresence>
-                    {!canAdd && (
-                      <View
-                        className="mb-3 overflow-hidden"
-                      >
-                        <View
-                          className="flex items-center gap-2.5 rounded-2xl p-3"
-                          style={{ backgroundColor: "rgba(245,158,11,.07)", borderWidth: 1, borderColor: "rgba(245,158,11,.14)", borderStyle: "solid" }}
-                        >
-                          <View className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
-                            <Star size={13} className="text-amber-400" />
-                          </View>
-
-                          <Text className="text-[10px] font-medium leading-relaxed text-amber-300/70">
-                            <Text>Votre espace est complet. Retirez un raccourci pour en ajouter un nouveau.</Text></Text>
-                        </View>
-                      </View>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Available actions */}
-
-                  <View className="flex flex-col gap-2">
-                    <AnimatePresence mode="popLayout">
-                      {filteredAvailable.map((action) => {
-                        const Icon = ICON_MAP[action.id];
-
-                        if (!Icon) {
-                          return null;
-                        }
-
-                        const disabled = !canAdd;
-
-                        return (
-                          <Pressable
-                            key={action.id}
-                            onPress={() => {
-                              if (!disabled) {
-                                toggle(action.id);
-                              }
-                            }}
-                            disabled={disabled}
-                            className="group flex w-full items-center gap-3 rounded-2xl p-3 text-left disabled:cursor-not-allowed"
-                            style={{ backgroundColor: "rgba(255,255,255,.025)", borderWidth: 1, borderColor: "rgba(255,255,255,.055)", borderStyle: "solid" }}
-                          >
-                            <View
-                              className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl"
-                              style={{ backgroundColor: action.bg, borderStyle: "solid" }}
-                            >
-                              <Icon
-                                size={17}
-                                style={{
-                                  color: action.color,
-                                }}
-                              />
-                            </View>
-
-                            <View className="min-w-0 flex-1">
-                              <Text className="truncate text-xs font-bold text-white/65">
-                                {action.label}
-                              </Text>
-
-                              <Text className="mt-0.5 truncate text-[9px] text-white/20">
-                                {action.description}
-                              </Text>
-                            </View>
-
-                            <View
-                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl"
-                              style={{ backgroundColor: disabled
-                                                                ? "rgba(255,255,255,.025)"
-                                                                : `${action.color}12`, borderColor: "rgba(255,255,255,.06)", borderStyle: "solid" }}
-                            >
-                              <Check
-                                size={13}
-                                style={{
-                                  color: disabled
-                                    ? "rgba(255,255,255,.15)"
-                                    : action.color,
-                                }}
-                              />
-                            </View>
-                          </Pressable>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </View>
-
-                  {/* No results */}
-
-                  <AnimatePresence>
-                    {filteredAvailable.length === 0 && normalizedSearch && (
-                      <View
-                        className="py-10 text-center"
-                      >
-                        <View className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[.04]">
-                          <Search size={17} className="text-white/20" />
-                        </View>
-
-                        <Text className="text-xs font-semibold text-white/35">
-                          <Text>Aucun raccourci trouvé</Text></Text>
-
-                        <Text className="mt-1 text-[10px] text-white/15">
-                          <Text>Essayez un autre terme.</Text></Text>
-                      </View>
-                    )}
-                  </AnimatePresence>
+                  <Text style={styles.sectionCount}>
+                    {filteredAvailable.length}
+                  </Text>
                 </View>
+
+                {/* Search */}
+                <View style={styles.searchWrap}>
+                  <Search size={14} color="rgba(255,255,255,0.4)" />
+                  <TextInput
+                    ref={searchRef}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    placeholder="Rechercher une action…"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    style={styles.searchInput}
+                    autoComplete="off"
+                    accessibilityLabel="Rechercher une action"
+                  />
+                  {searchQuery ? (
+                    <Pressable
+                      onPress={() => setSearchQuery("")}
+                      hitSlop={6}
+                      accessibilityLabel="Effacer"
+                    >
+                      <X size={13} color="rgba(255,255,255,0.5)" />
+                    </Pressable>
+                  ) : null}
+                </View>
+
+                {/* Warning if full */}
+                {!canAdd ? (
+                  <FadeUp distance={6}>
+                    <View style={styles.warningBox}>
+                      <LinearGradient
+                        colors={["rgba(245,158,11,0.18)", "rgba(15,7,32,0.6)"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      <View style={styles.warningBorder} pointerEvents="none" />
+                      <LinearGradient
+                        colors={[
+                          "rgba(251,191,36,0.28)",
+                          "rgba(245,158,11,0.08)",
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.warningIcon}
+                      >
+                        <Star size={13} color="#FBBF24" fill="#FBBF24" />
+                      </LinearGradient>
+                      <Text style={styles.warningText}>
+                        Votre espace est complet. Retirez un raccourci pour en
+                        ajouter un nouveau.
+                      </Text>
+                    </View>
+                  </FadeUp>
+                ) : null}
+
+                {/* Results */}
+                <View style={{ gap: 8, marginTop: 12 }}>
+                  {filteredAvailable.map((action, index) => (
+                    <AvailableRow
+                      key={action.id}
+                      action={action}
+                      index={index}
+                      disabled={!canAdd}
+                      onPress={() => {
+                        if (canAdd) toggle(action.id);
+                      }}
+                    />
+                  ))}
+                </View>
+
+                {/* No result */}
+                {filteredAvailable.length === 0 && normalizedSearch ? (
+                  <FadeUp>
+                    <View style={styles.noResult}>
+                      <LinearGradient
+                        colors={[
+                          "rgba(255,255,255,0.08)",
+                          "rgba(255,255,255,0.02)",
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.noResultIcon}
+                      >
+                        <Search size={17} color="rgba(255,255,255,0.4)" />
+                      </LinearGradient>
+                      <Text style={styles.noResultTitle}>
+                        Aucun raccourci trouvé
+                      </Text>
+                      <Text style={styles.noResultSub}>
+                        Essayez un autre terme.
+                      </Text>
+                    </View>
+                  </FadeUp>
+                ) : null}
               </View>
+            </ScrollView>
 
-              {/* Bottom hint */}
-
-              <View
-                className="relative flex flex-shrink-0 items-center justify-center gap-2 px-5 py-3"
-                style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,.045)", backgroundColor: "rgba(0,0,0,.12)" }}
-              >
-                <Sparkles size={10} className="text-violet-400/60" />
-
-                <Text className="text-[9px] text-white/20">
-                  Votre espace évolue avec vos habitudes
-                </Text>
-              </View>
+            {/* Bottom hint */}
+            <View style={styles.sheetFooter}>
+              <Sparkles size={10} color="rgba(167,139,250,0.7)" />
+              <Text style={styles.sheetFooterText}>
+                Votre espace évolue avec vos habitudes
+              </Text>
             </View>
-          </>
-        )}
-      </>
+          </Animated.View>
+        </View>
+      ) : null}
     </>
   );
 }
+
+/* ============================================================
+ * STYLES
+ * ============================================================ */
+
+const styles = StyleSheet.create({
+  /* ── Root ───────────────────────────────────────── */
+  root: {
+    position: "relative",
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  orbLeft: {
+    position: "absolute",
+    left: -40,
+    top: 40,
+    width: 128,
+    height: 128,
+    borderRadius: 9999,
+    backgroundColor: "rgba(139,92,246,0.22)",
+    opacity: 0.5,
+  },
+  orbRight: {
+    position: "absolute",
+    right: -40,
+    top: 0,
+    width: 96,
+    height: 96,
+    borderRadius: 9999,
+    backgroundColor: "rgba(99,102,241,0.18)",
+    opacity: 0.4,
+  },
+
+  /* ── Header ─────────────────────────────────────── */
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 12,
+  },
+  headerLeft: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  headerIconWrap: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerIconHalo: {
+    position: "absolute",
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: "rgba(167,139,250,0.42)",
+  },
+  headerIconGlow: {
+    position: "absolute",
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: "rgba(124,58,237,0.22)",
+  },
+  headerIconGradient: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.55,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+  headerSub: {
+    marginTop: 3,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+
+  /* Progress ring */
+  progressRing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  progressTrack: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 2,
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  progressText: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.1,
+  },
+
+  /* Customize button */
+  customizeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(139,92,246,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.28)",
+  },
+  customizeBtnText: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "#C4B5FD",
+    letterSpacing: 0.1,
+  },
+
+  /* ── Grid ───────────────────────────────────────── */
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  tileWrap: {
+    width: 56,
+    alignItems: "center",
+  },
+  tilePress: {
+    alignItems: "center",
+    gap: 8,
+  },
+  tileAura: {
+    position: "absolute",
+    top: -6,
+    left: -6,
+    right: -6,
+    bottom: -6,
+    borderRadius: 22,
+    opacity: 0.4,
+    shadowOpacity: 0.9,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  tilePressRing: {
+    position: "absolute",
+    top: -6,
+    left: -6,
+    right: -6,
+    bottom: -6,
+    borderRadius: 22,
+    borderWidth: 1.5,
+  },
+  tileGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  tileLabel: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
+    letterSpacing: 0.1,
+  },
+
+  /* ── Empty CTA ──────────────────────────────────── */
+  emptyCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.28)",
+    overflow: "hidden",
+  },
+  emptyCtaIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.35)",
+  },
+  emptyCtaTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.85)",
+    letterSpacing: -0.2,
+  },
+  emptyCtaSub: {
+    marginTop: 3,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  emptyCtaAction: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    color: "#C4B5FD",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: "rgba(139,92,246,0.14)",
+    overflow: "hidden",
+  },
+
+  /* ── Backdrop ───────────────────────────────────── */
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.78)",
+  },
+
+  /* ── Sheet ──────────────────────────────────────── */
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    overflow: "hidden",
+    backgroundColor: "#0A0818",
+    shadowColor: "#000",
+    shadowOpacity: 0.85,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: -20 },
+    elevation: 28,
+  },
+  sheetTopGlow: {
+    position: "absolute",
+    top: -100,
+    left: "25%",
+    right: "25%",
+    height: 160,
+    opacity: 0.9,
+  },
+  sheetTopLine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "rgba(167,139,250,0.4)",
+  },
+  sheetBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.16)",
+  },
+
+  /* Handle */
+  handleWrap: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  handleBar: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+
+  /* Sheet header */
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  sheetHeaderLeft: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  sheetHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.7,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  sheetTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.4,
+  },
+  sheetSub: {
+    marginTop: 3,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "600",
+  },
+  sheetHeaderActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  sheetIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  /* Sheet scroll */
+  sheetScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+
+  /* Section header */
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  sectionEyebrow: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 2,
+    color: "rgba(255,255,255,0.4)",
+  },
+  sectionSub: {
+    marginTop: 4,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.3)",
+    fontWeight: "500",
+  },
+  sectionCount: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.35)",
+  },
+  counterBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  counterBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+
+  /* Divider */
+  divider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    marginVertical: 24,
+  },
+
+  /* ── Row ────────────────────────────────────────── */
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    overflow: "hidden",
+  },
+  rowPosition: {
+    width: 22,
+    alignItems: "center",
+  },
+  rowPositionText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.3)",
+    letterSpacing: 0.5,
+  },
+  rowIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  rowLabel: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  rowDesc: {
+    marginTop: 3,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  reorderCol: {
+    width: 22,
+    gap: 3,
+    alignItems: "center",
+  },
+  reorderBtn: {
+    width: 20,
+    height: 18,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  reorderBtnDisabled: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+  },
+  removeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(239,68,68,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.22)",
+  },
+
+  /* ── Available row ──────────────────────────────── */
+  availableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    overflow: "hidden",
+  },
+  availableIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  availableLabel: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: -0.2,
+  },
+  availableDesc: {
+    marginTop: 3,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.35)",
+    fontWeight: "500",
+  },
+  availableAddBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  /* ── Search ─────────────────────────────────────── */
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    marginTop: 12,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12.5,
+    color: "#fff",
+    fontWeight: "500",
+    paddingVertical: 0,
+  },
+
+  /* ── Warning ────────────────────────────────────── */
+  warningBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.28)",
+    marginTop: 12,
+  },
+  warningBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  warningIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.35)",
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: "rgba(252,211,77,0.85)",
+    fontWeight: "600",
+  },
+
+  /* ── Empty state ────────────────────────────────── */
+  emptyState: {
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(255,255,255,0.1)",
+    marginTop: 12,
+  },
+  emptyStateIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.32)",
+    marginBottom: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: -0.2,
+  },
+  emptyStateSub: {
+    marginTop: 6,
+    maxWidth: 240,
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: "rgba(255,255,255,0.35)",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+
+  /* ── No result ──────────────────────────────────── */
+  noResult: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  noResultIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    marginBottom: 12,
+  },
+  noResultTitle: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.55)",
+  },
+  noResultSub: {
+    marginTop: 4,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.3)",
+    fontWeight: "500",
+  },
+
+  /* ── Sheet footer ───────────────────────────────── */
+  sheetFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(0,0,0,0.15)",
+  },
+  sheetFooterText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.35)",
+    letterSpacing: 0.1,
+  },
+});

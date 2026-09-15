@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/voyages/services/voyage-payment.service.ts
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 export interface PaymentData {
   bookingId: string;
@@ -27,10 +26,10 @@ export class VoyagePaymentService {
   ): Promise<string | null> {
     try {
       const result = await initFn(data);
-      UIService.openToast("Paiement initié", "success");
+      toast.success("Paiement initié");
       return result.paymentId;
     } catch {
-      UIService.openToast("Erreur lors de l'initiation du paiement", "error");
+      toast.error("Erreur lors de l'initiation du paiement");
       return null;
     }
   }
@@ -44,10 +43,10 @@ export class VoyagePaymentService {
   ): Promise<boolean> {
     try {
       await confirmFn({ paymentId });
-      UIService.openToast("Paiement confirmé", "success");
+      toast.success("Paiement confirmé");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la confirmation du paiement", "error");
+      toast.error("Erreur lors de la confirmation du paiement");
       return false;
     }
   }
@@ -61,10 +60,10 @@ export class VoyagePaymentService {
   ): Promise<boolean> {
     try {
       await refundFn({ bookingId });
-      UIService.openToast("Remboursement effectué", "success");
+      toast.success("Remboursement effectué");
       return true;
     } catch {
-      UIService.openToast("Erreur lors du remboursement", "error");
+      toast.error("Erreur lors du remboursement");
       return false;
     }
   }

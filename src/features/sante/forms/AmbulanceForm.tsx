@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/sante/forms/AmbulanceForm.tsx
 import { useForm } from "react-hook-form";
@@ -70,159 +70,91 @@ export function AmbulanceForm({
 
   return (
     <Form {...form}>
-      <View
-       
-        className="space-y-4 text-left"
-      >
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
+      <View className="space-y-4 text-left"><FormField control={form.control} name="name" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom du service d'ambulance *</Text></FormLabel>
+              <FormLabel>Nom du service d'ambulance *</FormLabel>
               <FormControl>
                 <Input placeholder="Ambulance Rapide" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone standard *</Text></FormLabel>
+              <FormLabel>Téléphone standard *</FormLabel>
               <FormControl>
                 <Input placeholder="+243 123 456 789" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="emergencyPhone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="emergencyPhone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Numéro d'urgence direct *</Text></FormLabel>
+              <FormLabel>Numéro d'urgence direct *</FormLabel>
               <FormControl>
                 <Input placeholder="112" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="address"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="address" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Adresse *</Text></FormLabel>
+              <FormLabel>Adresse *</FormLabel>
               <FormControl>
                 <Input placeholder="15 Avenue de l'Hôpital" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="city"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="city" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Ville *</Text></FormLabel>
+              <FormLabel>Ville *</FormLabel>
               <FormControl>
                 <Input placeholder="Kinshasa" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="country"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="country" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Pays</Text></FormLabel>
+              <FormLabel>Pays</FormLabel>
               <FormControl>
                 <Input placeholder="RDC" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="hours"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="hours" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Heures de service *</Text></FormLabel>
+              <FormLabel>Heures de service *</FormLabel>
               <FormControl>
                 <Input placeholder="24h/24" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="vehicles"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="vehicles" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nombre de véhicules opérationnels *</Text></FormLabel>
+              <FormLabel>Nombre de véhicules opérationnels *</FormLabel>
               <FormControl>
                 <Input type="number" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="paramedics"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="paramedics" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nombre de secouristes / ambulanciers *</Text></FormLabel>
+              <FormLabel>Nombre de secouristes / ambulanciers *</FormLabel>
               <FormControl>
                 <Input type="number" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="available"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="available" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
               <View className="space-y-0.5">
-                <FormLabel><Text>Disponible actuellement</Text></FormLabel>
+                <FormLabel>Disponible actuellement</FormLabel>
               </View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        {/* Intégration harmonieuse du sélecteur d'images [2] */}
-        <FormField
-          control={form.control}
-          name="images"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="images" render={({ field }) => (
             <FormItem>
               <FormControl>
                 <HealthImageSelector
@@ -234,14 +166,7 @@ export function AmbulanceForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button className="w-full h-11" disabled={isLoading}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isLoading ? "Enregistrement..." : submitLabel}
-        </Button>
-      </View>
+          )} /><Button  className="w-full h-11" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isLoading ? "Enregistrement..." : submitLabel}</Button></View>
     </Form>
   );
 }

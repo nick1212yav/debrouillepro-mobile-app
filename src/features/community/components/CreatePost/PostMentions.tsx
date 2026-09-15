@@ -37,14 +37,10 @@ export function PostMentions({ content, onSelect }: Props) {
         Mentionner
       </Text>
       {suggestions.map((user) => (
-        <Pressable
-          key={user}
-          onPress={() => {
+        <Pressable key={user} onPress={() => {
             onSelect(user);
             setShow(false);
-          }}
-          className="flex items-center gap-2 w-full px-2 py-1 text-sm text-white/70 rounded-lg"
-        >
+          }} className="flex items-center gap-2 w-full px-2 py-1 text-sm text-white/70 rounded-lg">
           <AtSign size={12} className="text-purple-400" />
           {user}
         </Pressable>

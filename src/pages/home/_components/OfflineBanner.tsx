@@ -1,6 +1,5 @@
 // src/pages/home/_components/OfflineBanner.tsx
-
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -9,663 +8,846 @@ import {
   Text,
   View,
 } from "react-native";
-import NetInfo from "@react-native-community/netinfo";
+import { LinearGradient } from "expo-linear-gradient";
 import { Check, RefreshCw, Wifi, WifiOff } from "lucide-react-native";
+
+// ── NetInfo (avec fallback si le package n'est pas installé) ────────────
+let NetInfo: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  NetInfo =
+    require("@react-native-community/netinfo").default ??
+    require("@react-native-community/netinfo");
+} catch {
+  NetInfo = null;
+}
 
 type ConnectionState = "online" | "offline" | "reconnected";
 
 const RECONNECTED_DISPLAY_MS = 2600;
 
+function getInitialState(): ConnectionState {
+  return "online";
+}
+
 function formatOfflineDuration(startedAt: number): string {
   const elapsed = Math.max(0, Date.now() - startedAt);
   const seconds = Math.floor(elapsed / 1000);
-
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-
+  if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
-
-  if (minutes < 60) {
-    return `${minutes} min`;
-  }
-
+  if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
-
-  if (remainingMinutes === 0) {
-    return `${hours} h`;
-  }
-
+  if (remainingMinutes === 0) return `${hours} h`;
   return `${hours} h ${remainingMinutes} min`;
 }
 
-function isConnectionAvailable(state: {
-  isConnected: boolean | null;
-  isInternetReachable: boolean | null;
-}): boolean {
-  if (state.isConnected !== true) {
-    return false;
-  }
+/* ============================================================================
+ * PULSING STATUS DOT
+ * ========================================================================== */
 
-  return state.isInternetReachable !== false;
-}
+function PulsingDot({ color }: { color: string }) {
+  const pulse = useRef(new Animated.Value(0)).current;
 
-export default function OfflineBanner() {
-  const [connectionState, setConnectionState] =
-    useState<ConnectionState>("online");
-
-  const [offlineDuration, setOfflineDuration] = useState("0s");
-
-  const offlineStartedAtRef = useRef<number | null>(null);
-  const connectionInitializedRef = useRef(false);
-  const wasOfflineRef = useRef(false);
-
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const durationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const offlineOpacity = useRef(new Animated.Value(0)).current;
-  const offlineTranslateY = useRef(new Animated.Value(24)).current;
-  const offlineScale = useRef(new Animated.Value(0.96)).current;
-
-  const reconnectedOpacity = useRef(new Animated.Value(0)).current;
-  const reconnectedTranslateY = useRef(new Animated.Value(20)).current;
-  const reconnectedScale = useRef(new Animated.Value(0.96)).current;
-
-  const iconPulse = useRef(new Animated.Value(1)).current;
-  const progressTranslate = useRef(new Animated.Value(-120)).current;
-
-  const clearReconnectTimer = useCallback(() => {
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
-  }, []);
-
-  const clearDurationTimer = useCallback(() => {
-    if (durationTimerRef.current) {
-      clearInterval(durationTimerRef.current);
-      durationTimerRef.current = null;
-    }
-  }, []);
-
-  const startOfflineClock = useCallback(() => {
-    const startedAt = Date.now();
-
-    offlineStartedAtRef.current = startedAt;
-    setOfflineDuration("0s");
-
-    clearDurationTimer();
-
-    durationTimerRef.current = setInterval(() => {
-      const currentStartedAt = offlineStartedAtRef.current;
-
-      if (!currentStartedAt) {
-        return;
-      }
-
-      setOfflineDuration(formatOfflineDuration(currentStartedAt));
-    }, 1000);
-  }, [clearDurationTimer]);
-
-  const startOfflineAnimations = useCallback(() => {
-    offlineOpacity.setValue(0);
-    offlineTranslateY.setValue(24);
-    offlineScale.setValue(0.96);
-
-    Animated.parallel([
-      Animated.timing(offlineOpacity, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-
-      Animated.spring(offlineTranslateY, {
-        toValue: 0,
-        stiffness: 380,
-        damping: 30,
-        mass: 0.8,
-        useNativeDriver: true,
-      }),
-
-      Animated.spring(offlineScale, {
-        toValue: 1,
-        stiffness: 380,
-        damping: 30,
-        mass: 0.8,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    iconPulse.setValue(1);
-
+  useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(iconPulse, {
-          toValue: 1.08,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1400,
+          easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }),
-
-        Animated.timing(iconPulse, {
-          toValue: 1,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 0,
           useNativeDriver: true,
         }),
       ]),
     ).start();
+  }, [pulse]);
 
-    progressTranslate.setValue(-120);
+  const scale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.6],
+  });
+  const opacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.7, 0],
+  });
 
-    Animated.loop(
-      Animated.timing(progressTranslate, {
-        toValue: 360,
-        duration: 2200,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ).start();
-  }, [
-    iconPulse,
-    offlineOpacity,
-    offlineScale,
-    offlineTranslateY,
-    progressTranslate,
-  ]);
+  return (
+    <View style={styles.dotWrap}>
+      <Animated.View
+        style={[
+          styles.dotPulse,
+          { backgroundColor: color, opacity, transform: [{ scale }] },
+        ]}
+      />
+      <View
+        style={[
+          styles.dotCore,
+          {
+            backgroundColor: color,
+            shadowColor: color,
+          },
+        ]}
+      />
+    </View>
+  );
+}
 
-  const startReconnectedAnimation = useCallback(() => {
-    reconnectedOpacity.setValue(0);
-    reconnectedTranslateY.setValue(20);
-    reconnectedScale.setValue(0.96);
+/* ============================================================================
+ * SIGNAL WAVES (reconnected)
+ * ========================================================================== */
 
-    Animated.parallel([
-      Animated.timing(reconnectedOpacity, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
+function SignalWaves({ color }: { color: string }) {
+  const waves = [
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+  ];
 
-      Animated.spring(reconnectedTranslateY, {
-        toValue: 0,
-        stiffness: 400,
-        damping: 30,
-        useNativeDriver: true,
-      }),
+  useEffect(() => {
+    waves.forEach((wave, i) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 200),
+          Animated.timing(wave, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(wave, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+          Animated.delay((2 - i) * 200),
+        ]),
+      ).start();
+    });
+  }, [waves]);
 
-      Animated.spring(reconnectedScale, {
-        toValue: 1,
-        stiffness: 400,
-        damping: 22,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [reconnectedOpacity, reconnectedScale, reconnectedTranslateY]);
+  return (
+    <View style={styles.wavesWrap} pointerEvents="none">
+      {waves.map((wave, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.waveRing,
+            {
+              borderColor: color,
+              opacity: wave.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.6, 0],
+              }),
+              transform: [
+                {
+                  scale: wave.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 2.2],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * ANIMATED PROGRESS BAR
+ * ========================================================================== */
+
+function AnimatedProgressBar({
+  active,
+  color,
+}: {
+  active: boolean;
+  color: string;
+}) {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (active) {
+      progress.setValue(0);
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(progress, {
+            toValue: 1,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: false,
+          }),
+          Animated.timing(progress, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: false,
+          }),
+        ]),
+      ).start();
+    }
+  }, [active, progress]);
+
+  const width = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
+
+  return (
+    <View style={styles.progressTrack}>
+      <Animated.View
+        style={[
+          styles.progressFill,
+          {
+            width,
+            backgroundColor: color,
+            shadowColor: color,
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+/* ============================================================================
+ * MAIN COMPONENT
+ * ========================================================================== */
+
+export default function OfflineBanner() {
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>(getInitialState);
+  const [offlineDuration, setOfflineDuration] = useState("0s");
+
+  const offlineStartedAt = useRef<number | null>(null);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const durationTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Animations
+  const offlineOpacity = useRef(new Animated.Value(0)).current;
+  const offlineTranslate = useRef(new Animated.Value(24)).current;
+  const offlineScale = useRef(new Animated.Value(0.96)).current;
+  const reconnectedOpacity = useRef(new Animated.Value(0)).current;
+  const reconnectedTranslate = useRef(new Animated.Value(20)).current;
+  const reconnectedScale = useRef(new Animated.Value(0.96)).current;
+  const retryRotate = useRef(new Animated.Value(0)).current;
+  const checkScale = useRef(new Animated.Value(0)).current;
+
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+  }, []);
+
+  const clearDurationTimer = useCallback(() => {
+    if (durationTimer.current) {
+      clearInterval(durationTimer.current);
+      durationTimer.current = null;
+    }
+  }, []);
+
+  const startOfflineClock = useCallback(() => {
+    offlineStartedAt.current = Date.now();
+    setOfflineDuration("0s");
+    clearDurationTimer();
+    durationTimer.current = setInterval(() => {
+      if (!offlineStartedAt.current) return;
+      setOfflineDuration(formatOfflineDuration(offlineStartedAt.current));
+    }, 1000);
+  }, [clearDurationTimer]);
 
   const handleOffline = useCallback(() => {
     clearReconnectTimer();
-
     setConnectionState("offline");
-    wasOfflineRef.current = true;
-
-    if (!offlineStartedAtRef.current) {
-      startOfflineClock();
-    }
+    startOfflineClock();
   }, [clearReconnectTimer, startOfflineClock]);
 
   const handleOnline = useCallback(() => {
     clearReconnectTimer();
     clearDurationTimer();
-
-    offlineStartedAtRef.current = null;
-
-    if (!wasOfflineRef.current) {
-      setConnectionState("online");
-      return;
-    }
-
     setConnectionState("reconnected");
-
-    reconnectTimerRef.current = setTimeout(() => {
+    offlineStartedAt.current = null;
+    reconnectTimer.current = setTimeout(() => {
       setConnectionState("online");
-      wasOfflineRef.current = false;
-      reconnectTimerRef.current = null;
     }, RECONNECTED_DISPLAY_MS);
   }, [clearDurationTimer, clearReconnectTimer]);
 
+  /* ───── NetInfo listener ───── */
   useEffect(() => {
-    if (connectionState === "offline") {
-      startOfflineAnimations();
+    if (!NetInfo) {
+      console.warn(
+        "[OfflineBanner] @react-native-community/netinfo non installé.",
+      );
+      return;
     }
-  }, [connectionState, startOfflineAnimations]);
 
-  useEffect(() => {
-    if (connectionState === "reconnected") {
-      startReconnectedAnimation();
-    }
-  }, [connectionState, startReconnectedAnimation]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const updateConnectionState = (state: {
-      isConnected: boolean | null;
-      isInternetReachable: boolean | null;
-    }) => {
-      if (!mounted) {
-        return;
-      }
-
-      const connected = isConnectionAvailable(state);
-
-      if (!connectionInitializedRef.current) {
-        connectionInitializedRef.current = true;
-
-        if (connected) {
-          setConnectionState("online");
-          return;
-        }
-
-        wasOfflineRef.current = true;
-        setConnectionState("offline");
-        startOfflineClock();
-
-        return;
-      }
-
-      if (connected) {
-        handleOnline();
-      } else {
+    const unsubscribe = NetInfo.addEventListener((state: any) => {
+      if (state.isConnected === false) {
         handleOffline();
+      } else if (state.isConnected === true) {
+        handleOnline();
       }
-    };
-
-    void NetInfo.fetch().then(updateConnectionState);
-
-    const unsubscribe = NetInfo.addEventListener(updateConnectionState);
+    });
 
     return () => {
-      mounted = false;
-
-      unsubscribe();
-
+      if (typeof unsubscribe === "function") unsubscribe();
       clearReconnectTimer();
       clearDurationTimer();
-
-      offlineOpacity.stopAnimation();
-      offlineTranslateY.stopAnimation();
-      offlineScale.stopAnimation();
-
-      reconnectedOpacity.stopAnimation();
-      reconnectedTranslateY.stopAnimation();
-      reconnectedScale.stopAnimation();
-
-      iconPulse.stopAnimation();
-      progressTranslate.stopAnimation();
     };
+  }, [clearReconnectTimer, clearDurationTimer, handleOffline, handleOnline]);
+
+  /* ───── Offline entrance ───── */
+  useEffect(() => {
+    if (connectionState === "offline") {
+      offlineOpacity.setValue(0);
+      offlineTranslate.setValue(24);
+      offlineScale.setValue(0.96);
+
+      Animated.parallel([
+        Animated.timing(offlineOpacity, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(offlineTranslate, {
+          toValue: 0,
+          stiffness: 380,
+          damping: 30,
+          useNativeDriver: true,
+        }),
+        Animated.spring(offlineScale, {
+          toValue: 1,
+          stiffness: 380,
+          damping: 30,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Retry spinner rotation
+      retryRotate.setValue(0);
+      Animated.loop(
+        Animated.timing(retryRotate, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ).start();
+    }
   }, [
-    clearDurationTimer,
-    clearReconnectTimer,
-    handleOffline,
-    handleOnline,
-    iconPulse,
+    connectionState,
     offlineOpacity,
+    offlineTranslate,
     offlineScale,
-    offlineTranslateY,
-    progressTranslate,
-    reconnectedOpacity,
-    reconnectedScale,
-    reconnectedTranslateY,
-    startOfflineClock,
+    retryRotate,
   ]);
 
-  const handleRetry = useCallback(async () => {
-    try {
-      const state = await NetInfo.fetch();
+  /* ───── Reconnected entrance ───── */
+  useEffect(() => {
+    if (connectionState === "reconnected") {
+      reconnectedOpacity.setValue(0);
+      reconnectedTranslate.setValue(20);
+      reconnectedScale.setValue(0.96);
+      checkScale.setValue(0);
 
-      if (isConnectionAvailable(state)) {
-        handleOnline();
-        return;
-      }
-
-      if (offlineStartedAtRef.current) {
-        setOfflineDuration(formatOfflineDuration(offlineStartedAtRef.current));
-      }
-    } catch {
-      // La bannière reste en état hors ligne.
+      Animated.parallel([
+        Animated.timing(reconnectedOpacity, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(reconnectedTranslate, {
+          toValue: 0,
+          stiffness: 400,
+          damping: 30,
+          useNativeDriver: true,
+        }),
+        Animated.spring(reconnectedScale, {
+          toValue: 1,
+          stiffness: 400,
+          damping: 30,
+          useNativeDriver: true,
+        }),
+        Animated.spring(checkScale, {
+          toValue: 1,
+          stiffness: 420,
+          damping: 14,
+          delay: 140,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
-  }, [handleOnline]);
+  }, [
+    connectionState,
+    reconnectedOpacity,
+    reconnectedTranslate,
+    reconnectedScale,
+    checkScale,
+  ]);
+
+  const handleRetry = useCallback(() => {
+    // Petit feedback visuel : rotation complète du bouton
+    retryRotate.setValue(0);
+    Animated.timing(retryRotate, {
+      toValue: 1,
+      duration: 700,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+
+    if (NetInfo?.fetch) {
+      NetInfo.fetch().then((state: any) => {
+        if (state.isConnected) handleOnline();
+      });
+    }
+  }, [handleOnline, retryRotate]);
 
   const isOffline = connectionState === "offline";
   const isReconnected = connectionState === "reconnected";
 
-  if (!isOffline && !isReconnected) {
-    return null;
-  }
+  const retryRotation = retryRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
   return (
-    <View
-      pointerEvents="box-none"
-      style={styles.container}
-      accessibilityLiveRegion="polite"
-    >
-      {isOffline && (
+    <View pointerEvents="box-none" style={styles.root}>
+      {/* ═══════════ OFFLINE ═══════════ */}
+      {isOffline ? (
         <Animated.View
-          accessibilityRole="alert"
           style={[
-            styles.banner,
-            styles.offlineBanner,
+            styles.bannerWrapper,
             {
               opacity: offlineOpacity,
               transform: [
-                {
-                  translateY: offlineTranslateY,
-                },
-                {
-                  scale: offlineScale,
-                },
+                { translateY: offlineTranslate },
+                { scale: offlineScale },
               ],
             },
           ]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
         >
-          <View style={styles.offlineContent}>
-            <Animated.View
-              style={[
-                styles.iconContainer,
-                styles.offlineIconContainer,
-                {
-                  transform: [
-                    {
-                      scale: iconPulse,
-                    },
-                  ],
-                },
+          <View style={styles.offlineBanner}>
+            {/* Base gradient */}
+            <LinearGradient
+              colors={[
+                "rgba(239,68,68,0.18)",
+                "rgba(15,7,20,0.9)",
+                "rgba(10,6,15,0.98)",
               ]}
-            >
-              <WifiOff size={20} strokeWidth={2.1} color="#fca5a5" />
-            </Animated.View>
+              locations={[0, 0.5, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
 
-            <View style={styles.messageContainer}>
-              <View style={styles.titleRow}>
-                <Text numberOfLines={1} style={styles.title}>
-                  Vous êtes hors ligne
+            {/* Top accent bar */}
+            <LinearGradient
+              colors={["#EF4444", "#F87171", "#FB923C"]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.offlineTopBar}
+            />
+
+            {/* Corner orb */}
+            <View style={styles.offlineOrb} pointerEvents="none" />
+
+            {/* Border ring */}
+            <View style={styles.offlineBorder} pointerEvents="none" />
+
+            <View style={styles.bannerContent}>
+              {/* Icon with halo */}
+              <View style={styles.iconOuter}>
+                <View style={styles.offlineIconHalo} pointerEvents="none" />
+                <LinearGradient
+                  colors={["rgba(248,113,113,0.28)", "rgba(239,68,68,0.1)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.iconInner}
+                >
+                  <WifiOff size={19} color="#FCA5A5" strokeWidth={2.4} />
+                </LinearGradient>
+              </View>
+
+              {/* Text */}
+              <View style={styles.textColumn}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.titleText}>Vous êtes hors ligne</Text>
+                  <PulsingDot color="#F87171" />
+                </View>
+                <Text style={styles.bodyText}>
+                  Les fonctionnalités nécessitant Internet peuvent être
+                  temporairement indisponibles.
                 </Text>
-
-                <View style={styles.offlineDot} />
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabelRed}>HORS LIGNE</Text>
+                  <View style={styles.metaSeparator} />
+                  <Text style={styles.metaValue}>{offlineDuration}</Text>
+                </View>
               </View>
 
-              <Text style={styles.description}>
-                Les fonctionnalités nécessitant Internet peuvent être
-                temporairement indisponibles.
-              </Text>
-
-              <View style={styles.statusRow}>
-                <Text style={styles.offlineLabel}>Hors ligne</Text>
-
-                <View style={styles.separatorDot} />
-
-                <Text style={styles.durationText}>{offlineDuration}</Text>
-              </View>
+              {/* Retry button */}
+              <Pressable
+                onPress={handleRetry}
+                style={({ pressed }) => [
+                  styles.retryButton,
+                  pressed && styles.retryButtonPressed,
+                ]}
+                accessibilityLabel="Vérifier la connexion"
+              >
+                <Animated.View
+                  style={{ transform: [{ rotate: retryRotation }] }}
+                >
+                  <RefreshCw
+                    size={16}
+                    color="rgba(255,255,255,0.7)"
+                    strokeWidth={2.3}
+                  />
+                </Animated.View>
+              </Pressable>
             </View>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Vérifier la connexion"
-              onPress={() => {
-                void handleRetry();
-              }}
-              style={({ pressed }) => [
-                styles.retryButton,
-                pressed && styles.retryButtonPressed,
-              ]}
-            >
-              <RefreshCw size={17} color="rgba(255,255,255,0.65)" />
-            </Pressable>
-          </View>
-
-          <View style={styles.progressTrack}>
-            <Animated.View
-              style={[
-                styles.progressIndicator,
-                {
-                  transform: [
-                    {
-                      translateX: progressTranslate,
-                    },
-                  ],
-                },
-              ]}
-            />
+            {/* Animated progress bar */}
+            <AnimatedProgressBar active={isOffline} color="#F87171" />
           </View>
         </Animated.View>
-      )}
+      ) : null}
 
-      {isReconnected && (
+      {/* ═══════════ RECONNECTED ═══════════ */}
+      {isReconnected ? (
         <Animated.View
-          accessibilityRole="alert"
           style={[
-            styles.banner,
-            styles.reconnectedBanner,
+            styles.bannerWrapper,
             {
               opacity: reconnectedOpacity,
               transform: [
-                {
-                  translateY: reconnectedTranslateY,
-                },
-                {
-                  scale: reconnectedScale,
-                },
+                { translateY: reconnectedTranslate },
+                { scale: reconnectedScale },
               ],
             },
           ]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
         >
-          <View style={styles.iconContainer}>
-            <Wifi size={20} strokeWidth={2.1} color="#6ee7b7" />
-          </View>
+          <View style={styles.reconnectedBanner}>
+            {/* Base gradient */}
+            <LinearGradient
+              colors={[
+                "rgba(52,211,153,0.2)",
+                "rgba(15,20,17,0.9)",
+                "rgba(10,15,12,0.98)",
+              ]}
+              locations={[0, 0.5, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
 
-          <View style={styles.messageContainer}>
-            <Text style={styles.title}>Connexion rétablie</Text>
+            {/* Top accent bar */}
+            <LinearGradient
+              colors={["#34D399", "#6EE7B7", "#A7F3D0"]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.reconnectedTopBar}
+            />
 
-            <Text style={styles.description}>
-              DébrouillePro est de nouveau connecté.
-            </Text>
-          </View>
+            {/* Corner orb */}
+            <View style={styles.reconnectedOrb} pointerEvents="none" />
 
-          <View style={styles.successIcon}>
-            <Check size={15} strokeWidth={3} color="#6ee7b7" />
+            {/* Border ring */}
+            <View style={styles.reconnectedBorder} pointerEvents="none" />
+
+            <View style={styles.bannerContent}>
+              {/* Icon with signal waves */}
+              <View style={styles.iconOuter}>
+                <SignalWaves color="#34D399" />
+                <LinearGradient
+                  colors={["rgba(52,211,153,0.32)", "rgba(16,185,129,0.12)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.iconInner}
+                >
+                  <Wifi size={19} color="#6EE7B7" strokeWidth={2.4} />
+                </LinearGradient>
+              </View>
+
+              {/* Text */}
+              <View style={styles.textColumn}>
+                <Text style={styles.titleText}>Connexion rétablie</Text>
+                <Text style={styles.bodyText}>
+                  DébrouillePro est de nouveau connecté.
+                </Text>
+              </View>
+
+              {/* Check circle */}
+              <Animated.View
+                style={[
+                  styles.checkCircle,
+                  { transform: [{ scale: checkScale }] },
+                ]}
+              >
+                <LinearGradient
+                  colors={["rgba(52,211,153,0.35)", "rgba(16,185,129,0.14)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Check size={14} color="#6EE7B7" strokeWidth={3} />
+              </Animated.View>
+            </View>
           </View>
         </Animated.View>
-      )}
+      ) : null}
     </View>
   );
 }
 
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
 const styles = StyleSheet.create({
-  container: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 16,
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    pointerEvents: "box-none",
     zIndex: 100,
-    elevation: 100,
+  },
+  bannerWrapper: {
+    width: "100%",
+    maxWidth: 420,
   },
 
-  banner: {
+  /* ── Shared dot ─────────────────────────────────── */
+  dotWrap: {
+    width: 8,
+    height: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dotPulse: {
+    position: "absolute",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  dotCore: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
+  /* ── Signal waves ───────────────────────────────── */
+  wavesWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  waveRing: {
+    position: "absolute",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+  },
+
+  /* ── Offline ────────────────────────────────────── */
+  offlineBanner: {
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: "#0A0610",
+    shadowColor: "#EF4444",
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 14,
+  },
+  offlineTopBar: {
+    height: 2,
     width: "100%",
+  },
+  offlineBorder: {
+    ...StyleSheet.absoluteFillObject,
     borderRadius: 22,
     borderWidth: 1,
-    padding: 14,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.42,
-    shadowRadius: 30,
-    shadowOffset: {
-      width: 0,
-      height: 16,
-    },
-
-    elevation: 18,
+    borderColor: "rgba(248,113,113,0.24)",
+  },
+  offlineOrb: {
+    position: "absolute",
+    top: -60,
+    right: -60,
+    width: 160,
+    height: 160,
+    borderRadius: 9999,
+    backgroundColor: "rgba(239,68,68,0.22)",
   },
 
-  offlineBanner: {
-    backgroundColor: "#11121e",
-    borderColor: "rgba(248,113,113,0.22)",
-  },
-
+  /* ── Reconnected ────────────────────────────────── */
   reconnectedBanner: {
-    backgroundColor: "#081412",
-    borderColor: "rgba(52,211,153,0.22)",
-
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: "#0A0F0C",
+    shadowColor: "#10B981",
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 14,
+  },
+  reconnectedTopBar: {
+    height: 2,
+    width: "100%",
+  },
+  reconnectedBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.24)",
+  },
+  reconnectedOrb: {
+    position: "absolute",
+    top: -60,
+    right: -60,
+    width: 160,
+    height: 160,
+    borderRadius: 9999,
+    backgroundColor: "rgba(16,185,129,0.22)",
   },
 
-  offlineContent: {
+  /* ── Layout ─────────────────────────────────────── */
+  bannerContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 14,
+    padding: 14,
   },
-
-  iconContainer: {
+  iconOuter: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  offlineIconHalo: {
+    position: "absolute",
+    width: 48,
+    height: 48,
+    borderRadius: 17,
+    backgroundColor: "rgba(248,113,113,0.28)",
+  },
+  iconInner: {
     width: 44,
     height: 44,
     borderRadius: 16,
-
     alignItems: "center",
     justifyContent: "center",
-
-    backgroundColor: "rgba(52,211,153,0.10)",
     borderWidth: 1,
-    borderColor: "rgba(52,211,153,0.20)",
+    borderColor: "rgba(255,255,255,0.12)",
   },
-
-  offlineIconContainer: {
-    backgroundColor: "rgba(248,113,113,0.10)",
-    borderColor: "rgba(248,113,113,0.20)",
-  },
-
-  messageContainer: {
+  textColumn: {
     flex: 1,
     minWidth: 0,
   },
-
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-
-  title: {
-    flexShrink: 1,
-
-    color: "#ffffff",
+  titleText: {
+    color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "900",
+    flexShrink: 1,
+    letterSpacing: -0.2,
   },
-
-  offlineDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-
-    backgroundColor: "#f87171",
-  },
-
-  description: {
-    marginTop: 3,
-
-    color: "rgba(255,255,255,0.45)",
+  bodyText: {
+    color: "rgba(255,255,255,0.5)",
     fontSize: 11,
     lineHeight: 16,
+    marginTop: 4,
+    fontWeight: "500",
   },
-
-  statusRow: {
-    marginTop: 6,
-
+  metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
+    marginTop: 8,
   },
-
-  offlineLabel: {
-    color: "rgba(252,165,165,0.75)",
-
+  metaLabelRed: {
+    color: "rgba(252,165,165,0.7)",
     fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 1,
-
-    textTransform: "uppercase",
+    fontWeight: "900",
+    letterSpacing: 1.2,
   },
-
-  separatorDot: {
+  metaSeparator: {
     width: 4,
     height: 4,
     borderRadius: 2,
-
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
-
-  durationText: {
-    color: "rgba(255,255,255,0.35)",
-
-    fontSize: 10,
-    fontWeight: "500",
+  metaValue: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 9.5,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
-
   retryButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.1)",
   },
-
   retryButtonPressed: {
     opacity: 0.7,
-    transform: [
-      {
-        scale: 0.94,
-      },
-    ],
+    transform: [{ scale: 0.9 }],
   },
 
-  progressTrack: {
-    height: 2,
-
-    marginTop: 12,
-
-    overflow: "hidden",
-    borderRadius: 999,
-
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-
-  progressIndicator: {
-    width: "34%",
-    height: "100%",
-    borderRadius: 999,
-
-    backgroundColor: "rgba(248,113,113,0.65)",
-  },
-
-  successIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-
+  /* ── Check circle ───────────────────────────────── */
+  checkCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.35)",
+    shadowColor: "#10B981",
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
 
-    backgroundColor: "rgba(52,211,153,0.15)",
+  /* ── Progress bar ───────────────────────────────── */
+  progressTrack: {
+    marginHorizontal: 14,
+    marginBottom: 12,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 2,
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
   },
 });

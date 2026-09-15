@@ -19,12 +19,7 @@ export function SubmitBtn({
   loading = false,
 }: Props) {
   return (
-    <Pressable
-      disabled={disabled || loading}
-      onPress={onClick}
-      className="w-full py-4 rounded-3xl text-white font-bold text-sm mt-3 disabled:opacity-40 flex items-center justify-center gap-2"
-      style={{  }}
-    >
+    <Pressable whileTap={{ scale: 0.97 }} disabled={disabled || loading} onPress={onClick} className="w-full py-4 rounded-3xl text-white font-bold text-sm mt-3 disabled:opacity-40 transition-opacity flex items-center justify-center gap-2" style={{ boxShadow: `0 8px 24px ${color}40` }}>
       {loading && <Loader2 size={16} className="animate-spin" />}
       {loading ? "En cours..." : label}
     </Pressable>

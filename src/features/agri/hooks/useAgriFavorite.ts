@@ -1,10 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/agri/hooks/useAgriFavorite.ts
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useCallback } from "react";
+import { toast } from "sonner";
 
 export function useAgriFavorite(productId?: string) {
   const toggle = useMutation(api.agri.toggleFavorite);
@@ -26,7 +25,7 @@ export function useAgriFavorite(productId?: string) {
       try {
         await toggle({ productId: targetId as unknown as Id<"agriProducts"> });
       } catch {
-        UIService.openToast("Connexion requise pour enregistrer vos favoris", "error");
+        toast.error("Connexion requise pour enregistrer vos favoris");
       }
     },
     [toggle, productId],

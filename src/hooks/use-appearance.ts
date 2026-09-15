@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth"; // ✅ nouveau hook
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { Appearance } from "react-native";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type AccentColor =
@@ -147,7 +148,7 @@ function savePrefs(prefs: AppearancePrefs) {
 
 // Apply CSS variables and class to <html>
 export function applyPrefs(prefs: AppearancePrefs) {
-  const root = undefined;
+  const root = document.documentElement;
   const palette = ACCENT_PALETTES[prefs.accent];
 
   root.style.setProperty("--primary", palette.primary);
@@ -167,7 +168,7 @@ export function applyPrefs(prefs: AppearancePrefs) {
     prefs.density === "compact" ? "0.6rem" : "1rem",
   );
 
-  const prefersDark = { matches: false, media: "", addListener: () => undefined, removeListener: () => undefined }.matches;
+  const prefersDark = Appearance.getColorScheme().matches;
   const isDark =
     prefs.colorMode === "sombre" ||
     (prefs.colorMode === "systeme" && prefersDark);

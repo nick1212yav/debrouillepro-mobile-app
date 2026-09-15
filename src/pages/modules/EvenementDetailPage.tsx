@@ -1,13 +1,19 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Pressable } from "react-native";
-
 // src/pages/modules/EvenementDetailPage.tsx
-import { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, MoreVertical } from "lucide-react-native";
+
 import {
   EventHeader,
   EventGallery,
@@ -37,6 +43,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 export default function EvenementDetailPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [showComments, setShowComments] = useState(false);
@@ -55,9 +62,11 @@ export default function EvenementDetailPage() {
   const { comments, addComment, addReply, likeComment } = useEventComments(
     id as Id<"events"> | undefined,
   );
-  const { tickets, purchase } = useTickets(id as Id<"events"> | undefined);
-  const { rsvp } = useEventRSVP();
-  const { events: relatedEvents } = useRelatedEvents(id || "");
+  const { tickets: _tickets, purchase } = useTickets(
+    id as Id<"events"> | undefined,
+  );
+  const { rsvp: _rsvp } = useEventRSVP();
+  const { events: _relatedEvents } = useRelatedEvents(id || "");
 
   useEffect(() => {
     if (eventData === undefined) {
@@ -81,7 +90,7 @@ export default function EvenementDetailPage() {
       await likeEvent({ eventId: event._id });
       setEvent({ ...event, likedByMe: !event.likedByMe });
     } catch {
-      UIService.openToast("Erreur lors du like", "error");
+      Alert.alert("Erreur", "Erreur lors du like");
     }
   };
 
@@ -90,9 +99,9 @@ export default function EvenementDetailPage() {
     try {
       await bookmarkEvent({ eventId: event._id });
       setEvent({ ...event, bookmarkedByMe: !event.bookmarkedByMe });
-      UIService.openToast(event.bookmarkedByMe ? "Retiré" : "Ajouté", "success");
+      Alert.alert("Succès", event.bookmarkedByMe ? "Retiré" : "Ajouté");
     } catch {
-      UIService.openToast("Erreur", "error");
+      Alert.alert("Erreur", "Erreur");
     }
   };
 
@@ -105,120 +114,121 @@ export default function EvenementDetailPage() {
       const isAttending = status === "attending";
       const isInterested = status === "interested";
       setEvent({ ...event, isAttending, isInterested });
-      UIService.openToast("Inscription mise à jour", "success");
+      Alert.alert("Succès", "Inscription mise à jour");
     } catch {
-      UIService.openToast("Erreur lors de l'inscription", "error");
+      Alert.alert("Erreur", "Erreur lors de l'inscription");
     }
   };
 
   if (loading) {
     return (
-      <View
-        className="h-full flex flex-col px-4 pt-12 pb-8 space-y-4"
-        style={{  }}
-      >
-        <Skeleton className="w-10 h-10 rounded-2xl" />
-        <Skeleton className="h-64 w-full rounded-2xl" />
-        <Skeleton className="h-8 w-3/4 rounded-xl" />
-        <Skeleton className="h-32 w-full rounded-xl" />
+      <View style={styles.screen}>
+        <View style={styles.loadingContainer}>
+          <Skeleton className="w-10 h-10 rounded-2xl" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
+          <Skeleton className="h-8 w-3/4 rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+        </View>
       </View>
     );
   }
 
   if (!event) {
     return (
-      <View
-        className="h-full flex flex-col items-center justify-center px-4"
-        style={{  }}
-      >
-        <Pressable onPress={() => router.back()} className="self-start mb-4">
-          <ArrowLeft size={24} className="text-white/60" />
+      <View style={[styles.screen, styles.center]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backButtonInline}
+          hitSlop={6}
+        >
+          <ArrowLeft size={24} color="rgba(255,255,255,0.6)" />
         </Pressable>
-        <Text className="text-white/40">Événement introuvable</Text>
+        <Text style={styles.mutedText}>Événement introuvable</Text>
       </View>
     );
   }
 
   return (
-    <View
-      className="h-full flex flex-col"
-      style={{  }}
-    >
-      <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3">
+    <View style={styles.screen}>
+      {/* Header */}
+      <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}
-          className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
+          style={styles.iconButton}
+          hitSlop={6}
+          accessibilityLabel="Retour"
         >
-          <ArrowLeft size={20} className="text-white" />
+          <ArrowLeft size={20} color="#FFFFFF" />
         </Pressable>
-        <Text className="text-white font-bold text-lg flex-1 truncate">
+        <Text style={styles.headerTitle} numberOfLines={1}>
           Événement
         </Text>
         <Pressable
           onPress={() => setShowMenu(!showMenu)}
-          className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
+          style={styles.iconButton}
+          hitSlop={6}
+          accessibilityLabel="Menu"
         >
-          <MoreVertical size={20} className="text-white/60" />
+          <MoreVertical size={20} color="rgba(255,255,255,0.6)" />
         </Pressable>
       </View>
 
-      <View
-        className="flex-1 overflow-y-auto px-4 pb-8 space-y-5"
-        style={{  }}
+      {/* Contenu */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <View
-          className="space-y-4"
-        >
-          <EventHeader
-            event={event}
-            onLike={handleLike}
-            onShare={() => setShowShare(true)}
+        <EventHeader
+          event={event}
+          onLike={handleLike}
+          onShare={() => setShowShare(true)}
+        />
+        <EventGallery
+          images={event.gallery || []}
+          title={event.title}
+          coverImage={event.coverImage}
+        />
+        <EventCountdown startDate={event.startDate} />
+        <RSVPButtons
+          currentStatus={
+            event.isAttending
+              ? "attending"
+              : event.isInterested
+                ? "interested"
+                : null
+          }
+          onRSVP={handleRSVP}
+        />
+        <EventStats event={event} />
+        <EventDescription event={event} />
+        <EventTimeline event={event} />
+        <EventOrganizer event={event} />
+        <EventMap event={event} />
+        <EventAttendees event={event} />
+        <EventTickets event={event} onPurchase={() => purchase()} />
+        <EventActions
+          onLike={handleLike}
+          onComment={() => setShowComments(!showComments)}
+          onShare={() => setShowShare(true)}
+          onBookmark={handleBookmark}
+          isLiked={event.likedByMe}
+          isBookmarked={event.bookmarkedByMe}
+          likeCount={event.attendingCount}
+          commentCount={event.commentCount}
+          shareCount={event.shareCount}
+        />
+
+        {showComments && (
+          <EventComments
+            comments={comments}
+            onAddComment={addComment}
+            onReply={addReply}
+            onLikeComment={likeComment}
+            onAuthorClick={(authorId) => router.push(`/profile/${authorId}`)}
           />
-          <EventGallery
-            images={event.gallery || []}
-            title={event.title}
-            coverImage={event.coverImage}
-          />
-          <EventCountdown startDate={event.startDate} />
-          <RSVPButtons
-            currentStatus={
-              event.isAttending
-                ? "attending"
-                : event.isInterested
-                  ? "interested"
-                  : null
-            }
-            onRSVP={handleRSVP}
-          />
-          <EventStats event={event} />
-          <EventDescription event={event} />
-          <EventTimeline event={event} />
-          <EventOrganizer event={event} />
-          <EventMap event={event} />
-          <EventAttendees event={event} />
-          <EventTickets event={event} onPurchase={() => purchase()} />
-          <EventActions
-            onLike={handleLike}
-            onComment={() => setShowComments(!showComments)}
-            onShare={() => setShowShare(true)}
-            onBookmark={handleBookmark}
-            isLiked={event.likedByMe}
-            isBookmarked={event.bookmarkedByMe}
-            likeCount={event.attendingCount}
-            commentCount={event.commentCount}
-            shareCount={event.shareCount}
-          />
-          {showComments && (
-            <EventComments
-              comments={comments}
-              onAddComment={addComment}
-              onReply={addReply}
-              onLikeComment={likeComment}
-              onAuthorClick={(authorId) => router.push(`/profile/${authorId}`)}
-            />
-          )}
-        </View>
-      </View>
+        )}
+      </ScrollView>
 
       {showShare && (
         <EventShare event={event} onClose={() => setShowShare(false)} />
@@ -226,3 +236,60 @@ export default function EvenementDetailPage() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  center: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 32,
+    gap: 16,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 12,
+  },
+  headerTitle: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 18,
+    flex: 1,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  backButtonInline: {
+    alignSelf: "flex-start",
+    marginBottom: 16,
+  },
+  mutedText: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 14,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    gap: 20,
+  },
+});

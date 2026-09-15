@@ -68,7 +68,7 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
   }, []);
 
   const startLocalStream = useCallback(async () => {
-    if (typeof undefined === "undefined" || !undefined) {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices) {
       throw new Error("Les appareils multimédia ne sont pas disponibles.");
     }
 
@@ -79,7 +79,7 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
     }));
 
     try {
-      const stream = await undefined.getUserMedia(
+      const stream = await navigator.mediaDevices.getUserMedia(
         type === "video"
           ? {
               audio: true,

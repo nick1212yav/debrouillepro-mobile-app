@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityPayments.ts
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 export function useCommunityPayments() {
   const processPayment = useMutation(api.community.processPayment);
@@ -19,10 +18,10 @@ export function useCommunityPayments() {
     }) => {
       try {
         const result = await processPayment(data);
-        UIService.openToast("Paiement effectué", "success");
+        toast.success("Paiement effectué");
         return result;
       } catch (error) {
-        UIService.openToast("Erreur lors du paiement", "error");
+        toast.error("Erreur lors du paiement");
         throw error;
       }
     },
@@ -36,17 +35,17 @@ export function useCommunityPayments() {
         const intent = await createPaymentIntent(data);
         return intent;
       } catch (error) {
-        UIService.openToast("Erreur lors de la création de l'intention de paiement", "error");
+        toast.error("Erreur lors de la création de l'intention de paiement");
         throw error;
       }
     },
     confirmPayment: async (paymentIntentId: string) => {
       try {
         const result = await confirmPayment({ paymentIntentId });
-        UIService.openToast("Paiement confirmé", "success");
+        toast.success("Paiement confirmé");
         return result;
       } catch (error) {
-        UIService.openToast("Erreur lors de la confirmation du paiement", "error");
+        toast.error("Erreur lors de la confirmation du paiement");
         throw error;
       }
     },

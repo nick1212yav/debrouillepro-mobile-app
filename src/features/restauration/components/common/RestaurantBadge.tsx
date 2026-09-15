@@ -17,9 +17,7 @@ export function RestaurantBadge({
   }[variant];
 
   return (
-    <Text
-      className={`inline-flex items-center px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${styles}`}
-    >
+    <Text className={`inline-flex items-center px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${styles}`}>
       {label}
     </Text>
   );

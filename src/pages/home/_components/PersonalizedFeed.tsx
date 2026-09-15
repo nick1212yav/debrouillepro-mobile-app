@@ -1,6 +1,24 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { Pressable, View, Text } from "react-native";
-import { useCallback, useMemo, useState } from "react";
+// src/pages/home/_components/PersonalizedFeed.tsx
+"use no memo";
+
+import {
+  Pressable,
+  View,
+  Text,
+  ScrollView,
+  Animated,
+  Easing,
+  StyleSheet,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  useCallback,
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+  type ReactNode,
+} from "react";
 import {
   Bookmark,
   BookmarkCheck,
@@ -21,47 +39,10 @@ import type {
 } from "@/features/publications/types";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
 import CommentsSheet from "./CommentsSheet";
 import { useHomeFeed } from "@/home/hooks/useHomeFeed";
-
-/**
- * ============================================================
- * DÉBROUILLEPRO
- * PersonalizedFeed — FINAL
- * ============================================================
- *
- * Architecture :
- *
- * PersonalizedFeed
- *       ↓
- * useHomeFeed
- *       ↓
- * Home Feed Engine
- *       ↓
- * Convex
- *
- * Ce composant ne fait PAS :
- * - de ranking
- * - de personnalisation
- * - de requête paginée directe
- * - de données mockées
- *
- * Il est responsable de :
- * - l'affichage
- * - les filtres
- * - les interactions utilisateur
- * - les commentaires
- * - les bookmarks
- * - les likes
- * - la suppression
- * - la pagination UI
- *
- * IMPORTANT :
- * Les données reçues doivent déjà être préparées
- * par le moteur Home / backend.
- * ============================================================
- */
 
 /* ============================================================
  * TYPE → API
@@ -75,28 +56,23 @@ function mapTypeToAPI(type: PublicationType): string {
     marketplace: "service",
     premium: "service",
     boost: "service",
-
     reputation: "community",
     recompenses: "community",
     parrainage: "community",
     sos: "community",
     groupes: "community",
-
     cours: "education",
     quiz: "education",
     certifications: "education",
     apprendre: "education",
     ecole: "education",
     mentorat: "education",
-
     freelance: "job",
-
     evenements: "evenement",
     annonces: "annonce",
     voyages: "voyages",
     hebergement: "hebergement",
   };
-
   return mapping[type] ?? type;
 }
 
@@ -113,118 +89,32 @@ interface FilterDefinition {
 }
 
 const FILTER_TYPES: FilterDefinition[] = [
-  {
-    value: "all",
-    label: "Tous",
-    color: "#8B5CF6",
-  },
-  {
-    value: "community",
-    label: "Community",
-    color: "#3B82F6",
-  },
-  {
-    value: "evenement",
-    label: "Événements",
-    color: "#8B5CF6",
-  },
-  {
-    value: "job",
-    label: "Emploi",
-    color: "#10B981",
-  },
-  {
-    value: "immo",
-    label: "Immobilier",
-    color: "#6366F1",
-  },
-  {
-    value: "service",
-    label: "Services",
-    color: "#F59E0B",
-  },
-  {
-    value: "sante",
-    label: "Santé",
-    color: "#EF4444",
-  },
-  {
-    value: "annonce",
-    label: "Annonces",
-    color: "#6366F1",
-  },
-  {
-    value: "restauration",
-    label: "Restauration",
-    color: "#F97316",
-  },
-  {
-    value: "hebergement",
-    label: "Hébergement",
-    color: "#8B5CF6",
-  },
-  {
-    value: "agri",
-    label: "Agriculture",
-    color: "#22C55E",
-  },
-  {
-    value: "energie",
-    label: "Énergie",
-    color: "#F59E0B",
-  },
-  {
-    value: "ong",
-    label: "ONG",
-    color: "#10B981",
-  },
-  {
-    value: "media",
-    label: "Médias",
-    color: "#EC4899",
-  },
-  {
-    value: "education",
-    label: "Éducation",
-    color: "#8B5CF6",
-  },
-  {
-    value: "finance",
-    label: "Finance",
-    color: "#F59E0B",
-  },
-  {
-    value: "voyages",
-    label: "Voyages",
-    color: "#06B6D4",
-  },
+  { value: "all", label: "Tous", color: "#A78BFA" },
+  { value: "community", label: "Community", color: "#60A5FA" },
+  { value: "evenement", label: "Événements", color: "#A78BFA" },
+  { value: "job", label: "Emploi", color: "#34D399" },
+  { value: "immo", label: "Immobilier", color: "#818CF8" },
+  { value: "service", label: "Services", color: "#FBBF24" },
+  { value: "sante", label: "Santé", color: "#F87171" },
+  { value: "annonce", label: "Annonces", color: "#818CF8" },
+  { value: "restauration", label: "Restauration", color: "#FB923C" },
+  { value: "hebergement", label: "Hébergement", color: "#A78BFA" },
+  { value: "agri", label: "Agriculture", color: "#4ADE80" },
+  { value: "energie", label: "Énergie", color: "#FBBF24" },
+  { value: "ong", label: "ONG", color: "#34D399" },
+  { value: "media", label: "Médias", color: "#F472B6" },
+  { value: "education", label: "Éducation", color: "#A78BFA" },
+  { value: "finance", label: "Finance", color: "#FBBF24" },
+  { value: "voyages", label: "Voyages", color: "#22D3EE" },
 ];
 
 /* ============================================================
  * PUBLICATION VALIDATION
  * ============================================================ */
 
-/**
- * Sécurité UI :
- *
- * PublicationRenderer ne reçoit jamais :
- * - null
- * - undefined
- * - objets primitifs
- * - cartes génériques sans identifiant
- * - objets sans type exploitable
- * - objets sans titre exploitable
- *
- * Le moteur Home reste responsable du filtrage métier.
- * Ce garde-fou protège uniquement le rendu.
- */
 function isRenderablePublication(value: unknown): value is Publication {
-  if (value === null || typeof value !== "object") {
-    return false;
-  }
-
+  if (value === null || typeof value !== "object") return false;
   const item = value as Record<string, unknown>;
-
   return (
     typeof item._id === "string" &&
     item._id.length > 0 &&
@@ -232,6 +122,59 @@ function isRenderablePublication(value: unknown): value is Publication {
     item.title.trim().length > 0 &&
     typeof item.type === "string" &&
     item.type.trim().length > 0
+  );
+}
+
+/* ============================================================
+ * FADE UP WRAPPER
+ * ============================================================ */
+
+function FadeUp({
+  delay = 0,
+  distance = 18,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: any;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(anim, {
+      toValue: 1,
+      duration: 380,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => {
+      animation.stop();
+    };
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
   );
 }
 
@@ -253,60 +196,100 @@ function BookmarkButton({
 
   const toggleBookmark = useMutation(api.bookmarks.toggle);
 
-  const [animating, setAnimating] = useState(false);
   const [pending, setPending] = useState(false);
+
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   const saved = isBookmarked === true;
 
   const handleClick = async () => {
-    if (!isAuthenticated || pending) {
-      return;
-    }
+    if (!isAuthenticated || pending) return;
 
-    setAnimating(true);
     setPending(true);
 
     try {
-      const result = await toggleBookmark({
-        publicationId,
-      });
+      const result = await toggleBookmark({ publicationId });
 
-      UIService.openToast(result
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(scaleAnim, {
+            toValue: 1.35,
+            duration: 120,
+            useNativeDriver: true,
+          }),
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 120,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+          Animated.timing(rotateAnim, {
+            toValue: 0,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+
+      toast.success(
+        result
           ? "Publication enregistrée"
-          : "Publication retirée des enregistrements", "success");
+          : "Publication retirée des enregistrements",
+        { icon: result ? "🔖" : "📌" },
+      );
     } catch {
-      UIService.openToast("Impossible de modifier l'enregistrement.", "error");
+      toast.error("Impossible de modifier l'enregistrement.");
     } finally {
       setPending(false);
-
-      undefined;
     }
   };
+
+  const rotate = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "-14deg"],
+  });
 
   return (
     <Pressable
       onPress={() => void handleClick()}
       disabled={!isAuthenticated || pending}
-      className={cn(
-        "relative flex items-center gap-1.5 rounded-xl px-3 py-2",
-        "text-xs font-semibold transition-all",
-        "cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-        saved ? "text-yellow-400" : "text-white/50",
-      )}
-      style={{ backgroundColor: saved ? "rgba(234,179,8,0.15)" : "rgba(255,255,255,0.06)", borderColor: "rgba(234,179,8,0.3)", borderStyle: "solid" }}
       accessibilityLabel={
         saved
           ? "Retirer la publication des enregistrements"
           : "Enregistrer la publication"
       }
-      aria-pressed={saved}
+      accessibilityState={{ selected: saved }}
+      style={({ pressed }) => [
+        styles.bookmarkBtn,
+        saved ? styles.bookmarkBtnSaved : styles.bookmarkBtnIdle,
+        pressed && { opacity: 0.75 },
+        (!isAuthenticated || pending) && { opacity: 0.5 },
+      ]}
     >
-      <View
+      <Animated.View
+        style={{
+          transform: [{ scale: scaleAnim }, { rotate }],
+        }}
       >
-        {saved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
-      </View>
-
-      <Text className="hidden sm:inline">
+        {saved ? (
+          <BookmarkCheck size={14} color="#FACC15" />
+        ) : (
+          <Bookmark size={14} color="rgba(255,255,255,0.55)" />
+        )}
+      </Animated.View>
+      <Text
+        style={[
+          styles.bookmarkText,
+          { color: saved ? "#FACC15" : "rgba(255,255,255,0.6)" },
+        ]}
+      >
         {saved ? "Enregistré" : "Enregistrer"}
       </Text>
     </Pressable>
@@ -319,31 +302,126 @@ function BookmarkButton({
 
 function CommentsButton({
   count,
-  onClick,
+  onPress,
 }: {
   count: number;
-  onClick: () => void;
+  onPress: () => void;
 }) {
   return (
     <Pressable
-      onPress={onClick}
-      className={cn(
-        "flex items-center gap-1.5 rounded-xl px-3 py-2",
-        "text-xs font-semibold text-white/55",
-        "cursor-pointer transition-all",
-        "hover:bg-white/10 hover:text-white/80",
-      )}
-      style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
+      onPress={onPress}
       accessibilityLabel={
         count > 0
           ? `${count} commentaire${count > 1 ? "s" : ""}`
           : "Ajouter un commentaire"
       }
+      style={({ pressed }) => [
+        styles.commentsBtn,
+        pressed && { opacity: 0.75 },
+      ]}
     >
-      <MessageCircle size={14} />
-
-      <Text>{count > 0 ? (count > 999 ? "999+" : count) : "Commenter"}</Text>
+      <MessageCircle size={14} color="rgba(255,255,255,0.6)" />
+      <Text style={styles.commentsBtnText}>
+        {count > 0 ? (count > 999 ? "999+" : count) : "Commenter"}
+      </Text>
     </Pressable>
+  );
+}
+
+/* ============================================================
+ * CATEGORY CHIP
+ * ============================================================ */
+
+function CategoryChip({
+  item,
+  active,
+  onPress,
+}: {
+  item: FilterDefinition;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.94,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  // Couleurs calculées en JS (pas d'Animated) → évite l'attache
+  // d'un AnimatedStyle non-natif dans l'arbre CSS-interop.
+  const borderColor = active ? `${item.color}66` : "rgba(255,255,255,0.09)";
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
+        style={styles.categoryChip}
+      >
+        {/* Base bg */}
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              borderRadius: 999,
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderWidth: 1,
+              borderColor,
+            },
+          ]}
+        />
+
+        {/* Active gradient (opacité gérée en JS, pas via Animated) */}
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              opacity: active ? 1 : 0,
+              borderRadius: 999,
+              overflow: "hidden",
+              shadowColor: item.color,
+              shadowOpacity: 0.4,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[`${item.color}E6`, `${item.color}AA`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+
+        <Text
+          style={[
+            styles.categoryChipText,
+            {
+              color: active ? "#FFFFFF" : "rgba(255,255,255,0.55)",
+            },
+          ]}
+        >
+          {item.label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -359,40 +437,21 @@ function CategoryBar({
   onChange: (type: FilterType) => void;
 }) {
   return (
-    <View
-      className="flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-none"
-      accessibilityRole="tablist"
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.categoryBarContent}
       accessibilityLabel="Filtrer le fil d'actualité"
     >
-      {FILTER_TYPES.map((item) => {
-        const isActive = active === item.value;
-
-        return (
-          <Pressable
-            key={item.value}
-            accessibilityRole="tab"
-            aria-selected={isActive}
-            onPress={() => onChange(item.value)}
-            className={cn(
-              "relative flex-shrink-0 whitespace-nowrap",
-              "rounded-full px-3.5 py-1.5",
-              "text-xs font-semibold",
-              "cursor-pointer transition-all",
-              isActive ? "text-white" : "text-white/45",
-            )}
-            style={{ backgroundColor: isActive ? item.color : "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.09)", borderStyle: "solid" }}
-          >
-            {item.label}
-
-            {isActive && (
-              <Text
-                className="absolute inset-0 -z-10 rounded-full"
-              />
-            )}
-          </Pressable>
-        );
-      })}
-    </View>
+      {FILTER_TYPES.map((item) => (
+        <CategoryChip
+          key={item.value}
+          item={item}
+          active={active === item.value}
+          onPress={() => onChange(item.value)}
+        />
+      ))}
+    </ScrollView>
   );
 }
 
@@ -401,39 +460,62 @@ function CategoryBar({
  * ============================================================ */
 
 function FeedSkeleton() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+    };
+  }, [pulse]);
+
+  const opacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 0.85],
+  });
+
   return (
     <View
-      className="mx-4 flex flex-col gap-4"
+      style={styles.skeletonWrap}
       accessibilityLabel="Chargement du fil"
-     
+      accessibilityState={{ busy: true }}
     >
       {[0, 1, 2].map((index) => (
-        <View
-          key={index}
-          className="overflow-hidden rounded-3xl"
-          style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-        >
-          <Skeleton className="h-44 w-full rounded-none" />
-
-          <View className="space-y-3 p-4">
-            <View className="flex items-center gap-3">
-              <Skeleton className="h-9 w-9 rounded-full" />
-              <View className="flex-1 space-y-2">
-                <Skeleton className="h-3.5 w-32 rounded-full" />
-                <Skeleton className="h-2.5 w-20 rounded-full" />
+        <Animated.View key={index} style={[styles.skeletonCard, { opacity }]}>
+          <Skeleton style={styles.skeletonHero} />
+          <View style={styles.skeletonBody}>
+            <View style={styles.skeletonAuthorRow}>
+              <Skeleton style={styles.skeletonAvatar} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <Skeleton style={styles.skeletonLine1} />
+                <Skeleton style={styles.skeletonLine2} />
               </View>
             </View>
-
-            <Skeleton className="h-5 w-2/3 rounded-xl" />
-            <Skeleton className="h-3 w-full rounded-xl" />
-            <Skeleton className="h-3 w-4/5 rounded-xl" />
-
-            <View className="flex gap-2 pt-1">
-              <Skeleton className="h-8 w-20 rounded-xl" />
-              <Skeleton className="h-8 w-20 rounded-xl" />
+            <Skeleton style={styles.skeletonTitle} />
+            <Skeleton style={styles.skeletonText} />
+            <Skeleton style={styles.skeletonTextShort} />
+            <View style={styles.skeletonActionsRow}>
+              <Skeleton style={styles.skeletonAction} />
+              <Skeleton style={styles.skeletonAction} />
             </View>
           </View>
-        </View>
+        </Animated.View>
       ))}
     </View>
   );
@@ -451,55 +533,116 @@ function EmptyFeed({
   activeType: FilterType;
 }) {
   const isFiltered = activeType !== "all";
+  const float = useRef(new Animated.Value(0)).current;
+  const iconScale = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(float, {
+          toValue: 1,
+          duration: 2800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(float, {
+          toValue: 0,
+          duration: 2800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+
+    const spring = Animated.spring(iconScale, {
+      toValue: 1,
+      delay: 100,
+      stiffness: 260,
+      damping: 20,
+      useNativeDriver: true,
+    });
+    spring.start();
+
+    return () => {
+      loop.stop();
+      spring.stop();
+    };
+  }, [float, iconScale]);
+
+  const translateY = float.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -5],
+  });
 
   return (
-    <View
-      className="mx-4"
-    >
-      <View
-        className="relative overflow-hidden rounded-3xl px-6 py-12 text-center"
-        style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "dashed" }}
-      >
-        {/* Ambient glow */}
-        <View
-          className="absolute left-1/2 top-0 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{  }}
-        />
+    <FadeUp distance={18}>
+      <View style={styles.emptyWrap}>
+        <View style={styles.emptyCard}>
+          <LinearGradient
+            colors={[
+              "rgba(139,92,246,0.14)",
+              "rgba(15,7,32,0.6)",
+              "rgba(10,6,24,0.85)",
+            ]}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.emptyBorder} pointerEvents="none" />
+          <View style={styles.emptyOrb} pointerEvents="none" />
 
-        <View
-          className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl"
-          style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}
-        >
-          <Plus size={28} className="text-violet-400" />
+          <Animated.View
+            style={[
+              styles.emptyIconWrap,
+              {
+                transform: [{ scale: iconScale }, { translateY }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={["rgba(167,139,250,0.32)", "rgba(99,102,241,0.08)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.emptyIconGradient}
+            >
+              <Plus size={28} color="#C4B5FD" strokeWidth={2.2} />
+            </LinearGradient>
+          </Animated.View>
+
+          <Text style={styles.emptyTitle}>
+            {isFiltered
+              ? "Aucun contenu dans cette catégorie"
+              : "Votre fil est prêt à vivre"}
+          </Text>
+
+          <Text style={styles.emptySub}>
+            {isFiltered
+              ? "Essayez une autre catégorie pour découvrir davantage de contenu."
+              : "Publiez quelque chose et commencez à construire votre espace dans la communauté."}
+          </Text>
+
+          <Pressable
+            onPress={onCreateOpen}
+            style={({ pressed }) => [
+              styles.emptyCtaOuter,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <LinearGradient
+              colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.emptyCta}
+            >
+              <Plus size={16} color="#fff" strokeWidth={2.6} />
+              <Text style={styles.emptyCtaText}>Créer une publication</Text>
+            </LinearGradient>
+          </Pressable>
         </View>
-
-        <Text className="mb-1 text-base font-bold text-white">
-          {isFiltered
-            ? "Aucun contenu dans cette catégorie"
-            : "Votre fil est prêt à vivre"}
-        </Text>
-
-        <Text className="mx-auto mb-6 max-w-sm text-sm leading-relaxed text-white/40">
-          {isFiltered
-            ? "Essayez une autre catégorie pour découvrir davantage de contenu."
-            : "Publiez quelque chose et commencez à construire votre espace dans la communauté."}
-        </Text>
-
-        <Pressable
-          onPress={onCreateOpen}
-          className={cn(
-            "inline-flex items-center gap-2 rounded-2xl",
-            "px-5 py-2.5",
-            "text-sm font-bold text-white",
-            "cursor-pointer",
-          )}
-          style={{  }}
-        >
-          <Plus size={16} />
-          Créer une publication
-        </Pressable>
       </View>
-    </View>
+    </FadeUp>
   );
 }
 
@@ -518,17 +661,86 @@ function PaginationFooter({
   count: number;
   onLoadMore: () => void;
 }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+  const dots = useMemo(() => [dot1, dot2, dot3], [dot1, dot2, dot3]);
+
+  useEffect(() => {
+    if (!loadingMore) return;
+
+    const loops = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 160),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 500,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.delay((2 - i) * 160),
+        ]),
+      ),
+    );
+
+    loops.forEach((loop) => loop.start());
+
+    return () => {
+      loops.forEach((loop) => loop.stop());
+    };
+  }, [loadingMore, dots]);
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.95,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
   if (loadingMore) {
     return (
       <View
-        className="flex items-center justify-center gap-1.5 py-5"
+        style={styles.loadingDotsWrap}
         accessibilityLabel="Chargement de publications supplémentaires"
-        aria-busy="true"
+        accessibilityState={{ busy: true }}
       >
-        {[0, 1, 2].map((index) => (
-          <Text
-            key={index}
-            className="h-2 w-2 rounded-full bg-violet-400"
+        {dots.map((dot, i) => (
+          <Animated.View
+            key={i}
+            style={[
+              styles.loadingDot,
+              {
+                opacity: dot.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.25, 1],
+                }),
+                transform: [
+                  {
+                    scale: dot.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.85, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
           />
         ))}
       </View>
@@ -537,32 +749,34 @@ function PaginationFooter({
 
   if (canLoadMore) {
     return (
-      <View className="flex justify-center px-4 pb-5 pt-1">
-        <Pressable
-          onPress={onLoadMore}
-          className={cn(
-            "flex items-center gap-2 rounded-2xl",
-            "px-5 py-2.5",
-            "text-sm font-semibold text-white/65",
-            "cursor-pointer transition-all",
-            "hover:text-white",
-          )}
-          style={{ backgroundColor: "rgba(255,255,255,0.065)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-        >
-          <RefreshCw size={14} />
-          Charger plus
-        </Pressable>
+      <View style={styles.paginationWrap}>
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Pressable
+            onPress={onLoadMore}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            style={({ pressed }) => [
+              styles.loadMoreBtn,
+              pressed && { opacity: 0.75 },
+            ]}
+          >
+            <RefreshCw size={14} color="rgba(255,255,255,0.75)" />
+            <Text style={styles.loadMoreText}>Charger plus</Text>
+          </Pressable>
+        </Animated.View>
       </View>
     );
   }
 
   if (count > 0) {
     return (
-      <View className="flex items-center justify-center gap-2 px-4 py-5">
-        <Text className="h-px w-8 bg-white/10" />
-        <Text className="text-xs text-white/25">Vous avez tout vu</Text>
-        <Text className="h-px w-8 bg-white/10" />
-      </View>
+      <FadeUp distance={6}>
+        <View style={styles.exhaustedWrap}>
+          <View style={styles.exhaustedLine} />
+          <Text style={styles.exhaustedText}>Vous avez tout vu</Text>
+          <View style={styles.exhaustedLine} />
+        </View>
+      </FadeUp>
     );
   }
 
@@ -587,180 +801,127 @@ export default function PersonalizedFeed({
   onCreateOpen,
 }: PersonalizedFeedProps) {
   const [activeType, setActiveType] = useState<FilterType>("all");
-
   const [commentsItem, setCommentsItem] = useState<Publication | null>(null);
 
   const { handleAction, handleCTA } = usePublicationActions();
 
-  /* ----------------------------------------------------------
-   * QUERY
-   * ---------------------------------------------------------- */
-
+  /* ───── query ───── */
   const queryType = activeType !== "all" ? mapTypeToAPI(activeType) : undefined;
 
   const { feed, loading, loadingMore, canLoadMore, loadMore } = useHomeFeed({
     type: queryType,
   });
 
-  /* ----------------------------------------------------------
-   * MUTATIONS
-   * ---------------------------------------------------------- */
-
+  /* ───── mutations ───── */
   const likePublication = useMutation(api.publications.likePublication);
-
   const deletePublication = useMutation(api.publications.deletePublication);
 
-  /* ----------------------------------------------------------
-   * PUBLICATIONS
-   * ---------------------------------------------------------- */
-
+  /* ───── publications ───── */
   const publications = useMemo<Publication[]>(() => {
-    if (!Array.isArray(feed)) {
-      return [];
-    }
-
+    if (!Array.isArray(feed)) return [];
     const seen = new Set<string>();
-
     return feed.filter((item): item is Publication => {
-      if (!isRenderablePublication(item)) {
-        return false;
-      }
-
-      if (seen.has(item._id)) {
-        return false;
-      }
-
+      if (!isRenderablePublication(item)) return false;
+      if (seen.has(item._id)) return false;
       seen.add(item._id);
-
       return true;
     });
   }, [feed]);
 
-  /* ----------------------------------------------------------
-   * LIKE
-   * ---------------------------------------------------------- */
-
+  /* ───── handlers ───── */
   const handleLike = useCallback(
     async (publicationId: Id<"publications">) => {
       try {
-        await likePublication({
-          publicationId,
-        });
+        await likePublication({ publicationId });
       } catch {
-        UIService.openToast("Impossible de modifier la publication.", "error");
+        toast.error("Impossible de modifier la publication.");
       }
     },
     [likePublication],
   );
 
-  /* ----------------------------------------------------------
-   * DELETE
-   * ---------------------------------------------------------- */
-
   const handleDelete = useCallback(
     async (publicationId: Id<"publications">) => {
       try {
-        await deletePublication({
-          publicationId,
-        });
-
-        UIService.openToast("Publication supprimée.", "success");
+        await deletePublication({ publicationId });
+        toast.success("Publication supprimée.");
       } catch {
-        UIService.openToast("Impossible de supprimer la publication.", "error");
+        toast.error("Impossible de supprimer la publication.");
       }
     },
     [deletePublication],
   );
 
-  /* ----------------------------------------------------------
-   * FILTER
-   * ---------------------------------------------------------- */
-
   const handleFilterChange = useCallback(
     (type: FilterType) => {
-      if (type === activeType) {
-        return;
-      }
-
+      if (type === activeType) return;
       setCommentsItem(null);
       setActiveType(type);
     },
     [activeType],
   );
 
-  /* ----------------------------------------------------------
+  /* ========================================================================
    * RENDER
-   * ---------------------------------------------------------- */
+   * ====================================================================== */
 
   return (
-    <View className="flex flex-col gap-0" accessibilityLabel="Fil personnalisé">
-      {/* CATEGORY FILTER */}
-      <View className="pb-3">
+    <View style={styles.root} accessibilityLabel="Fil personnalisé">
+      {/* ───── CATEGORY FILTER ───── */}
+      <View style={styles.categoryBarWrap}>
         <CategoryBar active={activeType} onChange={handleFilterChange} />
       </View>
 
-      {/* FEED */}
-      <>
-        {loading ? (
-          <View
-            key="loading"
-          >
-            <FeedSkeleton />
-          </View>
-        ) : publications.length === 0 ? (
-          <View
-            key="empty"
-          >
-            <EmptyFeed activeType={activeType} onCreateOpen={onCreateOpen} />
-          </View>
-        ) : (
-          <View
-            key={`feed-${activeType}`}
-            className="flex flex-col gap-4"
-          >
-            {publications.map((item, index) => (
-              <View
-                key={`${activeType}-${item._id}`}
-              >
-                <PublicationRenderer
-                  publication={item}
-                  index={index}
-                  onLike={() => {
-                    void handleLike(item._id);
-                  }}
-                  onDelete={() => {
-                    void handleDelete(item._id);
-                  }}
-                  onAction={(actionId) => handleAction(actionId, item)}
-                  onCTA={() => handleCTA(item)}
-                  actionsSlot={
-                    <View className="flex items-center gap-2">
-                      <CommentsButton
-                        count={item.commentCount ?? 0}
-                        onPress={() => setCommentsItem(item)}
-                      />
+      {/* ───── FEED ───── */}
+      {loading ? (
+        <FeedSkeleton />
+      ) : publications.length === 0 ? (
+        <EmptyFeed activeType={activeType} onCreateOpen={onCreateOpen} />
+      ) : (
+        <View style={styles.feedWrap}>
+          {publications.map((item, index) => (
+            <FadeUp
+              key={`${activeType}-${item._id}`}
+              delay={Math.min(index * 45, 250)}
+              distance={18}
+            >
+              <PublicationRenderer
+                publication={item}
+                index={index}
+                onLike={() => {
+                  void handleLike(item._id);
+                }}
+                onDelete={() => {
+                  void handleDelete(item._id);
+                }}
+                onAction={(actionId) => handleAction(actionId, item)}
+                onCTA={() => handleCTA(item)}
+                actionsSlot={
+                  <View style={styles.actionsRow}>
+                    <CommentsButton
+                      count={item.commentCount ?? 0}
+                      onPress={() => setCommentsItem(item)}
+                    />
+                    <BookmarkButton publicationId={item._id} />
+                  </View>
+                }
+              />
+            </FadeUp>
+          ))}
 
-                      <BookmarkButton publicationId={item._id} />
-                    </View>
-                  }
-                />
-              </View>
-            ))}
+          {/* ───── PAGINATION ───── */}
+          <PaginationFooter
+            canLoadMore={canLoadMore}
+            loadingMore={loadingMore}
+            count={publications.length}
+            onLoadMore={() => {
+              void loadMore();
+            }}
+          />
+        </View>
+      )}
 
-            {/* PAGINATION */}
-            <PaginationFooter
-              canLoadMore={canLoadMore}
-              loadingMore={loadingMore}
-              count={publications.length}
-              onLoadMore={() => {
-                void loadMore();
-              }}
-            />
-          </View>
-        )}
-      </>
-
-      {/* COMMENTS */}
+      {/* ───── COMMENTS ───── */}
       <CommentsSheet
         open={commentsItem !== null}
         onClose={() => setCommentsItem(null)}
@@ -770,3 +931,302 @@ export default function PersonalizedFeed({
     </View>
   );
 }
+
+/* ============================================================
+ * STYLES
+ * ============================================================ */
+
+const styles = StyleSheet.create({
+  root: {
+    flexDirection: "column",
+    gap: 0,
+  },
+
+  /* ── Category bar ───────────────────────────────── */
+  categoryBarWrap: {
+    paddingBottom: 12,
+  },
+  categoryBarContent: {
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 2,
+  },
+  categoryChip: {
+    height: 36,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+    overflow: "hidden",
+    minWidth: 60,
+  },
+  categoryChipText: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    letterSpacing: 0.1,
+    zIndex: 10,
+  },
+
+  /* ── Feed ───────────────────────────────────────── */
+  feedWrap: {
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  /* ── Bookmark button ────────────────────────────── */
+  bookmarkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  bookmarkBtnSaved: {
+    backgroundColor: "rgba(234,179,8,0.15)",
+    borderColor: "rgba(234,179,8,0.35)",
+  },
+  bookmarkBtnIdle: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+  bookmarkText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.1,
+  },
+
+  /* ── Comments button ────────────────────────────── */
+  commentsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+  commentsBtnText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.6)",
+    letterSpacing: 0.1,
+  },
+
+  /* ── Skeleton ───────────────────────────────────── */
+  skeletonWrap: {
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+  skeletonCard: {
+    borderRadius: 24,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  skeletonHero: {
+    height: 176,
+    width: "100%",
+    borderRadius: 0,
+  },
+  skeletonBody: {
+    padding: 16,
+    gap: 12,
+  },
+  skeletonAuthorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  skeletonAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  skeletonLine1: {
+    height: 14,
+    width: 128,
+    borderRadius: 7,
+  },
+  skeletonLine2: {
+    height: 10,
+    width: 80,
+    borderRadius: 5,
+  },
+  skeletonTitle: {
+    height: 20,
+    width: "66%",
+    borderRadius: 10,
+  },
+  skeletonText: {
+    height: 12,
+    width: "100%",
+    borderRadius: 6,
+  },
+  skeletonTextShort: {
+    height: 12,
+    width: "80%",
+    borderRadius: 6,
+  },
+  skeletonActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingTop: 4,
+  },
+  skeletonAction: {
+    height: 32,
+    width: 80,
+    borderRadius: 12,
+  },
+
+  /* ── Empty ──────────────────────────────────────── */
+  emptyWrap: {
+    paddingHorizontal: 16,
+  },
+  emptyCard: {
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 48,
+    alignItems: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.25)",
+    backgroundColor: "rgba(10,6,24,0.5)",
+  },
+  emptyBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  emptyOrb: {
+    position: "absolute",
+    top: -100,
+    alignSelf: "center",
+    width: 200,
+    height: 200,
+    borderRadius: 9999,
+    backgroundColor: "rgba(139,92,246,0.22)",
+  },
+  emptyIconWrap: {
+    marginBottom: 20,
+  },
+  emptyIconGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.35)",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#fff",
+    textAlign: "center",
+    letterSpacing: -0.3,
+    marginBottom: 6,
+  },
+  emptySub: {
+    maxWidth: 320,
+    fontSize: 12.5,
+    lineHeight: 19,
+    color: "rgba(255,255,255,0.45)",
+    textAlign: "center",
+    fontWeight: "500",
+    marginBottom: 22,
+  },
+  emptyCtaOuter: {
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
+  },
+  emptyCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  emptyCtaText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+
+  /* ── Pagination ─────────────────────────────────── */
+  paginationWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 20,
+    alignItems: "center",
+  },
+  loadMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.065)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  loadMoreText: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 0.2,
+  },
+  loadingDotsWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 20,
+  },
+  loadingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#A78BFA",
+  },
+  exhaustedWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  exhaustedLine: {
+    height: 1,
+    width: 32,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  exhaustedText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.35)",
+    letterSpacing: 0.2,
+  },
+});

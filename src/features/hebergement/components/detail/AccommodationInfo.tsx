@@ -25,25 +25,15 @@ export const AccommodationInfo: React.FC<AccommodationInfoProps> = ({
   area,
 }) => {
   return (
-    <View className="p-4 md:p-6 border-b border-white/5">
-      <Text className="text-white font-semibold text-sm mb-3">
-        Caractéristiques
-      </Text>
-      <View className="flex flex-wrap gap-2">
-        {capacity.guests > 0 && (
+    <View className="p-4 md:p-6 border-b border-white/5"><Text className="text-white font-semibold text-sm mb-3">Caractéristiques
+      </Text><View className="flex flex-wrap gap-2">{capacity.guests > 0 && (
           <RoomBadge type="guests" value={capacity.guests} />
-        )}
-        {rooms.bedrooms > 0 && (
+        )}{rooms.bedrooms > 0 && (
           <RoomBadge type="bedrooms" value={rooms.bedrooms} />
-        )}
-        {rooms.beds && rooms.beds > 0 && (
+        )}{rooms.beds && rooms.beds > 0 && (
           <RoomBadge type="beds" value={rooms.beds} />
-        )}
-        {rooms.bathrooms > 0 && (
+        )}{rooms.bathrooms > 0 && (
           <RoomBadge type="baths" value={rooms.bathrooms} />
-        )}
-        {area && area > 0 && <RoomBadge type="area" value={area} />}
-      </View>
-    </View>
+        )}{area && area > 0 && <RoomBadge type="area" value={area} />}</View></View>
   );
 };

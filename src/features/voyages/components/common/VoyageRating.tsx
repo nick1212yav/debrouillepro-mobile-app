@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/voyages/components/common/VoyageRating.tsx
 import { Star, StarHalf } from "lucide-react-native";
 import { cn } from "@/lib/utils";
@@ -29,9 +30,7 @@ export function VoyageRating({
   const hasHalfStar = rating % 1 >= 0.5;
 
   return (
-    <View className={cn("flex items-center gap-1.5", className)}>
-      <View className="flex items-center gap-0.5">
-        {Array.from({ length: 5 }).map((_, i) => {
+    <View className={cn("flex items-center gap-1.5", className)}><View className="flex items-center gap-0.5">{Array.from({ length: 5 }).map((_, i) => {
           if (i < fullStars) {
             return (
               <Star
@@ -51,14 +50,8 @@ export function VoyageRating({
             );
           }
           return <Star key={i} size={starSize} className="text-white/20" />;
-        })}
-      </View>
-      <Text className={cn("text-white font-medium", textSize)}>
-        {rating.toFixed(1)}
-      </Text>
-      {showCount && reviewCount !== undefined && (
-        <Text className={cn("text-white/40", textSize)}><Text>(</Text>{reviewCount}<Text>)</Text></Text>
-      )}
-    </View>
+        })}</View><Text className={cn("text-white font-medium", textSize)}>{rating.toFixed(1)}</Text>{showCount && reviewCount !== undefined && (
+        <Text className={cn("text-white/40", textSize)}>({reviewCount})</Text>
+      )}</View>
   );
 }

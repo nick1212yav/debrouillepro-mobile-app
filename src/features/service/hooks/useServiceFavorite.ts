@@ -1,7 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useServiceFavorite(
@@ -14,9 +14,9 @@ export function useServiceFavorite(
     try {
       const { favorited } = await toggle({ providerId });
       setIsFavorited(favorited);
-      UIService.openToast(favorited ? "Ajouté aux favoris ❤️" : "Retiré des favoris", "success");
+      toast.success(favorited ? "Ajouté aux favoris ❤️" : "Retiré des favoris");
     } catch {
-      UIService.openToast("Erreur lors de l'opération", "error");
+      toast.error("Erreur lors de l'opération");
     }
   };
   return { isFavorited, toggle: handleToggle };

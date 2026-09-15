@@ -1,148 +1,271 @@
-import { Text, View } from "react-native";
+// src/components/ui/dialog.tsx
 import * as React from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { XIcon } from "lucide-react-native";
-import { cn } from "@/lib/utils";
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type TextStyle,
+  type ViewProps,
+  type ViewStyle,
+} from "react-native";
+import { X } from "lucide-react-native";
 
-function Dialog({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+// ── Context pour open/close ──────────────────────────────────────────────
+interface DialogContextValue {
+  open: boolean;
+  setOpen: (open: boolean) => void;
 }
 
-function DialogTrigger({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return (
-    <DialogPrimitive.Trigger
-      data-slot="dialog-trigger"
-      className={className}
-      {...props}
-    />
-  );
+const DialogContext = React.createContext<DialogContextValue | null>(null);
+
+function useDialog(): DialogContextValue {
+  const ctx = React.useContext(DialogContext);
+  if (!ctx) {
+    // Fallback safe : évite un crash si un sous-composant est utilisé isolé
+    return { open: false, setOpen: () => undefined };
+  }
+  return ctx;
 }
 
-function DialogPortal({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
+// ── Dialog (racine) ──────────────────────────────────────────────────────
+interface DialogProps {
+  children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  defaultOpen?: boolean;
 }
 
-function DialogClose({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Close>) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
-}
-
-function DialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
-  return (
-    <DialogPrimitive.Overlay
-      data-slot="dialog-overlay"
-      className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-function DialogContent({
-  className,
+export function Dialog({
   children,
-  showCloseButton = true,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  open: controlledOpen,
+  onOpenChange,
+  defaultOpen = false,
+}: DialogProps) {
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (!isControlled) setInternalOpen(next);
+      onOpenChange?.(next);
+    },
+    [isControlled, onOpenChange],
+  );
+
+  const value = React.useMemo<DialogContextValue>(
+    () => ({ open, setOpen }),
+    [open, setOpen],
+  );
+
+  return (
+    <DialogContext.Provider value={value}>{children}</DialogContext.Provider>
+  );
+}
+
+// ── DialogTrigger ────────────────────────────────────────────────────────
+interface DialogTriggerProps {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
+}
+
+export function DialogTrigger({
+  children,
+  style,
+  disabled = false,
+}: DialogTriggerProps) {
+  const { setOpen } = useDialog();
+  return (
+    <Pressable
+      onPress={() => setOpen(true)}
+      disabled={disabled}
+      style={style}
+      accessibilityRole="button"
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+// ── DialogClose ──────────────────────────────────────────────────────────
+interface DialogCloseProps {
+  children?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function DialogClose({ children, style }: DialogCloseProps) {
+  const { setOpen } = useDialog();
+  return (
+    <Pressable
+      onPress={() => setOpen(false)}
+      style={style}
+      accessibilityRole="button"
+      accessibilityLabel="Fermer"
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+// ── DialogPortal (no-op en RN) ───────────────────────────────────────────
+export function DialogPortal({ children }: { children?: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+// ── DialogOverlay (no-op, utilisé dans Content) ─────────────────────────
+export function DialogOverlay(_props: ViewProps) {
+  return null;
+}
+
+// ── DialogContent ────────────────────────────────────────────────────────
+interface DialogContentProps {
+  children?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
   showCloseButton?: boolean;
-}) {
+}
+
+export function DialogContent({
+  children,
+  style,
+  showCloseButton = true,
+}: DialogContentProps) {
+  const { open, setOpen } = useDialog();
+
   return (
-    <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        data-slot="dialog-content"
-        className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            className="ring-offset-background data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          >
-            <XIcon />
-            <Text className="sr-only">Close</Text>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
-    </DialogPortal>
+    <Modal
+      visible={open}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setOpen(false)}
+      statusBarTranslucent
+    >
+      <View style={styles.overlay}>
+        {/* Backdrop */}
+        <Pressable
+          onPress={() => setOpen(false)}
+          style={styles.backdrop}
+          accessibilityLabel="Fermer"
+        />
+
+        {/* Content */}
+        <View style={[styles.content, style]}>
+          {children}
+
+          {showCloseButton && (
+            <Pressable
+              onPress={() => setOpen(false)}
+              style={styles.closeButton}
+              hitSlop={6}
+              accessibilityLabel="Fermer"
+            >
+              <X size={18} color="rgba(255,255,255,0.6)" />
+            </Pressable>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
-function DialogHeader({ className, ...props }: React.ComponentProps<typeof View>) {
+// ── DialogHeader ─────────────────────────────────────────────────────────
+export function DialogHeader({ style, children, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="dialog-header"
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
-      {...props}
-    />
+    <View style={[styles.header, style]} {...props}>
+      {children}
+    </View>
   );
 }
 
-function DialogFooter({ className, ...props }: React.ComponentProps<typeof View>) {
+// ── DialogFooter ─────────────────────────────────────────────────────────
+export function DialogFooter({ style, children, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="dialog-footer"
-      className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
-        className,
-      )}
-      {...props}
-    />
+    <View style={[styles.footer, style]} {...props}>
+      {children}
+    </View>
   );
 }
 
-function DialogTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Title>) {
-  return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
-      {...props}
-    />
-  );
+// ── DialogTitle ──────────────────────────────────────────────────────────
+interface DialogTitleProps {
+  children?: React.ReactNode;
+  style?: StyleProp<TextStyle>;
 }
 
-function DialogDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
-      {...props}
-    />
-  );
+export function DialogTitle({ children, style }: DialogTitleProps) {
+  return <Text style={[styles.title, style]}>{children}</Text>;
 }
 
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger,
-};
+// ── DialogDescription ────────────────────────────────────────────────────
+interface DialogDescriptionProps {
+  children?: React.ReactNode;
+  style?: StyleProp<TextStyle>;
+}
+
+export function DialogDescription({ children, style }: DialogDescriptionProps) {
+  return <Text style={[styles.description, style]}>{children}</Text>;
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  content: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#18181B",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    padding: 24,
+    gap: 16,
+    // Ombre iOS + Android
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  closeButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.7,
+  },
+  header: {
+    flexDirection: "column",
+    gap: 8,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  title: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+    lineHeight: 22,
+  },
+  description: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+});

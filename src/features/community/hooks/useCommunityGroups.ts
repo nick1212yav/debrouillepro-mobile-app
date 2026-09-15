@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityGroups.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import { adaptCommunityGroup } from "../adapter";
 import type { CommunityGroup } from "../types";
@@ -23,10 +22,10 @@ export function useCommunityGroups() {
     joinGroup: async (groupId: Id<"groups">) => {
       try {
         const result = await joinGroup({ groupId });
-        UIService.openToast(result.joined ? "Rejoint !" : "Quitté", "success");
+        toast.success(result.joined ? "Rejoint !" : "Quitté");
         return result;
       } catch (error) {
-        UIService.openToast("Erreur lors de l'action sur le groupe", "error");
+        toast.error("Erreur lors de l'action sur le groupe");
         throw error;
       }
     },
@@ -45,10 +44,10 @@ export function useCommunityGroups() {
           tags: data.tags ?? [],
         };
         const groupId = await createGroup(payload);
-        UIService.openToast("Groupe créé !", "success");
+        toast.success("Groupe créé !");
         return groupId;
       } catch (error) {
-        UIService.openToast("Erreur lors de la création du groupe", "error");
+        toast.error("Erreur lors de la création du groupe");
         throw error;
       }
     },
@@ -70,19 +69,19 @@ export function useCommunityGroups() {
           tags: data.tags ?? [],
         };
         await updateGroup({ groupId, ...payload });
-        UIService.openToast("Groupe mis à jour", "success");
+        toast.success("Groupe mis à jour");
         return groupId;
       } catch (error) {
-        UIService.openToast("Erreur lors de la mise à jour", "error");
+        toast.error("Erreur lors de la mise à jour");
         throw error;
       }
     },
     deleteGroup: async (groupId: Id<"groups">) => {
       try {
         await deleteGroup({ groupId });
-        UIService.openToast("Groupe supprimé", "success");
+        toast.success("Groupe supprimé");
       } catch (error) {
-        UIService.openToast("Erreur lors de la suppression", "error");
+        toast.error("Erreur lors de la suppression");
         throw error;
       }
     },

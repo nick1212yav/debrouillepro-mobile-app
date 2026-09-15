@@ -1,4 +1,4 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Pressable, Text } from "react-native";
 
 // src/features/network/components/People/PeopleFilters.tsx
 import { useState, useCallback } from "react";
@@ -128,200 +128,75 @@ export function PeopleFilters({
     (filters.minRating ? 1 : 0);
 
   return (
-    <View className={cn("relative", className)}>
-      {/* Bouton toggle */}
-      <Pressable
-        onPress={toggle}
-        className={cn(
+    <View className={cn("relative", className)}>{}<Pressable onPress={toggle} className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-2xl text-xs font-semibold transition-all",
           "bg-white/5 border border-white/10 hover:bg-white/8",
           isOpen && "bg-white/8 border-indigo-500/30",
-        )}
-      >
-        <Filter
-          size={14}
-          className={isOpen ? "text-indigo-400" : "text-white/40"}
-        />
-        <Text className="text-white/70">Filtres</Text>
-        {activeFilterCount > 0 && (
-          <Text className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300">
-            {activeFilterCount}
-          </Text>
-        )}
-        {isOpen ? (
+        )}><Filter size={14} className={isOpen ? "text-indigo-400" : "text-white/40"} /><Text className="text-white/70">Filtres</Text>{activeFilterCount > 0 && (
+          <Text className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300">{activeFilterCount}</Text>
+        )}{isOpen ? (
           <ChevronUp size={14} className="text-white/40" />
         ) : (
           <ChevronDown size={14} className="text-white/40" />
-        )}
-      </Pressable>
-
-      {/* Panneau de filtres */}
-      <>
-        {(isOpen || externalIsOpen) && (
-          <View
-            className="absolute top-full left-0 right-0 mt-2 z-50 p-4 rounded-2xl overflow-auto max-h-[80vh]"
-            style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", maxHeight: "min(80vh, 500px)" }}
-          >
-            <View className="space-y-4">
-              {/* En-tête */}
-              <View className="flex items-center justify-between">
-                <Text className="text-white font-bold text-sm">Filtres</Text>
-                <View className="flex items-center gap-2">
-                  <Pressable
-                    onPress={handleReset}
-                    className="text-xs text-white/40"
-                  >
-                    <Text>Réinitialiser</Text></Pressable>
-                  <Pressable
-                    onPress={handleApply}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-500"
-                  >
-                    <Text>Appliquer</Text></Pressable>
-                </View>
-              </View>
-
-              {/* Tri */}
-              <View>
-                <Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2">
-                  Trier par
-                </Text>
-                <View className="flex flex-wrap gap-1.5">
-                  {SORT_OPTIONS.map((opt) => (
-                    <Pressable
-                      key={opt.id}
-                      onPress={() =>
-                        handleSortChange(opt.id as PeopleFiltersState["sortBy"])
-                      }
-                      className={cn(
+        )}</Pressable>{}<View>{(isOpen || externalIsOpen) && (
+          <View initial={{ opacity: 0, y: 8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.97 }} className="absolute top-full left-0 right-0 mt-2 z-50 p-4 rounded-2xl overflow-auto max-h-[80vh]" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", boxShadow: "0 8px 32px rgba(0,0,0,0.6)", maxHeight: "min(80vh, 500px)" }}>
+            <View className="space-y-4">{}<View className="flex items-center justify-between"><Text className="text-white font-bold text-sm">Filtres</Text><View className="flex items-center gap-2"><Pressable onPress={handleReset} className="text-xs text-white/40 transition-colors"><Text>Réinitialiser</Text></Pressable><Pressable onPress={handleApply} className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-500 transition-colors"><Text>Appliquer</Text></Pressable></View></View>{}<View><Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2">Trier par
+                </Text><View className="flex flex-wrap gap-1.5">{SORT_OPTIONS.map((opt) => (
+                    <Pressable key={opt.id} onPress={() =>
+                        handleSortChange(opt.id as PeopleFiltersState["sortBy"])} className={cn(
                         "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
                         filters.sortBy === opt.id
                           ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
                           : "text-white/40 border border-white/10 hover:bg-white/5",
-                      )}
-                    >
-                      {opt.label}
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-
-              {/* Rôles */}
-              {rolesOptions.length > 0 && (
-                <View>
-                  <Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <Users size={12} />
-                    Profils
-                  </Text>
-                  <View className="flex flex-wrap gap-1.5">
-                    {rolesOptions.map((role) => (
-                      <Pressable
-                        key={role.id}
-                        onPress={() => handleRoleToggle(role.id)}
-                        className={cn(
+                      )}>{opt.label}</Pressable>
+                  ))}</View></View>{}{rolesOptions.length > 0 && (
+                <View><Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1"><Users size={12} />Profils
+                  </Text><View className="flex flex-wrap gap-1.5">{rolesOptions.map((role) => (
+                      <Pressable key={role.id} onPress={() => handleRoleToggle(role.id)} className={cn(
                           "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
                           filters.roles.includes(role.id)
                             ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
                             : "text-white/40 border border-white/10 hover:bg-white/5",
-                        )}
-                      >
-                        {role.icon} {role.label}
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Localisations */}
-              {locationsOptions.length > 0 && (
-                <View>
-                  <Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <MapPin size={12} />
-                    Localisations
-                  </Text>
-                  <View className="flex flex-wrap gap-1.5">
-                    {locationsOptions.map((loc) => (
-                      <Pressable
-                        key={loc.id}
-                        onPress={() => handleLocationToggle(loc.id)}
-                        className={cn(
+                        )}>{role.icon}{role.label}</Pressable>
+                    ))}</View></View>
+              )}{}{locationsOptions.length > 0 && (
+                <View><Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1"><MapPin size={12} />Localisations
+                  </Text><View className="flex flex-wrap gap-1.5">{locationsOptions.map((loc) => (
+                      <Pressable key={loc.id} onPress={() => handleLocationToggle(loc.id)} className={cn(
                           "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
                           filters.locations.includes(loc.id)
                             ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
                             : "text-white/40 border border-white/10 hover:bg-white/5",
-                        )}
-                      >
-                        {loc.icon} {loc.label}
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Secteurs */}
-              {industriesOptions.length > 0 && (
-                <View>
-                  <Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <Briefcase size={12} />
-                    Secteurs
-                  </Text>
-                  <View className="flex flex-wrap gap-1.5">
-                    {industriesOptions.map((ind) => (
-                      <Pressable
-                        key={ind.id}
-                        onPress={() => handleIndustryToggle(ind.id)}
-                        className={cn(
+                        )}>{loc.icon}{loc.label}</Pressable>
+                    ))}</View></View>
+              )}{}{industriesOptions.length > 0 && (
+                <View><Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2 flex items-center gap-1"><Briefcase size={12} />Secteurs
+                  </Text><View className="flex flex-wrap gap-1.5">{industriesOptions.map((ind) => (
+                      <Pressable key={ind.id} onPress={() => handleIndustryToggle(ind.id)} className={cn(
                           "px-3 py-1.5 rounded-full text-xs font-medium transition-all",
                           filters.industries.includes(ind.id)
                             ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
                             : "text-white/40 border border-white/10 hover:bg-white/5",
-                        )}
-                      >
-                        {ind.icon} {ind.label}
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Options supplémentaires */}
-              <View>
-                <Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2">
-                  Options
-                </Text>
-                <View className="flex flex-wrap gap-2">
-                  <Pressable
-                    onPress={handleVerifiedToggle}
-                    className={cn(
+                        )}>{ind.icon}{ind.label}</Pressable>
+                    ))}</View></View>
+              )}{}<View><Text className="text-white/40 text-[10px] font-semibold uppercase tracking-wider mb-2">Options
+                </Text><View className="flex flex-wrap gap-2"><Pressable onPress={handleVerifiedToggle} className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
                       filters.verifiedOnly
                         ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                         : "text-white/40 border border-white/10 hover:bg-white/5",
-                    )}
-                  >
-                    <Star size={12} />
-                    <Text>Vérifiés uniquement</Text></Pressable>
-                  <Pressable
-                    onPress={() => {
+                    )}><Star size={12} />Vérifiés uniquement
+                  </Pressable><Pressable onPress={() => {
                       // Note minimale toggle
                       const newRating = filters.minRating ? undefined : 4;
                       onFiltersChange({ ...filters, minRating: newRating });
-                    }}
-                    className={cn(
+                    }} className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all",
                       filters.minRating
                         ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
                         : "text-white/40 border border-white/10 hover:bg-white/5",
-                    )}
-                  >
-                    <Clock size={12} />
-                    <Text>Note ≥</Text>{filters.minRating || "4"}
-                  </Pressable>
-                </View>
-              </View>
-            </View>
+                    )}><Clock size={12} />Note ≥ {filters.minRating || "4"}</Pressable></View></View></View>
           </View>
-        )}
-      </>
-    </View>
+        )}</View></View>
   );
 }

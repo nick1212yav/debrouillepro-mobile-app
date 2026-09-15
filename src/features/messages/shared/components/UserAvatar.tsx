@@ -1,4 +1,4 @@
-import { Text, View, Image, ViewProps, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { Text, View, Image, ViewProps, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
 
 // src/features/messages/shared/components/UserAvatar.tsx
 
@@ -56,25 +56,15 @@ export function UserAvatar({
   };
 
   return (
-    <View
-      {...props}
-      className={className}
-      style={containerStyle}
-      accessibilityLabel={name ?? "Utilisateur"}
-    >
+    <View {...props} className={className} style={containerStyle} accessibilityLabel={name ?? "Utilisateur"}>
       {avatar ? (
-        <Image
-          style={{ width: "100%", height: "100%", display: "flex" }} source={{ uri: avatar }} accessibilityLabel={name ?? "Utilisateur"}
-        />
+        <Image style={{ width: "100%", height: "100%", display: "flex" }} source={{ uri: avatar }} accessibilityLabel={name ?? "Utilisateur"} />
       ) : (
-        <Text>{initials}</Text>
+        <Text accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants">{initials}</Text>
       )}
 
       {online && (
-        <Text
-          accessibilityLabel="En ligne"
-          style={{ position: "absolute", right: 1, bottom: 1, width: Math.max(8, Math.round(size * 0.24)), height: Math.max(8, Math.round(size * 0.24)), borderRadius: "50%", backgroundColor: "#22c55e", borderColor: "#fff", borderStyle: "solid" }}
-        />
+        <Text accessibilityLabel="En ligne" style={{ position: "absolute", right: 1, bottom: 1, width: Math.max(8, Math.round(size * 0.24)), height: Math.max(8, Math.round(size * 0.24)), borderRadius: 50, backgroundColor: "#22c55e", borderColor: "#fff", borderStyle: "solid" }} />
       )}
     </View>
   );

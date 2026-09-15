@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateRideShareForm.tsx
 import { useForm } from "react-hook-form";
@@ -87,14 +87,9 @@ export function CreateRideShareForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="origin"
-            render={({ field }) => (
+      <View className="space-y-4"><View className="gap-4"><FormField control={form.control} name="origin" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Lieu de départ *</Text></FormLabel>
+                <FormLabel>Lieu de départ *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Rond-point Ngaba"
@@ -104,14 +99,9 @@ export function CreateRideShareForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="destination"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="destination" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Lieu d'arrivée *</Text></FormLabel>
+                <FormLabel>Lieu d'arrivée *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Boulevard du 30 Juin"
@@ -121,17 +111,9 @@ export function CreateRideShareForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="departureDate"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="departureDate" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Date de départ *</Text></FormLabel>
+                <FormLabel>Date de départ *</FormLabel>
                 <FormControl>
                   <Input
                     type="date"
@@ -141,14 +123,9 @@ export function CreateRideShareForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="departureTime"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="departureTime" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Heure de départ *</Text></FormLabel>
+                <FormLabel>Heure de départ *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 08:30"
@@ -158,57 +135,39 @@ export function CreateRideShareForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="seats"
-            render={({ field }) => (
+            )} /></View><View className="gap-2"><FormField control={form.control} name="seats" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Places dispo *</Text></FormLabel>
+                <FormLabel>Places dispo *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseInt(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseInt(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="pricePerSeat"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="pricePerSeat" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prix p. place *</Text></FormLabel>
+                <FormLabel>Prix p. place *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -219,24 +178,19 @@ export function CreateRideShareForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                    <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="description" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Précisions importantes (Bagages acceptés, climatisation, itinéraire, etc.)</Text></FormLabel>
+                Précisions importantes (Bagages acceptés, climatisation,
+                itinéraire, etc.)
+              </FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Ex: Grand coffre disponible, climatisation active, départ à l'heure précise..."
@@ -247,22 +201,14 @@ export function CreateRideShareForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+          )} /><Button  className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Publication en cours...</Text></>
+              Publication en cours...
+            </>
           ) : (
             "👥 Publier l'offre de covoiturage"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

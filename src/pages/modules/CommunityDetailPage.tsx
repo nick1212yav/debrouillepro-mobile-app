@@ -1,21 +1,13 @@
-import { useLocalSearchParams, useRouter, Link } from "expo-router";
-import { UIService } from "@/core/sdk/ui/UIService";
-
-function NativeConfirmAlert(message: string): boolean {
-  Alert.alert(message, "Confirmation", [
-    { text: "Annuler", style: "cancel" },
-    { text: "Confirmer", onPress: () => undefined },
-  ]);
-  return false;
-}
-import { View, Text, Pressable, Alert } from "react-native";
+import { View, Pressable, Text } from "react-native";
 
 // src/pages/modules/CommunityDetailPage.tsx
 import { useState, useEffect, Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   MoreVertical,
@@ -55,6 +47,7 @@ import {
 import { adaptCommunityPost } from "@/features/community/adapter";
 import type { CommunityPost } from "@/features/community/types";
 import type { Id } from "@/convex/_generated/dataModel";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 // ── ErrorBoundary ──────────────────────────────────────────────────────────
 class ErrorBoundary extends Component<{
@@ -126,8 +119,8 @@ const CommunityMonetization = () => null;
 const CommunitySponsors = () => null;
 
 export default function CommunityDetailPage() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [post, setPost] = useState<CommunityPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [showComments, setShowComments] = useState(false);
@@ -202,7 +195,7 @@ export default function CommunityDetailPage() {
         likeCount: post.likedByMe ? post.likeCount - 1 : post.likeCount + 1,
       });
     } catch (error) {
-      UIService.openToast("Erreur lors du like", "error");
+      toast.error("Erreur lors du like");
     }
   };
 
@@ -214,9 +207,11 @@ export default function CommunityDetailPage() {
         ...post,
         bookmarkedByMe: !post.bookmarkedByMe,
       });
-      UIService.openToast(post.bookmarkedByMe ? "Retiré des favoris" : "Ajouté aux favoris", "success");
+      toast.success(
+        post.bookmarkedByMe ? "Retiré des favoris" : "Ajouté aux favoris",
+      );
     } catch (error) {
-      UIService.openToast("Erreur lors de l'enregistrement", "error");
+      toast.error("Erreur lors de l'enregistrement");
     }
   };
 
@@ -226,29 +221,29 @@ export default function CommunityDetailPage() {
 
   const handleDelete = async () => {
     if (!post) return;
-    if (!NativeConfirmAlert("Voulez-vous vraiment supprimer ce post ?")) return;
+    if (!confirm("Voulez-vous vraiment supprimer ce post ?")) return;
     try {
       await deletePost({ publicationId: post._id });
-      UIService.openToast("Post supprimé", "success");
-      router.back();
+      toast.success("Post supprimé");
+      navigate(-1);
     } catch (error) {
-      UIService.openToast("Erreur lors de la suppression", "error");
+      toast.error("Erreur lors de la suppression");
     }
   };
 
   const handleCopyLink = () => {
-    undefined.writeText(undefined.href);
-    UIService.openToast("Lien copié !", "success");
+    Clipboard.setString(window.location.href);
+    toast.success("Lien copié !");
     setShowMenu(false);
   };
 
   const handleHide = () => {
-    UIService.openToast("Post masqué (fonctionnalité à implémenter)", "info");
+    toast.info("Post masqué (fonctionnalité à implémenter)");
     setShowMenu(false);
   };
 
   const handleEdit = () => {
-    router.push(`/community/edit/${post?._id}`);
+    navigate(`/community/edit/${post?._id}`);
     setShowMenu(false);
   };
 
@@ -256,18 +251,18 @@ export default function CommunityDetailPage() {
     if (!post) return;
     try {
       await addComment(text);
-      UIService.openToast("Commentaire ajouté", "success");
+      toast.success("Commentaire ajouté");
     } catch (error) {
-      UIService.openToast("Erreur lors de l'ajout du commentaire", "error");
+      toast.error("Erreur lors de l'ajout du commentaire");
     }
   };
 
   const handleReply = async (text: string, parentId: string) => {
     try {
       await addReply(text, parentId as Id<"comments">);
-      UIService.openToast("Réponse ajoutée", "success");
+      toast.success("Réponse ajoutée");
     } catch (error) {
-      UIService.openToast("Erreur lors de l'ajout de la réponse", "error");
+      toast.error("Erreur lors de l'ajout de la réponse");
     }
   };
 
@@ -280,37 +275,37 @@ export default function CommunityDetailPage() {
   }) => {
     try {
       await moderateText(reason);
-      UIService.openToast("Signalement envoyé", "success");
+      toast.success("Signalement envoyé");
     } catch (error) {
-      UIService.openToast("Erreur lors du signalement", "error");
+      toast.error("Erreur lors du signalement");
     }
   };
 
-  const handleStatsLikes = () => UIService.openToast("Liste des likes à venir", "info");
+  const handleStatsLikes = () => toast.info("Liste des likes à venir");
   const handleStatsComments = () => setShowComments(!showComments);
   const handleStatsShares = () => setShowShare(true);
-  const handleStatsBookmarks = () => UIService.openToast("Liste des favoris à venir", "info");
+  const handleStatsBookmarks = () => toast.info("Liste des favoris à venir");
 
   const handleVote = async (optionId: string) => {
     if (!post) return;
     try {
       await votePoll({ publicationId: post._id, optionId });
-      UIService.openToast("Vote enregistré !", "success");
+      toast.success("Vote enregistré !");
     } catch (error) {
-      UIService.openToast("Erreur lors du vote", "error");
+      toast.error("Erreur lors du vote");
     }
   };
 
   const handleAnswer = async (answer: string) => {
-    UIService.openToast("Réponse aux questions bientôt disponible", "info");
+    toast.info("Réponse aux questions bientôt disponible");
   };
 
   const handleLikeComment = async (commentId: string) => {
-    UIService.openToast("Like des commentaires bientôt disponible", "info");
+    toast.info("Like des commentaires bientôt disponible");
   };
 
   const handleAuthorClick = (authorId: string) => {
-    router.push(`/profile/${authorId}`);
+    navigate(`/profile/${authorId}`);
   };
 
   // ── Handler pour les réactions multiples ──────────────────────────────
@@ -340,7 +335,7 @@ export default function CommunityDetailPage() {
       if (!post.likedByMe) {
         handleLike();
       }
-      UIService.openToast(`Réaction ${emoji} ajoutée`, "success");
+      toast.success(`Réaction ${emoji} ajoutée`);
       // Ici, appeler une mutation Convex pour stocker la réaction
     }
   };
@@ -348,68 +343,34 @@ export default function CommunityDetailPage() {
   // ── Handler pour le suivi ──────────────────────────────────────────────
   const handleFollow = () => {
     setIsFollowing(true);
-    UIService.openToast("Vous suivez maintenant cet auteur", "success");
+    toast.success("Vous suivez maintenant cet auteur");
   };
 
   const handleUnfollow = () => {
     setIsFollowing(false);
-    UIService.openToast("Vous ne suivez plus cet auteur", "info");
+    toast.info("Vous ne suivez plus cet auteur");
   };
 
   // ── États de chargement et d'erreur ─────────────────────────────────────
 
   if (loading) {
     return (
-      <View
-        className="h-full flex flex-col"
-        style={{  }}
-      >
-        <View className="px-4 pt-12 pb-3">
-          <Skeleton className="w-10 h-10 rounded-2xl" />
-        </View>
-        <View className="px-4 space-y-4">
-          <Skeleton className="h-64 w-full rounded-2xl" />
-          <Skeleton className="h-8 w-3/4 rounded-xl" />
-          <Skeleton className="h-6 w-1/2 rounded-xl" />
-          <Skeleton className="h-32 w-full rounded-xl" />
-        </View>
-      </View>
+      <View className="h-full flex flex-col" style={{
+}}><View className="px-4 pt-12 pb-3"><Skeleton className="w-10 h-10 rounded-2xl" /></View><View className="px-4 space-y-4"><Skeleton className="h-64 w-full rounded-2xl" /><Skeleton className="h-8 w-3/4 rounded-xl" /><Skeleton className="h-6 w-1/2 rounded-xl" /><Skeleton className="h-32 w-full rounded-xl" /></View></View>
     );
   }
 
   if (!post) {
     return (
-      <View
-        className="h-full flex flex-col items-center justify-center"
-        style={{  }}
-      >
-        <Pressable onPress={() => router.back()} className="self-start ml-4 mb-4">
-          <ArrowLeft size={24} className="text-white/60" />
-        </Pressable>
-        <Text className="text-white/40">Post introuvable</Text>
-      </View>
+      <View className="h-full flex flex-col items-center justify-center" style={{
+}}><Pressable onPress={() => navigate(-1)} className="self-start ml-4 mb-4"><ArrowLeft size={24} className="text-white/60" /></Pressable><Text className="text-white/40">Post introuvable</Text></View>
     );
   }
 
   // ── Mode debug ──────────────────────────────────────────────────────────
   if (debugMode) {
     return (
-      <View className="p-6 text-white min-h-screen bg-black">
-        <Text className="text-xl font-bold mb-4">🔍 Données du post (debug)</Text>
-        <pre className="text-xs bg-white/10 p-4 rounded-xl overflow-auto max-h-[80vh] border border-white/10">
-          {JSON.stringify(post, null, 2)}
-        </pre>
-        <Pressable
-          onPress={() => setDebugMode(false)}
-          className="mt-6 px-4 py-2 bg-purple-500/20 rounded-xl"
-        >
-          <Text>Retour au rendu normal</Text></Pressable>
-        <Pressable
-          onPress={() => router.back()}
-          className="mt-6 ml-4 px-4 py-2 bg-white/10 rounded-xl"
-        >
-          <Text>← Retour</Text></Pressable>
-      </View>
+      <View className="p-6 text-white min-h-screen bg-black"><Text className="text-xl font-bold mb-4">🔍 Données du post (debug)</Text><pre className="text-xs bg-white/10 p-4 rounded-xl overflow-auto max-h-[80vh] border border-white/10">{JSON.stringify(post, null, 2)}</pre><Pressable onPress={() => setDebugMode(false)} className="mt-6 px-4 py-2 bg-purple-500/20 rounded-xl transition-colors"><Text>Retour au rendu normal</Text></Pressable><Pressable onPress={() => navigate(-1)} className="mt-6 ml-4 px-4 py-2 bg-white/10 rounded-xl transition-colors"><Text>← Retour</Text></Pressable></View>
     );
   }
 
@@ -435,9 +396,7 @@ export default function CommunityDetailPage() {
   // ── Rendu principal ─────────────────────────────────────────────────────
 
   const renderContent = () => (
-    <View
-      className="space-y-4"
-    >
+    <View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
       <ErrorBoundary
         fallback={
           <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityHeader</Text></View>
@@ -459,8 +418,7 @@ export default function CommunityDetailPage() {
       {images && images.length > 0 && (
         <ErrorBoundary
           fallback={
-            <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityGallery</Text></View>
+            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityGallery</Text></View>
           }
         >
           <CommunityGallery images={images} title={post.title || "Post"} />
@@ -468,19 +426,14 @@ export default function CommunityDetailPage() {
       )}
 
       {post.title && (
-        <Text className="text-xl font-bold text-white leading-tight">
-          {post.title}
-        </Text>
+        <Text className="text-xl font-bold text-white leading-tight">{post.title}</Text>
       )}
-      <Text className="text-white/80 text-sm leading-relaxed">
-        {post.description}
-      </Text>
+      <Text className="text-white/80 text-sm leading-relaxed">{post.description}</Text>
 
       {post.tags.length > 0 && (
         <ErrorBoundary
           fallback={
-            <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityHashtags</Text></View>
+            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityHashtags</Text></View>
           }
         >
           <CommunityHashtags tags={post.tags} />
@@ -490,8 +443,7 @@ export default function CommunityDetailPage() {
       {safeMeta.location && (
         <ErrorBoundary
           fallback={
-            <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityLocation</Text></View>
+            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityLocation</Text></View>
           }
         >
           <CommunityLocation location={safeMeta.location} />
@@ -511,17 +463,13 @@ export default function CommunityDetailPage() {
       )}
 
       {post.type === "evenement" && safeMeta.eventDate && (
-        <View className="flex items-center gap-2 text-sm text-white/60 bg-white/5 rounded-xl p-3">
-          <Calendar size={16} className="text-purple-400" />
-          <Text>{new Date(safeMeta.eventDate).toLocaleDateString()}</Text>
-          {safeMeta.eventLocation && (
+        <View className="flex items-center gap-2 text-sm text-white/60 bg-white/5 rounded-xl p-3"><Calendar size={16} className="text-purple-400" /><Text>{new Date(safeMeta.eventDate).toLocaleDateString()}</Text>{safeMeta.eventLocation && (
             <>
-              <Text className="text-white/20">|</Text>
+              <span className="text-white/20">|</span>
               <MapPin size={16} className="text-purple-400" />
-              <Text>{safeMeta.eventLocation}</Text>
+              <span>{safeMeta.eventLocation}</span>
             </>
-          )}
-        </View>
+          )}</View>
       )}
 
       {post.type === "poll" && safeMeta.pollOptions.length > 0 && (
@@ -541,8 +489,7 @@ export default function CommunityDetailPage() {
       {post.type === "question" && (
         <ErrorBoundary
           fallback={
-            <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityQuestion</Text></View>
+            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityQuestion</Text></View>
           }
         >
           <CommunityQuestion
@@ -554,8 +501,7 @@ export default function CommunityDetailPage() {
 
       <ErrorBoundary
         fallback={
-          <View className="text-red-400 p-4">
-            <Text>❌ Erreur dans CommunityStatistics</Text></View>
+          <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityStatistics</Text></View>
         }
       >
         <CommunityStatistics
@@ -573,8 +519,7 @@ export default function CommunityDetailPage() {
 
       <ErrorBoundary
         fallback={
-          <View className="text-red-400 p-4">
-            <Text>❌ Erreur dans CommunityActions</Text></View>
+          <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityActions</Text></View>
         }
       >
         <CommunityActions
@@ -597,8 +542,7 @@ export default function CommunityDetailPage() {
       {showComments && (
         <ErrorBoundary
           fallback={
-            <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityComments</Text></View>
+            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityComments</Text></View>
           }
         >
           <CommunityComments
@@ -612,160 +556,100 @@ export default function CommunityDetailPage() {
         </ErrorBoundary>
       )}
 
-      <View className="flex items-center justify-between pt-4 border-t border-white/10">
-        <Pressable
-          onPress={handleLike}
-          className="flex items-center gap-2 text-white/60"
-        >
-          <Heart
+      <View className="flex items-center justify-between pt-4 border-t border-white/10"><Pressable onPress={handleLike} className="flex items-center gap-2 text-white/60 transition-colors"><Heart
             size={18}
             className={post.likedByMe ? "fill-red-500 text-red-500" : ""}
-          />
-          <Text>{post.likeCount}</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setShowComments(!showComments)}
-          className="flex items-center gap-2 text-white/60"
-        >
-          <MessageCircle size={18} />
-          <Text>{post.commentCount}</Text>
-        </Pressable>
-        <Pressable
-          onPress={handleShare}
-          className="flex items-center gap-2 text-white/60"
-        >
-          <Share2 size={18} />
-        </Pressable>
-        <Pressable
-          onPress={handleBookmark}
-          className="flex items-center gap-2 text-white/60"
-        >
-          <Bookmark
+          /><Text>{post.likeCount}</Text></Pressable><Pressable onPress={() => setShowComments(!showComments)} className="flex items-center gap-2 text-white/60 transition-colors"><MessageCircle size={18} /><Text>{post.commentCount}</Text></Pressable><Pressable onPress={handleShare} className="flex items-center gap-2 text-white/60 transition-colors"><Share2 size={18} /></Pressable><Pressable onPress={handleBookmark} className="flex items-center gap-2 text-white/60 transition-colors"><Bookmark
             size={18}
             className={
               post.bookmarkedByMe ? "fill-purple-400 text-purple-400" : ""
             }
-          />
-        </Pressable>
-      </View>
+          /></Pressable></View>
     </View>
   );
 
   return (
-    <View
-      className="h-full flex flex-col"
-      style={{  }}
-    >
-      <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3 relative">
-        <Pressable
-          onPress={() => router.back()}
-          className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-        >
-          <ArrowLeft size={20} className="text-white" />
-        </Pressable>
-        <Text className="text-white font-bold text-lg flex-1 truncate">
-          Publication
-        </Text>
-        <Pressable
-          onPress={() => setShowMenu(!showMenu)}
-          className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-        >
-          <MoreVertical size={20} className="text-white/60" />
-        </Pressable>
-        <Pressable
-          onPress={() => setDebugMode(true)}
-          className="text-[10px] text-white/20 px-2 py-1"
-        >
-          <Text>debug</Text></Pressable>
-
-        {showMenu && (
-          <View className="absolute right-4 top-16 z-50 w-48 rounded-xl bg-zinc-900/95 border border-white/10 shadow-xl overflow-hidden">
-            <View className="py-1">
-              <Pressable
+    <View className="h-full flex flex-col" style={{
+}}><View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3 relative"><Pressable onPress={() => navigate(-1)} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors"><ArrowLeft size={20} className="text-white" /></Pressable><Text className="text-white font-bold text-lg flex-1 truncate">Publication
+        </Text><Pressable onPress={() => setShowMenu(!showMenu)} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors"><MoreVertical size={20} className="text-white/60" /></Pressable><Pressable onPress={() => setDebugMode(true)} className="text-[10px] text-white/20 transition-colors px-2 py-1"><Text>debug</Text></Pressable>{showMenu && (
+          <div className="absolute right-4 top-16 z-50 w-48 rounded-xl bg-zinc-900/95 backdrop-blur-sm border border-white/10 shadow-xl overflow-hidden">
+            <div className="py-1">
+              <button
                 onPress={handleEdit}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 transition-colors"
               >
                 <Pencil size={16} />
-                <Text>Modifier</Text></Pressable>
-              <Pressable
+                Modifier
+              </button>
+              <button
                 onPress={handleDelete}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 transition-colors"
               >
                 <Trash2 size={16} />
-                <Text>Supprimer</Text></Pressable>
+                Supprimer
+              </button>
               <hr className="border-white/5" />
-              <Pressable
+              <button
                 onPress={handleCopyLink}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 transition-colors"
               >
                 <Link size={16} />
-                <Text>Copier le lien</Text></Pressable>
-              <Pressable
+                Copier le lien
+              </button>
+              <button
                 onPress={() => {
                   setShowMenu(false);
                   handleReport();
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 transition-colors"
               >
                 <Flag size={16} />
-                <Text>Signaler</Text></Pressable>
-              <Pressable
+                Signaler
+              </button>
+              <button
                 onPress={handleHide}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 transition-colors"
               >
                 <EyeOff size={16} />
-                <Text>Masquer</Text></Pressable>
-            </View>
-            <Pressable
+                Masquer
+              </button>
+            </div>
+            <button
               onPress={() => setShowMenu(false)}
               className="absolute top-2 right-2 text-white/30"
             >
               <X size={16} />
-            </Pressable>
-          </View>
-        )}
-      </View>
-
-      <View
-        className="flex-1 overflow-y-auto px-4 pb-8 space-y-5"
-        style={{  }}
-      >
-        <ErrorBoundary
+            </button>
+          </div>
+        )}</View><View className="flex-1 overflow-y-auto px-4 pb-8 space-y-5" style={{ }}><ErrorBoundary
           fallback={
-            <View className="text-red-400 p-6 text-center bg-red-500/10 rounded-2xl border border-red-500/20">
-              <Text className="font-bold text-lg">
+            <div className="text-red-400 p-6 text-center bg-red-500/10 rounded-2xl border border-red-500/20">
+              <p className="font-bold text-lg">
                 ❌ Erreur dans l'affichage du post
-              </Text>
-              <Text className="text-sm text-red-300/70 mt-2">
+              </p>
+              <p className="text-sm text-red-300/70 mt-2">
                 Un composant a planté. Utilisez le bouton "debug" en haut à
                 droite pour voir les données brutes.
-              </Text>
-            </View>
+              </p>
+            </div>
           }
-        >
-          {renderContent()}
-        </ErrorBoundary>
-      </View>
-
-      {showShare && (
+        >{renderContent()}</ErrorBoundary></View>{showShare && (
         <CommunityShare
           title={post.title || "Post"}
           description={post.description}
-          url={undefined.href}
+          url={window.location.href}
           onClose={() => setShowShare(false)}
         />
-      )}
-
-      {showReport && (
-        <View className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <View className="bg-zinc-900 rounded-2xl p-6 max-w-sm w-full border border-white/10">
-            <Text className="text-white font-bold text-lg mb-2">
+      )}{showReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-zinc-900 rounded-2xl p-6 max-w-sm w-full border border-white/10">
+            <h3 className="text-white font-bold text-lg mb-2">
               Signaler ce post
-            </Text>
-            <Text className="text-white/60 text-sm mb-4">
+            </h3>
+            <p className="text-white/60 text-sm mb-4">
               Pourquoi signalez-vous ce contenu ?
-            </Text>
-            <View className="space-y-2">
+            </p>
+            <div className="space-y-2">
               {[
                 "Spam",
                 "Contenu inapproprié",
@@ -773,36 +657,27 @@ export default function CommunityDetailPage() {
                 "Fausse information",
                 "Autre",
               ].map((reason) => (
-                <Pressable
-                  key={reason}
-                  onPress={() => {
+                <Pressable key={reason} onPress={() => {
                     reportContent({ postId: post._id, reason });
                     setShowReport(false);
-                  }}
-                  className="w-full text-left px-4 py-2 rounded-xl text-white/80"
-                >
+                  }} className="w-full text-left px-4 py-2 rounded-xl text-white/80 transition-colors">
                   {reason}
                 </Pressable>
               ))}
-            </View>
-            <Pressable
-              onPress={() => setShowReport(false)}
-              className="mt-4 text-white/40 text-sm"
-            >
-              <Text>Annuler</Text></Pressable>
-          </View>
-        </View>
-      )}
-
-      {showBoost && (
+            </div>
+            <Pressable onPress={() => setShowReport(false)} className="mt-4 text-white/40 text-sm">
+              Annuler
+            </Pressable>
+          </div>
+        </div>
+      )}{showBoost && (
         <CommunityBoost
           onBoost={async (duration) => {
-            UIService.openToast(`Post boosté pour ${duration} jours !`, "success");
+            toast.success(`Post boosté pour ${duration} jours !`);
             setShowBoost(false);
           }}
           onClose={() => setShowBoost(false)}
         />
-      )}
-    </View>
+      )}</View>
   );
 }

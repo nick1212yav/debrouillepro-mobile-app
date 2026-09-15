@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { Pressable, View } from "react-native";
+import { View, Pressable, Text } from "react-native";
 import { useState } from "react";
 import { Globe, Loader2, ChevronDown } from "lucide-react-native";
 
@@ -45,31 +45,13 @@ export function CommunityAITranslate({ text, onTranslate }: Props) {
   };
 
   return (
-    <View className="space-y-2">
-      <View className="flex items-center gap-2">
-        <Picker
-         
-          onValueChange={(val) => setTargetLanguage(val)}
-          className="px-2 py-1 rounded-lg text-xs bg-white/5 border border-white/10 text-white outline-none"
-         selectedValue={targetLanguage}>
-          {LANGUAGES.map((lang) => (
-            <Picker.Item label={`${lang.label}`} value={lang.code} />
-          ))}
-        </Picker>
-        <Pressable
-          onPress={handleTranslate}
-          disabled={isLoading}
-          className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-purple-400 bg-purple-500/10 disabled:opacity-50"
-        >
-          {isLoading ? (
+    <View className="space-y-2"><View className="flex items-center gap-2"><Picker onValueChange={(value) => setTargetLanguage(value)} className="px-2 py-1 rounded-lg text-xs bg-white/5 border border-white/10 text-white outline-none" selectedValue={targetLanguage}>{LANGUAGES.map((lang) => (
+            <Picker.Item label={lang.label} value={lang.code} />
+          ))}</Picker><Pressable onPress={handleTranslate} disabled={isLoading} className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-purple-400 bg-purple-500/10 transition-colors disabled:opacity-50">{isLoading ? (
             <Loader2 size={12} className="animate-spin" />
           ) : (
             <Globe size={12} />
-          )}
-          {translated ? "Afficher l'original" : "Traduire"}
-        </Pressable>
-      </View>
-      {translated && (
+          )}{translated ? "Afficher l'original" : "Traduire"}</Pressable></View>{translated && (
         <View className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
           <Text className="text-white/70 text-sm">
             {showOriginal ? text : translated}
@@ -80,7 +62,6 @@ export function CommunityAITranslate({ text, onTranslate }: Props) {
               : `Traduit en ${LANGUAGES.find((l) => l.code === targetLanguage)?.label}`}
           </Text>
         </View>
-      )}
-    </View>
+      )}</View>
   );
 }

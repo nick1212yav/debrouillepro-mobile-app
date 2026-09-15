@@ -1,11 +1,29 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Pressable, Text, TextInput, GestureResponderEvent, ViewStyle, TextStyle, ImageStyle } from "react-native";
+// src/pages/modules/ActionsPage.tsx
+"use no memo";
+
+import {
+  View,
+  Text,
+  Pressable,
+  TextInput,
+  ScrollView,
+  StyleSheet,
+  Platform,
+  Animated,
+  Easing,
+  useWindowDimensions,
+  type GestureResponderEvent,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
-  type ComponentType
+  type ComponentType,
+  type ReactNode,
 } from "react";
 import {
   ArrowLeft,
@@ -67,14 +85,16 @@ import {
   Newspaper,
   TreePine,
 } from "lucide-react-native";
+import { toast } from "sonner";
+
 /* ============================================================================
  * TYPES
  * ========================================================================== */
 
 type LucideIcon = ComponentType<{
   size?: number;
-  style?: ViewStyle | TextStyle | ImageStyle;
-  className?: string;
+  color?: string;
+  style?: object;
 }>;
 
 interface Action {
@@ -88,11 +108,10 @@ interface Action {
 }
 
 /* ============================================================================
- * ACTIONS
+ * DATA — 60+ actions
  * ========================================================================== */
 
 const ALL_ACTIONS: Action[] = [
-  // Finance
   {
     id: "payer",
     icon: CreditCard,
@@ -148,7 +167,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Finance & Paiements",
   },
 
-  // Mobilité
   {
     id: "vtc",
     icon: Car,
@@ -204,7 +222,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Mobilité & Livraison",
   },
 
-  // Immo & emploi
   {
     id: "louer",
     icon: Home,
@@ -260,7 +277,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Immobilier & Emploi",
   },
 
-  // Services
   {
     id: "plomberie",
     icon: Wrench,
@@ -316,7 +332,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Services à domicile",
   },
 
-  // Santé
   {
     id: "rdv",
     icon: CalendarDays,
@@ -381,7 +396,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Santé & Bien-être",
   },
 
-  // Éducation
   {
     id: "cours",
     icon: BookOpen,
@@ -437,7 +451,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Éducation & Formation",
   },
 
-  // Social
   {
     id: "groupes",
     icon: Users,
@@ -484,7 +497,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Social & Communauté",
   },
 
-  // Media
   {
     id: "lire-news",
     icon: Newspaper,
@@ -507,7 +519,7 @@ const ALL_ACTIONS: Action[] = [
     id: "creer-contenu",
     icon: Camera,
     label: "Créer contenu",
-    desc: "Stories · Vidéos · Posts",
+    desc: "Stories · Vidéos",
     page: "editeur",
     color: "#8B5CF6",
     category: "Médias & Création",
@@ -540,7 +552,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Médias & Création",
   },
 
-  // Agri
   {
     id: "planter",
     icon: Leaf,
@@ -563,7 +574,7 @@ const ALL_ACTIONS: Action[] = [
     id: "environnement",
     icon: TreePine,
     label: "Écologie",
-    desc: "Recyclage · Green actions",
+    desc: "Recyclage · Green",
     page: "environnement",
     color: "#22C55E",
     category: "Agriculture & Environnement",
@@ -578,7 +589,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Agriculture & Environnement",
   },
 
-  // Gouvernance
   {
     id: "sos",
     icon: AlertTriangle,
@@ -625,7 +635,6 @@ const ALL_ACTIONS: Action[] = [
     category: "Gouvernance & Sécurité",
   },
 
-  // ONG
   {
     id: "dons",
     icon: HandHeart,
@@ -654,7 +663,6 @@ const ALL_ACTIONS: Action[] = [
     category: "ONG & Solidarité",
   },
 
-  // Carte
   {
     id: "carte",
     icon: MapPin,
@@ -685,108 +693,494 @@ const ALL_ACTIONS: Action[] = [
 ];
 
 /* ============================================================================
- * STORAGE
+ * STORAGE HELPERS (safe on RN + web)
  * ========================================================================== */
 
 const RECENT_KEY = "debrouille_recent_actions";
 const FAV_KEY = "debrouille_fav_actions";
 const MAX_RECENT = 6;
 
-function readStorage(key: string): string[] {
+function getStorage(): Storage | null {
   try {
-    const value = localStorage.getItem(key);
+    if (typeof globalThis === "undefined") return null;
+    const s = (globalThis as { localStorage?: Storage }).localStorage;
+    if (!s || typeof s.getItem !== "function") return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+function readStorage(key: string): string[] {
+  const storage = getStorage();
+  if (!storage) return [];
+  try {
+    const value = storage.getItem(key);
     return value ? (JSON.parse(value) as string[]) : [];
   } catch {
     return [];
   }
 }
 
-const CATEGORIES = [
+function writeStorage(key: string, value: string[]) {
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* noop */
+  }
+}
+
+const CATEGORIES: string[] = [
   "Tous",
-  ...Array.from(new Set(ALL_ACTIONS.map((action) => action.category))),
+  ...Array.from(new Set(ALL_ACTIONS.map((a) => a.category))),
+];
+
+const PREFERRED_IDS = [
+  "payer",
+  "transferer",
+  "vtc",
+  "emploi",
+  "louer",
+  "rdv",
+  "marche",
+  "voyager",
 ];
 
 /* ============================================================================
- * ACTION CARD
+ * AMBIENT BACKGROUND — orbes flottants natifs
  * ========================================================================== */
 
-function ActionCard({
+function AmbientBackground() {
+  const { width: W, height: H } = useWindowDimensions();
+  const orbA = useRef(new Animated.Value(0)).current;
+  const orbB = useRef(new Animated.Value(0)).current;
+  const orbC = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loopA = Animated.loop(
+      Animated.sequence([
+        Animated.timing(orbA, {
+          toValue: -40,
+          duration: 9000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(orbA, {
+          toValue: 0,
+          duration: 9000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const loopB = Animated.loop(
+      Animated.sequence([
+        Animated.timing(orbB, {
+          toValue: 50,
+          duration: 11000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(orbB, {
+          toValue: 0,
+          duration: 11000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const loopC = Animated.loop(
+      Animated.sequence([
+        Animated.timing(orbC, {
+          toValue: -30,
+          duration: 10000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(orbC, {
+          toValue: 0,
+          duration: 10000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loopA.start();
+    loopB.start();
+    loopC.start();
+    return () => {
+      loopA.stop();
+      loopB.stop();
+      loopC.stop();
+    };
+  }, [orbA, orbB, orbC]);
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <LinearGradient
+        colors={["#05030E", "#0C0724", "#08041A", "#10062A"]}
+        locations={[0, 0.35, 0.7, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: Math.max(360, W * 0.9),
+            height: Math.max(360, W * 0.9),
+            top: -180,
+            left: -140,
+            backgroundColor: "rgba(139,92,246,0.28)",
+            transform: [{ translateY: orbA }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 320,
+            height: 320,
+            top: H * 0.4,
+            right: -140,
+            backgroundColor: "rgba(99,102,241,0.22)",
+            transform: [{ translateY: orbB }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 280,
+            height: 280,
+            bottom: -120,
+            left: -60,
+            backgroundColor: "rgba(249,115,22,0.16)",
+            transform: [{ translateY: orbC }],
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+/* ============================================================================
+ * REVEAL — entrance animée native
+ * ========================================================================== */
+
+function Reveal({
+  delay = 0,
+  distance = 14,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: object;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(anim, {
+      toValue: 1,
+      duration: 480,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * PRESS SCALE WRAPPER — feedback natif
+ * ========================================================================== */
+
+function PressScale({
+  onPress,
+  onLongPress,
+  children,
+  style,
+  scaleTo = 0.96,
+  accessibilityLabel,
+  disabled,
+}: {
+  onPress?: () => void;
+  onLongPress?: () => void;
+  children: ReactNode;
+  style?: object;
+  scaleTo?: number;
+  accessibilityLabel?: string;
+  disabled?: boolean;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const pressIn = () => {
+    Animated.spring(scale, {
+      toValue: scaleTo,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const pressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={[style, { transform: [{ scale }] }]}>
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * ACTION TILE — grande tuile bento (2 colonnes)
+ * ========================================================================== */
+
+function ActionTile({
   action,
   isFav,
-  featured = false,
   onTap,
   onToggleFav,
 }: {
   action: Action;
   isFav: boolean;
-  featured?: boolean;
   onTap: () => void;
   onToggleFav: (event: GestureResponderEvent) => void;
 }) {
   const Icon = action.icon;
 
   return (
-    <Pressable
-      onPress={onTap}
-      className={[
-        "group relative cursor-pointer overflow-hidden rounded-[22px]",
-        "border backdrop-blur-xl",
-        featured ? "min-h-[122px]" : "min-h-[108px]",
-      ].join(" ")}
-      style={{ borderColor: `${action.color}30` }}
-    >
-      {/* halo */}
-      <View
-        className="absolute -right-7 -top-7 h-20 w-20 rounded-full opacity-30"
-        style={{ backgroundColor: action.color }}
-      />
-
-      {/* favorite */}
-      <Pressable
-       
-        accessibilityLabel={
-          isFav
-            ? `Retirer ${action.label} des favoris`
-            : `Ajouter ${action.label} aux favoris`
-        }
-        onPress={onToggleFav}
-        className="absolute right-2.5 top-2.5 z-20 flex h-7 w-7 items-center justify-center rounded-xl border border-white/5 bg-black/20"
-      >
-        <Star
-          size={11}
-          className={
-            isFav
-              ? "fill-yellow-400 text-yellow-400"
-              : "text-white/25 transition group-hover:text-white/50"
-          }
+    <PressScale onPress={onTap} style={styles.tileWrap} scaleTo={0.97}>
+      <View style={[styles.tile, { borderColor: `${action.color}33` }]}>
+        {/* Gradient de fond */}
+        <LinearGradient
+          colors={[`${action.color}22`, `${action.color}08`, "rgba(0,0,0,0)"]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
         />
-      </Pressable>
 
-      <View className="relative flex h-full flex-col justify-between p-3.5">
+        {/* Halo supérieur */}
         <View
-          className="flex h-10 w-10 items-center justify-center rounded-[15px] border"
-          style={{ backgroundColor: `${action.color}20`, borderColor: `${action.color}28` }}
+          pointerEvents="none"
+          style={[styles.tileHalo, { backgroundColor: action.color }]}
+        />
+
+        {/* Fav */}
+        <Pressable
+          onPress={onToggleFav}
+          accessibilityLabel={
+            isFav
+              ? `Retirer ${action.label} des favoris`
+              : `Ajouter ${action.label} aux favoris`
+          }
+          style={styles.tileFavBtn}
+          hitSlop={6}
         >
-          <Icon size={18} style={{ color: action.color }} />
+          <Star
+            size={11}
+            color={isFav ? "#FACC15" : "rgba(255,255,255,0.35)"}
+            fill={isFav ? "#FACC15" : "transparent"}
+          />
+        </Pressable>
+
+        {/* Icone */}
+        <View
+          style={[
+            styles.tileIconBox,
+            {
+              backgroundColor: `${action.color}26`,
+              borderColor: `${action.color}40`,
+            },
+          ]}
+        >
+          <Icon size={20} color={action.color} />
         </View>
 
-        <View className="mt-3 min-w-0">
-          <View className="flex items-center gap-1.5">
-            <Text className="truncate text-[11px] font-black text-white">
-              {action.label}
-            </Text>
-
-            {featured && (
-              <ArrowUpRight size={11} className="shrink-0 text-white/30" />
-            )}
-          </View>
-
-          <Text className="mt-1 text-[9px] leading-[1.35] text-white/35">
+        {/* Texte */}
+        <View style={styles.tileTextBlock}>
+          <Text style={styles.tileLabel} numberOfLines={1}>
+            {action.label}
+          </Text>
+          <Text style={styles.tileDesc} numberOfLines={2}>
             {action.desc}
           </Text>
         </View>
+
+        {/* Chevron discret en bas à droite */}
+        <View style={styles.tileChevron}>
+          <ChevronRight size={12} color="rgba(255,255,255,0.22)" />
+        </View>
       </View>
-    </Pressable>
+    </PressScale>
+  );
+}
+
+/* ============================================================================
+ * FEATURED CARD — grande carte carrousel horizontal
+ * ========================================================================== */
+
+function FeaturedCard({
+  action,
+  isFav,
+  onTap,
+  onToggleFav,
+}: {
+  action: Action;
+  isFav: boolean;
+  onTap: () => void;
+  onToggleFav: (event: GestureResponderEvent) => void;
+}) {
+  const Icon = action.icon;
+
+  return (
+    <PressScale onPress={onTap} style={styles.featuredWrap} scaleTo={0.97}>
+      <LinearGradient
+        colors={[`${action.color}30`, `${action.color}12`, "rgba(10,6,24,0.6)"]}
+        locations={[0, 0.5, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.featuredCard, { borderColor: `${action.color}44` }]}
+      >
+        {/* Halo */}
+        <View
+          pointerEvents="none"
+          style={[styles.featuredHalo, { backgroundColor: action.color }]}
+        />
+
+        {/* Fav */}
+        <Pressable
+          onPress={onToggleFav}
+          accessibilityLabel={
+            isFav ? "Retirer des favoris" : "Ajouter aux favoris"
+          }
+          style={styles.featuredFavBtn}
+          hitSlop={6}
+        >
+          <Star
+            size={12}
+            color={isFav ? "#FACC15" : "rgba(255,255,255,0.4)"}
+            fill={isFav ? "#FACC15" : "transparent"}
+          />
+        </Pressable>
+
+        {/* Icone */}
+        <View
+          style={[
+            styles.featuredIconBox,
+            {
+              backgroundColor: `${action.color}2A`,
+              borderColor: `${action.color}55`,
+              shadowColor: action.color,
+            },
+          ]}
+        >
+          <Icon size={22} color={action.color} />
+        </View>
+
+        {/* Texte */}
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <Text style={styles.featuredLabel} numberOfLines={1}>
+            {action.label}
+          </Text>
+          <Text style={styles.featuredDesc} numberOfLines={1}>
+            {action.desc}
+          </Text>
+
+          <View style={styles.featuredBottomRow}>
+            <View
+              style={[
+                styles.featuredBadge,
+                {
+                  backgroundColor: `${action.color}22`,
+                  borderColor: `${action.color}55`,
+                },
+              ]}
+            >
+              <Text style={[styles.featuredBadgeText, { color: action.color }]}>
+                {action.category.split(" ")[0]}
+              </Text>
+            </View>
+            <ArrowUpRight size={14} color="rgba(255,255,255,0.45)" />
+          </View>
+        </View>
+      </LinearGradient>
+    </PressScale>
+  );
+}
+
+/* ============================================================================
+ * RECENT CHIP — petite pastille horizontale
+ * ========================================================================== */
+
+function RecentChip({ action, onTap }: { action: Action; onTap: () => void }) {
+  const Icon = action.icon;
+
+  return (
+    <PressScale onPress={onTap} scaleTo={0.94}>
+      <LinearGradient
+        colors={[`${action.color}1E`, `${action.color}08`]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.recentChip, { borderColor: `${action.color}33` }]}
+      >
+        <View
+          style={[
+            styles.recentIconBox,
+            { backgroundColor: `${action.color}26` },
+          ]}
+        >
+          <Icon size={15} color={action.color} />
+        </View>
+        <Text style={styles.recentLabel} numberOfLines={1}>
+          {action.label}
+        </Text>
+      </LinearGradient>
+    </PressScale>
   );
 }
 
@@ -800,6 +1194,7 @@ interface ActionsPageProps {
 }
 
 export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Tous");
   const [recentIds, setRecentIds] = useState<string[]>(() =>
@@ -808,16 +1203,14 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
   const [favIds, setFavIds] = useState<string[]>(() => readStorage(FAV_KEY));
 
   useEffect(() => {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recentIds));
+    writeStorage(RECENT_KEY, recentIds);
   }, [recentIds]);
 
   useEffect(() => {
-    localStorage.setItem(FAV_KEY, JSON.stringify(favIds));
+    writeStorage(FAV_KEY, favIds);
   }, [favIds]);
 
-  /* --------------------------------------------------------------------------
-   * ACTION
-   * ------------------------------------------------------------------------ */
+  /* ─────────── Handlers ─────────── */
 
   const handleTap = useCallback(
     (action: Action) => {
@@ -833,43 +1226,48 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
         return;
       }
 
-      UIService.openToast(action.label, "info");
+      toast(action.label, {
+        description: action.desc,
+        duration: 2000,
+      });
     },
     [onNavigate],
   );
 
-  const handleToggleFav = useCallback((event: GestureResponderEvent, action: Action) => {
-    setFavIds((previous) => {
-      const exists = previous.includes(action.id);
+  const handleToggleFav = useCallback(
+    (event: GestureResponderEvent, action: Action) => {
+      event.stopPropagation();
 
-      if (exists) {
-        UIService.openToast("Retiré des favoris", "info");
-        return previous.filter((id) => id !== action.id);
-      }
+      setFavIds((previous) => {
+        const exists = previous.includes(action.id);
 
-      UIService.openToast(`${action.label} ajouté aux favoris`, "info");
+        if (exists) {
+          toast("Retiré des favoris", { duration: 1400 });
+          return previous.filter((id) => id !== action.id);
+        }
 
-      return [action.id, ...previous];
-    });
-  }, []);
+        toast(`${action.label} ajouté aux favoris`, { duration: 1400 });
+        return [action.id, ...previous];
+      });
+    },
+    [],
+  );
 
-  /* --------------------------------------------------------------------------
-   * DERIVED DATA
-   * ------------------------------------------------------------------------ */
+  /* ─────────── Derived data ─────────── */
 
   const recentActions = useMemo(
     () =>
       recentIds
-        .map((id) => ALL_ACTIONS.find((action) => action.id === id))
-        .filter((action): action is Action => Boolean(action)),
+        .map((id) => ALL_ACTIONS.find((a) => a.id === id))
+        .filter((a): a is Action => Boolean(a)),
     [recentIds],
   );
 
   const favActions = useMemo(
     () =>
       favIds
-        .map((id) => ALL_ACTIONS.find((action) => action.id === id))
-        .filter((action): action is Action => Boolean(action)),
+        .map((id) => ALL_ACTIONS.find((a) => a.id === id))
+        .filter((a): a is Action => Boolean(a)),
     [favIds],
   );
 
@@ -890,501 +1288,1008 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
     });
   }, [search, activeCategory]);
 
-  const groupedActions = useMemo(() => {
-    return CATEGORIES.filter((category) => category !== "Tous").reduce<
-      Record<string, Action[]>
-    >((result, category) => {
-      const actions = filteredActions.filter(
-        (action) => action.category === category,
-      );
-
-      if (actions.length > 0) {
-        result[category] = actions;
-      }
-
-      return result;
-    }, {});
-  }, [filteredActions]);
-
   const isFiltering = search.trim().length > 0 || activeCategory !== "Tous";
 
-  const popularActions = useMemo(() => {
-    const preferredIds = [
-      "payer",
-      "transferer",
-      "vtc",
-      "emploi",
-      "louer",
-      "rdv",
-      "marketplace",
-      "voyager",
-    ];
+  const popularActions = useMemo(
+    () =>
+      PREFERRED_IDS.map((id) => ALL_ACTIONS.find((a) => a.id === id)).filter(
+        (a): a is Action => Boolean(a),
+      ),
+    [],
+  );
 
-    return preferredIds
-      .map((id) => ALL_ACTIONS.find((action) => action.id === id))
-      .filter((action): action is Action => Boolean(action));
-  }, []);
-
-  /* --------------------------------------------------------------------------
-   * RENDER
-   * ------------------------------------------------------------------------ */
+  /* ─────────── Render ─────────── */
 
   return (
-    <View
-      className="fixed inset-0 z-50 flex min-h-0 flex-col overflow-hidden text-white"
-      style={{  }}
-    >
-      {/* Ambient background */}
-      <View className="absolute inset-0 overflow-hidden">
-        <View
-          className="absolute left-[10%] top-[8%] h-64 w-64 rounded-full"
-          style={{ backgroundColor: "rgba(99,102,241,0.08)" }}
-        />
-        <View
-          className="absolute right-[5%] top-[35%] h-72 w-72 rounded-full"
-          style={{ backgroundColor: "rgba(14,165,233,0.06)" }}
-        />
-      </View>
+    <View style={styles.root}>
+      <AmbientBackground />
 
-      {/* ----------------------------------------------------------------------
-       * HEADER
-       * -------------------------------------------------------------------- */}
-
-      <View className="relative z-20 shrink-0 border-b border-white/[0.06] bg-[#03050d]/90 px-4 pb-3 pt-[max(14px,env(safe-area-inset-top))]">
-        <View className="mx-auto w-full max-w-6xl">
-          <View className="flex items-center gap-3">
-            <Pressable
-              onPress={onBack}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.06]"
-            >
-              <ArrowLeft size={17} className="text-white/80" />
-            </Pressable>
-
-            <View className="min-w-0 flex-1">
-              <View className="flex items-center gap-2">
-                <Text className="truncate text-[17px] font-black tracking-tight">
-                  Actions rapides
-                </Text>
-
-                <Text className="hidden rounded-full border border-orange-400/20 bg-orange-400/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.14em] text-orange-300 sm:inline-flex">
-                  Command Center
-                </Text>
-              </View>
-
-              <Text className="mt-1 text-[10px] text-white/35">
-                {ALL_ACTIONS.length} services · {CATEGORIES.length - 1}{" "}
-                catégories
-              </Text>
-            </View>
-
-            <View
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-              style={{  }}
-            >
-              <Zap size={17} className="text-white" />
-            </View>
-          </View>
-
-          {/* Search */}
-          <View
-            className="mt-3 flex items-center gap-2 rounded-2xl border px-3.5 py-3"
-            style={{ backgroundColor: "rgba(255,255,255,0.045)", borderColor: "rgba(255,255,255,0.08)" }}
-          >
-            <Search size={15} className="shrink-0 text-white/30" />
-
-            <TextInput
-              value={search}
-              onChangeText={(text) => setSearch(text)}
-              placeholder="Que voulez-vous faire ?"
-              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/25"
-             
-             
-             returnKeyType="search"/>
-
-            <>
-              {search ? (
-                <Pressable
-                  key="clear"
-                  onPress={() => setSearch("")}
-                  className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/[0.07]"
-                >
-                  <X size={12} className="text-white/45" />
-                </Pressable>
-              ) : (
-                <Text
-                  key="shortcut"
-                  className="hidden rounded-lg border border-white/[0.07] px-2 py-1 text-[8px] font-bold text-white/20 sm:block"
-                >
-                  <Text>⌘ K</Text></Text>
-              )}
-            </>
-          </View>
-
-          {/* Category rail */}
-          <View
-            className="mt-3 flex gap-2 overflow-x-auto pb-0.5"
-            style={{ overscrollBehaviorX: "contain" }}
-          >
-            {CATEGORIES.map((category) => {
-              const active = activeCategory === category;
-
-              return (
-                <Pressable
-                  key={category}
-                 
-                  onPress={() => setActiveCategory(category)}
-                  className="shrink-0 rounded-xl border px-3 py-2 text-[10px] font-bold"
-                  style={{ borderColor: active
-                                        ? "rgba(249,115,22,0.34)"
-                                        : "rgba(255,255,255,0.06)" }}
-                >
-                  {category === "Tous"
-                    ? `Tous · ${ALL_ACTIONS.length}`
-                    : category.split(" ")[0]}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      </View>
-
-      {/* ----------------------------------------------------------------------
-       * SCROLL CONTENT
-       * -------------------------------------------------------------------- */}
-
+      {/* ═════════════ HEADER ═════════════ */}
       <View
-        className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5"
-        style={{ touchAction: "pan-y" }}
+        style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 8 }]}
       >
-        <View className="mx-auto w-full max-w-6xl pb-[calc(32px+env(safe-area-inset-bottom))]">
-          {/* ------------------------------------------------------------------
-           * HERO
-           * ---------------------------------------------------------------- */}
+        {/* Row 1 */}
+        <View style={styles.headerRow}>
+          <Pressable
+            onPress={onBack}
+            accessibilityLabel="Retour"
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.backBtn,
+              pressed && { opacity: 0.75, transform: [{ scale: 0.94 }] },
+            ]}
+          >
+            <ArrowLeft size={17} color="rgba(255,255,255,0.9)" />
+          </Pressable>
 
-          {!isFiltering && (
-            <View
-              className="relative mb-6 overflow-hidden rounded-[28px] border border-white/[0.08]"
-              style={{  }}
+          <View style={styles.headerTitleWrap}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              Actions rapides
+            </Text>
+            <Text style={styles.headerSub} numberOfLines={1}>
+              {ALL_ACTIONS.length} services · {CATEGORIES.length - 1} catégories
+            </Text>
+          </View>
+
+          <LinearGradient
+            colors={["#8B5CF6", "#6366F1"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerIcon}
+          >
+            <Zap size={17} color="#fff" />
+          </LinearGradient>
+        </View>
+
+        {/* Row 2 — Search */}
+        <View style={styles.searchWrap}>
+          <Search size={15} color="rgba(255,255,255,0.4)" />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Que voulez-vous faire ?"
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            style={styles.searchInput}
+            autoComplete="off"
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <Pressable
+              onPress={() => setSearch("")}
+              style={styles.searchClear}
+              hitSlop={6}
             >
-              <View className="absolute -right-12 -top-20 h-52 w-52 rounded-full bg-violet-500/15" />
-              <View className="absolute -bottom-20 left-20 h-40 w-40 rounded-full bg-blue-500/10" />
-
-              <View className="relative p-5 sm:p-6">
-                <View className="flex items-start gap-4">
-                  <View
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[17px]"
-                    style={{  }}
-                  >
-                    <Sparkles size={21} className="text-white" />
-                  </View>
-
-                  <View className="min-w-0 flex-1">
-                    <Text className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-300/70">
-                      Votre centre de commandes
-                    </Text>
-
-                    <Text className="mt-1 text-xl font-black tracking-tight sm:text-2xl">
-                      Faites plus, en moins de temps.
-                    </Text>
-
-                    <Text className="mt-2 max-w-xl text-[11px] leading-relaxed text-white/40 sm:text-xs">
-                      Retrouvez vos actions essentielles et accédez directement
-                      aux services de DébrouillePro.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Quick stats */}
-                <View className="mt-5 gap-2">
-                  <View className="rounded-2xl border border-white/[0.06] bg-black/15 p-3">
-                    <Text className="text-lg font-black">{ALL_ACTIONS.length}</Text>
-                    <Text className="text-[8px] font-bold uppercase tracking-wider text-white/30">
-                      Actions
-                    </Text>
-                  </View>
-
-                  <View className="rounded-2xl border border-white/[0.06] bg-black/15 p-3">
-                    <Text className="text-lg font-black">{favActions.length}</Text>
-                    <Text className="text-[8px] font-bold uppercase tracking-wider text-white/30">
-                      Favoris
-                    </Text>
-                  </View>
-
-                  <View className="rounded-2xl border border-white/[0.06] bg-black/15 p-3">
-                    <Text className="text-lg font-black">{recentActions.length}</Text>
-                    <Text className="text-[8px] font-bold uppercase tracking-wider text-white/30">
-                      Récents
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
+              <X size={12} color="rgba(255,255,255,0.6)" />
+            </Pressable>
           )}
+        </View>
 
-          {/* ------------------------------------------------------------------
-           * FILTER RESULT
-           * ---------------------------------------------------------------- */}
+        {/* Row 3 — Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+        >
+          {CATEGORIES.map((category) => {
+            const active = activeCategory === category;
+            const label =
+              category === "Tous"
+                ? `Tous · ${ALL_ACTIONS.length}`
+                : category.split(" ")[0];
 
-          {isFiltering ? (
-            <View>
-              <View className="mb-4 flex items-end justify-between">
+            return (
+              <Pressable
+                key={category}
+                onPress={() => setActiveCategory(category)}
+                style={[
+                  styles.chip,
+                  active ? styles.chipActive : styles.chipIdle,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    { color: active ? "#FDBA74" : "rgba(255,255,255,0.6)" },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* ═════════════ BODY ═════════════ */}
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={[
+          styles.bodyContent,
+          { paddingBottom: insets.bottom + 40 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {isFiltering ? (
+          <>
+            {/* Result header */}
+            <Reveal>
+              <View style={styles.resultHeader}>
                 <View>
-                  <Text className="text-[9px] font-black uppercase tracking-[0.18em] text-white/25">
-                    Résultats
-                  </Text>
-
-                  <Text className="mt-1 text-base font-black">
+                  <Text style={styles.resultEyebrow}>RÉSULTATS</Text>
+                  <Text style={styles.resultTitle}>
                     {filteredActions.length} action
                     {filteredActions.length !== 1 ? "s" : ""}
                   </Text>
                 </View>
-
                 <Pressable
-                 
                   onPress={() => {
                     setSearch("");
                     setActiveCategory("Tous");
                   }}
-                  className="text-[10px] font-bold text-violet-300"
+                  hitSlop={6}
                 >
-                  <Text>Réinitialiser</Text></Pressable>
+                  <Text style={styles.resetLink}>Réinitialiser</Text>
+                </Pressable>
               </View>
+            </Reveal>
 
-              {filteredActions.length === 0 ? (
-                <View className="flex min-h-[300px] flex-col items-center justify-center rounded-[28px] border border-white/[0.06] bg-white/[0.02]">
-                  <View className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/[0.04]">
-                    <Search size={24} className="text-white/15" />
+            {filteredActions.length === 0 ? (
+              <Reveal>
+                <View style={styles.emptyWrap}>
+                  <View style={styles.emptyIcon}>
+                    <Search size={24} color="rgba(255,255,255,0.2)" />
                   </View>
-
-                  <Text className="mt-4 text-sm font-bold text-white/40">
-                    Aucune action trouvée
-                  </Text>
-
-                  <Text className="mt-1 text-[10px] text-white/20">
+                  <Text style={styles.emptyTitle}>Aucune action trouvée</Text>
+                  <Text style={styles.emptySub}>
                     Essayez un autre mot ou une autre catégorie.
                   </Text>
                 </View>
-              ) : (
-                <View className="gap-2.5">
-                  {filteredActions.map((action) => (
-                    <ActionCard
-                      key={action.id}
+              </Reveal>
+            ) : (
+              <View style={styles.grid}>
+                {filteredActions.map((action, i) => (
+                  <Reveal
+                    key={action.id}
+                    delay={Math.min(i * 25, 300)}
+                    style={styles.gridItem}
+                  >
+                    <ActionTile
                       action={action}
                       isFav={favIds.includes(action.id)}
                       onTap={() => handleTap(action)}
                       onToggleFav={(event) => handleToggleFav(event, action)}
                     />
-                  ))}
-                </View>
-              )}
-            </View>
-          ) : (
-            <>
-              {/* --------------------------------------------------------------
-               * POPULAR
-               * ------------------------------------------------------------ */}
+                  </Reveal>
+                ))}
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            {/* ─── HERO COMPACT ─── */}
+            <Reveal delay={20}>
+              <View style={styles.hero}>
+                <LinearGradient
+                  colors={[
+                    "rgba(139,92,246,0.22)",
+                    "rgba(99,102,241,0.10)",
+                    "rgba(10,6,24,0.4)",
+                  ]}
+                  locations={[0, 0.5, 1]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View pointerEvents="none" style={styles.heroOrbA} />
+                <View pointerEvents="none" style={styles.heroOrbB} />
 
-              <View className="mb-7">
-                <View className="mb-3 flex items-end justify-between">
-                  <View>
-                    <Text className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-300/60">
-                      Accès instantané
-                    </Text>
-                    <Text className="mt-1 text-base font-black">
-                      Les plus utiles
+                <View style={styles.heroTopRow}>
+                  <LinearGradient
+                    colors={["#8B5CF6", "#6366F1"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.heroIconBox}
+                  >
+                    <Sparkles size={20} color="#fff" />
+                  </LinearGradient>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.heroEyebrow}>CENTRE DE COMMANDES</Text>
+                    <Text style={styles.heroTitle}>
+                      Faites plus, en moins de temps.
                     </Text>
                   </View>
-
-                  <Zap size={15} className="text-orange-400" />
                 </View>
 
-                <View className="gap-2.5">
-                  {popularActions.map((action) => (
-                    <ActionCard
-                      key={action.id}
-                      action={action}
-                      featured
-                      isFav={favIds.includes(action.id)}
-                      onTap={() => handleTap(action)}
-                      onToggleFav={(event) => handleToggleFav(event, action)}
-                    />
-                  ))}
-                </View>
-              </View>
-
-              {/* --------------------------------------------------------------
-               * FAVORITES
-               * ------------------------------------------------------------ */}
-
-              {favActions.length > 0 && (
-                <View
-                  className="mb-7"
-                >
-                  <View className="mb-3 flex items-center gap-2">
-                    <Heart size={14} className="fill-rose-400 text-rose-400" />
-
-                    <Text className="text-base font-black">Mes favoris</Text>
-
-                    <Text className="rounded-full bg-white/[0.05] px-2 py-1 text-[8px] font-bold text-white/30">
+                <View style={styles.heroStatsRow}>
+                  <View style={styles.heroStat}>
+                    <Text style={styles.heroStatValue}>
+                      {ALL_ACTIONS.length}
+                    </Text>
+                    <Text style={styles.heroStatLabel}>ACTIONS</Text>
+                  </View>
+                  <View style={styles.heroStatDivider} />
+                  <View style={styles.heroStat}>
+                    <Text style={[styles.heroStatValue, { color: "#FACC15" }]}>
                       {favActions.length}
                     </Text>
+                    <Text style={styles.heroStatLabel}>FAVORIS</Text>
                   </View>
-
-                  <View className="gap-2.5">
-                    {favActions.map((action) => (
-                      <ActionCard
-                        key={action.id}
-                        action={action}
-                        isFav
-                        onTap={() => handleTap(action)}
-                        onToggleFav={(event) => handleToggleFav(event, action)}
-                      />
-                    ))}
+                  <View style={styles.heroStatDivider} />
+                  <View style={styles.heroStat}>
+                    <Text style={[styles.heroStatValue, { color: "#34D399" }]}>
+                      {recentActions.length}
+                    </Text>
+                    <Text style={styles.heroStatLabel}>RÉCENTS</Text>
                   </View>
                 </View>
-              )}
+              </View>
+            </Reveal>
 
-              {/* --------------------------------------------------------------
-               * RECENT
-               * ------------------------------------------------------------ */}
-
-              {recentActions.length > 0 && (
-                <View
-                  className="mb-8"
-                >
-                  <View className="mb-3 flex items-center gap-2">
-                    <Clock size={14} className="text-white/35" />
-
-                    <Text className="text-base font-black">Récemment utilisés</Text>
-
-                    <Pressable
-                     
-                      onPress={() => setRecentIds([])}
-                      className="ml-auto text-[9px] font-bold text-white/25"
-                    >
-                      <Text>Effacer</Text></Pressable>
+            {/* ─── POPULAR — carrousel horizontal ─── */}
+            <Reveal delay={100}>
+              <View style={styles.sectionHeaderRow}>
+                <View>
+                  <View style={styles.sectionEyebrowRow}>
+                    <Flame size={11} color="#FB923C" />
+                    <Text style={[styles.sectionEyebrow, { color: "#FDBA74" }]}>
+                      ACCÈS INSTANTANÉ
+                    </Text>
                   </View>
-
-                  <View
-                    className="flex gap-2.5 overflow-x-auto pb-1"
-                    style={{ overscrollBehaviorX: "contain" }}
-                  >
-                    {recentActions.map((action) => {
-                      const Icon = action.icon;
-
-                      return (
-                        <Pressable
-                          key={action.id}
-                          onPress={() => handleTap(action)}
-                          className="flex min-w-[105px] shrink-0 flex-col items-center rounded-2xl border p-3"
-                          style={{ backgroundColor: `${action.color}10`, borderColor: `${action.color}24` }}
-                        >
-                          <View
-                            className="flex h-9 w-9 items-center justify-center rounded-xl"
-                            style={{ backgroundColor: `${action.color}20` }}
-                          >
-                            <Icon size={16} style={{ color: action.color }} />
-                          </View>
-
-                          <Text className="mt-2 text-[10px] font-bold text-white/75">
-                            {action.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                  <Text style={styles.sectionTitle}>Les plus utiles</Text>
                 </View>
-              )}
-
-              {/* --------------------------------------------------------------
-               * ALL CATEGORIES
-               * ------------------------------------------------------------ */}
-
-              <View className="space-y-8">
-                {Object.entries(groupedActions).map(
-                  ([category, actions], categoryIndex) => {
-                    const categoryColor = actions[0]?.color ?? "#8B5CF6";
-
-                    return (
-                      <View
-                        key={category}
-                      >
-                        <Pressable
-                         
-                          onPress={() => setActiveCategory(category)}
-                          className="group mb-3 flex w-full items-center gap-2 text-left"
-                        >
-                          <Text
-                            className="h-6 w-1.5 rounded-full"
-                            style={{ backgroundColor: categoryColor }}
-                          />
-
-                          <View className="min-w-0 flex-1">
-                            <Text className="text-[15px] font-black">
-                              {category}
-                            </Text>
-
-                            <Text className="mt-0.5 text-[9px] text-white/25">
-                              Explorez les services disponibles
-                            </Text>
-                          </View>
-
-                          <Text className="rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-1 text-[8px] font-bold text-white/25">
-                            {actions.length}
-                          </Text>
-
-                          <ChevronRight
-                            size={14}
-                            className="text-white/20"
-                          />
-                        </Pressable>
-
-                        <View className="gap-2.5">
-                          {actions.map((action) => (
-                            <ActionCard
-                              key={action.id}
-                              action={action}
-                              isFav={favIds.includes(action.id)}
-                              onTap={() => handleTap(action)}
-                              onToggleFav={(event) =>
-                                handleToggleFav(event, action)
-                              }
-                            />
-                          ))}
-                        </View>
-                      </View>
-                    );
-                  },
-                )}
+                <View style={styles.sectionCountBadge}>
+                  <Text style={styles.sectionCountText}>
+                    {popularActions.length}
+                  </Text>
+                </View>
               </View>
 
-              {/* --------------------------------------------------------------
-               * FOOTER
-               * ------------------------------------------------------------ */}
-
-              <View
-                className="mt-10 rounded-[24px] border border-white/[0.06] bg-white/[0.025] p-4"
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.featuredRow}
               >
-                <View className="flex items-center gap-3">
-                  <View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/10">
-                    <Sparkles size={15} className="text-violet-400" />
-                  </View>
+                {popularActions.map((action) => (
+                  <FeaturedCard
+                    key={action.id}
+                    action={action}
+                    isFav={favIds.includes(action.id)}
+                    onTap={() => handleTap(action)}
+                    onToggleFav={(event) => handleToggleFav(event, action)}
+                  />
+                ))}
+              </ScrollView>
+            </Reveal>
 
-                  <Text className="text-[10px] font-bold leading-relaxed text-white/30">
-                    <Text>DébrouillePro rassemble vos services essentiels dans un seul espace.</Text><Text className="text-white/55">
-                      {" "}
-                      <Text>Ajoutez vos actions préférées pour les retrouver encore plus vite.</Text></Text>
+            {/* ─── FAVORITES ─── */}
+            {favActions.length > 0 && (
+              <Reveal delay={160}>
+                <View style={styles.sectionHeaderRow}>
+                  <View>
+                    <View style={styles.sectionEyebrowRow}>
+                      <Heart size={11} color="#FB7185" fill="#FB7185" />
+                      <Text
+                        style={[styles.sectionEyebrow, { color: "#FDA4AF" }]}
+                      >
+                        MES FAVORIS
+                      </Text>
+                    </View>
+                    <Text style={styles.sectionTitle}>Vos préférés</Text>
+                  </View>
+                </View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.recentRow}
+                >
+                  {favActions.map((action) => (
+                    <RecentChip
+                      key={action.id}
+                      action={action}
+                      onTap={() => handleTap(action)}
+                    />
+                  ))}
+                </ScrollView>
+              </Reveal>
+            )}
+
+            {/* ─── RECENT ─── */}
+            {recentActions.length > 0 && (
+              <Reveal delay={220}>
+                <View style={styles.sectionHeaderRow}>
+                  <View>
+                    <View style={styles.sectionEyebrowRow}>
+                      <Clock size={11} color="rgba(255,255,255,0.55)" />
+                      <Text
+                        style={[
+                          styles.sectionEyebrow,
+                          { color: "rgba(255,255,255,0.5)" },
+                        ]}
+                      >
+                        RÉCENTS
+                      </Text>
+                    </View>
+                    <Text style={styles.sectionTitle}>
+                      Reprendre là où vous étiez
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => setRecentIds([])} hitSlop={6}>
+                    <Text style={styles.clearLink}>Effacer</Text>
+                  </Pressable>
+                </View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.recentRow}
+                >
+                  {recentActions.map((action) => (
+                    <RecentChip
+                      key={action.id}
+                      action={action}
+                      onTap={() => handleTap(action)}
+                    />
+                  ))}
+                </ScrollView>
+              </Reveal>
+            )}
+
+            {/* ─── TOUTES LES ACTIONS ─── */}
+            <Reveal delay={280}>
+              <View style={[styles.sectionHeaderRow, { marginTop: 8 }]}>
+                <View>
+                  <View style={styles.sectionEyebrowRow}>
+                    <Sparkles size={11} color="#A78BFA" />
+                    <Text style={[styles.sectionEyebrow, { color: "#C4B5FD" }]}>
+                      EXPLORER
+                    </Text>
+                  </View>
+                  <Text style={styles.sectionTitle}>Toutes les actions</Text>
+                </View>
+              </View>
+            </Reveal>
+
+            <View style={styles.grid}>
+              {ALL_ACTIONS.map((action, i) => (
+                <Reveal
+                  key={action.id}
+                  delay={Math.min(320 + i * 15, 700)}
+                  style={styles.gridItem}
+                >
+                  <ActionTile
+                    action={action}
+                    isFav={favIds.includes(action.id)}
+                    onTap={() => handleTap(action)}
+                    onToggleFav={(event) => handleToggleFav(event, action)}
+                  />
+                </Reveal>
+              ))}
+            </View>
+
+            {/* ─── FOOTER ─── */}
+            <Reveal delay={700}>
+              <View style={styles.footer}>
+                <LinearGradient
+                  colors={["rgba(167,139,250,0.14)", "rgba(99,102,241,0.05)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={styles.footerRow}>
+                  <View style={styles.footerIconBox}>
+                    <Sparkles size={15} color="#A78BFA" />
+                  </View>
+                  <Text style={styles.footerText}>
+                    DébrouillePro rassemble vos services essentiels dans un seul
+                    espace.{" "}
+                    <Text style={styles.footerHighlight}>
+                      Ajoutez vos actions préférées pour les retrouver encore
+                      plus vite.
+                    </Text>
                   </Text>
                 </View>
 
-                <View className="mt-4 flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.18em] text-white/15">
-                  <Text className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  <Text>Centre de commandes actif</Text></View>
+                <View style={styles.footerStatusRow}>
+                  <View style={styles.footerDot} />
+                  <Text style={styles.footerStatusText}>
+                    CENTRE DE COMMANDES ACTIF
+                  </Text>
+                </View>
               </View>
-            </>
-          )}
-        </View>
-      </View>
+            </Reveal>
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const TILE_SHADOW = Platform.select({
+  ios: {
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  android: { elevation: 4 },
+  default: {},
+});
+
+const styles = StyleSheet.create({
+  /* ── Root ─────────────────────────── */
+  root: {
+    flex: 1,
+    backgroundColor: "#05030E",
+  },
+  orb: {
+    position: "absolute",
+    borderRadius: 9999,
+  },
+
+  /* ── Header ───────────────────────── */
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    backgroundColor: "rgba(5,3,14,0.92)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+    zIndex: 10,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+  headerTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.4,
+  },
+  headerSub: {
+    marginTop: 3,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.42)",
+    fontWeight: "600",
+  },
+  headerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#8B5CF6",
+        shadowOpacity: 0.55,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 6 },
+      },
+      android: { elevation: 8 },
+      default: {},
+    }),
+  },
+
+  /* ── Search ───────────────────────── */
+  searchWrap: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+  searchInput: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 14,
+    padding: 0,
+  },
+  searchClear: {
+    width: 26,
+    height: 26,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
+  /* ── Chips ────────────────────────── */
+  chipsRow: {
+    gap: 8,
+    paddingTop: 14,
+    paddingRight: 8,
+  },
+  chip: {
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  chipActive: {
+    borderColor: "rgba(249,115,22,0.55)",
+    backgroundColor: "rgba(249,115,22,0.14)",
+  },
+  chipIdle: {
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.1,
+  },
+
+  /* ── Body ─────────────────────────── */
+  body: {
+    flex: 1,
+  },
+  bodyContent: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    gap: 24,
+  },
+
+  /* ── Result header ────────────────── */
+  resultHeader: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  resultEyebrow: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.35)",
+    letterSpacing: 2,
+  },
+  resultTitle: {
+    marginTop: 4,
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.4,
+  },
+  resetLink: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: "#C4B5FD",
+  },
+
+  /* ── Sections ─────────────────────── */
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  sectionEyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  sectionEyebrow: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 2,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.4,
+  },
+  sectionCountBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  sectionCountText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.5)",
+  },
+  clearLink: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.4)",
+  },
+
+  /* ── Hero compact ─────────────────── */
+  hero: {
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.28)",
+    overflow: "hidden",
+  },
+  heroOrbA: {
+    position: "absolute",
+    top: -60,
+    right: -60,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: "rgba(139,92,246,0.20)",
+  },
+  heroOrbB: {
+    position: "absolute",
+    bottom: -50,
+    left: -40,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(99,102,241,0.14)",
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  heroIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#6366F1",
+        shadowOpacity: 0.55,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+      },
+      android: { elevation: 8 },
+      default: {},
+    }),
+  },
+  heroEyebrow: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "rgba(196,181,253,0.9)",
+    letterSpacing: 2,
+  },
+  heroTitle: {
+    marginTop: 4,
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.4,
+  },
+  heroStatsRow: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
+  heroStat: {
+    flex: 1,
+    alignItems: "center",
+  },
+  heroStatValue: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#C4B5FD",
+    letterSpacing: -0.5,
+  },
+  heroStatLabel: {
+    marginTop: 3,
+    fontSize: 8.5,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.35)",
+    letterSpacing: 1.4,
+  },
+  heroStatDivider: {
+    width: 1,
+    height: 26,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
+  /* ── Featured carousel ────────────── */
+  featuredRow: {
+    gap: 12,
+    paddingRight: 8,
+  },
+  featuredWrap: {
+    width: 190,
+  },
+  featuredCard: {
+    width: 190,
+    height: 170,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 14,
+    overflow: "hidden",
+    ...TILE_SHADOW,
+  },
+  featuredHalo: {
+    position: "absolute",
+    top: -40,
+    right: -40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    opacity: 0.25,
+  },
+  featuredFavBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  featuredIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0.55,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 6 },
+      },
+      android: { elevation: 4 },
+      default: {},
+    }),
+  },
+  featuredLabel: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+  featuredDesc: {
+    marginTop: 3,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.55)",
+    fontWeight: "600",
+  },
+  featuredBottomRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  featuredBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  featuredBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+
+  /* ── Recent chips ─────────────────── */
+  recentRow: {
+    gap: 10,
+    paddingRight: 8,
+  },
+  recentChip: {
+    minWidth: 120,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+    gap: 8,
+  },
+  recentIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recentLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.85)",
+  },
+
+  /* ── Grid 2-col ───────────────────── */
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 10,
+  },
+  gridItem: {
+    width: "48.5%",
+  },
+
+  /* ── Action Tile ──────────────────── */
+  tileWrap: {
+    width: "100%",
+  },
+  tile: {
+    minHeight: 132,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 12,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    overflow: "hidden",
+    ...TILE_SHADOW,
+  },
+  tileHalo: {
+    position: "absolute",
+    top: -30,
+    right: -30,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    opacity: 0.22,
+  },
+  tileFavBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    zIndex: 2,
+    width: 24,
+    height: 24,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  tileIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  tileTextBlock: {
+    marginTop: 10,
+    minWidth: 0,
+  },
+  tileLabel: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.1,
+  },
+  tileDesc: {
+    marginTop: 3,
+    fontSize: 10,
+    lineHeight: 13,
+    color: "rgba(255,255,255,0.42)",
+    fontWeight: "600",
+  },
+  tileChevron: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+  },
+
+  /* ── Empty ────────────────────────── */
+  emptyWrap: {
+    minHeight: 260,
+    paddingVertical: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.02)",
+  },
+  emptyIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  emptyTitle: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.55)",
+  },
+  emptySub: {
+    marginTop: 4,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.3)",
+    fontWeight: "600",
+  },
+
+  /* ── Footer ───────────────────────── */
+  footer: {
+    marginTop: 6,
+    padding: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.2)",
+    overflow: "hidden",
+  },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  footerIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.25)",
+  },
+  footerText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "600",
+  },
+  footerHighlight: {
+    color: "rgba(255,255,255,0.85)",
+  },
+  footerStatusRow: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  footerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#34D399",
+  },
+  footerStatusText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.3)",
+    letterSpacing: 1.8,
+  },
+});

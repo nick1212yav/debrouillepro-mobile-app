@@ -19,31 +19,19 @@ export function CallControls({
 }: CallControlsProps) {
   return (
     <View className="flex items-center justify-center gap-3">
-      <Pressable
-        onPress={onToggleMute}
-        className="rounded-full bg-white/10 px-4 py-3 text-sm text-white"
-        accessibilityLabel={isMuted ? "Activer le microphone" : "Couper le microphone"}
-      >
+      <Pressable onPress={onToggleMute} className="rounded-full bg-white/10 px-4 py-3 text-sm text-white transition" accessibilityLabel={isMuted ? "Activer le microphone" : "Couper le microphone"}>
         {isMuted ? "🔇" : "🎙️"}
       </Pressable>
 
       {isVideoCall && (
-        <Pressable
-          onPress={onToggleCamera}
-          className="rounded-full bg-white/10 px-4 py-3 text-sm text-white"
-          accessibilityLabel={
+        <Pressable onPress={onToggleCamera} className="rounded-full bg-white/10 px-4 py-3 text-sm text-white transition" accessibilityLabel={
             isCameraEnabled ? "Désactiver la caméra" : "Activer la caméra"
-          }
-        >
+          }>
           {isCameraEnabled ? "📹" : "🚫"}
         </Pressable>
       )}
 
-      <Pressable
-        onPress={onEnd}
-        className="rounded-full bg-red-600 px-5 py-3 text-sm font-medium text-white"
-        accessibilityLabel="Terminer l'appel"
-      >
+      <Pressable onPress={onEnd} className="rounded-full bg-red-600 px-5 py-3 text-sm font-medium text-white transition" accessibilityLabel="Terminer l'appel">
         ☎ Terminer
       </Pressable>
     </View>

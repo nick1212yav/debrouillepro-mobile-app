@@ -15,8 +15,7 @@ export function AnnonceStatistics({ publicationId }: Props) {
 
   if (statsData === undefined) {
     return (
-      <View className="text-white/40 text-sm">
-        <Text>Chargement des statistiques...</Text></View>
+      <View className="text-white/40 text-sm"><Text>Chargement des statistiques...</Text></View>
     );
   }
 
@@ -38,28 +37,19 @@ export function AnnonceStatistics({ publicationId }: Props) {
   ];
 
   return (
-    <View className="space-y-2">
-      <Text className="text-sm font-medium text-white/50">Statistiques</Text>
-      <View className="gap-2">
-        {statItems.map((item) => (
-          <View
-            key={item.label}
-            className="text-center p-2 rounded-xl bg-white/5 border border-white/5"
-          >
+    <View className="space-y-2"><Text className="text-sm font-medium text-white/50">Statistiques</Text><View className="gap-2">{statItems.map((item) => (
+          <View key={item.label} className="text-center p-2 rounded-xl bg-white/5 border border-white/5">
             <item.icon size={14} className="text-white/30 mx-auto" />
             <Text className="text-white font-bold text-sm mt-1">{item.value}</Text>
             <Text className="text-white/30 text-[10px]">{item.label}</Text>
           </View>
-        ))}
-      </View>
-      {stats.averageRating > 0 && (
+        ))}</View>{stats.averageRating > 0 && (
         <View className="flex items-center gap-2 text-xs text-white/40">
           <TrendingUp size={12} className="text-yellow-400" />
-          <Text><Text>Note moyenne :</Text>{stats.averageRating.toFixed(1)} <Text>/ 5</Text></Text>
-          <Text className="text-white/20"><Text>·</Text></Text>
-          <Text>{stats.reviewCount} <Text>avis</Text></Text>
+          <Text>Note moyenne : {stats.averageRating.toFixed(1)} / 5</Text>
+          <Text className="text-white/20">·</Text>
+          <Text>{stats.reviewCount} avis</Text>
         </View>
-      )}
-    </View>
+      )}</View>
   );
 }

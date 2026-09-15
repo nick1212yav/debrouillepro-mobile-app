@@ -20,27 +20,17 @@ export function AnnonceSafety({
   ];
 
   return (
-    <View className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-      <View className="flex items-center gap-2 mb-2">
-        <CheckCircle size={16} className="text-emerald-400" />
-        <Text className="text-sm font-medium text-emerald-400">Sécurité</Text>
-      </View>
-      <View className="flex flex-wrap gap-3">
-        {items.map((item) => (
+    <View className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10"><View className="flex items-center gap-2 mb-2"><CheckCircle size={16} className="text-emerald-400" /><Text className="text-sm font-medium text-emerald-400">Sécurité</Text></View><View className="flex flex-wrap gap-3">{items.map((item) => (
           <View key={item.label} className="flex items-center gap-1.5">
             {item.active ? (
               <CheckCircle size={12} className="text-emerald-400" />
             ) : (
               <AlertCircle size={12} className="text-white/20" />
             )}
-            <Text
-              className={`text-xs ${item.active ? "text-white/70" : "text-white/30"}`}
-            >
+            <Text className={`text-xs ${item.active ? "text-white/70" : "text-white/30"}`}>
               {item.label}
             </Text>
           </View>
-        ))}
-      </View>
-    </View>
+        ))}</View></View>
   );
 }

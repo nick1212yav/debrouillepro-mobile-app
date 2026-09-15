@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/network/components/Opportunities/ServiceMatches.tsx
 import { Wrench, Star, DollarSign } from "lucide-react-native";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -47,31 +48,21 @@ export function ServiceMatches({
 }: ServiceMatchesProps) {
   if (isLoading) {
     return (
-      <View className="space-y-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <View
-            key={i}
-            className="h-32 rounded-3xl bg-white/[0.02] border border-white/5 animate-pulse"
-          />
-        ))}
-      </View>
+      <View className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (
+          <View key={i} className="h-32 rounded-3xl bg-white/[0.02] border border-white/5 animate-pulse" />
+        ))}</View>
     );
   }
 
   if (services.length === 0) {
     return (
-      <View className="flex flex-col items-center justify-center py-12 text-center">
-        <Wrench size={36} className="text-white/10 mb-3" />
-        <Text className="text-white/40 text-xs">
-          Aucun service correspondant pour le moment
-        </Text>
-      </View>
+      <View className="flex flex-col items-center justify-center py-12 text-center"><Wrench size={36} className="text-white/10 mb-3" /><Text className="text-white/40 text-xs">Aucun service correspondant pour le moment
+        </Text></View>
     );
   }
 
   return (
-    <View className="flex flex-col gap-3">
-      {services.map((service) => (
+    <View className="flex flex-col gap-3">{services.map((service) => (
         <OpportunityCard
           key={service._id}
           // ✅ Correction : transtypé 'as any' pour bypasser l'absence de la propriété 'logo' du SDK [1]
@@ -95,13 +86,8 @@ export function ServiceMatches({
             applyLabel: service.isContacted ? "Contacté" : "Contacter",
           } as any)}
           extraInfo={
-            <View className="gap-2 mt-2 pt-2 border-t border-white/5 text-[10px] text-white/40">
-              <View className="flex items-center gap-1">
-                <Star size={10} className="fill-yellow-500 text-yellow-500" />
-                <Text>
-                  {service.rating.toFixed(1)} <Text>(</Text>{service.reviewCount} <Text>avis)</Text></Text>
-              </View>
-              {service.price && (
+            <View className="gap-2 mt-2 pt-2 border-t border-white/5 text-[10px] text-white/40"><View className="flex items-center gap-1"><Star size={10} className="fill-yellow-500 text-yellow-500" /><Text>{service.rating.toFixed(1)}({service.reviewCount}avis)
+                </Text></View>{service.price && (
                 <View className="flex items-center gap-1 text-green-400 font-bold">
                   <DollarSign size={10} />
                   <Text>
@@ -109,11 +95,9 @@ export function ServiceMatches({
                     {service.priceUnit ? ` / ${service.priceUnit}` : ""}
                   </Text>
                 </View>
-              )}
-            </View>
+              )}</View>
           }
         />
-      ))}
-    </View>
+      ))}</View>
   );
 }

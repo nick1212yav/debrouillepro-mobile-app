@@ -1,4 +1,5 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
+
 // src/features/agri/components/search/AgriAvailabilityFilter.tsx
 import { Check } from "lucide-react-native";
 
@@ -30,26 +31,16 @@ export function AgriAvailabilityFilter({
   ];
 
   return (
-    <View className="space-y-1.5">
-      <Text className="text-[10px] text-white/30 uppercase tracking-wider font-bold">
-        Statut de disponibilité
-      </Text>
-      <View className="flex flex-col gap-2">
-        {config.map((item) => {
+    <View className="space-y-1.5"><Text className="text-[10px] text-white/30 uppercase tracking-wider font-bold">Statut de disponibilité
+      </Text><View className="flex flex-col gap-2">{config.map((item) => {
           const isChecked = status.includes(item.id);
           return (
-            <Pressable
-              key={item.id}
-              onPress={() => onToggleStatus(item.id)}
-              className="flex items-center gap-3 p-3 rounded-2xl w-full text-left border border-white/5 bg-white/[0.02]"
-            >
-              <View
-                className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${
+            <Pressable key={item.id} onPress={() => onToggleStatus(item.id)} className="flex items-center gap-3 p-3 rounded-2xl w-full text-left transition-all border border-white/5 bg-white/[0.02]">
+              <View className={`w-5 h-5 rounded-lg flex items-center justify-center border transition-all ${
                   isChecked
                     ? "bg-green-500 border-green-500 text-black"
                     : "border-white/20 bg-transparent text-transparent"
-                }`}
-              >
+                }`}>
                 <Check size={12} strokeWidth={3} />
               </View>
               <View className="flex-1 min-w-0">
@@ -62,8 +53,6 @@ export function AgriAvailabilityFilter({
               </View>
             </Pressable>
           );
-        })}
-      </View>
-    </View>
+        })}</View></View>
   );
 }

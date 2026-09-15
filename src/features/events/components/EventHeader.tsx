@@ -1,7 +1,16 @@
-import { Link } from "expo-router";
-import { View, Text, Pressable, Image } from "react-native";
 // src/features/events/components/EventHeader.tsx
-import { Calendar, Clock, MapPin, Users, Share2, Heart } from "lucide-react-native";
+import React from "react";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Users,
+  Share2,
+  Heart,
+} from "lucide-react-native";
+
 import {
   CATEGORY_LABELS,
   CATEGORY_COLORS,
@@ -18,6 +27,8 @@ interface Props {
 }
 
 export function EventHeader({ event, onLike, onShare, onFollow }: Props) {
+  const router = useRouter();
+
   const categoryColor = CATEGORY_COLORS[event.category] || "#8B5CF6";
   const statusCfg = STATUS_LABELS[event.status] || STATUS_LABELS.upcoming;
 
@@ -37,145 +48,326 @@ export function EventHeader({ event, onLike, onShare, onFollow }: Props) {
     });
   };
 
+  const handleAuthorPress = () => {
+    if (event.authorId) {
+      router.push(`/profile/${event.authorId}`);
+    }
+  };
+
   return (
-    <View className="space-y-4">
-      {/* En-tête avec catégorie et statut */}
-      <View className="flex items-start justify-between">
-        <View className="flex items-center gap-3">
+    <View style={styles.container}>
+      {/* Header : catégorie + actions */}
+      <View style={styles.topRow}>
+        <View style={styles.headerLeft}>
           <View
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
-            style={{ backgroundColor: `${categoryColor}22` }}
+            style={[
+              styles.categoryIconWrapper,
+              { backgroundColor: `${categoryColor}22` },
+            ]}
           >
-            {CATEGORY_ICONS[event.category]}
+            <Text style={styles.categoryEmoji}>
+              {CATEGORY_ICONS[event.category]}
+            </Text>
           </View>
-          <View>
-            <View className="flex items-center gap-2">
-              <Text
-                className="text-sm font-semibold"
-                style={{ color: categoryColor }}
-              >
+
+          <View style={styles.titleColumn}>
+            <View style={styles.categoryRow}>
+              <Text style={[styles.categoryLabel, { color: categoryColor }]}>
                 {CATEGORY_LABELS[event.category]}
               </Text>
               <Text
-                className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-                style={{ backgroundColor: statusCfg.bg, color: statusCfg.color }}
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: statusCfg.bg, color: statusCfg.color },
+                ]}
               >
                 {statusCfg.label}
               </Text>
             </View>
-            <Text className="text-xl font-bold text-white leading-tight">
+            <Text style={styles.eventTitle} numberOfLines={2}>
               {event.title}
             </Text>
           </View>
         </View>
 
-        <View className="flex items-center gap-2">
+        <View style={styles.actionsRow}>
           <Pressable
             onPress={onLike}
-            className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: event.likedByMe
-                            ? "rgba(236,72,153,0.15)"
-                            : "rgba(255,255,255,0.06)" }}
+            style={({ pressed }) => [
+              styles.iconButton,
+              {
+                backgroundColor: event.likedByMe
+                  ? "rgba(236,72,153,0.15)"
+                  : "rgba(255,255,255,0.06)",
+              },
+              pressed && styles.pressed,
+            ]}
+            hitSlop={6}
+            accessibilityLabel="Aimer"
           >
             <Heart
               size={18}
-              className={
-                event.likedByMe
-                  ? "fill-pink-500 text-pink-500"
-                  : "text-white/40"
-              }
+              color={event.likedByMe ? "#EC4899" : "rgba(255,255,255,0.4)"}
+              fill={event.likedByMe ? "#EC4899" : "transparent"}
             />
           </Pressable>
+
           <Pressable
             onPress={onShare}
-            className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
+            style={({ pressed }) => [
+              styles.iconButton,
+              styles.iconButtonNeutral,
+              pressed && styles.pressed,
+            ]}
+            hitSlop={6}
+            accessibilityLabel="Partager"
           >
-            <Share2 size={18} className="text-white/40" />
+            <Share2 size={18} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
       </View>
 
-      {/* Infos détaillées */}
-      <View className="gap-2">
-        <View
-          className="rounded-2xl p-3"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-        >
-          <Calendar size={14} className="text-purple-400 mb-1" />
-          <Text className="text-white/40 text-[10px]">Date</Text>
-          <Text className="text-white text-sm font-semibold">
-            {formatDate(event.startDate)}
-          </Text>
-        </View>
-
-        <View
-          className="rounded-2xl p-3"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-        >
-          <Clock size={14} className="text-pink-400 mb-1" />
-          <Text className="text-white/40 text-[10px]">Heure</Text>
-          <Text className="text-white text-sm font-semibold">
-            {formatTime(event.startDate)}
-          </Text>
-        </View>
-
-        <View
-          className="rounded-2xl p-3"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-        >
-          <MapPin size={14} className="text-orange-400 mb-1" />
-          <Text className="text-white/40 text-[10px]">Lieu</Text>
-          <Text className="text-white text-sm font-semibold truncate">
-            {event.location}
-          </Text>
-        </View>
-
-        <View
-          className="rounded-2xl p-3"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-        >
-          <Users size={14} className="text-green-400 mb-1" />
-          <Text className="text-white/40 text-[10px]">Participants</Text>
-          <Text className="text-white text-sm font-semibold">
-            {event.attendingCount}
-          </Text>
-        </View>
+      {/* Info cards : date / heure / lieu / participants */}
+      <View style={styles.infoGrid}>
+        <InfoCard
+          icon={<Calendar size={14} color="#A78BFA" />}
+          label="Date"
+          value={formatDate(event.startDate)}
+        />
+        <InfoCard
+          icon={<Clock size={14} color="#F472B6" />}
+          label="Heure"
+          value={formatTime(event.startDate)}
+        />
+        <InfoCard
+          icon={<MapPin size={14} color="#FB923C" />}
+          label="Lieu"
+          value={event.location}
+          numberOfLines={1}
+        />
+        <InfoCard
+          icon={<Users size={14} color="#4ADE80" />}
+          label="Participants"
+          value={String(event.attendingCount)}
+        />
       </View>
 
-      {/* Auteur */}
+      {/* Organisateur */}
       {event.authorName && (
-        <View className="flex items-center gap-3 py-2 px-3 rounded-2xl bg-white/5 border border-white/5">
+        <View style={styles.authorCard}>
           {event.authorAvatar ? (
             <Image
-             
-             
-              className="w-9 h-9 rounded-full object-cover"
-             source={{ uri: event.authorAvatar }} accessibilityLabel={event.authorName}/>
+              source={{ uri: event.authorAvatar }}
+              style={styles.avatar}
+              accessibilityLabel={event.authorName}
+            />
           ) : (
             <View
-              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold"
-              style={{ backgroundColor: `${categoryColor}33` }}
+              style={[
+                styles.avatar,
+                styles.avatarFallback,
+                { backgroundColor: `${categoryColor}33` },
+              ]}
             >
-              {event.authorName.charAt(0).toUpperCase()}
+              <Text style={styles.avatarInitial}>
+                {event.authorName.charAt(0).toUpperCase()}
+              </Text>
             </View>
           )}
-          <View className="flex-1">
-            <Link
-              href={`/profile/${event.authorId}`}
-              className="text-white font-medium text-sm"
-            >
-              {event.authorName}
-            </Link>
-            <Text className="text-white/30 text-[10px]"><Text>Organisateur</Text></Text>
+
+          <View style={styles.authorInfo}>
+            <Pressable onPress={handleAuthorPress} hitSlop={4}>
+              <Text style={styles.authorName}>{event.authorName}</Text>
+            </Pressable>
+            <Text style={styles.authorRole}>Organisateur</Text>
           </View>
+
           <Pressable
             onPress={onFollow}
-            className="px-4 py-1.5 rounded-full text-xs font-semibold text-white"
-            style={{  }}
+            style={({ pressed }) => [
+              styles.followButton,
+              pressed && styles.pressed,
+            ]}
+            accessibilityLabel="Suivre l'organisateur"
           >
-            <Text>Suivre</Text></Pressable>
+            <Text style={styles.followButtonText}>Suivre</Text>
+          </Pressable>
         </View>
       )}
     </View>
   );
 }
+
+// ── InfoCard ─────────────────────────────────────────────────────────────
+function InfoCard({
+  icon,
+  label,
+  value,
+  numberOfLines,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  numberOfLines?: number;
+}) {
+  return (
+    <View style={styles.infoCard}>
+      <View style={styles.infoCardIcon}>{icon}</View>
+      <Text style={styles.infoCardLabel}>{label}</Text>
+      <Text style={styles.infoCardValue} numberOfLines={numberOfLines}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+// ── Styles ───────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: {
+    gap: 16,
+  },
+  topRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  headerLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  categoryIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryEmoji: {
+    fontSize: 22,
+  },
+  titleColumn: {
+    flex: 1,
+  },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  categoryLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  statusBadge: {
+    fontSize: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    fontWeight: "700",
+    overflow: "hidden",
+  },
+  eventTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 26,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconButtonNeutral: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  pressed: {
+    transform: [{ scale: 0.94 }],
+    opacity: 0.85,
+  },
+  infoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  infoCard: {
+    flexGrow: 1,
+    flexBasis: "48%",
+    minWidth: 140,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    gap: 4,
+  },
+  infoCardIcon: {
+    marginBottom: 2,
+  },
+  infoCardLabel: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10,
+  },
+  infoCardValue: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  authorCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  avatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitial: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  authorInfo: {
+    flex: 1,
+  },
+  authorName: {
+    color: "#FFFFFF",
+    fontWeight: "500",
+    fontSize: 14,
+  },
+  authorRole: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 10,
+  },
+  followButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#8B5CF6",
+  },
+  followButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+});

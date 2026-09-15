@@ -19,11 +19,7 @@ export function MediaGallery({ items, onOpen }: MediaGalleryProps) {
         const isImage = item.type.startsWith("image/");
 
         return (
-          <Pressable
-            key={String(item.id)}
-            onPress={() => onOpen?.(index)}
-            className="relative aspect-square overflow-hidden bg-black/20"
-          >
+          <Pressable key={String(item.id)} onPress={() => onOpen?.(index)} className="relative aspect-square overflow-hidden bg-black/20">
             {isImage ? (
               <ImagePreview
                 src={item.url}

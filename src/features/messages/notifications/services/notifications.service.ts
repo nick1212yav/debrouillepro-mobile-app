@@ -1,8 +1,6 @@
-// src/features/messages/notifications/services/notifications.service.ts
+import { Linking } from "react-native";
 
-import { AppState, type AppStateStatus } from "react-native";
-import * as Notifications from "expo-notifications";
-import { Audio } from "expo-av";
+// src/features/messages/notifications/services/notifications.service.ts
 
 export type MessageNotificationType =
   | "message"
@@ -39,12 +37,6 @@ export interface NotificationPreferences {
   system: boolean;
 }
 
-export type NativeNotificationPermissionStatus =
-  | "granted"
-  | "denied"
-  | "undetermined"
-  | "unsupported";
-
 type NotificationListener = (notifications: MessageNotification[]) => void;
 
 const DEFAULT_PREFERENCES: NotificationPreferences = {
@@ -64,29 +56,7 @@ let preferences: NotificationPreferences = {
   ...DEFAULT_PREFERENCES,
 };
 
-let currentAppState: AppStateStatus = AppState.currentState;
-
 const listeners = new Set<NotificationListener>();
-
-/**
- * Configure le comportement des notifications lorsque
- * l'application est ouverte.
- *
- * Cette configuration est volontairement centralisée ici
- * afin que le module Messages possède un comportement stable.
- */
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
-
-AppState.addEventListener("change", (nextState) => {
-  currentAppState = nextState;
-});
 
 function emit(): void {
   const snapshot = [...notifications];
@@ -123,36 +93,11 @@ function isNotificationEnabled(notification: MessageNotification): boolean {
   }
 }
 
-function mapPermissionStatus(
-  status: Notifications.PermissionStatus,
-): NativeNotificationPermissionStatus {
-  switch (status) {
-    case Notifications.PermissionStatus.GRANTED:
-      return "granted";
-
-    case Notifications.PermissionStatus.DENIED:
-      return "denied";
-
-    case Notifications.PermissionStatus.UNDETERMINED:
-    default:
-      return "undetermined";
-  }
-}
-
-/**
- * Vérifie si l'application est actuellement au premier plan.
- */
-export function isApplicationActive(): boolean {
-  return currentAppState === "active";
-}
-
 /**
  * Retourne les préférences actuelles.
  */
 export function getNotificationPreferences(): NotificationPreferences {
-  return {
-    ...preferences,
-  };
+  return { ...preferences };
 }
 
 /**
@@ -166,9 +111,7 @@ export function setNotificationPreferences(
     ...next,
   };
 
-  return {
-    ...preferences,
-  };
+  return { ...preferences };
 }
 
 /**
@@ -179,9 +122,7 @@ export function resetNotificationPreferences(): NotificationPreferences {
     ...DEFAULT_PREFERENCES,
   };
 
-  return {
-    ...preferences,
-  };
+  return { ...preferences };
 }
 
 /**
@@ -202,13 +143,14 @@ export function getUnreadNotifications(): MessageNotification[] {
  * Retourne le nombre de notifications non lues.
  */
 export function getUnreadNotificationCount(): number {
-  return notifications.reduce((count, notification) => {
-    return notification.read ? count : count + 1;
-  }, 0);
+  return notifications.reduce(
+    (count, notification) => count + (notification.read ? 0 : 1),
+    0,
+  );
 }
 
 /**
- * Ajoute une notification locale au store du module.
+ * Ajoute une notification.
  */
 export function addNotification(
   notification: Omit<MessageNotification, "id" | "timestamp" | "read"> & {
@@ -306,8 +248,7 @@ export function clearNotifications(): void {
 }
 
 /**
- * Abonne un composant aux changements
- * du système de notifications.
+ * Abonne un composant aux notifications.
  */
 export function subscribeNotifications(
   listener: NotificationListener,
@@ -323,207 +264,134 @@ export function subscribeNotifications(
 
 /**
  * Demande l'autorisation d'afficher
- * des notifications natives.
+ * des notifications navigateur.
  */
-export async function requestBrowserPermission(): Promise<NativeNotificationPermissionStatus> {
-  try {
-    const currentPermissions = await Notifications.getPermissionsAsync();
-
-    if (currentPermissions.status === Notifications.PermissionStatus.GRANTED) {
-      return "granted";
-    }
-
-    const requestedPermissions = await Notifications.requestPermissionsAsync();
-
-    return mapPermissionStatus(requestedPermissions.status);
-  } catch (error) {
-    console.warn(
-      "[notifications.service] Impossible de demander la permission:",
-      error,
-    );
-
+export async function requestBrowserPermission(): Promise<
+  NotificationPermission | "unsupported"
+> {
+  if (typeof window === "undefined" || typeof Notification === "undefined") {
     return "unsupported";
   }
-}
 
-/**
- * Alias explicite pour le runtime mobile.
- *
- * On conserve requestBrowserPermission pour éviter de casser
- * les imports existants pendant la migration.
- */
-export async function requestNotificationPermission(): Promise<NativeNotificationPermissionStatus> {
-  return requestBrowserPermission();
-}
-
-/**
- * Vérifie si les notifications natives sont disponibles.
- */
-export async function isBrowserNotificationSupported(): Promise<boolean> {
-  try {
-    const permissions = await Notifications.getPermissionsAsync();
-
-    return permissions !== null;
-  } catch {
-    return false;
+  if (Notification.permission === "granted") {
+    return "granted";
   }
+
+  if (Notification.permission === "denied") {
+    return "denied";
+  }
+
+  return Notification.requestPermission();
 }
 
 /**
- * Alias mobile plus explicite.
+ * Vérifie si les notifications navigateur
+ * sont disponibles.
  */
-export async function isNotificationSupported(): Promise<boolean> {
-  return isBrowserNotificationSupported();
+export function isBrowserNotificationSupported(): boolean {
+  return typeof window !== "undefined" && typeof Notification !== "undefined";
 }
 
 /**
- * Programme immédiatement une notification locale native.
- *
- * Le store interne est conservé séparément :
- * addNotification() gère l'historique applicatif,
- * showBrowserNotification() gère l'affichage système.
+ * Affiche une notification navigateur.
  */
-export async function showBrowserNotification(
+export function showBrowserNotification(
   notification: MessageNotification,
-): Promise<string | null> {
+): Notification | null {
   if (
     !preferences.enabled ||
     !preferences.browser ||
-    !isNotificationEnabled(notification)
+    !isBrowserNotificationSupported()
   ) {
     return null;
   }
 
-  try {
-    const permissions = await Notifications.getPermissionsAsync();
-
-    if (permissions.status !== Notifications.PermissionStatus.GRANTED) {
-      return null;
-    }
-
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: notification.title,
-        body: notification.body,
-        sound: preferences.sound ? "default" : undefined,
-        data: {
-          notificationId: notification.id,
-          conversationId: notification.conversationId,
-          messageId: notification.messageId,
-          senderId: notification.senderId,
-          url: notification.url,
-          metadata: notification.metadata,
-        },
-      },
-      trigger: null,
-    });
-
-    return notificationId;
-  } catch (error) {
-    console.warn(
-      "[notifications.service] Impossible d'afficher la notification:",
-      error,
-    );
-
-    return null;
-  }
-}
-
-/**
- * Alias mobile plus explicite.
- */
-export async function showNativeNotification(
-  notification: MessageNotification,
-): Promise<string | null> {
-  return showBrowserNotification(notification);
-}
-
-/**
- * Ajoute une notification au store et,
- * si nécessaire, l'affiche au niveau système.
- */
-export async function dispatchNotification(
-  notification: Omit<MessageNotification, "id" | "timestamp" | "read"> & {
-    id?: string;
-    timestamp?: number;
-    read?: boolean;
-  },
-): Promise<MessageNotification | null> {
-  const created = addNotification(notification);
-
-  if (!created) {
+  if (Notification.permission !== "granted") {
     return null;
   }
 
-  /**
-   * Si l'application est ouverte, l'interface
-   * peut déjà afficher la notification via le store.
-   *
-   * La notification système reste néanmoins configurable.
-   */
-  if (!isApplicationActive()) {
-    await showNativeNotification(created);
+  const browserNotification = new Notification(notification.title, {
+    body: notification.body,
+    icon: notification.senderAvatar ?? undefined,
+    tag: notification.id,
+    data: {
+      notificationId: notification.id,
+      conversationId: notification.conversationId,
+      messageId: notification.messageId,
+      url: notification.url,
+    },
+  });
+
+  if (notification.url) {
+    browserNotification.onclick = () => {
+      if (typeof window !== "undefined") {
+        window.focus();
+        Linking.openURL(notification.url!);
+      }
+    };
   }
 
-  return created;
+  return browserNotification;
 }
 
 /**
  * Joue le son de notification.
  *
- * Le son est principalement géré par expo-notifications
- * pour les notifications système. Cette fonction est
- * conservée pour les appels explicites provenant de
- * l'interface applicative.
+ * Aucun fichier audio externe n'est requis.
  */
-export async function playNotificationSound(): Promise<void> {
-  if (!preferences.enabled || !preferences.sound) {
+export function playNotificationSound(): void {
+  if (
+    !preferences.enabled ||
+    !preferences.sound ||
+    typeof window === "undefined"
+  ) {
     return;
   }
 
   try {
-    /**
-     * Aucun fichier audio n'est chargé ici.
-     *
-     * Sur mobile, expo-notifications joue le son système
-     * lorsqu'une notification est affichée avec
-     * sound: "default".
-     *
-     * Cette fonction reste volontairement sans effet
-     * sonore direct afin d'éviter une dépendance à un asset
-     * inexistant et de ne jamais provoquer d'erreur.
-     */
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: false,
-    });
-  } catch {
-    // Le son reste optionnel.
-  }
-}
+    const AudioContextClass =
+      window.AudioContext ??
+      (
+        window as typeof window & {
+          webkitAudioContext?: typeof AudioContext;
+        }
+      ).webkitAudioContext;
 
-/**
- * Supprime les notifications système affichées
- * par l'application.
- */
-export async function dismissAllNativeNotifications(): Promise<void> {
-  try {
-    await Notifications.dismissAllNotificationsAsync();
-  } catch {
-    // Une erreur native ne doit pas perturber
-    // le système applicatif.
-  }
-}
+    if (!AudioContextClass) {
+      return;
+    }
 
-/**
- * Annule une notification système programmée.
- */
-export async function cancelNativeNotification(
-  nativeNotificationId: string,
-): Promise<void> {
-  try {
-    await Notifications.cancelScheduledNotificationAsync(nativeNotificationId);
+    const context = new AudioContextClass();
+
+    const oscillator = context.createOscillator();
+
+    const gain = context.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, context.currentTime);
+
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+
+    gain.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.01);
+
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.12);
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.13);
+
+    oscillator.addEventListener(
+      "ended",
+      () => {
+        void context.close();
+      },
+      { once: true },
+    );
   } catch {
-    // Ignorer les erreurs d'annulation.
+    // Le son est optionnel : aucune erreur ne doit
+    // perturber le système de notifications.
   }
 }
 
@@ -531,6 +399,13 @@ export async function cancelNativeNotification(
  * Crée un identifiant local unique.
  */
 function createNotificationId(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+
   return `notification-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 10)}`;

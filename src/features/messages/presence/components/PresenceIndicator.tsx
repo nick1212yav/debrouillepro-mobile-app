@@ -32,16 +32,10 @@ export function PresenceIndicator({
   const isAway = status === "away";
 
   return (
-    <Text
-      className={`inline-flex items-center justify-center ${className}`}
-      title={isOnline ? "En ligne" : isAway ? "Absent" : "Hors ligne"}
-      accessibilityLabel={isOnline ? "En ligne" : isAway ? "Absent" : "Hors ligne"}
-    >
-      <Text
-        className={`${sizeClasses[size]} rounded-full ${
+    <Text className={`inline-flex items-center justify-center ${className}`} title={isOnline ? "En ligne" : isAway ? "Absent" : "Hors ligne"} accessibilityLabel={isOnline ? "En ligne" : isAway ? "Absent" : "Hors ligne"}>
+      <Text className={`${sizeClasses[size]} rounded-full ${
           isOnline ? "bg-emerald-500" : isAway ? "bg-amber-400" : "bg-white/25"
-        }`}
-      />
+        }`} />
     </Text>
   );
 }

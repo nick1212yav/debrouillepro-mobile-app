@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityStories.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import { adaptCommunityStory } from "../adapter";
 import type { CommunityStory } from "../types";
@@ -27,11 +26,11 @@ export function useCommunityStories() {
     }) => {
       try {
         const storyId = await createStory(data);
-        UIService.openToast("Story publiée", "success");
+        toast.success("Story publiée");
         // On retourne l'ID, le composant devra rafraîchir
         return storyId;
       } catch (error) {
-        UIService.openToast("Erreur lors de la publication de la story", "error");
+        toast.error("Erreur lors de la publication de la story");
         throw error;
       }
     },
@@ -45,9 +44,9 @@ export function useCommunityStories() {
     deleteStory: async (storyId: Id<"stories">) => {
       try {
         await deleteStory({ storyId });
-        UIService.openToast("Story supprimée", "success");
+        toast.success("Story supprimée");
       } catch (error) {
-        UIService.openToast("Erreur lors de la suppression", "error");
+        toast.error("Erreur lors de la suppression");
         throw error;
       }
     },

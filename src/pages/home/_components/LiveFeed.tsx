@@ -1,5 +1,16 @@
-import { View, Pressable, Text } from "react-native";
-import { useMemo, useState } from "react";
+// src/pages/home/_components/LiveFeed.tsx
+import {
+  View,
+  Pressable,
+  Text,
+  ScrollView,
+  Animated,
+  Easing,
+  StyleSheet,
+  Platform,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   RefreshCw,
   Plus,
@@ -17,7 +28,6 @@ import { usePublicationActions } from "@/features/publications/hooks/usePublicat
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 import {
   PUBLICATION_TYPES,
@@ -43,47 +53,615 @@ interface LiveFeedProps {
 const PAGE_SIZE = 10;
 
 /* ============================================================================
- * COMPONENT
+ * ENTRANCE WRAPPER
+ * ========================================================================== */
+
+function FadeUp({
+  delay = 0,
+  distance = 14,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: any;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 420,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * PULSING SPARKLE (header icon)
+ * ========================================================================== */
+
+function PulsingHeaderIcon({
+  activeType,
+}: {
+  activeType: PublicationType | "all";
+}) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.06],
+  });
+
+  return (
+    <Animated.View style={[styles.headerIconWrap, { transform: [{ scale }] }]}>
+      <LinearGradient
+        colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerIconGradient}
+      >
+        {activeType === "all" ? (
+          <Sparkles size={16} color="#fff" strokeWidth={2.4} />
+        ) : (
+          <LayoutGrid size={16} color="#fff" strokeWidth={2.4} />
+        )}
+      </LinearGradient>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * FILTER CHIP
+ * ========================================================================== */
+
+function FilterChip({
+  label,
+  active,
+  color,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  color: string;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const activeAnim = useRef(new Animated.Value(active ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(activeAnim, {
+      toValue: active ? 1 : 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [active, activeAnim]);
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.94,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const borderColor = activeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.09)", "rgba(255,255,255,0.15)"],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
+        style={styles.filterChip}
+      >
+        {/* Base bg (inactive) */}
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              borderRadius: 12,
+              backgroundColor: "rgba(255,255,255,0.045)",
+              borderWidth: 1,
+              borderColor,
+            },
+          ]}
+        />
+
+        {/* Active gradient overlay */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              opacity: activeAnim,
+              borderRadius: 12,
+              overflow: "hidden",
+              shadowColor: color,
+              shadowOpacity: 0.4,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[`${color}E6`, `${color}AA`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+
+        <Text
+          style={[
+            styles.filterChipText,
+            {
+              color: active ? "#FFFFFF" : "rgba(255,255,255,0.55)",
+            },
+          ]}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * LIVE FEED SKELETON
+ * ========================================================================== */
+
+function LiveFeedSkeleton() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  const opacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 0.85],
+  });
+
+  return (
+    <View
+      accessibilityLabel="Chargement du fil"
+      accessibilityState={{ busy: true }}
+      style={{ gap: 16 }}
+    >
+      {[0, 1, 2].map((index) => (
+        <Animated.View key={index} style={[styles.skeletonCard, { opacity }]}>
+          <Skeleton style={styles.skeletonHero} />
+          <View style={styles.skeletonBody}>
+            <View style={styles.skeletonAuthorRow}>
+              <Skeleton style={styles.skeletonAvatar} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <Skeleton style={styles.skeletonLine1} />
+                <Skeleton style={styles.skeletonLine2} />
+              </View>
+            </View>
+            <Skeleton style={styles.skeletonTitle} />
+            <Skeleton style={styles.skeletonText} />
+            <Skeleton style={styles.skeletonTextShort} />
+            <View style={styles.skeletonActionsRow}>
+              <Skeleton style={styles.skeletonAction} />
+              <Skeleton style={styles.skeletonAction} />
+            </View>
+          </View>
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * EMPTY FEED
+ * ========================================================================== */
+
+function EmptyFeed({
+  activeType,
+  onCreateOpen,
+  onReset,
+}: {
+  activeType: PublicationType | "all";
+  onCreateOpen: () => void;
+  onReset: () => void;
+}) {
+  const isFiltered = activeType !== "all";
+  const float = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(float, {
+          toValue: 1,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(float, {
+          toValue: 0,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [float]);
+
+  const translateY = float.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -6],
+  });
+  const rotate = float.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: ["0deg", "3deg", "-3deg"],
+  });
+
+  return (
+    <FadeUp distance={15}>
+      <View style={styles.emptyCard}>
+        <LinearGradient
+          colors={[
+            "rgba(139,92,246,0.14)",
+            "rgba(15,7,32,0.6)",
+            "rgba(10,6,24,0.85)",
+          ]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.emptyBorder} pointerEvents="none" />
+        <View style={styles.emptyOrb} pointerEvents="none" />
+
+        <View style={styles.emptyContent}>
+          <Animated.View
+            style={[
+              styles.emptyIconWrap,
+              { transform: [{ translateY }, { rotate }] },
+            ]}
+          >
+            <LinearGradient
+              colors={["rgba(167,139,250,0.32)", "rgba(99,102,241,0.08)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.emptyIconGradient}
+            >
+              {isFiltered ? (
+                <LayoutGrid size={26} color="#C4B5FD" />
+              ) : (
+                <Sparkles size={26} color="#C4B5FD" />
+              )}
+            </LinearGradient>
+          </Animated.View>
+
+          <Text style={styles.emptyTitle}>
+            {isFiltered
+              ? "Rien dans cette catégorie"
+              : "Le feed est encore calme"}
+          </Text>
+
+          <Text style={styles.emptySub}>
+            {isFiltered
+              ? "Aucune publication disponible dans cette catégorie pour le moment. Explore les autres catégories ou sois le premier à publier."
+              : "Il n'y a encore aucune publication à afficher. Crée la première et fais découvrir quelque chose à ta communauté."}
+          </Text>
+
+          <View style={styles.emptyActions}>
+            {isFiltered ? (
+              <Pressable
+                onPress={onReset}
+                style={({ pressed }) => [
+                  styles.emptySecondaryBtn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.emptySecondaryText}>Explorer tout</Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              onPress={onCreateOpen}
+              style={({ pressed }) => [
+                styles.emptyPrimaryOuter,
+                pressed && styles.pressed,
+              ]}
+            >
+              <LinearGradient
+                colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emptyPrimary}
+              >
+                <Plus size={14} color="#fff" strokeWidth={2.6} />
+                <Text style={styles.emptyPrimaryText}>
+                  Créer une publication
+                </Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </FadeUp>
+  );
+}
+
+/* ============================================================================
+ * LOADING DOTS
+ * ========================================================================== */
+
+function LoadingDots() {
+  const dots = [
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+  ];
+
+  useEffect(() => {
+    dots.forEach((dot, i) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 140),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.delay((2 - i) * 140),
+        ]),
+      ).start();
+    });
+  }, [dots]);
+
+  return (
+    <View
+      style={styles.loadingDotsRow}
+      accessibilityLabel="Chargement des publications"
+    >
+      {dots.map((dot, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.loadingDot,
+            {
+              opacity: dot.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.2, 1],
+              }),
+              transform: [
+                {
+                  scale: dot.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.85, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * REFRESH SPINNER
+ * ========================================================================== */
+
+function RefreshSpinner({ active }: { active: boolean }) {
+  const rotate = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!active) {
+      rotate.setValue(0);
+      return;
+    }
+    Animated.loop(
+      Animated.timing(rotate, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, [active, rotate]);
+
+  const rotation = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+      <RefreshCw size={14} color="rgba(255,255,255,0.7)" />
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * FEED PAGINATION
+ * ========================================================================== */
+
+function FeedPagination({
+  canLoadMore,
+  isLoadingMore,
+  isExhausted,
+  count,
+  onLoadMore,
+}: {
+  canLoadMore: boolean;
+  isLoadingMore: boolean;
+  isExhausted: boolean;
+  count: number;
+  onLoadMore: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  return (
+    <View style={styles.paginationWrap}>
+      {canLoadMore ? (
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Pressable
+            onPress={onLoadMore}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            disabled={isLoadingMore}
+            style={({ pressed }) => [
+              styles.loadMoreBtn,
+              pressed && !isLoadingMore && styles.pressed,
+              isLoadingMore && { opacity: 0.6 },
+            ]}
+          >
+            <RefreshSpinner active={isLoadingMore} />
+            <Text style={styles.loadMoreText}>
+              {isLoadingMore ? "Chargement…" : "Charger plus"}
+            </Text>
+            {!isLoadingMore ? (
+              <ChevronRight size={14} color="rgba(255,255,255,0.5)" />
+            ) : null}
+          </Pressable>
+        </Animated.View>
+      ) : null}
+
+      {isLoadingMore ? <LoadingDots /> : null}
+
+      {isExhausted && count > 0 ? (
+        <FadeUp distance={6}>
+          <View style={styles.exhaustedRow}>
+            <View style={styles.exhaustedLine} />
+            <Text style={styles.exhaustedText}>Vous avez tout vu</Text>
+            <View style={styles.exhaustedLine} />
+          </View>
+        </FadeUp>
+      ) : null}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * MAIN COMPONENT
  * ========================================================================== */
 
 export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
   const [activeType, setActiveType] = useState<PublicationType | "all">("all");
-
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   /* --------------------------------------------------------------------------
-   * BACKEND — SOURCE UNIQUE DE VÉRITÉ
+   * BACKEND
    * ------------------------------------------------------------------------ */
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.publications.listFeed,
     activeType !== "all" ? { type: activeType } : {},
-    {
-      initialNumItems: PAGE_SIZE,
-    },
+    { initialNumItems: PAGE_SIZE },
   );
 
   const likePublication = useMutation(api.publications.likePublication);
-
   const deletePublication = useMutation(api.publications.deletePublication);
-
   const { handleAction, handleCTA } = usePublicationActions();
 
   /* --------------------------------------------------------------------------
-   * DERIVED DATA
-   *
-   * Aucune génération locale.
-   * On ne fait que filtrer les résultats réellement renvoyés
-   * par Convex.
+   * DERIVED
    * ------------------------------------------------------------------------ */
 
   const visibleResults = useMemo(() => {
     return results.filter((item) => !item.isHidden);
   }, [results]);
-
-  /* --------------------------------------------------------------------------
-   * CATEGORY COUNT
-   * ------------------------------------------------------------------------ */
 
   const visibleCount = visibleResults.length;
 
@@ -93,9 +671,7 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
 
   const handleLike = async (id: string) => {
     if (actionInProgress === `like:${id}`) return;
-
     setActionInProgress(`like:${id}`);
-
     try {
       await likePublication({
         publicationId: id as Parameters<
@@ -115,9 +691,7 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
 
   const handleDelete = async (id: string) => {
     if (actionInProgress === `delete:${id}`) return;
-
     setActionInProgress(`delete:${id}`);
-
     try {
       await deletePublication({
         publicationId: id as Parameters<
@@ -140,71 +714,48 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
 
   const handleTypeChange = (type: PublicationType | "all") => {
     if (type === activeType) return;
-
     setActiveType(type);
-
-    /*
-     * La requête paginée est automatiquement recalculée par Convex
-     * lorsque ses arguments changent.
-     */
     setActionInProgress(null);
   };
 
   /* --------------------------------------------------------------------------
-   * LOADING
+   * STATE
    * ------------------------------------------------------------------------ */
 
   const isLoading = status === "LoadingFirstPage";
-
   const isLoadingMore = status === "LoadingMore";
-
   const canLoadMore = status === "CanLoadMore";
-
   const isExhausted = status === "Exhausted";
 
-  /* ==========================================================================
+  /* ========================================================================
    * RENDER
-   * ======================================================================== */
+   * ====================================================================== */
 
   return (
-    <View
-      className="relative flex w-full flex-col"
-      accessibilityLabel="Fil d'actualité"
-    >
-      {/* =====================================================================
-          HEADER / FILTERS
-      ====================================================================== */}
+    <View style={styles.root} accessibilityLabel="Fil d'actualité">
+      {/* ═══════════ HEADER STICKY ═══════════ */}
+      <View style={styles.headerWrap}>
+        <LinearGradient
+          colors={["rgba(6,6,18,0.96)", "rgba(6,6,18,0.72)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.headerBorder} pointerEvents="none" />
 
-      <View className="sticky top-0 z-20 border-b border-white/[0.04] bg-[#060612]/80">
-        <View className="px-4 pt-2 sm:px-5">
-          {/* -----------------------------------------------------------------
-              SECTION HEADER
-          ------------------------------------------------------------------ */}
+        <View style={styles.headerInner}>
+          {/* Row 1 */}
+          <View style={styles.headerTopRow}>
+            <View style={styles.headerLeft}>
+              <PulsingHeaderIcon activeType={activeType} />
 
-          <View className="flex items-center justify-between gap-3 pb-3">
-            <View className="flex min-w-0 items-center gap-3">
-              <View
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-500/10"
-              >
-                {activeType === "all" ? (
-                  <Sparkles
-                    className="h-4 w-4 text-violet-300"
-                  />
-                ) : (
-                  <LayoutGrid
-                    className="h-4 w-4 text-violet-300"
-                  />
-                )}
-              </View>
-
-              <View className="min-w-0">
-                <Text className="truncate text-sm font-bold text-white">
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
                   {activeType === "all"
                     ? "À découvrir"
                     : (TYPE_LABELS[activeType] ?? "Publications")}
                 </Text>
-
-                <Text className="truncate text-[10px] text-white/35">
+                <Text style={styles.headerSub} numberOfLines={1}>
                   {isLoading
                     ? "Chargement du feed…"
                     : visibleCount > 0
@@ -218,99 +769,78 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
 
             <Pressable
               onPress={onCreateOpen}
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 text-[10px] font-bold text-violet-200"
               accessibilityLabel="Créer une publication"
+              style={({ pressed }) => [
+                styles.publishBtn,
+                pressed && styles.pressed,
+              ]}
             >
-              <Plus className="h-3.5 w-3.5" />
-
-              <Text className="hidden xs:inline">Publier</Text>
+              <Plus size={13} color="#DDD6FE" strokeWidth={2.6} />
+              <Text style={styles.publishBtnText}>Publier</Text>
             </Pressable>
           </View>
 
-          {/* -----------------------------------------------------------------
-              CATEGORY NAVIGATION
-          ------------------------------------------------------------------ */}
-
-          <View
-            className="relative -mx-4 overflow-x-auto px-4 pb-3 scrollbar-none sm:-mx-5 sm:px-5"
-            accessibilityRole="tablist"
+          {/* Row 2 — filters */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersRow}
             accessibilityLabel="Catégories de publications"
           >
-            <View className="flex min-w-max items-center gap-2">
-              {/* ALL */}
-
+            <FilterChip
+              label="Tout"
+              active={activeType === "all"}
+              color="#8B5CF6"
+              onPress={() => handleTypeChange("all")}
+            />
+            {PUBLICATION_TYPES.map((type) => (
               <FilterChip
-                label="Tout"
-                active={activeType === "all"}
-                color="#8b5cf6"
-                onPress={() => handleTypeChange("all")}
+                key={type.value}
+                label={type.label}
+                active={activeType === type.value}
+                color={
+                  type.value === "all"
+                    ? "#8B5CF6"
+                    : (TYPE_COLORS[type.value] ?? type.color)
+                }
+                onPress={() => handleTypeChange(type.value)}
               />
-
-              {/* TYPES */}
-
-              {PUBLICATION_TYPES.map((type) => (
-                <FilterChip
-                  key={type.value}
-                  label={type.label}
-                  active={activeType === type.value}
-                  color={
-                    type.value === "all"
-                      ? "#8b5cf6"
-                      : (TYPE_COLORS[type.value] ?? type.color)
-                  }
-                  onPress={() => handleTypeChange(type.value)}
-                />
-              ))}
-            </View>
-          </View>
+            ))}
+          </ScrollView>
         </View>
       </View>
 
-      {/* =====================================================================
-          FEED CONTENT
-      ====================================================================== */}
+      {/* ═══════════ CONTENT ═══════════ */}
+      <View style={styles.content}>
+        {isLoading ? <LiveFeedSkeleton /> : null}
 
-      <View className="relative pt-4">
-        {/* -------------------------------------------------------------------
-            FIRST LOAD
-        -------------------------------------------------------------------- */}
-
-        {isLoading && <LiveFeedSkeleton />}
-
-        {/* -------------------------------------------------------------------
-            EMPTY
-        -------------------------------------------------------------------- */}
-
-        {!isLoading && visibleResults.length === 0 && (
+        {!isLoading && visibleResults.length === 0 ? (
           <EmptyFeed
             activeType={activeType}
             onCreateOpen={onCreateOpen}
             onReset={() => handleTypeChange("all")}
           />
-        )}
+        ) : null}
 
-        {/* -------------------------------------------------------------------
-            PUBLICATIONS
-        -------------------------------------------------------------------- */}
-
-        {!isLoading && visibleResults.length > 0 && (
-          <View className="flex flex-col gap-4">
-            <>
+        {!isLoading && visibleResults.length > 0 ? (
+          <View style={{ gap: 16 }}>
+            <View style={{ gap: 16 }}>
               {visibleResults.map((item, index) => {
                 const publication: Publication = {
                   ...item,
-
                   author: {
                     id: item.authorId,
                     name: item.author?.name ?? "Utilisateur",
                     avatar: item.author?.avatar,
                   },
-
                   isMine: "isMine" in item ? Boolean(item.isMine) : false,
                 };
+
                 return (
-                  <View
+                  <FadeUp
                     key={item._id}
+                    delay={index < 5 ? index * 25 : 0}
+                    distance={18}
                   >
                     <PublicationCard
                       publication={publication}
@@ -322,14 +852,10 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
                       }
                       onCTA={() => handleCTA(publication)}
                     />
-                  </View>
+                  </FadeUp>
                 );
               })}
-            </>
-
-            {/* ---------------------------------------------------------------
-                  PAGINATION
-              ---------------------------------------------------------------- */}
+            </View>
 
             <FeedPagination
               canLoadMore={canLoadMore}
@@ -339,235 +865,355 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
               onLoadMore={() => loadMore(PAGE_SIZE)}
             />
           </View>
-        )}
+        ) : null}
       </View>
     </View>
   );
 }
 
 /* ============================================================================
- * FILTER CHIP
+ * STYLES
  * ========================================================================== */
 
-interface FilterChipProps {
-  label: string;
-  active: boolean;
-  color: string;
-  onClick: () => void;
-}
+const styles = StyleSheet.create({
+  root: {
+    width: "100%",
+  },
+  pressed: { opacity: 0.85 },
 
-function FilterChip({ label, active, color, onClick }: FilterChipProps) {
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      aria-selected={active}
-      onPress={onClick}
-      className={cn(
-        "relative flex h-9 shrink-0 items-center overflow-hidden rounded-xl border px-3.5 text-[10px] font-bold transition-all",
-        active
-          ? "border-transparent text-white shadow-lg"
-          : "border-white/[0.08] bg-white/[0.045] text-white/40 hover:border-white/15 hover:bg-white/[0.07] hover:text-white/65",
-      )}
-      style={
-        active
-          ? {  }
-          : undefined
-      }
-    >
-      {active && (
-        <Text
-          className="absolute inset-0 rounded-xl"
-          style={{  }}
-        />
-      )}
+  /* ── Header ─────────────────────────────────────── */
+  headerWrap: {
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+    zIndex: 20,
+  },
+  headerBorder: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 1,
+    backgroundColor: "rgba(139,92,246,0.12)",
+  },
+  headerInner: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  headerLeft: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerIconWrap: {
+    width: 38,
+    height: 38,
+  },
+  headerIconGradient: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.35)",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.6,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+  headerSub: {
+    marginTop: 2,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "600",
+  },
+  publishBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: "rgba(139,92,246,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.4)",
+  },
+  publishBtnText: {
+    fontSize: 11.5,
+    fontWeight: "900",
+    color: "#DDD6FE",
+    letterSpacing: 0.1,
+  },
 
-      <Text className="relative z-10">{label}</Text>
-    </Pressable>
-  );
-}
+  /* ── Filters ────────────────────────────────────── */
+  filtersRow: {
+    gap: 8,
+    paddingRight: 16,
+  },
+  filterChip: {
+    height: 36,
+    minWidth: 60,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.1,
+    zIndex: 10,
+  },
 
-/* ============================================================================
- * SKELETON
- * ========================================================================== */
+  /* ── Content ────────────────────────────────────── */
+  content: {
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
 
-function LiveFeedSkeleton() {
-  return (
-    <View
-      className="flex flex-col gap-4 px-0"
-      accessibilityLabel="Chargement du fil"
-     
-    >
-      {[0, 1, 2].map((index) => (
-        <View
-          key={index}
-          className="overflow-hidden rounded-[1.75rem] border border-white/[0.06] bg-white/[0.025]"
-        >
-          <Skeleton className="h-52 w-full rounded-none bg-white/[0.06]" />
+  /* ── Skeleton ───────────────────────────────────── */
+  skeletonCard: {
+    borderRadius: 28,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.025)",
+  },
+  skeletonHero: {
+    height: 200,
+    width: "100%",
+    borderRadius: 0,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  skeletonBody: {
+    padding: 16,
+    gap: 12,
+  },
+  skeletonAuthorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  skeletonAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  skeletonLine1: {
+    height: 12,
+    width: 110,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  skeletonLine2: {
+    height: 10,
+    width: 80,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  skeletonTitle: {
+    height: 16,
+    width: "75%",
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  skeletonText: {
+    height: 12,
+    width: "100%",
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  skeletonTextShort: {
+    height: 12,
+    width: "83%",
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  skeletonActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingTop: 4,
+  },
+  skeletonAction: {
+    height: 32,
+    width: 80,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
 
-          <View className="space-y-3 p-4">
-            <View className="flex items-center gap-3">
-              <Skeleton className="h-9 w-9 rounded-full bg-white/[0.06]" />
+  /* ── Empty ──────────────────────────────────────── */
+  emptyCard: {
+    borderRadius: 32,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(10,6,24,0.55)",
+  },
+  emptyBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.15)",
+  },
+  emptyOrb: {
+    position: "absolute",
+    top: -60,
+    alignSelf: "center",
+    width: 200,
+    height: 200,
+    borderRadius: 9999,
+    backgroundColor: "rgba(139,92,246,0.22)",
+  },
+  emptyContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  emptyIconWrap: {
+    marginBottom: 20,
+  },
+  emptyIconGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.35)",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#fff",
+    textAlign: "center",
+    letterSpacing: -0.3,
+  },
+  emptySub: {
+    marginTop: 10,
+    maxWidth: 340,
+    fontSize: 12,
+    lineHeight: 19,
+    color: "rgba(255,255,255,0.45)",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  emptyActions: {
+    marginTop: 24,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptySecondaryBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  emptySecondaryText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 0.2,
+  },
+  emptyPrimaryOuter: {
+    borderRadius: 14,
+    overflow: "hidden",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
+  },
+  emptyPrimary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  emptyPrimaryText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
 
-              <View className="flex-1 space-y-2">
-                <Skeleton className="h-3 w-28 rounded-full bg-white/[0.06]" />
-                <Skeleton className="h-2.5 w-20 rounded-full bg-white/[0.06]" />
-              </View>
-            </View>
-
-            <Skeleton className="h-4 w-3/4 rounded-full bg-white/[0.06]" />
-
-            <Skeleton className="h-3 w-full rounded-full bg-white/[0.06]" />
-
-            <Skeleton className="h-3 w-5/6 rounded-full bg-white/[0.06]" />
-
-            <View className="flex gap-2 pt-1">
-              <Skeleton className="h-8 w-20 rounded-xl bg-white/[0.06]" />
-              <Skeleton className="h-8 w-20 rounded-xl bg-white/[0.06]" />
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/* ============================================================================
- * EMPTY STATE
- * ========================================================================== */
-
-interface EmptyFeedProps {
-  activeType: PublicationType | "all";
-  onCreateOpen: () => void;
-  onReset: () => void;
-}
-
-function EmptyFeed({ activeType, onCreateOpen, onReset }: EmptyFeedProps) {
-  const isFiltered = activeType !== "all";
-
-  return (
-    <View
-      className="mx-4 overflow-hidden rounded-[2rem] border border-white/[0.07] bg-white/[0.025] sm:mx-0"
-    >
-      <View className="relative px-6 py-10 text-center">
-        {/* Ambient decoration */}
-
-        <View className="absolute left-1/2 top-0 h-32 w-32 -translate-x-1/2 rounded-full bg-violet-500/10" />
-
-        <View
-          className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[1.5rem] border border-violet-400/15 bg-violet-500/10"
-        >
-          {isFiltered ? (
-            <LayoutGrid className="h-7 w-7 text-violet-300" />
-          ) : (
-            <Sparkles className="h-7 w-7 text-violet-300" />
-          )}
-        </View>
-
-        <Text className="relative text-base font-bold text-white">
-          {isFiltered
-            ? "Rien dans cette catégorie"
-            : "Le feed est encore calme"}
-        </Text>
-
-        <Text className="relative mx-auto mt-2 max-w-sm text-xs leading-5 text-white/40">
-          {isFiltered
-            ? "Aucune publication disponible dans cette catégorie pour le moment. Explore les autres catégories ou sois le premier à publier."
-            : "Il n'y a encore aucune publication à afficher. Crée la première et fais découvrir quelque chose à ta communauté."}
-        </Text>
-
-        <View className="relative mt-6 flex flex-col items-center justify-center gap-2 sm:flex-row">
-          {isFiltered && (
-            <Button
-              variant="outline"
-              size="sm"
-              onPress={onReset}
-              className="h-10 rounded-xl border-white/10 bg-white/5 px-4 text-xs text-white"
-            >
-              <Text>Explorer tout</Text></Button>
-          )}
-
-          <Button
-            size="sm"
-            onPress={onCreateOpen}
-            className="h-10 rounded-xl bg-violet-600 px-4 text-xs font-bold text-white shadow-lg shadow-violet-600/20"
-          >
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            <Text>Créer une publication</Text></Button>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-/* ============================================================================
- * PAGINATION
- * ========================================================================== */
-
-interface FeedPaginationProps {
-  canLoadMore: boolean;
-  isLoadingMore: boolean;
-  isExhausted: boolean;
-  count: number;
-  onLoadMore: () => void;
-}
-
-function FeedPagination({
-  canLoadMore,
-  isLoadingMore,
-  isExhausted,
-  count,
-  onLoadMore,
-}: FeedPaginationProps) {
-  return (
-    <View className="flex flex-col items-center gap-3 pb-6 pt-1">
-      {canLoadMore && (
-        <Pressable
-          onPress={onLoadMore}
-          disabled={isLoadingMore}
-          className="group flex h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-5 text-xs font-bold text-white/65 shadow-lg disabled:pointer-events-none disabled:opacity-50"
-        >
-          <RefreshCw
-            className={cn(
-              "h-3.5 w-3.5 transition-transform",
-              isLoadingMore && "animate-spin",
-            )}
-          />
-
-          {isLoadingMore ? "Chargement…" : "Charger plus"}
-
-          {!isLoadingMore && (
-            <ChevronRight className="h-3.5 w-3.5 opacity-40" />
-          )}
-        </Pressable>
-      )}
-
-      {isLoadingMore && (
-        <View
-          className="flex items-center gap-1.5"
-          accessibilityLabel="Chargement des publications"
-        >
-          {[0, 1, 2].map((index) => (
-            <Text
-              key={index}
-              className="h-1.5 w-1.5 rounded-full bg-violet-400"
-            />
-          ))}
-        </View>
-      )}
-
-      {isExhausted && count > 0 && (
-        <View
-          className="flex items-center gap-2 py-2"
-        >
-          <Text className="h-px w-8 bg-white/10" />
-
-          <Text className="text-[10px] font-medium text-white/25">
-            Vous avez tout vu
-          </Text>
-
-          <Text className="h-px w-8 bg-white/10" />
-        </View>
-      )}
-    </View>
-  );
-}
+  /* ── Pagination ─────────────────────────────────── */
+  paginationWrap: {
+    alignItems: "center",
+    paddingTop: 8,
+    paddingBottom: 32,
+    gap: 12,
+  },
+  loadMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  loadMoreText: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 0.2,
+  },
+  loadingDotsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  loadingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#A78BFA",
+  },
+  exhaustedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 8,
+  },
+  exhaustedLine: {
+    height: 1,
+    width: 32,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  exhaustedText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.35)",
+    letterSpacing: 0.2,
+  },
+});

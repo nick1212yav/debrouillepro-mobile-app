@@ -57,57 +57,20 @@ function JobItem({ job, onClick }: { job: Job; onClick?: () => void }) {
   });
 
   return (
-    <Pressable
-      className="p-3 rounded-xl bg-white/5 border border-white/5"
-      onPress={onClick}
-    >
-      <View className="flex items-start justify-between gap-2">
-        <View className="flex-1 min-w-0">
-          <Text className="text-white font-semibold text-sm truncate">
-            {job.title}
-          </Text>
-          {job.department && (
+    <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-white/5 border border-white/5 transition-colors" onPress={onClick}>
+      <View className="flex items-start justify-between gap-2"><View className="flex-1 min-w-0"><Text className="text-white font-semibold text-sm truncate">{job.title}</Text>{job.department && (
             <Text className="text-white/40 text-xs">{job.department}</Text>
-          )}
-          <View className="flex items-center gap-3 flex-wrap mt-1 text-xs">
-            <Text
-              className="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-              style={{ backgroundColor: `${JOB_TYPE_COLORS[job.type]}20`, color: JOB_TYPE_COLORS[job.type] }}
-            >
-              {JOB_TYPE_LABELS[job.type]}
-            </Text>
-            {job.location && (
-              <Text className="flex items-center gap-1 text-white/40">
-                <MapPin size={11} />
-                {job.location}
-              </Text>
-            )}
-            {job.salary && (
-              <Text className="flex items-center gap-1 text-emerald-400">
-                <DollarSign size={11} />
-                {job.salary}
-              </Text>
-            )}
-          </View>
-        </View>
-        <View className="flex flex-col items-end text-right flex-shrink-0">
-          <Text className="text-white/30 text-[10px] flex items-center gap-1">
-            <CalendarDays size={10} />
-            {postedDate}
-          </Text>
-          {job.deadline && (
-            <Text className="text-white/20 text-[9px]">
-              Jusqu'au {new Date(job.deadline).toLocaleDateString("fr-FR")}
-            </Text>
-          )}
-        </View>
-      </View>
+          )}<View className="flex items-center gap-3 flex-wrap mt-1 text-xs"><Text className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: `${JOB_TYPE_COLORS[job.type]}20`, color: JOB_TYPE_COLORS[job.type] }}>{JOB_TYPE_LABELS[job.type]}</Text>{job.location && (
+              <Text className="flex items-center gap-1 text-white/40"><MapPin size={11} />{job.location}</Text>
+            )}{job.salary && (
+              <Text className="flex items-center gap-1 text-emerald-400"><DollarSign size={11} />{job.salary}</Text>
+            )}</View></View><View className="flex flex-col items-end text-right flex-shrink-0"><Text className="text-white/30 text-[10px] flex items-center gap-1"><CalendarDays size={10} />{postedDate}</Text>{job.deadline && (
+            <Text className="text-white/20 text-[9px]">Jusqu'au {new Date(job.deadline).toLocaleDateString("fr-FR")}</Text>
+          )}</View></View>
       {job.description && (
-        <Text className="text-white/40 text-xs mt-1">
-          {job.description}
-        </Text>
+        <Text className="text-white/40 text-xs mt-1">{job.description}</Text>
       )}
-    </Pressable>
+    </View>
   );
 }
 
@@ -122,17 +85,7 @@ export function CompanyJobs({
 }: CompanyJobsProps) {
   if (isLoading) {
     return (
-      <View className={cn("space-y-3", className)}>
-        <View className="flex items-center justify-between">
-          <View className="flex items-center gap-2">
-            <Skeleton className="w-8 h-8 rounded-xl" />
-            <Skeleton className="h-4 w-24 rounded-lg" />
-          </View>
-          <Skeleton className="h-8 w-20 rounded-xl" />
-        </View>
-        <Skeleton className="h-20 w-full rounded-xl" />
-        <Skeleton className="h-20 w-full rounded-xl" />
-      </View>
+      <View className={cn("space-y-3", className)}><View className="flex items-center justify-between"><View className="flex items-center gap-2"><Skeleton className="w-8 h-8 rounded-xl" /><Skeleton className="h-4 w-24 rounded-lg" /></View><Skeleton className="h-8 w-20 rounded-xl" /></View><Skeleton className="h-20 w-full rounded-xl" /><Skeleton className="h-20 w-full rounded-xl" /></View>
     );
   }
 
@@ -145,31 +98,18 @@ export function CompanyJobs({
   }
 
   return (
-    <View
-      className={cn(
+    <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn(
         "rounded-3xl p-5",
         "bg-white/5 border border-white/10",
         className,
-      )}
-    >
-      <View className="flex items-center justify-between mb-4">
-        <View className="flex items-center gap-2">
-          <View className="w-8 h-8 rounded-xl flex items-center justify-center bg-emerald-500/10 text-emerald-400">
-            <Briefcase size={15} />
-          </View>
-          <Text className="text-white font-bold text-sm">Offres d'emploi</Text>
-          {totalCount !== undefined && (
-            <Text className="text-white/30 text-xs"><Text>(</Text>{totalCount}<Text>)</Text></Text>
-          )}
-        </View>
-        {showViewAll && (
-          <Pressable
-            onPress={onViewAll}
-            className="text-xs text-emerald-400"
-          >
-            <Text>Voir toutes</Text></Pressable>
-        )}
-      </View>
+      )}>
+      <View className="flex items-center justify-between mb-4"><View className="flex items-center gap-2"><View className="w-8 h-8 rounded-xl flex items-center justify-center bg-emerald-500/10 text-emerald-400"><Briefcase size={15} /></View><Text className="text-white font-bold text-sm">Offres d'emploi</Text>{totalCount !== undefined && (
+            <Text className="text-white/30 text-xs">({totalCount})</Text>
+          )}</View>{showViewAll && (
+          <Pressable onPress={onViewAll} className="text-xs text-emerald-400 transition-colors">
+            Voir toutes
+          </Pressable>
+        )}</View>
 
       <View className="space-y-2">
         {displayJobs.map((job) => (

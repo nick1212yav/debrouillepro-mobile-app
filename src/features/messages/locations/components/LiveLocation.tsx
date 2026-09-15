@@ -1,4 +1,5 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
+
 // src/features/messages/locations/components/LiveLocation.tsx
 
 import { useEffect, useRef, useState } from "react";
@@ -8,7 +9,6 @@ import type { Id } from "../../../../../convex/_generated/dataModel";
 import { formatLiveDuration } from "../services/locations.service";
 
 import { useLocation, useLiveLocation } from "../hooks/useLocation";
-import { usePathname } from "expo-router";
 
 export interface LiveLocationProps {
   messageId: Id<"messages"> | undefined;
@@ -25,7 +25,7 @@ export function LiveLocation({ messageId, onStopped }: LiveLocationProps) {
     stopWatching,
     updateLiveLocation,
     stopLiveLocation,
-  } = usePathname();
+  } = useLocation();
 
   const [elapsed, setElapsed] = useState(0);
 
@@ -82,9 +82,9 @@ export function LiveLocation({ messageId, onStopped }: LiveLocationProps) {
 
     update();
 
-    const interval = undefined;
+    const interval = setInterval(update, 1000);
 
-    return () => undefined;
+    return () => clearInterval(interval);
   }, [liveMessage?.metadata?.startedAt]);
 
   if (!messageId) {
@@ -108,43 +108,17 @@ export function LiveLocation({ messageId, onStopped }: LiveLocationProps) {
   };
 
   return (
-    <View
-      style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: "#bfdbfe", borderStyle: "solid", backgroundColor: "#eff6ff" }}
-    >
-      <View
-        style={{
+    <View style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: "#bfdbfe", borderStyle: "solid", backgroundColor: "#eff6ff" }}><View style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 10,
-        }}
-      >
-        <View>
-          <View
-            style={{  }}
-          >
-            <Text>📡 Position en direct</Text></View>
-
-          <View
-            style={{ marginTop: 3 }}
-          >
-            {active && !expired
+        }}><View><View style={{ fontWeight: 800, fontSize: 13 }}><Text>📡 Position en direct</Text></View><View style={{ marginTop: 3, fontSize: 11 }}>{active && !expired
               ? `Active depuis ${formatLiveDuration(elapsed)}`
-              : "Partage terminé"}
-          </View>
-        </View>
-
-        {active && !expired && (
-          <Text
-            style={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: "#22c55e" }}
-          />
-        )}
-      </View>
-
-      {metadata && (
-        <View
-          style={{  }}
-        >
+              : "Partage terminé"}</View></View>{active && !expired && (
+          <Text style={{ width: 9, height: 9, borderRadius: 50, backgroundColor: "#22c55e", boxShadow: "0 0 0 4px rgba(34,197,94,.15)" }} />
+        )}</View>{metadata && (
+        <View style={{ fontSize: 11 }}>
           {metadata.latitude.toFixed(6)}
           {" · "}
           {metadata.longitude.toFixed(6)}
@@ -152,19 +126,15 @@ export function LiveLocation({ messageId, onStopped }: LiveLocationProps) {
           {metadata.accuracy !== undefined && (
             <>
               {" · précision ±"}
-              {Math.round(metadata.accuracy)}<Text>m</Text></>
+              {Math.round(metadata.accuracy)}m
+            </>
           )}
         </View>
-      )}
-
-      {active && !expired && (
-        <Pressable
-          onPress={() => void handleStop()}
-          style={{ width: "100%", paddingVertical: 9, paddingHorizontal: 12, borderWidth: 0, borderRadius: 10, backgroundColor: "#fff" }}
-        >
-          <Text>🛑 Arrêter le partage</Text></Pressable>
-      )}
-    </View>
+      )}{active && !expired && (
+        <Pressable onPress={() => void handleStop()} style={{ width: "100%", paddingVertical: 9, paddingHorizontal: 12, borderWidth: 0, borderRadius: 10, backgroundColor: "#fff", fontWeight: 800, fontSize: 12 }}>
+          🛑 Arrêter le partage
+        </Pressable>
+      )}</View>
   );
 }
 

@@ -16,9 +16,9 @@ const PATTERNS: Record<HapticPattern, number | number[]> = {
 
 export function useHaptic() {
   const trigger = (pattern: HapticPattern = "light") => {
-    if (!("vibrate" in undefined)) return;
+    if (!("vibrate" in navigator)) return;
     try {
-      false;
+      navigator.vibrate(PATTERNS[pattern]);
     } catch {
       // ignore — vibration not allowed in this context
     }

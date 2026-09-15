@@ -34,9 +34,7 @@ export function JobMessage({
 
   if (isLoading) {
     return (
-      <View
-        style={{ padding: 16, borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "solid", borderRadius: 16 }}
-      >
+      <View style={{ padding: 16, borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "solid", borderRadius: 16, fontSize: 14 }}>
         Chargement de l'offre...
       </View>
     );
@@ -44,9 +42,7 @@ export function JobMessage({
 
   if (!job) {
     return (
-      <View
-        style={{ padding: 16, borderWidth: 1, borderColor: "#fecaca", borderStyle: "solid", borderRadius: 16, backgroundColor: "#fff" }}
-      >
+      <View style={{ padding: 16, borderWidth: 1, borderColor: "#fecaca", borderStyle: "solid", borderRadius: 16, backgroundColor: "#fff", fontSize: 14 }}>
         Cette offre d'emploi n'est plus disponible.
       </View>
     );

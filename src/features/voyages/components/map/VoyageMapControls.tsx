@@ -81,18 +81,9 @@ export function VoyageMapControls({
   ];
 
   return (
-    <View
-      className={`absolute ${positionClasses[position]} flex flex-col gap-1.5 ${className}`}
-      style={{ zIndex: 10 }}
-    >
+    <View initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`absolute ${positionClasses[position]} flex flex-col gap-1.5 ${className}`} style={{ zIndex: 10 }}>
       {controls.map(({ icon: Icon, onClick, label }) => (
-        <Pressable
-          key={label}
-          onPress={onClick}
-          className="w-9 h-9 rounded-xl bg-black/50 border border-white/10 text-white/70 flex items-center justify-center"
-          accessibilityLabel={label}
-          title={label}
-        >
+        <Pressable key={label} onPress={onClick} className="w-9 h-9 rounded-xl bg-black/50 backdrop-blur-sm border border-white/10 text-white/70 transition flex items-center justify-center" accessibilityLabel={label} title={label}>
           <Icon size={16} />
         </Pressable>
       ))}

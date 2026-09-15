@@ -1,8 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { Picker } from "@react-native-picker/picker";
 import { View, Text, Pressable, TextInput } from "react-native";
 import { useState, useCallback } from "react";
 import { X, MapPin, Loader2, Upload } from "lucide-react-native";
+import { toast } from "sonner";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import ImageUploader from "@/components/ImageUploader";
@@ -48,7 +48,7 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
   // ✅ Géocodage direct (adresse → coordonnées)
   const geocodeLocation = useCallback(async (address: string) => {
     if (!address.trim()) {
-      UIService.openToast("Veuillez saisir une adresse", "warning");
+      toast.warning("Veuillez saisir une adresse");
       return;
     }
     setGeocoding(true);
@@ -66,14 +66,14 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
         if (data[0].display_name) {
           setLocation(data[0].display_name);
         }
-        UIService.openToast("Adresse géolocalisée ✅", "success");
+        toast.success("Adresse géolocalisée ✅");
       } else {
-        UIService.openToast("Adresse non trouvée", "warning");
+        toast.warning("Adresse non trouvée");
         setLatitude(undefined);
         setLongitude(undefined);
       }
     } catch {
-      UIService.openToast("Erreur de géocodage", "error");
+      toast.error("Erreur de géocodage");
       setLatitude(undefined);
       setLongitude(undefined);
     } finally {
@@ -83,12 +83,12 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
 
   // ✅ Détection GPS + reverse geocoding
   const detectUserLocation = useCallback(() => {
-    if (!("geolocation" in undefined)) {
-      UIService.openToast("Géolocalisation non supportée", "error");
+    if (!("geolocation" in navigator)) {
+      toast.error("Géolocalisation non supportée");
       return;
     }
     setGeocoding(true);
-    undefined.getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
@@ -105,14 +105,14 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
           } else {
             setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
           }
-          UIService.openToast("Position détectée 📍", "success");
+          toast.success("Position détectée 📍");
         } catch {
           setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
         }
         setGeocoding(false);
       },
       () => {
-        UIService.openToast("Impossible de détecter la position", "error");
+        toast.error("Impossible de détecter la position");
         setGeocoding(false);
       },
       { timeout: 10000, enableHighAccuracy: true },
@@ -137,7 +137,7 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
       !category ||
       !location
     ) {
-      UIService.openToast("Veuillez remplir tous les champs obligatoires", "error");
+      toast.error("Veuillez remplir tous les champs obligatoires");
       return;
     }
     setIsSubmitting(true);
@@ -199,14 +199,16 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
         longitude,
       });
 
-      UIService.openToast("Service publié !", "success");
+      toast.success("Service publié !");
       onSuccess?.();
       onClose();
     } catch (error) {
       console.error("❌ Erreur lors de la publication:", error);
-      UIService.openToast(error instanceof Error
+      toast.error(
+        error instanceof Error
           ? error.message
-          : "Erreur lors de la publication", "error");
+          : "Erreur lors de la publication",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -215,165 +217,21 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
   if (!isOpen) return null;
 
   return (
-    <Pressable
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70"
-      onPress={onClose}
-    >
-      <Pressable
-        className="w-full max-w-md rounded-t-3xl p-6 bg-[#0D1117] border border-white/10"
-        onPress={(e) => e.stopPropagation()}
-      >
-        <View className="w-10 h-1 rounded-full mx-auto mb-5 bg-white/20" />
-
-        <View className="flex items-center justify-between mb-4">
-          <Text className="text-white font-bold text-lg">Publier un service</Text>
-          <Pressable
-            onPress={onClose}
-            className="w-8 h-8 rounded-xl flex items-center justify-center"
-          >
-            <X size={18} className="text-white/60" />
-          </Pressable>
-        </View>
-
-        <View className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-          <TextInput
-            value={name}
-            onChangeText={(text) => setName(text)}
-            placeholder="Nom du prestataire *"
-            className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30"
-          />
-
-          <TextInput
-            value={specialty}
-            onChangeText={(text) => setSpecialty(text)}
-            placeholder="Spécialité *"
-            className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30"
-          />
-
-          <TextInput
-            value={description}
-            onChangeText={(text) => setDescription(text)}
-            placeholder="Description *"
-           
-            className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30"
-           multiline textAlignVertical="top"/>
-
-          <View className="flex gap-2">
-            <TextInput
-              value={price}
-              onChangeText={(text) => setPrice(text)}
-              placeholder="Prix *"
-             
-              className="flex-1 rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30"
-             keyboardType="numeric"/>
-            <Picker
-             
-              onValueChange={(val) => setCurrency(val)}
-              className="rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none"
-             selectedValue={currency}>
-              <Picker.Item label="USD" value="USD" />
-              <Picker.Item label="EUR" value="EUR" />
-              <Picker.Item label="CDF" value="CDF" />
-              <Picker.Item label="CFA" value="CFA" />
-            </Picker>
-          </View>
-
-          <Picker
-           
-            onValueChange={(val) => setCategory(val)}
-            className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none"
-           selectedValue={category}>
-            <Picker.Item label="Catégorie *" value="" />
-            {CATEGORIES.map((c) => (
-              <Picker.Item label={`${c}`} value={c} />
-            ))}
-          </Picker>
-
-          {/* ✅ Localisation avec géolocalisation */}
-          <View className="space-y-2">
-            <View
-              className="rounded-2xl p-3.5"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-            >
-              <View className="flex items-center gap-2.5">
-                <MapPin size={14} style={{ color: "#F97316" }} />
-                <TextInput
-                  value={location}
-                  onChangeText={(text) => setLocation(text)}
-                  placeholder="Localisation *"
-                  className="flex-1 bg-transparent text-white text-sm placeholder:text-white/30 outline-none"
-                 
-                 editable={!(geocoding)}/>
-                <Pressable
-                 
-                  onPress={handleGeolocate}
-                  disabled={geocoding}
-                  className="flex-shrink-0 disabled:opacity-40 text-xs font-medium px-2 py-1 rounded-lg"
-                  style={{ backgroundColor: "rgba(245,158,11,0.2)" }}
-                >
-                  {geocoding ? (
+    <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70" onPress={onClose}><View className="w-full max-w-md rounded-t-3xl p-6 bg-[#0D1117] border border-white/10" onPress={(e) => e.stopPropagation()}><View className="w-10 h-1 rounded-full mx-auto mb-5 bg-white/20" /><View className="flex items-center justify-between mb-4"><Text className="text-white font-bold text-lg">Publier un service</Text><Pressable onPress={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"><X size={18} className="text-white/60" /></Pressable></View><View className="space-y-3 max-h-[60vh] overflow-y-auto pr-1"><TextInput value={name} onChangeText={(value) => setName(value)} placeholder="Nom du prestataire *" className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" /><TextInput value={specialty} onChangeText={(value) => setSpecialty(value)} placeholder="Spécialité *" className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" /><TextInput value={description} onChangeText={(value) => setDescription(value)} placeholder="Description *" className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" multiline textAlignVertical="top" /><View className="flex gap-2"><TextInput value={price} onChangeText={(value) => setPrice(value)} placeholder="Prix *" className="flex-1 rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" keyboardType="numeric" /><Picker onValueChange={(value) => setCurrency(value)} className="rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none" selectedValue={currency}><Picker.Item label="USD" value="USD" /><Picker.Item label="EUR" value="EUR" /><Picker.Item label="CDF" value="CDF" /><Picker.Item label="CFA" value="CFA" /></Picker></View><Picker onValueChange={(value) => setCategory(value)} className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none" selectedValue={category}><Picker.Item label="Catégorie *" value="" />{CATEGORIES.map((c) => (
+              <Picker.Item label={c} value={c} />
+            ))}</Picker>{}<View className="space-y-2"><View className="rounded-2xl p-3.5" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><View className="flex items-center gap-2.5"><MapPin size={14} style={{  }} /><TextInput value={location} onChangeText={(value) => setLocation(value)} placeholder="Localisation *" className="flex-1 bg-transparent text-white text-sm placeholder:text-white/30 outline-none" editable={!(geocoding)} /><Pressable onPress={handleGeolocate} disabled={geocoding} className="flex-shrink-0 disabled:opacity-40 text-xs font-medium px-2 py-1 rounded-lg" style={{ backgroundColor: "rgba(245,158,11,0.2)" }}>{geocoding ? (
                     <Loader2 size={14} className="animate-spin" />
                   ) : (
                     "📍"
-                  )}
-                </Pressable>
-              </View>
-            </View>
-            <Pressable
-             
-              onPress={detectUserLocation}
-              disabled={geocoding}
-              className="flex items-center gap-2 text-xs text-white/40"
-            >
-              <MapPin size={12} />
-              <Text>Utiliser ma position actuelle</Text></Pressable>
-            {latitude && longitude && (
-              <View className="text-[10px] text-emerald-400/60 flex items-center gap-1">
-                <Text>
-                  ✅ Coordonnées GPS : {latitude.toFixed(4)},{" "}
-                  {longitude.toFixed(4)}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <TextInput
-            value={responseTime}
-            onChangeText={(text) => setResponseTime(text)}
-            placeholder="Temps de réponse (ex: < 1h)"
-            className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30"
-          />
-
-          <View>
-            <Text className="text-xs text-white/40 block mb-1">
-              Compétences (séparées par des virgules)
-            </Text>
-            <TextInput
-              value={skills.join(", ")}
-              onChangeText={(text) =>
+                  )}</Pressable></View></View><Pressable onPress={detectUserLocation} disabled={geocoding} className="flex items-center gap-2 text-xs text-white/40 transition-colors"><MapPin size={12} /><Text>Utiliser ma position actuelle</Text></Pressable>{latitude && longitude && (
+              <View className="text-[10px] text-emerald-400/60 flex items-center gap-1"><Text>✅ Coordonnées GPS : {latitude.toFixed(4)},{" "}{longitude.toFixed(4)}</Text></View>
+            )}</View><TextInput value={responseTime} onChangeText={(value) => setResponseTime(value)} placeholder="Temps de réponse (ex: < 1h)" className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" /><View><Text className="text-xs text-white/40 block mb-1">Compétences (séparées par des virgules)
+            </Text><TextInput value={skills.join(", ")} onChangeText={(value) =>
                 setSkills(
-                  text
+                  value
                     .split(",")
                     .map((s) => s.trim())
                     .filter(Boolean),
-                )
-              }
-              placeholder="Plomberie, Électricité, ..."
-              className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30"
-            />
-          </View>
-
-          <ImageUploader images={images} onChange={setImages} color="#F97316" />
-        </View>
-
-        <Pressable
-          onPress={handleSubmit}
-          disabled={isSubmitting || geocoding}
-          className="w-full py-3.5 rounded-xl text-white font-bold mt-4 bg-gradient-to-r from-orange-500 to-red-500 disabled:opacity-50"
-        >
-          {isSubmitting ? "Publication..." : "Publier"}
-        </Pressable>
-      </Pressable>
-    </Pressable>
+                )} placeholder="Plomberie, Électricité, ..." className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" /></View><ImageUploader images={images} onChange={setImages} color="#F97316" /></View><Pressable onPress={handleSubmit} disabled={isSubmitting || geocoding} className="w-full py-3.5 rounded-xl text-white font-bold mt-4 bg-gradient-to-r from-orange-500 to-red-500 disabled:opacity-50">{isSubmitting ? "Publication..." : "Publier"}</Pressable></View></View>
   );
 }

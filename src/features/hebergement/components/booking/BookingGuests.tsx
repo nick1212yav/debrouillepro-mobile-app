@@ -32,35 +32,7 @@ export const BookingGuests: React.FC<BookingGuestsProps> = ({
   };
 
   return (
-    <View
-      className={`p-4 rounded-2xl bg-white/5 border border-white/10 ${className}`}
-    >
-      <View className="flex items-center gap-2 mb-2">
-        <Users size={16} className="text-indigo-400" />
-        <Text className="text-sm font-semibold text-white">Voyageurs</Text>
-      </View>
-      <Text className="text-[10px] text-white/40 mb-3 uppercase font-bold tracking-wider">
-        Maximum {maxGuests} personnes autorisées
-      </Text>
-
-      <View className="divide-y divide-white/5">
-        <GuestCounter
-          label="Adultes"
-          subtitle="13 ans et plus"
-          value={guests.adults}
-          min={1}
-          max={maxGuests}
-          onChange={handleAdultChange}
-        />
-        <GuestCounter
-          label="Enfants"
-          subtitle="De 2 à 12 ans"
-          value={guests.children}
-          min={0}
-          max={maxGuests - 1}
-          onChange={handleChildrenChange}
-        />
-      </View>
-    </View>
+    <View className={`p-4 rounded-2xl bg-white/5 border border-white/10 ${className}`}><View className="flex items-center gap-2 mb-2"><Users size={16} className="text-indigo-400" /><Text className="text-sm font-semibold text-white">Voyageurs</Text></View><Text className="text-[10px] text-white/40 mb-3 uppercase font-bold tracking-wider">Maximum {maxGuests}personnes autorisées
+      </Text><View className="divide-y divide-white/5"><GuestCounter label="Adultes" subtitle="13 ans et plus" value={guests.adults} min={1} max={maxGuests} onChange={handleAdultChange} /><GuestCounter label="Enfants" subtitle="De 2 à 12 ans" value={guests.children} min={0} max={maxGuests - 1} onChange={handleChildrenChange} /></View></View>
   );
 };

@@ -1,6 +1,5 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { Picker } from "@react-native-picker/picker";
-import { View, Text, Pressable, Image, TextInput } from "react-native";
+import { View, Text, Pressable, TextInput, Image } from "react-native";
 
 // src/pages/modules/MarketplaceProPage.tsx
 // ✅ Version corrigée – toutes les erreurs TS7006 résolues
@@ -9,9 +8,10 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { ConvexError } from "convex/values";
-import { Skeleton } from "@/components/ui/skeleton";
-import { SignInButton } from "@/components/ui/signin";
-import type { Id } from "@/convex/_generated/dataModel.d";
+import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import {
   ArrowLeft,
   TrendingUp,
@@ -125,7 +125,7 @@ function CreateProductSheet({
 
   const handleSubmit = async () => {
     if (!form.title || !form.price || !form.stock) {
-      UIService.openToast("Titre, prix et stock sont requis", "error");
+      toast.error("Titre, prix et stock sont requis");
       return;
     }
     setSubmitting(true);
@@ -154,15 +154,15 @@ function CreateProductSheet({
         deliveryAvailable: form.deliveryAvailable,
         location: form.location || undefined,
       });
-      UIService.openToast("Produit créé !", "success");
+      toast.success("Produit créé !");
       onCreated();
       onClose();
     } catch (err) {
       if (err instanceof ConvexError) {
         const data = err.data as { message: string };
-        UIService.openToast(data.message, "error");
+        toast.error(data.message);
       } else {
-        UIService.openToast("Erreur lors de la création", "error");
+        toast.error("Erreur lors de la création");
       }
     } finally {
       setSubmitting(false);
@@ -171,29 +171,12 @@ function CreateProductSheet({
 
   return (
     <>
-      <Pressable
-        onPress={onClose}
-        className="absolute inset-0 z-40"
-        style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
-      />
-      <View
-        className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl p-5 max-h-[85%] overflow-y-auto"
-        style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-      >
+      <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={onClose} className="absolute inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} />
+      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl p-5 max-h-[85%] overflow-y-auto" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
         <View className="w-12 h-1 rounded-full bg-white/20 mx-auto mb-4" />
-        <View className="flex items-center justify-between mb-4">
-          <Text className="text-white font-black text-lg">Nouveau produit</Text>
-          <Pressable
-            onPress={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-          >
-            <X size={15} className="text-white" />
-          </Pressable>
-        </View>
+        <View className="flex items-center justify-between mb-4"><Text className="text-white font-black text-lg">Nouveau produit</Text><Pressable onPress={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><X size={15} className="text-white" /></Pressable></View>
 
-        <View className="space-y-3">
-          {[
+        <View className="space-y-3">{[
             {
               label: "Titre *",
               key: "title" as const,
@@ -231,80 +214,10 @@ function CreateProductSheet({
               placeholder: "Kinshasa, RDC",
             },
           ].map(({ label, key, placeholder }) => (
-            <View key={key}>
-              <Text className="text-white/50 text-xs mb-1">{label}</Text>
-              <TextInput
-                value={form[key] as string}
-                onChangeText={(text) => update(key, text)}
-                placeholder={placeholder}
-                className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none placeholder:text-white/25"
-                style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-              />
-            </View>
-          ))}
+            <View key={key}><Text className="text-white/50 text-xs mb-1">{label}</Text><TextInput value={form[key] as string} onChangeText={(value) => update(key, value)} placeholder={placeholder} className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none placeholder:text-white/25" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View>
+          ))}<View className="flex gap-3"><View className="flex-1"><Text className="text-white/50 text-xs mb-1">Devise</Text><Picker onValueChange={(value) => update("currency", value)} className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} selectedValue={form.currency}><Picker.Item label="FCFA (XAF)" value="XAF" /><Picker.Item label="USD" value="USD" /><Picker.Item label="EUR" value="EUR" /></Picker></View><View className="flex-1"><Text className="text-white/50 text-xs mb-1">Unité</Text><Picker onValueChange={(value) => update("unit", value)} className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} selectedValue={form.unit}><Picker.Item label="Pièce" value="pièce" /><Picker.Item label="Kg" value="kg" /><Picker.Item label="Lot" value="lot" /></Picker></View></View><View className="flex gap-4"><Text className="flex items-center gap-2"><Pressable onPress={(e) => update("deliveryAvailable", e.target.checked)} className="rounded" accessibilityRole="checkbox" accessibilityState={{ checked: form.deliveryAvailable }} /><Text className="text-white/60 text-xs">Livraison</Text></Text><Text className="flex items-center gap-2"><Pressable onPress={(e) => update("isDigital", e.target.checked)} className="rounded" accessibilityRole="checkbox" accessibilityState={{ checked: form.isDigital }} /><Text className="text-white/60 text-xs">Digital</Text></Text></View></View>
 
-          <View className="flex gap-3">
-            <View className="flex-1">
-              <Text className="text-white/50 text-xs mb-1">Devise</Text>
-              <Picker
-               
-                onValueChange={(val) => update("currency", val)}
-                className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none"
-                style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-               selectedValue={form.currency}>
-                <Picker.Item label="FCFA (XAF)" value="XAF" />
-                <Picker.Item label="USD" value="USD" />
-                <Picker.Item label="EUR" value="EUR" />
-              </Picker>
-            </View>
-            <View className="flex-1">
-              <Text className="text-white/50 text-xs mb-1">Unité</Text>
-              <Picker
-               
-                onValueChange={(val) => update("unit", val)}
-                className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none"
-                style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-               selectedValue={form.unit}>
-                <Picker.Item label="Pièce" value="pièce" />
-                <Picker.Item label="Kg" value="kg" />
-                <Picker.Item label="Lot" value="lot" />
-              </Picker>
-            </View>
-          </View>
-
-          <View className="flex gap-4">
-            <Text className="flex items-center gap-2">
-              <Pressable
-               
-                checked={form.deliveryAvailable}
-                onPress={(e) => update("deliveryAvailable", e.target.checked)}
-                className="rounded"
-               accessibilityRole="checkbox" accessibilityState={{ checked: form.deliveryAvailable }}/>
-              <Text className="text-white/60 text-xs">Livraison</Text>
-            </Text>
-            <Text className="flex items-center gap-2">
-              <Pressable
-               
-                checked={form.isDigital}
-                onPress={(e) => update("isDigital", e.target.checked)}
-                className="rounded"
-               accessibilityRole="checkbox" accessibilityState={{ checked: form.isDigital }}/>
-              <Text className="text-white/60 text-xs">Digital</Text>
-            </Text>
-          </View>
-        </View>
-
-        <Pressable
-          onPress={handleSubmit}
-          disabled={submitting}
-          className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-40 mt-4"
-          style={{  }}
-        >
-          <Plus size={16} className="text-white" />
-          <Text className="text-white font-black">
-            {submitting ? "Création..." : "Créer le produit"}
-          </Text>
-        </Pressable>
+        <Pressable onPress={handleSubmit} disabled={submitting} className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40 mt-4" style={{ boxShadow: "0 4px 20px rgba(249,115,22,0.35)" }}><Plus size={16} className="text-white" /><Text className="text-white font-black">{submitting ? "Création..." : "Créer le produit"}</Text></Pressable>
       </View>
     </>
   );
@@ -396,13 +309,13 @@ function MarketplaceProInner({ onBack }: { onBack: () => void }) {
   ) => {
     try {
       await updateOrderStatusMutation({ id: orderId, status });
-      UIService.openToast(`Commande mise à jour: ${ORDER_STATUS_CFG[status].label}`, "success");
+      toast.success(`Commande mise à jour: ${ORDER_STATUS_CFG[status].label}`);
     } catch (err) {
       if (err instanceof ConvexError) {
         const data = err.data as { message: string };
-        UIService.openToast(data.message, "error");
+        toast.error(data.message);
       } else {
-        UIService.openToast("Erreur de mise à jour", "error");
+        toast.error("Erreur de mise à jour");
       }
     }
   };
@@ -410,13 +323,13 @@ function MarketplaceProInner({ onBack }: { onBack: () => void }) {
   const handleArchiveProduct = async (productId: Id<"products">) => {
     try {
       await updateProductMutation({ id: productId, status: "archived" });
-      UIService.openToast("Produit archivé", "success");
+      toast.success("Produit archivé");
     } catch (err) {
       if (err instanceof ConvexError) {
         const data = err.data as { message: string };
-        UIService.openToast(data.message, "error");
+        toast.error(data.message);
       } else {
-        UIService.openToast("Erreur", "error");
+        toast.error("Erreur");
       }
     }
   };
@@ -434,121 +347,27 @@ function MarketplaceProInner({ onBack }: { onBack: () => void }) {
   const sparkMax = Math.max(...sparkData, 1);
 
   return (
-    <View
-      className="h-full flex flex-col relative"
-      style={{  }}
-    >
-      {/* Ambient glows */}
-      <View
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-48"
-        style={{  }}
-      />
-      <View
-        className="absolute bottom-32 right-0 w-48 h-48"
-        style={{  }}
-      />
-
-      {/* Header */}
-      <View
-        className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3"
-        style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", }}
-      >
-        <Pressable
-          onPress={onBack}
-          className="w-9 h-9 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-        >
-          <ArrowLeft size={18} className="text-white" />
-        </Pressable>
-        <View className="flex-1">
-          <Text className="text-white font-black text-lg">Marketplace Pro</Text>
-          <Text className="text-white/40 text-xs">Dashboard vendeur</Text>
-        </View>
-        <Pressable
-          onPress={() => setShowCreateSheet(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
-          style={{  }}
-        >
-          <Plus size={13} className="text-white" />
-          <Text className="text-white font-semibold text-xs">Produit</Text>
-        </Pressable>
-      </View>
-
-      {/* Tabs */}
-      <View className="flex-shrink-0 flex gap-1 px-4 py-3">
-        {[
+    <View className="h-full flex flex-col relative" style={{  }}>{}<View className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-48 pointer-events-none" style={{  }} /><View className="absolute bottom-32 right-0 w-48 h-48 pointer-events-none" style={{  }} />{}<View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" }}><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-white font-black text-lg">Marketplace Pro</Text><Text className="text-white/40 text-xs">Dashboard vendeur</Text></View><Pressable onPress={() => setShowCreateSheet(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl active:scale-95 transition-all" style={{  }}><Plus size={13} className="text-white" /><Text className="text-white font-semibold text-xs">Produit</Text></Pressable></View>{}<View className="flex-shrink-0 flex gap-1 px-4 py-3">{[
           { id: "dashboard" as TabId, label: "Dashboard", icon: BarChart2 },
           { id: "produits" as TabId, label: "Produits", icon: Package },
           { id: "commandes" as TabId, label: "Commandes", icon: ShoppingBag },
           { id: "boosts" as TabId, label: "Boosts", icon: Megaphone },
         ].map(({ id, label, icon: Icon }) => (
-          <Pressable
-            key={id}
-            onPress={() => setTab(id)}
-            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold"
-            style={
-              tab === id
+          <Pressable key={id} onPress={() => setTab(id)} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold transition-all" style={tab === id
                 ? {  }
-                : { backgroundColor: "rgba(255,255,255,0.06)" }
-            }
-          >
-            <Icon size={11} />
-            {label}
-          </Pressable>
-        ))}
-      </View>
-
-      <View
-        className="flex-1 overflow-y-auto"
-        style={{  }}
-      >
-        {/* ── Dashboard tab ─────────────────────────────────────────── */}
-        {tab === "dashboard" && (
-          <View className="px-4 pb-8">
-            {/* Revenue card */}
-            <View
-              className="rounded-2xl overflow-hidden mb-5"
-            >
-              <View
-                className="h-1.5"
-                style={{  }}
-              />
-              <View
-                className="p-5"
-                style={{ borderWidth: 1, borderColor: "rgba(249,115,22,0.2)", borderStyle: "solid" }}
-              >
-                <Text className="text-white/50 text-sm mb-1">
-                  Chiffre d'affaires (livrés)
-                </Text>
-                <Text className="text-white font-black text-4xl mb-0.5">
-                  {fmt(totalCA)}
-                  <Text className="text-white/40 text-lg font-normal">
-                    {" "}
-                    FCFA
-                  </Text>
-                </Text>
-                <Text className="text-green-400 text-xs font-semibold flex items-center gap-1 mb-4">
-                  <TrendingUp size={11} /> {totalOrders} commande
-                  {totalOrders > 1 ? "s" : ""} livrée
-                  {totalOrders > 1 ? "s" : ""}
-                </Text>
-
-                {/* Sparkline */}
-                <View className="flex items-end gap-1 h-14">
-                  {sparkData.map((v, i) => (
-                    <View
-                      key={i}
-                      className="flex-1 rounded-sm"
-                      style={{  }}
-                    />
-                  ))}
-                </View>
-              </View>
-            </View>
-
-            {/* KPI grid */}
-            <View className="gap-3 mb-5">
-              {[
+                : { backgroundColor: "rgba(255,255,255,0.06)" }}><Icon size={11} />{label}</Pressable>
+        ))}</View><View className="flex-1 overflow-y-auto" style={{  }}>{}{tab === "dashboard" && (
+          <View className="px-4 pb-8">{}<View initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl overflow-hidden mb-5"><View className="h-1.5" style={{  }} /><View className="p-5" style={{ borderWidth: 1, borderColor: "rgba(249,115,22,0.2)", borderStyle: "solid", borderTopWidth: 0 }}><Text className="text-white/50 text-sm mb-1">Chiffre d'affaires (livrés)
+                </Text><Text className="text-white font-black text-4xl mb-0.5">{fmt(totalCA)}<Text className="text-white/40 text-lg font-normal">{" "}FCFA
+                  </Text></Text><Text className="text-green-400 text-xs font-semibold flex items-center gap-1 mb-4"><TrendingUp size={11} />{totalOrders}commande
+                  {totalOrders > 1 ? "s" : ""}livrée
+                  {totalOrders > 1 ? "s" : ""}</Text>{}<View className="flex items-end gap-1 h-14">{sparkData.map((v, i) => (
+                    <View key={i} initial={{ height: 0 }} animate={{ height: `${(v / sparkMax) * 100}%` }} transition={{
+                        delay: i * 0.05,
+                        duration: 0.45,
+                        ease: "easeOut",
+                      }} className="flex-1 rounded-sm" style={{  }} />
+                  ))}</View></View></View>{}<View className="gap-3 mb-5">{[
                 {
                   icon: DollarSign,
                   label: "Revenu total",
@@ -575,100 +394,30 @@ function MarketplaceProInner({ onBack }: { onBack: () => void }) {
                   color: "#F59E0B",
                 },
               ].map(({ icon: Icon, label, value, color }) => (
-                <View
-                  key={label}
-                  className="rounded-2xl p-4"
-                  style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                >
-                  <View
-                    className="w-9 h-9 rounded-xl flex items-center justify-center mb-2"
-                    style={{ backgroundColor: `${color}22` }}
-                  >
-                    <Icon size={16} style={{ color }} />
-                  </View>
+                <View key={label} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
+                  <View className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: `${color}22` }}><Icon size={16} style={{ color }} /></View>
                   <Text className="text-white font-black text-lg">{value}</Text>
                   <Text className="text-white/50 text-xs">{label}</Text>
                 </View>
-              ))}
-            </View>
-
-            {/* Recent orders preview */}
-            {orders && orders.length > 0 && (
-              <View
-                className="rounded-2xl p-4"
-                style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-              >
-                <Text className="text-white font-bold text-sm mb-3">
-                  Dernières commandes
-                </Text>
-                {orders.slice(0, 3).map((o) => {
+              ))}</View>{}{orders && orders.length > 0 && (
+              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Text className="text-white font-bold text-sm mb-3">Dernières commandes
+                </Text>{orders.slice(0, 3).map((o) => {
                   const cfg =
                     ORDER_STATUS_CFG[o.status as OrderStatusDisplay] ??
                     ORDER_STATUS_CFG.pending;
                   return (
-                    <View
-                      key={o._id}
-                      className="flex items-center justify-between py-2 border-b border-white/5 last:border-0"
-                    >
-                      <View className="flex-1 min-w-0">
-                        <Text className="text-white/80 text-xs font-semibold">
-                          {o.product?.title ?? "Produit"}
-                        </Text>
-                        <Text className="text-white/40 text-[10px]">
-                          {o.counterpartName ?? "Acheteur"}
-                        </Text>
-                      </View>
-                      <Text
-                        className="px-2 py-0.5 rounded-full text-[9px] font-bold"
-                        style={{ color: cfg.color, backgroundColor: cfg.bg }}
-                      >
-                        {cfg.label}
-                      </Text>
-                    </View>
+                    <View key={o._id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0"><View className="flex-1 min-w-0"><Text className="text-white/80 text-xs font-semibold">{o.product?.title ?? "Produit"}</Text><Text className="text-white/40 text-[10px]">{o.counterpartName ?? "Acheteur"}</Text></View><Text className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ color: cfg.color, backgroundColor: cfg.bg }}>{cfg.label}</Text></View>
                   );
-                })}
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* ── Produits tab ──────────────────────────────────────────── */}
-        {tab === "produits" && (
-          <View className="px-4 pb-8">
-            <View
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-            >
-              <Search size={14} className="text-white/40" />
-              <TextInput
-                value={searchQuery}
-                onChangeText={(text) => setSearchQuery(text)}
-                placeholder="Rechercher un produit…"
-                className="flex-1 bg-transparent text-white text-sm placeholder-white/30 outline-none"
-              />
-            </View>
-
-            {!products ? (
-              <View className="space-y-3">
-                {Array.from({ length: 3 }).map((_, i) => (
+                })}</View>
+            )}</View>
+        )}{}{tab === "produits" && (
+          <View className="px-4 pb-8"><View className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={14} className="text-white/40" /><TextInput value={searchQuery} onChangeText={(value) => setSearchQuery(value)} placeholder="Rechercher un produit…" className="flex-1 bg-transparent text-white text-sm placeholder-white/30 outline-none" /></View>{!products ? (
+              <View className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-32 w-full rounded-2xl" />
-                ))}
-              </View>
+                ))}</View>
             ) : products.length === 0 ? (
-              <View className="text-center py-16">
-                <Package size={40} className="text-white/20 mx-auto mb-3" />
-                <Text className="text-white/40 text-sm">Aucun produit</Text>
-                <Text className="text-white/25 text-xs mt-1">
-                  Créez votre premier produit pour commencer à vendre
-                </Text>
-                <Pressable
-                  onPress={() => setShowCreateSheet(true)}
-                  className="mt-4 px-4 py-2 rounded-xl text-sm font-bold text-white"
-                  style={{  }}
-                >
-                  <Plus size={14} className="inline mr-1" />
-                  <Text>Créer un produit</Text></Pressable>
-              </View>
+              <View className="text-center py-16"><Package size={40} className="text-white/20 mx-auto mb-3" /><Text className="text-white/40 text-sm">Aucun produit</Text><Text className="text-white/25 text-xs mt-1">Créez votre premier produit pour commencer à vendre
+                </Text><Pressable onPress={() => setShowCreateSheet(true)} className="mt-4 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{  }}><Plus size={14} className="inline mr-1" /><Text>Créer un produit</Text></Pressable></View>
             ) : (
               <>
                 {products
@@ -693,50 +442,12 @@ function MarketplaceProInner({ onBack }: { onBack: () => void }) {
                           ? "Rupture"
                           : "Archivé";
                     return (
-                      <View
-                        key={p._id}
-                        className="rounded-2xl overflow-hidden mb-4"
-                        style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-                      >
-                        <View className="p-4">
-                          <View className="flex items-start gap-3 mb-3">
-                            <View
-                              className="w-12 h-12 rounded-xl flex items-center justify-center text-lg flex-shrink-0 overflow-hidden"
-                              style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-                            >
-                              {p.images.length > 0 ? (
-                                <Image
-                                 
-                                 
-                                  className="w-full h-full object-cover rounded-xl"
-                                 source={{ uri: p.images[0] }} accessibilityLabel={p.title}/>
+                      <View key={p._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="rounded-2xl overflow-hidden mb-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+                        <View className="p-4"><View className="flex items-start gap-3 mb-3"><View className="w-12 h-12 rounded-xl flex items-center justify-center text-lg flex-shrink-0 overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>{p.images.length > 0 ? (
+                                <Image className="w-full h-full object-cover rounded-xl" source={{ uri: p.images[0] }} accessibilityLabel={p.title} />
                               ) : (
                                 <Package size={20} className="text-white/30" />
-                              )}
-                            </View>
-                            <View className="flex-1 min-w-0">
-                              <Text className="text-white font-bold text-sm leading-tight">
-                                {p.title}
-                              </Text>
-                              <Text className="text-white/40 text-xs">
-                                {p.category} · {p.currency}
-                              </Text>
-                            </View>
-                            <View className="flex flex-col items-end flex-shrink-0 gap-1">
-                              <Text className="text-white font-bold text-sm">
-                                {fmt(p.price)} {p.currency}
-                              </Text>
-                              <Text
-                                className="px-2 py-0.5 rounded-full text-[9px] font-bold"
-                                style={{ color: statusColor, backgroundColor: `${statusColor}20` }}
-                              >
-                                {statusLabel}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View className="gap-2 mb-3">
-                            {[
+                              )}</View><View className="flex-1 min-w-0"><Text className="text-white font-bold text-sm leading-tight">{p.title}</Text><Text className="text-white/40 text-xs">{p.category}· {p.currency}</Text></View><View className="flex flex-col items-end flex-shrink-0 gap-1"><Text className="text-white font-bold text-sm">{fmt(p.price)}{p.currency}</Text><Text className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ color: statusColor, backgroundColor: `${statusColor}20` }}>{statusLabel}</Text></View></View><View className="gap-2 mb-3">{[
                               {
                                 icon: Package,
                                 val: p.stock,
@@ -756,72 +467,28 @@ function MarketplaceProInner({ onBack }: { onBack: () => void }) {
                                 color: "#3B82F6",
                               },
                             ].map(({ icon: Icon, val, label, color }) => (
-                              <View
-                                key={label}
-                                className="flex flex-col items-center gap-0.5 p-2 rounded-xl"
-                                style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
-                              >
-                                <Icon size={11} style={{ color }} />
-                                <Text className="text-white font-bold text-xs">
-                                  {val}
-                                </Text>
-                                <Text className="text-white/30 text-[9px]">
-                                  {label}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-
-                          <View className="flex items-center gap-2">
-                            {p.status === "active" && (
-                              <Pressable
-                                onPress={() => handleArchiveProduct(p._id)}
-                                className="flex-1 py-2 rounded-xl text-xs font-semibold text-white/60"
-                                style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-                              >
-                                <Text>Archiver</Text></Pressable>
-                            )}
-                            {p.status === "archived" && (
-                              <Pressable
-                                onPress={async () => {
+                              <View key={label} className="flex flex-col items-center gap-0.5 p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Icon size={11} style={{ color }} /><Text className="text-white font-bold text-xs">{val}</Text><Text className="text-white/30 text-[9px]">{label}</Text></View>
+                            ))}</View><View className="flex items-center gap-2">{p.status === "active" && (
+                              <Pressable onPress={() => handleArchiveProduct(p._id)} className="flex-1 py-2 rounded-xl text-xs font-semibold text-white/60" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><Text>Archiver</Text></Pressable>
+                            )}{p.status === "archived" && (
+                              <Pressable onPress={async () => {
                                   await updateProductMutation({
                                     id: p._id,
                                     status: "active",
                                   });
-                                  UIService.openToast("Produit réactivé", "success");
-                                }}
-                                className="flex-1 py-2 rounded-xl text-xs font-semibold text-green-400"
-                                style={{ backgroundColor: "rgba(16,185,129,0.1)" }}
-                              >
-                                <Text>Réactiver</Text></Pressable>
-                            )}
-                          </View>
-                        </View>
+                                  toast.success("Produit réactivé");
+                                }} className="flex-1 py-2 rounded-xl text-xs font-semibold text-green-400" style={{ backgroundColor: "rgba(16,185,129,0.1)" }}><Text>Réactiver</Text></Pressable>
+                            )}</View></View>
                       </View>
                     );
                   })}
                 {productsStatus === "Exhausted" && products.length >= 50 && (
-                  <Pressable
-                    onPress={() => loadMore()}
-                    className="w-full py-2.5 rounded-xl text-xs font-semibold text-white/50"
-                    style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-                  >
-                    <Text>Charger plus</Text></Pressable>
+                  <Pressable onPress={() => loadMore()} className="w-full py-2.5 rounded-xl text-xs font-semibold text-white/50" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><Text>Charger plus</Text></Pressable>
                 )}
               </>
-            )}
-          </View>
-        )}
-
-        {/* ── Commandes tab ──────────────────────────────────────────── */}
-        {tab === "commandes" && (
-          <View className="px-4 pb-8">
-            {/* Filter chips */}
-            <View
-              className="flex gap-2 overflow-x-auto pb-1 mb-3"
-              style={{  }}
-            >
-              {(
+            )}</View>
+        )}{}{tab === "commandes" && (
+          <View className="px-4 pb-8">{}<View className="flex gap-2 overflow-x-auto pb-1 mb-3" style={{  }}>{(
                 [
                   "tous",
                   "pending",
@@ -837,187 +504,60 @@ function MarketplaceProInner({ onBack }: { onBack: () => void }) {
                     ? (orders?.length ?? 0)
                     : (orders?.filter((o) => o.status === f).length ?? 0);
                 return (
-                  <Pressable
-                    key={f}
-                    onPress={() => setOrderFilter(f)}
-                    className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold"
-                    style={
-                      orderFilter === f
+                  <Pressable key={f} onPress={() => setOrderFilter(f)} className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all" style={orderFilter === f
                         ? {  }
-                        : { backgroundColor: "rgba(255,255,255,0.06)" }
-                    }
-                  >
-                    {f === "tous" ? "Tous" : ORDER_STATUS_CFG[f].label} <Text>(</Text>{count}
-                    <Text>)</Text></Pressable>
+                        : { backgroundColor: "rgba(255,255,255,0.06)" }}>{f === "tous" ? "Tous" : ORDER_STATUS_CFG[f].label}<Text>(</Text>{count}<Text>)</Text></Pressable>
                 );
-              })}
-            </View>
-
-            {/* Search */}
-            <View
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-            >
-              <Search size={14} className="text-white/40" />
-              <TextInput
-                value={searchQuery}
-                onChangeText={(text) => setSearchQuery(text)}
-                placeholder="Rechercher une commande…"
-                className="flex-1 bg-transparent text-white text-sm placeholder-white/30 outline-none"
-              />
-            </View>
-
-            {!orders ? (
-              <View className="space-y-3">
-                {Array.from({ length: 3 }).map((_, i) => (
+              })}</View>{}<View className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={14} className="text-white/40" /><TextInput value={searchQuery} onChangeText={(value) => setSearchQuery(value)} placeholder="Rechercher une commande…" className="flex-1 bg-transparent text-white text-sm placeholder-white/30 outline-none" /></View>{!orders ? (
+              <View className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-28 w-full rounded-2xl" />
-                ))}
-              </View>
+                ))}</View>
             ) : filteredOrders.length === 0 ? (
-              <View className="text-center py-10 text-white/30 text-sm">
-                <Text>Aucune commande trouvée</Text></View>
+              <View className="text-center py-10 text-white/30 text-sm"><Text>Aucune commande trouvée</Text></View>
             ) : (
-              <View className="flex flex-col gap-2">
-                {filteredOrders.map((o, idx) => {
+              <View className="flex flex-col gap-2">{filteredOrders.map((o, idx) => {
                   const cfg =
                     ORDER_STATUS_CFG[o.status as OrderStatusDisplay] ??
                     ORDER_STATUS_CFG.pending;
                   return (
-                    <View
-                      key={o._id}
-                      className="rounded-2xl p-4"
-                      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                    >
-                      <View className="flex items-start justify-between mb-2">
-                        <View className="flex-1 min-w-0 pr-2">
-                          <Text className="text-white font-semibold text-sm">
-                            {o.product?.title ?? "Produit supprimé"}
-                          </Text>
-                          <Text className="text-white/40 text-xs">
-                            {o.counterpartName ?? "Acheteur"} · {o.quantity}x
-                          </Text>
-                        </View>
-                        <Text
-                          className="px-2.5 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0"
-                          style={{ color: cfg.color, backgroundColor: cfg.bg }}
-                        >
-                          {cfg.label}
-                        </Text>
-                      </View>
-                      <View className="gap-2 mb-3">
-                        <View
-                          className="p-2 rounded-xl"
-                          style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
-                        >
-                          <Text className="text-white/30 text-[10px]">Montant</Text>
-                          <Text className="font-bold text-xs text-white">
-                            {fmt(o.totalAmount)} {o.currency}
-                          </Text>
-                        </View>
-                        <View
-                          className="p-2 rounded-xl"
-                          style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
-                        >
-                          <Text className="text-white/30 text-[10px]">Quantité</Text>
-                          <Text className="font-bold text-xs text-white">
-                            {o.quantity} {o.product?.unit ?? "pcs"}
-                          </Text>
-                        </View>
-                      </View>
+                    <View key={o._id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
+                      <View className="flex items-start justify-between mb-2"><View className="flex-1 min-w-0 pr-2"><Text className="text-white font-semibold text-sm">{o.product?.title ?? "Produit supprimé"}</Text><Text className="text-white/40 text-xs">{o.counterpartName ?? "Acheteur"}· {o.quantity}x
+                          </Text></View><Text className="px-2.5 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0" style={{ color: cfg.color, backgroundColor: cfg.bg }}>{cfg.label}</Text></View>
+                      <View className="gap-2 mb-3"><View className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Text className="text-white/30 text-[10px]">Montant</Text><Text className="font-bold text-xs text-white">{fmt(o.totalAmount)}{o.currency}</Text></View><View className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Text className="text-white/30 text-[10px]">Quantité</Text><Text className="font-bold text-xs text-white">{o.quantity}{o.product?.unit ?? "pcs"}</Text></View></View>
 
                       {/* Actions */}
                       {o.status === "pending" && (
-                        <View className="flex gap-2">
-                          <Pressable
-                            onPress={() =>
-                              handleUpdateOrderStatus(o._id, "confirmed")
-                            }
-                            className="flex-1 py-2 rounded-xl text-xs font-bold text-white"
-                            style={{  }}
-                          >
-                            <Text>Confirmer</Text></Pressable>
-                          <Pressable
-                            onPress={() =>
-                              handleUpdateOrderStatus(o._id, "cancelled")
-                            }
-                            className="py-2 px-3 rounded-xl text-xs font-bold text-red-400"
-                            style={{ backgroundColor: "rgba(239,68,68,0.1)" }}
-                          >
-                            <Text>Annuler</Text></Pressable>
-                        </View>
+                        <View className="flex gap-2"><Pressable onPress={() =>
+                              handleUpdateOrderStatus(o._id, "confirmed")} className="flex-1 py-2 rounded-xl text-xs font-bold text-white" style={{  }}><Text>Confirmer</Text></Pressable><Pressable onPress={() =>
+                              handleUpdateOrderStatus(o._id, "cancelled")} className="py-2 px-3 rounded-xl text-xs font-bold text-red-400" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}><Text>Annuler</Text></Pressable></View>
                       )}
                       {o.status === "confirmed" && (
-                        <Pressable
-                          onPress={() =>
-                            handleUpdateOrderStatus(o._id, "shipped")
-                          }
-                          className="w-full py-2 rounded-xl text-xs font-bold text-white"
-                          style={{  }}
-                        >
-                          <Text>Marquer expédié</Text></Pressable>
+                        <Pressable onPress={() =>
+                            handleUpdateOrderStatus(o._id, "shipped")} className="w-full py-2 rounded-xl text-xs font-bold text-white" style={{  }}><Text>Marquer expédié</Text></Pressable>
                       )}
                       {o.status === "shipped" && (
-                        <Pressable
-                          onPress={() =>
-                            handleUpdateOrderStatus(o._id, "delivered")
-                          }
-                          className="w-full py-2 rounded-xl text-xs font-bold text-white"
-                          style={{  }}
-                        >
-                          <Text>Marquer livré</Text></Pressable>
+                        <Pressable onPress={() =>
+                            handleUpdateOrderStatus(o._id, "delivered")} className="w-full py-2 rounded-xl text-xs font-bold text-white" style={{  }}><Text>Marquer livré</Text></Pressable>
                       )}
                     </View>
                   );
-                })}
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* ── Boosts tab ─────────────────────────────────────────────── */}
-        {tab === "boosts" && (
-          <View className="px-4 pb-8">
-            {/* Info banner */}
-            <View
-              className="rounded-xl p-3 mb-4 flex items-start gap-2"
-              style={{ backgroundColor: "rgba(249,115,22,0.08)", borderWidth: 1, borderColor: "rgba(249,115,22,0.15)", borderStyle: "solid" }}
-            >
-              <Megaphone
-                size={14}
-                className="text-orange-400 mt-0.5 flex-shrink-0"
-              />
-              <Text className="text-orange-300/80 text-xs leading-relaxed">
-                Le système de boost sera bientôt disponible. Boostez vos
+                })}</View>
+            )}</View>
+        )}{}{tab === "boosts" && (
+          <View className="px-4 pb-8">{}<View className="rounded-xl p-3 mb-4 flex items-start gap-2" style={{ backgroundColor: "rgba(249,115,22,0.08)", borderWidth: 1, borderColor: "rgba(249,115,22,0.15)", borderStyle: "solid" }}><Megaphone size={14} className="text-orange-400 mt-0.5 flex-shrink-0" /><Text className="text-orange-300/80 text-xs leading-relaxed">Le système de boost sera bientôt disponible. Boostez vos
                 produits pour les afficher en tête des résultats et augmenter
                 votre visibilité x3.
-              </Text>
-            </View>
-
-            <View className="text-center py-12">
-              <Flame size={40} className="text-white/15 mx-auto mb-3" />
-              <Text className="text-white/40 text-sm font-semibold">
-                Fonctionnalité à venir
-              </Text>
-              <Text className="text-white/25 text-xs mt-1">
-                Les boosts seront disponibles prochainement
-              </Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* ── Create product sheet ────────────────────────────────────── */}
-      <>
-        {showCreateSheet && (
+              </Text></View><View className="text-center py-12"><Flame size={40} className="text-white/15 mx-auto mb-3" /><Text className="text-white/40 text-sm font-semibold">Fonctionnalité à venir
+              </Text><Text className="text-white/25 text-xs mt-1">Les boosts seront disponibles prochainement
+              </Text></View></View>
+        )}</View>{}<View>{showCreateSheet && (
           <CreateProductSheet
             onClose={() => setShowCreateSheet(false)}
             onCreated={() => {
               /* products auto-refresh via reactive query */
             }}
           />
-        )}
-      </>
-    </View>
+        )}</View></View>
   );
 }
 
@@ -1033,37 +573,22 @@ export default function MarketplaceProPage({
 
   if (loading) {
     return (
-      <View
-        className="h-full w-full flex flex-col items-center justify-center gap-3 px-4"
-        style={{  }}
-      >
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-32" />
-        <View className="space-y-3 w-full mt-6">
-          {Array.from({ length: 3 }).map((_, i) => (
+      <View className="h-full w-full flex flex-col items-center justify-center gap-3 px-4" style={{  }}><Skeleton className="h-8 w-48" /><Skeleton className="h-4 w-32" /><View className="space-y-3 w-full mt-6">{Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-24 w-full rounded-2xl" />
-          ))}
-        </View>
-      </View>
+          ))}</View></View>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <View
-        className="h-full w-full flex flex-col items-center justify-center gap-4 px-6 text-center"
-        style={{  }}
-      >
+      <View className="h-full w-full flex flex-col items-center justify-center gap-4 px-6 text-center" style={{  }}>
         <ShoppingBag size={48} className="text-white/20" />
         <Text className="text-white font-bold text-lg">Espace Vendeur</Text>
         <Text className="text-white/50 text-sm">
           Connectez-vous pour gérer votre boutique
         </Text>
         <SignInButton />
-        <Pressable
-          onPress={onBack}
-          className="text-white/40 text-xs mt-4"
-        >
+        <Pressable onPress={onBack} className="text-white/40 text-xs mt-4">
           ← Retour
         </Pressable>
       </View>

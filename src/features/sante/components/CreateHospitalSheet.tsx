@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreateHospitalSheet.tsx
@@ -13,6 +12,7 @@ import { HospitalForm } from "../forms/HospitalForm";
 import type { HospitalFormValues } from "../forms/HospitalForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface CreateHospitalSheetProps {
   open: boolean;
@@ -39,13 +39,13 @@ export function CreateHospitalSheet({
             .filter(Boolean) || [],
         images: [],
       });
-      UIService.openToast("Hôpital créé avec succès !", "success");
+      toast.success("Hôpital créé avec succès !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erreur lors de la création";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

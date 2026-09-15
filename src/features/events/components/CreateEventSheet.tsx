@@ -1,5 +1,4 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { Pressable, View, Text, TextInput, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { Pressable, View, Text, TextInput, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
 
 // src/features/events/components/CreateEventSheet.tsx
 // ✅ Version finale – sans données mockées, utilisant les vraies données du formulaire
@@ -26,6 +25,7 @@ import {
   Share2,
   BarChart3,
 } from "lucide-react-native";
+import { toast } from "sonner";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { CATEGORY_LABELS, CATEGORY_COLORS } from "@/features/events/types";
@@ -65,27 +65,13 @@ function SectionHeader({
   badge?: string;
 }) {
   return (
-    <Pressable
-      onPress={onToggle}
-      className="w-full flex items-center justify-between py-3 px-4 rounded-2xl"
-      style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", }}
-    >
-      <View className="flex items-center gap-2.5">
-        <Icon size={18} style={{ color }} />
-        <Text className="text-white font-semibold text-sm">{title}</Text>
-        {badge && (
-          <Text className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">
-            {badge}
-          </Text>
-        )}
-        <Text className="text-xs text-white/20 ml-1">(optionnel)</Text>
-      </View>
-      {isOpen ? (
+    <Pressable onPress={onToggle} className="w-full flex items-center justify-between py-3 px-4 rounded-2xl transition-colors" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}><View className="flex items-center gap-2.5"><Icon size={18} style={{ color }} /><Text className="text-white font-semibold text-sm">{title}</Text>{badge && (
+          <Text className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">{badge}</Text>
+        )}<Text className="text-xs text-white/20 ml-1">(optionnel)</Text></View>{isOpen ? (
         <ChevronUp size={16} className="text-white/30" />
       ) : (
         <ChevronDown size={16} className="text-white/30" />
-      )}
-    </Pressable>
+      )}</Pressable>
   );
 }
 
@@ -107,21 +93,7 @@ function FieldInput({
   required?: boolean;
 }) {
   return (
-    <View
-      className="rounded-2xl p-3.5 mb-2"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
-      <View className="flex items-center gap-2.5">
-        <Icon size={14} style={{ color }} />
-        <TextInput
-         
-          value={value}
-          onChangeText={(text) => onChange(text)}
-          placeholder={required ? `${placeholder} *` : placeholder}
-          className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-        />
-      </View>
-    </View>
+    <View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2.5"><Icon size={14} style={{ color }} /><TextInput value={value} onChangeText={(value) => onChange(value)} placeholder={required ? `${placeholder} *` : placeholder} className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none" /></View></View>
   );
 }
 
@@ -143,21 +115,7 @@ function FieldTextarea({
   required?: boolean;
 }) {
   return (
-    <View
-      className="rounded-2xl p-3.5 mb-2"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
-      <View className="flex items-start gap-2.5">
-        <Icon size={14} style={{ color, marginTop: 3 }} />
-        <TextInput
-          value={value}
-          onChangeText={(text) => onChange(text)}
-          placeholder={required ? `${placeholder} *` : placeholder}
-         
-          className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/25"
-         multiline textAlignVertical="top"/>
-      </View>
-    </View>
+    <View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-start gap-2.5"><Icon size={14} style={{ color, marginTop: 3 }} /><TextInput value={value} onChangeText={(value) => onChange(value)} placeholder={required ? `${placeholder} *` : placeholder} className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/25" multiline textAlignVertical="top" /></View></View>
   );
 }
 
@@ -173,18 +131,9 @@ function CategoryPills({
   onChange: (c: string) => void;
 }) {
   return (
-    <View className="flex flex-wrap gap-2 mb-4">
-      {cats.map(([key, label]) => (
-        <Pressable
-          key={key}
-          onPress={() => onChange(key)}
-          className="px-3 py-1.5 rounded-2xl text-xs font-semibold"
-          style={{ backgroundColor: active === key ? `${color}33` : "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          {label}
-        </Pressable>
-      ))}
-    </View>
+    <View className="flex flex-wrap gap-2 mb-4">{cats.map(([key, label]) => (
+        <Pressable key={key} onPress={() => onChange(key)} className="px-3 py-1.5 rounded-2xl text-xs font-semibold transition-all" style={{ backgroundColor: active === key ? `${color}33` : "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>{label}</Pressable>
+      ))}</View>
   );
 }
 
@@ -214,46 +163,9 @@ function TagsInput({
   };
 
   return (
-    <View
-      className="rounded-2xl p-3.5 mb-2"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
-      <View className="flex flex-wrap gap-1.5 mb-2">
-        {value.map((tag) => (
-          <Text
-            key={tag}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs"
-            style={{ backgroundColor: `${color}25`, color }}
-          >
-            #{tag}
-            <Pressable
-             
-              onPress={() => removeTag(tag)}
-              className=""
-            >
-              <X size={12} />
-            </Pressable>
-          </Text>
-        ))}
-      </View>
-      <View className="flex items-center gap-2">
-        <TextInput
-          value={input}
-          onChangeText={(text) => setInput(text)}
-          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-          placeholder={placeholder}
-          className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-        />
-        <Pressable
-         
-          onPress={addTag}
-          disabled={!input.trim()}
-          className="text-white/40 disabled:opacity-30"
-        >
-          <Text style={{ color }}>+</Text>
-        </Pressable>
-      </View>
-    </View>
+    <View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex flex-wrap gap-1.5 mb-2">{value.map((tag) => (
+          <Text key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs" style={{ backgroundColor: `${color}25`, color }}>#{tag}<Pressable onPress={() => removeTag(tag)} className="transition-colors"><X size={12} /></Pressable></Text>
+        ))}</View><View className="flex items-center gap-2"><TextInput value={input} onChangeText={(value) => setInput(value)} onKeyPress={(e) => e.nativeEvent.key === "Enter" && (e.preventDefault(), addTag())} placeholder={placeholder} className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none" /><Pressable onPress={addTag} disabled={!input.trim()} className="text-white/40 transition-colors disabled:opacity-30"><Text style={{ color }}>+</Text></Pressable></View></View>
   );
 }
 
@@ -271,12 +183,7 @@ function SubmitBtn({
   loading?: boolean;
 }) {
   return (
-    <Pressable
-      disabled={disabled || loading}
-      onPress={onClick}
-      className="w-full py-4 rounded-3xl text-white font-bold text-sm mt-3 disabled:opacity-40 flex items-center justify-center gap-2"
-      style={{  }}
-    >
+    <Pressable whileTap={{ scale: 0.97 }} disabled={disabled || loading} onPress={onClick} className="w-full py-4 rounded-3xl text-white font-bold text-sm mt-3 disabled:opacity-40 transition-opacity flex items-center justify-center gap-2" style={{ boxShadow: `0 8px 24px ${color}40` }}>
       {loading && <Loader2 size={16} className="animate-spin" />}
       {loading ? "Création en cours..." : label}
     </Pressable>
@@ -299,175 +206,24 @@ function GeneralSection({
   onDetectLocation: () => void;
 }) {
   return (
-    <View className="pt-2">
-      <CategoryPills
-        cats={Object.entries(CATEGORY_LABELS) as [string, string][]}
-        active={form.category}
-        color={color}
-        onChange={(c) => update("category", c)}
-      />
-
-      <FieldInput
-        icon={Tag}
-        color={color}
-        placeholder="Nom de l'événement"
-        value={form.title}
-        onChange={(v) => update("title", v)}
-        required
-      />
-
-      <FieldTextarea
-        icon={FileText}
-        color={color}
-        placeholder="Description"
-        value={form.description}
-        onChange={(v) => update("description", v)}
-        rows={3}
-        required
-      />
-
-      <AIWriteAssist
-        contentType="event_description"
-        topic={form.title}
-        onGenerated={(text) => update("description", text)}
-        description={form.description}
-        onTagsSuggested={(tags) => {
+    <View className="pt-2"><CategoryPills cats={Object.entries(CATEGORY_LABELS) as [string, string][]} active={form.category} color={color} onChange={(c) => update("category", c)} /><FieldInput icon={Tag} color={color} placeholder="Nom de l'événement" value={form.title} onChange={(v) => update("title", v)} required /><FieldTextarea icon={FileText} color={color} placeholder="Description" value={form.description} onChange={(v) => update("description", v)} rows={3} required /><AIWriteAssist contentType="event_description" topic={form.title} onGenerated={(text) => update("description", text)} description={form.description} onTagsSuggested={(tags) => {
           const newTags = tags.filter((t) => !form.tags.includes(t));
           if (newTags.length > 0) {
             update("tags", [...form.tags, ...newTags]);
           }
-        }}
-        category={form.category}
-        color={color}
-      />
-
-      <View className="gap-2">
-        <View
-          className="rounded-2xl p-3.5 mb-2"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          <View className="flex items-center gap-2.5">
-            <Calendar size={14} style={{ color }} />
-            <TextInput
-             
-              value={form.startDate}
-              onChangeText={(text) => update("startDate", text)}
-              className="flex-1 bg-transparent text-white text-sm outline-none"
-            />
-          </View>
-        </View>
-        <View
-          className="rounded-2xl p-3.5 mb-2"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          <View className="flex items-center gap-2.5">
-            <Calendar size={14} style={{ color, opacity: 0.5 }} />
-            <TextInput
-             
-              value={form.endDate}
-              onChangeText={(text) => update("endDate", text)}
-              placeholder="Fin"
-              className="flex-1 bg-transparent text-white text-sm outline-none"
-            />
-          </View>
-        </View>
-      </View>
-
-      <View
-        className="rounded-2xl p-3.5 mb-2"
-        style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-      >
-        <View className="flex items-center gap-2.5">
-          <MapPin size={14} style={{ color }} />
-          <TextInput
-            value={form.location}
-            onChangeText={(text) => update("location", text)}
-            placeholder="Lieu *"
-            className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-          />
-          <Pressable
-           
-            onPress={onDetectLocation}
-            disabled={detectingLocation}
-            className="flex-shrink-0 disabled:opacity-40"
-           
-          >
-            {detectingLocation ? (
+        }} category={form.category} color={color} /><View className="gap-2"><View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2.5"><Calendar size={14} style={{ color }} /><TextInput value={form.startDate} onChangeText={(value) => update("startDate", value)} className="flex-1 bg-transparent text-white text-sm outline-none" /></View></View><View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2.5"><Calendar size={14} style={{ color, opacity: 0.5 }} /><TextInput value={form.endDate} onChangeText={(value) => update("endDate", value)} placeholder="Fin" className="flex-1 bg-transparent text-white text-sm outline-none" /></View></View></View><View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2.5"><MapPin size={14} style={{ color }} /><TextInput value={form.location} onChangeText={(value) => update("location", value)} placeholder="Lieu *" className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none" /><Pressable onPress={onDetectLocation} disabled={detectingLocation} className="flex-shrink-0 disabled:opacity-40">{detectingLocation ? (
               <Loader2 size={14} className="animate-spin" style={{ color }} />
             ) : (
               <LocateFixed size={14} style={{ color }} />
-            )}
-          </Pressable>
-        </View>
-      </View>
-
-      <FieldInput
-        icon={MapPin}
-        color={color}
-        placeholder="Adresse complète (optionnel)"
-        value={form.address || ""}
-        onChange={(v) => update("address", v)}
-      />
-
-      <View
-        className="rounded-2xl p-3.5 mb-2"
-        style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-      >
-        <View className="flex items-center justify-between mb-2">
-          <View className="flex items-center gap-2.5">
-            <Tag size={14} style={{ color }} />
-            <Text className="text-xs text-white/40">Gratuit ?</Text>
-          </View>
-          <Pressable
-            onPress={() => update("isFree", !form.isFree)}
-            className="px-3 py-1 rounded-full text-xs font-bold"
-            style={
-              form.isFree
+            )}</Pressable></View></View><FieldInput icon={MapPin} color={color} placeholder="Adresse complète (optionnel)" value={form.address || ""} onChange={(v) => update("address", v)} /><View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center justify-between mb-2"><View className="flex items-center gap-2.5"><Tag size={14} style={{ color }} /><Text className="text-xs text-white/40">Gratuit ?</Text></View><Pressable onPress={() => update("isFree", !form.isFree)} className="px-3 py-1 rounded-full text-xs font-bold transition-colors" style={form.isFree
                 ? { backgroundColor: "rgba(16,185,129,0.2)", borderWidth: 1, borderColor: "rgba(16,185,129,0.3)", borderStyle: "solid" }
-                : { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }
-            }
-          >
-            {form.isFree ? "Oui" : "Non"}
-          </Pressable>
-        </View>
-        {!form.isFree && (
-          <TextInput
-            value={form.price}
-            onChangeText={(text) => update("price", text)}
-            placeholder="Ex: 15 000 FCFA"
-            className="w-full bg-transparent text-white text-sm outline-none placeholder:text-white/25 mt-1"
-          />
-        )}
-      </View>
-
-      <View
-        className="rounded-2xl p-3.5 mb-2"
-        style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-      >
-        <View className="flex items-center gap-2.5">
-          <Users size={14} style={{ color }} />
-          <TextInput
-           
-            value={form.maxAttendees || ""}
-            onChangeText={(text) =>
+                : { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>{form.isFree ? "Oui" : "Non"}</Pressable></View>{!form.isFree && (
+          <TextInput value={form.price} onChangeText={(value) => update("price", value)} placeholder="Ex: 15 000 FCFA" className="w-full bg-transparent text-white text-sm outline-none placeholder:text-white/25 mt-1" />
+        )}</View><View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2.5"><Users size={14} style={{ color }} /><TextInput value={form.maxAttendees || ""} onChangeText={(value) =>
               update(
                 "maxAttendees",
-                text ? parseInt(text) : undefined,
-              )
-            }
-            placeholder="Places disponibles (optionnel)"
-            className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/25"
-           keyboardType="numeric"/>
-        </View>
-      </View>
-
-      <TagsInput
-        value={form.tags}
-        onChange={(tags) => update("tags", tags)}
-        placeholder="Tags (ex: Musique, Festival, Gratuit...)"
-        color={color}
-      />
-    </View>
+                value ? parseInt(value) : undefined,
+              )} placeholder="Places disponibles (optionnel)" className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/25" keyboardType="numeric" /></View></View><TagsInput value={form.tags} onChange={(tags) => update("tags", tags)} placeholder="Tags (ex: Musique, Festival, Gratuit...)" color={color} /></View>
   );
 }
 
@@ -487,36 +243,13 @@ function MediaSection({
   color: string;
 }) {
   return (
-    <View className="pt-2">
-      <ImageUploader
-        images={images}
-        onChange={setImages}
-        color={color}
-        label="Images"
-      />
-
-      <View
-        className="rounded-2xl p-3.5 mb-2"
-        style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-      >
-        <View className="flex items-center gap-2.5">
-          <Video size={14} style={{ color }} />
-          <TextInput
-            value={videos.join(", ")}
-            onChangeText={(text) =>
+    <View className="pt-2"><ImageUploader images={images} onChange={setImages} color={color} label="Images" /><View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2.5"><Video size={14} style={{ color }} /><TextInput value={videos.join(", ")} onChangeText={(value) =>
               setVideos(
-                text
+                value
                   .split(",")
                   .map((v) => v.trim())
                   .filter(Boolean),
-              )
-            }
-            placeholder="Vidéos (URLs séparées par des virgules)"
-            className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/25"
-          />
-        </View>
-      </View>
-    </View>
+              )} placeholder="Vidéos (URLs séparées par des virgules)" className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/25" /></View></View></View>
   );
 }
 
@@ -524,79 +257,52 @@ function MediaSection({
 
 function TicketsSection({ event }: { event: Event }) {
   return (
-    <View className="pt-2">
-      <EventTickets event={event} onPurchase={() => {}} />
-    </View>
+    <View className="pt-2"><EventTickets event={event} onPurchase={() => {}} /></View>
   );
 }
 
 function ProgramSection({ event }: { event: Event }) {
   return (
-    <View className="pt-2">
-      <EventTimeline event={event} />
-    </View>
+    <View className="pt-2"><EventTimeline event={event} /></View>
   );
 }
 
 function AttendeesSection({ event }: { event: Event }) {
   return (
-    <View className="pt-2">
-      <EventAttendees event={event} />
-    </View>
+    <View className="pt-2"><EventAttendees event={event} /></View>
   );
 }
 
 function OrganizerSection({ event }: { event: Event }) {
   return (
-    <View className="pt-2">
-      <EventOrganizer
-        event={event}
-        onContact={() => UIService.openToast("Contacter l'organisateur", "info")}
-      />
-    </View>
+    <View className="pt-2"><EventOrganizer event={event} onContact={() => toast.info("Contacter l'organisateur")} /></View>
   );
 }
 
 function MapSection({ event }: { event: Event }) {
   return (
-    <View className="pt-2">
-      <EventMap event={event} />
-    </View>
+    <View className="pt-2"><EventMap event={event} /></View>
   );
 }
 
 function QRSection({ eventTitle }: { eventTitle: string }) {
   const ticketNumber = `TICKET-${Date.now().toString().slice(-6)}`;
   return (
-    <View className="pt-2">
-      <EventQR
-        ticketNumber={ticketNumber}
-        eventTitle={eventTitle || "Événement"}
-        isValid={true}
-      />
-    </View>
+    <View className="pt-2"><EventQR ticketNumber={ticketNumber} eventTitle={eventTitle || "Événement"} isValid={true} /></View>
   );
 }
 
 function CountdownSection({ startDate }: { startDate: string }) {
   if (!startDate) return null;
   return (
-    <View className="pt-2">
-      <EventCountdown startDate={startDate} />
-    </View>
+    <View className="pt-2"><EventCountdown startDate={startDate} /></View>
   );
 }
 
 function ShareSection() {
   return (
-    <View className="pt-2">
-      <View className="text-center text-white/40 text-sm p-4 bg-white/5 rounded-xl">
-        <Share2 size={24} className="mx-auto mb-2 text-white/20" />
-        <Text><Text>Après création, partagez votre événement</Text></Text>
-        <Text className="text-xs text-white/20 mt-1">
-          <Text>Les liens de partage seront disponibles</Text></Text>
-      </View>
-    </View>
+    <View className="pt-2"><View className="text-center text-white/40 text-sm p-4 bg-white/5 rounded-xl"><Share2 size={24} className="mx-auto mb-2 text-white/20" /><Text>Après création, partagez votre événement</Text><Text className="text-xs text-white/20 mt-1">Les liens de partage seront disponibles
+        </Text></View></View>
   );
 }
 
@@ -665,12 +371,12 @@ export function CreateEventSheet({ onClose, onSuccess }: Props) {
   };
 
   const detectLocation = useCallback(() => {
-    if (!("geolocation" in undefined)) {
-      UIService.openToast("Géolocalisation non supportée", "error");
+    if (!("geolocation" in navigator)) {
+      toast.error("Géolocalisation non supportée");
       return;
     }
     setLocating(true);
-    undefined.getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           const res = await fetch(
@@ -701,7 +407,7 @@ export function CreateEventSheet({ onClose, onSuccess }: Props) {
               ? `${place}, ${country}`
               : `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`,
           );
-          UIService.openToast("Position détectée !", "success");
+          toast.success("Position détectée !");
         } catch {
           update(
             "location",
@@ -711,7 +417,7 @@ export function CreateEventSheet({ onClose, onSuccess }: Props) {
         setLocating(false);
       },
       () => {
-        UIService.openToast("Impossible de détecter la position", "error");
+        toast.error("Impossible de détecter la position");
         setLocating(false);
       },
       { timeout: 10000 },
@@ -720,7 +426,7 @@ export function CreateEventSheet({ onClose, onSuccess }: Props) {
 
   const handleSubmit = async () => {
     if (!form.title || !form.startDate || !form.location) {
-      UIService.openToast("Veuillez remplir le titre, la date et le lieu", "error");
+      toast.error("Veuillez remplir le titre, la date et le lieu");
       return;
     }
 
@@ -745,12 +451,12 @@ export function CreateEventSheet({ onClose, onSuccess }: Props) {
         gallery: images,
         videos: videos,
       });
-      UIService.openToast("Événement créé avec succès !", "success");
+      toast.success("Événement créé avec succès !");
       onSuccess?.();
       onClose();
     } catch (error) {
       console.error(error);
-      UIService.openToast("Erreur lors de la création", "error");
+      toast.error("Erreur lors de la création");
     } finally {
       setIsSubmitting(false);
     }
@@ -795,17 +501,11 @@ export function CreateEventSheet({ onClose, onSuccess }: Props) {
   };
 
   return (
-    <View className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/50">
-      <View
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl p-5"
-        style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-      >
+    <View className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 300 }} className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl p-5" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
         <View className="flex items-center justify-between mb-4">
           <Text className="text-white font-bold text-lg">Créer un événement</Text>
-          <Pressable
-            onPress={onClose}
-            className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/5"
-          >
+          <Pressable onPress={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/5 transition-colors">
             <X size={18} className="text-white/60" />
           </Pressable>
         </View>

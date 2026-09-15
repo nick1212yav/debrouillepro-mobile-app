@@ -3,8 +3,8 @@ import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
 import { api } from "@/convex/_generated/api.js";
-import { Skeleton } from "@/components/ui/skeleton";
-import { SignInButton } from "@/components/ui/signin";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
 import {
   ArrowLeft, TrendingUp, TrendingDown, DollarSign, Crown, ShoppingBag,
   BarChart2, PieChart, Zap, Flame, Star, AlertCircle, CheckCircle,
@@ -105,19 +105,13 @@ function SparklineChart({ data, color }: { data: number[]; color: string }) {
 function BarStack({ points }: { points: RevenuePoint[] }) {
   const maxTotal = Math.max(...points.map(p => p.premium + p.contenu + p.marketplace));
   return (
-    <View className="flex items-end gap-1 h-28 w-full">
-      {points.map((p, i) => {
+    <View className="flex items-end gap-1 h-28 w-full">{points.map((p, i) => {
         const total = p.premium + p.contenu + p.marketplace;
         const pct = total / maxTotal;
         return (
-          <View key={i} className="flex-1 flex flex-col justify-end gap-px" style={{ height: `${pct * 100}%` }}>
-            <View style={{ flex: p.marketplace, backgroundColor: COLORS.marketplace, borderRadius: "2px 2px 0 0" }} />
-            <View style={{ flex: p.contenu, backgroundColor: COLORS.contenu }} />
-            <View style={{ flex: p.premium, backgroundColor: COLORS.premium }} />
-          </View>
+          <View key={i} className="flex-1 flex flex-col justify-end gap-px" style={{ height: `${pct * 100}%` }}><View style={{ flex: p.marketplace, backgroundColor: COLORS.marketplace, borderRadius: "2px 2px 0 0" }} /><View style={{ flex: p.contenu, backgroundColor: COLORS.contenu }} /><View style={{ flex: p.premium, backgroundColor: COLORS.premium }} /></View>
         );
-      })}
-    </View>
+      })}</View>
   );
 }
 
@@ -164,17 +158,9 @@ function DonutChart({ premium, contenu, marketplace }: { premium: number; conten
 // ── Loading skeleton ─────────────────────────────────────────────────────────
 function RevenueSkeleton() {
   return (
-    <View className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 p-4 space-y-4">
-      <Skeleton className="h-12 w-full bg-white/10 rounded-xl" />
-      <Skeleton className="h-10 w-full bg-white/5 rounded-xl" />
-      <Skeleton className="h-52 w-full bg-white/5 rounded-2xl" />
-      <View className="gap-3">
-        {Array.from({ length: 3 }).map((_, i) => (
+    <View className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 p-4 space-y-4"><Skeleton className="h-12 w-full bg-white/10 rounded-xl" /><Skeleton className="h-10 w-full bg-white/5 rounded-xl" /><Skeleton className="h-52 w-full bg-white/5 rounded-2xl" /><View className="gap-3">{Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-32 bg-white/5 rounded-xl" />
-        ))}
-      </View>
-      <Skeleton className="h-36 w-full bg-white/5 rounded-2xl" />
-    </View>
+        ))}</View><Skeleton className="h-36 w-full bg-white/5 rounded-2xl" /></View>
   );
 }
 
@@ -281,266 +267,54 @@ function RevenusDashboardInner({ onBack, onNavigate }: { onBack: () => void; onN
   }
 
   return (
-    <View className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-y-auto pb-24">
-      {/* Header */}
-      <View className="sticky top-0 z-30 bg-gray-950/90 border-b border-white/5 px-4 py-3 flex items-center gap-3">
-        <Pressable onPress={onBack} className="p-2 rounded-full bg-white/10">
-          <ArrowLeft size={18} />
-        </Pressable>
-        <View className="flex-1">
-          <Text className="font-bold text-lg leading-tight">Tableau de Bord Revenus</Text>
-          <Text className="text-xs text-gray-400">
-            {activeStreamCount > 0
+    <View className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-y-auto pb-24">{}<View className="sticky top-0 z-30 bg-gray-950/90 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center gap-3"><Pressable onPress={onBack} className="p-2 rounded-full bg-white/10 transition-colors"><ArrowLeft size={18} /></Pressable><View className="flex-1"><Text className="font-bold text-lg leading-tight">Tableau de Bord Revenus</Text><Text className="text-xs text-gray-400">{activeStreamCount > 0
               ? `${activeStreamCount} source${activeStreamCount > 1 ? "s" : ""} active${activeStreamCount > 1 ? "s" : ""}`
-              : "Vue consolidée de toutes vos sources"}
-          </Text>
-        </View>
-        <Pressable className="p-2 rounded-full bg-white/10">
-          <Download size={16} />
-        </Pressable>
-        <Pressable className="p-2 rounded-full bg-white/10">
-          <RefreshCw size={16} />
-        </Pressable>
-      </View>
-
-      <View className="px-4 pt-4 space-y-5">
-
-        {/* Period selector */}
-        <View className="flex gap-2 bg-white/5 rounded-xl p-1">
-          {(["7j", "30j", "90j", "12m"] as const).map(p => (
-            <Pressable
-              key={p}
-              onPress={() => setPeriod(p)}
-              className={`flex-1 text-sm py-1.5 rounded-lg transition-all cursor-pointer font-medium ${period === p ? "bg-white text-gray-900" : "text-gray-400 hover:text-white"}`}
-            >
-              {p}
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Grand Total Card */}
-        <View
-          key={period}
-          className="rounded-2xl bg-gradient-to-br from-emerald-600/30 to-teal-800/30 border border-emerald-500/20 p-5"
-        >
-          <View className="flex items-start justify-between mb-4">
-            <View>
-              <Text className="text-gray-300 text-sm mb-1">Revenus totaux ({period})</Text>
-              <Text className="text-4xl font-bold text-white">{fmtFCFA(grandTotal)}</Text>
-            </View>
-            <View className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm font-semibold ${trendPct >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
-              {trendPct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-              {trendPct >= 0 ? "+" : ""}{trendPct}<Text>%</Text></View>
-          </View>
-
-          {/* Donut + Legend */}
-          <View className="flex items-center gap-6">
-            <DonutChart premium={totals.premium} contenu={totals.contenu} marketplace={totals.marketplace} />
-            <View className="flex-1 space-y-2">
-              {sources.map(s => (
-                <View key={s.id} className="flex items-center gap-2 text-sm">
-                  <View className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }} />
-                  <Text className="text-gray-300 flex-1">{s.label}</Text>
-                  <Text className="font-semibold">{fmtFCFA(s.total)}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        {/* Source cards */}
-        <View>
-          <View className="flex items-center justify-between mb-3">
-            <Text className="font-semibold text-sm text-gray-300 uppercase tracking-wide">Par source</Text>
-            <View className="flex gap-1">
-              {(["all", "premium", "contenu", "marketplace"] as const).map(s => (
-                <Pressable
-                  key={s}
-                  onPress={() => setSource(s)}
-                  className={`text-xs px-2 py-1 rounded-lg cursor-pointer transition-all ${source === s ? "bg-white text-gray-900 font-bold" : "bg-white/10 text-gray-400 hover:text-white"}`}
-                >
-                  {s === "all" ? "Tous" : s.charAt(0).toUpperCase() + s.slice(1)}
-                </Pressable>
-              ))}
-            </View>
-          </View>
-          <View className="gap-3">
-            {sources.map(s => (
-              <Pressable
-                key={s.id}
-                onPress={() => { if (onNavigate) onNavigate(s.id === "premium" ? "premium" : s.id === "contenu" ? "revenus" : "marketplace-pro"); }}
-                className="rounded-xl p-3 border border-white/10 bg-white/5 flex flex-col gap-2 text-left"
-              >
-                <View className="flex items-center justify-between">
-                  <View className="p-1.5 rounded-lg" style={{ backgroundColor: `${s.color}22` }}>
-                    <Text style={{ color: s.color }}>{s.icon}</Text>
-                  </View>
-                  <Text className="text-xs text-emerald-400 font-semibold">+{s.trend}%</Text>
-                </View>
-                <View>
-                  <Text className="text-xs text-gray-400">{s.label}</Text>
-                  <Text className="font-bold text-sm leading-tight">{fmtFCFA(s.total)}</Text>
-                </View>
+              : "Vue consolidée de toutes vos sources"}</Text></View><Pressable className="p-2 rounded-full bg-white/10 transition-colors"><Download size={16} /></Pressable><Pressable className="p-2 rounded-full bg-white/10 transition-colors"><RefreshCw size={16} /></Pressable></View><View className="px-4 pt-4 space-y-5">{}<View className="flex gap-2 bg-white/5 rounded-xl p-1">{(["7j", "30j", "90j", "12m"] as const).map(p => (
+            <Pressable key={p} onPress={() => setPeriod(p)} className={`flex-1 text-sm py-1.5 rounded-lg transition-all cursor-pointer font-medium ${period === p ? "bg-white text-gray-900" : "text-gray-400 hover:text-white"}`}>{p}</Pressable>
+          ))}</View>{}<View key={period} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl bg-gradient-to-br from-emerald-600/30 to-teal-800/30 border border-emerald-500/20 p-5"><View className="flex items-start justify-between mb-4"><View><Text className="text-gray-300 text-sm mb-1">Revenus totaux ({period})</Text><Text className="text-4xl font-bold text-white">{fmtFCFA(grandTotal)}</Text></View><View className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm font-semibold ${trendPct >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>{trendPct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{trendPct >= 0 ? "+" : ""}{trendPct}<Text>%</Text></View></View>{}<View className="flex items-center gap-6"><DonutChart premium={totals.premium} contenu={totals.contenu} marketplace={totals.marketplace} /><View className="flex-1 space-y-2">{sources.map(s => (
+                <View key={s.id} className="flex items-center gap-2 text-sm"><View className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }} /><Text className="text-gray-300 flex-1">{s.label}</Text><Text className="font-semibold">{fmtFCFA(s.total)}</Text></View>
+              ))}</View></View></View>{}<View><View className="flex items-center justify-between mb-3"><Text className="font-semibold text-sm text-gray-300 uppercase tracking-wide">Par source</Text><View className="flex gap-1">{(["all", "premium", "contenu", "marketplace"] as const).map(s => (
+                <Pressable key={s} onPress={() => setSource(s)} className={`text-xs px-2 py-1 rounded-lg cursor-pointer transition-all ${source === s ? "bg-white text-gray-900 font-bold" : "bg-white/10 text-gray-400 hover:text-white"}`}>{s === "all" ? "Tous" : s.charAt(0).toUpperCase() + s.slice(1)}</Pressable>
+              ))}</View></View><View className="gap-3">{sources.map(s => (
+              <Pressable key={s.id} whileTap={{ scale: 0.97 }} onPress={() => { if (onNavigate) onNavigate(s.id === "premium" ? "premium" : s.id === "contenu" ? "revenus" : "marketplace-pro"); }} className="rounded-xl p-3 border border-white/10 bg-white/5 flex flex-col gap-2 transition-all text-left">
+                <View className="flex items-center justify-between"><View className="p-1.5 rounded-lg" style={{ backgroundColor: `${s.color}22` }}><Text style={{ color: s.color }}>{s.icon}</Text></View><Text className="text-xs text-emerald-400 font-semibold">+{s.trend}%</Text></View>
+                <View><Text className="text-xs text-gray-400">{s.label}</Text><Text className="font-bold text-sm leading-tight">{fmtFCFA(s.total)}</Text></View>
                 <SparklineChart data={sparkData(s.id as keyof Omit<RevenuePoint, "date">)} color={s.color} />
               </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Stacked Bar Chart */}
-        <View className="rounded-2xl bg-white/5 border border-white/10 p-4">
-          <View className="flex items-center justify-between mb-3">
-            <Text className="font-semibold text-sm">Évolution cumulée</Text>
-            <View className="flex gap-3 text-xs text-gray-400">
-              <Text><Text className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: COLORS.premium }} />Abonnem.</Text>
-              <Text><Text className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: COLORS.contenu }} />Contenu</Text>
-              <Text><Text className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: COLORS.marketplace }} />Market.</Text>
-            </View>
-          </View>
-          <BarStack points={filteredPoints} />
-          <View className="flex justify-between mt-2">
-            {filteredPoints.map((p, i) => (
+            ))}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/10 p-4"><View className="flex items-center justify-between mb-3"><Text className="font-semibold text-sm">Évolution cumulée</Text><View className="flex gap-3 text-xs text-gray-400"><Text><Text className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: COLORS.premium }} />Abonnem.</Text><Text><Text className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: COLORS.contenu }} />Contenu</Text><Text><Text className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: COLORS.marketplace }} />Market.</Text></View></View><BarStack points={filteredPoints} /><View className="flex justify-between mt-2">{filteredPoints.map((p, i) => (
               <Text key={i} className="text-xs text-gray-500 flex-1 text-center">{p.date}</Text>
-            ))}
-          </View>
-        </View>
-
-        {/* Goals */}
-        <View className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
-          <Pressable
-            onPress={() => setExpandGoals(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3"
-          >
-            <View className="flex items-center gap-2">
-              <Target size={18} className="text-yellow-400" />
-              <Text className="font-semibold text-sm">Objectifs de revenus</Text>
-            </View>
-            {expandGoals ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-          </Pressable>
-          <>
-            {expandGoals && (
-              <View
-                className="overflow-hidden"
-              >
-                <View className="px-4 pb-4 space-y-3">
-                  {adjustedGoals.map(g => {
+            ))}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden"><Pressable onPress={() => setExpandGoals(v => !v)} className="w-full flex items-center justify-between px-4 py-3"><View className="flex items-center gap-2"><Target size={18} className="text-yellow-400" /><Text className="font-semibold text-sm">Objectifs de revenus</Text></View>{expandGoals ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}</Pressable><View>{expandGoals && (
+              <View initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                <View className="px-4 pb-4 space-y-3">{adjustedGoals.map(g => {
                     const pct = Math.min(100, Math.round((g.current / g.target) * 100));
                     const src = sources.find(s => s.id === g.source);
                     return (
-                      <View key={g.id} className="space-y-1.5">
-                        <View className="flex items-center justify-between text-sm">
-                          <View className="flex items-center gap-1.5">
-                            {src && <Text style={{ color: src.color }}>{src.icon}</Text>}
-                            <Text className="text-gray-200">{g.label}</Text>
-                          </View>
-                          <View className="text-right">
-                            <Text className="font-semibold text-white text-xs">{pct}%</Text>
-                            <Text className="text-gray-500 text-xs ml-1">avant {g.deadline}</Text>
-                          </View>
-                        </View>
-                        <View className="h-2 bg-white/10 rounded-full overflow-hidden">
-                          <View
-                            className="h-full rounded-full"
-                            style={{ backgroundColor: src?.color ?? "#10b981" }}
-                          />
-                        </View>
-                        <View className="flex justify-between text-xs text-gray-500">
-                          <Text>{typeof g.current === "number" && g.current > 1000 ? fmtFCFA(g.current) : g.current}</Text>
-                          <Text>{typeof g.target === "number" && g.target > 1000 ? fmtFCFA(g.target) : g.target}</Text>
-                        </View>
-                      </View>
+                      <View key={g.id} className="space-y-1.5"><View className="flex items-center justify-between text-sm"><View className="flex items-center gap-1.5">{src && <Text style={{ color: src.color }}>{src.icon}</Text>}<Text className="text-gray-200">{g.label}</Text></View><View className="text-right"><Text className="font-semibold text-white text-xs">{pct}%</Text><Text className="text-gray-500 text-xs ml-1">avant {g.deadline}</Text></View></View><View className="h-2 bg-white/10 rounded-full overflow-hidden"><View initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, ease: "easeOut" }} className="h-full rounded-full" style={{ backgroundColor: src?.color ?? "#10b981" }} /></View><View className="flex justify-between text-xs text-gray-500"><Text>{typeof g.current === "number" && g.current > 1000 ? fmtFCFA(g.current) : g.current}</Text><Text>{typeof g.target === "number" && g.target > 1000 ? fmtFCFA(g.target) : g.target}</Text></View></View>
                     );
-                  })}
-                </View>
+                  })}</View>
               </View>
-            )}
-          </>
-        </View>
-
-        {/* Insights */}
-        <View>
-          <View className="flex items-center gap-2 mb-3">
-            <Sparkles size={16} className="text-purple-400" />
-            <Text className="font-semibold text-sm">Insights automatiques</Text>
-          </View>
-          <View className="space-y-2">
-            {INSIGHTS.map(ins => (
-              <Pressable
-                key={ins.id}
-                onPress={() => setExpandedInsight(expandedInsight === ins.id ? null : ins.id)}
-                className={`rounded-xl p-3 border cursor-pointer transition-all ${
+            )}</View></View>{}<View><View className="flex items-center gap-2 mb-3"><Sparkles size={16} className="text-purple-400" /><Text className="font-semibold text-sm">Insights automatiques</Text></View><View className="space-y-2">{INSIGHTS.map(ins => (
+              <View key={ins.id} layout onPress={() => setExpandedInsight(expandedInsight === ins.id ? null : ins.id)} className={`rounded-xl p-3 border cursor-pointer transition-all ${
                   ins.type === "up" ? "bg-emerald-500/10 border-emerald-500/20" :
                   ins.type === "down" ? "bg-red-500/10 border-red-500/20" :
                   "bg-blue-500/10 border-blue-500/20"
-                }`}
-              >
-                <View className="flex items-start gap-2">
-                  {ins.type === "up" && <TrendingUp size={16} className="text-emerald-400 mt-0.5 shrink-0" />}
-                  {ins.type === "down" && <AlertCircle size={16} className="text-red-400 mt-0.5 shrink-0" />}
-                  {ins.type === "tip" && <Zap size={16} className="text-blue-400 mt-0.5 shrink-0" />}
-                  <Text className="text-sm text-gray-200">{ins.message}</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Comparison MoM */}
-        <View className="rounded-2xl bg-white/5 border border-white/10 p-4">
-          <View className="flex items-center gap-2 mb-3">
-            <Calendar size={16} className="text-teal-400" />
-            <Text className="font-semibold text-sm">Comparaison Mois / Mois</Text>
-          </View>
-          <View className="gap-3">
-            {sources.map(s => {
+                }`}>
+                <View className="flex items-start gap-2">{ins.type === "up" && <TrendingUp size={16} className="text-emerald-400 mt-0.5 shrink-0" />}{ins.type === "down" && <AlertCircle size={16} className="text-red-400 mt-0.5 shrink-0" />}{ins.type === "tip" && <Zap size={16} className="text-blue-400 mt-0.5 shrink-0" />}<Text className="text-sm text-gray-200">{ins.message}</Text></View>
+              </View>
+            ))}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/10 p-4"><View className="flex items-center gap-2 mb-3"><Calendar size={16} className="text-teal-400" /><Text className="font-semibold text-sm">Comparaison Mois / Mois</Text></View><View className="gap-3">{sources.map(s => {
               const prev = Math.round(s.total * 0.8);
               const diff = s.total - prev;
               const pct = prev > 0 ? Math.round((diff / prev) * 100) : 0;
               return (
-                <View key={s.id} className="rounded-xl bg-white/5 p-3 text-center">
-                  <Text className="text-xs text-gray-400 mb-1">{s.label}</Text>
-                  <Text className="font-bold text-sm">{fmt(s.total)}</Text>
-                  <Text className="text-xs text-gray-500">vs {fmt(prev)}</Text>
-                  <View className={`mt-1 text-xs font-semibold flex items-center justify-center gap-0.5 ${pct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {pct >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownLeft size={12} />}
-                    {pct >= 0 ? "+" : ""}{pct}<Text>%</Text></View>
-                </View>
+                <View key={s.id} className="rounded-xl bg-white/5 p-3 text-center"><Text className="text-xs text-gray-400 mb-1">{s.label}</Text><Text className="font-bold text-sm">{fmt(s.total)}</Text><Text className="text-xs text-gray-500">vs {fmt(prev)}</Text><View className={`mt-1 text-xs font-semibold flex items-center justify-center gap-0.5 ${pct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{pct >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownLeft size={12} />}{pct >= 0 ? "+" : ""}{pct}<Text>%</Text></View></View>
               );
-            })}
-          </View>
-        </View>
-
-        {/* Quick links */}
-        <View className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
-          <Text className="px-4 pt-3 pb-2 text-xs text-gray-400 font-semibold uppercase tracking-wide">Accès rapide</Text>
-          {[
+            })}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden"><Text className="px-4 pt-3 pb-2 text-xs text-gray-400 font-semibold uppercase tracking-wide">Accès rapide</Text>{[
             { label: "Abonnements Premium", page: "premium", icon: <Crown size={16} className="text-yellow-400" />, sub: "Gérer vos plans" },
             { label: "Revenus de Contenu", page: "revenus", icon: <Sparkles size={16} className="text-purple-400" />, sub: "Tips, dons & retraits" },
             { label: "Marketplace Pro", page: "marketplace-pro", icon: <ShoppingBag size={16} className="text-cyan-400" />, sub: "Produits & commandes" },
           ].map(link => (
-            <Pressable
-              key={link.page}
-              onPress={() => onNavigate && onNavigate(link.page)}
-              className="w-full flex items-center gap-3 px-4 py-3 border-t border-white/5"
-            >
-              <View className="p-2 rounded-lg bg-white/5">{link.icon}</View>
-              <View className="flex-1 text-left">
-                <Text className="text-sm font-medium">{link.label}</Text>
-                <Text className="text-xs text-gray-400">{link.sub}</Text>
-              </View>
-              <ChevronRight size={16} className="text-gray-500" />
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Safety Strip */}
-        <View className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center gap-3">
-          <CheckCircle size={18} className="text-emerald-400 shrink-0" />
-          <Text className="text-xs text-gray-400"><Text>Toutes vos données financières sont chiffrées et sécurisées localement.</Text></Text>
-        </View>
-
-      </View>
-    </View>
+            <Pressable key={link.page} onPress={() => onNavigate && onNavigate(link.page)} className="w-full flex items-center gap-3 px-4 py-3 border-t border-white/5 transition-all"><View className="p-2 rounded-lg bg-white/5">{link.icon}</View><View className="flex-1 text-left"><Text className="text-sm font-medium">{link.label}</Text><Text className="text-xs text-gray-400">{link.sub}</Text></View><ChevronRight size={16} className="text-gray-500" /></Pressable>
+          ))}</View>{}<View className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center gap-3"><CheckCircle size={18} className="text-emerald-400 shrink-0" /><Text className="text-xs text-gray-400">Toutes vos données financières sont chiffrées et sécurisées localement.</Text></View></View></View>
   );
 }
 
@@ -555,7 +329,7 @@ export default function RevenusDashboardPage({ onBack, onNavigate }: Props) {
       </AuthLoading>
       <Unauthenticated>
         <View className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex flex-col items-center justify-center gap-4 p-6">
-          <Pressable onPress={onBack} className="absolute top-4 left-4 p-2 rounded-full bg-white/10">
+          <Pressable onPress={onBack} className="absolute top-4 left-4 p-2 rounded-full bg-white/10 transition-colors">
             <ArrowLeft size={18} className="text-white" />
           </Pressable>
           <BarChart2 size={48} className="text-emerald-400/60" />

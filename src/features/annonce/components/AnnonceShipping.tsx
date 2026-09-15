@@ -12,17 +12,11 @@ export function AnnonceShipping({ available, price, currency = "USD" }: Props) {
   if (!available) return null;
 
   return (
-    <View className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/5 border border-white/5">
-      <Truck size={16} className="text-white/40" />
-      <View className="flex-1">
-        <Text className="text-xs text-white/80 font-medium">
-          <Text>Livraison disponible</Text></Text>
-        {price !== undefined && (
+    <View className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/5 border border-white/5"><Truck size={16} className="text-white/40" /><View className="flex-1"><Text className="text-xs text-white/80 font-medium">Livraison disponible
+        </Text>{price !== undefined && (
           <Text className="text-xs text-white/40">
-            <Text>Frais de livraison :</Text>{formatPrice(price, currency)}
+            Frais de livraison : {formatPrice(price, currency)}
           </Text>
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }

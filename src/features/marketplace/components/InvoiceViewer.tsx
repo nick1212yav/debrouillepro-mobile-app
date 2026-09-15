@@ -1,4 +1,5 @@
 import { View, Text, Pressable, Alert } from "react-native";
+
 // src/features/marketplace/components/InvoiceViewer.tsx
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
@@ -186,7 +187,7 @@ export function InvoiceViewer({
   };
 
   const handlePrint = () => {
-    undefined;
+    window.print();
   };
 
   const getStatusIcon = (status: InvoiceData["status"]) => {
@@ -221,61 +222,20 @@ export function InvoiceViewer({
 
   if (loading) {
     return (
-      <View className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="text-white/40 animate-spin" />
-      </View>
+      <View className="flex items-center justify-center py-12"><Loader2 size={24} className="text-white/40 animate-spin" /></View>
     );
   }
 
   if (error || !invoice) {
     return (
-      <View className="text-center py-12 text-white/40 text-sm">
-        <FileText size={32} className="mx-auto mb-3 text-white/20" />
-        {error || "Facture introuvable"}
-      </View>
+      <View className="text-center py-12 text-white/40 text-sm"><FileText size={32} className="mx-auto mb-3 text-white/20" />{error || "Facture introuvable"}</View>
     );
   }
 
   return (
-    <View className="space-y-4 p-4 print:p-0">
-      {/* En‑tête avec actions */}
-      <View className="flex items-center justify-between print:hidden">
-        <Text className="text-white font-bold text-lg">Facture</Text>
-        <View className="flex items-center gap-2">
-          <Pressable
-            onPress={handleDownload}
-            className="p-2 rounded-xl bg-orange-500/20 text-orange-400 flex items-center gap-2 text-sm font-medium"
-          >
-            <Download size={14} /> <Text>Télécharger</Text></Pressable>
-          <Pressable
-            onPress={handlePrint}
-            className="p-2 rounded-xl bg-white/5 text-white/60 flex items-center gap-2 text-sm font-medium"
-          >
-            <Printer size={14} /> <Text>Imprimer</Text></Pressable>
-          {onClose && (
-            <Pressable
-              onPress={onClose}
-              className="p-2 rounded-xl bg-white/5 text-white/60"
-            >
-              <X size={18} />
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      {/* Corps de la facture */}
-      <View className="rounded-2xl bg-white/5 border border-white/5 p-5 print:bg-transparent print:border-0">
-        {/* En‑tête de la facture */}
-        <View className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/10">
-          <View>
-            <Text className="text-white font-bold text-xl">Facture</Text>
-            <Text className="text-white/40 text-sm">{invoice.number}</Text>
-          </View>
-          <View className="text-right">
-            <View className="flex items-center gap-2 justify-end">
-              {getStatusIcon(invoice.status)}
-              <Text
-                className={`text-sm font-semibold ${
+    <View className="space-y-4 p-4 print:p-0">{}<View className="flex items-center justify-between print:hidden"><Text className="text-white font-bold text-lg">Facture</Text><View className="flex items-center gap-2"><Pressable onPress={handleDownload} className="p-2 rounded-xl bg-orange-500/20 text-orange-400 transition-colors flex items-center gap-2 text-sm font-medium"><Download size={14} /><Text>Télécharger</Text></Pressable><Pressable onPress={handlePrint} className="p-2 rounded-xl bg-white/5 text-white/60 transition-colors flex items-center gap-2 text-sm font-medium"><Printer size={14} /><Text>Imprimer</Text></Pressable>{onClose && (
+            <Pressable onPress={onClose} className="p-2 rounded-xl bg-white/5 text-white/60 transition-colors"><X size={18} /></Pressable>
+          )}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/5 p-5 print:bg-transparent print:border-0">{}<View className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/10"><View><Text className="text-white font-bold text-xl">Facture</Text><Text className="text-white/40 text-sm">{invoice.number}</Text></View><View className="text-right"><View className="flex items-center gap-2 justify-end">{getStatusIcon(invoice.status)}<Text className={`text-sm font-semibold ${
                   invoice.status === "paid"
                     ? "text-green-400"
                     : invoice.status === "pending"
@@ -283,137 +243,44 @@ export function InvoiceViewer({
                       : invoice.status === "overdue"
                         ? "text-red-400"
                         : "text-gray-400"
-                }`}
-              >
-                {getStatusLabel(invoice.status)}
-              </Text>
-            </View>
-            <Text className="text-white/30 text-xs">
-              Date: {format(invoice.date, "dd MMM yyyy", { locale: fr })}
-            </Text>
-          </View>
-        </View>
-
-        {/* Infos client / vendeur */}
-        <View className="gap-4 py-4 border-b border-white/10">
-          <View>
-            <Text className="text-white/30 text-xs font-medium uppercase tracking-wider">
-              Vendeur
-            </Text>
-            <Text className="text-white font-medium">{invoice.sellerName}</Text>
-            <Text className="text-white/60 text-sm">{invoice.sellerEmail}</Text>
-            {invoice.sellerAddress && (
+                }`}>{getStatusLabel(invoice.status)}</Text></View><Text className="text-white/30 text-xs">Date: {format(invoice.date, "dd MMM yyyy", { locale: fr })}</Text></View></View>{}<View className="gap-4 py-4 border-b border-white/10"><View><Text className="text-white/30 text-xs font-medium uppercase tracking-wider">Vendeur
+            </Text><Text className="text-white font-medium">{invoice.sellerName}</Text><Text className="text-white/60 text-sm">{invoice.sellerEmail}</Text>{invoice.sellerAddress && (
               <Text className="text-white/40 text-xs">{invoice.sellerAddress}</Text>
-            )}
-          </View>
-          <View>
-            <Text className="text-white/30 text-xs font-medium uppercase tracking-wider">
-              Client
-            </Text>
-            <Text className="text-white font-medium">{invoice.buyerName}</Text>
-            <Text className="text-white/60 text-sm">{invoice.buyerEmail}</Text>
-            {invoice.buyerAddress && (
+            )}</View><View><Text className="text-white/30 text-xs font-medium uppercase tracking-wider">Client
+            </Text><Text className="text-white font-medium">{invoice.buyerName}</Text><Text className="text-white/60 text-sm">{invoice.buyerEmail}</Text>{invoice.buyerAddress && (
               <Text className="text-white/40 text-xs">{invoice.buyerAddress}</Text>
-            )}
-          </View>
-        </View>
-
-        {/* Échéance */}
-        <View className="py-3 flex flex-wrap gap-4 justify-between border-b border-white/10">
-          <View>
-            <Text className="text-white/30 text-xs uppercase tracking-wider">
-              Date d'émission
-            </Text>
-            <Text className="text-white text-sm">
-              {format(invoice.date, "dd MMM yyyy", { locale: fr })}
-            </Text>
-          </View>
-          <View>
-            <Text className="text-white/30 text-xs uppercase tracking-wider">
-              Date d'échéance
-            </Text>
-            <Text className="text-white text-sm">
-              {format(invoice.dueDate, "dd MMM yyyy", { locale: fr })}
-            </Text>
-          </View>
-          <View>
-            <Text className="text-white/30 text-xs uppercase tracking-wider">
-              Devise
-            </Text>
-            <Text className="text-white text-sm">{invoice.currency}</Text>
-          </View>
-        </View>
-
-        {/* Lignes de produits */}
-        <View className="py-4">
-          <View className="w-full text-sm">
-            <View>
-              <View className="border-b border-white/5 text-white/40 text-xs uppercase tracking-wider">
-                <Text className="text-left py-2">Description</Text>
-                <Text className="text-right py-2">Qté</Text>
-                <Text className="text-right py-2">Prix unitaire</Text>
-                <Text className="text-right py-2">Total</Text>
-              </View>
-            </View>
-            <View>
-              {invoice.items.map((item, idx) => (
-                <View key={idx} className="border-b border-white/5 last:border-0">
-                  <View className="py-2 text-white">{item.description}</View>
-                  <View className="py-2 text-right text-white/70">
+            )}</View></View>{}<View className="py-3 flex flex-wrap gap-4 justify-between border-b border-white/10"><View><Text className="text-white/30 text-xs uppercase tracking-wider">Date d'émission
+            </Text><Text className="text-white text-sm">{format(invoice.date, "dd MMM yyyy", { locale: fr })}</Text></View><View><Text className="text-white/30 text-xs uppercase tracking-wider">Date d'échéance
+            </Text><Text className="text-white text-sm">{format(invoice.dueDate, "dd MMM yyyy", { locale: fr })}</Text></View><View><Text className="text-white/30 text-xs uppercase tracking-wider">Devise
+            </Text><Text className="text-white text-sm">{invoice.currency}</Text></View></View>{}<View className="py-4"><table className="w-full text-sm"><thead><tr className="border-b border-white/5 text-white/40 text-xs uppercase tracking-wider"><th className="text-left py-2"><Text>Description</Text></th><th className="text-right py-2"><Text>Qté</Text></th><th className="text-right py-2"><Text>Prix unitaire</Text></th><th className="text-right py-2"><Text>Total</Text></th></tr></thead><tbody>{invoice.items.map((item, idx) => (
+                <tr key={idx} className="border-b border-white/5 last:border-0">
+                  <td className="py-2 text-white">{item.description}</td>
+                  <td className="py-2 text-right text-white/70">
                     {item.quantity}
-                  </View>
-                  <View className="py-2 text-right text-white/70">
+                  </td>
+                  <td className="py-2 text-right text-white/70">
                     {item.unitPrice.toLocaleString()}
-                  </View>
-                  <View className="py-2 text-right text-white font-medium">
+                  </td>
+                  <td className="py-2 text-right text-white font-medium">
                     {item.total.toLocaleString()}
-                  </View>
-                </View>
-              ))}
-            </View>
-            <View>
-              <View>
-                <View
-                  colSpan={3}
-                  className="text-right text-white/60 text-sm pt-3"
-                >
-                  <Text>Sous‑total</Text></View>
-                <View className="text-right text-white pt-3">
-                  {invoice.subtotal.toLocaleString()} {invoice.currency}
-                </View>
-              </View>
-              {invoice.tax > 0 && (
-                <View>
-                  <View colSpan={3} className="text-right text-white/60 text-sm">
-                    <Text>Taxes</Text></View>
-                  <View className="text-right text-white">
+                  </td>
+                </tr>
+              ))}</tbody><tfoot><tr><td colSpan={3} className="text-right text-white/60 text-sm pt-3"><Text>Sous‑total</Text></td><td className="text-right text-white pt-3">{invoice.subtotal.toLocaleString()}{invoice.currency}</td></tr>{invoice.tax > 0 && (
+                <tr>
+                  <td colSpan={3} className="text-right text-white/60 text-sm">
+                    Taxes
+                  </td>
+                  <td className="text-right text-white">
                     {invoice.tax.toLocaleString()} {invoice.currency}
-                  </View>
-                </View>
-              )}
-              <View>
-                <View
-                  colSpan={3}
-                  className="text-right text-white font-bold text-base pt-2"
-                >
-                  <Text>Total</Text></View>
-                <View className="text-right text-white font-bold text-base pt-2">
-                  {invoice.total.toLocaleString()} {invoice.currency}
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Notes */}
-        {invoice.notes && (
+                  </td>
+                </tr>
+              )}<tr><td colSpan={3} className="text-right text-white font-bold text-base pt-2"><Text>Total</Text></td><td className="text-right text-white font-bold text-base pt-2">{invoice.total.toLocaleString()}{invoice.currency}</td></tr></tfoot></table></View>{}{invoice.notes && (
           <View className="pt-3 border-t border-white/10">
             <Text className="text-white/30 text-xs uppercase tracking-wider">
-              <Text>Notes</Text></Text>
+              Notes
+            </Text>
             <Text className="text-white/70 text-sm">{invoice.notes}</Text>
           </View>
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }

@@ -1,9 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/events/hooks/useTickets.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { adaptEventTicket } from "../adapter";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useTickets(eventId?: Id<"events">) {
@@ -21,10 +20,10 @@ export function useTickets(eventId?: Id<"events">) {
     if (!eventId) return;
     try {
       const result = await purchaseTicket({ eventId });
-      UIService.openToast("Billet acheté !", "success");
+      toast.success("Billet acheté !");
       return result;
     } catch (error) {
-      UIService.openToast("Erreur lors de l'achat", "error");
+      toast.error("Erreur lors de l'achat");
       throw error;
     }
   };
@@ -34,10 +33,10 @@ export function useTickets(eventId?: Id<"events">) {
       const result = await validateTicket({
         ticketId: ticketId as Id<"eventTickets">,
       });
-      UIService.openToast("Billet validé", "success");
+      toast.success("Billet validé");
       return result;
     } catch (error) {
-      UIService.openToast("Erreur lors de la validation", "error");
+      toast.error("Erreur lors de la validation");
       throw error;
     }
   };

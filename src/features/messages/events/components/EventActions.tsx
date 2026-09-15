@@ -28,37 +28,23 @@ export function EventActions({
   onBookmark,
 }: EventActionsProps) {
   return (
-    <View
-      style={{
+    <View style={{
         display: "flex",
         flexWrap: "wrap",
         gap: 8,
-      }}
-    >
+      }}>
       {onRsvp && (
         <>
-          <Pressable
-            disabled={disabled}
-            onPress={() => void onRsvp("attending")}
-            style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#cbd5e1", borderStyle: "solid", backgroundColor: currentRsvp === "attending" ? "#dcfce7" : "#ffffff" }}
-          >
+          <Pressable disabled={disabled} onPress={() => void onRsvp("attending")} style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#cbd5e1", borderStyle: "solid", backgroundColor: currentRsvp === "attending" ? "#dcfce7" : "#ffffff", fontWeight: 700 }}>
             {currentRsvp === "attending" ? "✓ Je participe" : "Participer"}
           </Pressable>
 
-          <Pressable
-            disabled={disabled}
-            onPress={() => void onRsvp("interested")}
-            style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#cbd5e1", borderStyle: "solid", backgroundColor: currentRsvp === "interested" ? "#fef3c7" : "#ffffff" }}
-          >
+          <Pressable disabled={disabled} onPress={() => void onRsvp("interested")} style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#cbd5e1", borderStyle: "solid", backgroundColor: currentRsvp === "interested" ? "#fef3c7" : "#ffffff", fontWeight: 700 }}>
             {currentRsvp === "interested" ? "★ Intéressé" : "Intéressé"}
           </Pressable>
 
           {currentRsvp && (
-            <Pressable
-              disabled={disabled}
-              onPress={() => void onRsvp("not_going")}
-              style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", backgroundColor: "#ffffff" }}
-            >
+            <Pressable disabled={disabled} onPress={() => void onRsvp("not_going")} style={{ paddingVertical: 9, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", backgroundColor: "#ffffff" }}>
               Je ne participe plus
             </Pressable>
           )}
@@ -66,23 +52,13 @@ export function EventActions({
       )}
 
       {onLike && (
-        <Pressable
-          disabled={disabled}
-          onPress={() => void onLike()}
-          accessibilityLabel="J'aime l'événement"
-          style={{ paddingVertical: 9, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", backgroundColor: "#ffffff" }}
-        >
+        <Pressable disabled={disabled} onPress={() => void onLike()} accessibilityLabel="J'aime l'événement" style={{ paddingVertical: 9, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", backgroundColor: "#ffffff", fontSize: 16 }}>
           {liked ? "❤️" : "♡"}
         </Pressable>
       )}
 
       {onBookmark && (
-        <Pressable
-          disabled={disabled}
-          onPress={() => void onBookmark()}
-          accessibilityLabel="Enregistrer l'événement"
-          style={{ paddingVertical: 9, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", backgroundColor: "#ffffff" }}
-        >
+        <Pressable disabled={disabled} onPress={() => void onBookmark()} accessibilityLabel="Enregistrer l'événement" style={{ paddingVertical: 9, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", backgroundColor: "#ffffff", fontSize: 16 }}>
           {bookmarked ? "🔖" : "🏷️"}
         </Pressable>
       )}

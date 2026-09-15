@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreateClinicSheet.tsx
@@ -13,6 +12,7 @@ import { ClinicForm } from "../forms/ClinicForm";
 import type { ClinicFormValues } from "../forms/ClinicForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface CreateClinicSheetProps {
   open: boolean;
@@ -38,13 +38,13 @@ export function CreateClinicSheet({
             .filter(Boolean) || [],
         images: [],
       });
-      UIService.openToast("Clinique créée avec succès !", "success");
+      toast.success("Clinique créée avec succès !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erreur lors de la création";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

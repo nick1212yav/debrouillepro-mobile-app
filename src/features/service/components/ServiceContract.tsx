@@ -10,9 +10,7 @@ export function ServiceContract({
   return (
     <View className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
       <Text className="text-white text-sm">Contrat #{contract.id}</Text>
-      <Pressable
-        className="text-white/40" accessibilityHint={contract.url}
-      >
+      <Pressable className="text-white/40" accessibilityHint={contract.url}>
         <Download size={16} />
       </Pressable>
     </View>

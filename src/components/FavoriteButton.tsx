@@ -1,7 +1,7 @@
 import { Pressable, View } from "react-native";
 import { Heart } from "lucide-react-native";
-import { useFavorites } from "@/hooks/use-favorites";
-import type { FavoriteItem } from "@/hooks/use-favorites";
+import { useFavorites } from "@/hooks/use-favorites.ts";
+import type { FavoriteItem } from "@/hooks/use-favorites.ts";
 
 interface FavoriteButtonProps {
   item: FavoriteItem;
@@ -13,26 +13,19 @@ export default function FavoriteButton({ item, className = "" }: FavoriteButtonP
   const fav = isFavorite(item.id);
 
   return (
-    <Pressable
-      onPress={(e) => {
+    <Pressable onPress={(e) => {
         toggle(item);
-      }}
-      className={`flex items-center justify-center cursor-pointer rounded-xl active:scale-90 transition-all ${className}`}
-      style={{ backgroundColor: fav
+      }} whileTap={{ scale: 0.8 }} className={`flex items-center justify-center cursor-pointer rounded-xl active:scale-90 transition-all ${className}`} style={{ backgroundColor: fav
                 ? "rgba(239,68,68,0.25)"
-                : "rgba(255,255,255,0.12)", borderColor: "rgba(239,68,68,0.4)", borderStyle: "solid" }}
-      accessibilityLabel={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
-    >
-      <>
-        <View
-          key={fav ? "filled" : "empty"}
-        >
+                : "rgba(255,255,255,0.12)", borderColor: "rgba(239,68,68,0.4)", borderStyle: "solid" }} accessibilityLabel={fav ? "Retirer des favoris" : "Ajouter aux favoris"}>
+<View>
+        <View key={fav ? "filled" : "empty"} initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ duration: 0.15 }}>
           <Heart
             size={14}
             className={fav ? "text-red-400 fill-red-400" : "text-white/70"}
           />
         </View>
-      </>
+      </View>
     </Pressable>
   );
 }

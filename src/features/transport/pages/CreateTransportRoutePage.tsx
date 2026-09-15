@@ -1,11 +1,11 @@
-import { useRouter } from "expo-router";
-import { UIService } from "@/core/sdk/ui/UIService";
-import { Picker } from "@react-native-picker/picker";
-import { View, Text, Pressable, TextInput } from "react-native";
+import { View, Pressable, Text, TextInput, NativeSyntheticEvent, TextInputChangeEventData } from "react-native";
+
 // src/features/transport/pages/CreateTransportRoutePage.tsx
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Car,
@@ -19,7 +19,7 @@ import {
 } from "lucide-react-native";
 
 export default function CreateTransportRoutePage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const createRoute = useMutation(api.transport.createTransportRoute);
 
   // Correction de la requête pour correspondre à votre schéma existant : getCurrentUser
@@ -62,7 +62,7 @@ export default function CreateTransportRoutePage() {
   }, [currentDriver]);
 
   const handleChange = (
-    e: string,
+    e: NativeSyntheticEvent<TextInputChangeEventData>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -74,9 +74,10 @@ export default function CreateTransportRoutePage() {
     }));
   };
 
-  const handleSubmit = async (e: unknown) => {
+  const handleSubmit = async (e: NativeSyntheticEvent<any>) => {
+    e.preventDefault();
     if (!formData.origin || !formData.destination || !formData.departureTime) {
-      UIService.openToast("Veuillez remplir tous les champs obligatoires.", "error");
+      toast.error("Veuillez remplir tous les champs obligatoires.");
       return;
     }
 
@@ -101,12 +102,12 @@ export default function CreateTransportRoutePage() {
         phone: currentDriver?.phone,
       });
 
-      UIService.openToast("Votre trajet a été publié avec succès !", "success");
-      router("/transport");
+      toast.success("Votre trajet a été publié avec succès !");
+      navigate("/transport");
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Erreur de création du trajet";
-      UIService.openToast(msg, "error");
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -115,247 +116,44 @@ export default function CreateTransportRoutePage() {
   // Écran de chargement des données Convex
   if (currentUser === undefined || drivers === undefined) {
     return (
-      <View className="h-full min-h-screen flex items-center justify-center bg-[#02040c]">
-        <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
-      </View>
+      <View className="h-full min-h-screen flex items-center justify-center bg-[#02040c]"><Loader2 className="w-8 h-8 text-violet-500 animate-spin" /></View>
     );
   }
 
   // ÉCRAN INTERSTITIEL PREMIUM : Redirection si l'utilisateur n'est pas chauffeur
   if (!currentDriver) {
     return (
-      <View className="min-h-screen bg-[#020412] text-white flex flex-col justify-between p-6">
-        {/* Header simple */}
-        <View className="flex items-center gap-3 pt-6">
-          <Pressable
-            onPress={() => router.back()}
-            className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-          >
-            <ArrowLeft size={18} />
-          </Pressable>
-          <Text className="text-xs font-bold text-white/40">
-            Étape d'authentification
-          </Text>
-        </View>
-
-        {/* Visuel & Explication */}
-        <View className="max-w-sm mx-auto text-center space-y-5 my-auto">
-          <View className="w-16 h-16 rounded-3xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400 mx-auto">
-            <Car size={32} />
-          </View>
-          <View className="space-y-2">
-            <Text className="text-xl font-black text-white leading-tight">
-              Devenez d'abord chauffeur
-            </Text>
-            <Text className="text-xs text-white/50 leading-relaxed">
-              Pour garantir la sécurité de notre réseau de transport, vous devez
+      <View className="min-h-screen bg-[#020412] text-white flex flex-col justify-between p-6">{}<View className="flex items-center gap-3 pt-6"><Pressable onPress={() => navigate(-1)} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors"><ArrowLeft size={18} /></Pressable><Text className="text-xs font-bold text-white/40">Étape d'authentification
+          </Text></View>{}<View className="max-w-sm mx-auto text-center space-y-5 my-auto"><View className="w-16 h-16 rounded-3xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400 mx-auto"><Car size={32} /></View><View className="space-y-2"><Text className="text-xl font-black text-white leading-tight">Devenez d'abord chauffeur
+            </Text><Text className="text-xs text-white/50 leading-relaxed">Pour garantir la sécurité de notre réseau de transport, vous devez
               configurer votre profil de conducteur certifié avant de publier
               vos trajets.
-            </Text>
-          </View>
-
-          <View className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex gap-3 text-left">
-            <ShieldAlert
-              size={18}
-              className="text-amber-400 flex-shrink-0 mt-0.5"
-            />
-            <View>
-              <Text className="text-xs font-bold text-white">
-                Création rapide et gratuite
-              </Text>
-              <Text className="text-[10px] text-white/40 mt-0.5">
-                Il vous suffit de renseigner votre véhicule et votre permis de
+            </Text></View><View className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex gap-3 text-left"><ShieldAlert size={18} className="text-amber-400 flex-shrink-0 mt-0.5" /><View><Text className="text-xs font-bold text-white">Création rapide et gratuite
+              </Text><Text className="text-[10px] text-white/40 mt-0.5">Il vous suffit de renseigner votre véhicule et votre permis de
                 conduire une seule fois.
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Actions du bas */}
-        <View className="space-y-3 max-w-sm mx-auto w-full pb-6">
-          <Pressable
-            onPress={() => router("/transport/become-driver")}
-            className="w-full py-4 rounded-2xl bg-violet-600 text-xs font-black text-white flex items-center justify-center gap-2 shadow-lg shadow-violet-600/10"
-          >
-            <Text>S'enregistrer comme chauffeur</Text><ChevronRight size={14} />
-          </Pressable>
-          <Pressable
-            onPress={() => router.back()}
-            className="w-full py-4 rounded-2xl border border-white/5 bg-white/5 text-xs font-bold text-white/80"
-          >
-            <Text>Plus tard</Text></Pressable>
-        </View>
-      </View>
+              </Text></View></View></View>{}<View className="space-y-3 max-w-sm mx-auto w-full pb-6"><Pressable onPress={() => navigate("/transport/become-driver")} className="w-full py-4 rounded-2xl bg-violet-600 text-xs font-black text-white flex items-center justify-center gap-2 transition-colors shadow-lg shadow-violet-600/10"><Text>S'enregistrer comme chauffeur</Text><ChevronRight size={14} /></Pressable><Pressable onPress={() => navigate(-1)} className="w-full py-4 rounded-2xl border border-white/5 bg-white/5 text-xs font-bold text-white/80 transition-colors"><Text>Plus tard</Text></Pressable></View></View>
     );
   }
 
   // FORMULAIRE PREMIUM SI L'UTILISATEUR EST DEJA CHAUFFEUR
   return (
-    <View className="min-h-screen bg-[#020412] text-white flex flex-col">
-      {/* Header */}
-      <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3 border-b border-white/5 bg-[#070914]/40">
-        <Pressable
-          onPress={() => router.back()}
-          className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-        >
-          <ArrowLeft size={18} className="text-white" />
-        </Pressable>
-        <View>
-          <Text className="text-white font-bold text-base">
-            Publier un itinéraire
-          </Text>
-          <Text className="text-[10px] text-emerald-400 flex items-center gap-1 font-bold">
-            <Text className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Compte Chauffeur Connecté ({currentDriver.name})
-          </Text>
-        </View>
-      </View>
-
-      {/* Formulaire de saisie */}
-      <View
-       
-        className="flex-1 p-6 space-y-5 overflow-y-auto max-w-md mx-auto w-full pb-28"
-      >
-        <View className="space-y-4">
-          <Text className="text-xs font-black text-white/30 uppercase tracking-widest">
-            Informations du trajet
-          </Text>
-
-          <View className="gap-3">
-            <View className="relative">
-              <Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">
-                Origine
-              </Text>
-              <View className="relative">
-                <MapPin
-                  size={14}
-                  className="absolute left-4 top-3.5 text-white/30"
-                />
-                <TextInput
-                 
-                 
-                 value={formData.origin}
-                  onChangeText={handleChange}
-                  placeholder="Ex: Kinshasa"
-                  className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-11 pr-4 py-3.5 text-xs text-white outline-none"
-                />
-              </View>
-            </View>
-
-            <View className="relative">
-              <Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">
-                Destination
-              </Text>
-              <View className="relative">
-                <MapPin
-                  size={14}
-                  className="absolute left-4 top-3.5 text-white/30"
-                />
-                <TextInput
-                 
-                 
-                 value={formData.destination}
-                  onChangeText={handleChange}
-                  placeholder="Ex: Lubumbashi"
-                  className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-11 pr-4 py-3.5 text-xs text-white outline-none"
-                />
-              </View>
-            </View>
-          </View>
-
-          <View>
-            <Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">
-              Heure de départ planifiée
-            </Text>
-            <View className="relative">
-              <Clock
-                size={14}
-                className="absolute left-4 top-3.5 text-white/30"
-              />
-              <TextInput
-               
-               
-               value={formData.departureTime}
-                onChangeText={handleChange}
-                placeholder="Ex: Demain à 08:30"
-                className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-11 pr-4 py-3.5 text-xs text-white outline-none"
-              />
-            </View>
-          </View>
-        </View>
-
-        <View className="space-y-4 pt-4 border-t border-white/5">
-          <Text className="text-xs font-black text-white/30 uppercase tracking-widest">
-            Capacité & Tarification
-          </Text>
-
-          <View className="gap-3">
-            <View>
-              <Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">
-                Nombre de places
-              </Text>
-              <TextInput
-               
-               
-                value={formData.seats}
-                onChangeText={handleChange}
-                min={1}
-                className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3.5 text-xs text-white outline-none"
-               keyboardType="numeric"/>
-            </View>
-
-            <View>
-              <Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">
-                Prix par place
-              </Text>
-              <View className="relative">
-                <Coins
-                  size={14}
-                  className="absolute left-4 top-3.5 text-white/30"
-                />
-                <TextInput
-                 
-                 
-                  value={formData.pricePerSeat}
-                  onChangeText={handleChange}
-                  min={1}
-                  className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-11 pr-4 py-3.5 text-xs text-white outline-none"
-                 keyboardType="numeric"/>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View className="space-y-4 pt-4 border-t border-white/5">
-          <Text className="text-[10px] uppercase font-bold text-white/40 block">
-            Note de trajet (Facultatif)
-          </Text>
-          <TextInput
-           
-            value={formData.description}
-            onChangeText={handleChange}
-            placeholder="Ex: Bagages autorisés dans la limite du coffre, climatisation active..."
-           
-            className="w-full bg-white/[0.03] border border-white/5 rounded-2xl p-4 text-xs text-white outline-none"
-           multiline textAlignVertical="top"/>
-        </View>
-
-        {/* Bouton de validation d'action flottant */}
-        <View className="fixed bottom-0 left-0 right-0 p-4 bg-[#020412]/80 border-t border-white/5 z-20 max-w-md mx-auto">
-          <Pressable
-            disabled={loading}
-            className="w-full py-4 rounded-2xl bg-violet-600 text-xs font-black text-white flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {loading ? (
+    <View className="min-h-screen bg-[#020412] text-white flex flex-col">{}<View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3 border-b border-white/5 bg-[#070914]/40"><Pressable onPress={() => navigate(-1)} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors"><ArrowLeft size={18} className="text-white" /></Pressable><View><Text className="text-white font-bold text-base">Publier un itinéraire
+          </Text><Text className="text-[10px] text-emerald-400 flex items-center gap-1 font-bold"><Text className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />Compte Chauffeur Connecté ({currentDriver.name})
+          </Text></View></View>{}<View className="flex-1 p-6 space-y-5 overflow-y-auto max-w-md mx-auto w-full pb-28"><View className="space-y-4"><Text className="text-xs font-black text-white/30 uppercase tracking-widest">Informations du trajet
+          </Text><View className="gap-3"><View className="relative"><Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">Origine
+              </Text><View className="relative"><MapPin size={14} className="absolute left-4 top-3.5 text-white/30" /><TextInput  required value={formData.origin} onChangeText={handleChange} placeholder="Ex: Kinshasa" className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-11 pr-4 py-3.5 text-xs text-white focus:border-violet-500/50 outline-none" /></View></View><View className="relative"><Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">Destination
+              </Text><View className="relative"><MapPin size={14} className="absolute left-4 top-3.5 text-white/30" /><TextInput  required value={formData.destination} onChangeText={handleChange} placeholder="Ex: Lubumbashi" className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-11 pr-4 py-3.5 text-xs text-white focus:border-violet-500/50 outline-none" /></View></View></View><View><Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">Heure de départ planifiée
+            </Text><View className="relative"><Clock size={14} className="absolute left-4 top-3.5 text-white/30" /><TextInput  required value={formData.departureTime} onChangeText={handleChange} placeholder="Ex: Demain à 08:30" className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-11 pr-4 py-3.5 text-xs text-white focus:border-violet-500/50 outline-none" /></View></View></View><View className="space-y-4 pt-4 border-t border-white/5"><Text className="text-xs font-black text-white/30 uppercase tracking-widest">Capacité & Tarification
+          </Text><View className="gap-3"><View><Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">Nombre de places
+              </Text><TextInput  value={formData.seats} onChangeText={handleChange} className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3.5 text-xs text-white focus:border-violet-500/50 outline-none" keyboardType="numeric" /></View><View><Text className="text-[10px] uppercase font-bold text-white/40 block mb-1">Prix par place
+              </Text><View className="relative"><Coins size={14} className="absolute left-4 top-3.5 text-white/30" /><TextInput  value={formData.pricePerSeat} onChangeText={handleChange} className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-11 pr-4 py-3.5 text-xs text-white focus:border-violet-500/50 outline-none" keyboardType="numeric" /></View></View></View></View><View className="space-y-4 pt-4 border-t border-white/5"><Text className="text-[10px] uppercase font-bold text-white/40 block">Note de trajet (Facultatif)
+          </Text><TextInput  value={formData.description} onChangeText={handleChange} placeholder="Ex: Bagages autorisés dans la limite du coffre, climatisation active..." className="w-full bg-white/[0.03] border border-white/5 rounded-2xl p-4 text-xs text-white focus:border-violet-500/50 outline-none" multiline textAlignVertical="top" /></View>{}<View className="fixed bottom-0 left-0 right-0 p-4 bg-[#020412]/80 backdrop-blur-md border-t border-white/5 z-20 max-w-md mx-auto"><Pressable disabled={loading} className="w-full py-4 rounded-2xl bg-violet-600 text-xs font-black text-white flex items-center justify-center gap-2 transition-colors disabled:opacity-50">{loading ? (
               <Loader2 size={16} className="animate-spin text-white" />
             ) : (
               <>
                 <Plus size={16} />
-                <Text>Publier l'itinéraire</Text></>
-            )}
-          </Pressable>
-        </View>
-      </View>
-    </View>
+                Publier l'itinéraire
+              </>
+            )}</Pressable></View></View></View>
   );
 }

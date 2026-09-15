@@ -23,10 +23,7 @@ export function ProductDocuments({ documents }: Props) {
         Documents
       </Text>
       {documents.map((doc) => (
-        <Pressable
-          key={doc.id}
-          className="flex items-center gap-3 p-3 rounded-xl bg-white/5" accessibilityHint={doc.url}
-        >
+        <Pressable key={doc.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/5 transition-colors" accessibilityHint={doc.url}>
           <FileText size={16} className="text-purple-400" />
           <Text className="flex-1 text-white/80 text-sm">{doc.title}</Text>
           <Download size={14} className="text-white/30" />

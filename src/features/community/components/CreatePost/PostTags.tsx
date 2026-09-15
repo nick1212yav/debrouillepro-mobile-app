@@ -1,4 +1,5 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
+
 // src/features/community/components/CreatePost/PostTags.tsx
 import { useState } from "react";
 import { X, Plus } from "lucide-react-native";
@@ -29,27 +30,16 @@ export function PostTags({ tags, onChange }: Props) {
   };
 
   return (
-    <View>
-      <Text className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-2">
-        Tags
-      </Text>
-      <View className="flex flex-wrap gap-1.5">
-        {TAGS.map((tag) => {
+    <View><Text className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-2">Tags
+      </Text><View className="flex flex-wrap gap-1.5">{TAGS.map((tag) => {
           const sel = tags.includes(tag);
           return (
-            <Pressable
-              key={tag}
-              onPress={() => toggleTag(tag)}
-              className="text-[11px] font-semibold px-2.5 py-1 rounded-xl"
-              style={{ backgroundColor: sel
-                                ? "rgba(139,92,246,0.2)"
-                                : "rgba(255,255,255,0.05)", borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}
-            >
+            <Pressable key={tag} onPress={() => toggleTag(tag)} className="text-[11px] font-semibold px-2.5 py-1 rounded-xl transition-all" style={{ backgroundColor: sel
+                              ? "rgba(139,92,246,0.2)"
+                              : "rgba(255,255,255,0.05)", borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}>
               {tag}
             </Pressable>
           );
-        })}
-      </View>
-    </View>
+        })}</View></View>
   );
 }

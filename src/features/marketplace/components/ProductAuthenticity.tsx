@@ -18,9 +18,7 @@ export function ProductAuthenticity({ verified, certificateUrl }: Props) {
         Produit authentifié
       </Text>
       {certificateUrl && (
-        <Pressable
-          className="text-[10px] text-green-300/70 underline ml-auto" accessibilityHint={certificateUrl}
-        >
+        <Pressable className="text-[10px] text-green-300/70 underline ml-auto" accessibilityHint={certificateUrl}>
           Voir le certificat
         </Pressable>
       )}

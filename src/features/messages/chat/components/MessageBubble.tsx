@@ -33,97 +33,19 @@ export function MessageBubble({
   const metaClass = own ? "text-black/40" : "text-white/30";
 
   return (
-    <View
-      className={["flex w-full", own ? "justify-end" : "justify-start"].join(
+    <View className={["flex w-full", own ? "justify-end" : "justify-start"].join(
         " ",
-      )}
-    >
-      <MessageContextMenu
-        message={message}
-        currentUserId={currentUserId}
-        onReply={onReply}
-        onForward={onForward}
-      >
-        <View
-          className={[
+      )}><MessageContextMenu message={message} currentUserId={currentUserId} onReply={onReply} onForward={onForward}><View className={[
             "min-w-0 max-w-[82%] rounded-2xl px-3 py-2",
             bubbleClass,
-          ].join(" ")}
-        >
-          {/* ============================================================ */}
-          {/* EXPÉDITEUR                                                    */}
-          {/* ============================================================ */}
-
-          {!own && (
-            <Text className="mb-1 truncate text-xs font-semibold opacity-60">
-              {senderName}
-            </Text>
-          )}
-
-          {/* ============================================================ */}
-          {/* RÉPONSE                                                       */}
-          {/* ============================================================ */}
-
-          {message.replyToId && (
+          ].join(" ")}>{}{}{}{!own && (
+            <Text className="mb-1 truncate text-xs font-semibold opacity-60">{senderName}</Text>
+          )}{}{}{}{message.replyToId && (
             <ReplyPreview replyToId={message.replyToId} own={own} />
-          )}
-
-          {/* ============================================================ */}
-          {/* CONTENU                                                       */}
-          {/* ============================================================ */}
-          {/*
-           * MessageBubble ne connaît pas les détails des différents
-           * types de messages.
-           *
-           * Toute la logique spécialisée est déléguée à
-           * MessageTypeRenderer :
-           *
-           * text
-           * voice
-           * image
-           * video
-           * file
-           * location
-           * contact
-           * event
-           * job
-           * property
-           * poll
-           * payment
-           * etc.
-           */}
-
-          <MessageTypeRenderer message={message} own={own} />
-
-          {/* ============================================================ */}
-          {/* MÉTADONNÉES                                                   */}
-          {/* ============================================================ */}
-
-          <View
-            className={[
+          )}{}{}{}{}<MessageTypeRenderer message={message} own={own} />{}{}{}<View className={[
               "mt-1 flex items-center justify-end gap-1 text-[10px]",
               metaClass,
-            ].join(" ")}
-          >
-            {chatService.isEdited(message) && <Text><Text>modifié</Text></Text>}
-
-            <Text>{chatService.formatTime(message)}</Text>
-
-            {own && <MessageStatus status={message.status} />}
-          </View>
-
-          {/* ============================================================ */}
-          {/* RÉACTIONS                                                     */}
-          {/* ============================================================ */}
-
-          <MessageReactions
-            messageId={message._id}
-            reactions={message.reactions}
-            own={own}
-          />
-        </View>
-      </MessageContextMenu>
-    </View>
+            ].join(" ")}>{chatService.isEdited(message) && <Text>modifié</Text>}<Text>{chatService.formatTime(message)}</Text>{own && <MessageStatus status={message.status} />}</View>{}{}{}<MessageReactions messageId={message._id} reactions={message.reactions} own={own} /></View></MessageContextMenu></View>
   );
 }
 

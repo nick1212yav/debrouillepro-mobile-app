@@ -1,7 +1,27 @@
-import { View, Pressable, Text, Linking } from "react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+// src/pages/home/_components/NearbyNow.tsx
 import {
-  AlertCircle,
+  View,
+  Pressable,
+  Text,
+  ScrollView,
+  Animated,
+  Easing,
+  StyleSheet,
+  Linking,
+  Platform,
+  type ViewStyle,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type ComponentType,
+} from "react";
+import {
   Building2,
   CalendarDays,
   ChevronRight,
@@ -14,7 +34,6 @@ import {
   Search,
   ShoppingBag,
   Sparkles,
-  Store,
   Utensils,
   Wrench,
 } from "lucide-react-native";
@@ -48,21 +67,6 @@ interface GeoState {
   message?: string;
 }
 
-interface NearbyItem {
-  id: string;
-  name: string;
-  category: NearbyCategory;
-  categoryLabel: string;
-  distanceMeters: number;
-  distanceLabel: string;
-  lat: number;
-  lng: number;
-  address?: string;
-  icon: typeof MapPin;
-  accent: string;
-  emoji: string;
-}
-
 type NearbyCategory =
   | "service"
   | "shop"
@@ -73,85 +77,62 @@ type NearbyCategory =
   | "community"
   | "place";
 
+interface NearbyItem {
+  id: string;
+  name: string;
+  category: NearbyCategory;
+  categoryLabel: string;
+  distanceMeters: number;
+  distanceLabel: string;
+  lat: number;
+  lng: number;
+  address?: string;
+  Icon: ComponentType<{ size?: number; color?: string }>;
+  accent: string;
+  emoji: string;
+}
+
 /* ============================================================================
- * CONFIGURATION
+ * CONFIG
  * ========================================================================== */
 
+const isBrowser = typeof window !== "undefined";
 const SEARCH_RADIUS_METERS = 2500;
 
 const CATEGORY_CONFIG: Record<
   NearbyCategory,
-  {
-    label: string;
-    accent: string;
-    emoji: string;
-    icon: typeof MapPin;
-  }
+  { label: string; accent: string; emoji: string; Icon: typeof MapPin }
 > = {
-  service: {
-    label: "Service",
-    accent: "#3B82F6",
-    emoji: "🛠️",
-    icon: Wrench,
-  },
-
+  service: { label: "Service", accent: "#60A5FA", emoji: "🛠️", Icon: Wrench },
   shop: {
     label: "Commerce",
-    accent: "#F59E0B",
+    accent: "#FBBF24",
     emoji: "🛍️",
-    icon: ShoppingBag,
+    Icon: ShoppingBag,
   },
-
-  food: {
-    label: "À manger",
-    accent: "#F97316",
-    emoji: "🍽️",
-    icon: Utensils,
-  },
-
-  health: {
-    label: "Santé",
-    accent: "#EF4444",
-    emoji: "❤️",
-    icon: Crosshair,
-  },
-
+  food: { label: "À manger", accent: "#FB923C", emoji: "🍽️", Icon: Utensils },
+  health: { label: "Santé", accent: "#F87171", emoji: "❤️", Icon: Crosshair },
   event: {
     label: "Événement",
-    accent: "#EC4899",
+    accent: "#F472B6",
     emoji: "🎉",
-    icon: CalendarDays,
+    Icon: CalendarDays,
   },
-
   job: {
     label: "Opportunité",
-    accent: "#10B981",
+    accent: "#34D399",
     emoji: "💼",
-    icon: Building2,
+    Icon: Building2,
   },
-
   community: {
     label: "Communauté",
-    accent: "#8B5CF6",
+    accent: "#A78BFA",
     emoji: "👥",
-    icon: MapPinned,
+    Icon: MapPinned,
   },
-
-  place: {
-    label: "À proximité",
-    accent: "#06B6D4",
-    emoji: "📍",
-    icon: MapPin,
-  },
+  place: { label: "À proximité", accent: "#22D3EE", emoji: "📍", Icon: MapPin },
 };
 
-/**
- * Requêtes OSM.
- *
- * On interroge plusieurs familles en UNE requête Overpass.
- * Cela évite l'ancien comportement qui mélangeait aléatoirement
- * les catégories et ne retournait qu'un seul lieu.
- */
 const OVERPASS_FILTERS = [
   'node["amenity"~"restaurant|cafe|fast_food|pharmacy|clinic|hospital|bank|school|fuel"]',
   'node["shop"]',
@@ -172,29 +153,23 @@ function haversineMeters(
   lng2: number,
 ): number {
   const R = 6371000;
-
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
-
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLng / 2) ** 2;
-
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function formatDistance(meters: number): string {
-  if (meters < 1000) {
-    return `${Math.max(1, Math.round(meters))} m`;
-  }
-
+  if (meters < 1000) return `${Math.max(1, Math.round(meters))} m`;
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
 /* ============================================================================
- * OSM CATEGORY RESOLUTION
+ * CATEGORY RESOLUTION
  * ========================================================================== */
 
 function resolveCategory(tags: Record<string, string>): NearbyCategory {
@@ -212,7 +187,6 @@ function resolveCategory(tags: Record<string, string>): NearbyCategory {
   ) {
     return "health";
   }
-
   if (
     amenity === "restaurant" ||
     amenity === "cafe" ||
@@ -221,15 +195,8 @@ function resolveCategory(tags: Record<string, string>): NearbyCategory {
   ) {
     return "food";
   }
-
-  if (shop) {
-    return "shop";
-  }
-
-  if (craft || office) {
-    return "service";
-  }
-
+  if (shop) return "shop";
+  if (craft || office) return "service";
   if (
     tourism === "hotel" ||
     tourism === "attraction" ||
@@ -238,11 +205,7 @@ function resolveCategory(tags: Record<string, string>): NearbyCategory {
   ) {
     return "place";
   }
-
-  if (amenity) {
-    return "service";
-  }
-
+  if (amenity) return "service";
   return "place";
 }
 
@@ -253,10 +216,7 @@ function resolveCategory(tags: Record<string, string>): NearbyCategory {
 async function reverseGeocode(
   lat: number,
   lng: number,
-): Promise<{
-  city: string;
-  country: string;
-}> {
+): Promise<{ city: string; country: string }> {
   try {
     const url =
       `https://nominatim.openstreetmap.org/reverse` +
@@ -273,12 +233,7 @@ async function reverseGeocode(
       },
     });
 
-    if (!response.ok) {
-      return {
-        city: "",
-        country: "",
-      };
-    }
+    if (!response.ok) return { city: "", country: "" };
 
     const data = (await response.json()) as {
       address?: {
@@ -292,7 +247,6 @@ async function reverseGeocode(
     };
 
     const address = data.address;
-
     return {
       city:
         address?.city ??
@@ -304,10 +258,7 @@ async function reverseGeocode(
       country: address?.country ?? "",
     };
   } catch {
-    return {
-      city: "",
-      country: "",
-    };
+    return { city: "", country: "" };
   }
 }
 
@@ -318,8 +269,6 @@ async function reverseGeocode(
 async function fetchNearbyPlaces(
   coordinates: Coordinates,
 ): Promise<NearbyItem[]> {
-  const filter = OVERPASS_FILTERS.join(";");
-
   const query = `
 [out:json][timeout:12];
 (
@@ -333,9 +282,7 @@ out center tags;
 
   const response = await fetch("https://overpass-api.de/api/interpreter", {
     method: "POST",
-    headers: {
-      "Content-Type": "text/plain;charset=UTF-8",
-    },
+    headers: { "Content-Type": "text/plain;charset=UTF-8" },
     body: query,
   });
 
@@ -348,10 +295,7 @@ out center tags;
       id: number;
       lat?: number;
       lon?: number;
-      center?: {
-        lat: number;
-        lon: number;
-      };
+      center?: { lat: number; lon: number };
       tags?: Record<string, string>;
     }>;
   };
@@ -361,19 +305,12 @@ out center tags;
   const normalized = elements
     .map((element): NearbyItem | null => {
       const tags = element.tags ?? {};
-
       const lat = element.lat ?? element.center?.lat;
       const lng = element.lon ?? element.center?.lon;
-
-      if (typeof lat !== "number" || typeof lng !== "number") {
-        return null;
-      }
+      if (typeof lat !== "number" || typeof lng !== "number") return null;
 
       const name = tags.name ?? tags["name:fr"] ?? tags.brand ?? tags.operator;
-
-      if (!name?.trim()) {
-        return null;
-      }
+      if (!name?.trim()) return null;
 
       const category = resolveCategory(tags);
       const config = CATEGORY_CONFIG[category];
@@ -399,27 +336,19 @@ out center tags;
         lat,
         lng,
         address: address || undefined,
-        icon: config.icon,
+        Icon: config.Icon,
         accent: config.accent,
         emoji: config.emoji,
       };
     })
     .filter((item): item is NearbyItem => item !== null);
 
-  /**
-   * Déduplication par nom.
-   */
   const seen = new Set<string>();
-
   return normalized
     .sort((a, b) => a.distanceMeters - b.distanceMeters)
     .filter((item) => {
       const key = item.name.toLowerCase();
-
-      if (seen.has(key)) {
-        return false;
-      }
-
+      if (seen.has(key)) return false;
       seen.add(key);
       return true;
     })
@@ -439,51 +368,270 @@ function buildMapUrl(lat: number, lng: number): string {
 }
 
 /* ============================================================================
+ * FADE UP
+ * ========================================================================== */
+
+function FadeUp({
+  delay = 0,
+  distance = 12,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: ViewStyle;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 480,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * PULSING HEADER ICON
+ * ========================================================================== */
+
+function PulsingNavIcon() {
+  const pulse = useRef(new Animated.Value(0)).current;
+  const ring = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    Animated.loop(
+      Animated.timing(ring, {
+        toValue: 1,
+        duration: 2200,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, [pulse, ring]);
+
+  const glowScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.06],
+  });
+  const ringScale = ring.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.9, 1.65],
+  });
+  const ringOpacity = ring.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.65, 0],
+  });
+
+  return (
+    <View style={styles.headerIconWrap}>
+      <Animated.View
+        style={[
+          styles.headerIconRing,
+          { opacity: ringOpacity, transform: [{ scale: ringScale }] },
+        ]}
+      />
+      <Animated.View
+        style={[styles.headerIconHalo, { transform: [{ scale: glowScale }] }]}
+      />
+      <LinearGradient
+        colors={["#67E8F9", "#22D3EE", "#06B6D4"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerIconGradient}
+      >
+        <Navigation size={19} color="#fff" strokeWidth={2.3} />
+      </LinearGradient>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * REFRESH BUTTON
+ * ========================================================================== */
+
+function RefreshButton({
+  onPress,
+  refreshing,
+}: {
+  onPress: () => void;
+  refreshing: boolean;
+}) {
+  const rotate = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (refreshing) {
+      Animated.loop(
+        Animated.timing(rotate, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ).start();
+    } else {
+      rotate.setValue(0);
+    }
+  }, [refreshing, rotate]);
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const rotation = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={refreshing}
+        accessibilityLabel="Actualiser les lieux proches"
+        style={({ pressed }) => [
+          styles.refreshBtn,
+          pressed && !refreshing && styles.pressed,
+        ]}
+      >
+        <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+          <RefreshCw size={13} color="rgba(255,255,255,0.75)" />
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
  * SKELETON
  * ========================================================================== */
 
 function NearbySkeleton() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  const opacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 0.9],
+  });
+
   return (
-    <View className="mx-5 mt-4">
-      <View
-        className="overflow-hidden rounded-[30px] p-4"
-        style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-      >
-        <View className="flex items-center gap-3">
-          <View
-            className="h-11 w-11 animate-pulse rounded-2xl"
-            style={{ backgroundColor: "rgba(6,182,212,.13)" }}
-          />
+    <View style={styles.wrapper}>
+      <View style={styles.skeletonCard}>
+        <LinearGradient
+          colors={[
+            "rgba(6,182,212,0.12)",
+            "rgba(15,7,32,0.6)",
+            "rgba(10,6,24,0.85)",
+          ]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.borderRing} pointerEvents="none" />
 
-          <View className="flex-1 space-y-2">
-            <View
-              className="h-3 w-36 animate-pulse rounded-full"
-              style={{ backgroundColor: "rgba(255,255,255,.08)" }}
-            />
-
-            <View
-              className="h-2.5 w-52 animate-pulse rounded-full"
-              style={{ backgroundColor: "rgba(255,255,255,.05)" }}
-            />
+        <View style={styles.skeletonHeader}>
+          <Animated.View style={[styles.skeletonLogo, { opacity }]} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <Animated.View style={[styles.skeletonLine1, { opacity }]} />
+            <Animated.View style={[styles.skeletonLine2, { opacity }]} />
           </View>
         </View>
 
-        <View className="mt-4 flex gap-2 overflow-hidden">
-          {[0, 1, 2].map((item) => (
-            <View
-              key={item}
-              className="h-28 min-w-[150px] animate-pulse rounded-2xl"
-              style={{ backgroundColor: "rgba(255,255,255,.045)" }}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.cardsRow}
+        >
+          {[0, 1, 2].map((i) => (
+            <Animated.View
+              key={i}
+              style={[styles.skeletonCardMini, { opacity }]}
             />
           ))}
-        </View>
+        </ScrollView>
       </View>
     </View>
   );
 }
 
 /* ============================================================================
- * PERMISSION / ERROR STATE
+ * PERMISSION / ERROR
  * ========================================================================== */
 
 function NearbyPermission({
@@ -493,84 +641,227 @@ function NearbyPermission({
   onRetry: () => void;
   message: string;
 }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.95,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
   return (
-    <View
-      className="mx-5 mt-4"
-    >
-      <View
-        className="relative overflow-hidden rounded-[30px] p-4"
-        style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-      >
-        <View className="flex items-center gap-3">
-          <View
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: "rgba(59,130,246,.13)", borderWidth: 1, borderColor: "rgba(96,165,250,.15)", borderStyle: "solid" }}
-          >
-            <LocateFixed size={20} className="text-blue-300" />
+    <FadeUp distance={12}>
+      <View style={styles.wrapper}>
+        <View style={styles.permissionCard}>
+          <LinearGradient
+            colors={[
+              "rgba(59,130,246,0.14)",
+              "rgba(15,7,32,0.6)",
+              "rgba(10,6,24,0.85)",
+            ]}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.permissionBorder} pointerEvents="none" />
+
+          <View style={styles.permissionRow}>
+            <LinearGradient
+              colors={["rgba(96,165,250,0.28)", "rgba(59,130,246,0.08)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.permissionIcon}
+            >
+              <LocateFixed size={20} color="#93C5FD" />
+            </LinearGradient>
+
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.permissionTitle}>Activez votre position</Text>
+              <Text style={styles.permissionSub}>{message}</Text>
+            </View>
+
+            <Animated.View style={{ transform: [{ scale }] }}>
+              <Pressable
+                onPress={onRetry}
+                onPressIn={onPressIn}
+                onPressOut={onPressOut}
+                style={styles.permissionRetry}
+              >
+                <RefreshCw size={11} color="#BFDBFE" />
+                <Text style={styles.permissionRetryText}>Réessayer</Text>
+              </Pressable>
+            </Animated.View>
           </View>
-
-          <View className="min-w-0 flex-1">
-            <Text className="text-[12px] font-bold text-white">
-              Activez votre position
-            </Text>
-
-            <Text className="mt-0.5 text-[9px] leading-relaxed text-white/35">
-              {message}
-            </Text>
-          </View>
-
-          <Pressable
-           
-            onPress={onRetry}
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[9px] font-bold text-blue-200"
-            style={{ backgroundColor: "rgba(59,130,246,.12)", borderWidth: 1, borderColor: "rgba(96,165,250,.15)", borderStyle: "solid" }}
-          >
-            <RefreshCw size={11} />
-            <Text>Réessayer</Text></Pressable>
         </View>
       </View>
-    </View>
+    </FadeUp>
   );
 }
 
 /* ============================================================================
- * COMPONENT
+ * NEARBY CARD
+ * ========================================================================== */
+
+function NearbyCard({
+  item,
+  index,
+  onPress,
+}: {
+  item: NearbyItem;
+  index: number;
+  onPress: () => void;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const Icon = item.Icon;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 480,
+      delay: 220 + index * 60,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, index]);
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.965,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const translateX = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [18, 0],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [{ translateX }, { scale }],
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={styles.nearbyCard}
+      >
+        <LinearGradient
+          colors={[`${item.accent}18`, "rgba(255,255,255,0)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* Top row */}
+        <View style={styles.nearbyTopRow}>
+          <View
+            style={[
+              styles.nearbyIcon,
+              {
+                backgroundColor: `${item.accent}22`,
+                borderColor: `${item.accent}55`,
+              },
+            ]}
+          >
+            <Icon size={15} color={item.accent} />
+          </View>
+          <Text style={styles.nearbyEmoji}>{item.emoji}</Text>
+        </View>
+
+        {/* Category */}
+        <Text
+          style={[styles.nearbyCategory, { color: item.accent }]}
+          numberOfLines={1}
+        >
+          {item.categoryLabel.toUpperCase()}
+        </Text>
+
+        {/* Name */}
+        <Text style={styles.nearbyName} numberOfLines={2}>
+          {item.name}
+        </Text>
+
+        {/* Distance */}
+        <View style={styles.nearbyDistanceRow}>
+          <View style={styles.nearbyDistanceBadge}>
+            <MapPin size={9} color="#67E8F9" />
+          </View>
+          <Text style={styles.nearbyDistance}>{item.distanceLabel}</Text>
+        </View>
+
+        {/* Address */}
+        {item.address ? (
+          <Text style={styles.nearbyAddress} numberOfLines={1}>
+            {item.address}
+          </Text>
+        ) : null}
+
+        {/* Footer */}
+        <View style={styles.nearbyFooter}>
+          <Text style={styles.nearbyFooterText}>Voir sur la carte</Text>
+          <ChevronRight size={11} color="rgba(255,255,255,0.35)" />
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * MAIN
  * ========================================================================== */
 
 export default function NearbyNow({ onNavigate }: NearbyNowProps) {
-  const [geo, setGeo] = useState<GeoState>({
-    status: "idle",
-  });
-
+  const [geo, setGeo] = useState<GeoState>({ status: "idle" });
   const [items, setItems] = useState<NearbyItem[]>([]);
-
   const [loadingPlaces, setLoadingPlaces] = useState(false);
-
   const [refreshing, setRefreshing] = useState(false);
 
+  /* ───── LOCATION ───── */
   const requestLocation = useCallback(() => {
-    if (!("geolocation" in undefined)) {
+    if (
+      !isBrowser ||
+      typeof navigator === "undefined" ||
+      !("geolocation" in navigator)
+    ) {
       setGeo({
         status: "unsupported",
         message: "La géolocalisation n'est pas disponible sur cet appareil.",
       });
-
       return;
     }
 
-    setGeo({
-      status: "loading",
-    });
+    setGeo({ status: "loading" });
 
-    undefined.getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       async (position) => {
         const coordinates = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
-
         const location = await reverseGeocode(coordinates.lat, coordinates.lng);
-
         setGeo({
           status: "ready",
           coordinates,
@@ -585,10 +876,8 @@ export default function NearbyNow({ onNavigate }: NearbyNowProps) {
             message:
               "Votre position est nécessaire pour afficher ce qui se trouve autour de vous.",
           });
-
           return;
         }
-
         setGeo({
           status: "error",
           message: "Impossible d'obtenir votre position pour le moment.",
@@ -602,12 +891,11 @@ export default function NearbyNow({ onNavigate }: NearbyNowProps) {
     );
   }, []);
 
+  /* ───── LOAD PLACES ───── */
   const loadNearby = useCallback(async (coordinates: Coordinates) => {
     setLoadingPlaces(true);
-
     try {
       const nearby = await fetchNearbyPlaces(coordinates);
-
       setItems(nearby);
     } catch {
       setItems([]);
@@ -617,41 +905,46 @@ export default function NearbyNow({ onNavigate }: NearbyNowProps) {
     }
   }, []);
 
+  /* ───── REFRESH ───── */
   const refresh = useCallback(() => {
     if (!geo.coordinates) {
       requestLocation();
       return;
     }
-
     setRefreshing(true);
-    loadNearby(geo.coordinates);
+    void loadNearby(geo.coordinates);
   }, [geo.coordinates, requestLocation, loadNearby]);
 
+  /* ───── EFFECTS ───── */
   useEffect(() => {
     requestLocation();
   }, [requestLocation]);
 
   useEffect(() => {
-    if (geo.status !== "ready" || !geo.coordinates) {
-      return;
-    }
-
-    loadNearby(geo.coordinates);
+    if (geo.status !== "ready" || !geo.coordinates) return;
+    void loadNearby(geo.coordinates);
   }, [geo.status, geo.coordinates, loadNearby]);
 
   const visibleItems = useMemo(() => items.slice(0, 5), [items]);
 
-  /* --------------------------------------------------------------------------
-   * LOADING
-   * ------------------------------------------------------------------------ */
+  /* ───── LINK ───── */
+  const openMapLink = useCallback(async (lat: number, lng: number) => {
+    const url = buildMapUrl(lat, lng);
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) await Linking.openURL(url);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  /* ========================================================================
+   * STATES
+   * ====================================================================== */
 
   if (geo.status === "idle" || geo.status === "loading") {
     return <NearbySkeleton />;
   }
-
-  /* --------------------------------------------------------------------------
-   * PERMISSION / UNSUPPORTED
-   * ------------------------------------------------------------------------ */
 
   if (
     geo.status === "denied" ||
@@ -669,291 +962,579 @@ export default function NearbyNow({ onNavigate }: NearbyNowProps) {
     );
   }
 
-  /* --------------------------------------------------------------------------
-   * READY BUT LOADING PLACES
-   * ------------------------------------------------------------------------ */
-
   if (loadingPlaces && visibleItems.length === 0) {
     return <NearbySkeleton />;
   }
 
-  /* --------------------------------------------------------------------------
-   * EMPTY
-   * ------------------------------------------------------------------------ */
-
   if (geo.status === "ready" && visibleItems.length === 0) {
     return (
-      <View
-        className="mx-5 mt-4"
-      >
-        <View
-          className="rounded-[30px] p-4"
-          style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-        >
-          <View className="flex items-center gap-3">
-            <View
-              className="flex h-11 w-11 items-center justify-center rounded-2xl"
-              style={{ backgroundColor: "rgba(6,182,212,.10)" }}
-            >
-              <MapPin size={19} className="text-cyan-300" />
+      <FadeUp distance={12}>
+        <View style={styles.wrapper}>
+          <View style={styles.emptyCard}>
+            <LinearGradient
+              colors={[
+                "rgba(6,182,212,0.12)",
+                "rgba(15,7,32,0.6)",
+                "rgba(10,6,24,0.85)",
+              ]}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.emptyBorder} pointerEvents="none" />
+
+            <View style={styles.emptyRow}>
+              <LinearGradient
+                colors={["rgba(34,211,238,0.28)", "rgba(6,182,212,0.08)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emptyIcon}
+              >
+                <MapPin size={19} color="#67E8F9" />
+              </LinearGradient>
+
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.emptyTitle}>
+                  Rien de trouvé autour de vous
+                </Text>
+                <Text style={styles.emptySub} numberOfLines={2}>
+                  {geo.city
+                    ? `Nous cherchons autour de ${geo.city}.`
+                    : "Aucun lieu référencé à proximité pour le moment."}
+                </Text>
+              </View>
+
+              <RefreshButton onPress={refresh} refreshing={refreshing} />
             </View>
-
-            <View className="min-w-0 flex-1">
-              <Text className="text-[12px] font-bold text-white">
-                Rien de trouvé autour de vous
-              </Text>
-
-              <Text className="mt-0.5 text-[9px] text-white/35">
-                {geo.city
-                  ? `Nous cherchons autour de ${geo.city}.`
-                  : "Aucun lieu référencé à proximité pour le moment."}
-              </Text>
-            </View>
-
-            <Pressable
-             
-              onPress={refresh}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-white/45"
-              style={{ backgroundColor: "rgba(255,255,255,.05)" }}
-              accessibilityLabel="Actualiser"
-            >
-              <RefreshCw size={13} />
-            </Pressable>
           </View>
         </View>
-      </View>
+      </FadeUp>
     );
   }
 
-  /* --------------------------------------------------------------------------
+  /* ========================================================================
    * MAIN
-   * ------------------------------------------------------------------------ */
+   * ====================================================================== */
 
   return (
-    <>
-      <View
-        className="mx-5 mt-4"
-        accessibilityLabel="À proximité"
-      >
-        <View
-          className="relative overflow-hidden rounded-[30px]"
-          style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}
-        >
-          {/* ------------------------------------------------------------------
-           * BACKGROUND GLOW
-           * ---------------------------------------------------------------- */}
-
-          <View
-            className="absolute -right-20 -top-24 h-56 w-56 rounded-full"
-            style={{  }}
+    <FadeUp distance={18}>
+      <View style={styles.wrapper} accessibilityLabel="À proximité">
+        <View style={styles.mainCard}>
+          <LinearGradient
+            colors={[
+              "rgba(6,182,212,0.14)",
+              "rgba(15,7,32,0.7)",
+              "rgba(10,6,24,0.92)",
+            ]}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
           />
 
-          <View
-            className="absolute -bottom-24 left-0 h-48 w-48 rounded-full"
-            style={{  }}
-          />
+          <View style={styles.topHighlight} pointerEvents="none" />
+          <View style={styles.mainBorder} pointerEvents="none" />
+          <View style={styles.mainOrb1} pointerEvents="none" />
+          <View style={styles.mainOrb2} pointerEvents="none" />
 
-          {/* ------------------------------------------------------------------
-           * HEADER
-           * ---------------------------------------------------------------- */}
+          {/* ───── HEADER ───── */}
+          <View style={styles.header}>
+            <PulsingNavIcon />
 
-          <View className="relative flex items-center gap-3 px-4 pb-3 pt-4">
-            <View
-              className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
-              style={{ borderWidth: 1, borderColor: "rgba(103,232,249,.20)", borderStyle: "solid" }}
-            >
-              <Navigation
-                size={19}
-                className="text-cyan-300"
-                strokeWidth={2.2}
-              />
-
-              <Text
-                className="absolute inset-1 rounded-full"
-                style={{ borderWidth: 1, borderColor: "rgba(103,232,249,.45)", borderStyle: "solid" }}
-              />
-            </View>
-
-            <View className="min-w-0 flex-1">
-              <View className="flex items-center gap-2">
-                <Text className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">
-                  NearbyNow
-                </Text>
-
-                <Text
-                  className="h-1.5 w-1.5 rounded-full bg-cyan-400"
-                 
-                />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <View style={styles.headerEyebrowRow}>
+                <Text style={styles.headerEyebrow}>NEARBYNOW</Text>
+                <View style={styles.headerDot} />
               </View>
-
-              <Text className="mt-0.5 truncate text-[15px] font-bold text-white">
-                Autour de vous
-              </Text>
-
-              <Text className="mt-0.5 flex items-center gap-1 text-[10px] text-white/40">
-                <MapPin size={9} />
-
-                {geo.city ? geo.city : "Votre position actuelle"}
-
-                <Text className="text-white/20">·</Text>
-
-                <Text>rayon {SEARCH_RADIUS_METERS / 1000} km</Text>
-              </Text>
+              <Text style={styles.headerTitle}>Autour de vous</Text>
+              <View style={styles.headerSubRow}>
+                <MapPin size={9} color="rgba(255,255,255,0.5)" />
+                <Text style={styles.headerSub} numberOfLines={1}>
+                  {geo.city ? geo.city : "Votre position actuelle"}
+                  <Text style={{ color: "rgba(255,255,255,0.3)" }}> · </Text>
+                  rayon {SEARCH_RADIUS_METERS / 1000}km
+                </Text>
+              </View>
             </View>
 
-            <Pressable
-             
-              onPress={refresh}
-              disabled={refreshing}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/35 disabled:cursor-default"
-              style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.06)", borderStyle: "solid" }}
-              accessibilityLabel="Actualiser les lieux proches"
-            >
-              <RefreshCw
-                size={13}
-                className={refreshing ? "animate-spin" : ""}
-              />
-            </Pressable>
+            <RefreshButton onPress={refresh} refreshing={refreshing} />
           </View>
 
-          {/* ------------------------------------------------------------------
-           * HORIZONTAL CARDS
-           * ---------------------------------------------------------------- */}
-
-          <View className="relative flex gap-2 overflow-x-auto px-3 pb-3 scrollbar-none">
-            {visibleItems.map((item, index) => {
-              const Icon = item.icon;
-
-              return (
-                <Pressable
-                  key={item.id}
-                  onPress={() => {
-                    Linking.openURL(String(buildMapUrl(item.lat, item.lng)));
-                  }}
-                  className="group relative min-w-[172px] max-w-[190px] flex-1 overflow-hidden rounded-[23px] p-3 text-left"
-                  style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.065)", borderStyle: "solid" }}
-                >
-                  {/* Top visual */}
-                  <View className="flex items-center justify-between">
-                    <View
-                      className="flex h-9 w-9 items-center justify-center rounded-xl"
-                      style={{ backgroundColor: `${item.accent}16`, borderStyle: "solid" }}
-                    >
-                      <Icon
-                        size={15}
-                        style={{
-                          color: item.accent,
-                        }}
-                      />
-                    </View>
-
-                    <Text className="text-[15px]">
-                      {item.emoji}
-                    </Text>
-                  </View>
-
-                  {/* Category */}
-                  <View className="mt-3">
-                    <Text
-                      className="text-[8px] font-black uppercase tracking-[0.08em]"
-                      style={{
-                        color: item.accent,
-                      }}
-                    >
-                      {item.categoryLabel}
-                    </Text>
-                  </View>
-
-                  {/* Name */}
-                  <Text className="mt-1 min-h-[30px] text-[12px] font-bold leading-tight text-white">
-                    {item.name}
-                  </Text>
-
-                  {/* Distance */}
-                  <View className="mt-2 flex items-center gap-1.5">
-                    <View
-                      className="flex h-5 w-5 items-center justify-center rounded-md"
-                      style={{ backgroundColor: "rgba(255,255,255,.045)" }}
-                    >
-                      <MapPin size={9} className="text-cyan-300" />
-                    </View>
-
-                    <Text className="text-[9px] font-bold text-white/55">
-                      {item.distanceLabel}
-                    </Text>
-                  </View>
-
-                  {/* Address */}
-                  {item.address && (
-                    <Text className="mt-1 text-[8px] text-white/25">
-                      {item.address}
-                    </Text>
-                  )}
-
-                  {/* Footer */}
-                  <View
-                    className="mt-3 flex items-center justify-between border-t pt-2"
-                    style={{
-                      borderColor: "rgba(255,255,255,.05)",
-                    }}
-                  >
-                    <Text className="text-[8px] font-semibold text-white/25">
-                      Voir sur la carte
-                    </Text>
-
-                    <ChevronRight
-                      size={11}
-                      className="text-white/25"
-                    />
-                  </View>
-
-                  {/* Hover */}
-                  <View
-                    className="absolute inset-0 opacity-0"
-                    style={{  }}
-                  />
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* ------------------------------------------------------------------
-           * FOOTER
-           * ---------------------------------------------------------------- */}
-
-          <View
-            className="relative flex items-center gap-2 border-t px-4 py-2.5"
-            style={{
-              borderColor: "rgba(255,255,255,.055)",
-            }}
+          {/* ───── CARDS ───── */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardsRow}
           >
-            <View
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg"
-              style={{ backgroundColor: "rgba(6,182,212,.09)" }}
-            >
-              <Search size={9} className="text-cyan-300" />
+            {visibleItems.map((item, index) => (
+              <NearbyCard
+                key={item.id}
+                item={item}
+                index={index}
+                onPress={() => openMapLink(item.lat, item.lng)}
+              />
+            ))}
+          </ScrollView>
+
+          {/* ───── FOOTER ───── */}
+          <FadeUp delay={540} distance={6}>
+            <View style={styles.footer}>
+              <View style={styles.footerIcon}>
+                <Search size={10} color="#67E8F9" />
+              </View>
+              <Text style={styles.footerText} numberOfLines={1}>
+                {visibleItems.length} lieu
+                {visibleItems.length > 1 ? "x" : ""} trouvé
+                {visibleItems.length > 1 ? "s" : ""} près de vous
+              </Text>
+              <Pressable
+                onPress={() => onNavigate("nearby")}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.footerLink,
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <Text style={styles.footerLinkText}>Explorer</Text>
+                <ChevronRight size={10} color="#67E8F9" />
+              </Pressable>
             </View>
-
-            <Text className="min-w-0 flex-1 truncate text-[9px] font-medium text-white/30">
-              {visibleItems.length} <Text>lieu</Text>{visibleItems.length > 1 ? "x" : ""} <Text>trouvé</Text>{visibleItems.length > 1 ? "s" : ""} <Text>près de vous</Text></Text>
-
-            <Pressable
-              onPress={() => {
-                /**
-                 * Si une page Nearby dédiée existe déjà,
-                 * on la laisse gérer la navigation.
-                 *
-                 * Sinon on retombe sur l'explorateur.
-                 */
-                onNavigate("nearby");
-              }}
-              className="flex shrink-0 items-center gap-1 text-[9px] font-bold text-cyan-300"
-            >
-              <Text>Explorer</Text><ChevronRight size={10} />
-            </Pressable>
-          </View>
+          </FadeUp>
         </View>
       </View>
-    </>
+    </FadeUp>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  wrapper: {
+    marginHorizontal: 20,
+    marginTop: 16,
+  },
+  pressed: { opacity: 0.85 },
+
+  /* ── Main card ──────────────────────────────────── */
+  mainCard: {
+    borderRadius: 30,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#0B061E",
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 12,
+  },
+  topHighlight: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  mainBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(34,211,238,0.16)",
+  },
+  mainOrb1: {
+    position: "absolute",
+    top: -100,
+    right: -80,
+    width: 220,
+    height: 220,
+    borderRadius: 9999,
+    backgroundColor: "rgba(6,182,212,0.2)",
+  },
+  mainOrb2: {
+    position: "absolute",
+    bottom: -100,
+    left: -80,
+    width: 200,
+    height: 200,
+    borderRadius: 9999,
+    backgroundColor: "rgba(34,211,238,0.14)",
+  },
+
+  /* ── Header ─────────────────────────────────────── */
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  headerIconWrap: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerIconHalo: {
+    position: "absolute",
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: "rgba(34,211,238,0.45)",
+  },
+  headerIconRing: {
+    position: "absolute",
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(103,232,249,0.65)",
+  },
+  headerIconGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    shadowColor: "#06B6D4",
+    shadowOpacity: 0.75,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  headerEyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerEyebrow: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 2,
+    color: "#67E8F9",
+  },
+  headerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22D3EE",
+    shadowColor: "#22D3EE",
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  headerTitle: {
+    marginTop: 4,
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.4,
+  },
+  headerSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 4,
+  },
+  headerSub: {
+    flex: 1,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "600",
+  },
+
+  /* ── Refresh btn ────────────────────────────────── */
+  refreshBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  /* ── Cards row ──────────────────────────────────── */
+  cardsRow: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  nearbyCard: {
+    minWidth: 172,
+    maxWidth: 195,
+    padding: 12,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    overflow: "hidden",
+  },
+  nearbyTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  nearbyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  nearbyEmoji: {
+    fontSize: 16,
+  },
+  nearbyCategory: {
+    marginTop: 12,
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  nearbyName: {
+    marginTop: 5,
+    minHeight: 30,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 15,
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  nearbyDistanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+  },
+  nearbyDistanceBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.055)",
+  },
+  nearbyDistance: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 0.1,
+  },
+  nearbyAddress: {
+    marginTop: 4,
+    fontSize: 9,
+    color: "rgba(255,255,255,0.35)",
+    fontWeight: "500",
+  },
+  nearbyFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+  },
+  nearbyFooterText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.4)",
+    letterSpacing: 0.2,
+  },
+
+  /* ── Footer ─────────────────────────────────────── */
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(0,0,0,0.15)",
+  },
+  footerIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(6,182,212,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(34,211,238,0.25)",
+  },
+  footerText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 9.5,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.45)",
+  },
+  footerLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+  },
+  footerLinkText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#67E8F9",
+    letterSpacing: 0.2,
+  },
+
+  /* ── Permission ─────────────────────────────────── */
+  permissionCard: {
+    borderRadius: 30,
+    padding: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(10,6,24,0.5)",
+  },
+  permissionBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.15)",
+  },
+  permissionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  permissionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.3)",
+  },
+  permissionTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+  permissionSub: {
+    marginTop: 3,
+    fontSize: 10,
+    lineHeight: 14,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "500",
+  },
+  permissionRetry: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(59,130,246,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.28)",
+  },
+  permissionRetryText: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    color: "#BFDBFE",
+    letterSpacing: 0.2,
+  },
+
+  /* ── Empty ──────────────────────────────────────── */
+  emptyCard: {
+    borderRadius: 30,
+    padding: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(10,6,24,0.5)",
+  },
+  emptyBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(34,211,238,0.15)",
+  },
+  emptyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  emptyIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(34,211,238,0.3)",
+  },
+  emptyTitle: {
+    fontSize: 12.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  emptySub: {
+    marginTop: 4,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "500",
+  },
+
+  /* ── Skeleton ───────────────────────────────────── */
+  skeletonCard: {
+    borderRadius: 30,
+    padding: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(10,6,24,0.5)",
+  },
+  borderRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(34,211,238,0.12)",
+  },
+  skeletonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  skeletonLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(6,182,212,0.18)",
+  },
+  skeletonLine1: {
+    height: 12,
+    width: 140,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  skeletonLine2: {
+    height: 10,
+    width: 200,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  skeletonCardMini: {
+    minWidth: 172,
+    height: 108,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+});

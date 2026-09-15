@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreatePrescriptionSheet.tsx
@@ -13,6 +12,7 @@ import { PrescriptionForm } from "../forms/PrescriptionForm";
 import type { PrescriptionFormValues } from "../forms/PrescriptionForm";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface CreatePrescriptionSheetProps {
   open: boolean;
@@ -42,13 +42,13 @@ export function CreatePrescriptionSheet({
         status: data.status,
         refills: data.refills,
       });
-      UIService.openToast("Ordonnance créée avec succès !", "success");
+      toast.success("Ordonnance créée avec succès !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erreur lors de la création";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

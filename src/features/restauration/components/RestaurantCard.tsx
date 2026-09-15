@@ -1,7 +1,13 @@
-import { useRouter } from "expo-router";
-import { View, Pressable, Image, Text, GestureResponderEvent } from "react-native";
+import {
+  View,
+  Pressable,
+  Image,
+  Text,
+  GestureResponderEvent,
+} from "react-native";
 
 // src/features/restauration/components/RestaurantCard.tsx
+import { useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import {
   MapPin,
@@ -60,7 +66,7 @@ export function RestaurantCard({
   isLiked = false,
   isBookmarked = false,
 }: Props) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const meta = parseMeta(publication.meta);
   const [isHovered, setIsHovered] = useState(false);
   const [liked, setLiked] = useState(isLiked);
@@ -79,6 +85,7 @@ export function RestaurantCard({
   const isPromoted = meta.isPromoted || false;
   const description = meta.description || publication.description || "";
   const createdAt = publication._creationTime || Date.now();
+  const images = publication.images || [];
 
   // Couleur dynamique selon la cuisine
   const color = CUISINE_COLORS[cuisine.toLowerCase()] || "#F97316";
@@ -91,74 +98,85 @@ export function RestaurantCard({
 
   // Gestionnaires
   const handleCardClick = useCallback(() => {
-    router.push(`/restauration/${publication._id}`);
-  }, [router, publication._id]);
+    navigate(`/restauration/${publication._id}`);
+  }, [navigate, publication._id]);
 
   const handleLike = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     setLiked(!liked);
     onLike?.();
   };
 
   const handleBookmark = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     setBookmarked(!bookmarked);
     onBookmark?.();
   };
 
   const handleShare = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     onShare?.();
   };
 
   const handleComment = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     onComment?.();
   };
 
   const handleCTA = (e?: GestureResponderEvent) => {
-    router.push(`/restauration/${publication._id}`);
+    e?.stopPropagation();
+    navigate(`/restauration/${publication._id}`);
   };
 
-  // Rendu des badges
+  // Rendu des badges — View container + Text interne
   const renderBadges = () => {
     const badges = [];
+
     if (isOpen) {
       badges.push(
-        <Text
+        <View
           key="open"
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/90 text-white border border-emerald-400/30"
+          className="flex-row items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/90 border border-emerald-400/30"
         >
-          <Text className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-          Ouvert
-        </Text>,
+          <View className="w-1.5 h-1.5 rounded-full bg-white" />
+          <Text className="text-[10px] font-bold text-white">Ouvert</Text>
+        </View>,
       );
     } else {
       badges.push(
-        <Text
+        <View
           key="closed"
-          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-500/90 text-white border border-red-400/30"
+          className="px-2.5 py-1 rounded-lg bg-red-500/90 border border-red-400/30"
         >
-          Fermé
-        </Text>,
+          <Text className="text-[10px] font-bold text-white">Fermé</Text>
+        </View>,
       );
     }
+
     if (isVerified) {
       badges.push(
-        <Text
+        <View
           key="verified"
-          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-500/90 text-white border border-blue-400/30 flex items-center gap-1"
+          className="flex-row items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/90 border border-blue-400/30"
         >
-          <CheckCircle size={10} /> Vérifié
-        </Text>,
+          <CheckCircle size={10} color="#FFFFFF" />
+          <Text className="text-[10px] font-bold text-white">Vérifié</Text>
+        </View>,
       );
     }
+
     if (isPromoted) {
       badges.push(
-        <Text
+        <View
           key="promoted"
-          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-purple-500/90 text-white border border-purple-400/30 flex items-center gap-1"
+          className="flex-row items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-500/90 border border-purple-400/30"
         >
-          <Sparkles size={10} /> Promu
-        </Text>,
+          <Sparkles size={10} color="#FFFFFF" />
+          <Text className="text-[10px] font-bold text-white">Promu</Text>
+        </View>,
       );
     }
+
     return badges.slice(0, 3);
   };
 
@@ -169,119 +187,138 @@ export function RestaurantCard({
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
     const stars = [];
+
     for (let i = 0; i < fullStars; i++) {
-      stars.push(
-        <Star key={i} size={14} className="fill-amber-400 text-amber-400" />,
-      );
+      stars.push(<Star key={i} size={14} color="#FBBF24" fill="#FBBF24" />);
     }
+
     if (hasHalfStar) {
       stars.push(
         <View key="half" className="relative">
-          <Star size={14} className="text-amber-400" />
+          <Star size={14} color="#FBBF24" />
           <View className="absolute inset-0 overflow-hidden w-1/2">
-            <Star size={14} className="fill-amber-400 text-amber-400" />
+            <Star size={14} color="#FBBF24" fill="#FBBF24" />
           </View>
         </View>,
       );
     }
+
     const emptyStars = 5 - stars.length;
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <Star key={`empty-${i}`} size={14} className="text-white/20" />,
+        <Star key={`empty-${i}`} size={14} color="rgba(255,255,255,0.2)" />,
       );
     }
+
     return stars;
   };
 
   return (
-    <Pressable
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-      onPress={handleCardClick}
+    <View
+      onTouchStart={() => setIsHovered(true)}
+      onTouchEnd={() => setIsHovered(false)}
+      onStartShouldSetResponder={() => true}
+      onResponderRelease={handleCardClick}
       className="relative rounded-3xl overflow-hidden"
-      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", transform: isHovered ? "scale(1.015)" : "scale(1)" }}
+      style={{
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+        borderStyle: "solid",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: isHovered ? 20 : 4 },
+        shadowOpacity: isHovered ? 0.3 : 0.1,
+        shadowRadius: isHovered ? 30 : 10,
+        elevation: isHovered ? 12 : 4,
+        transform: isHovered ? [{ scale: 1.015 }] : [{ scale: 1 }],
+      }}
     >
-      {/* Glow effect */}
-      <View
-        className="absolute inset-0 opacity-0"
-        style={{ opacity: isHovered ? 1 : 0 }}
-      />
-
       {/* Images */}
-      <View className="relative h-48 overflow-hidden bg-black/20">
-        {publication.images && publication.images.length > 0 ? (
+      <View
+        className="relative overflow-hidden bg-black/20"
+        style={{ height: 192 }}
+      >
+        {images && images.length > 0 ? (
           <Image
-            src={publication.images[0]}
-            alt={name}
-            className="w-full h-full object-cover"
+            source={{ uri: images[0] }}
+            accessibilityLabel={name}
+            className="w-full h-full"
             style={{
-              transform: isHovered ? "scale(1.05)" : "scale(1)"
+              transform: isHovered ? [{ scale: 1.05 }] : [{ scale: 1 }],
             }}
-            loading="lazy"
+            resizeMode="cover"
           />
         ) : (
           <View
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full items-center justify-center"
             style={{ backgroundColor: `${color}22` }}
           >
-            <UtensilsCrossed
-              size={48}
-              className="opacity-30"
-              style={{ color }}
-            />
+            <UtensilsCrossed size={48} color={color} />
           </View>
         )}
 
-        {/* Gradient overlay */}
+        {/* Overlay */}
         <View
           className="absolute inset-0"
-          style={{  }}
+          style={{ backgroundColor: "rgba(0,0,0,0.08)" }}
         />
 
         {/* Badges */}
-        <View className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+        <View className="absolute top-3 left-3 flex-row flex-wrap gap-1.5">
           {badges}
         </View>
 
-        {/* Actions rapides (bookmark) sur l'image */}
+        {/* Bookmark */}
         <Pressable
           onPress={handleBookmark}
-          className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
+          className="absolute top-3 right-3 w-9 h-9 rounded-full items-center justify-center"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.5)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.1)",
+            borderStyle: "solid",
+          }}
         >
           <Bookmark
             size={16}
-            className={
-              bookmarked ? "fill-amber-400 text-amber-400" : "text-white/80"
-            }
+            color={bookmarked ? "#FBBF24" : "rgba(255,255,255,0.8)"}
+            fill={bookmarked ? "#FBBF24" : "transparent"}
           />
         </Pressable>
 
-        {/* Prix / Catégorie */}
+        {/* Price range */}
         <View className="absolute bottom-3 left-3">
           <Text
             className="px-3 py-1.5 rounded-xl text-sm font-bold"
-            style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#FCD34D", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
+            style={{
+              backgroundColor: "rgba(0,0,0,0.6)",
+              color: "#FCD34D",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.1)",
+              borderStyle: "solid",
+            }}
           >
             {priceRange || "€"}
           </Text>
         </View>
 
-        {/* Cuisine */}
+        {/* Cuisine badge */}
         <View
-          className="absolute bottom-3 right-3 px-2.5 py-1 rounded-xl text-[10px] font-bold"
+          className="absolute bottom-3 right-3 px-2.5 py-1 rounded-xl"
           style={{ backgroundColor: `${color}cc` }}
         >
-          {cuisine || "Restaurant"}
+          <Text className="text-[10px] font-bold text-white">
+            {cuisine || "Restaurant"}
+          </Text>
         </View>
       </View>
 
       {/* Contenu */}
-      <View className="p-4 space-y-3">
-        {/* Header : nom + temps */}
-        <View className="flex items-start justify-between gap-3">
+      <View className="p-4 gap-3">
+        {/* Titre + rating */}
+        <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1 min-w-0">
-            <View className="flex items-center gap-2 mb-0.5">
+            <View className="flex-row items-center gap-2 mb-0.5">
               <Text
                 className="text-[10px] font-bold uppercase tracking-wider"
                 style={{ color }}
@@ -295,105 +332,126 @@ export function RestaurantCard({
               {name}
             </Text>
           </View>
-          {/* Note */}
-          <View className="flex items-center gap-1 flex-shrink-0">
-            <View className="flex items-center gap-0.5">{renderStars()}</View>
-            {reviewCount > 0 && (
+
+          <View className="flex-row items-center gap-1 flex-shrink-0">
+            <View className="flex-row items-center gap-0.5">
+              {renderStars()}
+            </View>
+            {reviewCount > 0 ? (
               <Text className="text-white/40 text-xs ml-1">
                 ({reviewCount})
               </Text>
-            )}
+            ) : null}
           </View>
         </View>
 
-        {/* Localisation */}
-        {location && (
-          <View className="flex items-center gap-1.5 text-xs text-white/50">
-            <MapPin size={12} className="text-white/30" />
-            <Text className="truncate">{location}</Text>
+        {/* Location */}
+        {location ? (
+          <View className="flex-row items-center gap-1.5">
+            <MapPin size={12} color="rgba(255,255,255,0.3)" />
+            <Text className="text-xs text-white/50 flex-1" numberOfLines={1}>
+              {location}
+            </Text>
           </View>
-        )}
+        ) : null}
 
-        {/* Livraison */}
-        {deliveryTime && (
-          <View className="flex items-center gap-1.5 text-xs text-white/50">
-            <Truck size={12} className="text-white/30" />
-            <Text>Livraison en {deliveryTime}</Text>
+        {/* Delivery time */}
+        {deliveryTime ? (
+          <View className="flex-row items-center gap-1.5">
+            <Truck size={12} color="rgba(255,255,255,0.3)" />
+            <Text className="text-xs text-white/50">
+              Livraison en {deliveryTime}
+            </Text>
           </View>
-        )}
+        ) : null}
 
-        {/* Description courte */}
-        {description && (
-          <Text className="text-sm text-white/60 leading-relaxed">
+        {/* Description */}
+        {description ? (
+          <Text
+            className="text-sm text-white/60 leading-relaxed"
+            numberOfLines={3}
+          >
             {description}
           </Text>
-        )}
+        ) : null}
 
-        {/* Statistiques */}
-        <View className="flex items-center gap-3 text-xs text-white/30">
-          <View className="flex items-center gap-1">
-            <Eye size={11} />
-            <Text>{publication.viewCount || 0}</Text>
+        {/* Stats */}
+        <View className="flex-row items-center gap-3">
+          <View className="flex-row items-center gap-1">
+            <Eye size={11} color="rgba(255,255,255,0.3)" />
+            <Text className="text-xs text-white/30">
+              {publication.viewCount || 0}
+            </Text>
           </View>
-          <View className="flex items-center gap-1">
-            <Heart size={11} />
-            <Text>{publication.likeCount || 0}</Text>
+          <View className="flex-row items-center gap-1">
+            <Heart size={11} color="rgba(255,255,255,0.3)" />
+            <Text className="text-xs text-white/30">
+              {publication.likeCount || 0}
+            </Text>
           </View>
-          {publication.shareCount && publication.shareCount > 0 && (
-            <View className="flex items-center gap-1">
-              <Share2 size={11} />
-              <Text>{publication.shareCount}</Text>
+          {publication.shareCount && publication.shareCount > 0 ? (
+            <View className="flex-row items-center gap-1">
+              <Share2 size={11} color="rgba(255,255,255,0.3)" />
+              <Text className="text-xs text-white/30">
+                {publication.shareCount}
+              </Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
 
       {/* Actions sociales */}
-      <View className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between flex-wrap gap-2">
-        <View className="flex items-center gap-1">
-          {/* Like */}
+      <View className="px-4 py-2.5 border-t border-white/5 flex-row items-center justify-between flex-wrap gap-2">
+        <View className="flex-row items-center gap-1">
           <Pressable
             onPress={handleLike}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-              liked
-                ? "text-rose-400 bg-rose-500/10"
-                : "text-white/40 hover:text-white hover:bg-white/5"
-            }`}
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-xl"
+            style={{
+              backgroundColor: liked ? "rgba(244,63,94,0.1)" : "transparent",
+            }}
           >
-            <Heart size={14} className={liked ? "fill-rose-400" : ""} />
-            <Text>{publication.likeCount || 0}</Text>
+            <Heart
+              size={14}
+              color={liked ? "#FB7185" : "rgba(255,255,255,0.4)"}
+              fill={liked ? "#FB7185" : "transparent"}
+            />
+            <Text
+              className="text-xs font-medium"
+              style={{ color: liked ? "#FB7185" : "rgba(255,255,255,0.4)" }}
+            >
+              {publication.likeCount || 0}
+            </Text>
           </Pressable>
 
-          {/* Comment */}
           <Pressable
             onPress={handleComment}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40"
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-xl"
           >
-            <MessageCircle size={14} />
-            <Text>{publication.commentCount || 0}</Text>
+            <MessageCircle size={14} color="rgba(255,255,255,0.4)" />
+            <Text className="text-xs font-medium text-white/40">
+              {publication.commentCount || 0}
+            </Text>
           </Pressable>
 
-          {/* Share */}
           <Pressable
             onPress={handleShare}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40"
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-xl"
           >
-            <Share2 size={14} />
+            <Share2 size={14} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
 
-        {/* CTA Voir le menu */}
         <Pressable
           onPress={handleCTA}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white"
-          style={{  }}
+          className="flex-row items-center gap-1.5 px-4 py-1.5 rounded-xl"
+          style={{ backgroundColor: color }}
         >
-          <UtensilsCrossed size={12} />
-          <Text><Text>Voir le menu</Text></Text>
-          <ChevronRight size={12} className="opacity-60" />
+          <UtensilsCrossed size={12} color="#FFFFFF" />
+          <Text className="text-xs font-bold text-white">Voir le menu</Text>
+          <ChevronRight size={12} color="rgba(255,255,255,0.6)" />
         </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
 }
 

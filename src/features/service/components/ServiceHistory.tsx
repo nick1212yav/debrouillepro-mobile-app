@@ -14,10 +14,7 @@ export function ServiceHistory({
     <View className="space-y-2">
       <Text className="text-sm font-medium text-white/50">Historique</Text>
       {history.map((h) => (
-        <View
-          key={h._id}
-          className="p-2 rounded-xl bg-white/5 text-white/60 text-xs"
-        >
+        <View key={h._id} className="p-2 rounded-xl bg-white/5 text-white/60 text-xs">
           {h.event}
         </View>
       ))}

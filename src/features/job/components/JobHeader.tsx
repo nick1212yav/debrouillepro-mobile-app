@@ -1,4 +1,4 @@
-import { View, Text, Image } from "react-native";
+import { View, Image, Text } from "react-native";
 import { Briefcase, CheckCircle2, Clock } from "lucide-react-native";
 
 interface Props {
@@ -30,39 +30,15 @@ export function JobHeader({
   };
 
   return (
-    <View className="flex items-start gap-3">
-      {companyLogo ? (
-        <Image
-         
-         
-          className="w-12 h-12 rounded-2xl object-cover flex-shrink-0"
-         source={{ uri: companyLogo }} accessibilityLabel={company}/>
+    <View className="flex items-start gap-3">{companyLogo ? (
+        <Image className="w-12 h-12 rounded-2xl object-cover flex-shrink-0" source={{ uri: companyLogo }} accessibilityLabel={company} />
       ) : (
-        <View
-          className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-lg"
-          style={{ backgroundColor: `${contractColor}20` }}
-        >
-          <Briefcase size={20} style={{ color: contractColor }} />
-        </View>
-      )}
-      <View className="flex-1 min-w-0">
-        <Text className="text-sm font-bold text-white leading-tight truncate">
-          {title}
-        </Text>
-        <View className="flex items-center gap-1.5 mt-0.5">
-          <CheckCircle2 size={11} className="text-blue-400" />
-          <Text className="text-xs text-white/60 truncate">{company}</Text>
-        </View>
-        <View className="flex items-center gap-2 mt-0.5 text-[10px] text-white/30">
-          {authorName && (
+        <View className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-lg" style={{ backgroundColor: `${contractColor}20` }}><Briefcase size={20} style={{  }} /></View>
+      )}<View className="flex-1 min-w-0"><Text className="text-sm font-bold text-white leading-tight truncate">{title}</Text><View className="flex items-center gap-1.5 mt-0.5"><CheckCircle2 size={11} className="text-blue-400" /><Text className="text-xs text-white/60 truncate">{company}</Text></View><View className="flex items-center gap-2 mt-0.5 text-[10px] text-white/30">{authorName && (
             <>
-              <Text><Text>par</Text>{authorName}</Text>
-              <Text><Text>·</Text></Text>
+              <Text>par {authorName}</Text>
+              <Text>·</Text>
             </>
-          )}
-          <Text>{timeAgo(createdAt)}</Text>
-        </View>
-      </View>
-    </View>
+          )}<Text>{timeAgo(createdAt)}</Text></View></View></View>
   );
 }

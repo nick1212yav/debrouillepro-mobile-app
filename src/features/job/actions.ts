@@ -1,4 +1,6 @@
 import type { ActionConfig } from "../../core/sdk/types";
+import { Clipboard } from "@react-native-clipboard/clipboard";
+import { Share } from "react-native";
 
 // ✅ Statuts possibles dans ton modèle (à adapter selon tes données)
 // Exemples : "active", "open", "published", "closed", "sold", "filled"
@@ -65,10 +67,10 @@ export const actions: ActionConfig[] = [
     variant: "ghost",
     order: 4,
     execute: async (context) => {
-      if (undefined) {
-        await undefined;
+      if (navigator.share) {
+        await Share.share({ message: String(context.publication.description) + "\n" + "\n" + String(window.location.href), title: context.publication.title });
       } else {
-        await undefined.writeText(undefined.href);
+        await Clipboard.setString(window.location.href);
         context.ui.openToast("Lien copié !", "success");
       }
     },

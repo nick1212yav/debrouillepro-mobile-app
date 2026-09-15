@@ -1,7 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useAnnonceOffers(annonceId: string) {
@@ -17,9 +17,9 @@ export function useAnnonceOffers(annonceId: string) {
         amount,
         message: message || "Offre d'achat",
       });
-      UIService.openToast("Offre envoyée", "success");
+      toast.success("Offre envoyée");
     } catch (error) {
-      UIService.openToast("Erreur lors de l'envoi", "error");
+      toast.error("Erreur lors de l'envoi");
       throw error;
     } finally {
       setLoading(false);

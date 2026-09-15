@@ -1,4 +1,4 @@
-import { Pressable, View, TextInput, Text, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { Pressable, View, TextInput, Text, NativeSyntheticEvent, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
 
 // src/features/messages/immo/components/PropertyMessage.tsx
 
@@ -41,7 +41,9 @@ export function PropertyMessage({
 
   const [showRequestForm, setShowRequestForm] = useState(false);
 
-  const handleSubmit = (event: unknown) => {
+  const handleSubmit = (event: NativeSyntheticEvent<any>) => {
+    event.preventDefault();
+
     if (!onSendVisitRequest) {
       return;
     }
@@ -50,20 +52,15 @@ export function PropertyMessage({
   };
 
   return (
-    <View
-      style={{
+    <View style={{
         ...wrapperStyle,
         alignSelf: isOwn ? "flex-end" : "flex-start",
-      }}
-    >
+      }}>
       <PropertyPreview property={property} compact onPress={onOpenProperty} />
 
       <View style={actionsStyle}>
         {!requestSent && !showRequestForm && (
-          <Pressable
-            onPress={() => setShowRequestForm(true)}
-            style={primaryButtonStyle}
-          >
+          <Pressable onPress={() => setShowRequestForm(true)} style={primaryButtonStyle}>
             📅 Demander une visite
           </Pressable>
         )}
@@ -74,43 +71,8 @@ export function PropertyMessage({
       </View>
 
       {showRequestForm && !requestSent && (
-        <View style={formStyle}>
-          <Text style={labelStyle}>Message</Text>
-
-          <TextInput
-            value={message}
-            onChangeText={(text) => setMessage(text)}
-            disabled={isSendingRequest}
-            style={textareaStyle} multiline textAlignVertical="top"
-          />
-
-          <Text style={labelStyle}>Date souhaitée</Text>
-
-          <TextInput
-            value={visitDate}
-            onChangeText={(text) => setVisitDate(text)}
-            disabled={isSendingRequest}
-            style={inputStyle}
-          />
-
-          {error && <View style={errorStyle}>{error}</View>}
-
-          <View style={formActionsStyle}>
-            <Pressable
-              onPress={() => setShowRequestForm(false)}
-              disabled={isSendingRequest}
-              style={secondaryButtonStyle}
-            >
-              <Text>Annuler</Text></Pressable>
-
-            <Pressable
-              disabled={isSendingRequest || !message.trim()}
-              style={primaryButtonStyle}
-            >
-              {isSendingRequest ? "Envoi…" : "Envoyer la demande"}
-            </Pressable>
-          </View>
-        </View>
+        <View style={formStyle}><Text style={labelStyle}>Message</Text><TextInput value={message} onChangeText={(value) => setMessage(value)} style={textareaStyle} multiline textAlignVertical="top" editable={!(isSendingRequest)} /><Text style={labelStyle}>Date souhaitée</Text><TextInput value={visitDate} onChangeText={(value) => setVisitDate(value)} style={inputStyle} editable={!(isSendingRequest)} />{error && <View style={errorStyle}>{error}</View>}<View style={formActionsStyle}><Pressable onPress={() => setShowRequestForm(false)} disabled={isSendingRequest} style={secondaryButtonStyle}>Annuler
+            </Pressable><Pressable disabled={isSendingRequest || !message.trim()} style={primaryButtonStyle}>{isSendingRequest ? "Envoi…" : "Envoyer la demande"}</Pressable></View></View>
       )}
     </View>
   );
@@ -133,14 +95,14 @@ const formStyle: ViewStyle | TextStyle | ImageStyle = {
 };
 
 const labelStyle: ViewStyle | TextStyle | ImageStyle = {
-  display: "flex",
+  display: "block",
   marginBottom: 5,
   fontSize: 12,
   fontWeight: 700,
   color: "#374151",
 };
 
-const textareaStyle: ViewStyle | TextStyle | ImageStyle = {
+const textareaStyle: TextStyle = {
   width: "100%",
   boxSizing: "border-box",
   resize: "vertical",
@@ -187,7 +149,7 @@ const secondaryButtonStyle: ViewStyle | TextStyle | ImageStyle = {
   cursor: "pointer",
 };
 
-const successStyle: ViewStyle | TextStyle | ImageStyle = {
+const successStyle: TextStyle = {
   padding: "10px 12px",
   borderRadius: 10,
   background: "#ecfdf5",

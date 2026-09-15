@@ -1,4 +1,4 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text } from "react-native";
 import React from "react";
 import { ModuleRegistry } from "../../../core/sdk/registry/ModuleRegistry";
 import { buildCardData } from "../../../core/sdk/engines/CardEngine";
@@ -17,22 +17,13 @@ export function ModuleCard({ moduleId, publication, onClick, render }: Props) {
   const cardData = buildCardData(publication, manifest);
 
   if (render) {
-    return <Pressable onPress={onClick}>{render(cardData)}</Pressable>;
+    return <View onPress={onClick}>{render(cardData)}</View>;
   }
 
   return (
-    <Pressable
-      onPress={onClick}
-      className="bg-white/5 rounded-xl p-4"
-    >
-      <Text className="text-white font-semibold">{cardData.hero}</Text>
-      {manifest.card.sections?.map((key: string) => (
-        <View key={key} className="mt-2 text-sm text-white/60">
-          {cardData[key]}
-        </View>
-      ))}
-      <View className="mt-3 flex gap-3 flex-wrap">
-        {manifest.card.metrics?.map((metricKey: string) => {
+    <View onPress={onClick} className="bg-white/5 rounded-xl p-4 transition-colors"><Text className="text-white font-semibold">{cardData.hero}</Text>{manifest.card.sections?.map((key: string) => (
+        <View key={key} className="mt-2 text-sm text-white/60">{cardData[key]}</View>
+      ))}<View className="mt-3 flex gap-3 flex-wrap">{manifest.card.metrics?.map((metricKey: string) => {
           const metric = manifest.metrics.find((m) => m.key === metricKey);
           if (!metric) return null;
           const value = publication.meta?.[metricKey];
@@ -43,8 +34,6 @@ export function ModuleCard({ moduleId, publication, onClick, render }: Props) {
               {metric.unit && ` ${metric.unit}`}
             </Text>
           );
-        })}
-      </View>
-    </Pressable>
+        })}</View></View>
   );
 }

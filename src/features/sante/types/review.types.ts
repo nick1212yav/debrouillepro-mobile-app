@@ -1,140 +1,62 @@
 // src/features/sante/types/review.types.ts
-
 import type { Id } from "@/convex/_generated/dataModel";
-
-// ─────────────────────────────────────────────────────────────
-// Reviews
-// ─────────────────────────────────────────────────────────────
-
-export type ReviewStatus = "published" | "pending" | "flagged" | "hidden";
-
-export interface ReviewResponse {
-  doctorId: Id<"medicalProfessionals">;
-  doctorName: string;
-  content: string;
-  date: Date;
-}
 
 export interface Review {
   _id: Id<"reviews">;
-
-  /**
-   * Compatibilité avec les composants utilisant `id`.
-   */
-  id?: string;
-
+  id?: string; // Pour compatibilité avec les composants
   professionalId: Id<"medicalProfessionals">;
-
   patientId: Id<"users">;
-
   patientName: string;
-
   patientAvatar?: string;
-
   rating: number;
-
   comment: string;
-
   date: Date;
-
   likes: number;
-
   verified: boolean;
-
   helpful: number;
-
   images?: string[];
-
-  response?: ReviewResponse;
-
+  response?: {
+    doctorId: Id<"medicalProfessionals">;
+    doctorName: string;
+    content: string;
+    date: Date;
+  };
   createdAt: Date;
-
   updatedAt: Date;
-
-  status: ReviewStatus;
+  status: "published" | "pending" | "flagged" | "hidden";
 }
-
-// ─────────────────────────────────────────────────────────────
-// Statistiques
-// ─────────────────────────────────────────────────────────────
 
 export interface ReviewStats {
   average: number;
-
   count: number;
-
-  /**
-   * Distribution des notes :
-   *
-   * [1 étoile, 2 étoiles, 3 étoiles, 4 étoiles, 5 étoiles]
-   */
   distribution: [number, number, number, number, number];
-
   verifiedCount: number;
-
   withCommentCount: number;
-
   withImagesCount: number;
-
   likesTotal: number;
-}
-
-// ─────────────────────────────────────────────────────────────
-// Questions / Réponses
-// ─────────────────────────────────────────────────────────────
-
-export type QuestionStatus = "open" | "answered" | "closed";
-
-/**
- * Une réponse est un sous-document de Question.
- *
- * Elle n'utilise donc pas `Id<"...">`, car aucune table Convex
- * `answers` n'est définie.
- */
-export interface QuestionAnswer {
-  _id: string;
-
-  /**
-   * Compatibilité avec les composants utilisant `id`.
-   */
-  id?: string;
-
-  authorId: Id<"users">;
-
-  author: string;
-
-  content: string;
-
-  date: Date;
-
-  likes: number;
 }
 
 export interface Question {
   _id: Id<"questions">;
-
-  /**
-   * Compatibilité avec les composants utilisant `id`.
-   */
-  id?: string;
-
+  id?: string; // Pour compatibilité avec les composants
   professionalId: Id<"medicalProfessionals">;
-
   patientId: Id<"users">;
-
   patientName: string;
-
   question: string;
-
   date: Date;
-
   likes: number;
-
-  answers: QuestionAnswer[];
-
-  status: QuestionStatus;
-
+  answers: {
+    // ✅ Correction : on utilise `_id` et on le traite comme un ID de type `Id<"questions">`
+    // car Convex n'a pas de table "answers" – c'est un sous-document.
+    _id: string; // Utilisation de string car c'est un sous-document, pas une table séparée
+    id?: string;
+    authorId: Id<"users">;
+    author: string;
+    content: string;
+    date: Date;
+    likes: number;
+  }[];
+  status: "open" | "answered" | "closed";
   createdAt: Date;
-
   updatedAt: Date;
 }

@@ -88,16 +88,8 @@ export function NetworkStats({
   return (
     <View className={cn("flex gap-3 px-4", className)}>
       {stats.map((stat, index) => (
-        <Pressable
-          key={stat.key}
-          onPress={() => onStatClick?.(stat.key)}
-          className="flex-1 p-3 rounded-xl flex items-center gap-2 text-left"
-          style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          <View
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: stat.bg }}
-          >
+        <Pressable key={stat.key} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }} onPress={() => onStatClick?.(stat.key)} className="flex-1 p-3 rounded-xl flex items-center gap-2 text-left transition-colors" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+          <View className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: stat.bg }}>
             <stat.icon size={14} />
           </View>
           <View className="min-w-0">

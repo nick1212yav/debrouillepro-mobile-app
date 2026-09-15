@@ -34,71 +34,26 @@ export function PinnedMessages({
   };
 
   return (
-    <View
-      className={[
+    <View className={[
         "flex w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111827]",
         className,
-      ].join(" ")}
-    >
-      {/* Header */}
-      <View className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <View className="flex items-center gap-3">
-          <View className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10">
-            <Pin size={17} className="text-violet-400" />
-          </View>
-
-          <View>
-            <Text className="text-sm font-semibold text-white">
-              Messages épinglés
-            </Text>
-
-            <Text className="text-[11px] text-white/35">
-              {isLoading
+      ].join(" ")}>{}<View className="flex items-center justify-between border-b border-white/10 px-4 py-3"><View className="flex items-center gap-3"><View className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10"><Pin size={17} className="rotate-[-35deg] text-violet-400" /></View><View><Text className="text-sm font-semibold text-white">Messages épinglés
+            </Text><Text className="text-[11px] text-white/35">{isLoading
                 ? "Chargement..."
                 : `${pinnedMessages.length} ${
                     pinnedMessages.length > 1 ? "messages" : "message"
-                  }`}
-            </Text>
-          </View>
-        </View>
-
-        {onClose && (
-          <Pressable
-           
-            onPress={onClose}
-            accessibilityLabel="Fermer"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30"
-          >
-            <X size={17} />
-          </Pressable>
-        )}
-      </View>
-
-      {/* Liste */}
-      <View className="max-h-[520px] overflow-y-auto p-3">
-        {isLoading ? (
-          <View className="space-y-2">
-            {Array.from({
+                  }`}</Text></View></View>{onClose && (
+          <Pressable onPress={onClose} accessibilityLabel="Fermer" className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition"><X size={17} /></Pressable>
+        )}</View>{}<View className="max-h-[520px] overflow-y-auto p-3">{isLoading ? (
+          <View className="space-y-2">{Array.from({
               length: 3,
             }).map((_, index) => (
-              <View
-                key={index}
-                className="h-[76px] animate-pulse rounded-2xl border border-white/5 bg-white/[0.03]"
-              />
-            ))}
-          </View>
+              <View key={index} className="h-[76px] animate-pulse rounded-2xl border border-white/5 bg-white/[0.03]" />
+            ))}</View>
         ) : pinnedMessages.length === 0 ? (
-          <View className="flex flex-col items-center justify-center px-6 py-12 text-center">
-            <View className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5">
-              <Pin size={20} className="text-white/20" />
-            </View>
-
-            <Text className="text-sm font-medium text-white/50">
-              <Text>Aucun message épinglé</Text></Text>
-
-            <Text className="mt-1 max-w-xs text-xs text-white/25">
-              <Text>Les messages importants que tu épingles apparaîtront ici.</Text></Text>
-          </View>
+          <View className="flex flex-col items-center justify-center px-6 py-12 text-center"><View className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5"><Pin size={20} className="rotate-[-35deg] text-white/20" /></View><Text className="text-sm font-medium text-white/50">Aucun message épinglé
+            </Text><Text className="mt-1 max-w-xs text-xs text-white/25">Les messages importants que tu épingles apparaîtront ici.
+            </Text></View>
         ) : (
           <View className="space-y-2">
             {pinnedMessages.map((message) => (
@@ -111,9 +66,7 @@ export function PinnedMessages({
               />
             ))}
           </View>
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }
 

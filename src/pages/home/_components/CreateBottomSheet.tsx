@@ -1,9 +1,29 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { Picker } from "@react-native-picker/picker";
-import { View, Pressable, Text, TextInput, ViewStyle, TextStyle, ImageStyle } from "react-native";
-
 // src/pages/home/_components/CreateBottomSheet.tsx
-import { useState, useCallback, useEffect, useMemo } from "react";
+import {
+  View,
+  Pressable,
+  Text,
+  TextInput,
+  ScrollView,
+  Animated,
+  Easing,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+  type ViewStyle,
+  type TextStyle,
+  type ImageStyle,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import {
   X,
   Home,
@@ -44,17 +64,16 @@ import {
   Wand2,
   TrendingUp,
   Compass,
-  Command,
 } from "lucide-react-native";
-import ArticleForm from "./ArticleForm";
+import ArticleForm from "./ArticleForm.tsx";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
-import { SignInButton } from "@/components/ui/signin";
-import type { PublicationType } from "@/hooks/use-publications";
-import AIWriteAssist from "@/components/AIWriteAssist";
-import ImageUploader from "@/components/ImageUploader";
-import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { SignInButton } from "@/components/ui/signin.tsx";
+import type { PublicationType } from "@/hooks/use-publications.ts";
+import AIWriteAssist from "@/components/AIWriteAssist.tsx";
+import ImageUploader from "@/components/ImageUploader.tsx";
 import { CreatePropertySheet } from "@/features/immo/components/CreatePropertySheet";
 import { CreateAnnonceSheet } from "@/features/annonce/sheets/CreateAnnonceSheet";
 import { CreateServiceSheet } from "@/features/service/sheets/CreateServiceSheet";
@@ -69,31 +88,35 @@ import { CreateAgriSheet } from "@/features/agri/sheets/CreateAgriSheet";
 import { CreateNetworkSheet } from "@/features/network/sheets/CreateNetworkSheet";
 import { CreateVoyageSheet } from "@/features/voyages/sheets/CreateVoyageSheet";
 
-// ─── Interface ────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * CONSTANTS
+ * ========================================================================== */
+
+const isBrowser = typeof window !== "undefined";
+
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 interface CreateBottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-// ─── Type local étendu pour inclure "network" et "voyages" ──────────────
-
 type ExtendedPublicationType = PublicationType | "network" | "voyages";
-
-// ─── Publication type config (enriched with keywords) ──────────────────────
 
 type CreateOption = {
   id: ExtendedPublicationType;
-  icon: React.ComponentType<{
-    size: number;
-    style?: ViewStyle | TextStyle | ImageStyle;
-    className?: string;
-  }>;
+  icon: ComponentType<{ size: number; color?: string; style?: any }>;
   label: string;
   desc: string;
   color: string;
   keywords: string[];
 };
+
+/* ============================================================================
+ * DATA
+ * ========================================================================== */
 
 const CREATE_OPTIONS: CreateOption[] = [
   {
@@ -363,37 +386,9 @@ const CREATE_OPTIONS: CreateOption[] = [
   },
 ];
 
-// ─── Local storage pour l'historique ─────────────────────────────────────
-
-const HISTORY_STORAGE_KEY = "debrouille_create_history";
-const MAX_HISTORY = 4;
-
-function getCreationHistory(): ExtendedPublicationType[] {
-  try {
-    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as ExtendedPublicationType[];
-    return parsed.filter((id) => CREATE_OPTIONS.some((o) => o.id === id));
-  } catch {
-    return [];
-  }
-}
-
-function addToHistory(id: ExtendedPublicationType): void {
-  const current = getCreationHistory();
-  const next = [id, ...current.filter((x) => x !== id)].slice(0, MAX_HISTORY);
-  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(next));
-}
-
-// ─── Create Hub v2 — premium navigation ───────────────────────────────────────
-
 const CREATE_GROUPS: {
   label: string;
-  icon: React.ComponentType<{
-    size: number;
-    style?: ViewStyle | TextStyle | ImageStyle;
-    className?: string;
-  }>;
+  icon: ComponentType<{ size: number; color?: string; style?: any }>;
   ids: ExtendedPublicationType[];
 }[] = [
   {
@@ -411,16 +406,8 @@ const CREATE_GROUPS: {
     icon: Briefcase,
     ids: ["job", "service", "network"],
   },
-  {
-    label: "Communauté",
-    icon: Users,
-    ids: ["community", "evenement", "ong"],
-  },
-  {
-    label: "Agriculture & Santé",
-    icon: Leaf,
-    ids: ["agri", "sante"],
-  },
+  { label: "Communauté", icon: Users, ids: ["community", "evenement", "ong"] },
+  { label: "Agriculture & Santé", icon: Leaf, ids: ["agri", "sante"] },
   {
     label: "Média & Création",
     icon: Video,
@@ -435,891 +422,53 @@ const QUICK_CREATE_IDS: ExtendedPublicationType[] = [
   "marketplace",
 ];
 
-function CreateSearchBar({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <View
-      className="relative mb-5"
-    >
-      <View
-        className="absolute inset-0 rounded-[22px]"
-        style={{ opacity: 0.8 }}
-      />
-      <View
-        className="relative flex items-center rounded-[22px] overflow-hidden"
-        style={{ backgroundColor: "rgba(255,255,255,0.055)", borderWidth: 1, borderColor: "rgba(255,255,255,0.10)", borderStyle: "solid" }}
-      >
-        <Search size={18} className="ml-4 text-white/35 shrink-0" />
-        <TextInput
-         
-          value={value}
-          onChangeText={(text) => onChange(text)}
-          placeholder="Que voulez-vous créer ?  Ex. maison, emploi, restaurant..."
-          className="w-full bg-transparent py-4 pl-3 pr-4 text-white placeholder:text-white/30 outline-none text-sm"
-          data-create-hub-search="true"
-          autoFocus
-        />
-        {!value && (
-          <Text className="hidden sm:flex mr-3 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white/30">
-            <Command size={10} />K
-          </Text>
-        )}
-        {value && (
-          <Pressable
-           
-            onPress={() => onChange("")}
-            className="mr-3 h-7 w-7 rounded-full bg-white/8 flex items-center justify-center text-white/45"
-            accessibilityLabel="Effacer la recherche"
-          >
-            <X size={13} />
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
+const HISTORY_STORAGE_KEY = "debrouille_create_history";
+const MAX_HISTORY = 4;
 
-function CreateHero({ onAI }: { onAI: () => void }) {
-  return (
-    <View
-      className="relative overflow-hidden rounded-[28px] mb-5"
-      style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.10)", borderStyle: "solid" }}
-    >
-      <View
-        className="absolute -right-14 -top-14 h-36 w-36 rounded-full"
-        style={{ backgroundColor: "rgba(139,92,246,.18)" }}
-      />
-      <View
-        className="absolute -left-10 -bottom-16 h-32 w-32 rounded-full"
-        style={{ backgroundColor: "rgba(14,165,233,.14)" }}
-      />
+const memoryStore: Record<string, string> = {};
 
-      <View className="relative p-5 sm:p-6">
-        <View className="flex items-start justify-between gap-4">
-          <View>
-            <View className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 mb-3">
-              <Sparkles size={12} className="text-violet-300" />
-              <Text className="text-[10px] font-bold uppercase tracking-[.16em] text-white/55">
-                Create Hub
-              </Text>
-            </View>
-            <Text className="text-white text-[25px] sm:text-[29px] font-black tracking-tight leading-none">
-              Donnez vie à vos idées.
-            </Text>
-            <Text className="mt-2 max-w-[560px] text-sm leading-5 text-white/48">
-              Publiez, vendez, proposez un service, trouvez une opportunité ou
-              partagez avec votre communauté.
-            </Text>
-          </View>
-
-          <View
-            className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl"
-            style={{  }}
-          >
-            <Wand2 size={25} className="text-white" />
-          </View>
-        </View>
-
-        <Pressable
-         
-          onPress={onAI}
-          className="mt-5 w-full group rounded-2xl p-[1px] text-left"
-          style={{  }}
-        >
-          <View className="flex items-center gap-3 rounded-[15px] bg-[#101022]/95 px-4 py-3.5">
-            <View className="h-9 w-9 shrink-0 rounded-xl flex items-center justify-center bg-white/8">
-              <Sparkles size={16} className="text-violet-300" />
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text className="text-sm font-bold text-white">
-                Je ne sais pas quoi choisir
-              </Text>
-              <Text className="text-xs text-white/35 truncate">
-                Décrivez simplement ce que vous voulez faire...
-              </Text>
-            </View>
-            <ArrowRight
-              size={17}
-              className="text-white/35"
-            />
-          </View>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function CreateQuickActions({
-  history,
-  onSelect,
-}: {
-  history: ExtendedPublicationType[];
-  onSelect: (id: ExtendedPublicationType) => void;
-}) {
-  const historyOptions = history
-    .map((id) => CREATE_OPTIONS.find((o) => o.id === id))
-    .filter(Boolean) as CreateOption[];
-
-  const fallbackOptions = QUICK_CREATE_IDS.map((id) =>
-    CREATE_OPTIONS.find((o) => o.id === id),
-  ).filter(Boolean) as CreateOption[];
-
-  const options = [...historyOptions, ...fallbackOptions]
-    .filter(
-      (opt, index, arr) => arr.findIndex((x) => x.id === opt.id) === index,
-    )
-    .slice(0, 4);
-
-  return (
-    <View className="mb-6">
-      <View className="flex items-center justify-between mb-2.5">
-        <View className="flex items-center gap-2">
-          <TrendingUp size={13} className="text-emerald-300" />
-          <Text className="text-[10px] font-black uppercase tracking-[.16em] text-white/38">
-            {historyOptions.length ? "Vos raccourcis" : "Création rapide"}
-          </Text>
-        </View>
-        <Text className="text-[10px] text-white/20">1 clic</Text>
-      </View>
-
-      <View className="gap-2.5">
-        {options.map((opt, index) => (
-          <Pressable
-            key={opt.id}
-            onPress={() => onSelect(opt.id)}
-            className="group relative overflow-hidden rounded-2xl p-3 text-left"
-            style={{ borderStyle: "solid" }}
-          >
-            <View
-              className="absolute -right-4 -top-4 h-12 w-12 rounded-full opacity-30"
-              style={{ backgroundColor: opt.color }}
-            />
-            <View
-              className="relative h-8 w-8 rounded-xl flex items-center justify-center mb-2"
-              style={{ backgroundColor: `${opt.color}22`, borderStyle: "solid" }}
-            >
-              <opt.icon size={16} style={{ color: opt.color }} />
-            </View>
-            <Text className="relative text-xs font-bold text-white truncate">
-              {opt.label}
-            </Text>
-            <Text className="relative mt-0.5 text-[10px] text-white/30 truncate">
-              {opt.desc}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function CreateRecent({
-  history,
-  onSelect,
-}: {
-  history: ExtendedPublicationType[];
-  onSelect: (id: ExtendedPublicationType) => void;
-}) {
-  if (history.length === 0) return null;
-
-  const recentOptions = history
-    .map((id) => CREATE_OPTIONS.find((o) => o.id === id))
-    .filter(Boolean) as CreateOption[];
-
-  return (
-    <View
-      className="mb-5"
-    >
-      <View className="flex items-center gap-2 text-[10px] text-white/30 font-black uppercase tracking-[.16em] mb-2">
-        <Clock size={12} />
-        <Text>Dernières créations</Text>
-      </View>
-      <View className="flex flex-wrap gap-2">
-        {recentOptions.map((opt) => (
-          <Pressable
-            key={opt.id}
-           
-            onPress={() => onSelect(opt.id)}
-            className="group flex items-center gap-2 px-3 py-2 rounded-xl"
-            style={{ backgroundColor: "rgba(255,255,255,.035)", borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-          >
-            <opt.icon size={14} style={{ color: opt.color }} />
-            <Text className="text-xs text-white/65">
-              {opt.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function CreateGroupedGrid({
-  options,
-  onSelect,
-}: {
-  options: CreateOption[];
-  onSelect: (id: ExtendedPublicationType) => void;
-}) {
-  const renderGroup = (
-    group: (typeof CREATE_GROUPS)[number],
-    groupIndex: number,
-  ) => {
-    const items = options.filter((opt) => group.ids.includes(opt.id));
-    if (!items.length) return null;
-
-    return (
-      <View
-        key={group.label}
-        className="mb-6"
-      >
-        <View className="flex items-center gap-2.5 mb-2.5">
-          <View
-            className="h-7 w-7 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,.05)", borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-          >
-            <group.icon size={13} className="text-white/45" />
-          </View>
-          <View>
-            <Text className="text-[10px] text-white/42 uppercase tracking-[.15em] font-black">
-              {group.label}
-            </Text>
-            <Text className="text-[9px] text-white/20">
-              {items.length} option{items.length > 1 ? "s" : ""}
-            </Text>
-          </View>
-        </View>
-
-        <View className="gap-2.5">
-          {items.map((opt, index) => (
-            <Pressable
-              key={opt.id}
-              onPress={() => onSelect(opt.id)}
-              className="group relative overflow-hidden rounded-[20px] p-3.5 text-left"
-              style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.075)", borderStyle: "solid" }}
-            >
-              <View
-                className="absolute -right-8 -top-8 h-20 w-20 rounded-full opacity-0"
-                style={{ backgroundColor: opt.color }}
-              />
-
-              <View className="relative flex items-start justify-between gap-2">
-                <View
-                  className="h-10 w-10 shrink-0 rounded-[14px] flex items-center justify-center"
-                  style={{ backgroundColor: `${opt.color}18`, borderStyle: "solid" }}
-                >
-                  <opt.icon size={19} style={{ color: opt.color }} />
-                </View>
-
-                <ArrowRight
-                  size={14}
-                  className="mt-1 text-white/15"
-                />
-              </View>
-
-              <View className="relative mt-3">
-                <Text className="text-[13px] font-bold text-white/90">
-                  {opt.label}
-                </Text>
-                <Text className="mt-1 text-[10px] leading-4 text-white/30">
-                  {opt.desc}
-                </Text>
-              </View>
-
-              <View
-                className="absolute bottom-0 left-0 right-0 h-[1px] opacity-0"
-                style={{  }}
-              />
-            </Pressable>
-          ))}
-        </View>
-      </View>
-    );
-  };
-
-  return <View>{CREATE_GROUPS.map(renderGroup)}</View>;
-}
-
-// ─── Shared sub-components ────────────────────────────────────────────────────
-// ─── Shared sub-components ────────────────────────────────────────────────────
-
-function FieldInput({
-  icon: Icon,
-  color,
-  placeholder,
-  value,
-  onChange,
-  type = "text",
-}: {
-  icon: React.ComponentType<{
-    size: number;
-    style?: ViewStyle | TextStyle | ImageStyle;
-    className?: string;
-  }>;
-  color: string;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-}) {
-  return (
-    <View
-      className="rounded-2xl p-3.5 mb-2"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
-      <View className="flex items-center gap-2.5">
-        <Icon size={14} style={{ color }} />
-        <TextInput
-         
-          value={value}
-          onChangeText={(text) => onChange(text)}
-          placeholder={placeholder}
-          className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-        />
-      </View>
-    </View>
-  );
-}
-
-function FieldTextarea({
-  icon: Icon,
-  color,
-  placeholder,
-  value,
-  onChange,
-  rows = 3,
-}: {
-  icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
-  color: string;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  rows?: number;
-}) {
-  return (
-    <View
-      className="rounded-2xl p-3.5 mb-2"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
-      <View className="flex items-start gap-2.5">
-        <Icon size={14} style={{ color, marginTop: 3 }} />
-        <TextInput
-          value={value}
-          onChangeText={(text) => onChange(text)}
-          placeholder={placeholder}
-         
-          className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-         multiline textAlignVertical="top"/>
-      </View>
-    </View>
-  );
-}
-
-function CategoryPills({
-  cats,
-  active,
-  color,
-  onChange,
-}: {
-  cats: string[];
-  active: string;
-  color: string;
-  onChange: (c: string) => void;
-}) {
-  return (
-    <View className="flex flex-wrap gap-2 mb-4">
-      {cats.map((c) => (
-        <Pressable
-          key={c}
-          onPress={() => onChange(c)}
-          className="px-3 py-1.5 rounded-2xl text-xs font-semibold"
-          style={{ backgroundColor: active === c ? `${color}33` : "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          {c}
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-function FormWrapper({
-  title,
-  color,
-  onBack,
-  onClose,
-  children,
-}: {
-  title: string;
-  color: string;
-  onBack: () => void;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <View className="flex flex-col gap-0">
-      <View className="flex items-center gap-3 mb-4">
-        <Pressable
-          onPress={onBack}
-          className="w-8 h-8 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-        >
-          <ArrowLeft size={16} className="text-white" />
-        </Pressable>
-        <Text className="text-white font-bold text-base flex-1">{title}</Text>
-        <Pressable
-          onPress={onClose}
-          className="w-8 h-8 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-        >
-          <X size={16} className="text-white/60" />
-        </Pressable>
-      </View>
-      {children}
-    </View>
-  );
-}
-
-function SubmitBtn({
-  color,
-  label,
-  onClick,
-  disabled,
-  loading,
-}: {
-  color: string;
-  label: string;
-  onClick: () => void;
-  disabled: boolean;
-  loading?: boolean;
-}) {
-  return (
-    <Pressable
-      disabled={disabled || loading}
-      onPress={() => {
-        console.log("🟢 SubmitBtn cliqué !");
-        onClick();
-      }}
-      className="w-full py-4 rounded-3xl text-white font-bold text-sm mt-3 disabled:opacity-40 flex items-center justify-center gap-2"
-      style={{  }}
-    >
-      {loading && <Loader2 size={16} className="animate-spin" />}
-      {loading ? "Publication en cours..." : label}
-    </Pressable>
-  );
-}
-
-// ─── Tags Input ──────────────────────────────────────────────────────────────
-
-function TagsInput({
-  value,
-  onChange,
-  placeholder,
-  color,
-}: {
-  value: string[];
-  onChange: (tags: string[]) => void;
-  placeholder: string;
-  color: string;
-}) {
-  const [input, setInput] = useState("");
-
-  const addTag = () => {
-    const trimmed = input.trim();
-    if (trimmed && !value.includes(trimmed)) {
-      onChange([...value, trimmed]);
-      setInput("");
+const store = {
+  get(k: string): string | null {
+    if (isBrowser) {
+      try {
+        return window.localStorage.getItem(k);
+      } catch {
+        return null;
+      }
     }
-  };
+    return memoryStore[k] ?? null;
+  },
+  set(k: string, v: string) {
+    if (isBrowser) {
+      try {
+        window.localStorage.setItem(k, v);
+      } catch {}
+    } else {
+      memoryStore[k] = v;
+    }
+  },
+};
 
-  const removeTag = (tag: string) => {
-    onChange(value.filter((t) => t !== tag));
-  };
-
-  return (
-    <View
-      className="rounded-2xl p-3.5 mb-2"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
-      <View className="flex flex-wrap gap-1.5 mb-2">
-        {value.map((tag) => (
-          <Text
-            key={tag}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs"
-            style={{ backgroundColor: `${color}25`, color: color }}
-          >
-            {tag}
-            <Pressable
-             
-              onPress={() => removeTag(tag)}
-              className=""
-            >
-              <X size={12} />
-            </Pressable>
-          </Text>
-        ))}
-      </View>
-      <View className="flex items-center gap-2">
-        <TextInput
-          value={input}
-          onChangeText={(text) => setInput(text)}
-          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-          placeholder={placeholder}
-          className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-        />
-        <Pressable
-         
-          onPress={addTag}
-          disabled={!input.trim()}
-          className="text-white/40 disabled:opacity-30"
-        >
-          <Plus size={16} style={{ color }} />
-        </Pressable>
-      </View>
-    </View>
-  );
+function getCreationHistory(): ExtendedPublicationType[] {
+  try {
+    const raw = store.get(HISTORY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ExtendedPublicationType[];
+    return parsed.filter((id) => CREATE_OPTIONS.some((o) => o.id === id));
+  } catch {
+    return [];
+  }
 }
 
-// ─── Job Form ─────────────────────────────────────────────────────────────────
-
-function JobForm({
-  onBack,
-  onClose,
-  color,
-}: {
-  onBack: () => void;
-  onClose: () => void;
-  color: string;
-}) {
-  console.log("✅ JobForm RENDU");
-
-  const createJob = useMutation(api.employment.createJob);
-  const [form, setForm] = useState({
-    title: "",
-    company: "",
-    description: "",
-    city: "",
-    country: "Congo",
-    salaryMin: "",
-    salaryMax: "",
-    currency: "USD",
-    contractType: "cdi",
-    remote: false,
-    skills: [] as string[],
-    benefits: [] as string[],
-    contactEmail: "",
-    contactPhone: "",
-    deadline: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [locating, setLocating] = useState(false);
-
-  const setField = (key: keyof typeof form) => (value: any) =>
-    setForm((f) => ({ ...f, [key]: value }));
-
-  const detectLocation = useCallback(() => {
-    if (!("geolocation" in undefined)) {
-      UIService.openToast("Géolocalisation non supportée", "error");
-      return;
-    }
-    setLocating(true);
-    undefined.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`,
-          );
-          const data = (await res.json()) as {
-            address?: {
-              city?: string;
-              town?: string;
-              village?: string;
-              suburb?: string;
-              state?: string;
-              country?: string;
-            };
-          };
-          const addr = data.address;
-          const place =
-            addr?.city ??
-            addr?.town ??
-            addr?.village ??
-            addr?.suburb ??
-            addr?.state ??
-            "";
-          const country = addr?.country ?? "";
-          setField("city")(place);
-          if (country) setField("country")(country);
-          UIService.openToast("Position détectée !", "success");
-        } catch {
-          setField("city")(
-            `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`,
-          );
-        }
-        setLocating(false);
-      },
-      () => {
-        UIService.openToast("Impossible de détecter la position", "error");
-        setLocating(false);
-      },
-      { timeout: 10000 },
-    );
-  }, []);
-
-  const handleSubmit = async () => {
-    console.log("🔥 handleSubmit JobForm appelé");
-
-    if (!form.title || !form.company || !form.description || !form.city) {
-      UIService.openToast("Veuillez remplir tous les champs obligatoires", "error");
-      return;
-    }
-
-    console.log("🔥 createJob appelé avec :", form);
-
-    setLoading(true);
-    try {
-      const result = await createJob({
-        title: form.title,
-        description: form.description,
-        company: form.company,
-        category: form.contractType,
-        contractType: form.contractType as any,
-        salaryMin: form.salaryMin ? parseFloat(form.salaryMin) : undefined,
-        salaryMax: form.salaryMax ? parseFloat(form.salaryMax) : undefined,
-        currency: form.currency || "USD",
-        city: form.city,
-        remote: form.remote,
-        skills: form.skills,
-        deadline: form.deadline || undefined,
-      });
-
-      console.log("✅ createJob terminé, result:", result);
-
-      UIService.openToast("Offre d'emploi publiée !", "success");
-      onClose();
-    } catch (err) {
-      console.error("❌ createJob erreur:", err);
-      UIService.openToast("Erreur lors de la publication", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const contractTypes = [
-    { label: "CDI", value: "cdi" },
-    { label: "CDD", value: "cdd" },
-    { label: "Stage", value: "stage" },
-    { label: "Freelance", value: "freelance" },
-    { label: "Alternance", value: "alternance" },
-    { label: "Bénévole", value: "benevole" },
-  ];
-
-  const currencies = ["USD", "EUR", "CDF", "CFA"];
-
-  return (
-    <FormWrapper
-      title="Offre d'emploi"
-      color={color}
-      onBack={onBack}
-      onClose={onClose}
-    >
-      <View className="space-y-1">
-        <FieldInput
-          icon={Briefcase}
-          color={color}
-          placeholder="Intitulé du poste *"
-          value={form.title}
-          onChange={setField("title")}
-        />
-        <FieldInput
-          icon={Users}
-          color={color}
-          placeholder="Nom de l'entreprise *"
-          value={form.company}
-          onChange={setField("company")}
-        />
-        <FieldTextarea
-          icon={FileText}
-          color={color}
-          placeholder="Description du poste *"
-          value={form.description}
-          onChange={setField("description")}
-          rows={4}
-        />
-
-        {/* Localisation */}
-        <View
-          className="rounded-2xl p-3.5 mb-2"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          <View className="flex items-center gap-2.5">
-            <MapPin size={14} style={{ color }} />
-            <TextInput
-              value={form.city}
-              onChangeText={(text) => setField("city")(text)}
-              placeholder="Ville *"
-              className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-            />
-            <Pressable
-             
-              onPress={detectLocation}
-              disabled={locating}
-              className="flex-shrink-0 disabled:opacity-40"
-            >
-              {locating ? (
-                <Loader2 size={14} className="animate-spin" style={{ color }} />
-              ) : (
-                <LocateFixed size={14} style={{ color }} />
-              )}
-            </Pressable>
-          </View>
-        </View>
-        <FieldInput
-          icon={Globe}
-          color={color}
-          placeholder="Pays"
-          value={form.country}
-          onChange={setField("country")}
-        />
-
-        {/* Salaire */}
-        <View className="gap-2">
-          <FieldInput
-            icon={Tag}
-            color={color}
-            placeholder="Salaire min"
-            value={form.salaryMin}
-            onChange={setField("salaryMin")}
-            type="number"
-          />
-          <FieldInput
-            icon={Tag}
-            color={color}
-            placeholder="Salaire max"
-            value={form.salaryMax}
-            onChange={setField("salaryMax")}
-            type="number"
-          />
-          <View
-            className="rounded-2xl p-3.5 mb-2"
-            style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-          >
-            <Picker
-             
-              onValueChange={(val) => setField("currency")(val)}
-              className="w-full bg-transparent text-white text-sm outline-none"
-              style={{ color: "white" }}
-             selectedValue={form.currency}>
-              {currencies.map((c) => (
-                <Picker.Item label={`${c}`} value={c} />
-              ))}
-            </Picker>
-          </View>
-        </View>
-
-        {/* Type de contrat */}
-        <View className="flex flex-wrap gap-2 mb-2">
-          {contractTypes.map((ct) => (
-            <Pressable
-              key={ct.value}
-              onPress={() => setField("contractType")(ct.value)}
-              className="px-3 py-1.5 rounded-2xl text-xs font-semibold"
-              style={{ backgroundColor: form.contractType === ct.value
-                                  ? `${color}33`
-                                  : "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-            >
-              {ct.label}
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Télétravail */}
-        <View
-          className="rounded-2xl p-3.5 mb-2 flex items-center gap-2"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          <Pressable
-           
-            onPress={() => setField("remote")(!form.remote)}
-            className={cn(
-              "w-5 h-5 rounded-md flex items-center justify-center transition-colors",
-              form.remote ? "bg-purple-500" : "bg-white/10",
-            )}
-          >
-            {form.remote && <Check size={12} className="text-white" />}
-          </Pressable>
-          <Text className="text-sm text-white/70">Télétravail possible</Text>
-        </View>
-
-        {/* Compétences */}
-        <TagsInput
-          value={form.skills}
-          onChange={setField("skills")}
-          placeholder="Compétences (ex: React, Node.js, ...)"
-          color={color}
-        />
-
-        {/* Avantages */}
-        <TagsInput
-          value={form.benefits}
-          onChange={setField("benefits")}
-          placeholder="Avantages (ex: Mutuelle, Tickets resto, ...)"
-          color={color}
-        />
-
-        {/* Contact */}
-        <FieldInput
-          icon={Mail}
-          color={color}
-          placeholder="Email de contact"
-          value={form.contactEmail}
-          onChange={setField("contactEmail")}
-          type="email"
-        />
-        <FieldInput
-          icon={Phone}
-          color={color}
-          placeholder="Téléphone de contact"
-          value={form.contactPhone}
-          onChange={setField("contactPhone")}
-          type="tel"
-        />
-
-        {/* Date limite */}
-        <View
-          className="rounded-2xl p-3.5 mb-2"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          <View className="flex items-center gap-2.5">
-            <CalendarIcon size={14} style={{ color }} />
-            <TextInput
-             
-              value={form.deadline}
-              onChangeText={(text) => setField("deadline")(text)}
-              className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-            />
-          </View>
-        </View>
-
-        <SubmitBtn
-          color={color}
-          label="Publier l'offre"
-          onPress={handleSubmit}
-          disabled={
-            !form.title || !form.company || !form.description || !form.city
-          }
-          loading={loading}
-        />
-      </View>
-    </FormWrapper>
-  );
+function addToHistory(id: ExtendedPublicationType): void {
+  const current = getCreationHistory();
+  const next = [id, ...current.filter((x) => x !== id)].slice(0, MAX_HISTORY);
+  store.set(HISTORY_STORAGE_KEY, JSON.stringify(next));
 }
 
-// ─── Categories for Generic Forms ──────────────────────────────────────────
+/* ============================================================================
+ * CATEGORIES
+ * ========================================================================== */
 
 const IMMO_CATS = [
   "Location",
@@ -1419,7 +568,7 @@ const VIDEO_CATS = [
   "Vlog",
   "Live replay",
 ];
-const ARTICLE_CATS = [
+const ARTICLE_CATS_FORM = [
   "Tech",
   "Société",
   "Culture",
@@ -1487,7 +636,1205 @@ const AI_CONTENT_TYPE_MAP: Record<
   voyages: "post",
 };
 
-// ─── Generic Form ────────────────────────────────────────────────────────────
+/* ============================================================================
+ * ANIMATION HELPERS
+ * ========================================================================== */
+
+function FadeUp({
+  delay = 0,
+  distance = 12,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: any;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 420,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * AMBIENT BACKGROUND (orbs)
+ * ========================================================================== */
+
+function AmbientBackdrop() {
+  const orbA = useRef(new Animated.Value(0)).current;
+  const orbB = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = (v: Animated.Value, to: number, dur: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(v, {
+            toValue: to,
+            duration: dur,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(v, {
+            toValue: 0,
+            duration: dur,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    loop(orbA, -40, 9000);
+    loop(orbB, 50, 11000);
+  }, [orbA, orbB]);
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Animated.View
+        style={[
+          styles.ambientOrb,
+          {
+            width: 340,
+            height: 340,
+            top: -160,
+            left: -120,
+            backgroundColor: "rgba(139,92,246,0.4)",
+            transform: [{ translateY: orbA }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.ambientOrb,
+          {
+            width: 300,
+            height: 300,
+            bottom: -140,
+            right: -100,
+            backgroundColor: "rgba(99,102,241,0.32)",
+            transform: [{ translateY: orbB }],
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+/* ============================================================================
+ * LOADING SPINNER
+ * ========================================================================== */
+
+function LoadingSpinner({
+  color = "#fff",
+  size = 16,
+}: {
+  color?: string;
+  size?: number;
+}) {
+  const rotate = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rotate, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, [rotate]);
+
+  const rotation = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+      <Loader2 size={size} color={color} />
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * SEARCH BAR
+ * ========================================================================== */
+
+function CreateSearchBar({
+  value,
+  onChange,
+  inputRef,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  inputRef?: React.RefObject<TextInput>;
+}) {
+  const [focused, setFocused] = useState(false);
+  const focusAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(focusAnim, {
+      toValue: focused ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [focused, focusAnim]);
+
+  const borderColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.1)", "rgba(139,92,246,0.55)"],
+  });
+
+  return (
+    <FadeUp delay={60}>
+      <Animated.View style={[styles.searchBar, { borderColor }]}>
+        <Search size={18} color="rgba(255,255,255,0.45)" />
+        <TextInput
+          ref={inputRef}
+          value={value}
+          onChangeText={onChange}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder="Que voulez-vous créer ? Ex. maison, emploi, restaurant…"
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          style={styles.searchInput}
+          autoFocus
+          accessibilityLabel="Recherche de création"
+        />
+        {value ? (
+          <Pressable
+            onPress={() => onChange("")}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.searchClear,
+              pressed && styles.pressed,
+            ]}
+            accessibilityLabel="Effacer"
+          >
+            <X size={13} color="rgba(255,255,255,0.65)" />
+          </Pressable>
+        ) : null}
+      </Animated.View>
+    </FadeUp>
+  );
+}
+
+/* ============================================================================
+ * HERO
+ * ========================================================================== */
+
+function CreateHero({ onAI }: { onAI: () => void }) {
+  const wand = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(wand, {
+          toValue: 1,
+          duration: 3500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(wand, {
+          toValue: 0,
+          duration: 3500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [wand]);
+
+  const translateY = wand.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -4],
+  });
+  const rotate = wand.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "2deg"],
+  });
+
+  return (
+    <FadeUp distance={14}>
+      <View style={styles.heroCard}>
+        {/* Gradients + orbs */}
+        <LinearGradient
+          colors={[
+            "rgba(139,92,246,0.22)",
+            "rgba(76,29,149,0.08)",
+            "rgba(15,7,32,0.85)",
+          ]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.heroTopLine} pointerEvents="none" />
+        <View style={styles.heroBorder} pointerEvents="none" />
+        <View style={styles.heroOrb1} pointerEvents="none" />
+        <View style={styles.heroOrb2} pointerEvents="none" />
+
+        <View style={{ padding: 20 }}>
+          <View style={styles.heroHeaderRow}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <View style={styles.heroBadge}>
+                <Sparkles size={12} color="#C4B5FD" />
+                <Text style={styles.heroBadgeText}>CREATE HUB</Text>
+              </View>
+              <Text style={styles.heroTitle}>Donnez vie à vos idées.</Text>
+              <Text style={styles.heroSub}>
+                Publiez, vendez, proposez un service, trouvez une opportunité ou
+                partagez avec votre communauté.
+              </Text>
+            </View>
+
+            <Animated.View
+              style={[
+                styles.heroWandWrap,
+                { transform: [{ translateY }, { rotate }] },
+              ]}
+            >
+              <LinearGradient
+                colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.heroWand}
+              >
+                <Wand2 size={25} color="#fff" />
+              </LinearGradient>
+            </Animated.View>
+          </View>
+
+          <Pressable
+            onPress={onAI}
+            style={({ pressed }) => [
+              styles.heroAIButtonOuter,
+              pressed && styles.pressed,
+            ]}
+          >
+            <LinearGradient
+              colors={["rgba(167,139,250,0.5)", "rgba(99,102,241,0.5)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroAIButtonGradient}
+            >
+              <View style={styles.heroAIButtonInner}>
+                <View style={styles.heroAIIconBox}>
+                  <Sparkles size={16} color="#C4B5FD" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.heroAITitle}>
+                    Je ne sais pas quoi choisir
+                  </Text>
+                  <Text style={styles.heroAISub} numberOfLines={1}>
+                    Décrivez simplement ce que vous voulez faire…
+                  </Text>
+                </View>
+                <ArrowRight size={17} color="rgba(255,255,255,0.55)" />
+              </View>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </View>
+    </FadeUp>
+  );
+}
+
+/* ============================================================================
+ * QUICK ACTIONS
+ * ========================================================================== */
+
+function CreateQuickActions({
+  history,
+  onSelect,
+}: {
+  history: ExtendedPublicationType[];
+  onSelect: (id: ExtendedPublicationType) => void;
+}) {
+  const historyOptions = history
+    .map((id) => CREATE_OPTIONS.find((o) => o.id === id))
+    .filter(Boolean) as CreateOption[];
+
+  const fallbackOptions = QUICK_CREATE_IDS.map((id) =>
+    CREATE_OPTIONS.find((o) => o.id === id),
+  ).filter(Boolean) as CreateOption[];
+
+  const options = [...historyOptions, ...fallbackOptions]
+    .filter(
+      (opt, index, arr) => arr.findIndex((x) => x.id === opt.id) === index,
+    )
+    .slice(0, 4);
+
+  return (
+    <FadeUp delay={120}>
+      <View style={{ marginBottom: 24 }}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <TrendingUp size={13} color="#6EE7B7" />
+            <Text style={styles.sectionEyebrow}>
+              {historyOptions.length ? "VOS RACCOURCIS" : "CRÉATION RAPIDE"}
+            </Text>
+          </View>
+          <Text style={styles.sectionEyebrowDim}>1 clic</Text>
+        </View>
+
+        <View style={{ gap: 10 }}>
+          {options.map((opt, index) => (
+            <FadeUp key={opt.id} delay={160 + index * 45}>
+              <Pressable
+                onPress={() => onSelect(opt.id)}
+                style={({ pressed }) => [
+                  styles.quickActionCard,
+                  { borderColor: `${opt.color}33` },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <LinearGradient
+                  colors={[`${opt.color}18`, "rgba(255,255,255,0)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View
+                  style={[
+                    styles.quickActionIcon,
+                    {
+                      backgroundColor: `${opt.color}22`,
+                      borderColor: `${opt.color}55`,
+                    },
+                  ]}
+                >
+                  <opt.icon size={16} color={opt.color} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.quickActionTitle} numberOfLines={1}>
+                    {opt.label}
+                  </Text>
+                  <Text style={styles.quickActionSub} numberOfLines={1}>
+                    {opt.desc}
+                  </Text>
+                </View>
+                <ArrowRight size={14} color={`${opt.color}AA`} />
+              </Pressable>
+            </FadeUp>
+          ))}
+        </View>
+      </View>
+    </FadeUp>
+  );
+}
+
+/* ============================================================================
+ * RECENT
+ * ========================================================================== */
+
+function CreateRecent({
+  history,
+  onSelect,
+}: {
+  history: ExtendedPublicationType[];
+  onSelect: (id: ExtendedPublicationType) => void;
+}) {
+  if (history.length === 0) return null;
+
+  const recentOptions = history
+    .map((id) => CREATE_OPTIONS.find((o) => o.id === id))
+    .filter(Boolean) as CreateOption[];
+
+  return (
+    <FadeUp delay={200}>
+      <View style={{ marginBottom: 20 }}>
+        <View style={styles.sectionHeaderRow}>
+          <Clock size={12} color="rgba(255,255,255,0.5)" />
+          <Text style={styles.sectionEyebrow}>DERNIÈRES CRÉATIONS</Text>
+        </View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {recentOptions.map((opt) => (
+            <Pressable
+              key={opt.id}
+              onPress={() => onSelect(opt.id)}
+              style={({ pressed }) => [
+                styles.recentChip,
+                pressed && styles.pressed,
+              ]}
+            >
+              <opt.icon size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.recentChipText}>{opt.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </FadeUp>
+  );
+}
+
+/* ============================================================================
+ * GROUPED GRID
+ * ========================================================================== */
+
+function CreateGroupedGrid({
+  options,
+  onSelect,
+}: {
+  options: CreateOption[];
+  onSelect: (id: ExtendedPublicationType) => void;
+}) {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 640;
+
+  return (
+    <View>
+      {CREATE_GROUPS.map((group, groupIndex) => {
+        const items = options.filter((opt) => group.ids.includes(opt.id));
+        if (!items.length) return null;
+
+        return (
+          <FadeUp key={group.label} delay={groupIndex * 50}>
+            <View style={{ marginBottom: 24 }}>
+              <View style={styles.groupHeaderRow}>
+                <View style={styles.groupIconWrap}>
+                  <group.icon size={13} color="rgba(255,255,255,0.65)" />
+                </View>
+                <View>
+                  <Text style={styles.groupTitle}>{group.label}</Text>
+                  <Text style={styles.groupCount}>
+                    {items.length} option{items.length > 1 ? "s" : ""}
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={{
+                  gap: 10,
+                  flexDirection: isWide ? "row" : "column",
+                  flexWrap: isWide ? "wrap" : "nowrap",
+                }}
+              >
+                {items.map((opt, index) => (
+                  <FadeUp
+                    key={opt.id}
+                    delay={groupIndex * 50 + index * 30}
+                    style={
+                      isWide ? { flexBasis: "48%", flexGrow: 1 } : undefined
+                    }
+                  >
+                    <Pressable
+                      onPress={() => onSelect(opt.id)}
+                      style={({ pressed }) => [
+                        styles.gridCard,
+                        { borderColor: `${opt.color}33` },
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={[`${opt.color}14`, "rgba(255,255,255,0)"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      <View style={styles.gridCardTopRow}>
+                        <View
+                          style={[
+                            styles.gridCardIcon,
+                            {
+                              backgroundColor: `${opt.color}22`,
+                              borderColor: `${opt.color}55`,
+                            },
+                          ]}
+                        >
+                          <opt.icon size={19} color={opt.color} />
+                        </View>
+                        <ArrowRight size={14} color="rgba(255,255,255,0.3)" />
+                      </View>
+                      <Text style={styles.gridCardTitle}>{opt.label}</Text>
+                      <Text style={styles.gridCardSub}>{opt.desc}</Text>
+                    </Pressable>
+                  </FadeUp>
+                ))}
+              </View>
+            </View>
+          </FadeUp>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * FORM HELPERS
+ * ========================================================================== */
+
+function FieldInput({
+  icon: Icon,
+  color,
+  placeholder,
+  value,
+  onChange,
+}: {
+  icon: ComponentType<{ size: number; color?: string }>;
+  color: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const focusAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(focusAnim, {
+      toValue: focused ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [focused, focusAnim]);
+
+  const borderColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.08)", `${color}66`],
+  });
+  const bgColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.045)", `${color}12`],
+  });
+
+  return (
+    <Animated.View
+      style={[styles.fieldShell, { borderColor, backgroundColor: bgColor }]}
+    >
+      <Icon size={14} color={color} />
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder={placeholder}
+        placeholderTextColor="rgba(255,255,255,0.3)"
+        style={styles.fieldInput}
+      />
+    </Animated.View>
+  );
+}
+
+function FieldTextarea({
+  icon: Icon,
+  color,
+  placeholder,
+  value,
+  onChange,
+}: {
+  icon: ComponentType<{ size: number; color?: string }>;
+  color: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  rows?: number;
+}) {
+  const [focused, setFocused] = useState(false);
+  const focusAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(focusAnim, {
+      toValue: focused ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [focused, focusAnim]);
+
+  const borderColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.08)", `${color}66`],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.fieldShell,
+        { borderColor, alignItems: "flex-start", paddingVertical: 12 },
+      ]}
+    >
+      <View style={{ marginTop: 3 }}>
+        <Icon size={14} color={color} />
+      </View>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder={placeholder}
+        placeholderTextColor="rgba(255,255,255,0.3)"
+        style={[styles.fieldInput, { minHeight: 60 }]}
+        multiline
+        textAlignVertical="top"
+      />
+    </Animated.View>
+  );
+}
+
+function CategoryPills({
+  cats,
+  active,
+  color,
+  onChange,
+}: {
+  cats: string[];
+  active: string;
+  color: string;
+  onChange: (c: string) => void;
+}) {
+  return (
+    <View style={styles.catsRow}>
+      {cats.map((c) => {
+        const isActive = active === c;
+        return (
+          <Pressable
+            key={c}
+            onPress={() => onChange(c)}
+            style={({ pressed }) => [
+              styles.catPill,
+              isActive && {
+                backgroundColor: `${color}28`,
+                borderColor: `${color}66`,
+              },
+              pressed && styles.pressed,
+            ]}
+          >
+            {isActive ? (
+              <Check size={11} color={color} strokeWidth={3} />
+            ) : null}
+            <Text style={[styles.catPillText, isActive && { color }]}>{c}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function FormWrapper({
+  title,
+  color,
+  onBack,
+  onClose,
+  children,
+}: {
+  title: string;
+  color: string;
+  onBack: () => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <View>
+      <View style={styles.formHeader}>
+        <Pressable
+          onPress={onBack}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconBtnSm, pressed && styles.pressed]}
+        >
+          <ArrowLeft size={15} color="rgba(255,255,255,0.85)" />
+        </Pressable>
+        <View
+          style={[styles.formHeaderTitleWrap, { borderColor: `${color}55` }]}
+        >
+          <Text style={styles.formHeaderTitle}>{title}</Text>
+        </View>
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconBtnSm, pressed && styles.pressed]}
+        >
+          <X size={15} color="rgba(255,255,255,0.75)" />
+        </Pressable>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function SubmitBtn({
+  color,
+  label,
+  onClick,
+  disabled,
+  loading,
+}: {
+  color: string;
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+  loading?: boolean;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  const isDisabled = disabled || loading;
+
+  return (
+    <Animated.View style={{ transform: [{ scale }], marginTop: 12 }}>
+      <Pressable
+        onPress={onClick}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={isDisabled}
+        style={[styles.submitOuter, isDisabled && styles.submitDisabled]}
+      >
+        <LinearGradient
+          colors={
+            isDisabled
+              ? ["#1E1E2F", "#16162A"]
+              : [`${color}`, `${color}CC`, `${color}AA`]
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.submitGradient}
+        >
+          {loading ? <LoadingSpinner color="#fff" /> : null}
+          <Text style={styles.submitText}>
+            {loading ? "Publication en cours…" : label}
+          </Text>
+        </LinearGradient>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function TagsInput({
+  value,
+  onChange,
+  placeholder,
+  color,
+}: {
+  value: string[];
+  onChange: (tags: string[]) => void;
+  placeholder: string;
+  color: string;
+}) {
+  const [input, setInput] = useState("");
+
+  const addTag = () => {
+    const trimmed = input.trim();
+    if (trimmed && !value.includes(trimmed)) {
+      onChange([...value, trimmed]);
+      setInput("");
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    onChange(value.filter((t) => t !== tag));
+  };
+
+  return (
+    <View style={styles.tagsShell}>
+      {value.length > 0 ? (
+        <View style={styles.tagsList}>
+          {value.map((tag) => (
+            <View
+              key={tag}
+              style={[styles.tagChip, { backgroundColor: `${color}22` }]}
+            >
+              <Text style={[styles.tagChipText, { color }]}>{tag}</Text>
+              <Pressable onPress={() => removeTag(tag)} hitSlop={6}>
+                <X size={12} color={color} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          onSubmitEditing={addTag}
+          placeholder={placeholder}
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          style={styles.fieldInput}
+        />
+        <Pressable
+          onPress={addTag}
+          disabled={!input.trim()}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.tagAdd,
+            pressed && styles.pressed,
+            !input.trim() && { opacity: 0.4 },
+          ]}
+        >
+          <Plus size={16} color={color} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * JOB FORM
+ * ========================================================================== */
+
+function JobForm({
+  onBack,
+  onClose,
+  color,
+}: {
+  onBack: () => void;
+  onClose: () => void;
+  color: string;
+}) {
+  const createJob = useMutation(api.employment.createJob);
+
+  const [form, setForm] = useState({
+    title: "",
+    company: "",
+    description: "",
+    city: "",
+    country: "Congo",
+    salaryMin: "",
+    salaryMax: "",
+    currency: "USD",
+    contractType: "cdi",
+    remote: false,
+    skills: [] as string[],
+    benefits: [] as string[],
+    contactEmail: "",
+    contactPhone: "",
+    deadline: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
+
+  const setField = (key: keyof typeof form) => (value: any) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const detectLocation = useCallback(() => {
+    if (!isBrowser || !("geolocation" in navigator)) {
+      toast.error("Géolocalisation non supportée");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`,
+          );
+          const data = (await res.json()) as {
+            address?: {
+              city?: string;
+              town?: string;
+              village?: string;
+              suburb?: string;
+              state?: string;
+              country?: string;
+            };
+          };
+          const addr = data.address;
+          const place =
+            addr?.city ??
+            addr?.town ??
+            addr?.village ??
+            addr?.suburb ??
+            addr?.state ??
+            "";
+          const country = addr?.country ?? "";
+          setField("city")(place);
+          if (country) setField("country")(country);
+          toast.success("Position détectée !");
+        } catch {
+          setField("city")(
+            `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`,
+          );
+        }
+        setLocating(false);
+      },
+      () => {
+        toast.error("Impossible de détecter la position");
+        setLocating(false);
+      },
+      { timeout: 10000 },
+    );
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!form.title || !form.company || !form.description || !form.city) {
+      toast.error("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await createJob({
+        title: form.title,
+        description: form.description,
+        company: form.company,
+        category: form.contractType,
+        contractType: form.contractType as any,
+        salaryMin: form.salaryMin ? parseFloat(form.salaryMin) : undefined,
+        salaryMax: form.salaryMax ? parseFloat(form.salaryMax) : undefined,
+        currency: form.currency || "USD",
+        city: form.city,
+        remote: form.remote,
+        skills: form.skills,
+        deadline: form.deadline || undefined,
+      });
+      toast.success("Offre d'emploi publiée !");
+      onClose();
+    } catch {
+      toast.error("Erreur lors de la publication");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const contractTypes = [
+    { label: "CDI", value: "cdi" },
+    { label: "CDD", value: "cdd" },
+    { label: "Stage", value: "stage" },
+    { label: "Freelance", value: "freelance" },
+    { label: "Alternance", value: "alternance" },
+    { label: "Bénévole", value: "benevole" },
+  ];
+
+  const currencies = ["USD", "EUR", "CDF", "CFA"];
+
+  return (
+    <FormWrapper
+      title="Offre d'emploi"
+      color={color}
+      onBack={onBack}
+      onClose={onClose}
+    >
+      <FieldInput
+        icon={Briefcase}
+        color={color}
+        placeholder="Intitulé du poste *"
+        value={form.title}
+        onChange={setField("title")}
+      />
+      <FieldInput
+        icon={Users}
+        color={color}
+        placeholder="Nom de l'entreprise *"
+        value={form.company}
+        onChange={setField("company")}
+      />
+      <FieldTextarea
+        icon={FileText}
+        color={color}
+        placeholder="Description du poste *"
+        value={form.description}
+        onChange={setField("description")}
+      />
+
+      <View style={styles.fieldShell}>
+        <MapPin size={14} color={color} />
+        <TextInput
+          value={form.city}
+          onChangeText={setField("city")}
+          placeholder="Ville *"
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          style={styles.fieldInput}
+        />
+        <Pressable
+          onPress={detectLocation}
+          disabled={locating}
+          hitSlop={8}
+          style={{ opacity: locating ? 0.5 : 1 }}
+        >
+          {locating ? (
+            <LoadingSpinner color={color} size={14} />
+          ) : (
+            <LocateFixed size={14} color={color} />
+          )}
+        </Pressable>
+      </View>
+
+      <FieldInput
+        icon={Globe}
+        color={color}
+        placeholder="Pays"
+        value={form.country}
+        onChange={setField("country")}
+      />
+
+      <View style={{ gap: 8, marginTop: 4 }}>
+        <FieldInput
+          icon={Tag}
+          color={color}
+          placeholder="Salaire min"
+          value={form.salaryMin}
+          onChange={setField("salaryMin")}
+        />
+        <FieldInput
+          icon={Tag}
+          color={color}
+          placeholder="Salaire max"
+          value={form.salaryMax}
+          onChange={setField("salaryMax")}
+        />
+        <View style={styles.currencyRow}>
+          {currencies.map((c) => {
+            const isActive = form.currency === c;
+            return (
+              <Pressable
+                key={c}
+                onPress={() => setField("currency")(c)}
+                style={[
+                  styles.currencyPill,
+                  isActive && {
+                    backgroundColor: `${color}28`,
+                    borderColor: `${color}66`,
+                  },
+                ]}
+              >
+                <Text style={[styles.currencyPillText, isActive && { color }]}>
+                  {c}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.catsRow}>
+        {contractTypes.map((ct) => {
+          const isActive = form.contractType === ct.value;
+          return (
+            <Pressable
+              key={ct.value}
+              onPress={() => setField("contractType")(ct.value)}
+              style={[
+                styles.catPill,
+                isActive && {
+                  backgroundColor: `${color}28`,
+                  borderColor: `${color}66`,
+                },
+              ]}
+            >
+              <Text style={[styles.catPillText, isActive && { color }]}>
+                {ct.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Pressable
+        onPress={() => setField("remote")(!form.remote)}
+        style={({ pressed }) => [styles.checkRow, pressed && styles.pressed]}
+      >
+        <View
+          style={[
+            styles.checkBox,
+            form.remote && { backgroundColor: color, borderColor: color },
+          ]}
+        >
+          {form.remote ? (
+            <Check size={12} color="#fff" strokeWidth={3} />
+          ) : null}
+        </View>
+        <Text style={styles.checkLabel}>Télétravail possible</Text>
+      </Pressable>
+
+      <TagsInput
+        value={form.skills}
+        onChange={setField("skills")}
+        placeholder="Compétences (ex: React, Node.js…)"
+        color={color}
+      />
+
+      <TagsInput
+        value={form.benefits}
+        onChange={setField("benefits")}
+        placeholder="Avantages (ex: Mutuelle, Tickets resto…)"
+        color={color}
+      />
+
+      <FieldInput
+        icon={Mail}
+        color={color}
+        placeholder="Email de contact"
+        value={form.contactEmail}
+        onChange={setField("contactEmail")}
+      />
+
+      <FieldInput
+        icon={Phone}
+        color={color}
+        placeholder="Téléphone de contact"
+        value={form.contactPhone}
+        onChange={setField("contactPhone")}
+      />
+
+      <View style={styles.fieldShell}>
+        <CalendarIcon size={14} color={color} />
+        <TextInput
+          value={form.deadline}
+          onChangeText={setField("deadline")}
+          placeholder="Date limite (AAAA-MM-JJ)"
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          style={styles.fieldInput}
+        />
+      </View>
+
+      <SubmitBtn
+        color={color}
+        label="Publier l'offre"
+        onPress={handleSubmit}
+        disabled={
+          !form.title || !form.company || !form.description || !form.city
+        }
+        loading={loading}
+      />
+    </FormWrapper>
+  );
+}
+
+/* ============================================================================
+ * GENERIC FORM
+ * ========================================================================== */
 
 function GenericForm({
   type,
@@ -1510,9 +1857,7 @@ function GenericForm({
   submitLabel: string;
   onBack: () => void;
   onClose: () => void;
-  createFn: ReturnType<
-    typeof useMutation<typeof api.publications.createPublication>
-  >;
+  createFn: any;
 }) {
   const [form, setForm] = useState<FormState>({
     title: "",
@@ -1531,12 +1876,12 @@ function GenericForm({
     setForm((f) => ({ ...f, [k]: v }));
 
   const detectLocation = useCallback(() => {
-    if (!("geolocation" in undefined)) {
-      UIService.openToast("Géolocalisation non supportée", "error");
+    if (!isBrowser || !("geolocation" in navigator)) {
+      toast.error("Géolocalisation non supportée");
       return;
     }
     setLocating(true);
-    undefined.getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
           const res = await fetch(
@@ -1566,7 +1911,7 @@ function GenericForm({
               ? `${place}, ${country}`
               : `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`,
           );
-          UIService.openToast("Position détectée !", "success");
+          toast.success("Position détectée !");
         } catch {
           set("location")(
             `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`,
@@ -1575,7 +1920,7 @@ function GenericForm({
         setLocating(false);
       },
       () => {
-        UIService.openToast("Impossible de détecter la position", "error");
+        toast.error("Impossible de détecter la position");
         setLocating(false);
       },
       { timeout: 10000 },
@@ -1587,14 +1932,9 @@ function GenericForm({
     setLoading(true);
     try {
       const meta: any = {};
-      if (type === "annonce" && form.condition) {
-        meta.condition = form.condition;
-      }
-      if (form.contact) {
-        meta.contact = form.contact;
-      }
+      if (type === "annonce" && form.condition) meta.condition = form.condition;
+      if (form.contact) meta.contact = form.contact;
 
-      // ✅ Cast en any pour éviter l'erreur TypeScript (le type "voyages" n'est jamais passé ici)
       await createFn({
         type: type as any,
         title: form.title,
@@ -1606,10 +1946,10 @@ function GenericForm({
         tags: form.category ? [form.category.toLowerCase()] : [],
         meta: Object.keys(meta).length > 0 ? JSON.stringify(meta) : undefined,
       });
-      UIService.openToast("Publication créée avec succès !", "success");
+      toast.success("Publication créée avec succès !");
       onClose();
     } catch {
-      UIService.openToast("Erreur lors de la publication. Réessayez.", "error");
+      toast.error("Erreur lors de la publication. Réessayez.");
     } finally {
       setLoading(false);
     }
@@ -1630,6 +1970,7 @@ function GenericForm({
         color={color}
         onChange={set("category")}
       />
+
       <FieldInput
         icon={Tag}
         color={color}
@@ -1643,18 +1984,20 @@ function GenericForm({
         placeholder={descPlaceholder}
         value={form.description}
         onChange={set("description")}
-        rows={3}
       />
+
       <AIWriteAssist
         contentType={AI_CONTENT_TYPE_MAP[type]}
         topic={form.title}
         onGenerated={(text) => set("description")(text)}
         description={form.description}
-        onTagsSuggested={(_tags) => {}}
+        onTagsSuggested={(_tags: any) => {}}
         category={form.category || undefined}
         color={color}
       />
+
       <ImageUploader images={images} onChange={setImages} color={color} />
+
       <FieldInput
         icon={Tag}
         color={color}
@@ -1662,55 +2005,69 @@ function GenericForm({
         value={form.price}
         onChange={set("price")}
       />
-      <View
-        className="rounded-2xl p-3.5 mb-2"
-        style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-      >
-        <View className="flex items-center gap-2.5">
-          <MapPin size={14} style={{ color }} />
-          <TextInput
-            value={form.location}
-            onChangeText={(text) => set("location")(text)}
-            placeholder="Localisation (ville, quartier)"
-            className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-          />
-          <Pressable
-           
-            onPress={detectLocation}
-            disabled={locating}
-            className="flex-shrink-0 disabled:opacity-40"
-           
-          >
-            {locating ? (
-              <Loader2 size={14} className="animate-spin" style={{ color }} />
-            ) : (
-              <LocateFixed size={14} style={{ color }} />
-            )}
-          </Pressable>
-        </View>
-      </View>
-      {type === "annonce" && (
-        <View
-          className="rounded-2xl p-3.5 mb-2"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
+
+      <View style={styles.fieldShell}>
+        <MapPin size={14} color={color} />
+        <TextInput
+          value={form.location}
+          onChangeText={set("location")}
+          placeholder="Localisation (ville, quartier)"
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          style={styles.fieldInput}
+        />
+        <Pressable
+          onPress={detectLocation}
+          disabled={locating}
+          hitSlop={8}
+          style={{ opacity: locating ? 0.5 : 1 }}
         >
-          <View className="flex items-center gap-2.5">
-            <Tag size={14} style={{ color }} />
-            <Picker
-             
-              onValueChange={(val) => set("condition")(val)}
-              className="flex-1 bg-transparent text-white text-sm outline-none"
-             selectedValue={form.condition}>
-              <Picker.Item label="État du produit (optionnel)" value="" />
-              <Picker.Item label="Neuf" value="neuf" />
-              <Picker.Item label="Comme neuf" value="comme-neuf" />
-              <Picker.Item label="Très bon état" value="tres-bon" />
-              <Picker.Item label="Bon état" value="bon" />
-              <Picker.Item label="État acceptable" value="acceptable" />
-            </Picker>
+          {locating ? (
+            <LoadingSpinner color={color} size={14} />
+          ) : (
+            <LocateFixed size={14} color={color} />
+          )}
+        </Pressable>
+      </View>
+
+      {type === "annonce" ? (
+        <View style={styles.fieldShell}>
+          <Tag size={14} color={color} />
+          <View
+            style={{ flex: 1, flexDirection: "row", gap: 6, flexWrap: "wrap" }}
+          >
+            {[
+              { value: "", label: "État (optionnel)" },
+              { value: "neuf", label: "Neuf" },
+              { value: "comme-neuf", label: "Comme neuf" },
+              { value: "tres-bon", label: "Très bon" },
+              { value: "bon", label: "Bon" },
+              { value: "acceptable", label: "Acceptable" },
+            ].map((opt) => {
+              const isActive = form.condition === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => set("condition")(opt.value)}
+                  style={[
+                    styles.currencyPill,
+                    isActive && {
+                      backgroundColor: `${color}28`,
+                      borderColor: `${color}66`,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.currencyPillText, isActive && { color }]}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
-      )}
+      ) : null}
+
       <FieldInput
         icon={Tag}
         color={color}
@@ -1718,6 +2075,7 @@ function GenericForm({
         value={form.contact}
         onChange={set("contact")}
       />
+
       <SubmitBtn
         color={color}
         label={submitLabel}
@@ -1729,12 +2087,15 @@ function GenericForm({
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+/* ============================================================================
+ * MAIN COMPONENT
+ * ========================================================================== */
 
 export default function CreateBottomSheet({
   isOpen,
   onClose,
 }: CreateBottomSheetProps) {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const { isAuthenticated } = useFirebaseAuth();
   const createPublication = useMutation(api.publications.createPublication);
 
@@ -1746,7 +2107,52 @@ export default function CreateBottomSheet({
     getCreationHistory(),
   );
   const [aiMode, setAiMode] = useState(false);
+  const [mounted, setMounted] = useState(isOpen);
 
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const searchInputRef = useRef<TextInput>(null);
+
+  /* ─── entrance / exit ─── */
+  useEffect(() => {
+    if (isOpen) {
+      setMounted(true);
+      backdropAnim.setValue(0);
+      slideAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 1,
+          duration: 240,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 380,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 260,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start(() => setMounted(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  /* ─── reset on open ─── */
   useEffect(() => {
     if (isOpen) {
       setSearchQuery("");
@@ -1755,15 +2161,15 @@ export default function CreateBottomSheet({
     }
   }, [isOpen]);
 
+  /* ─── web keyboard ─── */
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !isBrowser) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        undefined<TextInput>('[data-create-hub-search="true"]')
-          ?.focus();
+        event.preventDefault();
+        searchInputRef.current?.focus();
       }
-
       if (event.key === "Escape") {
         if (activeType || aiMode) {
           setActiveType(null);
@@ -1774,34 +2180,33 @@ export default function CreateBottomSheet({
       }
     };
 
-    undefined;
-    return () => undefined;
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [isOpen, activeType, aiMode, onClose]);
 
-  const handleSelectType = (id: ExtendedPublicationType) => {
+  /* ─── actions ─── */
+  const handleSelectType = useCallback((id: ExtendedPublicationType) => {
     addToHistory(id);
     setHistory(getCreationHistory());
     setAiMode(false);
     setActiveType(id);
-  };
+  }, []);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setActiveType(null);
     setAiMode(false);
     onClose();
-  };
+  }, [onClose]);
 
-  const handleBackToHub = () => {
+  const handleBackToHub = useCallback(() => {
     setActiveType(null);
     setAiMode(false);
     setSearchQuery("");
-  };
+  }, []);
 
   const filteredOptions = useMemo(() => {
     if (!searchQuery.trim()) return CREATE_OPTIONS;
-
     const q = searchQuery.toLowerCase().trim();
-
     return CREATE_OPTIONS.filter(
       (opt) =>
         opt.label.toLowerCase().includes(q) ||
@@ -1827,8 +2232,8 @@ export default function CreateBottomSheet({
     immo: {
       cats: IMMO_CATS,
       titlePlaceholder: "Titre de l'annonce",
-      descPlaceholder: "Décrivez le bien (surface, état, équipements...)",
-      pricePlaceholder: "Prix ou loyer (ex: 450 000 FCFA/mois)",
+      descPlaceholder: "Décrivez le bien (surface, état, équipements…)",
+      pricePlaceholder: "Prix ou loyer",
       submitLabel: "Publier l'annonce",
     },
     job: {
@@ -1841,99 +2246,99 @@ export default function CreateBottomSheet({
     service: {
       cats: SERVICE_CATS,
       titlePlaceholder: "Nom du service",
-      descPlaceholder: "Décrivez votre service en détail...",
-      pricePlaceholder: "Tarif (ex: 15 000 FCFA/h)",
+      descPlaceholder: "Décrivez votre service…",
+      pricePlaceholder: "Tarif",
       submitLabel: "Publier le service",
     },
     evenement: {
       cats: EVENT_CATS,
       titlePlaceholder: "Nom de l'événement",
-      descPlaceholder: "Programme, intervenants, informations pratiques...",
-      pricePlaceholder: "Prix d'entrée (ou Gratuit)",
+      descPlaceholder: "Programme, intervenants…",
+      pricePlaceholder: "Prix d'entrée",
       submitLabel: "Publier l'événement",
     },
     community: {
       cats: COMMUNITY_CATS,
-      titlePlaceholder: "Titre de votre post",
-      descPlaceholder: "Quoi de neuf ? Partagez avec votre communauté...",
-      pricePlaceholder: "Lien ou référence (optionnel)",
+      titlePlaceholder: "Titre du post",
+      descPlaceholder: "Quoi de neuf ?",
+      pricePlaceholder: "Lien (optionnel)",
       submitLabel: "Publier le post",
     },
     agri: {
       cats: AGRI_CATS,
-      titlePlaceholder: "Produit ou service agricole",
-      descPlaceholder: "Quantité disponible, qualité, conditions...",
-      pricePlaceholder: "Prix (ex: 18 000 FCFA / 50kg)",
+      titlePlaceholder: "Produit agricole",
+      descPlaceholder: "Quantité, qualité…",
+      pricePlaceholder: "Prix",
       submitLabel: "Publier l'offre agri",
     },
     sante: {
       cats: SANTE_CATS,
       titlePlaceholder: "Service de santé",
-      descPlaceholder: "Spécialité, disponibilités, conditions...",
+      descPlaceholder: "Spécialité, disponibilités…",
       pricePlaceholder: "Tarif consultation",
       submitLabel: "Publier l'annonce santé",
     },
     annonce: {
       cats: ANNONCE_CATS,
       titlePlaceholder: "Titre de l'annonce",
-      descPlaceholder: "État, caractéristiques, raison de la vente...",
+      descPlaceholder: "État, caractéristiques…",
       pricePlaceholder: "Prix demandé",
       submitLabel: "Publier l'annonce",
     },
     restauration: {
       cats: RESTO_CATS,
       titlePlaceholder: "Nom du restaurant / plat",
-      descPlaceholder: "Menu, spécialités, horaires d'ouverture...",
+      descPlaceholder: "Menu, spécialités…",
       pricePlaceholder: "Fourchette de prix",
       submitLabel: "Publier la fiche",
     },
     hebergement: {
       cats: HEBERG_CATS,
       titlePlaceholder: "Nom de l'hébergement",
-      descPlaceholder: "Équipements, règlement, disponibilités...",
-      pricePlaceholder: "Tarif nuit/mois",
+      descPlaceholder: "Équipements, règlement…",
+      pricePlaceholder: "Tarif",
       submitLabel: "Publier l'hébergement",
     },
     energie: {
       cats: ENERGIE_CATS,
-      titlePlaceholder: "Produit ou service énergie",
-      descPlaceholder: "Caractéristiques, puissance, garantie...",
+      titlePlaceholder: "Produit / service énergie",
+      descPlaceholder: "Caractéristiques, puissance…",
       pricePlaceholder: "Prix ou devis",
       submitLabel: "Publier l'offre énergie",
     },
     ong: {
       cats: ONG_CATS,
       titlePlaceholder: "Nom de la campagne",
-      descPlaceholder: "Objectif, bénéficiaires, comment aider...",
-      pricePlaceholder: "Objectif de collecte",
+      descPlaceholder: "Objectif, bénéficiaires…",
+      pricePlaceholder: "Objectif collecte",
       submitLabel: "Lancer la campagne",
     },
     video: {
       cats: VIDEO_CATS,
       titlePlaceholder: "Titre de la vidéo",
-      descPlaceholder: "Décrivez votre vidéo, ajoutez des hashtags...",
-      pricePlaceholder: "Lien vidéo (YouTube, etc.)",
+      descPlaceholder: "Décrivez votre vidéo…",
+      pricePlaceholder: "Lien vidéo",
       submitLabel: "Publier la vidéo",
     },
     article: {
-      cats: ARTICLE_CATS,
+      cats: ARTICLE_CATS_FORM,
       titlePlaceholder: "Titre de l'article",
-      descPlaceholder: "Rédigez votre article...",
-      pricePlaceholder: "Temps de lecture (ex: 5 min)",
+      descPlaceholder: "Rédigez votre article…",
+      pricePlaceholder: "Temps de lecture",
       submitLabel: "Publier l'article",
     },
     sondage: {
       cats: SONDAGE_CATS,
       titlePlaceholder: "Question du sondage",
-      descPlaceholder: "Options (une par ligne, max 4)",
-      pricePlaceholder: "Durée (ex: 48h)",
+      descPlaceholder: "Options (une par ligne)",
+      pricePlaceholder: "Durée",
       submitLabel: "Lancer le sondage",
     },
     marketplace: {
       cats: MARKETPLACE_CATS,
       titlePlaceholder: "Nom du produit",
-      descPlaceholder: "Décrivez votre produit (caractéristiques, état...)",
-      pricePlaceholder: "Prix (ex: 150 000 FCFA)",
+      descPlaceholder: "Décrivez votre produit…",
+      pricePlaceholder: "Prix",
       submitLabel: "Publier le produit",
     },
     network: {
@@ -1947,7 +2352,6 @@ export default function CreateBottomSheet({
 
   const renderActiveForm = () => {
     if (!activeType) return null;
-
     const color = activeOption?.color ?? "#8B5CF6";
 
     if (activeType === "job") {
@@ -1955,99 +2359,90 @@ export default function CreateBottomSheet({
         <JobForm onBack={handleBackToHub} onClose={handleClose} color={color} />
       );
     }
-
     if (activeType === "article") {
       return <ArticleForm onBack={handleBackToHub} onClose={handleClose} />;
     }
-
     if (activeType === "immo") {
       return (
         <CreatePropertySheet
           onClose={handleClose}
           onSuccess={() => {
-            UIService.openToast("Bien publié !", "success");
+            toast.success("Bien publié !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "annonce") {
       return (
         <CreateAnnonceSheet
           isOpen={true}
           onClose={handleClose}
           onSuccess={() => {
-            UIService.openToast("Annonce publiée !", "success");
+            toast.success("Annonce publiée !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "service") {
       return (
         <CreateServiceSheet
           isOpen={true}
           onClose={handleClose}
           onSuccess={() => {
-            UIService.openToast("Service publié !", "success");
+            toast.success("Service publié !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "community") {
       return (
         <CreatePostSheet
           isOpen={true}
           onClose={handleClose}
           onSuccess={() => {
-            UIService.openToast("Post publié !", "success");
+            toast.success("Post publié !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "evenement") {
       return (
         <CreateEventSheet
           onClose={handleClose}
           onSuccess={() => {
-            UIService.openToast("Événement créé !", "success");
+            toast.success("Événement créé !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "marketplace") {
       return (
         <CreateProductSheet
           isOpen={true}
           onClose={handleClose}
           onSuccess={() => {
-            UIService.openToast("Produit publié !", "success");
+            toast.success("Produit publié !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "sante") {
       return (
         <CreateHealthSheet
           onClose={handleClose}
           onSuccess={() => {
-            UIService.openToast("Annonce santé publiée !", "success");
+            toast.success("Annonce santé publiée !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "transport") {
       return (
         <CreateTransportSheet
@@ -2056,13 +2451,12 @@ export default function CreateBottomSheet({
             if (!open) handleClose();
           }}
           onSuccess={() => {
-            UIService.openToast("Trajet publié !", "success");
+            toast.success("Trajet publié !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "restauration") {
       return (
         <CreateRestaurantSheet
@@ -2071,13 +2465,12 @@ export default function CreateBottomSheet({
             if (!open) handleClose();
           }}
           onSuccess={() => {
-            UIService.openToast("Restaurant ajouté !", "success");
+            toast.success("Restaurant ajouté !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "hebergement") {
       return (
         <CreateAccommodationSheet
@@ -2086,13 +2479,12 @@ export default function CreateBottomSheet({
             if (!open) handleClose();
           }}
           onSuccess={() => {
-            UIService.openToast("Hébergement ajouté !", "success");
+            toast.success("Hébergement ajouté !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "agri") {
       return (
         <CreateAgriSheet
@@ -2101,33 +2493,31 @@ export default function CreateBottomSheet({
             if (!open) handleClose();
           }}
           onSuccess={() => {
-            UIService.openToast("Produit agricole publié !", "success");
+            toast.success("Produit agricole publié !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "network") {
       return (
         <CreateNetworkSheet
           isOpen={true}
           onClose={handleClose}
           onSuccess={() => {
-            UIService.openToast("Publication réseau créée !", "success");
+            toast.success("Publication réseau créée !");
             handleClose();
           }}
         />
       );
     }
-
     if (activeType === "voyages") {
       return (
         <CreateVoyageSheet
           isOpen={true}
           onClose={handleClose}
           onSuccess={() => {
-            UIService.openToast("Voyage créé !", "success");
+            toast.success("Voyage créé !");
             handleClose();
           }}
         />
@@ -2151,321 +2541,1265 @@ export default function CreateBottomSheet({
     );
   };
 
+  if (!mounted) return null;
+
+  const translateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_HEIGHT, 0],
+  });
+
   return (
-    <>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <Pressable
-            onPress={handleClose}
-            className="fixed inset-0 z-40"
-            style={{ backgroundColor: "rgba(2,2,12,.76)" }}
-          />
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {/* Backdrop */}
+      <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
+        <Pressable
+          onPress={handleClose}
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel="Fermer"
+        />
+      </Animated.View>
 
-          {/* Ambient glow behind the sheet */}
-          <View
-            className="fixed inset-x-0 bottom-0 z-40"
-            style={{ height: "45vh" }}
-          />
+      {/* Sheet */}
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            maxHeight: Math.min(SCREEN_HEIGHT * 0.92, 980),
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={["#0C0A1F", "#0A0818", "#070512"]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.topLine} pointerEvents="none" />
+        <View style={styles.borderRing} pointerEvents="none" />
+        <AmbientBackdrop />
 
-          {/* Hub */}
-          <View
-            className="fixed bottom-0 left-0 right-0 z-50 mx-auto overflow-hidden rounded-t-[32px] sm:rounded-t-[36px]"
-            style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.085)", borderStyle: "solid", maxHeight: "min(92vh, 980px)" }}
-          >
-            {/* Top glow */}
-            <View
-              className="absolute left-0 right-0 top-0 h-px"
-              style={{  }}
-            />
+        {/* Handle */}
+        <View style={styles.handleWrap}>
+          <View style={styles.handleBar} />
+        </View>
 
-            {/* Drag handle */}
-            <View className="flex justify-center pt-3 pb-1">
-              <View className="h-1.5 w-12 rounded-full bg-white/15" />
-            </View>
-
-            <View
-              className="overflow-y-auto px-4 pb-8 sm:px-6 lg:px-8"
-              style={{ maxHeight: "calc(min(92vh, 980px) - 22px)" }}
-            >
-              {!isAuthenticated ? (
-                <View
-                  className="mx-auto max-w-xl py-8 sm:py-12"
-                >
-                  <View className="flex justify-end mb-2">
-                    <Pressable
-                     
-                      onPress={handleClose}
-                      className="h-9 w-9 rounded-xl flex items-center justify-center bg-white/6 border border-white/8"
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {!isAuthenticated ? (
+            <NotAuthenticatedView onClose={handleClose} />
+          ) : (
+            <>
+              {/* ───── HUB ───── */}
+              {!activeType && !aiMode ? (
+                <View style={styles.hubWrap}>
+                  <View style={styles.hubHeader}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
                     >
-                      <X size={17} className="text-white/70" />
+                      <LinearGradient
+                        colors={["#A78BFA", "#6366F1"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.hubLogo}
+                      >
+                        <Plus size={16} color="#fff" strokeWidth={2.6} />
+                      </LinearGradient>
+                      <View>
+                        <Text style={styles.hubTitle}>Créer</Text>
+                        <Text style={styles.hubSub}>Votre espace d'action</Text>
+                      </View>
+                    </View>
+                    <Pressable
+                      onPress={handleClose}
+                      hitSlop={8}
+                      style={({ pressed }) => [
+                        styles.iconBtnSm,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <X size={16} color="rgba(255,255,255,0.75)" />
                     </Pressable>
                   </View>
 
-                  <View
-                    className="relative overflow-hidden rounded-[30px] p-7 text-center"
-                    style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.09)", borderStyle: "solid" }}
-                  >
-                    <View
-                      className="mx-auto mb-5 h-16 w-16 rounded-[22px] flex items-center justify-center"
-                      style={{  }}
-                    >
-                      <Sparkles size={27} className="text-white" />
-                    </View>
+                  <CreateHero onAI={() => setAiMode(true)} />
 
-                    <Text className="text-2xl font-black text-white">
-                      Créez quelque chose de remarquable.
-                    </Text>
-                    <Text className="mt-2 text-sm leading-5 text-white/45">
-                      Connectez-vous pour publier sur DébrouillePro.
-                    </Text>
+                  <CreateSearchBar
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    inputRef={searchInputRef}
+                  />
 
-                    <View className="mt-6">
-                      <SignInButton />
-                    </View>
-                  </View>
-                </View>
-              ) : (
-                <AnimatePresence mode="wait">
-                  {!activeType && !aiMode ? (
-                    <View
-                      key="hub"
-                      className="mx-auto max-w-5xl pt-3"
-                    >
-                      <View className="flex items-center justify-between mb-3">
-                        <View className="flex items-center gap-2">
-                          <View
-                            className="h-8 w-8 rounded-xl flex items-center justify-center"
-                            style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.22)", borderStyle: "solid" }}
-                          >
-                            <Plus size={16} className="text-violet-200" />
-                          </View>
-                          <View>
-                            <Text className="text-sm font-black text-white">
-                              Créer
-                            </Text>
-                            <Text className="text-[10px] text-white/25">
-                              Votre espace d'action
-                            </Text>
-                          </View>
-                        </View>
+                  {!searchQuery.trim() ? (
+                    <CreateQuickActions
+                      history={history}
+                      onSelect={handleSelectType}
+                    />
+                  ) : null}
 
-                        <Pressable
-                         
-                          onPress={handleClose}
-                          className="h-9 w-9 rounded-xl flex items-center justify-center bg-white/6 border border-white/8"
-                          accessibilityLabel="Fermer"
-                        >
-                          <X size={17} className="text-white/65" />
-                        </Pressable>
+                  {searchQuery.trim() ? (
+                    <FadeUp>
+                      <View style={styles.resultsRow}>
+                        <Compass size={13} color="#67E8F9" />
+                        <Text style={styles.resultsText}>
+                          {filteredOptions.length} résultat
+                          {filteredOptions.length > 1 ? "s" : ""} pour{" "}
+                          <Text style={{ color: "rgba(255,255,255,0.7)" }}>
+                            “{searchQuery}”
+                          </Text>
+                        </Text>
                       </View>
+                    </FadeUp>
+                  ) : null}
 
-                      <CreateHero onAI={() => setAiMode(true)} />
-
-                      <CreateSearchBar
-                        value={searchQuery}
-                        onChange={setSearchQuery}
-                      />
-
-                      {!searchQuery.trim() && (
-                        <CreateQuickActions
-                          history={history}
-                          onSelect={handleSelectType}
-                        />
-                      )}
-
-                      {searchQuery.trim() && (
-                        <View className="mb-5 flex items-center gap-2">
-                          <Compass size={13} className="text-cyan-300" />
-                          <Text className="text-[10px] font-black uppercase tracking-[.16em] text-white/35">
-                            {filteredOptions.length} résultat
-                            {filteredOptions.length > 1 ? "s" : ""} pour{" "}
-                            <Text className="text-white/65">
-                              “{searchQuery}”
-                            </Text>
-                          </Text>
-                        </View>
-                      )}
-
-                      {filteredOptions.length > 0 ? (
-                        <CreateGroupedGrid
-                          options={filteredOptions}
-                          onSelect={handleSelectType}
-                        />
-                      ) : (
-                        <View
-                          className="rounded-[24px] p-7 text-center"
-                          style={{ backgroundColor: "rgba(255,255,255,.035)", borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-                        >
-                          <View className="mx-auto mb-3 h-11 w-11 rounded-2xl bg-white/6 flex items-center justify-center">
-                            <Search size={18} className="text-white/35" />
-                          </View>
-                          <Text className="text-sm font-bold text-white/75">
-                            Aucun résultat
-                          </Text>
-                          <Text className="mt-1 text-xs text-white/30">
-                            Essayez un autre mot ou demandez à l'assistant.
-                          </Text>
-                          <Pressable
-                           
-                            onPress={() => setAiMode(true)}
-                            className="mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white"
-                            style={{  }}
-                          >
-                            <Sparkles size={13} />
-                            <Text>M'aider à choisir</Text></Pressable>
-                        </View>
-                      )}
-
-                      {history.length > 0 && !searchQuery.trim() && (
-                        <CreateRecent
-                          history={history}
-                          onSelect={handleSelectType}
-                        />
-                      )}
-                    </View>
-                  ) : aiMode && !activeType ? (
-                    <View
-                      key="ai"
-                      className="mx-auto max-w-2xl pt-3"
-                    >
-                      <View className="flex items-center justify-between mb-5">
-                        <Pressable
-                         
-                          onPress={handleBackToHub}
-                          className="flex items-center gap-2 text-sm text-white/55"
-                        >
-                          <ArrowLeft size={16} />
-                          <Text>Retour</Text></Pressable>
-                        <Pressable
-                         
-                          onPress={handleClose}
-                          className="h-9 w-9 rounded-xl flex items-center justify-center bg-white/6 border border-white/8"
-                        >
-                          <X size={17} className="text-white/65" />
-                        </Pressable>
-                      </View>
-
-                      <View
-                        className="relative overflow-hidden rounded-[30px] p-6 sm:p-8"
-                        style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.09)", borderStyle: "solid" }}
-                      >
-                        <View className="text-center">
-                          <View
-                            className="mx-auto mb-4 h-14 w-14 rounded-[20px] flex items-center justify-center"
-                            style={{  }}
-                          >
-                            <Sparkles size={23} className="text-white" />
-                          </View>
-
-                          <Text className="text-2xl sm:text-3xl font-black text-white">
-                            Dites-moi ce que vous voulez faire.
-                          </Text>
-                          <Text className="mt-2 text-sm text-white/40">
-                            Pas besoin de connaître le bon module. Décrivez
-                            simplement votre objectif.
-                          </Text>
-                        </View>
-
-                        <View className="mt-7">
-                          <View
-                            className="rounded-[22px] p-4"
-                            style={{ backgroundColor: "rgba(0,0,0,.18)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}
-                          >
-                            <TextInput
-                              value={searchQuery}
-                              onChangeText={(text) => setSearchQuery(text)}
-                              autoFocus
-                             
-                              placeholder={`Ex. « Je veux vendre ma maison à Kinshasa »\nEx. « Je cherche un chauffeur »\nEx. « Je veux publier mon service de plomberie »`}
-                              className="w-full bg-transparent text-white text-sm leading-6 placeholder:text-white/22 outline-none"
-                             multiline textAlignVertical="top"/>
-                          </View>
-
-                          <Text className="mt-3 text-[10px] text-white/22 text-center">
-                            <Text>L'assistant de création vous aidera à choisir le bon espace.</Text></Text>
-
-                          <Pressable
-                            disabled={!searchQuery.trim()}
-                            onPress={() => {
-                              const q = searchQuery.toLowerCase();
-                              const match = CREATE_OPTIONS.find((opt) =>
-                                opt.keywords.some((kw) => q.includes(kw)),
-                              );
-
-                              if (match) {
-                                handleSelectType(match.id);
-                              } else {
-                                UIService.openToast("Choisissez une catégorie dans le hub pour continuer.", "info");
-                                setAiMode(false);
-                              }
-                            }}
-                            className="mt-5 w-full rounded-2xl py-4 text-sm font-black text-white flex items-center justify-center gap-2 disabled:opacity-35"
-                            style={{  }}
-                          >
-                            <Wand2 size={16} />
-                            <Text>Trouver le meilleur espace</Text><ArrowRight size={16} />
-                          </Pressable>
-                        </View>
-                      </View>
-                    </View>
+                  {filteredOptions.length > 0 ? (
+                    <CreateGroupedGrid
+                      options={filteredOptions}
+                      onSelect={handleSelectType}
+                    />
                   ) : (
-                    <View
-                      key={activeType}
-                      className="mx-auto max-w-4xl pt-2"
-                    >
-                      <View
-                        className="mb-4 rounded-[22px] px-3 py-2.5 flex items-center gap-3"
-                        style={{ borderColor: "#8B5CF6", borderStyle: "solid" }}
-                      >
+                    <FadeUp>
+                      <View style={styles.noResultCard}>
+                        <View style={styles.noResultIcon}>
+                          <Search size={18} color="rgba(255,255,255,0.4)" />
+                        </View>
+                        <Text style={styles.noResultTitle}>Aucun résultat</Text>
+                        <Text style={styles.noResultSub}>
+                          Essayez un autre mot ou demandez à l'assistant.
+                        </Text>
                         <Pressable
-                          onPress={handleBackToHub}
-                          className="h-8 w-8 shrink-0 rounded-xl flex items-center justify-center bg-white/6"
-                          accessibilityLabel="Retour au hub"
+                          onPress={() => setAiMode(true)}
+                          style={({ pressed }) => [
+                            styles.noResultBtn,
+                            pressed && styles.pressed,
+                          ]}
                         >
-                          <ArrowLeft size={15} className="text-white/70" />
-                        </Pressable>
-
-                        {activeOption && (
-                          <>
-                            <View
-                              className="h-8 w-8 shrink-0 rounded-xl flex items-center justify-center"
-                              style={{ backgroundColor: `${activeOption.color}20` }}
-                            >
-                              <activeOption.icon
-                                size={15}
-                                style={{ color: activeOption.color }}
-                              />
-                            </View>
-                            <View className="min-w-0 flex-1">
-                              <Text className="text-sm font-black text-white truncate">
-                                {activeOption.label}
-                              </Text>
-                              <Text className="text-[10px] text-white/30 truncate">
-                                {activeOption.desc}
-                              </Text>
-                            </View>
-                          </>
-                        )}
-
-                        <Pressable
-                          onPress={handleClose}
-                          className="h-8 w-8 shrink-0 rounded-xl flex items-center justify-center bg-white/5"
-                          accessibilityLabel="Fermer"
-                        >
-                          <X size={15} className="text-white/55" />
+                          <Sparkles size={13} color="#fff" />
+                          <Text style={styles.noResultBtnText}>
+                            M'aider à choisir
+                          </Text>
                         </Pressable>
                       </View>
-
-                      {renderActiveForm()}
-                    </View>
+                    </FadeUp>
                   )}
-                </AnimatePresence>
-              )}
-            </View>
-          </View>
-        </>
-      )}
-    </>
+
+                  {history.length > 0 && !searchQuery.trim() ? (
+                    <CreateRecent
+                      history={history}
+                      onSelect={handleSelectType}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* ───── AI MODE ───── */}
+              {aiMode && !activeType ? (
+                <View style={styles.aiWrap}>
+                  <View style={styles.hubHeader}>
+                    <Pressable
+                      onPress={handleBackToHub}
+                      hitSlop={8}
+                      style={({ pressed }) => [
+                        styles.backRow,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <ArrowLeft size={16} color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.backRowText}>Retour</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={handleClose}
+                      hitSlop={8}
+                      style={({ pressed }) => [
+                        styles.iconBtnSm,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <X size={16} color="rgba(255,255,255,0.75)" />
+                    </Pressable>
+                  </View>
+
+                  <FadeUp>
+                    <View style={styles.aiCard}>
+                      <LinearGradient
+                        colors={[
+                          "rgba(139,92,246,0.18)",
+                          "rgba(99,102,241,0.06)",
+                          "rgba(15,7,32,0.85)",
+                        ]}
+                        locations={[0, 0.5, 1]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      <View style={styles.aiBorder} pointerEvents="none" />
+
+                      <View style={{ alignItems: "center" }}>
+                        <LinearGradient
+                          colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.aiIconBig}
+                        >
+                          <Sparkles size={23} color="#fff" />
+                        </LinearGradient>
+                        <Text style={styles.aiTitle}>
+                          Dites-moi ce que vous voulez faire.
+                        </Text>
+                        <Text style={styles.aiSub}>
+                          Pas besoin de connaître le bon module. Décrivez
+                          simplement votre objectif.
+                        </Text>
+                      </View>
+
+                      <View style={styles.aiInputWrap}>
+                        <TextInput
+                          value={searchQuery}
+                          onChangeText={setSearchQuery}
+                          autoFocus
+                          placeholder={`Ex. « Je veux vendre ma maison à Kinshasa »\nEx. « Je cherche un chauffeur »\nEx. « Je veux publier mon service de plomberie »`}
+                          placeholderTextColor="rgba(255,255,255,0.3)"
+                          style={styles.aiInput}
+                          multiline
+                          textAlignVertical="top"
+                        />
+                      </View>
+
+                      <Text style={styles.aiHint}>
+                        L'assistant de création vous aidera à choisir le bon
+                        espace.
+                      </Text>
+
+                      <Pressable
+                        disabled={!searchQuery.trim()}
+                        onPress={() => {
+                          const q = searchQuery.toLowerCase();
+                          const match = CREATE_OPTIONS.find((opt) =>
+                            opt.keywords.some((kw) => q.includes(kw)),
+                          );
+                          if (match) {
+                            handleSelectType(match.id);
+                          } else {
+                            toast.info(
+                              "Choisissez une catégorie dans le hub pour continuer.",
+                            );
+                            setAiMode(false);
+                          }
+                        }}
+                        style={({ pressed }) => [
+                          styles.aiSubmitOuter,
+                          !searchQuery.trim() && { opacity: 0.4 },
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <LinearGradient
+                          colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.aiSubmit}
+                        >
+                          <Wand2 size={16} color="#fff" />
+                          <Text style={styles.aiSubmitText}>
+                            Trouver le meilleur espace
+                          </Text>
+                          <ArrowRight size={16} color="#fff" />
+                        </LinearGradient>
+                      </Pressable>
+                    </View>
+                  </FadeUp>
+                </View>
+              ) : null}
+
+              {/* ───── ACTIVE FORM ───── */}
+              {activeType ? (
+                <FadeUp>
+                  <View style={styles.activeFormWrap}>
+                    <View
+                      style={[
+                        styles.activeFormHeader,
+                        {
+                          borderColor: `${activeOption?.color ?? "#8B5CF6"}55`,
+                        },
+                      ]}
+                    >
+                      <Pressable
+                        onPress={handleBackToHub}
+                        hitSlop={8}
+                        style={({ pressed }) => [
+                          styles.iconBtnSm,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <ArrowLeft size={15} color="rgba(255,255,255,0.85)" />
+                      </Pressable>
+
+                      {activeOption ? (
+                        <>
+                          <View
+                            style={[
+                              styles.activeFormIcon,
+                              { backgroundColor: `${activeOption.color}22` },
+                            ]}
+                          >
+                            <activeOption.icon
+                              size={15}
+                              color={activeOption.color}
+                            />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text
+                              style={styles.activeFormTitle}
+                              numberOfLines={1}
+                            >
+                              {activeOption.label}
+                            </Text>
+                            <Text
+                              style={styles.activeFormSub}
+                              numberOfLines={1}
+                            >
+                              {activeOption.desc}
+                            </Text>
+                          </View>
+                        </>
+                      ) : null}
+
+                      <Pressable
+                        onPress={handleClose}
+                        hitSlop={8}
+                        style={({ pressed }) => [
+                          styles.iconBtnSm,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <X size={15} color="rgba(255,255,255,0.75)" />
+                      </Pressable>
+                    </View>
+
+                    {renderActiveForm()}
+                  </View>
+                </FadeUp>
+              ) : null}
+            </>
+          )}
+        </ScrollView>
+      </Animated.View>
+    </View>
   );
 }
+
+/* ============================================================================
+ * NOT AUTHENTICATED
+ * ========================================================================== */
+
+function NotAuthenticatedView({ onClose }: { onClose: () => void }) {
+  return (
+    <FadeUp>
+      <View style={styles.notAuthWrap}>
+        <View style={{ alignItems: "flex-end", marginBottom: 8 }}>
+          <Pressable
+            onPress={onClose}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.iconBtnSm,
+              pressed && styles.pressed,
+            ]}
+          >
+            <X size={17} color="rgba(255,255,255,0.75)" />
+          </Pressable>
+        </View>
+
+        <LinearGradient
+          colors={[
+            "rgba(139,92,246,0.18)",
+            "rgba(99,102,241,0.06)",
+            "rgba(15,7,32,0.85)",
+          ]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.notAuthCard}
+        >
+          <View style={styles.notAuthBorder} pointerEvents="none" />
+
+          <LinearGradient
+            colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.notAuthIcon}
+          >
+            <Sparkles size={27} color="#fff" />
+          </LinearGradient>
+
+          <Text style={styles.notAuthTitle}>
+            Créez quelque chose de remarquable.
+          </Text>
+          <Text style={styles.notAuthSub}>
+            Connectez-vous pour publier sur DébrouillePro.
+          </Text>
+
+          <View style={{ marginTop: 24, width: "100%", alignItems: "center" }}>
+            <SignInButton />
+          </View>
+        </LinearGradient>
+      </View>
+    </FadeUp>
+  );
+}
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  pressed: { opacity: 0.85, transform: [{ scale: 0.985 }] },
+
+  ambientOrb: { position: "absolute", borderRadius: 9999 },
+
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(2,2,12,0.76)",
+  },
+
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    overflow: "hidden",
+    backgroundColor: "#0A0818",
+    shadowColor: "#000",
+    shadowOpacity: 0.75,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: -20 },
+    elevation: 24,
+  },
+
+  topLine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "rgba(129,140,248,0.35)",
+    zIndex: 30,
+  },
+
+  borderRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.15)",
+    zIndex: 25,
+  },
+
+  handleWrap: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 6,
+    zIndex: 10,
+  },
+  handleBar: {
+    width: 48,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    paddingTop: 8,
+  },
+
+  // Hub
+  hubWrap: { maxWidth: 900, width: "100%", alignSelf: "center" },
+  hubHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 12,
+  },
+  hubLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.35)",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  hubTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+  hubSub: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  iconBtnSm: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  // Hero
+  heroCard: {
+    borderRadius: 28,
+    overflow: "hidden",
+    marginBottom: 20,
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 10,
+  },
+  heroTopLine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+  heroBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.28)",
+  },
+  heroOrb1: {
+    position: "absolute",
+    width: 150,
+    height: 150,
+    borderRadius: 999,
+    top: -60,
+    right: -60,
+    backgroundColor: "rgba(139,92,246,0.35)",
+  },
+  heroOrb2: {
+    position: "absolute",
+    width: 130,
+    height: 130,
+    borderRadius: 999,
+    bottom: -60,
+    left: -40,
+    backgroundColor: "rgba(14,165,233,0.28)",
+  },
+  heroHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 16,
+  },
+  heroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(167,139,250,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.35)",
+    marginBottom: 12,
+  },
+  heroBadgeText: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    color: "rgba(255,255,255,0.75)",
+  },
+  heroTitle: {
+    fontSize: 25,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -1,
+    lineHeight: 30,
+  },
+  heroSub: {
+    marginTop: 8,
+    maxWidth: 460,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "rgba(255,255,255,0.55)",
+    fontWeight: "500",
+  },
+  heroWandWrap: {
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.7,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  heroWand: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  heroAIButtonOuter: {
+    marginTop: 20,
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  heroAIButtonGradient: {
+    padding: 1,
+    borderRadius: 18,
+  },
+  heroAIButtonInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 17,
+    backgroundColor: "#101022",
+  },
+  heroAIIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.35)",
+  },
+  heroAITitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  heroAISub: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.4)",
+    marginTop: 2,
+  },
+
+  // Search
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 2,
+    fontSize: 14,
+    color: "#fff",
+    fontWeight: "500",
+  },
+  searchClear: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
+  // Section headers
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  sectionEyebrow: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    color: "rgba(255,255,255,0.5)",
+  },
+  sectionEyebrowDim: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.3)",
+    fontWeight: "600",
+  },
+
+  // Quick actions
+  quickActionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  quickActionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  quickActionTitle: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  quickActionSub: {
+    marginTop: 2,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+
+  // Recent
+  recentChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  recentChipText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+  },
+
+  // Grouped grid
+  groupHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+  },
+  groupIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  groupTitle: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    color: "rgba(255,255,255,0.55)",
+    textTransform: "uppercase",
+  },
+  groupCount: {
+    marginTop: 2,
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.35)",
+    fontWeight: "600",
+  },
+
+  gridCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  gridCardTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  gridCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  gridCardTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.95)",
+    letterSpacing: -0.2,
+  },
+  gridCardSub: {
+    marginTop: 4,
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+
+  // Results header
+  resultsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  resultsText: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    color: "rgba(255,255,255,0.55)",
+    textTransform: "uppercase",
+  },
+
+  // No results
+  noResultCard: {
+    padding: 28,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    alignItems: "center",
+  },
+  noResultIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    marginBottom: 12,
+  },
+  noResultTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.85)",
+  },
+  noResultSub: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.4)",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  noResultBtn: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 14,
+    backgroundColor: "#6366F1",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  noResultBtnText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#fff",
+  },
+
+  // AI mode
+  aiWrap: { maxWidth: 700, width: "100%", alignSelf: "center" },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  backRowText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.7)",
+  },
+  aiCard: {
+    borderRadius: 28,
+    padding: 24,
+    overflow: "hidden",
+    backgroundColor: "rgba(12,8,28,0.65)",
+  },
+  aiBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.28)",
+  },
+  aiIconBig: {
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.6,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  aiTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.8,
+    textAlign: "center",
+    lineHeight: 28,
+  },
+  aiSub: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "rgba(255,255,255,0.5)",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  aiInputWrap: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 22,
+    backgroundColor: "rgba(0,0,0,0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    minHeight: 110,
+  },
+  aiInput: {
+    fontSize: 13.5,
+    lineHeight: 20,
+    color: "#fff",
+    minHeight: 80,
+    fontWeight: "500",
+  },
+  aiHint: {
+    marginTop: 12,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.35)",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  aiSubmitOuter: {
+    marginTop: 20,
+    borderRadius: 18,
+    overflow: "hidden",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
+  },
+  aiSubmit: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 18,
+  },
+  aiSubmitText: {
+    fontSize: 13.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+
+  // Active form wrapper
+  activeFormWrap: { maxWidth: 720, width: "100%", alignSelf: "center" },
+  activeFormHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  activeFormIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activeFormTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  activeFormSub: {
+    marginTop: 2,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+
+  // Form header
+  formHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  formHeaderTitleWrap: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+  formHeaderTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+
+  // Fields
+  fieldShell: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    marginBottom: 8,
+  },
+  fieldInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13.5,
+    color: "#fff",
+    paddingVertical: 0,
+    fontWeight: "500",
+  },
+
+  // Categories
+  catsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginVertical: 8,
+  },
+  catPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+  catPillText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 0.2,
+  },
+
+  // Currency pills
+  currencyRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  currencyPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  currencyPillText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 0.3,
+  },
+
+  // Checkbox
+  checkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    marginVertical: 8,
+  },
+  checkBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  checkLabel: {
+    fontSize: 12.5,
+    color: "rgba(255,255,255,0.8)",
+    fontWeight: "600",
+  },
+
+  // Tags
+  tagsShell: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    marginBottom: 8,
+  },
+  tagsList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 8,
+  },
+  tagChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  tagChipText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  tagAdd: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  // Submit
+  submitOuter: {
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.4,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  submitDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+  },
+  submitText: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+
+  // Not authenticated
+  notAuthWrap: { maxWidth: 560, width: "100%", alignSelf: "center" },
+  notAuthCard: {
+    borderRadius: 30,
+    padding: 28,
+    alignItems: "center",
+    overflow: "hidden",
+    backgroundColor: "rgba(12,8,28,0.6)",
+  },
+  notAuthBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.25)",
+  },
+  notAuthIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  notAuthTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#fff",
+    textAlign: "center",
+    letterSpacing: -0.6,
+    lineHeight: 28,
+  },
+  notAuthSub: {
+    marginTop: 10,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.5)",
+    textAlign: "center",
+    fontWeight: "500",
+    lineHeight: 19,
+  },
+});

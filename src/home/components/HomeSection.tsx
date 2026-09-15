@@ -1,4 +1,4 @@
-import { Pressable, View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import React from "react";
 
 import type {
@@ -127,63 +127,34 @@ export function HomeSection({
     }
 
     return (
-      <View
-        key={key}
-        className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300"
-      >
-        {(
+      <View key={key} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300">{(
           item as unknown as {
             title?: string;
           }
-        ).title ?? "Contenu"}
-      </View>
+        ).title ?? "Contenu"}</View>
     );
   };
 
   return (
-    <View className={`space-y-4 ${className}`} accessibilityLabel={section.title}>
-      <View className="flex items-start justify-between gap-4">
-        <View className="min-w-0">
-          <View className="flex items-center gap-2">
-            {section.icon && <Text className="text-lg">{section.icon}</Text>}
-
-            <Text className="text-lg font-bold text-white">{section.title}</Text>
-          </View>
-
-          {section.subtitle && (
+    <View className={`space-y-4 ${className}`} accessibilityLabel={section.title}><View className="flex items-start justify-between gap-4"><View className="min-w-0"><View className="flex items-center gap-2">{section.icon && <Text className="text-lg">{section.icon}</Text>}<Text className="text-lg font-bold text-white">{section.title}</Text></View>{section.subtitle && (
             <Text className="mt-1 text-sm text-gray-400">{section.subtitle}</Text>
-          )}
-        </View>
-
-        {section.actions && section.actions.length > 0 && (
+          )}</View>{section.actions && section.actions.length > 0 && (
           <View className="flex shrink-0 gap-2">
             {section.actions.map((action, index) => (
-              <Pressable
-                key={action.id ?? `section-action-${index}`}
-                onPress={() =>
+              <Pressable key={action.id ?? `section-action-${index}`} onPress={() =>
                   onAction?.(String(action.id ?? "action"), items[0])
-                }
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-gray-300"
-              >
+                } className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-gray-300 transition">
                 {action.label}
               </Pressable>
             ))}
           </View>
-        )}
-      </View>
-
-      <View
-        className={
+        )}</View><View className={
           sectionType === "nearby" ||
           sectionType === "opportunities" ||
           sectionType === "recommendations"
             ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
             : "space-y-3"
-        }
-      >
-        {items.map(renderItem)}
-      </View>
-    </View>
+        }>{items.map(renderItem)}</View></View>
   );
 }
 

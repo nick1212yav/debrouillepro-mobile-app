@@ -21,16 +21,13 @@ export function DoctorFavorite({
   };
 
   return (
-    <Pressable
-      onPress={onToggle}
-      className={`flex items-center justify-center rounded-2xl transition-colors ${
+    <Pressable onPress={onToggle} className={`flex items-center justify-center rounded-2xl transition-colors ${
         sizes[size]
       } ${
         isFavorite
           ? "bg-red-500/20 hover:bg-red-500/30"
           : "bg-white/5 hover:bg-white/10"
-      }`}
-    >
+      }`}>
       <Heart
         size={size === "sm" ? 16 : size === "md" ? 20 : 24}
         className={isFavorite ? "fill-red-500 text-red-500" : "text-white/60"}

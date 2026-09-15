@@ -1,5 +1,4 @@
 import type { ActionConfig } from "@/core/sdk/types";
-import { useRouter } from "expo-router";
 
 export const serviceActions: ActionConfig[] = [
   {
@@ -11,7 +10,7 @@ export const serviceActions: ActionConfig[] = [
       const entity = ctx.data || ctx.provider || ctx.entity;
       const navigate = ctx.navigate;
       if (navigate && entity?._id) {
-        router.push(`/service/${entity._id}`);
+        navigate(`/service/${entity._id}`);
       } else {
         console.warn("Impossible de naviguer vers le prestataire");
       }

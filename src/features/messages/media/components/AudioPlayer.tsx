@@ -1,4 +1,3 @@
-import { View } from "react-native";
 interface AudioPlayerProps {
   src: string;
   className?: string;
@@ -6,7 +5,7 @@ interface AudioPlayerProps {
 
 export function AudioPlayer({ src, className = "" }: AudioPlayerProps) {
   return (
-    <View
+    <audio
       src={src}
       controls
       preload="metadata"

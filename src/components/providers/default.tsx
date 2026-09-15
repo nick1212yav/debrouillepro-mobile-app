@@ -1,23 +1,18 @@
+// src/components/providers/default.tsx
+import { type ReactNode } from "react";
 import { AuthProvider } from "./auth";
 import { ConvexProviderWrapper } from "./convex";
-import { UserSync } from "./UserSync";
 import { QueryClientProvider } from "./query-client";
 import { ThemeProvider } from "./theme";
-import { Toaster } from "../ui/sonner";
 import { TooltipProvider } from "../ui/tooltip";
 
-export function DefaultProviders({ children }: { children: React.ReactNode }) {
+export function DefaultProviders({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <ConvexProviderWrapper>
-        <UserSync />
-
         <QueryClientProvider>
           <TooltipProvider>
-            <ThemeProvider>
-              <Toaster />
-              {children}
-            </ThemeProvider>
+            <ThemeProvider>{children}</ThemeProvider>
           </TooltipProvider>
         </QueryClientProvider>
       </ConvexProviderWrapper>

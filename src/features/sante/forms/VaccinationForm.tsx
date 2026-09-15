@@ -1,4 +1,5 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
+
 // src/features/sante/forms/VaccinationForm.tsx
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -70,17 +71,9 @@ export function VaccinationForm({
 
   return (
     <Form {...form}>
-      <View
-       
-        className="space-y-4 text-left"
-      >
-        {/* Sélection du Patient */}
-        <FormField
-          control={form.control}
-          name="patientId"
-          render={({ field }) => (
+      <View className="space-y-4 text-left">{}<FormField control={form.control} name="patientId" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Patient *</Text></FormLabel>
+              <FormLabel>Patient *</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -97,15 +90,9 @@ export function VaccinationForm({
               </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="name" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom du vaccin *</Text></FormLabel>
+              <FormLabel>Nom du vaccin *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: BCG, Fièvre jaune, COVID-19"
@@ -114,43 +101,25 @@ export function VaccinationForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="date"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="date" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Date d'administration *</Text></FormLabel>
+              <FormLabel>Date d'administration *</FormLabel>
               <FormControl>
                 <Input type="date" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="nextDose"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="nextDose" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Date de rappel conseillée</Text></FormLabel>
+              <FormLabel>Date de rappel conseillée</FormLabel>
               <FormControl>
                 <Input type="date" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="status"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="status" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Statut *</Text></FormLabel>
+              <FormLabel>Statut *</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -158,64 +127,40 @@ export function VaccinationForm({
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="completed"><Text>Complété</Text></SelectItem>
-                  <SelectItem value="pending"><Text>En attente</Text></SelectItem>
-                  <SelectItem value="overdue"><Text>En retard</Text></SelectItem>
+                  <SelectItem value="completed">Complété</SelectItem>
+                  <SelectItem value="pending">En attente</SelectItem>
+                  <SelectItem value="overdue">En retard</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="administeredBy"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="administeredBy" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Administré par</Text></FormLabel>
+              <FormLabel>Administré par</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: Dr. Kabange" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="location"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="location" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Lieu de vaccination</Text></FormLabel>
+              <FormLabel>Lieu de vaccination</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: Clinique Ngaliema" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="batchNumber"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="batchNumber" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Numéro de lot</Text></FormLabel>
+              <FormLabel>Numéro de lot</FormLabel>
               <FormControl>
                 <Input placeholder="Ex: B4902-X" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="sideEffects"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="sideEffects" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Effets secondaires signalés</Text></FormLabel>
+              <FormLabel>Effets secondaires signalés</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Légère fièvre, courbatures"
@@ -224,14 +169,7 @@ export function VaccinationForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button className="w-full h-11" disabled={isLoading}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isLoading ? "Enregistrement..." : submitLabel}
-        </Button>
-      </View>
+          )} /><Button  className="w-full h-11" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isLoading ? "Enregistrement..." : submitLabel}</Button></View>
     </Form>
   );
 }

@@ -27,34 +27,23 @@ interface Props {
 export function PostEmojiPicker({ emoji, onChange, show, onToggle }: Props) {
   return (
     <View className="relative">
-      <Pressable
-        onPress={onToggle}
-        className="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl"
-        style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-      >
+      <Pressable onPress={onToggle} className="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl transition-transform active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
         {emoji}
       </Pressable>
-      <>
+<View>
         {show && (
-          <View
-            className="absolute top-12 left-0 z-10 p-3 rounded-2xl gap-2"
-            style={{ backgroundColor: "rgba(20,20,40,0.98)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid", width: 180 }}
-          >
+          <View initial={{ opacity: 0, scale: 0.9, y: -5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} className="absolute top-12 left-0 z-10 p-3 rounded-2xl gap-2" style={{ backgroundColor: "rgba(20,20,40,0.98)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid", width: 180 }}>
             {EMOJIS.map((e) => (
-              <Pressable
-                key={e}
-                onPress={() => {
+              <Pressable key={e} onPress={() => {
                   onChange(e);
                   onToggle();
-                }}
-                className="text-xl"
-              >
+                }} className="text-xl transition-transform">
                 {e}
               </Pressable>
             ))}
           </View>
         )}
-      </>
+      </View>
     </View>
   );
 }

@@ -1,16 +1,17 @@
-import { UIService } from "@/core/sdk/ui/UIService";
+// src/hooks/use-badges.ts
 import { useCallback } from "react";
 import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { BADGE_DEFINITIONS, LEVELS } from "@/constants/badges";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth"; // ✅ AJOUT
+import { api } from "@/convex/_generated/api";
+import { showToast } from "@/lib/toast";
+import { BADGE_DEFINITIONS } from "@/constants/badges";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 /**
  * Hook that exposes `awardXp` and `checkBadges` helpers.
  * Shows a toast when new badges are unlocked.
  */
 export function useBadges() {
-  const { user } = useFirebaseAuth(); // ✅ Récupérer l'utilisateur Firebase
+  const { user } = useFirebaseAuth();
   const email = user?.email;
 
   const checkAndAward = useMutation(api.badges.checkAndAwardBadges);
@@ -46,7 +47,12 @@ export function useBadges() {
         for (const badgeId of result.newlyUnlocked) {
           const def = BADGE_DEFINITIONS.find((b) => b.id === badgeId);
           if (!def) continue;
-          UIService.openToast(`Badge débloqué : ${def.label} ${def.emoji}`, "success");
+          showToast.success(`Badge débloqué : ${def.label} ${def.emoji}`, {
+            description: `${def.description}${
+              def.xpReward > 0 ? ` · +${def.xpReward} XP` : ""
+            }`,
+            duration: 4000,
+          });
         }
       } catch {
         // silently fail when unauthenticated

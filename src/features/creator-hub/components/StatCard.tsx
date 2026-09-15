@@ -26,14 +26,8 @@ export function StatCard({
   delta,
 }: StatCardProps) {
   return (
-    <View
-      className="p-4 rounded-2xl flex items-center gap-3"
-      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
-      <View
-        className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `${color}20` }}
-      >
+    <View initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-2xl flex items-center gap-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+      <View className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}20`, color }}>
         {icon}
       </View>
       <View className="flex-1 min-w-0">
@@ -45,10 +39,7 @@ export function StatCard({
         {sub && <Text className="text-white/35 text-xs mt-0.5">{sub}</Text>}
       </View>
       {delta && (
-        <Text
-          className="text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0"
-          style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#34D399" }}
-        >
+        <Text className="text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#34D399" }}>
           {delta}
         </Text>
       )}

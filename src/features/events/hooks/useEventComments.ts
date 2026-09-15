@@ -1,10 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/events/hooks/useEventComments.ts
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { adaptEventComment } from "../adapter";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { EventComment } from "../types";
 
@@ -40,9 +39,9 @@ export function useEventComments(eventId?: Id<"events">): {
         const adapted = adaptEventComment(newComment);
         setComments((prev) => [...prev, adapted]);
       }
-      UIService.openToast("Commentaire ajouté", "success");
+      toast.success("Commentaire ajouté");
     } catch (error) {
-      UIService.openToast("Erreur lors de l'ajout du commentaire", "error");
+      toast.error("Erreur lors de l'ajout du commentaire");
       throw error;
     }
   };
@@ -66,9 +65,9 @@ export function useEventComments(eventId?: Id<"events">): {
           }),
         );
       }
-      UIService.openToast("Réponse ajoutée", "success");
+      toast.success("Réponse ajoutée");
     } catch (error) {
-      UIService.openToast("Erreur lors de l'ajout de la réponse", "error");
+      toast.error("Erreur lors de l'ajout de la réponse");
       throw error;
     }
   };
@@ -106,7 +105,7 @@ export function useEventComments(eventId?: Id<"events">): {
         }),
       );
     } catch {
-      UIService.openToast("Erreur lors du like", "error");
+      toast.error("Erreur lors du like");
     }
   };
 

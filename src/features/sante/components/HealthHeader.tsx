@@ -1,4 +1,5 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Pressable, Text } from "react-native";
+
 // src/features/sante/components/HealthHeader.tsx
 import type { ReactNode } from "react";
 import { ArrowLeft, Heart, Share2 } from "lucide-react-native";
@@ -21,22 +22,10 @@ export function HealthHeader({
   children,
 }: HealthHeaderProps) {
   return (
-    <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3">
-      {onBack && (
-        <Pressable
-          onPress={onBack}
-          className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-        >
-          <ArrowLeft size={20} className="text-white" />
-        </Pressable>
-      )}
-      <Text className="text-white font-bold text-lg flex-1 truncate">{title}</Text>
-      <View className="flex items-center gap-1.5">
-        {onFavorite && (
-          <Pressable
-            onPress={onFavorite}
-            className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-          >
+    <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3">{onBack && (
+        <Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors"><ArrowLeft size={20} className="text-white" /></Pressable>
+      )}<Text className="text-white font-bold text-lg flex-1 truncate">{title}</Text><View className="flex items-center gap-1.5">{onFavorite && (
+          <Pressable onPress={onFavorite} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors">
             <Heart
               size={18}
               className={
@@ -44,17 +33,10 @@ export function HealthHeader({
               }
             />
           </Pressable>
-        )}
-        {onShare && (
-          <Pressable
-            onPress={onShare}
-            className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-          >
+        )}{onShare && (
+          <Pressable onPress={onShare} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors">
             <Share2 size={18} className="text-white/60" />
           </Pressable>
-        )}
-        {children}
-      </View>
-    </View>
+        )}{children}</View></View>
   );
 }

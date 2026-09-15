@@ -1,4 +1,4 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text } from "react-native";
 import { Eye, Heart, MessageCircle, Share2, Bookmark } from "lucide-react-native";
 
 interface Props {
@@ -45,21 +45,12 @@ export function CommunityStatistics({
   ];
 
   return (
-    <View className="space-y-2">
-      <Text className="text-sm font-medium text-white/50">Statistiques</Text>
-      <View className="gap-1.5">
-        {stats.map((stat) => (
-          <Pressable
-            key={stat.label}
-            className="text-center p-2 rounded-xl bg-white/5 border border-white/5"
-            onPress={stat.onClick}
-          >
+    <View className="space-y-2"><Text className="text-sm font-medium text-white/50">Statistiques</Text><View className="gap-1.5">{stats.map((stat) => (
+          <View key={stat.label} className="text-center p-2 rounded-xl bg-white/5 border border-white/5 transition-colors" onPress={stat.onClick}>
             <stat.icon size={14} className="text-white/30 mx-auto" />
             <Text className="text-white font-bold text-sm mt-1">{stat.value}</Text>
             <Text className="text-white/30 text-[10px]">{stat.label}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
+          </View>
+        ))}</View></View>
   );
 }

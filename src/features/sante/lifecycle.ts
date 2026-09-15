@@ -1,7 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/sante/lifecycle.ts
 import type { ModuleLifecycle } from "@/core/sdk/types/manifest.types";
+import { toast } from "sonner";
+
 export const SANTE_LIFECYCLE: ModuleLifecycle = {
   // Appelé avant la création d'une entité
   beforeCreate: async (data) => {
@@ -13,7 +13,7 @@ export const SANTE_LIFECYCLE: ModuleLifecycle = {
   // Appelé après la création
   afterCreate: async (data) => {
     console.log("[Sante] afterCreate:", data);
-    UIService.openToast("Entité créée avec succès", "success");
+    toast.success("Entité créée avec succès");
   },
 
   // Avant mise à jour
@@ -25,7 +25,7 @@ export const SANTE_LIFECYCLE: ModuleLifecycle = {
   // Après mise à jour
   afterUpdate: async (data) => {
     console.log("[Sante] afterUpdate:", data);
-    UIService.openToast("Entité mise à jour", "success");
+    toast.success("Entité mise à jour");
   },
 
   // Avant suppression
@@ -38,7 +38,7 @@ export const SANTE_LIFECYCLE: ModuleLifecycle = {
   // Après suppression
   afterDelete: async (data) => {
     console.log("[Sante] afterDelete:", data);
-    UIService.openToast("Entité supprimée", "success");
+    toast.success("Entité supprimée");
   },
 
   // Avant affichage (view)
@@ -59,7 +59,7 @@ export const SANTE_LIFECYCLE: ModuleLifecycle = {
   // Après partage
   afterShare: async (data) => {
     console.log("[Sante] afterShare:", data);
-    UIService.openToast("Partagé avec succès", "success");
+    toast.success("Partagé avec succès");
   },
 };
 

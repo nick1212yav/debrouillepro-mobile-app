@@ -48,19 +48,13 @@ export function JobMeta({
       {items.map(
         (item, idx) =>
           item.visible && (
-            <View
-              key={idx}
-              className="flex items-center gap-1 text-white/40 text-[10px]"
-            >
+            <View key={idx} className="flex items-center gap-1 text-white/40 text-[10px]">
               <item.icon size={10} />
               <Text>{item.label}</Text>
             </View>
           ),
       )}
-      <Text
-        className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ml-auto"
-        style={{ backgroundColor: `${contractColor}25`, color: contractColor }}
-      >
+      <Text className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ml-auto" style={{ backgroundColor: `${contractColor}25`, color: contractColor }}>
         {contractLabel}
       </Text>
     </View>

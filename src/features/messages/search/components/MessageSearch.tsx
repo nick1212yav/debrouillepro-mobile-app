@@ -1,4 +1,4 @@
-import { View, Text, Pressable, TextInput } from "react-native";
+import { View, Pressable, TextInput, Text } from "react-native";
 import { Loader2, Search, X } from "lucide-react-native";
 import { useMemo, useState } from "react";
 
@@ -47,70 +47,23 @@ export function MessageSearch({
   }, [filter, conversations]);
 
   return (
-    <View className="flex h-full min-h-0 flex-col overflow-hidden bg-[#0b1120]">
-      <View className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-        {onClose && (
-          <Pressable
-           
-            onPress={onClose}
-            accessibilityLabel="Fermer la recherche"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/40"
-          >
-            <X size={18} />
-          </Pressable>
-        )}
-
-        <View className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3">
-          {isLoading ? (
+    <View className="flex h-full min-h-0 flex-col overflow-hidden bg-[#0b1120]"><View className="flex items-center gap-2 border-b border-white/10 px-4 py-3">{onClose && (
+          <Pressable onPress={onClose} accessibilityLabel="Fermer la recherche" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/40"><X size={18} /></Pressable>
+        )}<View className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3">{isLoading ? (
             <Loader2
               size={17}
               className="shrink-0 animate-spin text-violet-400"
             />
           ) : (
             <Search size={17} className="shrink-0 text-white/30" />
-          )}
-
-          <TextInput
-            autoFocus
-           
-            value={query}
-            onChangeText={(text) => setQuery(text)}
-            placeholder={
-              conversationId
+          )}<TextInput autoFocus value={query} onChangeText={(value) => setQuery(value)} placeholder={conversationId
                 ? "Rechercher dans la conversation..."
-                : "Rechercher dans les messages..."
-            }
-            className="h-11 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/25"
-           returnKeyType="search"/>
-
-          {query && (
-            <Pressable
-             
-              onPress={clear}
-              accessibilityLabel="Effacer la recherche"
-              className="text-white/30"
-            >
-              <X size={16} />
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      <SearchFilters value={filter} onChange={setFilter} />
-
-      <View className="min-h-0 flex-1 overflow-y-auto">
-        {!query.trim() ? (
-          <View className="flex flex-col items-center justify-center px-6 py-16 text-center">
-            <View className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10">
-              <Search size={23} className="text-violet-400" />
-            </View>
-
-            <Text className="text-sm font-medium text-white/60">
-              <Text>Rechercher dans la messagerie</Text></Text>
-
-            <Text className="mt-1 max-w-xs text-xs leading-5 text-white/30">
-              <Text>Recherche un mot, une phrase ou un nom de conversation.</Text></Text>
-          </View>
+                : "Rechercher dans les messages..."} className="h-11 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/25" returnKeyType="search" />{query && (
+            <Pressable onPress={clear} accessibilityLabel="Effacer la recherche" className="text-white/30"><X size={16} /></Pressable>
+          )}</View></View><SearchFilters value={filter} onChange={setFilter} /><View className="min-h-0 flex-1 overflow-y-auto">{!query.trim() ? (
+          <View className="flex flex-col items-center justify-center px-6 py-16 text-center"><View className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10"><Search size={23} className="text-violet-400" /></View><Text className="text-sm font-medium text-white/60">Rechercher dans la messagerie
+            </Text><Text className="mt-1 max-w-xs text-xs leading-5 text-white/30">Recherche un mot, une phrase ou un nom de conversation.
+            </Text></View>
         ) : (
           <SearchResults
             messages={filteredMessages}
@@ -121,9 +74,7 @@ export function MessageSearch({
               onConversationClick?.(conversation.conversationId)
             }
           />
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 }
 

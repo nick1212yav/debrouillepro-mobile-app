@@ -2,7 +2,7 @@ import { View } from "react-native";
 import * as React from "react";
 import { GripVerticalIcon } from "lucide-react-native";
 import * as ResizablePrimitive from "react-resizable-panels";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 function ResizablePanelGroup({
   className,

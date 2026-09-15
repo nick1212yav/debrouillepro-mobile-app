@@ -15,11 +15,7 @@ export function DoctorChat({
   disabled = false,
 }: DoctorChatProps) {
   return (
-    <Pressable
-      onPress={onChat}
-      disabled={disabled || !userId}
-      className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium bg-purple-500/20 text-purple-400 border border-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
-    >
+    <Pressable onPress={onChat} disabled={disabled || !userId} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium transition-colors bg-purple-500/20 text-purple-400 border border-purple-500/20 disabled:opacity-40">
       <MessageCircle size={14} />
       Chat
     </Pressable>

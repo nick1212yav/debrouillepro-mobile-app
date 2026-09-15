@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditAppointmentSheet.tsx
@@ -15,6 +14,7 @@ import {
 } from "../forms/AppointmentForm";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface EditAppointmentSheetProps {
   open: boolean;
@@ -45,11 +45,11 @@ export function EditAppointmentSheet({
         // ❌ reminder n'est pas accepté par la mutation
         // On ne l'envoie pas
       });
-      UIService.openToast("Rendez-vous mis à jour !", "success");
+      toast.success("Rendez-vous mis à jour !");
       onOpenChange(false);
       onSuccess?.();
     } catch (e) {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
 

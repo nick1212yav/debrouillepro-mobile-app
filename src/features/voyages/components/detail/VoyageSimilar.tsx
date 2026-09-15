@@ -13,13 +13,10 @@ export function VoyageSimilar({ trip, onSelect }: VoyageSimilarProps) {
   // Pour l'instant, un placeholder. Plus tard, on utilisera une requête Convex.
   // On affiche simplement un message.
   return (
-    <View
-      className="rounded-3xl p-6 bg-white/5 border border-white/10"
-    >
+    <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl p-6 bg-white/5 border border-white/10">
       <View className="flex items-center gap-2 mb-4">
         <ArrowRight size={16} className="text-indigo-400" />
-        <Text className="text-white font-bold text-base">
-          Vous pourriez aussi aimer
+        <Text className="text-white font-bold text-base">Vous pourriez aussi aimer
         </Text>
       </View>
 

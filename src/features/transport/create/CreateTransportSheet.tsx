@@ -1,8 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Pressable, Image, TextInput } from "react-native";
+import { View, Pressable, Text, Image, TextInput, NativeSyntheticEvent, TextInputChangeEventData } from "react-native";
 
 // src/features/transport/create/CreateTransportSheet.tsx
 import { useState, useRef, useEffect } from "react";
+import { AnimatePresence } from "motion/react";
 import {
   X,
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
   Sparkles,
   Loader2,
 } from "lucide-react-native";
+import { toast } from "sonner";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 
@@ -154,7 +155,7 @@ export function CreateTransportSheet({
 
   const startRecording = async () => {
     try {
-      const stream = await undefined.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -175,9 +176,9 @@ export function CreateTransportSheet({
 
       mediaRecorder.start();
       setIsRecording(true);
-      UIService.openToast("Enregistrement audio démarré...", "info");
+      toast.info("Enregistrement audio démarré...");
     } catch (err) {
-      UIService.openToast("Impossible d'accéder au microphone.", "error");
+      toast.error("Impossible d'accéder au microphone.");
     }
   };
 
@@ -193,7 +194,7 @@ export function CreateTransportSheet({
   };
 
   // Gestionnaires de fichiers
-  const handleImageUpload = (e: string) => {
+  const handleImageUpload = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
       const newUrls = filesArray.map((file) => URL.createObjectURL(file));
@@ -201,7 +202,7 @@ export function CreateTransportSheet({
     }
   };
 
-  const handleVideoUpload = (e: string) => {
+  const handleVideoUpload = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setVideo(URL.createObjectURL(file));
@@ -329,7 +330,7 @@ export function CreateTransportSheet({
       }
 
       await createRoute(payload);
-      UIService.openToast("Trajet publié avec succès !", "success");
+      toast.success("Trajet publié avec succès !");
 
       // Reset des médias
       setImages([]);
@@ -342,7 +343,7 @@ export function CreateTransportSheet({
       console.error("Erreur Convex :", error);
       const message =
         error?.message || "Erreur lors de la publication. Veuillez réessayer.";
-      UIService.openToast(message, "error");
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -366,260 +367,68 @@ export function CreateTransportSheet({
   if (!open) return null;
 
   return (
-    <>
-      <View className="fixed inset-0 z-50 flex items-end">
-        {/* Overlay */}
-        <Pressable
-          onPress={() => onOpenChange(false)}
-          className="absolute inset-0 bg-black/70"
-        />
-
-        {/* Sheet */}
-        <View
-          className="relative w-full max-h-[92vh] overflow-hidden rounded-t-[32px] bg-gradient-to-b from-[#0c0d1e] to-[#080816] border-t border-white/10"
-        >
-          {/* Handle */}
-          <View className="flex justify-center pt-3">
-            <View className="w-10 h-1 rounded-full bg-white/20" />
-          </View>
-
-          {/* Header */}
-          <View className="px-5 pt-2 pb-4 flex items-center gap-3 border-b border-white/5">
-            <Pressable
-              onPress={() => onOpenChange(false)}
-              className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-            >
-              <ArrowLeft size={18} className="text-white" />
-            </Pressable>
-            <View className="flex-1">
-              <Text className="text-white text-xl font-black">Transport</Text>
-              <Text className="text-white/40 text-xs font-medium">
-                Choisissez votre catégorie de transport
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => onOpenChange(false)}
-              className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
-            >
-              <X size={18} className="text-white/60" />
-            </Pressable>
-          </View>
-
-          {/* Corps avec défilement */}
-          <View
-            className="overflow-y-auto px-5 pb-36 pt-4"
-            style={{ maxHeight: "calc(92vh - 130px)" }}
-          >
-            {/* Filtres */}
-            <View className="flex flex-wrap gap-2 mb-4">
-              {GROUP_FILTERS.map((group) => (
-                <Pressable
-                  key={group.id}
-                  onPress={() => setFilterGroup(group.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+<View>
+      <View className="fixed inset-0 z-50 flex items-end">{}<View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => onOpenChange(false)} className="absolute inset-0 bg-black/70 backdrop-blur-sm" />{}<View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="relative w-full max-h-[92vh] overflow-hidden rounded-t-[32px] bg-gradient-to-b from-[#0c0d1e] to-[#080816] border-t border-white/10">{}<View className="flex justify-center pt-3"><View className="w-10 h-1 rounded-full bg-white/20" /></View>{}<View className="px-5 pt-2 pb-4 flex items-center gap-3 border-b border-white/5"><Pressable onPress={() => onOpenChange(false)} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors"><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-white text-xl font-black">Transport</Text><Text className="text-white/40 text-xs font-medium">Choisissez votre catégorie de transport
+              </Text></View><Pressable onPress={() => onOpenChange(false)} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors"><X size={18} className="text-white/60" /></Pressable></View>{}<View className="overflow-y-auto px-5 pb-36 pt-4" style={{ maxHeight: "calc(92vh - 130px)", msOverflowStyle: "none" }}>{}<View className="flex flex-wrap gap-2 mb-4">{GROUP_FILTERS.map((group) => (
+                <Pressable key={group.id} onPress={() => setFilterGroup(group.id)} className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     filterGroup === group.id
                       ? "bg-violet-500/30 text-violet-300 border border-violet-400/30"
                       : "bg-white/5 text-white/50 border border-white/5 hover:bg-white/10"
-                  }`}
-                >
-                  {group.label}
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Onglets en cartes */}
-            <View
-              className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide"
-              style={{  }}
-            >
-              {filteredTabs.map((tab) => (
-                <Pressable
-                  key={tab.id}
-                  onPress={() => setActiveTab(tab.id)}
-                  className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                  }`}>{group.label}</Pressable>
+              ))}</View>{}<View className="flex gap-2 overflow-x-auto pb-3 mb-4" style={{ msOverflowStyle: "none" }}>{filteredTabs.map((tab) => (
+                <Pressable key={tab.id} onPress={() => setActiveTab(tab.id)} className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                     activeTab === tab.id
                       ? "bg-violet-600/20 text-violet-300 border border-violet-400/30"
                       : "bg-white/5 text-white/50 border border-white/5 hover:bg-white/10"
-                  }`}
-                >
-                  <Text className="text-base">{tab.icon}</Text>
-                  {tab.label}
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Formulaire avec animation */}
-            <AnimatePresence mode="wait">
-              <View
-                key={activeTab}
-              >
-                <CurrentForm onSubmit={handleSubmit} isLoading={loading} />
-              </View>
-            </AnimatePresence>
-
-            {/* ─── PANNEAU MULTIMÉDIA EXCLUSIF (Solution A) ─── */}
-            <View className="mt-8 pt-6 border-t border-white/5 space-y-6">
-              <View>
-                <Text className="text-xs font-black text-white/30 uppercase tracking-widest flex items-center gap-1.5">
-                  <Sparkles size={12} className="text-violet-400" />
-                  Options de confiance (Multimédia)
-                </Text>
-                <Text className="text-[10px] text-white/40 mt-1">
-                  Les annonces avec photos et mémos vocaux reçoivent jusqu'à 4
+                  }`}><Text className="text-base">{tab.icon}</Text>{tab.label}</Pressable>
+              ))}</View>{}<AnimatePresence mode="wait"><View key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}><CurrentForm onSubmit={handleSubmit} isLoading={loading} /></View></AnimatePresence>{}<View className="mt-8 pt-6 border-t border-white/5 space-y-6"><View><Text className="text-xs font-black text-white/30 uppercase tracking-widest flex items-center gap-1.5"><Sparkles size={12} className="text-violet-400" />Options de confiance (Multimédia)
+                </Text><Text className="text-[10px] text-white/40 mt-1">Les annonces avec photos et mémos vocaux reçoivent jusqu'à 4
                   fois plus de sollicitations.
-                </Text>
-              </View>
-
-              {/* 1. SECTION PHOTOS (Jusqu'à 10) */}
-              <View className="space-y-3">
-                <Text className="text-[10px] font-bold text-white/60 block">
-                  📸 Galerie Photos (Facultatif)
-                </Text>
-
-                <View className="gap-2">
-                  {images.map((url, i) => (
-                    <View
-                      key={i}
-                      className="relative aspect-square rounded-xl overflow-hidden border border-white/5 bg-white/5"
-                    >
-                      <Image
-                       
-                       
-                        className="w-full h-full object-cover"
-                       source={{ uri: url }} accessibilityLabel="Aperçu"/>
-                      <Pressable
-                        onPress={() =>
+                </Text></View>{}<View className="space-y-3"><Text className="text-[10px] font-bold text-white/60 block">📸 Galerie Photos (Facultatif)
+                </Text><View className="gap-2">{images.map((url, i) => (
+                    <View key={i} className="relative aspect-square rounded-xl overflow-hidden border border-white/5 bg-white/5"><Image className="w-full h-full object-cover" source={{ uri: url }} accessibilityLabel="Aperçu" /><Pressable onPress={() =>
                           setImages((prev) =>
                             prev.filter((_, idx) => idx !== i),
-                          )
-                        }
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
-                      >
-                        <X size={10} className="text-white/80" />
-                      </Pressable>
-                    </View>
-                  ))}
-
-                  {images.length < 10 && (
-                    <Text className="aspect-square rounded-xl border border-dashed border-white/10 bg-white/[0.01] flex flex-col items-center justify-center gap-1">
-                      <Camera size={18} className="text-white/40" />
-                      <Text className="text-[9px] text-white/30 font-bold">
-                        {images.length}/10
-                      </Text>
-                      <TextInput
-                       
-                       
-                        multiple
-                        onChangeText={handleImageUpload}
-                        className="hidden"
-                      />
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              <View className="gap-3 pt-1">
-                {/* 2. SECTION VIDÉO */}
-                <View className="space-y-2">
-                  <Text className="text-[10px] font-bold text-white/60 block">
-                    🎥 Clip Vidéo (30s max)
-                  </Text>
-                  {video ? (
-                    <View className="relative h-24 rounded-xl overflow-hidden border border-white/5 bg-black/40 flex items-center justify-center">
-                      <Video size={20} className="text-violet-400" />
-                      <Text className="absolute bottom-1 left-2 text-[8px] text-white/40 font-mono">
-                        Vidéo ajoutée
-                      </Text>
-                      <Pressable
-                        onPress={() => setVideo(null)}
-                        className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
-                      >
-                        <X size={10} className="text-white/80" />
-                      </Pressable>
-                    </View>
+                          )} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center transition-colors"><X size={10} className="text-white/80" /></Pressable></View>
+                  ))}{images.length < 10 && (
+                    <Text className="aspect-square rounded-xl border border-dashed border-white/10 bg-white/[0.01] flex flex-col items-center justify-center gap-1 transition-all"><Camera size={18} className="text-white/40" /><Text className="text-[9px] text-white/30 font-bold">{images.length}/10
+                      </Text><TextInput onChangeText={handleImageUpload} className="hidden" /></Text>
+                  )}</View></View><View className="gap-3 pt-1">{}<View className="space-y-2"><Text className="text-[10px] font-bold text-white/60 block">🎥 Clip Vidéo (30s max)
+                  </Text>{video ? (
+                    <View className="relative h-24 rounded-xl overflow-hidden border border-white/5 bg-black/40 flex items-center justify-center"><Video size={20} className="text-violet-400" /><Text className="absolute bottom-1 left-2 text-[8px] text-white/40 font-mono">Vidéo ajoutée
+                      </Text><Pressable onPress={() => setVideo(null)} className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center transition-colors"><X size={10} className="text-white/80" /></Pressable></View>
                   ) : (
-                    <Text className="h-24 rounded-xl border border-dashed border-white/10 bg-white/[0.01] flex flex-col items-center justify-center gap-1">
-                      <Video size={18} className="text-white/40" />
-                      <Text className="text-[9px] text-white/30 font-bold">
-                        Ajouter un clip
-                      </Text>
-                      <TextInput
-                       
-                       
-                        onChangeText={handleVideoUpload}
-                        className="hidden"
-                      />
-                    </Text>
-                  )}
-                </View>
-
-                {/* 3. SECTION MÉMO VOCAL (TRÈS PRATIQUE / CONTEXTE LOCAL RDC) */}
-                <View className="space-y-2">
-                  <Text className="text-[10px] font-bold text-white/60 block">
-                    🎙️ Message Vocal de présentation
-                  </Text>
-
-                  {audioUrl ? (
-                    <View className="relative h-24 rounded-xl border border-white/5 bg-white/5 p-3 flex flex-col justify-between">
-                      <View className="flex items-center gap-2">
-                        <View className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                          <Volume2 size={12} />
-                        </View>
-                        <Text className="text-[9px] text-emerald-400 font-bold">
-                          Prêt à l'envoi
-                        </Text>
-                      </View>
-                      <View
-                        src={audioUrl}
-                        controls
-                        className="w-full h-6 scale-90 -mx-3"
-                      />
-                      <Pressable
-                        onPress={() => setAudioUrl(null)}
-                        className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
-                      >
-                        <X size={10} className="text-white/80" />
-                      </Pressable>
-                    </View>
+                    <Text className="h-24 rounded-xl border border-dashed border-white/10 bg-white/[0.01] flex flex-col items-center justify-center gap-1 transition-all"><Video size={18} className="text-white/40" /><Text className="text-[9px] text-white/30 font-bold">Ajouter un clip
+                      </Text><TextInput onChangeText={handleVideoUpload} className="hidden" /></Text>
+                  )}</View>{}<View className="space-y-2"><Text className="text-[10px] font-bold text-white/60 block">🎙️ Message Vocal de présentation
+                  </Text>{audioUrl ? (
+                    <View className="relative h-24 rounded-xl border border-white/5 bg-white/5 p-3 flex flex-col justify-between"><View className="flex items-center gap-2"><View className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400"><Volume2 size={12} /></View><Text className="text-[9px] text-emerald-400 font-bold">Prêt à l'envoi
+                        </Text></View><audio src={audioUrl} controls className="w-full h-6 scale-90 -mx-3" /><Pressable onPress={() => setAudioUrl(null)} className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center transition-colors"><X size={10} className="text-white/80" /></Pressable></View>
                   ) : isRecording ? (
-                    <View className="h-24 rounded-xl border border-red-500/20 bg-red-500/5 p-3 flex flex-col justify-between items-center text-center">
-                      <Text className="text-[9px] text-red-400 font-black animate-pulse flex items-center gap-1">
-                        ● ENREGISTREMENT ({recordingTime}s)
-                      </Text>
-                      {/* Onde de voix simulée */}
-                      <View className="flex gap-0.5 items-end h-6">
-                        {[0.2, 0.8, 0.4, 0.9, 0.6, 0.1, 0.7, 0.4, 0.9, 0.3].map(
+                    <View className="h-24 rounded-xl border border-red-500/20 bg-red-500/5 p-3 flex flex-col justify-between items-center text-center"><Text className="text-[9px] text-red-400 font-black animate-pulse flex items-center gap-1">● ENREGISTREMENT ({recordingTime}s)
+                      </Text>{}<View className="flex gap-0.5 items-end h-6">{[0.2, 0.8, 0.4, 0.9, 0.6, 0.1, 0.7, 0.4, 0.9, 0.3].map(
                           (val, idx) => (
-                            <View
-                              key={idx}
-                              className="w-1 rounded-full bg-red-400"
-                            />
+                            <View key={idx} animate={{
+                                height: [
+                                  `${val * 10}px`,
+                                  `${val * 24}px`,
+                                  `${val * 10}px`,
+                                ],
+                              }} transition={{
+                                duration: 0.6 + idx * 0.1,
+                                repeat: Infinity,
+                              }} className="w-1 rounded-full bg-red-400" />
                           ),
-                        )}
-                      </View>
-                      <Pressable
-                        onPress={stopRecording}
-                        className="px-2.5 py-1 rounded-lg bg-red-500 text-[8px] font-black uppercase text-white flex items-center gap-1"
-                      >
-                        <Square size={8} className="fill-white" />
-                        <Text>Arrêter</Text></Pressable>
-                    </View>
+                        )}</View><Pressable onPress={stopRecording} className="px-2.5 py-1 rounded-lg bg-red-500 text-[8px] font-black uppercase text-white flex items-center gap-1 transition-colors"><Square size={8} className="fill-white" />Arrêter
+                      </Pressable></View>
                   ) : (
-                    <Pressable
-                      onPress={startRecording}
-                      className="w-full h-24 rounded-xl border border-dashed border-white/10 bg-white/[0.01] flex flex-col items-center justify-center gap-1"
-                    >
+                    <Pressable onPress={startRecording} className="w-full h-24 rounded-xl border border-dashed border-white/10 bg-white/[0.01] flex flex-col items-center justify-center gap-1 transition-all">
                       <Mic size={18} className="text-white/40" />
                       <Text className="text-[9px] text-white/30 font-bold">
-                        <Text>Enregistrer ma voix</Text></Text>
+                        Enregistrer ma voix
+                      </Text>
                     </Pressable>
-                  )}
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-      </View>
-    </>
+                  )}</View></View></View></View></View></View>
+    </View>
   );
 }

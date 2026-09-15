@@ -1,11 +1,4 @@
-function NativeConfirmAlert(message: string): boolean {
-  Alert.alert(message, "Confirmation", [
-    { text: "Annuler", style: "cancel" },
-    { text: "Confirmer", onPress: () => undefined },
-  ]);
-  return false;
-}
-import { Pressable, View, Alert } from "react-native";
+import { Pressable, View } from "react-native";
 import type { Id } from "@/convex/_generated/dataModel";
 
 import { useGroupActions } from "../hooks/useGroupActions";
@@ -19,7 +12,9 @@ export function GroupSettings({ conversationId, onLeft }: GroupSettingsProps) {
   const { leaveGroup, syncMembers } = useGroupActions();
 
   const handleLeave = async () => {
-    const confirmed = NativeConfirmAlert("Voulez-vous vraiment quitter ce groupe ?");
+    const confirmed = window.confirm(
+      "Voulez-vous vraiment quitter ce groupe ?",
+    );
 
     if (!confirmed) {
       return;
@@ -36,17 +31,11 @@ export function GroupSettings({ conversationId, onLeft }: GroupSettingsProps) {
 
   return (
     <View className="space-y-2">
-      <Pressable
-        onPress={handleSync}
-        className="w-full rounded-xl px-4 py-3 text-left text-sm text-white"
-      >
+      <Pressable onPress={handleSync} className="w-full rounded-xl px-4 py-3 text-left text-sm text-white">
         Synchroniser les membres
       </Pressable>
 
-      <Pressable
-        onPress={handleLeave}
-        className="w-full rounded-xl px-4 py-3 text-left text-sm text-red-400"
-      >
+      <Pressable onPress={handleLeave} className="w-full rounded-xl px-4 py-3 text-left text-sm text-red-400">
         Quitter le groupe
       </Pressable>
     </View>

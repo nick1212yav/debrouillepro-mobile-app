@@ -1,4 +1,4 @@
-import type { } from "lucide-react-native";
+import type { LucideIcon } from "lucide-react-native";
 
 export type NavItem = {
   id: string;

@@ -1,6 +1,6 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/network/lifecycle.ts
+import { toast } from "sonner";
+
 // ✅ Clause 'implements ModuleLifecycle' retirée pour la résilience de compilation [1]
 export class NetworkLifecycle {
   async onMount(): Promise<void> {
@@ -13,6 +13,6 @@ export class NetworkLifecycle {
 
   async onError(error: Error): Promise<void> {
     console.error("[Network] Erreur détectée:", error);
-    UIService.openToast("Une erreur est survenue dans le module Réseau", "error");
+    toast.error("Une erreur est survenue dans le module Réseau");
   }
 }

@@ -41,9 +41,7 @@ export function NetworkAvatar({
   const renderContent = () => {
     if (avatar) {
       return (
-        <Image
-          className="rounded-full object-cover w-full h-full border border-white/10" source={{ uri: avatar }} accessibilityLabel={name || "Avatar"}
-        />
+        <Image className="rounded-full object-cover w-full h-full border border-white/10" source={{ uri: avatar }} accessibilityLabel={name || "Avatar"} />
       );
     }
 
@@ -57,20 +55,14 @@ export function NetworkAvatar({
       : "?";
 
     return (
-      <View
-        className="rounded-full flex items-center justify-center font-black text-white border border-white/10 w-full h-full"
-        style={{  }}
-      >
+      <View className="rounded-full flex items-center justify-center font-black text-white border border-white/10 w-full h-full" style={{ fontSize: pixelSize * 0.35 }}>
         {initials}
       </View>
     );
   };
 
   return (
-    <View
-      className={`relative flex-shrink-0 ${className}`}
-      style={{ width: pixelSize, height: pixelSize }}
-    >
+    <View className={`relative flex-shrink-0 ${className}`} style={{ width: pixelSize, height: pixelSize }}>
       {renderContent()}
 
       {/* ✅ Badge de présence en ligne */}
@@ -80,7 +72,7 @@ export function NetworkAvatar({
 
       {/* ✅ Badge de vérification intégré sur l'avatar */}
       {verified && (
-        <Text className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center">
+        <Text className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center">
           <ShieldCheck size={11} className="text-emerald-400" />
         </Text>
       )}

@@ -1,4 +1,6 @@
-import { useRouter } from "expo-router";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 import { ActionRegistry } from "@/core/sdk/registry/ActionRegistry";
@@ -6,26 +8,28 @@ import { UIService } from "@/core/sdk/ui/UIService";
 
 import { getPublicationConfig } from "../config";
 import type { Publication } from "../types";
+import { Clipboard } from "@react-native-clipboard/clipboard";
+import { Share } from "react-native";
 
 export function usePublicationActions() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { user } = useFirebaseAuth();
 
   const handleAction = async (actionId: string, publication: Publication) => {
     switch (actionId) {
       case "like":
-        UIService.openToast("Fonction bientôt disponible", "info");
+        toast.info("Fonction bientôt disponible");
         return;
       case "comment":
-        router.push(`/publication/${publication._id}#comments`);
+        navigate(`/publication/${publication._id}#comments`);
         return;
       case "share":
         try {
-          if (undefined) {
-            await undefined;
+          if (navigator.share) {
+            await Share.share({ message: String(publication.description ?? "") + "\n" + "\n" + String(window.location.href), title: publication.title });
           } else {
-            await undefined.writeText(undefined.href);
-            UIService.openToast("Lien copié !", "success");
+            await Clipboard.setString(window.location.href);
+            toast.success("Lien copié !");
           }
         } catch {
           // utilisateur a annulé
@@ -33,19 +37,19 @@ export function usePublicationActions() {
         return;
       case "save":
       case "bookmark":
-        UIService.openToast("Publication sauvegardée", "success");
+        toast.success("Publication sauvegardée");
         return;
       case "contact":
-        UIService.openToast("Ouverture du contact...", "info");
+        toast.info("Ouverture du contact...");
         return;
       case "call":
-        UIService.openToast("Appel...", "info");
+        toast.info("Appel...");
         return;
       case "navigate":
-        UIService.openToast("Navigation...", "info");
+        toast.info("Navigation...");
         return;
       default:
-        UIService.openToast(actionId, "info");
+        toast.info(actionId);
     }
   };
 
@@ -55,7 +59,7 @@ export function usePublicationActions() {
     const config = getPublicationConfig(publication.type);
 
     if (!config) {
-      router.push(`/publication/${publication._id}`);
+      navigate(`/publication/${publication._id}`);
       return;
     }
 
@@ -66,7 +70,7 @@ export function usePublicationActions() {
           publication,
           user,
           services: {},
-          router,
+          navigate,
           ui: {
             openSheet: UIService.openSheet,
             openModal: UIService.openModal,
@@ -79,19 +83,19 @@ export function usePublicationActions() {
         return;
       } catch (error) {
         console.error("❌ [handleCTA] Erreur:", error);
-        UIService.openToast("Impossible d'exécuter cette action", "error");
+        toast.error("Impossible d'exécuter cette action");
         return;
       }
     }
 
     // Compatibilité ancien système (route)
     if (config.cta?.route) {
-      router(config.cta.route.replace(":id", publication._id));
+      navigate(config.cta.route.replace(":id", publication._id));
       return;
     }
 
     // Fallback générique
-    router.push(`/publication/${publication._id}`);
+    navigate(`/publication/${publication._id}`);
   };
 
   return {

@@ -1,3 +1,4 @@
+import { View } from "react-native";
 import type { GeoCoordinates } from "../types/common.types";
 
 export class GoogleMapsProvider {
@@ -14,7 +15,7 @@ export class GoogleMapsProvider {
     center: GeoCoordinates,
     zoom: number = 14,
   ): void {
-    const google = (undefined as any).google;
+    const google = (window as any).google;
     if (!google || !google.maps) {
       console.warn(
         "[GoogleMapsProvider] Le SDK Google Maps n'est pas chargé globalement.",
@@ -78,7 +79,7 @@ export class GoogleMapsProvider {
    * Positionne ou déplace dynamiquement le marqueur représentant le coursier
    */
   public updateCourierMarker(position: GeoCoordinates): void {
-    const google = (undefined as any).google;
+    const google = (window as any).google;
     if (!google || !this.mapInstance) return;
 
     if (this.courierMarker) {

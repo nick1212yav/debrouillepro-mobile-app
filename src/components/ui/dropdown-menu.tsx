@@ -1,8 +1,8 @@
-import { Text } from "react-native";
+import { Text, TextProps } from "react-native";
 import * as React from "react";
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 function DropdownMenu({
   ...props
@@ -98,7 +98,7 @@ function DropdownMenuCheckboxItem({
       checked={checked}
       {...props}
     >
-      <Text className="absolute left-2 flex size-3.5 items-center justify-center">
+      <Text className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
         </DropdownMenuPrimitive.ItemIndicator>
@@ -133,7 +133,7 @@ function DropdownMenuRadioItem({
       )}
       {...props}
     >
-      <Text className="absolute left-2 flex size-3.5 items-center justify-center">
+      <Text className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>
           <CircleIcon className="size-2 fill-current" />
         </DropdownMenuPrimitive.ItemIndicator>
@@ -179,16 +179,12 @@ function DropdownMenuSeparator({
 function DropdownMenuShortcut({
   className,
   ...props
-}: React.ComponentProps<typeof Text>) {
+}: TextProps) {
   return (
-    <Text
-      data-slot="dropdown-menu-shortcut"
-      className={cn(
+    <Text data-slot="dropdown-menu-shortcut" className={cn(
         "text-muted-foreground ml-auto text-xs tracking-widest",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 

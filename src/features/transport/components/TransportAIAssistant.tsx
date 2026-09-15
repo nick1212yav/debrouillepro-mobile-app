@@ -1,4 +1,5 @@
-import { View, Text } from "react-native";
+import { View, Text, NativeSyntheticEvent } from "react-native";
+
 // src/features/transport/components/TransportAIAssistant.tsx
 import { useState } from "react";
 import { Cpu, Send, Loader2, ArrowRight, Sparkles } from "lucide-react-native";
@@ -18,7 +19,8 @@ export function TransportAIAssistant() {
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSend = async (e: unknown) => {
+  const handleSend = async (e: NativeSyntheticEvent<any>) => {
+    e.preventDefault();
     if (!inputValue.trim()) return;
 
     const userText = inputValue;
@@ -43,63 +45,15 @@ export function TransportAIAssistant() {
   };
 
   return (
-    <View className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] space-y-4">
-      <View className="flex items-center gap-2">
-        <Cpu size={16} className="text-violet-400" />
-        <Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest flex items-center gap-1">
-          Débrouille AI Mobilité [2]
-          <Sparkles size={10} className="text-violet-400 animate-pulse" />
-        </Text>
-      </View>
-
-      {/* Zone de chat */}
-      <View
-        className="h-44 rounded-2xl bg-black/40 p-3.5 overflow-y-auto space-y-3.5 border border-white/5"
-        style={{  }}
-      >
-        {messages.map((m, i) => (
-          <View
-            key={i}
-            className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <View
-              className={`p-3 rounded-2xl text-[11px] leading-relaxed max-w-[85%] ${
+    <View className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] space-y-4"><View className="flex items-center gap-2"><Cpu size={16} className="text-violet-400" /><Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest flex items-center gap-1">Débrouille AI Mobilité [2]
+          <Sparkles size={10} className="text-violet-400 animate-pulse" /></Text></View>{}<View className="h-44 rounded-2xl bg-black/40 p-3.5 overflow-y-auto space-y-3.5 border border-white/5" style={{  }}>{messages.map((m, i) => (
+          <View key={i} className={`flex ${m.sender === "user" ? "justify-end" : "justify-start"}`}><View className={`p-3 rounded-2xl text-[11px] leading-relaxed max-w-[85%] ${
                 m.sender === "user"
                   ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold"
                   : "bg-white/5 text-white/80 border border-white/5 font-semibold"
-              }`}
-            >
-              {m.text}
-            </View>
-          </View>
-        ))}
-        {loading && (
-          <View className="flex justify-start">
-            <View className="p-3 rounded-2xl text-[11px] bg-white/5 border border-white/5 text-white/50 flex items-center gap-1.5">
-              <Loader2 size={12} className="animate-spin text-violet-400" />
-              <Text><Text>Analyse de votre demande... [2]</Text></Text>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* Input de saisie */}
-      <View className="flex gap-2">
-        <Input
-          value={inputValue}
-          onChange={(text) => setInputValue(text)}
-          placeholder="Ex : Le chauffeur accepte-t-il les bagages ? [2]"
-          className="flex-1 h-10 rounded-xl bg-white/5 border-white/10 text-xs placeholder:text-white/20"
-          disabled={loading}
-        />
-        <Button
-          size="icon"
-          className="w-10 h-10 rounded-xl bg-violet-600"
-          disabled={loading}
-        >
-          <Send size={14} className="text-white" />
-        </Button>
-      </View>
-    </View>
+              }`}>{m.text}</View></View>
+        ))}{loading && (
+          <View className="flex justify-start"><View className="p-3 rounded-2xl text-[11px] bg-white/5 border border-white/5 text-white/50 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin text-violet-400" /><Text>Analyse de votre demande... [2]</Text></View></View>
+        )}</View>{}<View className="flex gap-2"><Input value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Ex : Le chauffeur accepte-t-il les bagages ? [2]" className="flex-1 h-10 rounded-xl bg-white/5 border-white/10 text-xs placeholder:text-white/20" disabled={loading} /><Button  size="icon" className="w-10 h-10 rounded-xl bg-violet-600" disabled={loading}><Send size={14} className="text-white" /></Button></View></View>
   );
 }

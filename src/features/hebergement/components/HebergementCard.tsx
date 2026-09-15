@@ -1,7 +1,13 @@
-import { useRouter } from "expo-router";
-import { View, Pressable, Image, Text, GestureResponderEvent } from "react-native";
+import {
+  View,
+  Pressable,
+  Image,
+  Text,
+  GestureResponderEvent,
+} from "react-native";
 
 // src/features/hebergement/components/HebergementCard.tsx
+import { useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import {
   MapPin,
@@ -68,7 +74,7 @@ export function HebergementCard({
   isLiked = false,
   isBookmarked = false,
 }: Props) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const meta = parseMeta(publication.meta);
   const [isHovered, setIsHovered] = useState(false);
   const [liked, setLiked] = useState(isLiked);
@@ -104,74 +110,85 @@ export function HebergementCard({
 
   // Gestionnaires
   const handleCardClick = useCallback(() => {
-    router.push(`/hebergement/${publication._id}`);
-  }, [router, publication._id]);
+    navigate(`/hebergement/${publication._id}`);
+  }, [navigate, publication._id]);
 
   const handleLike = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     setLiked(!liked);
     onLike?.();
   };
 
   const handleBookmark = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     setBookmarked(!bookmarked);
     onBookmark?.();
   };
 
   const handleShare = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     onShare?.();
   };
 
   const handleComment = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     onComment?.();
   };
 
   const handleCTA = (e?: GestureResponderEvent) => {
-    router.push(`/hebergement/${publication._id}`);
+    e?.stopPropagation();
+    navigate(`/hebergement/${publication._id}`);
   };
 
-  // Rendu des badges
+  // Rendu des badges — les conteneurs sont des <View>, seul le texte est dans <Text>
   const renderBadges = () => {
     const badges = [];
+
     if (isAvailable) {
       badges.push(
-        <Text
+        <View
           key="available"
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/90 text-white border border-emerald-400/30"
+          className="flex-row items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/90 border border-emerald-400/30"
         >
-          <Text className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-          Disponible
-        </Text>,
+          <View className="w-1.5 h-1.5 rounded-full bg-white" />
+          <Text className="text-[10px] font-bold text-white">Disponible</Text>
+        </View>,
       );
     } else {
       badges.push(
-        <Text
+        <View
           key="unavailable"
-          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-500/90 text-white border border-red-400/30"
+          className="px-2.5 py-1 rounded-lg bg-red-500/90 border border-red-400/30"
         >
-          Indisponible
-        </Text>,
+          <Text className="text-[10px] font-bold text-white">Indisponible</Text>
+        </View>,
       );
     }
+
     if (isVerified) {
       badges.push(
-        <Text
+        <View
           key="verified"
-          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-500/90 text-white border border-blue-400/30 flex items-center gap-1"
+          className="flex-row items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/90 border border-blue-400/30"
         >
-          <CheckCircle size={10} /> Vérifié
-        </Text>,
+          <CheckCircle size={10} color="#FFFFFF" />
+          <Text className="text-[10px] font-bold text-white">Vérifié</Text>
+        </View>,
       );
     }
+
     if (isPromoted) {
       badges.push(
-        <Text
+        <View
           key="promoted"
-          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-purple-500/90 text-white border border-purple-400/30 flex items-center gap-1"
+          className="flex-row items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-500/90 border border-purple-400/30"
         >
-          <Sparkles size={10} /> Promu
-        </Text>,
+          <Sparkles size={10} color="#FFFFFF" />
+          <Text className="text-[10px] font-bold text-white">Promu</Text>
+        </View>,
       );
     }
+
     return badges.slice(0, 3);
   };
 
@@ -182,117 +199,141 @@ export function HebergementCard({
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
     const stars = [];
+
     for (let i = 0; i < fullStars; i++) {
-      stars.push(
-        <Star key={i} size={14} className="fill-amber-400 text-amber-400" />,
-      );
+      stars.push(<Star key={i} size={14} color="#FBBF24" fill="#FBBF24" />);
     }
+
     if (hasHalfStar) {
       stars.push(
         <View key="half" className="relative">
-          <Star size={14} className="text-amber-400" />
+          <Star size={14} color="#FBBF24" />
           <View className="absolute inset-0 overflow-hidden w-1/2">
-            <Star size={14} className="fill-amber-400 text-amber-400" />
+            <Star size={14} color="#FBBF24" fill="#FBBF24" />
           </View>
         </View>,
       );
     }
+
     const emptyStars = 5 - stars.length;
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <Star key={`empty-${i}`} size={14} className="text-white/20" />,
+        <Star key={`empty-${i}`} size={14} color="rgba(255,255,255,0.2)" />,
       );
     }
+
     return stars;
   };
 
   return (
-    <Pressable
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-      onPress={handleCardClick}
+    <View
+      onTouchStart={() => setIsHovered(true)}
+      onTouchEnd={() => setIsHovered(false)}
+      onStartShouldSetResponder={() => true}
+      onResponderRelease={handleCardClick}
       className="relative rounded-3xl overflow-hidden"
-      style={{ backgroundColor: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", transform: isHovered ? "scale(1.015)" : "scale(1)" }}
+      style={{
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+        borderStyle: "solid",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: isHovered ? 20 : 4 },
+        shadowOpacity: isHovered ? 0.3 : 0.1,
+        shadowRadius: isHovered ? 30 : 10,
+        elevation: isHovered ? 12 : 4,
+        transform: isHovered ? [{ scale: 1.015 }] : [{ scale: 1 }],
+      }}
     >
-      {/* Glow effect */}
-      <View
-        className="absolute inset-0 opacity-0"
-        style={{ opacity: isHovered ? 1 : 0 }}
-      />
-
       {/* Images */}
-      <View className="relative h-48 overflow-hidden bg-black/20">
+      <View
+        className="relative overflow-hidden bg-black/20"
+        style={{ height: 192 }}
+      >
         {images && images.length > 0 ? (
           <Image
-            src={images[0]}
-            alt={title}
-            className="w-full h-full object-cover"
+            source={{ uri: images[0] }}
+            accessibilityLabel={title}
+            className="w-full h-full"
             style={{
-              transform: isHovered ? "scale(1.05)" : "scale(1)"
+              transform: isHovered ? [{ scale: 1.05 }] : [{ scale: 1 }],
             }}
-            loading="lazy"
+            resizeMode="cover"
           />
         ) : (
           <View
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full items-center justify-center"
             style={{ backgroundColor: `${color}22` }}
           >
-            <Home size={48} className="opacity-30" style={{ color }} />
+            <Home size={48} color={color} />
           </View>
         )}
 
-        {/* Gradient overlay */}
+        {/* Overlay */}
         <View
           className="absolute inset-0"
-          style={{  }}
+          style={{ backgroundColor: "rgba(0,0,0,0.08)" }}
         />
 
         {/* Badges */}
-        <View className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+        <View className="absolute top-3 left-3 flex-row flex-wrap gap-1.5">
           {badges}
         </View>
 
-        {/* Actions rapides (bookmark) sur l'image */}
+        {/* Bookmark */}
         <Pressable
           onPress={handleBookmark}
-          className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
+          className="absolute top-3 right-3 w-9 h-9 rounded-full items-center justify-center"
+          style={{
+            backgroundColor: "rgba(0,0,0,0.5)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.1)",
+            borderStyle: "solid",
+          }}
         >
           <Bookmark
             size={16}
-            className={
-              bookmarked ? "fill-amber-400 text-amber-400" : "text-white/80"
-            }
+            color={bookmarked ? "#FBBF24" : "rgba(255,255,255,0.8)"}
+            fill={bookmarked ? "#FBBF24" : "transparent"}
           />
         </Pressable>
 
-        {/* Prix sur l'image */}
+        {/* Price */}
         {price > 0 && (
           <View className="absolute bottom-3 left-3">
             <Text
               className="px-3 py-1.5 rounded-xl text-sm font-bold"
-              style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#FCD34D", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
+              style={{
+                backgroundColor: "rgba(0,0,0,0.6)",
+                color: "#FCD34D",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.1)",
+                borderStyle: "solid",
+              }}
             >
-              {price.toLocaleString()} {currency} / {period}
+              {price.toLocaleString()}
+              {currency}/ {period}
             </Text>
           </View>
         )}
 
-        {/* Type */}
+        {/* Type badge */}
         <View
-          className="absolute bottom-3 right-3 px-2.5 py-1 rounded-xl text-[10px] font-bold"
+          className="absolute bottom-3 right-3 px-2.5 py-1 rounded-xl"
           style={{ backgroundColor: `${color}cc` }}
         >
-          {type || "Hébergement"}
+          <Text className="text-[10px] font-bold text-white">
+            {type || "Hébergement"}
+          </Text>
         </View>
       </View>
 
       {/* Contenu */}
-      <View className="p-4 space-y-3">
-        {/* Header : titre + temps */}
-        <View className="flex items-start justify-between gap-3">
+      <View className="p-4 gap-3">
+        {/* Titre + rating */}
+        <View className="flex-row items-start justify-between gap-3">
           <View className="flex-1 min-w-0">
-            <View className="flex items-center gap-2 mb-0.5">
+            <View className="flex-row items-center gap-2 mb-0.5">
               <Text
                 className="text-[10px] font-bold uppercase tracking-wider"
                 style={{ color }}
@@ -306,9 +347,11 @@ export function HebergementCard({
               {title}
             </Text>
           </View>
-          {/* Note */}
-          <View className="flex items-center gap-1 flex-shrink-0">
-            <View className="flex items-center gap-0.5">{renderStars()}</View>
+
+          <View className="flex-row items-center gap-1 flex-shrink-0">
+            <View className="flex-row items-center gap-0.5">
+              {renderStars()}
+            </View>
             {reviewCount > 0 && (
               <Text className="text-white/40 text-xs ml-1">
                 ({reviewCount})
@@ -317,105 +360,125 @@ export function HebergementCard({
           </View>
         </View>
 
-        {/* Localisation */}
-        {location && (
-          <View className="flex items-center gap-1.5 text-xs text-white/50">
-            <MapPin size={12} className="text-white/30" />
-            <Text className="truncate">{location}</Text>
-          </View>
-        )}
-
-        {/* Caractéristiques */}
-        <View className="flex items-center gap-3 flex-wrap text-xs text-white/60">
-          {bedrooms > 0 && (
-            <Text className="flex items-center gap-1">
-              <Bed size={12} className="text-white/30" /> {bedrooms} ch.
+        {/* Location */}
+        {location ? (
+          <View className="flex-row items-center gap-1.5">
+            <MapPin size={12} color="rgba(255,255,255,0.3)" />
+            <Text className="text-xs text-white/50 flex-1" numberOfLines={1}>
+              {location}
             </Text>
+          </View>
+        ) : null}
+
+        {/* Détails (chambres, sdb, surface) */}
+        <View className="flex-row items-center gap-3 flex-wrap">
+          {bedrooms > 0 && (
+            <View className="flex-row items-center gap-1">
+              <Bed size={12} color="rgba(255,255,255,0.3)" />
+              <Text className="text-xs text-white/60">{bedrooms} ch.</Text>
+            </View>
           )}
           {bathrooms > 0 && (
-            <Text className="flex items-center gap-1">
-              <Bath size={12} className="text-white/30" /> {bathrooms} sdb
-            </Text>
+            <View className="flex-row items-center gap-1">
+              <Bath size={12} color="rgba(255,255,255,0.3)" />
+              <Text className="text-xs text-white/60">{bathrooms} sdb</Text>
+            </View>
           )}
           {area > 0 && (
-            <Text className="flex items-center gap-1">
-              <Square size={12} className="text-white/30" /> {area} m²
-            </Text>
+            <View className="flex-row items-center gap-1">
+              <Square size={12} color="rgba(255,255,255,0.3)" />
+              <Text className="text-xs text-white/60">{area}m²</Text>
+            </View>
           )}
         </View>
 
-        {/* Description courte */}
-        {description && (
-          <Text className="text-sm text-white/60 leading-relaxed">
+        {/* Description */}
+        {description ? (
+          <Text
+            className="text-sm text-white/60 leading-relaxed"
+            numberOfLines={3}
+          >
             {description}
           </Text>
-        )}
+        ) : null}
 
-        {/* Statistiques */}
-        <View className="flex items-center gap-3 text-xs text-white/30">
-          <View className="flex items-center gap-1">
-            <Eye size={11} />
-            <Text>{publication.viewCount || 0}</Text>
+        {/* Stats */}
+        <View className="flex-row items-center gap-3">
+          <View className="flex-row items-center gap-1">
+            <Eye size={11} color="rgba(255,255,255,0.3)" />
+            <Text className="text-xs text-white/30">
+              {publication.viewCount || 0}
+            </Text>
           </View>
-          <View className="flex items-center gap-1">
-            <Heart size={11} />
-            <Text>{publication.likeCount || 0}</Text>
+          <View className="flex-row items-center gap-1">
+            <Heart size={11} color="rgba(255,255,255,0.3)" />
+            <Text className="text-xs text-white/30">
+              {publication.likeCount || 0}
+            </Text>
           </View>
-          {publication.shareCount && publication.shareCount > 0 && (
-            <View className="flex items-center gap-1">
-              <Share2 size={11} />
-              <Text>{publication.shareCount}</Text>
+          {publication.shareCount && publication.shareCount > 0 ? (
+            <View className="flex-row items-center gap-1">
+              <Share2 size={11} color="rgba(255,255,255,0.3)" />
+              <Text className="text-xs text-white/30">
+                {publication.shareCount}
+              </Text>
             </View>
-          )}
+          ) : null}
         </View>
       </View>
 
       {/* Actions sociales */}
-      <View className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between flex-wrap gap-2">
-        <View className="flex items-center gap-1">
-          {/* Like */}
+      <View className="px-4 py-2.5 border-t border-white/5 flex-row items-center justify-between flex-wrap gap-2">
+        <View className="flex-row items-center gap-1">
           <Pressable
             onPress={handleLike}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-              liked
-                ? "text-rose-400 bg-rose-500/10"
-                : "text-white/40 hover:text-white hover:bg-white/5"
-            }`}
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-xl"
+            style={{
+              backgroundColor: liked ? "rgba(244,63,94,0.1)" : "transparent",
+            }}
           >
-            <Heart size={14} className={liked ? "fill-rose-400" : ""} />
-            <Text>{publication.likeCount || 0}</Text>
+            <Heart
+              size={14}
+              color={liked ? "#FB7185" : "rgba(255,255,255,0.4)"}
+              fill={liked ? "#FB7185" : "transparent"}
+            />
+            <Text
+              className="text-xs font-medium"
+              style={{ color: liked ? "#FB7185" : "rgba(255,255,255,0.4)" }}
+            >
+              {publication.likeCount || 0}
+            </Text>
           </Pressable>
 
-          {/* Comment */}
           <Pressable
             onPress={handleComment}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40"
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-xl"
           >
-            <MessageCircle size={14} />
-            <Text>{publication.commentCount || 0}</Text>
+            <MessageCircle size={14} color="rgba(255,255,255,0.4)" />
+            <Text className="text-xs font-medium text-white/40">
+              {publication.commentCount || 0}
+            </Text>
           </Pressable>
 
-          {/* Share */}
           <Pressable
             onPress={handleShare}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-white/40"
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-xl"
           >
-            <Share2 size={14} />
+            <Share2 size={14} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
 
-        {/* CTA Voir le logement */}
         <Pressable
           onPress={handleCTA}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white"
-          style={{  }}
+          className="flex-row items-center gap-1.5 px-4 py-1.5 rounded-xl"
+          style={{ backgroundColor: color }}
         >
-          <Home size={12} />
-          <Text><Text>Voir le logement</Text></Text>
-          <ChevronRight size={12} className="opacity-60" />
+          <Home size={12} color="#FFFFFF" />
+          <Text className="text-xs font-bold text-white">Voir le logement</Text>
+          <ChevronRight size={12} color="rgba(255,255,255,0.6)" />
         </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
 }
 

@@ -1,13 +1,13 @@
-import { View, Text } from "react-native";
+import { View, Text, TextProps, ViewProps } from "react-native";
 import { useMemo } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils.ts";
+import { Label } from "@/components/ui/label.tsx";
+import { Separator } from "@/components/ui/separator.tsx";
 
-function FieldSet({ className, ...props }: React.ComponentProps<typeof View>) {
+function FieldSet({ className, ...props }: ViewProps) {
   return (
-    <View
+    <fieldset
       data-slot="field-set"
       className={cn(
         "flex flex-col gap-6",
@@ -23,9 +23,9 @@ function FieldLegend({
   className,
   variant = "legend",
   ...props
-}: React.ComponentProps<typeof View> & { variant?: "legend" | "label" }) {
+}: ViewProps & { variant?: "legend" | "label" }) {
   return (
-    <Text
+    <legend
       data-slot="field-legend"
       data-variant={variant}
       className={cn(
@@ -39,16 +39,12 @@ function FieldLegend({
   );
 }
 
-function FieldGroup({ className, ...props }: React.ComponentProps<typeof View>) {
+function FieldGroup({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="field-group"
-      className={cn(
+    <View data-slot="field-group" className={cn(
         "group/field-group @container/field-group flex w-full flex-col gap-7 data-[slot=checkbox-group]:gap-3 [&>[data-slot=field-group]]:gap-4",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
@@ -80,28 +76,18 @@ function Field({
   className,
   orientation = "vertical",
   ...props
-}: React.ComponentProps<typeof View> & VariantProps<typeof fieldVariants>) {
+}: ViewProps & VariantProps<typeof fieldVariants>) {
   return (
-    <View
-      accessibilityRole="group"
-      data-slot="field"
-      data-orientation={orientation}
-      className={cn(fieldVariants({ orientation }), className)}
-      {...props}
-    />
+    <View accessibilityRole="group" data-slot="field" data-orientation={orientation} className={cn(fieldVariants({ orientation }), className)} {...props} />
   );
 }
 
-function FieldContent({ className, ...props }: React.ComponentProps<typeof View>) {
+function FieldContent({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="field-content"
-      className={cn(
+    <View data-slot="field-content" className={cn(
         "group/field-content flex flex-1 flex-col gap-1.5 leading-snug",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
@@ -123,31 +109,23 @@ function FieldLabel({
   );
 }
 
-function FieldTitle({ className, ...props }: React.ComponentProps<typeof View>) {
+function FieldTitle({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="field-label"
-      className={cn(
+    <View data-slot="field-label" className={cn(
         "flex w-fit items-center gap-2 text-sm leading-snug font-medium group-data-[disabled=true]/field:opacity-50",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function FieldDescription({ className, ...props }: React.ComponentProps<typeof Text>) {
+function FieldDescription({ className, ...props }: TextProps) {
   return (
-    <Text
-      data-slot="field-description"
-      className={cn(
+    <Text data-slot="field-description" className={cn(
         "text-muted-foreground text-sm leading-normal font-normal group-has-[[data-orientation=horizontal]]/field:text-balance",
         "last:mt-0 nth-last-2:-mt-1 [[data-variant=legend]+&]:-mt-1.5",
         "[&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
@@ -155,25 +133,17 @@ function FieldSeparator({
   children,
   className,
   ...props
-}: React.ComponentProps<typeof View> & {
+}: ViewProps & {
   children?: React.ReactNode;
 }) {
   return (
-    <View
-      data-slot="field-separator"
-      data-content={!!children}
-      className={cn(
+    <View data-slot="field-separator" data-content={!!children} className={cn(
         "relative -my-2 h-5 text-sm group-data-[variant=outline]/field-group:-mb-2",
         className,
-      )}
-      {...props}
-    >
+      )} {...props}>
       <Separator className="absolute inset-0 top-1/2" />
       {children && (
-        <Text
-          className="bg-background text-muted-foreground relative mx-auto block w-fit px-2"
-          data-slot="field-separator-content"
-        >
+        <Text className="bg-background text-muted-foreground relative mx-auto block w-fit px-2" data-slot="field-separator-content">
           {children}
         </Text>
       )}
@@ -186,7 +156,7 @@ function FieldError({
   children,
   errors,
   ...props
-}: React.ComponentProps<typeof View> & {
+}: ViewProps & {
   errors?: Array<{ message?: string } | undefined>;
 }) {
   const content = useMemo(() => {
@@ -217,12 +187,7 @@ function FieldError({
   }
 
   return (
-    <View
-      accessibilityRole="alert"
-      data-slot="field-error"
-      className={cn("text-destructive text-sm font-normal", className)}
-      {...props}
-    >
+    <View accessibilityRole="alert" data-slot="field-error" className={cn("text-destructive text-sm font-normal", className)} {...props}>
       {content}
     </View>
   );

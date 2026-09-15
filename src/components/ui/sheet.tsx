@@ -1,8 +1,8 @@
-import { Text, View } from "react-native";
+import { Text, View, ViewProps } from "react-native";
 import * as React from "react";
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -80,7 +80,7 @@ function SheetContent({
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="ring-offset-background data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 disabled:pointer-events-none">
+        <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
           <XIcon className="size-4" />
           <Text className="sr-only">Close</Text>
         </SheetPrimitive.Close>
@@ -89,23 +89,15 @@ function SheetContent({
   );
 }
 
-function SheetHeader({ className, ...props }: React.ComponentProps<typeof View>) {
+function SheetHeader({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="sheet-header"
-      className={cn("flex flex-col gap-1.5 p-4", className)}
-      {...props}
-    />
+    <View data-slot="sheet-header" className={cn("flex flex-col gap-1.5 p-4", className)} {...props} />
   );
 }
 
-function SheetFooter({ className, ...props }: React.ComponentProps<typeof View>) {
+function SheetFooter({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="sheet-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
-      {...props}
-    />
+    <View data-slot="sheet-footer" className={cn("mt-auto flex flex-col gap-2 p-4", className)} {...props} />
   );
 }
 

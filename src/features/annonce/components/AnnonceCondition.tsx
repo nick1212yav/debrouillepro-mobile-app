@@ -23,10 +23,7 @@ export function AnnonceCondition({ condition }: Props) {
 
   return (
     <View className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5">
-      <Text
-        className="w-2 h-2 rounded-full"
-        style={{ backgroundColor: info.color }}
-      />
+      <Text className="w-2 h-2 rounded-full" style={{ backgroundColor: info.color }} />
       <Text className="text-xs text-white/80 font-medium">{info.label}</Text>
     </View>
   );

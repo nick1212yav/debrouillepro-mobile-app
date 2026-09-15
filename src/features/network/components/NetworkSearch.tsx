@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Image, TextInput } from "react-native";
+import { View, TextInput, Pressable, Image, Text, NativeSyntheticEvent, TextInputChangeEventData } from "react-native";
 
 // src/features/network/components/NetworkSearch.tsx
 import { useState, useCallback, useEffect } from "react";
@@ -41,7 +41,7 @@ export function NetworkSearch({
     setLocalValue(value);
   }, [value]);
 
-  const handleChange = (e: string) => {
+  const handleChange = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
     const newValue = e.target.value;
     setLocalValue(newValue);
     onChange(newValue);
@@ -52,7 +52,8 @@ export function NetworkSearch({
     onChange("");
   };
 
-  const handleSubmit = (e: unknown) => {
+  const handleSubmit = (e: NativeSyntheticEvent<any>) => {
+    e.preventDefault();
     onSearch?.(localValue);
   };
 
@@ -89,86 +90,27 @@ export function NetworkSearch({
   };
 
   return (
-    <View className={cn("relative", className)}>
-      <View>
-        <View
-          className={cn(
+    <View className={cn("relative", className)}><View><View className={cn(
             "flex items-center gap-2 px-3 py-2.5 rounded-2xl transition-all",
             "bg-white/5 border",
             isFocused
               ? "border-indigo-500/50 bg-white/8"
               : "border-white/8 hover:border-white/15",
-          )}
-        >
-          <Search
-            size={16}
-            className={cn(
+          )}><Search size={16} className={cn(
               "transition-colors flex-shrink-0",
               isFocused ? "text-indigo-400" : "text-white/30",
-            )}
-          />
-          <TextInput
-           
-            value={localValue}
-            onChangeText={handleChange}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-            placeholder={placeholder}
-            autoFocus={autoFocus}
-            className="flex-1 bg-transparent text-white text-sm placeholder:text-white/30 outline-none"
-          />
-          {localValue && (
-            <Pressable
-             
-              onPress={handleClear}
-              className="w-6 h-6 rounded-full flex items-center justify-center"
-            >
-              <X size={14} className="text-white/40" />
-            </Pressable>
-          )}
-          {isLoading && (
+            )} /><TextInput value={localValue} onChangeText={handleChange} onFocus={() => setIsFocused(true)} onBlur={() => setTimeout(() => setIsFocused(false), 200)} placeholder={placeholder} autoFocus={autoFocus} className="flex-1 bg-transparent text-white text-sm placeholder:text-white/30 outline-none" />{localValue && (
+            <Pressable onPress={handleClear} className="w-6 h-6 rounded-full flex items-center justify-center transition-colors"><X size={14} className="text-white/40" /></Pressable>
+          )}{isLoading && (
             <View className="w-4 h-4 rounded-full border-2 border-indigo-400/30 border-t-indigo-400 animate-spin" />
-          )}
-        </View>
-      </View>
-
-      <>
-        {showSuggestions && (
-          <View
-            className="absolute top-full left-0 right-0 mt-2 rounded-2xl overflow-hidden z-50"
-            style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-          >
-            <View
-              className="p-2 max-h-72 overflow-y-auto"
-              style={{  }}
-            >
-              {suggestions.map((item) => (
-                <Pressable
-                  key={item.id}
-                  onPress={() => handleSuggestionClick(item.id)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl text-left"
-                >
-                  <View className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 flex-shrink-0">
-                    {item.avatar ? (
-                      <Image
-                       
-                       
-                        className="w-full h-full rounded-xl object-cover"
-                       source={{ uri: item.avatar }} accessibilityLabel={item.name}/>
+          )}</View></View><View>{showSuggestions && (
+          <View initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }} className="absolute top-full left-0 right-0 mt-2 rounded-2xl overflow-hidden z-50" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+            <View className="p-2 max-h-72 overflow-y-auto" style={{  }}>{suggestions.map((item) => (
+                <Pressable key={item.id} onPress={() => handleSuggestionClick(item.id)} className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left"><View className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 flex-shrink-0">{item.avatar ? (
+                      <Image className="w-full h-full rounded-xl object-cover" source={{ uri: item.avatar }} accessibilityLabel={item.name} />
                     ) : (
                       getTypeIcon(item.type)
-                    )}
-                  </View>
-                  <View className="flex-1 min-w-0">
-                    <Text className="text-white text-sm font-medium truncate">
-                      {item.name}
-                    </Text>
-                    <View className="flex items-center gap-2 text-xs text-white/40">
-                      <Text className="flex items-center gap-1">
-                        {getTypeIcon(item.type)}
-                        {getTypeLabel(item.type)}
-                      </Text>
-                      {item.city && (
+                    )}</View><View className="flex-1 min-w-0"><Text className="text-white text-sm font-medium truncate">{item.name}</Text><View className="flex items-center gap-2 text-xs text-white/40"><Text className="flex items-center gap-1">{getTypeIcon(item.type)}{getTypeLabel(item.type)}</Text>{item.city && (
                         <>
                           <Text className="w-1 h-1 rounded-full bg-white/20" />
                           <Text className="flex items-center gap-1">
@@ -176,15 +118,9 @@ export function NetworkSearch({
                             {item.city}
                           </Text>
                         </>
-                      )}
-                    </View>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
+                      )}</View></View></Pressable>
+              ))}</View>
           </View>
-        )}
-      </>
-    </View>
+        )}</View></View>
   );
 }

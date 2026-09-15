@@ -193,17 +193,17 @@ export function usePresence(options: UsePresenceOptions = {}) {
     }
 
     const handleVisibilityChange = () => {
-      if (undefined === "visible") {
+      if (document.visibilityState === "visible") {
         void goOnline();
       } else {
         void goAway();
       }
     };
 
-    undefined("visibilitychange", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      undefined("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [autoStart, goAway, goOnline, isAuthenticated]);
 

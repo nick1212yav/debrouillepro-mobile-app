@@ -64,51 +64,20 @@ export function ActiveCall({ callId, onEnded }: ActiveCallProps) {
 
   if (!call) {
     return (
-      <View className="flex min-h-[300px] items-center justify-center rounded-2xl bg-zinc-950 text-white/50">
-        <Text>Chargement de l'appel...</Text></View>
+      <View className="flex min-h-[300px] items-center justify-center rounded-2xl bg-zinc-950 text-white/50"><Text>Chargement de l'appel...</Text></View>
     );
   }
 
   return (
-    <View className="flex min-h-[500px] flex-col overflow-hidden rounded-2xl bg-zinc-950">
-      <View className="flex items-center justify-between border-b border-white/10 px-5 py-4 text-white">
-        <View>
-          <Text className="font-semibold">
-            {call.type === "video" ? "Appel vidéo" : "Appel audio"}
-          </Text>
-
-          <Text className="text-xs text-white/50">
-            {isConnected
+    <View className="flex min-h-[500px] flex-col overflow-hidden rounded-2xl bg-zinc-950"><View className="flex items-center justify-between border-b border-white/10 px-5 py-4 text-white"><View><Text className="font-semibold">{call.type === "video" ? "Appel vidéo" : "Appel audio"}</Text><Text className="text-xs text-white/50">{isConnected
               ? "Connecté"
               : isConnecting
                 ? "Connexion..."
-                : "En attente"}
-          </Text>
-        </View>
-      </View>
-
-      <View className="flex-1 p-4">
-        {type === "video" ? (
+                : "En attente"}</Text></View></View><View className="flex-1 p-4">{type === "video" ? (
           <VideoGrid localStream={localStream} remoteStream={remoteStream} />
         ) : (
-          <View className="flex h-full min-h-[320px] items-center justify-center">
-            <View className="flex h-32 w-32 items-center justify-center rounded-full bg-white/10 text-5xl">
-              <Text>📞</Text></View>
-          </View>
-        )}
-      </View>
-
-      <View className="border-t border-white/10 p-5">
-        <CallControls
-          isMuted={isMuted}
-          isCameraEnabled={isCameraEnabled}
-          isVideoCall={type === "video"}
-          onToggleMute={handleToggleMute}
-          onToggleCamera={handleToggleCamera}
-          onEnd={handleEnd}
-        />
-      </View>
-    </View>
+          <View className="flex h-full min-h-[320px] items-center justify-center"><View className="flex h-32 w-32 items-center justify-center rounded-full bg-white/10 text-5xl"><Text>📞</Text></View></View>
+        )}</View><View className="border-t border-white/10 p-5"><CallControls isMuted={isMuted} isCameraEnabled={isCameraEnabled} isVideoCall={type === "video"} onToggleMute={handleToggleMute} onToggleCamera={handleToggleCamera} onEnd={handleEnd} /></View></View>
   );
 }
 

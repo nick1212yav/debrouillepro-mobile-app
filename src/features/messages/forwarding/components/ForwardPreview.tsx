@@ -74,29 +74,13 @@ export function ForwardPreview({
   const preview = getPreview(message);
 
   return (
-    <View
-      className={[
+    <View className={[
         "flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04]",
         compact ? "px-3 py-2" : "px-4 py-3",
-      ].join(" ")}
-    >
-      <View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">
-        {preview.icon}
-      </View>
-
-      <View className="min-w-0 flex-1">
-        <Text className="text-[11px] font-medium text-violet-400"><Text>Transférer</Text></Text>
-
-        <Text
-          className={[
+      ].join(" ")}><View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">{preview.icon}</View><View className="min-w-0 flex-1"><Text className="text-[11px] font-medium text-violet-400">Transférer</Text><Text className={[
             "truncate text-sm text-white/70",
             !message.text && "text-white/40",
-          ].join(" ")}
-        >
-          {preview.label}
-        </Text>
-      </View>
-    </View>
+          ].join(" ")}>{preview.label}</Text></View></View>
   );
 }
 

@@ -51,23 +51,17 @@ export function ModuleForm({
 
   return (
     <FormProvider {...methods}>
-      <View className="space-y-6">
-        {Object.entries(groups).map(([groupName, groupFields]) => (
+      <View className="space-y-6">{Object.entries(groups).map(([groupName, groupFields]) => (
           <View key={groupName} className="space-y-4">
-            <Text className="text-sm font-semibold text-white/60 uppercase tracking-wider">
-              {groupName}
-            </Text>
+            <Text className="text-sm font-semibold text-white/60 uppercase tracking-wider">{groupName}</Text>
             {groupFields.map((field: FieldConfig) => {
               const values = methods.watch();
               if (field.visibleIf && !field.visibleIf(values)) return null;
               return (
                 <View key={field.key}>
-                  <Text className="block text-sm font-medium text-white/70 mb-1">
-                    {field.label}
-                    {field.required && (
+                  <Text className="block text-sm font-medium text-white/70 mb-1">{field.label}{field.required && (
                       <Text className="text-red-400 ml-1">*</Text>
-                    )}
-                  </Text>
+                    )}</Text>
                   <FieldRenderer
                     field={field}
                     value={methods.watch(field.key)}
@@ -86,15 +80,7 @@ export function ModuleForm({
               );
             })}
           </View>
-        ))}
-
-        <Pressable
-          disabled={isSubmitting || !methods.formState.isValid}
-          className="w-full bg-purple-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? "Publication..." : "Publier"}
-        </Pressable>
-      </View>
+        ))}<Pressable disabled={isSubmitting || !methods.formState.isValid} className="w-full bg-purple-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 transition-colors">{isSubmitting ? "Publication..." : "Publier"}</Pressable></View>
     </FormProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateTrainForm.tsx
 import { useForm } from "react-hook-form";
@@ -108,13 +108,9 @@ export function CreateTrainForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="operatorName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="operatorName" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom de l'opérateur / régie ferroviaire *</Text></FormLabel>
+              <FormLabel>Nom de l'opérateur / régie ferroviaire *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: SCTP, SETRAG"
@@ -124,16 +120,9 @@ export function CreateTrainForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="trainNumber"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="trainNumber" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Numéro du train *</Text></FormLabel>
+                <FormLabel>Numéro du train *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: TR-402 Express"
@@ -143,14 +132,9 @@ export function CreateTrainForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="phone"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="phone" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Téléphone d'information *</Text></FormLabel>
+                <FormLabel>Téléphone d'information *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: +243 890 000 000"
@@ -160,17 +144,9 @@ export function CreateTrainForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="originStation"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="originStation" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Gare de départ *</Text></FormLabel>
+                <FormLabel>Gare de départ *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Gare Centrale, Kinshasa"
@@ -180,14 +156,9 @@ export function CreateTrainForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="destinationStation"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="destinationStation" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Gare d'arrivée *</Text></FormLabel>
+                <FormLabel>Gare d'arrivée *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Gare de Matadi"
@@ -197,57 +168,39 @@ export function CreateTrainForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="priceFirstClass"
-            render={({ field }) => (
+            )} /></View><View className="gap-2"><FormField control={form.control} name="priceFirstClass" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prix 1ère classe *</Text></FormLabel>
+                <FormLabel>Prix 1ère classe *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="priceSecondClass"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="priceSecondClass" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prix 2ème classe *</Text></FormLabel>
+                <FormLabel>Prix 2ème classe *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -258,24 +211,16 @@ export function CreateTrainForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                    <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="departureTime"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="departureTime" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Heure de départ *</Text></FormLabel>
+                <FormLabel>Heure de départ *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 06:45"
@@ -285,37 +230,27 @@ export function CreateTrainForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="totalSeats"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="totalSeats" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Capacité totale (sièges) *</Text></FormLabel>
+                <FormLabel>Capacité totale (sièges) *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseInt(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseInt(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="description" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Informations complémentaires (Restauration à bord, bagages, etc.)</Text></FormLabel>
+                Informations complémentaires (Restauration à bord, bagages,
+                etc.)
+              </FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Ex: Voiture restaurant active, limite de bagages à 30kg par passager, climatisation en 1ère classe..."
@@ -326,22 +261,14 @@ export function CreateTrainForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button
-          className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+          )} /><Button  className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Enregistrement...</Text></>
+              Enregistrement...
+            </>
           ) : (
             "🚆 Enregistrer la ligne de Train"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

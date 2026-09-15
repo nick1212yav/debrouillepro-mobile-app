@@ -1,33 +1,30 @@
-import { useRouter } from "expo-router";
-import { UIService } from "@/core/sdk/ui/UIService";
 import { Pressable, View } from "react-native";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { loginWithGoogle } from "../services/firebase/auth.service";
 
 export function GoogleButton() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   const handleClick = async () => {
     setLoading(true);
     try {
       await loginWithGoogle();
-      UIService.openToast("Connexion réussie !", "success");
-      router("/");
+      toast.success("Connexion réussie !");
+      navigate("/");
     } catch (error) {
-      UIService.openToast(error instanceof Error ? error.message : "Erreur de connexion", "error");
+      toast.error(
+        error instanceof Error ? error.message : "Erreur de connexion",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Pressable
-      onPress={handleClick}
-      disabled={loading}
-      className="w-full flex items-center justify-center gap-3 py-3 rounded-2xl font-semibold text-white disabled:opacity-60"
-      style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid" }}
-    >
+    <Pressable onPress={handleClick} disabled={loading} className="w-full flex items-center justify-center gap-3 py-3 rounded-2xl font-semibold text-white transition-all active:scale-95 disabled:opacity-60" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid" }}>
       {loading ? (
         <View className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
       ) : (

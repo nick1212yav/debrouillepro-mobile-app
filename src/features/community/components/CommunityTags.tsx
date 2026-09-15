@@ -1,4 +1,4 @@
-import { Pressable, View, Text, TextInput, NativeSyntheticEvent, TextInputKeyPressEventData } from "react-native";
+import { View, TextInput, NativeSyntheticEvent, Pressable, Text, TextInputKeyPressEventData } from "react-native";
 import { useState } from "react";
 import { Tag, Plus, X } from "lucide-react-native";
 
@@ -33,6 +33,7 @@ export function CommunityTags({
 
   const handleKeyDown = (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
     if (e.key === "Enter") {
+      e.preventDefault();
       handleAdd();
     }
     if (e.key === "Backspace" && !input && tags.length > 0) {
@@ -41,46 +42,25 @@ export function CommunityTags({
   };
 
   return (
-    <View className="space-y-2">
-      <View className="flex flex-wrap gap-1.5">
-        {tags.map((tag) => (
-          <Text
-            key={tag}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400"
-          >
+    <View className="space-y-2"><View className="flex flex-wrap gap-1.5">{tags.map((tag) => (
+          <Text key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
             <Tag size={10} className="opacity-60" />
             {tag}
-            <Pressable
-              onPress={() => onRemoveTag(tag)}
-              className="ml-0.5"
-            >
+            <Pressable onPress={() => onRemoveTag(tag)} className="transition-colors ml-0.5">
               <X size={12} />
             </Pressable>
           </Text>
-        ))}
-        {tags.length < maxTags && (
+        ))}{tags.length < maxTags && (
           <View className="flex items-center gap-1 px-2 py-1 rounded-full border border-white/10 border-dashed">
-            <TextInput
-              value={input}
-              onChangeText={(text) => setInput(text)}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              className="bg-transparent text-white text-xs outline-none placeholder:text-white/30 w-20"
-            />
-            <Pressable
-              onPress={handleAdd}
-              disabled={!input.trim()}
-              className="text-white/30 disabled:opacity-30"
-            >
+            <TextInput value={input} onChangeText={(value) => setInput(value)} onKeyPress={handleKeyDown} placeholder={placeholder} className="bg-transparent text-white text-xs outline-none placeholder:text-white/30 w-20" />
+            <Pressable onPress={handleAdd} disabled={!input.trim()} className="text-white/30 transition-colors disabled:opacity-30">
               <Plus size={12} />
             </Pressable>
           </View>
-        )}
-      </View>
-      {tags.length >= maxTags && (
+        )}</View>{tags.length >= maxTags && (
         <Text className="text-[10px] text-white/30">
-          <Text>Nombre maximum de tags atteint</Text></Text>
-      )}
-    </View>
+          Nombre maximum de tags atteint
+        </Text>
+      )}</View>
   );
 }

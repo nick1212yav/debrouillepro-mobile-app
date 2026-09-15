@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Text, Image, Pressable, GestureResponderEvent } from "react-native";
 
 // src/features/events/components/EventGallery.tsx
 import { useState, useEffect, useRef } from "react";
@@ -47,13 +47,8 @@ export function EventGallery({ images, title, coverImage }: Props) {
 
   if (validImages.length === 0) {
     return (
-      <View className="relative rounded-2xl overflow-hidden aspect-[16/9] bg-black/20 flex flex-col items-center justify-center">
-        <ImageOff size={32} className="text-white/20 mb-2" />
-        <Text className="text-white/30 text-sm">Aucune image disponible</Text>
-        <Text className="text-white/20 text-xs mt-1">
-          (images: {images?.length || 0}, cover: {coverImage ? "oui" : "non"})
-        </Text>
-      </View>
+      <View className="relative rounded-2xl overflow-hidden aspect-[16/9] bg-black/20 flex flex-col items-center justify-center"><ImageOff size={32} className="text-white/20 mb-2" /><Text className="text-white/30 text-sm">Aucune image disponible</Text><Text className="text-white/20 text-xs mt-1">(images: {images?.length || 0}, cover: {coverImage ? "oui" : "non"})
+        </Text></View>
     );
   }
 
@@ -87,11 +82,11 @@ export function EventGallery({ images, title, coverImage }: Props) {
   };
 
   // Gestion du swipe tactile
-  const handleTouchStart = (e: React.TouchEvent) => {
+  const handleTouchStart = (e: GestureResponderEvent) => {
     setTouchStartX(e.touches[0].clientX);
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
+  const handleTouchEnd = (e: GestureResponderEvent) => {
     if (touchStartX === null || validImages.length <= 1) return;
     const diff = touchStartX - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 50) {
@@ -103,19 +98,8 @@ export function EventGallery({ images, title, coverImage }: Props) {
 
   return (
     <>
-      <View
-        ref={containerRef}
-        className="relative rounded-2xl overflow-hidden aspect-[16/9] bg-black/20 group"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        {hasError ? (
-          <View className="w-full h-full flex items-center justify-center bg-white/5">
-            <View className="flex flex-col items-center gap-2">
-              <ImageOff size={32} className="text-white/20" />
-              <Text className="text-white/20 text-xs"><Text>Image indisponible</Text></Text>
-            </View>
-          </View>
+      <View ref={containerRef} className="relative rounded-2xl overflow-hidden aspect-[16/9] bg-black/20 group" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>{hasError ? (
+          <View className="w-full h-full flex items-center justify-center bg-white/5"><View className="flex flex-col items-center gap-2"><ImageOff size={32} className="text-white/20" /><Text className="text-white/20 text-xs">Image indisponible</Text></View></View>
         ) : (
           <View className="relative w-full h-full">
             {isLoadingImg && (
@@ -123,87 +107,49 @@ export function EventGallery({ images, title, coverImage }: Props) {
                 <Loader2 className="w-8 h-8 text-white/60 animate-spin" />
               </View>
             )}
-            <Image
-              key={currentIndex}
-             
-             
-              className={`w-full h-full object-cover cursor-pointer transition-opacity duration-300 ${
+            <Image key={currentIndex} className={`w-full h-full object-cover cursor-pointer transition-opacity duration-300 ${
                 isLoadingImg ? "opacity-0" : "opacity-100"
-              }`}
-              onPress={() => setIsFullscreen(true)}
-              onLoad={() => handleImageLoad(currentIndex)}
-              onError={() => handleImageError(currentIndex)}
-              loading="lazy"
-             source={{ uri: currentImage }} accessibilityLabel={`${title} - ${currentIndex + 1}`}/>
+              }`} onPress={() => setIsFullscreen(true)} source={{ uri: currentImage }} accessibilityLabel={`${title} - ${currentIndex + 1}`} />
           </View>
-        )}
-
-        {validImages.length > 1 && (
+        )}{validImages.length > 1 && (
           <>
-            <Pressable
-              onPress={(e) => {
+            <Pressable onPress={(e) => {
                 goToPrevious();
-              }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center z-10 opacity-0"
-              accessibilityLabel="Image précédente"
-            >
+              }} className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center transition-all z-10 opacity-0 focus:opacity-100 active:scale-95" accessibilityLabel="Image précédente">
               <ChevronLeft size={20} />
             </Pressable>
-            <Pressable
-              onPress={(e) => {
+            <Pressable onPress={(e) => {
                 goToNext();
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center z-10 opacity-0"
-              accessibilityLabel="Image suivante"
-            >
+              }} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center transition-all z-10 opacity-0 focus:opacity-100 active:scale-95" accessibilityLabel="Image suivante">
               <ChevronRight size={20} />
             </Pressable>
 
             <View className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
               {validImages.map((_, idx) => (
-                <Pressable
-                  key={idx}
-                  onPress={() => setCurrentIndex(idx)}
-                  className={`h-1.5 rounded-full transition-all ${
+                <Pressable key={idx} onPress={() => setCurrentIndex(idx)} className={`h-1.5 rounded-full transition-all ${
                     idx === currentIndex
                       ? "bg-white w-5"
                       : "bg-white/40 w-1.5 hover:bg-white/60"
-                  }`}
-                  accessibilityLabel={`Image ${idx + 1}`}
-                />
+                  }`} accessibilityLabel={`Image ${idx + 1}`} />
               ))}
             </View>
 
-            <View className="absolute top-2 left-2 bg-black/50 text-white text-[10px] font-medium px-2 py-0.5 rounded-full z-10">
-              {currentIndex + 1} <Text>/</Text>{validImages.length}
+            <View className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-0.5 rounded-full z-10">
+              {currentIndex + 1} / {validImages.length}
             </View>
 
-            <Pressable
-              onPress={() => setIsFullscreen(true)}
-              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center z-10 opacity-70"
-              accessibilityLabel="Plein écran"
-            >
+            <Pressable onPress={() => setIsFullscreen(true)} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center transition-all z-10 opacity-70" accessibilityLabel="Plein écran">
               <Maximize2 size={14} />
             </Pressable>
           </>
-        )}
-      </View>
+        )}</View>
 
-      <>
+<View>
         {isFullscreen && (
           <>
-            <Pressable
-              onPress={() => setIsFullscreen(false)}
-              className="fixed inset-0 z-50 bg-black/95"
-            />
-            <View
-              className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
-            >
-              <Pressable
-                onPress={() => setIsFullscreen(false)}
-                className="absolute top-4 right-4 text-white/70 z-10"
-                accessibilityLabel="Fermer"
-              >
+            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setIsFullscreen(false)} className="fixed inset-0 z-50 bg-black/95" />
+            <View initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4">
+              <Pressable onPress={() => setIsFullscreen(false)} className="absolute top-4 right-4 text-white/70 z-10 transition-colors active:scale-95" accessibilityLabel="Fermer">
                 <X size={28} />
               </Pressable>
 
@@ -216,42 +162,24 @@ export function EventGallery({ images, title, coverImage }: Props) {
                     </Text>
                   </View>
                 ) : (
-                  <Image
-                   
-                   
-                    className="w-full h-full object-contain"
-                    onError={() => handleImageError(currentIndex)}
-                   source={{ uri: currentImage }} accessibilityLabel={`${title} - ${currentIndex + 1}`}/>
+                  <Image className="w-full h-full object-contain" source={{ uri: currentImage }} accessibilityLabel={`${title} - ${currentIndex + 1}`} />
                 )}
 
                 {validImages.length > 1 && (
                   <>
-                    <Pressable
-                      onPress={goToPrevious}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white z-10"
-                      accessibilityLabel="Précédent"
-                    >
+                    <Pressable onPress={goToPrevious} className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white transition-colors active:scale-95 z-10" accessibilityLabel="Précédent">
                       <ChevronLeft size={24} />
                     </Pressable>
-                    <Pressable
-                      onPress={goToNext}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white z-10"
-                      accessibilityLabel="Suivant"
-                    >
+                    <Pressable onPress={goToNext} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white transition-colors active:scale-95 z-10" accessibilityLabel="Suivant">
                       <ChevronRight size={24} />
                     </Pressable>
                     <View className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
                       {validImages.map((_, idx) => (
-                        <Pressable
-                          key={idx}
-                          onPress={() => setCurrentIndex(idx)}
-                          className={`h-2 rounded-full transition-all ${
+                        <Pressable key={idx} onPress={() => setCurrentIndex(idx)} className={`h-2 rounded-full transition-all ${
                             idx === currentIndex
                               ? "bg-white w-6"
                               : "bg-white/40 w-2 hover:bg-white/60"
-                          }`}
-                          accessibilityLabel={`Image ${idx + 1}`}
-                        />
+                          }`} accessibilityLabel={`Image ${idx + 1}`} />
                       ))}
                     </View>
                     <View className="absolute bottom-4 right-4 text-white/60 text-sm font-medium z-10">
@@ -263,7 +191,7 @@ export function EventGallery({ images, title, coverImage }: Props) {
             </View>
           </>
         )}
-      </>
+      </View>
     </>
   );
 }

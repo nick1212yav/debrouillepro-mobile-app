@@ -1,4 +1,4 @@
-import { Pressable, Text, View, TextInput, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { Pressable, Text, View, TextInput, NativeSyntheticEvent, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
 
 // src/features/messages/payments/components/PaymentComposer.tsx
 
@@ -22,7 +22,9 @@ export function PaymentComposer({
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
 
-  const handleSubmit = (event: string) => {
+  const handleSubmit = (event: NativeSyntheticEvent<any>) => {
+    event.preventDefault();
+
     const parsedAmount = Number.parseFloat(amount.replace(",", "."));
 
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -35,44 +37,7 @@ export function PaymentComposer({
   const isDisabled = disabled || isLoading;
 
   return (
-    <View style={containerStyle}>
-      <View style={headerStyle}>
-        <strong><Text>Envoyer un paiement</Text></strong>
-      </View>
-
-      <View style={amountRowStyle}>
-        <TextInput
-          inputMode="decimal"
-          min="0.01"
-          step="0.01"
-          value={amount}
-          onChangeText={(text) => setAmount(text)}
-          placeholder="0,00"
-          disabled={isDisabled}
-          style={amountInputStyle}
-          accessibilityLabel="Montant" keyboardType="numeric"
-        />
-
-        <Text style={currencyStyle}>{currency.toUpperCase()}</Text>
-      </View>
-
-      <TextInput
-        value={description}
-        onChangeText={(text) => setDescription(text)}
-        placeholder="Motif du paiement"
-        maxLength={200}
-        disabled={isDisabled}
-        style={descriptionStyle}
-        accessibilityLabel="Motif du paiement"
-      />
-
-      <Pressable
-        disabled={isDisabled || !amount}
-        style={buttonStyle}
-      >
-        {isLoading ? "Traitement…" : "Continuer"}
-      </Pressable>
-    </View>
+    <View style={containerStyle}><View style={headerStyle}><strong>Envoyer un paiement</strong></View><View style={amountRowStyle}><TextInput inputMode="decimal" value={amount} onChangeText={(value) => setAmount(value)} placeholder="0,00" style={amountInputStyle} accessibilityLabel="Montant" keyboardType="numeric" editable={!(isDisabled)} /><Text style={currencyStyle}>{currency.toUpperCase()}</Text></View><TextInput value={description} onChangeText={(value) => setDescription(value)} placeholder="Motif du paiement" maxLength={200} style={descriptionStyle} accessibilityLabel="Motif du paiement" editable={!(isDisabled)} /><Pressable disabled={isDisabled || !amount} style={buttonStyle}>{isLoading ? "Traitement…" : "Continuer"}</Pressable></View>
   );
 }
 

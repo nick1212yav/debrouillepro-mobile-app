@@ -1,12 +1,9 @@
-// src/features/messages/chat/components/MessageComposer.tsx
-
+import { View, Text, Pressable, Image, TextInput, NativeSyntheticEvent, TextInputChangeEventData, TextInputKeyPressEventData } from "react-native";
 import {
   useCallback,
   useEffect,
   useRef,
-  useState,
-  type ChangeEvent,
-  type KeyboardEvent,
+  useState
 } from "react";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -162,13 +159,10 @@ function getFileIcon(file: File) {
   switch (kind) {
     case "image":
       return "🖼️";
-
     case "video":
       return "🎥";
-
     case "audio":
       return "🎵";
-
     default:
       return file.type === "application/pdf" ? "📕" : "📄";
   }
@@ -202,27 +196,21 @@ function formatRecordingTime(seconds: number) {
 
 export function MessageComposer({ conversationId }: MessageComposerProps) {
   const composer = useMessageComposer(conversationId);
+
   const voice = useVoiceRecorder();
 
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const inputRef = useRef<TextInput | null>(null);
 
-  const galleryInputRef = useRef<HTMLInputElement | null>(null);
-  const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  const documentInputRef = useRef<HTMLInputElement | null>(null);
-
-  const selectedFilesRef = useRef<SelectedFile[]>([]);
+  const galleryInputRef = useRef<TextInput | null>(null);
+  const cameraInputRef = useRef<TextInput | null>(null);
+  const documentInputRef = useRef<TextInput | null>(null);
 
   const [showAttachments, setShowAttachments] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [activeTool, setActiveTool] = useState<ComposerTool>(null);
 
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-
-  useEffect(() => {
-    selectedFilesRef.current = selectedFiles;
-  }, [selectedFiles]);
 
   const hasText = composer.text.trim().length > 0;
   const hasFiles = selectedFiles.length > 0;
@@ -230,26 +218,26 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   const isBusy = composer.isSending || voice.isRecording;
 
   const focusComposer = useCallback(() => {
-    window.requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
   }, []);
 
   /*
-   * Nettoyage final des previews uniquement au démontage.
+   * Nettoyage des URLs locales des fichiers.
    */
   useEffect(() => {
     return () => {
-      selectedFilesRef.current.forEach((item) => {
+      selectedFiles.forEach((item) => {
         if (item.previewUrl) {
           URL.revokeObjectURL(item.previewUrl);
         }
       });
     };
-  }, []);
+  }, [selectedFiles]);
 
   /*
-   * Fermeture propre de l'enregistrement vocal.
+   * Fermeture propre du vocal lors du démontage.
    */
   useEffect(() => {
     return () => {
@@ -267,14 +255,13 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   const insertEmoji = useCallback(
     (emoji: string) => {
       composer.setText(`${composer.text}${emoji}`);
-
       setShowEmojiPicker(false);
       focusComposer();
     },
     [composer, focusComposer],
   );
 
-  const handleKeyDown = async (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = async (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
     if (event.key !== "Enter" || event.shiftKey) {
       return;
     }
@@ -288,7 +275,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     try {
       await composer.send();
     } catch {
-      // L'erreur est exposée par le hook.
+      // L'erreur est déjà exposée par le hook.
     }
   };
 
@@ -319,23 +306,20 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     });
   }, []);
 
-  const handleGallerySelected = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleGallerySelected = (event: NativeSyntheticEvent<TextInputChangeEventData>) => {
     addFiles(Array.from(event.target.files ?? []));
-
     event.target.value = "";
     closeMenus();
   };
 
-  const handleCameraSelected = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleCameraSelected = (event: NativeSyntheticEvent<TextInputChangeEventData>) => {
     addFiles(Array.from(event.target.files ?? []));
-
     event.target.value = "";
     closeMenus();
   };
 
-  const handleDocumentsSelected = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleDocumentsSelected = (event: NativeSyntheticEvent<TextInputChangeEventData>) => {
     addFiles(Array.from(event.target.files ?? []));
-
     event.target.value = "";
     closeMenus();
   };
@@ -349,18 +333,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       }
 
       return current.filter((item) => item.id !== id);
-    });
-  }, []);
-
-  const clearSelectedFiles = useCallback(() => {
-    setSelectedFiles((current) => {
-      current.forEach((item) => {
-        if (item.previewUrl) {
-          URL.revokeObjectURL(item.previewUrl);
-        }
-      });
-
-      return [];
     });
   }, []);
 
@@ -397,8 +369,12 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       payment: "💳 ",
     };
 
+    /*
+     * Pour l'instant, ces éléments deviennent des intentions
+     * dans le composer. Le branchement métier de chaque module
+     * viendra ensuite.
+     */
     composer.setText(`${composer.text}${labels[tool]}`);
-
     focusComposer();
   };
 
@@ -408,563 +384,151 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
 
   const canSend = !composer.isSending && (hasText || hasFiles);
 
-  const handleSend = async () => {
-    if (!canSend || isBusy) {
-      return;
-    }
-
-    /*
-     * Le hook actuel gère l'envoi des messages texte.
-     * Les fichiers seront envoyés dès le raccordement
-     * définitif au Storage / backend.
-     */
-    if (!hasText && hasFiles) {
-      setAttachmentError(
-        "Les pièces jointes sont prêtes. Le stockage doit maintenant être raccordé pour leur envoi.",
-      );
-      return;
-    }
-
-    try {
-      await composer.send();
-
-      if (hasFiles) {
-        setAttachmentError(
-          "Le message texte a été envoyé. Les pièces jointes restent en attente du raccordement au stockage.",
-        );
-      }
-    } catch {
-      // L'erreur est exposée par le hook.
-    }
-  };
-
   return (
-    <div className="relative border-t border-white/[0.08] bg-black/95 px-3 pb-3 pt-2 backdrop-blur-xl sm:px-4">
-      {/* ================================================================ */}
-      {/* REPLY                                                            */}
-      {/* ================================================================ */}
+    <View className="relative border-t border-white/[0.08] bg-black/95 px-3 pb-3 pt-2 backdrop-blur-xl sm:px-4">{}{}{}{composer.replyTo && (
+        <View className="mb-2 overflow-hidden rounded-2xl border border-violet-400/15 bg-violet-500/[0.06]"><View className="flex items-start gap-2 px-3 py-2.5"><View className="mt-0.5 h-8 w-1 rounded-full bg-violet-400" /><View className="min-w-0 flex-1"><Text className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-violet-300">Réponse
+              </Text><ReplyPreview replyToId={composer.replyTo._id} own={false} /></View><Pressable onPress={composer.cancelReply} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/30 transition" accessibilityLabel="Annuler la réponse"><Text>×</Text></Pressable></View></View>
+      )}{}{}{}{activeTool && (
+        <View className="mb-2 flex items-center gap-2 rounded-xl border border-violet-400/15 bg-violet-500/[0.06] px-3 py-2"><Text className="text-sm">{TOOL_ITEMS.find((item) => item.key === activeTool)?.icon}</Text><Text className="text-xs text-violet-200">{TOOL_ITEMS.find((item) => item.key === activeTool)?.title}</Text><Pressable onPress={clearActiveTool} className="ml-auto text-xs text-white/30 transition"><Text>Annuler</Text></Pressable></View>
+      )}{}{}{}{(composer.error || voice.error || attachmentError) && (
+        <View className="mb-2 flex items-center gap-2 rounded-xl border border-red-500/15 bg-red-500/[0.06] px-3 py-2"><Text className="text-xs">⚠️</Text><Text className="min-w-0 flex-1 text-xs text-red-300">{composer.error ?? voice.error ?? attachmentError}</Text></View>
+      )}{}{}{}{selectedFiles.length > 0 && (
+        <View className="mb-2 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.035]"><View className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2"><View><Text className="text-xs font-semibold text-white/80">Pièces jointes
+              </Text><Text className="text-[10px] text-white/30">{selectedFiles.length}élément
+                {selectedFiles.length > 1 ? "s" : ""}</Text></View><Pressable onPress={() => {
+                selectedFiles.forEach((item) => {
+                  if (item.previewUrl) {
+                    URL.revokeObjectURL(item.previewUrl);
+                  }
+                });
 
-      {composer.replyTo && (
-        <div className="mb-2 overflow-hidden rounded-2xl border border-violet-400/15 bg-violet-500/[0.06]">
-          <div className="flex items-start gap-2 px-3 py-2.5">
-            <div className="mt-0.5 h-8 w-1 rounded-full bg-violet-400" />
-
-            <div className="min-w-0 flex-1">
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-violet-300">
-                Réponse
-              </p>
-
-              <ReplyPreview replyToId={composer.replyTo._id} own={false} />
-            </div>
-
-            <button
-              onPress={composer.cancelReply}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/30 transition hover:bg-white/10 hover:text-white"
-              aria-label="Annuler la réponse"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ================================================================ */}
-      {/* ACTIVE TOOL                                                      */}
-      {/* ================================================================ */}
-
-      {activeTool && (
-        <div className="mb-2 flex items-center gap-2 rounded-xl border border-violet-400/15 bg-violet-500/[0.06] px-3 py-2">
-          <span className="text-sm">
-            {TOOL_ITEMS.find((item) => item.key === activeTool)?.icon}
-          </span>
-
-          <span className="text-xs text-violet-200">
-            {TOOL_ITEMS.find((item) => item.key === activeTool)?.title}
-          </span>
-
-          <button
-            onPress={clearActiveTool}
-            className="ml-auto text-xs text-white/30 transition hover:text-white"
-          >
-            Annuler
-          </button>
-        </div>
-      )}
-
-      {/* ================================================================ */}
-      {/* ERRORS                                                           */}
-      {/* ================================================================ */}
-
-      {(composer.error || voice.error || attachmentError) && (
-        <div className="mb-2 flex items-center gap-2 rounded-xl border border-red-500/15 bg-red-500/[0.06] px-3 py-2">
-          <span className="text-xs">⚠️</span>
-
-          <p className="min-w-0 flex-1 text-xs text-red-300">
-            {composer.error ?? voice.error ?? attachmentError}
-          </p>
-        </div>
-      )}
-
-      {/* ================================================================ */}
-      {/* FILE PREVIEW                                                     */}
-      {/* ================================================================ */}
-
-      {selectedFiles.length > 0 && (
-        <div className="mb-2 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.035]">
-          <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
-            <div>
-              <p className="text-xs font-semibold text-white/80">
-                Pièces jointes
-              </p>
-
-              <p className="text-[10px] text-white/30">
-                {selectedFiles.length} élément
-                {selectedFiles.length > 1 ? "s" : ""}
-              </p>
-            </div>
-
-            <button
-              onPress={clearSelectedFiles}
-              className="rounded-lg px-2 py-1 text-[10px] text-white/30 transition hover:bg-white/10 hover:text-white"
-            >
-              Tout retirer
-            </button>
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto p-2">
-            {selectedFiles.map((item) => (
-              <div
-                key={item.id}
-                className="group relative h-[82px] w-[82px] shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-black/50"
-              >
-                {item.kind === "image" && item.previewUrl ? (
-                  <img
-                    src={item.previewUrl}
-                    alt={item.file.name}
-                    className="h-full w-full object-cover"
-                  />
+                setSelectedFiles([]);
+              }} className="rounded-lg px-2 py-1 text-[10px] text-white/30 transition"><Text>Tout retirer</Text></Pressable></View><View className="flex gap-2 overflow-x-auto p-2">{selectedFiles.map((item) => (
+              <View key={item.id} className="group relative h-[82px] w-[82px] shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-black/50">{item.kind === "image" && item.previewUrl ? (
+                  <Image className="h-full w-full object-cover" source={{ uri: item.previewUrl }} accessibilityLabel={item.file.name} />
                 ) : item.kind === "video" && item.previewUrl ? (
                   <video
                     src={item.previewUrl}
                     className="h-full w-full object-cover"
                     muted
-                    playsInline
                   />
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-2">
-                    <span className="text-2xl">{getFileIcon(item.file)}</span>
-
-                    <span className="max-w-full truncate text-[9px] text-white/50">
-                      {item.file.name}
-                    </span>
-                  </div>
-                )}
-
-                <div className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1 backdrop-blur">
-                  <p className="truncate text-[8px] text-white/60">
-                    {formatFileSize(item.file.size)}
-                  </p>
-                </div>
-
-                <button
-                  onPress={() => removeSelectedFile(item.id)}
-                  className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white/70 opacity-0 backdrop-blur transition group-hover:opacity-100 hover:bg-red-500 hover:text-white"
-                  aria-label={`Supprimer ${item.file.name}`}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t border-white/[0.06] px-3 py-1.5">
-            <p className="text-[9px] text-white/20">
-              Les fichiers sont prêts à être envoyés dès le raccordement du
-              stockage.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ================================================================ */}
-      {/* ATTACHMENT COMMAND CENTER                                       */}
-      {/* ================================================================ */}
-
-      {showAttachments && (
-        <div className="absolute bottom-[calc(100%-4px)] left-3 z-50 w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-3xl border border-white/[0.1] bg-[#0d0f16]/[0.98] p-2 shadow-[0_24px_80px_rgba(0,0,0,0.65)] backdrop-blur-2xl">
-          <div className="flex items-center justify-between px-3 pb-2 pt-2">
-            <div>
-              <p className="text-sm font-semibold text-white">Ajouter</p>
-
-              <p className="mt-0.5 text-[10px] text-white/30">
-                Tout ce que vous pouvez partager
-              </p>
-            </div>
-
-            <button
-              onPress={() => setShowAttachments(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/10 hover:text-white"
-              aria-label="Fermer"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-1">
-            <button
-              onPress={() => cameraInputRef.current?.click()}
-              className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.06]"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-lg transition group-hover:scale-105">
-                📷
-              </span>
-
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold text-white/80">
-                  Caméra
-                </span>
-
-                <span className="block truncate text-[9px] text-white/30">
-                  Prendre une photo
-                </span>
-              </span>
-            </button>
-
-            <button
-              onPress={() => galleryInputRef.current?.click()}
-              className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.06]"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/15 text-lg transition group-hover:scale-105">
-                🖼️
-              </span>
-
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold text-white/80">
-                  Galerie
-                </span>
-
-                <span className="block truncate text-[9px] text-white/30">
-                  Photos et vidéos
-                </span>
-              </span>
-            </button>
-
-            <button
-              onPress={() => documentInputRef.current?.click()}
-              className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.06]"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/15 text-lg transition group-hover:scale-105">
-                📄
-              </span>
-
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold text-white/80">
-                  Document
-                </span>
-
-                <span className="block truncate text-[9px] text-white/30">
-                  PDF, Word, Excel...
-                </span>
-              </span>
-            </button>
-
-            <button
-              onPress={() => {
+                  <View className="flex h-full w-full flex-col items-center justify-center gap-1 px-2"><Text className="text-2xl">{getFileIcon(item.file)}</Text><Text className="max-w-full truncate text-[9px] text-white/50">{item.file.name}</Text></View>
+                )}<View className="absolute inset-x-0 bottom-0 bg-black/70 px-1.5 py-1 backdrop-blur"><Text className="truncate text-[8px] text-white/60">{formatFileSize(item.file.size)}</Text></View><Pressable onPress={() => removeSelectedFile(item.id)} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white/70 opacity-0 backdrop-blur transition" accessibilityLabel={`Supprimer ${item.file.name}`}><Text>×</Text></Pressable></View>
+            ))}</View><View className="border-t border-white/[0.06] px-3 py-1.5"><Text className="text-[9px] text-white/20">Les fichiers sont prêts à être raccordés au stockage Convex.
+            </Text></View></View>
+      )}{}{}{}{showAttachments && (
+        <View className="absolute bottom-[calc(100%-4px)] left-3 z-50 w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-3xl border border-white/[0.1] bg-[#0d0f16]/[0.98] p-2 shadow-[0_24px_80px_rgba(0,0,0,0.65)] backdrop-blur-2xl"><View className="flex items-center justify-between px-3 pb-2 pt-2"><View><Text className="text-sm font-semibold text-white">Ajouter</Text><Text className="mt-0.5 text-[10px] text-white/30">Tout ce que vous pouvez partager
+              </Text></View><Pressable onPress={() => setShowAttachments(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition" accessibilityLabel="Fermer"><Text>×</Text></Pressable></View><View className="gap-1">{}<Pressable onPress={() => cameraInputRef.current?.click()} className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition"><Text className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/15 text-lg transition">📷
+              </Text><Text className="min-w-0"><Text className="block text-xs font-semibold text-white/80">Caméra
+                </Text><Text className="block truncate text-[9px] text-white/30">Prendre une photo
+                </Text></Text></Pressable>{}<Pressable onPress={() => galleryInputRef.current?.click()} className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition"><Text className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/15 text-lg transition">🖼️
+              </Text><Text className="min-w-0"><Text className="block text-xs font-semibold text-white/80">Galerie
+                </Text><Text className="block truncate text-[9px] text-white/30">Photos et vidéos
+                </Text></Text></Pressable>{}<Pressable onPress={() => documentInputRef.current?.click()} className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition"><Text className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/15 text-lg transition">📄
+              </Text><Text className="min-w-0"><Text className="block text-xs font-semibold text-white/80">Document
+                </Text><Text className="block truncate text-[9px] text-white/30">PDF, Word, Excel...
+                </Text></Text></Pressable>{}<Pressable onPress={() => {
                 void startVoice();
-              }}
-              disabled={voice.isRecording}
-              className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-white/[0.06] disabled:opacity-40"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/15 text-lg transition group-hover:scale-105">
-                🎙️
-              </span>
-
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold text-white/80">
-                  Message vocal
-                </span>
-
-                <span className="block truncate text-[9px] text-white/30">
-                  Enregistrer un vocal
-                </span>
-              </span>
-            </button>
-          </div>
-
-          <div className="my-2 h-px bg-white/[0.06]" />
-
-          <div className="grid grid-cols-2 gap-1">
-            {TOOL_ITEMS.map((tool) => (
-              <button
-                key={tool.key}
-                onPress={() => handleToolClick(tool.key)}
-                className="group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-white/[0.06]"
-              >
-                <span
-                  className={`flex h-9 w-9 items-center justify-center rounded-xl text-base transition group-hover:scale-105 ${tool.className}`}
-                >
-                  {tool.icon}
-                </span>
-
-                <span className="min-w-0">
-                  <span className="block text-[11px] font-semibold text-white/75">
-                    {tool.title}
-                  </span>
-
-                  <span className="block truncate text-[9px] text-white/25">
-                    {tool.description}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ================================================================ */}
-      {/* EMOJI PICKER                                                     */}
-      {/* ================================================================ */}
-
-      {showEmojiPicker && (
-        <div className="absolute bottom-[calc(100%-4px)] right-3 z-50 w-[min(330px,calc(100vw-24px))] overflow-hidden rounded-3xl border border-white/[0.1] bg-[#0d0f16]/[0.98] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.65)] backdrop-blur-2xl">
-          <div className="mb-3 flex items-center justify-between px-1">
-            <div>
-              <p className="text-sm font-semibold text-white">Emoji</p>
-
-              <p className="text-[10px] text-white/30">Ajouter une réaction</p>
-            </div>
-
-            <button
-              onPress={() => setShowEmojiPicker(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition hover:bg-white/10 hover:text-white"
-              aria-label="Fermer"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="grid grid-cols-6 gap-1">
-            {EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                onPress={() => insertEmoji(emoji)}
-                className="flex h-11 items-center justify-center rounded-xl text-xl transition hover:scale-110 hover:bg-white/[0.07] active:scale-95"
-                aria-label={`Ajouter ${emoji}`}
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ================================================================ */}
-      {/* VOICE RECORDING MODE                                            */}
-      {/* ================================================================ */}
-
-      {voice.isRecording && (
-        <div className="mb-2 overflow-hidden rounded-2xl border border-red-500/20 bg-gradient-to-r from-red-500/[0.08] to-transparent">
-          <div className="flex items-center gap-3 px-3 py-2.5">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10">
-              <span className="absolute h-3 w-3 animate-ping rounded-full bg-red-500/40" />
-
-              <span className="relative h-2.5 w-2.5 rounded-full bg-red-500" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-white/80">
-                Enregistrement vocal
-              </p>
-
-              <div className="mt-1 flex items-center gap-2">
-                <div className="flex items-end gap-[2px]">
-                  {[10, 16, 7, 20, 12, 17, 8, 14, 6, 18].map(
+              }} disabled={voice.isRecording} className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-left transition disabled:opacity-40"><Text className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-500/15 text-lg transition">🎙️
+              </Text><Text className="min-w-0"><Text className="block text-xs font-semibold text-white/80">Message vocal
+                </Text><Text className="block truncate text-[9px] text-white/30">Enregistrer un vocal
+                </Text></Text></Pressable></View><View className="my-2 h-px bg-white/[0.06]" /><View className="gap-1">{TOOL_ITEMS.map((tool) => (
+              <Pressable key={tool.key} onPress={() => handleToolClick(tool.key)} className="group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition"><Text className={`flex h-9 w-9 items-center justify-center rounded-xl text-base transition group-hover:scale-105 ${tool.className}`}>{tool.icon}</Text><Text className="min-w-0"><Text className="block text-[11px] font-semibold text-white/75">{tool.title}</Text><Text className="block truncate text-[9px] text-white/25">{tool.description}</Text></Text></Pressable>
+            ))}</View></View>
+      )}{}{}{}{showEmojiPicker && (
+        <View className="absolute bottom-[calc(100%-4px)] right-3 z-50 w-[min(330px,calc(100vw-24px))] overflow-hidden rounded-3xl border border-white/[0.1] bg-[#0d0f16]/[0.98] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.65)] backdrop-blur-2xl"><View className="mb-3 flex items-center justify-between px-1"><View><Text className="text-sm font-semibold text-white">Emoji</Text><Text className="text-[10px] text-white/30">Ajouter une réaction</Text></View><Pressable onPress={() => setShowEmojiPicker(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-white/30 transition" accessibilityLabel="Fermer"><Text>×</Text></Pressable></View><View className="gap-1">{EMOJIS.map((emoji) => (
+              <Pressable key={emoji} onPress={() => insertEmoji(emoji)} className="flex h-11 items-center justify-center rounded-xl text-xl transition active:scale-95" accessibilityLabel={`Ajouter ${emoji}`}>{emoji}</Pressable>
+            ))}</View></View>
+      )}{}{}{}{voice.isRecording && (
+        <View className="mb-2 overflow-hidden rounded-2xl border border-red-500/20 bg-gradient-to-r from-red-500/[0.08] to-transparent"><View className="flex items-center gap-3 px-3 py-2.5"><View className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10"><Text className="absolute h-3 w-3 animate-ping rounded-full bg-red-500/40" /><Text className="relative h-2.5 w-2.5 rounded-full bg-red-500" /></View><View className="min-w-0 flex-1"><Text className="text-xs font-semibold text-white/80">Enregistrement vocal
+              </Text><View className="mt-1 flex items-center gap-2"><View className="flex items-end gap-[2px]">{[10, 16, 7, 20, 12, 17, 8, 14, 6, 18].map(
                     (height, index) => (
-                      <span
-                        key={index}
-                        className="w-[2px] animate-pulse rounded-full bg-red-400/70"
-                        style={{
-                          height: `${height}px`,
-                          animationDelay: `${index * 70}ms`,
-                        }}
-                      />
+                      <Text key={index} className="w-[2px] animate-pulse rounded-full bg-red-400/70" style={{ height: `${height}px` }} />
                     ),
-                  )}
-                </div>
-
-                <span className="font-mono text-[10px] text-red-300">
-                  {formatRecordingTime(voice.duration)}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onPress={cancelVoice}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-white/30 transition hover:bg-white/10 hover:text-white"
-              aria-label="Annuler le vocal"
-              title="Annuler"
-            >
-              🗑️
-            </button>
-
-            <button
-              onPress={stopVoice}
-              className="flex h-9 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-black transition hover:bg-white/90"
-            >
-              <span>✓</span>
-              Terminer
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ================================================================ */}
-      {/* MAIN COMPOSER                                                    */}
-      {/* ================================================================ */}
-
-      <div
-        className={[
+                  )}</View><Text className="font-mono text-[10px] text-red-300">{formatRecordingTime(voice.duration)}</Text></View></View><Pressable onPress={cancelVoice} className="flex h-9 w-9 items-center justify-center rounded-xl text-white/30 transition" accessibilityLabel="Annuler le vocal"><Text>🗑️</Text></Pressable><Pressable onPress={stopVoice} className="flex h-9 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-black transition"><Text>✓</Text><Text>Terminer</Text></Pressable></View></View>
+      )}{}{}{}<View className={[
           "relative overflow-hidden rounded-[22px] border bg-white/[0.035] p-1.5 shadow-[0_8px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl transition-all",
           voice.isRecording
             ? "border-red-500/20"
             : showAttachments || showEmojiPicker
               ? "border-violet-400/20"
               : "border-white/[0.09] focus-within:border-white/[0.16]",
-        ].join(" ")}
-      >
-        <div className="flex min-h-[48px] items-end gap-1">
-          <button
-            onPress={() => {
+        ].join(" ")}><View className="flex min-h-[48px] items-end gap-1">{}<Pressable onPress={() => {
               setShowAttachments((current) => !current);
               setShowEmojiPicker(false);
-            }}
-            className={[
+            }} className={[
               "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl transition-all",
               showAttachments
                 ? "rotate-45 bg-violet-500/15 text-violet-300"
                 : "text-white/40 hover:bg-white/[0.06] hover:text-white",
-            ].join(" ")}
-            aria-label="Ajouter"
-            title="Ajouter"
-          >
-            ＋
-          </button>
+            ].join(" ")} accessibilityLabel="Ajouter"><Text>＋</Text></Pressable>{}<TextInput ref={inputRef} value={composer.text} onChangeText={(value) => {
+              composer.setText(value);
 
-          <textarea
-            ref={inputRef}
-            value={composer.text}
-            onChange={(event) => {
-              composer.setText(event.target.value);
-
-              if (activeTool && event.target.value.trim().length === 0) {
+              if (activeTool && value.trim().length === 0) {
                 setActiveTool(null);
               }
-            }}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            disabled={voice.isRecording}
-            placeholder={
-              voice.isRecording
+            }} onKeyPress={handleKeyDown} placeholder={voice.isRecording
                 ? "Enregistrement en cours..."
-                : "Écrire un message..."
-            }
-            className="max-h-32 min-h-10 flex-1 resize-none bg-transparent px-2 py-2.5 text-sm leading-5 text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-40"
-          />
-
-          <button
-            onPress={() => {
+                : "Écrire un message..."} className="max-h-32 min-h-10 flex-1 bg-transparent px-2 py-2.5 text-sm leading-5 text-white outline-none placeholder:text-white/25 disabled:opacity-40" multiline textAlignVertical="top" editable={!(voice.isRecording)} />{}<Pressable onPress={() => {
               setShowEmojiPicker((current) => !current);
               setShowAttachments(false);
-            }}
-            className={[
+            }} className={[
               "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg transition-all",
               showEmojiPicker
                 ? "bg-white/[0.08] text-white"
                 : "text-white/40 hover:bg-white/[0.06] hover:text-white",
-            ].join(" ")}
-            aria-label="Emoji"
-            title="Emoji"
-          >
-            😊
-          </button>
-
-          {!hasText && !hasFiles ? (
-            <button
-              onPress={() => {
+            ].join(" ")} accessibilityLabel="Emoji"><Text>😊</Text></Pressable>{}{!hasText && !hasFiles ? (
+            <Pressable onPress={() => {
                 if (voice.isRecording) {
                   stopVoice();
                 } else {
                   void startVoice();
                 }
-              }}
-              className={[
+              }} className={[
                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all",
                 voice.isRecording
                   ? "bg-red-500/15 text-red-400"
                   : "text-white/40 hover:bg-white/[0.06] hover:text-white",
-              ].join(" ")}
-              aria-label={
-                voice.isRecording
+              ].join(" ")} accessibilityLabel={voice.isRecording
                   ? "Arrêter le vocal"
-                  : "Enregistrer un message vocal"
-              }
-              title={voice.isRecording ? "Arrêter" : "Message vocal"}
-            >
-              {voice.isRecording ? "■" : "🎙️"}
-            </button>
+                  : "Enregistrer un message vocal"}>{voice.isRecording ? "■" : "🎙️"}</Pressable>
           ) : (
-            <button
-              disabled={!canSend || isBusy}
-              onPress={() => {
-                void handleSend();
-              }}
-              className={[
+            <Pressable disabled={!canSend || isBusy} onPress={() => {
+                if (!canSend || isBusy) {
+                  return;
+                }
+
+                /*
+                 * Le texte est actuellement envoyé par le hook existant.
+                 * Les fichiers restent sélectionnés jusqu'au branchement
+                 * définitif du Storage Convex.
+                 */
+                if (hasText) {
+                  void composer.send();
+                } else {
+                  setAttachmentError(
+                    "Les pièces jointes sont prêtes. Le stockage Convex doit maintenant être raccordé pour leur envoi.",
+                  );
+                }
+              }} className={[
                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all",
                 canSend && !isBusy
                   ? "bg-white text-black shadow-[0_4px_20px_rgba(255,255,255,0.12)] hover:scale-105 hover:bg-white/90 active:scale-95"
                   : "cursor-not-allowed bg-white/10 text-white/20",
-              ].join(" ")}
-              aria-label="Envoyer"
-              title="Envoyer"
-            >
-              {composer.isSending ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black" />
+              ].join(" ")} accessibilityLabel="Envoyer">{composer.isSending ? (
+                <Text className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black" />
               ) : (
-                <span className="text-base">➤</span>
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ================================================================ */}
-      {/* FOOTER                                                           */}
-      {/* ================================================================ */}
-
-      <div className="flex items-center justify-between px-1.5 pt-1.5">
-        <div className="flex min-w-0 items-center gap-1.5 text-[9px] text-white/20">
-          <span className="hidden sm:inline">Entrée pour envoyer</span>
-
-          <span className="hidden sm:inline">•</span>
-
-          <span className="hidden sm:inline">
-            Shift + Entrée pour une nouvelle ligne
-          </span>
-
-          <span className="sm:hidden">Appuyez sur Entrée pour envoyer</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {hasFiles && (
-            <span className="rounded-full bg-violet-500/10 px-2 py-1 text-[9px] font-medium text-violet-300/80">
+                <Text className="text-base">➤</Text>
+              )}</Pressable>
+          )}</View></View>{}{}{}<View className="flex items-center justify-between px-1.5 pt-1.5"><View className="flex min-w-0 items-center gap-1.5 text-[9px] text-white/20"><Text className="hidden sm:inline">Entrée pour envoyer</Text><Text className="hidden sm:inline">•</Text><Text className="hidden sm:inline">Shift + Entrée pour une nouvelle ligne
+          </Text><Text className="sm:hidden">Appuyez sur Entrée pour envoyer</Text></View><View className="flex items-center gap-2">{hasFiles && (
+            <Text className="rounded-full bg-violet-500/10 px-2 py-1 text-[9px] font-medium text-violet-300/80">
               {selectedFiles.length} fichier
               {selectedFiles.length > 1 ? "s" : ""}
-            </span>
-          )}
-
-          {voice.recording && !voice.isRecording && (
-            <button
-              onPress={() => {
+            </Text>
+          )}{voice.recording && !voice.isRecording && (
+            <Pressable onPress={() => {
                 const recording = voice.recording;
 
                 if (!recording) {
@@ -988,50 +552,14 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
                 addFiles([voiceFile]);
 
                 voice.resetRecording();
-              }}
-              className="group flex items-center gap-2 rounded-full border border-violet-400/15 bg-violet-500/10 px-3 py-1.5 text-[10px] font-semibold text-violet-200 transition-all hover:border-violet-400/30 hover:bg-violet-500/20 hover:text-white active:scale-95"
-            >
-              <span className="transition-transform group-hover:scale-110">
+              }} className="group flex items-center gap-2 rounded-full border border-violet-400/15 bg-violet-500/10 px-3 py-1.5 text-[10px] font-semibold text-violet-200 transition-all active:scale-95">
+              <Text className="transition-transform">
                 🎙️
-              </span>
+              </Text>
 
-              <span>Ajouter le vocal</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ================================================================ */}
-      {/* HIDDEN INPUTS                                                    */}
-      {/* ================================================================ */}
-
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleCameraSelected}
-      />
-
-      <input
-        ref={galleryInputRef}
-        type="file"
-        multiple
-        accept="image/*,video/*"
-        className="hidden"
-        onChange={handleGallerySelected}
-      />
-
-      <input
-        ref={documentInputRef}
-        type="file"
-        multiple
-        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z"
-        className="hidden"
-        onChange={handleDocumentsSelected}
-      />
-    </div>
+              <Text>Ajouter le vocal</Text>
+            </Pressable>
+          )}</View></View>{}{}{}<TextInput ref={cameraInputRef} className="hidden" onChangeText={handleCameraSelected} /><TextInput ref={galleryInputRef} className="hidden" onChangeText={handleGallerySelected} /><TextInput ref={documentInputRef} className="hidden" onChangeText={handleDocumentsSelected} /></View>
   );
 }
 

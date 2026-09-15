@@ -28,58 +28,38 @@ export function HealthGallery({ images, title }: HealthGalleryProps) {
   return (
     <>
       <View className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black/30 border border-white/10">
-        <Image
-          className="w-full h-full object-cover"
-          onPress={() => setIsFullscreen(true)} source={{ uri: images[currentIndex] }} accessibilityLabel={title || "Image"}
-        />
+        <Image className="w-full h-full object-cover" onPress={() => setIsFullscreen(true)} source={{ uri: images[currentIndex] }} accessibilityLabel={title || "Image"} />
         {images.length > 1 && (
           <>
-            <Pressable
-              onPress={prev}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white/80"
-            >
+            <Pressable onPress={prev} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white/80 transition-colors">
               <ChevronLeft size={18} />
             </Pressable>
-            <Pressable
-              onPress={next}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white/80"
-            >
+            <Pressable onPress={next} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white/80 transition-colors">
               <ChevronRight size={18} />
             </Pressable>
             <View className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
               {images.map((_, i) => (
-                <View
-                  key={i}
-                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                <View key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${
                     i === currentIndex ? "bg-white" : "bg-white/30"
-                  }`}
-                />
+                  }`} />
               ))}
             </View>
           </>
         )}
       </View>
 
-      <>
+<View>
         {isFullscreen && (
           <>
-            <Pressable
-              className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
-              onPress={() => setIsFullscreen(false)}
-            >
-              <Pressable
-                className="absolute top-4 right-4 text-white/80"
-                onPress={() => setIsFullscreen(false)}
-              >
+            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4" onPress={() => setIsFullscreen(false)}>
+              <Pressable className="absolute top-4 right-4 text-white/80" onPress={() => setIsFullscreen(false)}>
                 <X size={28} />
               </Pressable>
-              <Image
-                className="max-h-[90vh] max-w-[90vw] object-contain" source={{ uri: images[currentIndex] }} accessibilityLabel=""
-              />
-            </Pressable>
+              <Image className="max-h-[90vh] max-w-[90vw] object-contain" source={{ uri: images[currentIndex] }} accessibilityLabel="" />
+            </View>
           </>
         )}
-      </>
+      </View>
     </>
   );
 }

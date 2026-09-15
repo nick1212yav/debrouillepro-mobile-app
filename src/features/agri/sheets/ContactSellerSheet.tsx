@@ -1,7 +1,18 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Pressable, TextInput } from "react-native";
-
 // src/features/agri/sheets/ContactSellerSheet.tsx
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import {
   X,
   Phone,
@@ -10,7 +21,6 @@ import {
   CornerDownLeft,
 } from "lucide-react-native";
 import type { AgriProduct } from "../types/product.types";
-import { useState } from "react";
 
 interface ContactSellerSheetProps {
   isOpen: boolean;
@@ -23,6 +33,8 @@ interface ContactSellerSheetProps {
   product: AgriProduct;
 }
 
+const PHONE_NUMBER = "+24300000000";
+
 export function ContactSellerSheet({
   isOpen,
   onClose,
@@ -31,131 +43,375 @@ export function ContactSellerSheet({
 }: ContactSellerSheetProps) {
   const [negotiationText, setNegotiationText] = useState("");
 
-  const templates = [
-    `Bonjour, je suis intéressé par votre offre de "${product.title}". Est-elle toujours disponible ?`,
-    `Seriez-vous d'accord pour négocier le prix de ${product.pricing.price} ${product.pricing.currency} ?`,
-    `Quelle est la localisation exacte pour le retrait sur place ?`,
-  ];
+  const templates = useMemo(
+    () => [
+      `Bonjour, je suis intéressé par votre offre de "${product.title}". Est-elle toujours disponible ?`,
+      `Seriez-vous d'accord pour négocier le prix de ${product.pricing.price} ${product.pricing.currency} ?`,
+      `Quelle est la localisation exacte pour le retrait sur place ?`,
+    ],
+    [product.title, product.pricing.price, product.pricing.currency],
+  );
 
-  const handleSendQuery = (text: string) => {
-    UIService.openToast("Message envoyé avec succès au producteur !", "success");
+  const handleSendQuery = useCallback(
+    (text: string) => {
+      // Remplace `toast.success` par un feedback natif.
+      // Pour un toast stylé, installer `react-native-toast-message`.
+      Alert.alert("Succès", "Message envoyé avec succès au producteur !");
+      setNegotiationText("");
+      onClose();
+    },
+    [onClose],
+  );
+
+  const handleCall = useCallback(async () => {
+    const url = `tel:${PHONE_NUMBER}`;
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert("Erreur", "Impossible de lancer l'appel.");
+    }
+  }, []);
+
+  const handleDismiss = useCallback(() => {
     setNegotiationText("");
     onClose();
-  };
+  }, [onClose]);
 
   return (
-    <>
-      {isOpen && (
-        <>
-          <Pressable
-            onPress={onClose}
-            className="fixed inset-0 z-40 bg-black/75"
-          />
+    <Modal
+      visible={isOpen}
+      transparent
+      animationType="slide"
+      onRequestClose={handleDismiss}
+      statusBarTranslucent
+    >
+      <View style={styles.root}>
+        {/* Backdrop */}
+        <Pressable
+          onPress={handleDismiss}
+          style={styles.backdrop}
+          accessibilityLabel="Fermer"
+        />
 
-          <View
-            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-[32px] border-t border-white/5 bg-gradient-to-b from-[#0a0f0b] to-[#040604] overflow-hidden"
-            style={{ maxHeight: "80vh" }}
-          >
-            <View className="flex justify-center pt-3 pb-1">
-              <View className="w-10 h-1 rounded-full bg-white/20" />
+        {/* Bottom sheet */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.sheetWrapper}
+        >
+          <View style={styles.sheet}>
+            {/* Handle bar */}
+            <View style={styles.handleRow}>
+              <View style={styles.handle} />
             </View>
 
-            <View
-              className="px-5 pb-8 overflow-y-auto space-y-4"
-              style={{ maxHeight: "74vh" }}
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <View className="flex items-center justify-between py-2 border-b border-white/5">
-                <Text className="text-white font-black text-sm">
-                  Contacter le producteur
-                </Text>
+              {/* Header */}
+              <View style={styles.header}>
+                <Text style={styles.title}>Contacter le producteur</Text>
                 <Pressable
-                 
-                  onPress={onClose}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/[0.04] border border-white/5 text-white/50"
+                  onPress={handleDismiss}
+                  style={styles.closeButton}
+                  hitSlop={8}
+                  accessibilityLabel="Fermer"
                 >
-                  <X size={15} />
+                  <X size={15} color="rgba(255,255,255,0.5)" />
                 </Pressable>
               </View>
 
-              {/* Résumé profil producteur */}
-              <View className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between gap-3">
-                <View className="min-w-0">
-                  <View className="flex items-center gap-1.5">
-                    <Text className="text-white font-bold text-xs truncate leading-none">
+              {/* Seller card */}
+              <View style={styles.sellerCard}>
+                <View style={styles.sellerInfo}>
+                  <View style={styles.sellerNameRow}>
+                    <Text style={styles.sellerName} numberOfLines={1}>
                       {seller.name}
                     </Text>
                     {seller.verified && (
                       <ShieldCheck
                         size={14}
-                        className="text-emerald-400 flex-shrink-0"
+                        color="#34D399"
+                        style={styles.verifiedIcon}
                       />
                     )}
                   </View>
-                  <Text className="text-[9px] text-white/30 block mt-1">
+                  <Text style={styles.sellerSector}>
                     Secteur : {product.location.city}
                   </Text>
                 </View>
 
-                <View className="flex gap-2">
+                <View style={styles.actionsRow}>
                   <Pressable
-                    // Identifiant de test ou d'appel local
-                    className="w-9 h-9 rounded-xl flex items-center justify-center bg-green-500/10 border border-green-500/20 text-green-400"
-                   data-href="tel:+24300000000">
-                    <Phone size={14} />
+                    onPress={handleCall}
+                    style={({ pressed }) => [
+                      styles.callButton,
+                      pressed && styles.callButtonPressed,
+                    ]}
+                    accessibilityLabel="Appeler le producteur"
+                  >
+                    <Phone size={14} color="#4ADE80" />
                   </Pressable>
                 </View>
               </View>
 
-              {/* Templates de saisie rapide */}
-              <View className="space-y-1.5">
-                <Text className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
-                  Messages rapides
-                </Text>
-                <View className="flex flex-col gap-2">
+              {/* Quick templates */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Messages rapides</Text>
+                <View style={styles.templatesColumn}>
                   {templates.map((tpl, i) => (
                     <Pressable
                       key={i}
-                     
                       onPress={() => setNegotiationText(tpl)}
-                      className="p-3 text-left rounded-xl bg-white/[0.01] border border-white/5 text-white/70 text-[10px] leading-relaxed"
+                      style={({ pressed }) => [
+                        styles.templateButton,
+                        pressed && styles.templateButtonPressed,
+                      ]}
                     >
-                      {tpl}
+                      <Text style={styles.templateText}>{tpl}</Text>
                     </Pressable>
                   ))}
                 </View>
               </View>
 
-              {/* Zone de saisie d'un message libre */}
-              <View className="space-y-1.5 pt-1.5">
-                <Text className="text-[10px] text-white/40 uppercase tracking-widest font-bold">
-                  Message personnalisé
-                </Text>
-                <View className="relative flex items-center rounded-2xl bg-white/[0.03] border border-white/5 p-3.5">
+              {/* Custom message */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Message personnalisé</Text>
+                <View style={styles.inputWrapper}>
                   <MessageSquare
                     size={14}
-                    className="text-white/30 absolute left-4 top-4"
+                    color="rgba(255,255,255,0.3)"
+                    style={styles.inputIcon}
                   />
                   <TextInput
                     value={negotiationText}
-                    onChangeText={(text) => setNegotiationText(text)}
+                    onChangeText={setNegotiationText}
                     placeholder="Écrivez votre message..."
-                   
-                    className="w-full pl-7 pr-8 bg-transparent text-white text-xs placeholder:text-white/20 outline-none"
-                   multiline textAlignVertical="top"/>
-                  {negotiationText.trim() && (
+                    placeholderTextColor="rgba(255,255,255,0.2)"
+                    multiline
+                    numberOfLines={2}
+                    textAlignVertical="top"
+                    style={styles.input}
+                  />
+                  {negotiationText.trim().length > 0 && (
                     <Pressable
                       onPress={() => handleSendQuery(negotiationText)}
-                      className="absolute right-3 bottom-3 w-7 h-7 rounded-xl flex items-center justify-center bg-green-500 text-black"
+                      style={({ pressed }) => [
+                        styles.sendButton,
+                        pressed && styles.sendButtonPressed,
+                      ]}
+                      accessibilityLabel="Envoyer"
                     >
-                      <CornerDownLeft size={12} />
+                      <CornerDownLeft size={12} color="#000000" />
                     </Pressable>
                   )}
                 </View>
               </View>
-            </View>
+            </ScrollView>
           </View>
-        </>
-      )}
-    </>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.75)",
+  },
+  sheetWrapper: {
+    width: "100%",
+  },
+  sheet: {
+    backgroundColor: "#0a0f0b",
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+    maxHeight: "80%",
+    paddingBottom: 24,
+  },
+  handleRow: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  scroll: {
+    maxHeight: 560,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 16,
+  },
+
+  // Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  title: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+
+  // Seller card
+  sellerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  sellerInfo: {
+    flexShrink: 1,
+  },
+  sellerNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  sellerName: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16,
+    flexShrink: 1,
+  },
+  verifiedIcon: {
+    flexShrink: 0,
+  },
+  sellerSector: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 9,
+    marginTop: 4,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  callButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(34,197,94,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.2)",
+  },
+  callButtonPressed: {
+    backgroundColor: "rgba(34,197,94,0.2)",
+  },
+
+  // Sections
+  section: {
+    gap: 6,
+  },
+  sectionLabel: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+
+  // Templates
+  templatesColumn: {
+    flexDirection: "column",
+    gap: 8,
+  },
+  templateButton: {
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.01)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  templateButtonPressed: {
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  templateText: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 10,
+    lineHeight: 16,
+  },
+
+  // Input
+  inputWrapper: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  inputIcon: {
+    position: "absolute",
+    left: 16,
+    top: 16,
+  },
+  input: {
+    flex: 1,
+    paddingLeft: 28,
+    paddingRight: 32,
+    color: "#FFFFFF",
+    fontSize: 12,
+    minHeight: 40,
+  },
+  sendButton: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#22C55E",
+  },
+  sendButtonPressed: {
+    backgroundColor: "#4ADE80",
+    transform: [{ scale: 0.9 }],
+  },
+});

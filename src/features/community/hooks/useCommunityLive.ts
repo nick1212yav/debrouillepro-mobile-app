@@ -1,9 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityLive.ts
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useCommunityLive() {
@@ -26,10 +25,10 @@ export function useCommunityLive() {
       const result = await startLiveMutation({ title, description });
       setIsLive(true);
       setStreamUrl(result.streamUrl);
-      UIService.openToast("Live démarré !", "success");
+      toast.success("Live démarré !");
       return result;
     } catch (error) {
-      UIService.openToast("Erreur lors du démarrage du live", "error");
+      toast.error("Erreur lors du démarrage du live");
       throw error;
     }
   };
@@ -39,9 +38,9 @@ export function useCommunityLive() {
       await endLiveMutation({});
       setIsLive(false);
       setStreamUrl(null);
-      UIService.openToast("Live terminé", "success");
+      toast.success("Live terminé");
     } catch (error) {
-      UIService.openToast("Erreur lors de l'arrêt du live", "error");
+      toast.error("Erreur lors de l'arrêt du live");
       throw error;
     }
   };

@@ -61,33 +61,11 @@ export function VoyageSeatMap({
   const isOccupied = (seatId: string) => occupiedSeats.has(seatId);
 
   return (
-    <View className="w-full">
-      <View className="flex items-center justify-between mb-4">
-        <View className="flex items-center gap-2 text-sm">
-          <Armchair size={16} className="text-white/40" />
-          <Text className="text-white/60">Sélectionnez vos sièges</Text>
-          <Text className="text-white/40">
-            ({selectedSeats.length}/{maxSelectable})
-          </Text>
-        </View>
-        <View className="flex items-center gap-3 text-xs text-white/40">
-          <Text className="flex items-center gap-1">
-            <Text className="w-4 h-4 rounded bg-emerald-500/30 border border-emerald-500/50" />
-            Disponible
-          </Text>
-          <Text className="flex items-center gap-1">
-            <Text className="w-4 h-4 rounded bg-indigo-500/50 border border-indigo-500/70" />
-            Sélectionné
-          </Text>
-          <Text className="flex items-center gap-1">
-            <Text className="w-4 h-4 rounded bg-white/10 border border-white/20" />
-            Occupé
-          </Text>
-        </View>
-      </View>
-
-      <View className="gap-2 max-w-sm mx-auto">
-        {Array.from({ length: rows }).map((_, rowIndex) => {
+    <View className="w-full"><View className="flex items-center justify-between mb-4"><View className="flex items-center gap-2 text-sm"><Armchair size={16} className="text-white/40" /><Text className="text-white/60">Sélectionnez vos sièges</Text><Text className="text-white/40">({selectedSeats.length}/{maxSelectable})
+          </Text></View><View className="flex items-center gap-3 text-xs text-white/40"><Text className="flex items-center gap-1"><Text className="w-4 h-4 rounded bg-emerald-500/30 border border-emerald-500/50" />Disponible
+          </Text><Text className="flex items-center gap-1"><Text className="w-4 h-4 rounded bg-indigo-500/50 border border-indigo-500/70" />Sélectionné
+          </Text><Text className="flex items-center gap-1"><Text className="w-4 h-4 rounded bg-white/10 border border-white/20" />Occupé
+          </Text></View></View><View className="gap-2 max-w-sm mx-auto">{Array.from({ length: rows }).map((_, rowIndex) => {
           return Array.from({ length: columns }).map((_, colIndex) => {
             const seatId = `${seatLetters[colIndex]}${rowIndex + 1}`;
             const seatNumber = rowIndex * columns + colIndex + 1;
@@ -98,13 +76,7 @@ export function VoyageSeatMap({
             const isHovered = hoveredSeat === seatId;
 
             return (
-              <Pressable
-                key={seatId}
-                onPress={() => toggleSeat(seatId)}
-                onMouseEnter={() => setHoveredSeat(seatId)}
-                onMouseLeave={() => setHoveredSeat(null)}
-                disabled={occupied}
-                className={cn(
+              <Pressable key={seatId} whileTap={{ scale: 0.92 }} whileHover={{ scale: 1.05 }} onPress={() => toggleSeat(seatId)} disabled={occupied} className={cn(
                   "relative flex items-center justify-center rounded-lg text-xs font-medium transition-all",
                   "h-10 w-10 border",
                   occupied &&
@@ -118,8 +90,7 @@ export function VoyageSeatMap({
                     !occupied &&
                     !selected &&
                     "scale-105 border-indigo-500/30",
-                )}
-              >
+                )}>
                 {seatId}
                 {selected && (
                   <Check
@@ -136,15 +107,6 @@ export function VoyageSeatMap({
               </Pressable>
             );
           });
-        })}
-      </View>
-
-      <View className="mt-4 text-center text-xs text-white/30">
-        <View className="flex items-center justify-center gap-2">
-          <Users size={14} />
-          <Text><Text>Sièges restants :</Text>{availableSeats - selectedSeats.length}</Text>
-        </View>
-      </View>
-    </View>
+        })}</View><View className="mt-4 text-center text-xs text-white/30"><View className="flex items-center justify-center gap-2"><Users size={14} /><Text>Sièges restants : {availableSeats - selectedSeats.length}</Text></View></View></View>
   );
 }

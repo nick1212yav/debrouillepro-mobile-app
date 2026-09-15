@@ -31,11 +31,9 @@ export function ReplyPreview({ replyToId, own = false }: ReplyPreviewProps) {
   }
 
   return (
-    <View
-      className={`mb-2 rounded-lg border-l-2 px-2 py-1 ${
+    <View className={`mb-2 rounded-lg border-l-2 px-2 py-1 ${
         own ? "border-black/30 bg-black/5" : "border-white/30 bg-white/5"
-      }`}
-    >
+      }`}>
       <Text className="text-[10px] font-semibold opacity-60">
         {message.sender?.name ?? "Utilisateur"}
       </Text>

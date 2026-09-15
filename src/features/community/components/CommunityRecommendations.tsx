@@ -40,32 +40,15 @@ export function CommunityRecommendations({
   };
 
   return (
-    <View className="space-y-3">
-      <View className="flex items-center gap-2">
-        <Sparkles size={16} className="text-purple-400" />
-        <Text className="text-sm font-medium text-white/70">{title}</Text>
-      </View>
-      <View className="space-y-2">
-        {recommendations.slice(0, 5).map((item, index) => {
+    <View className="space-y-3"><View className="flex items-center gap-2"><Sparkles size={16} className="text-purple-400" /><Text className="text-sm font-medium text-white/70">{title}</Text></View><View className="space-y-2">{recommendations.slice(0, 5).map((item, index) => {
           const Icon = getIcon(item.type);
           return (
-            <Pressable
-              key={item.id}
-              onPress={() => onSelect(item)}
-              className="w-full flex items-center gap-3 p-2 rounded-xl text-left"
-            >
+            <Pressable key={item.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.05 }} onPress={() => onSelect(item)} className="w-full flex items-center gap-3 p-2 rounded-xl transition-colors text-left">
               {item.image ? (
-                <Image
-                 
-                 
-                  className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
-                 source={{ uri: item.image }} accessibilityLabel={item.title}/>
+                <Image className="w-10 h-10 rounded-xl object-cover flex-shrink-0" source={{ uri: item.image }} accessibilityLabel={item.title} />
               ) : (
-                <View
-                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${item.color || "#8B5CF6"}20` }}
-                >
-                  <Icon size={16} style={{ color: item.color || "#8B5CF6" }} />
+                <View className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${item.color || "#8B5CF6"}20` }}>
+                  <Icon size={16} style={{  }} />
                 </View>
               )}
               <View className="flex-1 min-w-0">
@@ -79,8 +62,6 @@ export function CommunityRecommendations({
               <ChevronRight size={14} className="text-white/20" />
             </Pressable>
           );
-        })}
-      </View>
-    </View>
+        })}</View></View>
   );
 }

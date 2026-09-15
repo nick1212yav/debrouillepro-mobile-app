@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/transport/components/detail/TransportQuestions.tsx
 import { HelpCircle, MessageSquare, Check, Sparkles } from "lucide-react-native";
 
@@ -29,43 +30,9 @@ export function TransportQuestions() {
   ];
 
   return (
-    <View className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] space-y-4">
-      <View className="flex items-center gap-2">
-        <HelpCircle size={16} className="text-violet-400" />
-        <Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest flex items-center gap-1">
-          Questions Fréquentes [2]
-          <Sparkles size={10} className="text-violet-400 animate-pulse" />
-        </Text>
-      </View>
-
-      <View className="space-y-3">
-        {faqs.map((faq) => (
-          <View
-            key={faq.id}
-            className="p-4 rounded-2xl bg-white/[0.01] border border-white/5 space-y-2"
-          >
-            <View className="flex items-start gap-2.5">
-              <MessageSquare size={13} className="text-violet-400 mt-0.5" />
-              <Text className="text-xs font-bold text-white leading-relaxed">
-                {faq.question}
-              </Text>
-            </View>
-
-            <View className="flex items-start gap-2.5 pl-5 text-[11px] text-white/50 leading-relaxed border-l border-white/5 mt-1">
-              <Check
-                size={12}
-                className="text-emerald-400 mt-0.5 flex-shrink-0"
-              />
-              <View>
-                <Text className="font-semibold"><Text>"</Text>{faq.answer}<Text>"</Text></Text>
-                <Text className="text-[9px] text-white/30 mt-1">
-                  <Text>Réponse de</Text>{faq.author}
-                </Text>
-              </View>
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
+    <View className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] space-y-4"><View className="flex items-center gap-2"><HelpCircle size={16} className="text-violet-400" /><Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest flex items-center gap-1">Questions Fréquentes [2]
+          <Sparkles size={10} className="text-violet-400 animate-pulse" /></Text></View><View className="space-y-3">{faqs.map((faq) => (
+          <View key={faq.id} className="p-4 rounded-2xl bg-white/[0.01] border border-white/5 space-y-2"><View className="flex items-start gap-2.5"><MessageSquare size={13} className="text-violet-400 mt-0.5" /><Text className="text-xs font-bold text-white leading-relaxed">{faq.question}</Text></View><View className="flex items-start gap-2.5 pl-5 text-[11px] text-white/50 leading-relaxed border-l border-white/5 mt-1"><Check size={12} className="text-emerald-400 mt-0.5 flex-shrink-0" /><View><Text className="font-semibold">"{faq.answer}"</Text><Text className="text-[9px] text-white/30 mt-1">Réponse de {faq.author}</Text></View></View></View>
+        ))}</View></View>
   );
 }

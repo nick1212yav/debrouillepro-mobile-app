@@ -1,46 +1,36 @@
-import { View, Text, Pressable } from "react-native";
+import { Text, View, Pressable, PressableProps, TextProps, ViewProps } from "react-native";
 import * as React from "react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
   MoreHorizontalIcon,
 } from "lucide-react-native";
-import { cn } from "@/lib/utils";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils.ts";
+import { Button, buttonVariants } from "@/components/ui/button.tsx";
 
-function Pagination({ className, ...props }: React.ComponentProps<typeof View>) {
+function Pagination({ className, ...props }: ViewProps) {
   return (
-    <View
-      accessibilityRole="navigation"
-      accessibilityLabel="pagination"
-      data-slot="pagination"
-      className={cn("mx-auto flex w-full justify-center", className)}
-      {...props}
-    />
+    <View accessibilityRole="navigation" accessibilityLabel="pagination" data-slot="pagination" className={cn("mx-auto flex w-full justify-center", className)} {...props} />
   );
 }
 
 function PaginationContent({
   className,
   ...props
-}: React.ComponentProps<typeof View>) {
+}: ViewProps) {
   return (
-    <View
-      data-slot="pagination-content"
-      className={cn("flex flex-row items-center gap-1", className)}
-      {...props}
-    />
+    <View data-slot="pagination-content" className={cn("flex flex-row items-center gap-1", className)} {...props} />
   );
 }
 
-function PaginationItem({ ...props }: React.ComponentProps<typeof View>) {
+function PaginationItem({ ...props }: ViewProps) {
   return <View data-slot="pagination-item" {...props} />;
 }
 
 type PaginationLinkProps = {
   isActive?: boolean;
 } & Pick<React.ComponentProps<typeof Button>, "size"> &
-  React.ComponentProps<typeof Pressable>;
+  PressableProps;
 
 function PaginationLink({
   className,
@@ -49,20 +39,14 @@ function PaginationLink({
   ...props
 }: PaginationLinkProps) {
   return (
-    <Pressable
-      aria-current={isActive ? "page" : undefined}
-      data-slot="pagination-link"
-      data-active={isActive}
-      className={cn(
+    <Pressable aria-current={isActive ? "page" : undefined} data-slot="pagination-link" data-active={isActive} className={cn(
         buttonVariants({
           variant: isActive ? "outline" : "ghost",
           size,
         }),
         "cursor-pointer",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
@@ -103,16 +87,9 @@ function PaginationNext({
 function PaginationEllipsis({
   className,
   ...props
-}: React.ComponentProps<typeof Text>) {
+}: TextProps) {
   return (
-    <Text
-     data-slot="pagination-ellipsis"
-      className={cn("flex size-9 items-center justify-center", className)}
-      {...props}
-    >
-      <MoreHorizontalIcon className="size-4" />
-      <Text className="sr-only">More pages</Text>
-    </Text>
+    <Text accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" data-slot="pagination-ellipsis" className={cn("flex size-9 items-center justify-center", className)} {...props}><MoreHorizontalIcon className="size-4" /><Text className="sr-only">More pages</Text></Text>
   );
 }
 

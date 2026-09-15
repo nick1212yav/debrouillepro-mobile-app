@@ -1,5 +1,6 @@
 import { Picker } from "@react-native-picker/picker";
-import { View, Text, Pressable, TextInput } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
+
 // src/features/sante/forms/AppointmentForm.tsx
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -62,124 +63,25 @@ export function AppointmentForm({
   });
 
   return (
-    <View
-     
-      className="space-y-4 text-left text-white text-xs"
-    >
-      {/* Sélecteur de médecin */}
-      <View className="flex flex-col gap-1.5">
-        <Text className="text-white/60 font-medium">Médecin *</Text>
-        <Picker
-          {...register("doctorId")}
-          className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white"
-        >
-          <Picker.Item label="Sélectionner un médecin" value="" />
-          {doctors.map((d) => (
-            <Picker.Item label={`${d.name}`} value={d.id} />
-          ))}
-        </Picker>
-        {errors.doctorId && (
+    <View className="space-y-4 text-left text-white text-xs">{}<View className="flex flex-col gap-1.5"><Text className="text-white/60 font-medium">Médecin *</Text><Picker {...register("doctorId")} className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-indigo-500"><Picker.Item label="Sélectionner un médecin" value="" enabled={false} />{doctors.map((d) => (
+            <Picker.Item label={d.name} value={d.id} />
+          ))}</Picker>{errors.doctorId && (
           <Text className="text-red-400 text-[10px]">{errors.doctorId.message}</Text>
-        )}
-      </View>
-
-      {/* Sélecteur de patient */}
-      <View className="flex flex-col gap-1.5">
-        <Text className="text-white/60 font-medium">Patient *</Text>
-        <Picker
-          {...register("patientId")}
-          className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white"
-        >
-          <Picker.Item label="Sélectionner un patient" value="" />
-          {patients.map((p) => (
-            <Picker.Item label={`${p.name}`} value={p.id} />
-          ))}
-        </Picker>
-        {errors.patientId && (
+        )}</View>{}<View className="flex flex-col gap-1.5"><Text className="text-white/60 font-medium">Patient *</Text><Picker {...register("patientId")} className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-indigo-500"><Picker.Item label="Sélectionner un patient" value="" enabled={false} />{patients.map((p) => (
+            <Picker.Item label={p.name} value={p.id} />
+          ))}</Picker>{errors.patientId && (
           <Text className="text-red-400 text-[10px]">{errors.patientId.message}</Text>
-        )}
-      </View>
-
-      {/* Date et Créneau */}
-      <View className="gap-3">
-        <View className="flex flex-col gap-1.5">
-          <Text className="text-white/60 font-medium">Date *</Text>
-          <TextInput
-           
-            {...register("date")}
-            className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white"
-          />
-          {errors.date && (
+        )}</View>{}<View className="gap-3"><View className="flex flex-col gap-1.5"><Text className="text-white/60 font-medium">Date *</Text><TextInput {...register("date")} className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-indigo-500" />{errors.date && (
             <Text className="text-red-400 text-[10px]">{errors.date.message}</Text>
-          )}
-        </View>
-
-        <View className="flex flex-col gap-1.5">
-          <Text className="text-white/60 font-medium">Créneau horaire *</Text>
-          <Picker
-            {...register("slot")}
-            className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white"
-          >
-            <Picker.Item label="Choisir un créneau" value="" />
-            {DEFAULT_SLOTS.map((s) => (
-              <Picker.Item label={`${s}`} value={s} />
-            ))}
-          </Picker>
-          {errors.slot && (
+          )}</View><View className="flex flex-col gap-1.5"><Text className="text-white/60 font-medium">Créneau horaire *</Text><Picker {...register("slot")} className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-indigo-500"><Picker.Item label="Choisir un créneau" value="" enabled={false} />{DEFAULT_SLOTS.map((s) => (
+              <Picker.Item label={s} value={s} />
+            ))}</Picker>{errors.slot && (
             <Text className="text-red-400 text-[10px]">{errors.slot.message}</Text>
-          )}
-        </View>
-      </View>
-
-      {/* Type de rendez-vous */}
-      <View className="flex flex-col gap-1.5">
-        <Text className="text-white/60 font-medium">
-          Type de consultation *
-        </Text>
-        <Picker
-          {...register("type")}
-          className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white"
-        >
-          <Picker.Item label="Consultation en clinique" value="consultation" />
-          <Picker.Item label="Téléconsultation en ligne" value="teleconsultation" />
-          <Picker.Item label="Urgence médicale" value="emergency" />
-          <Picker.Item label="Rendez-vous de suivi" value="follow-up" />
-        </Picker>
-        {errors.type && (
+          )}</View></View>{}<View className="flex flex-col gap-1.5"><Text className="text-white/60 font-medium">Type de consultation *
+        </Text><Picker {...register("type")} className="w-full h-11 px-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-indigo-500"><Picker.Item label="Consultation en clinique" value="consultation" /><Picker.Item label="Téléconsultation en ligne" value="teleconsultation" /><Picker.Item label="Urgence médicale" value="emergency" /><Picker.Item label="Rendez-vous de suivi" value="follow-up" /></Picker>{errors.type && (
           <Text className="text-red-400 text-[10px]">{errors.type.message}</Text>
-        )}
-      </View>
-
-      {/* Notes / Symptômes */}
-      <View className="flex flex-col gap-1.5">
-        <Text className="text-white/60 font-medium">
-          Symptômes ou notes de consultation
-        </Text>
-        <TextInput
-         
-          {...register("notes")}
-          placeholder="Décrivez brièvement les motifs de votre rendez-vous..."
-          className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white"
-         multiline textAlignVertical="top"/>
-      </View>
-
-      {/* Rappel */}
-      <View className="flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10">
-        <Text className="text-white/80 font-medium">
-          <Text>Activer le rappel automatique (SMS/Push)</Text></Text>
-        <Pressable
-         
-          {...register("reminder")}
-          className="w-4 h-4 rounded border-white/10"
-         accessibilityRole="checkbox" accessibilityState={{ checked: false }}/>
-      </View>
-
-      <Pressable
-        disabled={isLoading}
-        className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-red-600 to-red-700 disabled:opacity-50"
-      >
-        {isLoading ? "Réservation..." : submitLabel}
-      </Pressable>
-    </View>
+        )}</View>{}<View className="flex flex-col gap-1.5"><Text className="text-white/60 font-medium">Symptômes ou notes de consultation
+        </Text><TextInput {...register("notes")} placeholder="Décrivez brièvement les motifs de votre rendez-vous..." className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-indigo-500" multiline textAlignVertical="top" /></View>{}<View className="flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10"><Text className="text-white/80 font-medium">Activer le rappel automatique (SMS/Push)
+        </Text><Pressable {...register("reminder")} className="w-4 h-4 rounded border-white/10 accent-indigo-500" accessibilityRole="checkbox" /></View><Pressable disabled={isLoading} className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-red-600 to-red-700 active:scale-98 transition-all disabled:opacity-50">{isLoading ? "Réservation..." : submitLabel}</Pressable></View>
   );
 }

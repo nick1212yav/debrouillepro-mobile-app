@@ -46,12 +46,7 @@ export function EventCountdown({ startDate }: Props) {
 
   if (isPast) {
     return (
-      <View
-        className="rounded-2xl p-4 text-center"
-        style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-      >
-        <Text className="text-white/40 text-sm">🎉 Événement terminé</Text>
-      </View>
+      <View className="rounded-2xl p-4 text-center" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Text className="text-white/40 text-sm">🎉 Événement terminé</Text></View>
     );
   }
 
@@ -63,32 +58,16 @@ export function EventCountdown({ startDate }: Props) {
   ];
 
   return (
-    <View
-      className="rounded-2xl p-4"
-      style={{ backgroundColor: "rgba(139,92,246,0.08)", borderWidth: 1, borderColor: "rgba(139,92,246,0.15)", borderStyle: "solid" }}
-    >
-      <View className="flex items-center gap-2 mb-3">
-        <Clock size={14} className="text-purple-400" />
-        <Text className="text-purple-300/70 text-xs font-semibold uppercase tracking-wider">
-          Compte à rebours
-        </Text>
-      </View>
-      <View className="flex justify-around">
-        {items.map((item) => (
+    <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(139,92,246,0.08)", borderWidth: 1, borderColor: "rgba(139,92,246,0.15)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-3"><Clock size={14} className="text-purple-400" /><Text className="text-purple-300/70 text-xs font-semibold uppercase tracking-wider">Compte à rebours
+        </Text></View><View className="flex justify-around">{items.map((item) => (
           <View key={item.label} className="flex flex-col items-center gap-0.5">
-            <Text
-              key={item.value}
-              className="text-white font-bold text-2xl tabular-nums"
-              style={{  }}
-            >
+            <Text key={item.value} initial={{ scale: 1.2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-white font-bold text-2xl tabular-nums" style={{ textShadow: "0 0 20px rgba(139,92,246,0.4)" }}>
               {String(item.value).padStart(2, "0")}
             </Text>
             <Text className="text-white/30 text-[9px] uppercase tracking-wider">
               {item.label}
             </Text>
           </View>
-        ))}
-      </View>
-    </View>
+        ))}</View></View>
   );
 }

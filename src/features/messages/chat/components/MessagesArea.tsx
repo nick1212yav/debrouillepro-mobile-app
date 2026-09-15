@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
+import { View, Text } from "react-native";
+import { useEffect, useRef } from "react";
 
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -16,9 +17,6 @@ interface MessagesAreaProps {
   onForward?: (message: Message) => void;
 }
 
-const LOAD_MORE_THRESHOLD = 120;
-const LOAD_MORE_BATCH_SIZE = 30;
-
 export function MessagesArea({
   messages,
   currentUserId,
@@ -28,42 +26,7 @@ export function MessagesArea({
   onReply,
   onForward,
 }: MessagesAreaProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  /**
-   * Empêche plusieurs appels simultanés à onLoadMore
-   * avant que le parent ait eu le temps de mettre à jour
-   * la prop isLoadingMore.
-   */
-  const loadMoreRequestedRef = useRef(false);
-
-  useEffect(() => {
-    if (!isLoadingMore) {
-      loadMoreRequestedRef.current = false;
-    }
-  }, [isLoadingMore]);
-
-  const tryLoadMore = useCallback(() => {
-    const container = containerRef.current;
-
-    if (
-      !container ||
-      !onLoadMore ||
-      isLoadingMore ||
-      isDone ||
-      loadMoreRequestedRef.current
-    ) {
-      return;
-    }
-
-    if (container.scrollTop > LOAD_MORE_THRESHOLD) {
-      return;
-    }
-
-    loadMoreRequestedRef.current = true;
-
-    onLoadMore(LOAD_MORE_BATCH_SIZE);
-  }, [isDone, isLoadingMore, onLoadMore]);
+  const containerRef = useRef<View | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -73,71 +36,39 @@ export function MessagesArea({
     }
 
     const handleScroll = () => {
-      tryLoadMore();
+      if (
+        container.scrollTop <= 120 &&
+        !isLoadingMore &&
+        !isDone &&
+        onLoadMore
+      ) {
+        onLoadMore(30);
+      }
     };
 
-    container.addEventListener("scroll", handleScroll, {
-      passive: true,
-    });
+    container.addEventListener("scroll", handleScroll);
 
     return () => {
       container.removeEventListener("scroll", handleScroll);
     };
-  }, [tryLoadMore]);
-
-  /**
-   * Si la zone de messages est trop courte pour produire
-   * une barre de scroll, on vérifie également après le rendu
-   * si davantage de messages peuvent être chargés.
-   */
-  useEffect(() => {
-    const container = containerRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    if (
-      container.scrollHeight <= container.clientHeight &&
-      !isLoadingMore &&
-      !isDone
-    ) {
-      tryLoadMore();
-    }
-  }, [messages.length, isDone, isLoadingMore, tryLoadMore]);
+  }, [isLoadingMore, isDone, onLoadMore]);
 
   return (
-    <div
-      ref={containerRef}
-      className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
-      role="log"
-      aria-live="polite"
-      aria-relevant="additions"
-    >
-      {isLoadingMore && (
-        <div className="mb-4 text-center text-xs text-white/30">
-          Chargement des anciens messages...
-        </div>
-      )}
-
-      <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-2">
-        {messages.length > 0 ? (
-          messages.map((message) => (
-            <MessageBubble
-              key={String(message._id)}
-              message={message}
-              currentUserId={currentUserId}
-              onReply={onReply}
-              onForward={onForward}
-            />
-          ))
-        ) : (
-          <div className="flex flex-1 items-center justify-center py-20 text-sm text-white/30">
+    <View ref={containerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{isLoadingMore && (
+        <View className="mb-4 text-center text-xs text-white/30"><Text>Chargement des anciens messages...</Text></View>
+      )}<View className="mx-auto flex max-w-3xl flex-col gap-2">{messages.map((message) => (
+          <MessageBubble
+            key={String(message._id)}
+            message={message}
+            currentUserId={currentUserId}
+            onReply={onReply}
+            onForward={onForward}
+          />
+        ))}{messages.length === 0 && (
+          <View className="flex flex-1 items-center justify-center py-20 text-sm text-white/30">
             Aucun message.
-          </div>
-        )}
-      </div>
-    </div>
+          </View>
+        )}</View></View>
   );
 }
 

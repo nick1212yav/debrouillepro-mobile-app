@@ -27,28 +27,21 @@ export function PostMoodSelector({ value, onChange }: Props) {
 
   return (
     <View>
-      <Pressable
-        onPress={() => setShow(!show)}
-        className="flex items-center gap-2 text-xs text-white/40"
-      >
+      <Pressable onPress={() => setShow(!show)} className="flex items-center gap-2 text-xs text-white/40 transition-colors">
         <Smile size={14} />
         {value ? MOODS.find((m) => m.value === value)?.emoji : "Humeur"}
       </Pressable>
       {show && (
         <View className="flex flex-wrap gap-1.5 mt-2 p-2 rounded-xl bg-white/5 border border-white/10">
           {MOODS.map((m) => (
-            <Pressable
-              key={m.value}
-              onPress={() => {
+            <Pressable key={m.value} onPress={() => {
                 onChange(m.value);
                 setShow(false);
-              }}
-              className={`px-2 py-1 rounded-lg text-xs ${
+              }} className={`px-2 py-1 rounded-lg text-xs ${
                 value === m.value
                   ? "bg-purple-500/20 text-purple-400"
                   : "text-white/60 hover:bg-white/5"
-              }`}
-            >
+              }`}>
               {m.emoji} {m.label}
             </Pressable>
           ))}

@@ -9,10 +9,7 @@ interface DoctorFooterProps {
 
 export function DoctorFooter({ children }: DoctorFooterProps) {
   return (
-    <View
-      className="flex-shrink-0 p-4 border-t border-white/10"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
-    >
+    <View className="flex-shrink-0 p-4 border-t border-white/10" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
       {children}
     </View>
   );

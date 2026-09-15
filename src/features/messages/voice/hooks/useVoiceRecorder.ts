@@ -113,7 +113,7 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions = {}) {
       return;
     }
 
-    if (typeof undefined === "undefined" || !undefined) {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices) {
       throw new Error(
         "L'enregistrement audio n'est pas disponible sur cet appareil.",
       );
@@ -130,7 +130,7 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions = {}) {
     setUploadProgress(0);
 
     try {
-      const stream = await undefined.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: false,
       });

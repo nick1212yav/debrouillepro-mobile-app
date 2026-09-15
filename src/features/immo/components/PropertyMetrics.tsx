@@ -35,10 +35,7 @@ export function PropertyMetrics({ surface, rooms, bathrooms, color }: Props) {
   return (
     <View className="flex items-center gap-3 mt-2">
       {items.map((item, idx) => (
-        <View
-          key={idx}
-          className="flex items-center gap-1 text-white/50 text-xs"
-        >
+        <View key={idx} className="flex items-center gap-1 text-white/50 text-xs">
           <item.icon size={12} style={{ color }} />
           <Text>{item.label}</Text>
         </View>

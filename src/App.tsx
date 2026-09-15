@@ -1,13 +1,18 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-
 // src/App.tsx
-import { DefaultProviders } from "./components/providers/default";
+import {
+  BrowserRouter,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+import { DefaultProviders } from "./components/providers/default.tsx";
 import { UIBridge } from "@/core/sdk/ui/UIBridge";
-import Index from "./pages/Index";
-import AuthCallback from "./pages/auth/Callback";
-import NotFound from "./pages/NotFound";
+import Index from "./pages/Index.tsx";
+import AuthCallback from "./pages/auth/Callback.tsx";
+import NotFound from "./pages/NotFound.tsx";
 import { AuthPage } from "@/features/auth/pages/AuthPage";
-import { useServiceWorker } from "@/hooks/use-service-worker";
+import { useServiceWorker } from "@/hooks/use-service-worker.ts";
 
 import JobDetailPage from "./pages/modules/JobDetailPage";
 import ImmoDetailPage from "./pages/modules/ImmoDetailPage";
@@ -61,28 +66,28 @@ import CheckoutPage from "./pages/CheckoutPage";
 // ===============================
 
 function CommunityPageWrapper() {
-  const router = useRouter();
-  return <CommunityPage onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  return <CommunityPage onBack={() => navigate(-1)} />;
 }
 
 function EvenementsPageWrapper() {
-  const router = useRouter();
-  return <EvenementsPage onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  return <EvenementsPage onBack={() => navigate(-1)} />;
 }
 
 function EvenementsProPageWrapper() {
-  const router = useRouter();
-  return <EvenementsProPage onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  return <EvenementsProPage onBack={() => navigate(-1)} />;
 }
 
 function MarketplacePageWrapper() {
-  const router = useRouter();
-  return <MarketplacePage onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  return <MarketplacePage onBack={() => navigate(-1)} />;
 }
 
 function MarketplaceProPageWrapper() {
-  const router = useRouter();
-  return <MarketplaceProPage onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  return <MarketplaceProPage onBack={() => navigate(-1)} />;
 }
 
 // Wrapper Santé
@@ -92,58 +97,58 @@ function SantePageWrapper() {
 
 // Wrapper Transport
 function TransportPageWrapper() {
-  const router = useRouter();
-  return <TransportPage onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  return <TransportPage onBack={() => navigate(-1)} />;
 }
 
 // Wrapper Restauration
 function RestaurationPageWrapper() {
-  const router = useRouter();
-  return <RestaurationPage onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  return <RestaurationPage onBack={() => navigate(-1)} />;
 }
 
 // Wrapper Hébergement
 function HebergementPageWrapper() {
-  const router = useRouter();
-  return <HebergementPage onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  return <HebergementPage onBack={() => navigate(-1)} />;
 }
 
 // Wrapper Agriculture
 function AgriPageWrapper() {
-  const router = useRouter();
-  return <AgriPage onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  return <AgriPage onBack={() => navigate(-1)} />;
 }
 
 function AgriDetailPageWrapper() {
-  const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  return <AgriDetailPage productId={id as any} onBack={() => router.back()} />;
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  return <AgriDetailPage productId={id as any} onBack={() => navigate(-1)} />;
 }
 
 // Wrapper Network
 function NetworkPageWrapper() {
-  const router = useRouter();
+  const navigate = useNavigate();
   return (
     <NetworkPage
-      onBack={() => router.back()}
-      onViewProfile={(userId) => router.push(`/network/profile/${userId}`)}
+      onBack={() => navigate(-1)}
+      onViewProfile={(userId) => navigate(`/network/profile/${userId}`)}
     />
   );
 }
 
 function NetworkDetailPageWrapper() {
-  const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   return (
-    <NetworkDetailPage publicationId={id as any} onBack={() => router.back()} />
+    <NetworkDetailPage publicationId={id as any} onBack={() => navigate(-1)} />
   );
 }
 
 function NetworkProfilePageWrapper() {
-  const router = useRouter();
-  const { userId } = useLocalSearchParams<{ userId: string }>();
+  const navigate = useNavigate();
+  const { userId } = useParams<{ userId: string }>();
   return (
-    <NetworkProfilePage userId={userId as any} onBack={() => router.back()} />
+    <NetworkProfilePage userId={userId as any} onBack={() => navigate(-1)} />
   );
 }
 

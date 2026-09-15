@@ -1,4 +1,4 @@
-import { Pressable, View, Text, TextInput } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
 
 // src/features/network/components/Network/FollowersList.tsx
 import { useState } from "react";
@@ -66,91 +66,39 @@ export function FollowersList({
 
   if (isLoading) {
     return (
-      <View className={cn("space-y-3", className)}>
-        <View className="flex items-center justify-between">
-          <View className="flex items-center gap-2">
-            <Skeleton className="w-6 h-6 rounded-full" />
-            <Skeleton className="h-4 w-24 rounded-lg" />
-            <Skeleton className="h-4 w-8 rounded-lg" />
-          </View>
-          {showSearch && <Skeleton className="h-8 w-32 rounded-xl" />}
-        </View>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <View
-            key={i}
-            className="flex items-center gap-3 p-3 rounded-xl bg-white/5"
-          >
-            <Skeleton className="w-10 h-10 rounded-full" />
-            <View className="flex-1 space-y-1.5">
-              <Skeleton className="h-4 w-32 rounded-lg" />
-              <Skeleton className="h-3 w-24 rounded-lg" />
-            </View>
-            <Skeleton className="h-8 w-20 rounded-xl" />
-          </View>
-        ))}
-      </View>
+      <View className={cn("space-y-3", className)}><View className="flex items-center justify-between"><View className="flex items-center gap-2"><Skeleton className="w-6 h-6 rounded-full" /><Skeleton className="h-4 w-24 rounded-lg" /><Skeleton className="h-4 w-8 rounded-lg" /></View>{showSearch && <Skeleton className="h-8 w-32 rounded-xl" />}</View>{Array.from({ length: 3 }).map((_, i) => (
+          <View key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/5"><Skeleton className="w-10 h-10 rounded-full" /><View className="flex-1 space-y-1.5"><Skeleton className="h-4 w-32 rounded-lg" /><Skeleton className="h-3 w-24 rounded-lg" /></View><Skeleton className="h-8 w-20 rounded-xl" /></View>
+        ))}</View>
     );
   }
 
   if (followers.length === 0) {
     return (
-      <View
-        className={cn(
+      <View className={cn(
           "rounded-3xl p-6 text-center",
           "bg-white/5 border border-white/10",
           className,
-        )}
-      >
-        <Users size={32} className="mx-auto mb-3 text-white/20" />
-        <Text className="text-white font-semibold text-sm">Aucun abonné</Text>
-        <Text className="text-white/40 text-xs mt-1">
-          {isOwnProfile
+        )}><Users size={32} className="mx-auto mb-3 text-white/20" /><Text className="text-white font-semibold text-sm">Aucun abonné</Text><Text className="text-white/40 text-xs mt-1">{isOwnProfile
             ? "Vos abonnés apparaîtront ici"
-            : "Ce profil n'a pas encore d'abonnés"}
-        </Text>
-      </View>
+            : "Ce profil n'a pas encore d'abonnés"}</Text></View>
     );
   }
 
   return (
-    <View className={cn("space-y-3", className)}>
-      {/* Header */}
-      <View className="flex items-center justify-between">
-        <View className="flex items-center gap-2">
-          <Users size={16} className="text-indigo-400" />
-          <Text className="text-white font-semibold text-sm"><Text>Abonnés</Text></Text>
-          <Text className="text-white/30 text-xs"><Text>(</Text>{totalCount}<Text>)</Text></Text>
-        </View>
-        {showSearch && followers.length > 5 && (
+    <View className={cn("space-y-3", className)}>{}<View className="flex items-center justify-between"><View className="flex items-center gap-2"><Users size={16} className="text-indigo-400" /><Text className="text-white font-semibold text-sm">Abonnés</Text><Text className="text-white/30 text-xs">({totalCount})</Text></View>{showSearch && followers.length > 5 && (
           <View className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-white/5 border border-white/5">
             <Search size={12} className="text-white/30" />
-            <TextInput
-             
-              value={searchQuery}
-              onChangeText={(text) => setSearchQuery(text)}
-              placeholder="Rechercher..."
-              className="w-24 bg-transparent text-white/80 text-xs outline-none placeholder:text-white/20"
-            />
+            <TextInput value={searchQuery} onChangeText={(value) => setSearchQuery(value)} placeholder="Rechercher..." className="w-24 bg-transparent text-white/80 text-xs outline-none placeholder:text-white/20" />
           </View>
-        )}
-      </View>
-
-      {/* List */}
-      <>
-        {filteredFollowers.length === 0 ? (
+        )}</View>{}<View>{filteredFollowers.length === 0 ? (
           <Text className="text-white/30 text-sm text-center py-4">
-            <Text>Aucun résultat pour "</Text>{searchQuery}<Text>"</Text></Text>
+            Aucun résultat pour "{searchQuery}"
+          </Text>
         ) : (
           <View className="space-y-2">
             {filteredFollowers.map((follower, index) => (
-              <View
-                key={follower._id}
-                className="flex items-center gap-3 p-3 rounded-xl"
-              >
-                <Pressable
-                  onPress={() => onUserClick?.(follower._id)}
-                  className="flex-shrink-0"
-                >
+              <View key={follower._id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: index * 0.03 }} className="flex items-center gap-3 p-3 rounded-xl transition-colors">
+                <Pressable onPress={() => onUserClick?.(follower._id)} className="flex-shrink-0">
                   <ProfileAvatar
                     name={follower.name}
                     avatar={follower.avatar}
@@ -159,10 +107,7 @@ export function FollowersList({
                 </Pressable>
 
                 <View className="flex-1 min-w-0">
-                  <Pressable
-                    onPress={() => onUserClick?.(follower._id)}
-                    className="text-white font-semibold text-sm truncate w-full text-left"
-                  >
+                  <Pressable onPress={() => onUserClick?.(follower._id)} className="text-white font-semibold text-sm truncate w-full text-left">
                     {follower.name}
                   </Pressable>
                   {follower.headline && (
@@ -177,11 +122,7 @@ export function FollowersList({
 
                 <View className="flex items-center gap-1 flex-shrink-0">
                   {isOwnProfile && onRemoveFollower && (
-                    <Pressable
-                      onPress={() => onRemoveFollower(follower._id)}
-                      className="p-1.5 rounded-lg"
-                      title="Retirer l'abonné"
-                    >
+                    <Pressable onPress={() => onRemoveFollower(follower._id)} className="p-1.5 rounded-lg transition-colors" title="Retirer l'abonné">
                       <UserX size={14} className="text-red-400/60" />
                     </Pressable>
                   )}
@@ -197,23 +138,17 @@ export function FollowersList({
                   )}
                   {isOwnProfile && follower.isFollowing && (
                     <Text className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-indigo-500/20 text-indigo-300">
-                      <Text>Vous suit</Text></Text>
+                      Vous suit
+                    </Text>
                   )}
                 </View>
               </View>
             ))}
           </View>
-        )}
-      </>
-
-      {/* Load more */}
-      {hasMore && (
-        <Pressable
-          onPress={() => setShowAll(true)}
-          className="w-full py-2 text-sm text-white/40"
-        >
-          <Text>Voir plus (</Text>{followers.length - limit} <Text>autres)</Text></Pressable>
-      )}
-    </View>
+        )}</View>{}{hasMore && (
+        <Pressable onPress={() => setShowAll(true)} className="w-full py-2 text-sm text-white/40 transition-colors">
+          Voir plus ({followers.length - limit} autres)
+        </Pressable>
+      )}</View>
   );
 }

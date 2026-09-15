@@ -1,251 +1,100 @@
-// src/pages/modules/LiveStreamingPage.tsx
-
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { View, Text, Image, Pressable, TextInput, Share } from "react-native";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { useConvexAuth } from "@/lib/convex-auth-compat";
+import { api } from "@/convex/_generated/api.js";
+import type { Id } from "@/convex/_generated/dataModel.js";
 import {
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { useMutation, useQuery } from "convex/react";
-import {
-  ArrowLeft,
-  Eye,
-  Gift,
-  Heart,
-  MessageSquare,
-  Mic,
-  MicOff,
-  Play,
-  Radio,
-  Send,
-  Share2,
-  TrendingUp,
-  Users,
-  Video,
-  VideoOff,
-  X,
+  ArrowLeft, Radio, Users, Eye, Heart, MessageSquare,
+  Share2, Mic, MicOff, Video, VideoOff, Gift, Star,
+  TrendingUp, Clock, Play, Plus, X, Crown, Flame,
+  Send, Zap, Rocket, Diamond, Settings2,
 } from "lucide-react-native";
+import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
+import { SignInButton } from "@/components/ui/signin.tsx";
 
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import {
-  Authenticated,
-  Unauthenticated,
-  useConvexAuth,
-} from "@/lib/convex-auth-compat";
-import { SignInButton } from "@/components/ui/signin";
+/* __DEBROUILLEPRO_NATIVE_DOM_API_HELPERS_V8__ — scrollIntoView helper */
+const __debrouilleProNativeScrollIntoView = async (ref: { current?: { measure?: (cb: (x: number, y: number, w: number, h: number, px: number, py: number) => void) => void } }): Promise<void> => {
+  return new Promise((resolve) => {
+    ref.current?.measure?.((_x, _y, _w, _h, _px, py) => {
+      console.warn('__debrouilleProNativeScrollIntoView: implement scrollTo with pageY on your ScrollView ref');
+      resolve();
+    });
+  });
+};
 
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 type GiftType = "star" | "crown" | "fire" | "diamond" | "rocket";
 
 type FloatingReaction = {
   id: string;
   emoji: string;
   x: number;
-};
-
-type StreamMessage = {
-  _id: string;
-  text: string;
-  type: string;
-  amount?: number | null;
-  userName: string;
-  userAvatar?: string;
-};
-
-const GIFTS: {
-  type: GiftType;
-  emoji: string;
-  label: string;
-  price: number;
   color: string;
-}[] = [
-  {
-    type: "star",
-    emoji: "⭐",
-    label: "Étoile",
-    price: 10,
-    color: "#F59E0B",
-  },
-  {
-    type: "fire",
-    emoji: "🔥",
-    label: "Feu",
-    price: 50,
-    color: "#EF4444",
-  },
-  {
-    type: "crown",
-    emoji: "👑",
-    label: "Couronne",
-    price: 100,
-    color: "#8B5CF6",
-  },
-  {
-    type: "diamond",
-    emoji: "💎",
-    label: "Diamant",
-    price: 500,
-    color: "#06B6D4",
-  },
-  {
-    type: "rocket",
-    emoji: "🚀",
-    label: "Fusée",
-    price: 1000,
-    color: "#10B981",
-  },
+};
+
+// ── Gift Config ───────────────────────────────────────────────────────────────
+const GIFTS: { type: GiftType; emoji: string; label: string; price: number; color: string }[] = [
+  { type: "star",    emoji: "⭐", label: "Étoile",    price: 10,   color: "#F59E0B" },
+  { type: "fire",    emoji: "🔥", label: "Feu",       price: 50,   color: "#EF4444" },
+  { type: "crown",   emoji: "👑", label: "Couronne",  price: 100,  color: "#8B5CF6" },
+  { type: "diamond", emoji: "💎", label: "Diamant",   price: 500,  color: "#06B6D4" },
+  { type: "rocket",  emoji: "🚀", label: "Fusée",     price: 1000, color: "#10B981" },
 ];
 
-const CATEGORIES = [
-  "Tout",
-  "Musique",
-  "Cuisine",
-  "Tech",
-  "Sport",
-  "Beauté",
-  "Art",
-  "Business",
-  "Gaming",
-];
+const CATEGORIES = ["Tout", "Musique", "Cuisine", "Tech", "Sport", "Beauté", "Art", "Business", "Gaming"];
 
-const DEMO_THUMBNAIL =
-  "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=450&fit=crop";
-
-function formatNumber(value: number | undefined | null): string {
-  if (typeof value !== "number") {
-    return "0";
-  }
-
-  return value.toLocaleString();
-}
-
-function getAvatarColor(name: string): string {
-  const code = name.charCodeAt(0) || 0;
-
-  return `hsl(${(code * 13) % 360}, 60%, 40%)`;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Floating reactions
-// ─────────────────────────────────────────────────────────────────────────────
-
-function FloatingReactionItem({ reaction }: { reaction: FloatingReaction }) {
+// ── Floating emoji reaction component ────────────────────────────────────────
+function FloatingEmoji({ emoji, x, color, onDone }: { emoji: string; x: number; color: string; onDone: () => void }) {
   return (
-    <View
-      pointerEvents="none"
-      style={[
-        styles.floatingReaction,
-        {
-          left: `${reaction.x}%`,
-        },
-      ]}
-    >
-      <Text style={styles.floatingReactionEmoji}>{reaction.emoji}</Text>
+    <View className="absolute bottom-24 pointer-events-none text-3xl z-40" style={{ left: `${x}%` }} initial={{ y: 0, opacity: 1, scale: 0.5 }} animate={{ y: -300, opacity: 0, scale: 1.5 }} transition={{ duration: 2, ease: "easeOut" }} onAnimationComplete={onDone}>
+      <Text style={{  }}>{emoji}</Text>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Chat row
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ChatRow({ msg }: { msg: StreamMessage }) {
+// ── Chat Message Row ──────────────────────────────────────────────────────────
+function ChatRow({ msg }: {
+  msg: { _id: string; text: string; type: string; amount?: number | null; userName: string; userAvatar?: string }
+}) {
   const isSuperChat = msg.type === "super_chat";
   const isSystem = msg.type === "system";
 
   if (isSystem) {
     return (
-      <View style={styles.systemMessage}>
-        <Text style={styles.systemMessageText}>{msg.text}</Text>
+      <View initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-1.5 py-0.5">
+        <Text className="text-white/30 text-xs italic">{msg.text}</Text>
       </View>
     );
   }
 
   if (isSuperChat) {
     return (
-      <View style={styles.superChat}>
-        <Text style={styles.superChatEmoji}>🎁</Text>
-
-        <View style={styles.superChatContent}>
-          <Text numberOfLines={1} style={styles.superChatUser}>
-            {msg.userName}
-          </Text>
-
-          <Text numberOfLines={2} style={styles.superChatText}>
-            {msg.text}
-          </Text>
-        </View>
-
-        {typeof msg.amount === "number" && (
-          <Text style={styles.superChatAmount}>{msg.amount} pts</Text>
+      <View initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-2 px-3 py-2 rounded-xl my-1" style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}>
+        <Text className="text-lg">{msg.text.split(" ")[3] ?? "🎁"}</Text>
+        <View className="flex-1 min-w-0"><Text className="text-purple-300 text-xs font-bold truncate">{msg.userName}</Text><Text className="text-white text-xs truncate">{msg.text}</Text></View>
+        {msg.amount && (
+          <Text className="text-yellow-400 text-xs font-black flex-shrink-0">{msg.amount}pts</Text>
         )}
       </View>
     );
   }
 
-  const initial = msg.userName?.[0]?.toUpperCase() ?? "?";
-
   return (
-    <View style={styles.chatRow}>
-      <View
-        style={[
-          styles.chatAvatar,
-          {
-            backgroundColor: getAvatarColor(msg.userName),
-          },
-        ]}
-      >
-        <Text style={styles.chatAvatarText}>{initial}</Text>
-      </View>
-
-      <View style={styles.chatContent}>
-        <Text style={styles.chatMessage}>
-          <Text
-            style={[
-              styles.chatUserName,
-              {
-                color: getAvatarColor(msg.userName),
-              },
-            ]}
-          >
-            {msg.userName}{" "}
-          </Text>
-
-          <Text style={styles.chatMessageText}>{msg.text}</Text>
-        </Text>
-      </View>
+    <View initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex items-start gap-1.5 py-0.5">
+      <View className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-white" style={{ backgroundColor: `hsl(${msg.userName.charCodeAt(0) * 13 % 360},60%,40%)` }}>{msg.userName[0]?.toUpperCase()}</View>
+      <View className="flex-1 min-w-0"><Text className="text-white/60 text-xs font-bold mr-1" style={{ color: `hsl(${msg.userName.charCodeAt(0) * 13 % 360},70%,65%)` }}>{msg.userName}</Text><Text className="text-white/80 text-xs leading-snug">{msg.text}</Text></View>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Watch View
-// ─────────────────────────────────────────────────────────────────────────────
-
-function WatchView({
-  streamId,
-  onClose,
-}: {
-  streamId: Id<"liveStreams">;
-  onClose: () => void;
-}) {
-  const stream = useQuery(api.liveStreams.getStream, {
-    streamId,
-  });
-
-  const messages = useQuery(api.liveStreams.getStreamMessages, {
-    streamId,
-  });
-
+// ── Watch View ────────────────────────────────────────────────────────────────
+function WatchView({ streamId, onClose }: { streamId: Id<"liveStreams">; onClose: () => void }) {
+  const stream = useQuery(api.liveStreams.getStream, { streamId });
+  const messages = useQuery(api.liveStreams.getStreamMessages, { streamId });
   const { isAuthenticated } = useConvexAuth();
 
   const sendMsg = useMutation(api.liveStreams.sendMessage);
@@ -258,1934 +107,236 @@ function WatchView({
   const [liked, setLiked] = useState(false);
   const [showGifts, setShowGifts] = useState(false);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
+  const chatEndRef = useRef<View>(null);
 
-  const chatListRef = useRef<FlatList<StreamMessage>>(null);
-
+  // Join on mount, leave on unmount
   useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
+    if (!isAuthenticated) return;
+    joinStream({ streamId }).catch(() => null);
+    return () => { leaveStream({ streamId }).catch(() => null); };
+  }, [streamId, isAuthenticated, joinStream, leaveStream]);
 
-    void joinStream({
-      streamId,
-    }).catch(() => undefined);
-
-    return () => {
-      void leaveStream({
-        streamId,
-      }).catch(() => undefined);
-    };
-  }, [isAuthenticated, joinStream, leaveStream, streamId]);
-
+  // Auto-scroll chat
   useEffect(() => {
-    if ((messages?.length ?? 0) === 0) {
-      return;
-    }
-
-    requestAnimationFrame(() => {
-      chatListRef.current?.scrollToEnd({
-        animated: true,
-      });
-    });
+    __debrouilleProNativeScrollIntoView(chatEndRef.current);
   }, [messages]);
 
-  const addReaction = useCallback((emoji: string) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    setReactions((previous) => [
-      ...previous,
-      {
-        id,
-        emoji,
-        x: 15 + Math.random() * 65,
-      },
-    ]);
-
-    setTimeout(() => {
-      setReactions((previous) =>
-        previous.filter((reaction) => reaction.id !== id),
-      );
-    }, 2200);
+  const addReaction = useCallback((emoji: string, color: string) => {
+    const id = Math.random().toString(36).slice(2);
+    setReactions((p) => [...p, { id, emoji, x: 15 + Math.random() * 70, color }]);
+    setTimeout(() => setReactions((p) => p.filter((r) => r.id !== id)), 2200);
   }, []);
 
-  const handleLike = useCallback(async () => {
-    if (!isAuthenticated) {
-      Alert.alert("Connexion requise", "Connectez-vous pour réagir au live.");
-
-      return;
-    }
-
+  const handleLike = async () => {
+    if (!isAuthenticated) { toast("Connectez-vous pour réagir"); return; }
     setLiked(true);
-    addReaction("❤️");
+    addReaction("❤️", "#EF4444");
+    try { await likeStream({ streamId }); } catch { /* ignore */ }
+  };
 
+  const handleSendMsg = async () => {
+    if (!chatText.trim()) return;
+    if (!isAuthenticated) { toast("Connectez-vous pour chatter"); return; }
     try {
-      await likeStream({
-        streamId,
-      });
-    } catch {
-      // La réaction visuelle reste volontairement locale.
-    }
-  }, [addReaction, isAuthenticated, likeStream, streamId]);
-
-  const handleSendMessage = useCallback(async () => {
-    const text = chatText.trim();
-
-    if (!text) {
-      return;
-    }
-
-    if (!isAuthenticated) {
-      Alert.alert(
-        "Connexion requise",
-        "Connectez-vous pour participer au chat.",
-      );
-
-      return;
-    }
-
-    try {
-      await sendMsg({
-        streamId,
-        text,
-        type: "chat",
-      });
-
+      await sendMsg({ streamId, text: chatText, type: "chat" });
       setChatText("");
-    } catch {
-      Alert.alert("Erreur", "Impossible d'envoyer le message.");
-    }
-  }, [chatText, isAuthenticated, sendMsg, streamId]);
+    } catch { toast.error("Erreur envoi message"); }
+  };
 
-  const handleGift = useCallback(
-    async (gift: (typeof GIFTS)[number]) => {
-      if (!isAuthenticated) {
-        Alert.alert(
-          "Connexion requise",
-          "Connectez-vous pour envoyer un cadeau.",
-        );
-
-        return;
-      }
-
-      try {
-        await sendGift({
-          streamId,
-          giftType: gift.type,
-          amount: gift.price,
-        });
-
-        addReaction(gift.emoji);
-
-        setTimeout(() => addReaction(gift.emoji), 200);
-
-        setTimeout(() => addReaction(gift.emoji), 400);
-
-        setShowGifts(false);
-
-        Alert.alert("Cadeau envoyé", `${gift.emoji} ${gift.label} envoyé !`);
-      } catch {
-        Alert.alert("Erreur", "Impossible d'envoyer le cadeau.");
-      }
-    },
-    [addReaction, isAuthenticated, sendGift, streamId],
-  );
-
-  const handleShare = useCallback(async () => {
-    if (!stream) {
-      return;
-    }
-
+  const handleGift = async (gift: typeof GIFTS[0]) => {
+    if (!isAuthenticated) { toast("Connectez-vous pour envoyer des cadeaux"); return; }
     try {
-      await Share.share({
-        title: stream.title,
-        message: stream.title,
-      });
-
-      addReaction("🔗");
-    } catch {
-      // L'utilisateur peut annuler le partage.
-    }
-  }, [addReaction, stream]);
+      await sendGift({ streamId, giftType: gift.type, amount: gift.price });
+      addReaction(gift.emoji, gift.color);
+      for (let i = 0; i < 3; i++) {
+        setTimeout(() => addReaction(gift.emoji, gift.color), i * 200);
+      }
+      toast.success(`${gift.emoji} Cadeau envoyé !`);
+      setShowGifts(false);
+    } catch { toast.error("Erreur"); }
+  };
 
   if (!stream) {
     return (
-      <View style={styles.watchLoading}>
-        <Radio size={32} color="#6366F1" />
-
-        <Text style={styles.watchLoadingText}>Chargement du live...</Text>
-      </View>
+      <View className="h-full bg-black flex items-center justify-center"><Skeleton className="w-full h-full absolute inset-0" /></View>
     );
   }
 
-  const streamMessages = (messages ?? []) as StreamMessage[];
+  const DEMO_THUMB = "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=450&fit=crop";
 
   return (
-    <View style={styles.watchContainer}>
-      <View style={styles.videoArea}>
-        <Image
-          source={{
-            uri: stream.thumbnailUrl ?? DEMO_THUMBNAIL,
-          }}
-          style={styles.videoImage}
-          resizeMode="cover"
-        />
-
-        <View style={styles.videoOverlay} />
-
-        <View pointerEvents="none" style={styles.reactionsLayer}>
-          {reactions.map((reaction) => (
-            <FloatingReactionItem key={reaction.id} reaction={reaction} />
-          ))}
-        </View>
-
-        <View style={styles.watchTopBar}>
-          <Pressable onPress={onClose} style={styles.roundDarkButton}>
-            <ArrowLeft size={20} color="#FFFFFF" />
-          </Pressable>
-
-          <View style={styles.hostInfo}>
-            <View style={styles.hostAvatar}>
-              <Text style={styles.hostAvatarText}>
-                {stream.hostName?.[0]?.toUpperCase() ?? "L"}
-              </Text>
-            </View>
-
-            <View style={styles.hostText}>
-              <Text numberOfLines={1} style={styles.hostName}>
-                {stream.hostName}
-              </Text>
-
-              <Text numberOfLines={1} style={styles.hostCategory}>
-                {stream.category}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.liveInfo}>
-            <View style={styles.liveBadge}>
-              <Radio size={10} color="#FFFFFF" />
-
-              <Text style={styles.liveBadgeText}>LIVE</Text>
-            </View>
-
-            <View style={styles.viewerBadge}>
-              <Eye size={11} color="#9CA3AF" />
-
-              <Text style={styles.viewerBadgeText}>
-                {formatNumber(stream.viewerCount)}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.videoBottomInfo}>
-          <Text numberOfLines={2} style={styles.streamTitle}>
-            {stream.title}
-          </Text>
-
-          <View style={styles.likesInfo}>
-            <Heart size={13} color="#EF4444" fill="#EF4444" />
-
-            <Text style={styles.likesText}>
-              {formatNumber(stream.likeCount)} réactions
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.watchActions}>
-          <Pressable
-            onPress={() => void handleLike()}
-            style={styles.watchAction}
-          >
-            <Heart
-              size={28}
-              color={liked ? "#EF4444" : "#FFFFFF"}
-              fill={liked ? "#EF4444" : "transparent"}
-            />
-
-            <Text style={styles.watchActionText}>
-              {formatNumber(stream.likeCount)}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setShowGifts(true)}
-            style={styles.watchAction}
-          >
-            <Gift size={28} color="#F59E0B" />
-
-            <Text style={styles.watchActionText}>Cadeau</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => void handleShare()}
-            style={styles.watchAction}
-          >
-            <Share2 size={26} color="#FFFFFF" />
-
-            <Text style={styles.watchActionText}>Partager</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.chatSection}>
-        <FlatList
-          ref={chatListRef}
-          data={streamMessages}
-          keyExtractor={(item) => String(item._id)}
-          renderItem={({ item }) => <ChatRow msg={item} />}
-          style={styles.chatList}
-          contentContainerStyle={styles.chatListContent}
-          showsVerticalScrollIndicator={false}
-        />
-
-        <View style={styles.chatInputRow}>
-          {isAuthenticated ? (
+    <View className="h-full flex flex-col bg-black relative overflow-hidden">{}<View className="relative flex-1 overflow-hidden"><Image className="w-full h-full object-cover" style={{ opacity: 0.75 }} source={{ uri: stream.thumbnailUrl ?? DEMO_THUMB }} accessibilityLabel={stream.title} />{}<View className="absolute inset-0 pointer-events-none" style={{  }} />{}<View className="absolute inset-0 overflow-hidden pointer-events-none">{reactions.map((r) => (
+            <FloatingEmoji key={r.id} emoji={r.emoji} x={r.x} color={r.color} onDone={() => {}} />
+          ))}</View>{}<View className="absolute top-0 left-0 right-0 flex items-center gap-3 p-4 z-10"><Pressable onPress={onClose} className="p-2 rounded-full" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}><ArrowLeft size={18} color="white" /></Pressable><View className="flex items-center gap-2 flex-1 min-w-0"><View className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white text-sm" style={{  }}>{stream.hostName[0]?.toUpperCase()}</View><View className="min-w-0"><Text className="text-white text-sm font-bold truncate">{stream.hostName}</Text><Text className="text-xs text-gray-300 truncate">{stream.category}</Text></View></View><View className="flex items-center gap-2"><View className="flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(239,68,68,0.85)" }}><Radio size={10} color="white" className="animate-pulse" /><Text className="text-white text-xs font-black">LIVE</Text></View><View className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}><Eye size={11} color="#9CA3AF" /><Text className="text-white text-xs">{stream.viewerCount.toLocaleString()}</Text></View></View></View>{}<View className="absolute bottom-3 left-4 right-4"><Text className="text-white font-bold text-sm mb-1">{stream.title}</Text><View className="flex items-center gap-2"><Heart size={12} color="#EF4444" fill="#EF4444" /><Text className="text-white/70 text-xs">{stream.likeCount.toLocaleString()}réactions</Text></View></View>{}<View className="absolute right-3 bottom-20 flex flex-col items-center gap-4 z-10"><Pressable onPress={() => void handleLike()} className="flex flex-col items-center gap-1 active:scale-90 transition-transform"><View animate={liked ? { scale: [1, 1.5, 1] } : {}} transition={{ duration: 0.3 }}><Heart size={28} color={liked ? "#EF4444" : "white"} fill={liked ? "#EF4444" : "none"} /></View><Text className="text-white text-xs">{stream.likeCount}</Text></Pressable><Pressable onPress={() => setShowGifts(true)} className="flex flex-col items-center gap-1 active:scale-90 transition-transform"><Gift size={28} color="#F59E0B" /><Text className="text-white text-xs">Cadeau</Text></Pressable><Pressable onPress={() => {
+            Share.share({ message: String(stream.title), title: stream.title }).catch(() => null);
+            addReaction("🔗", "#6366F1");
+          }} className="flex flex-col items-center gap-1 active:scale-90 transition-transform"><Share2 size={26} color="white" /><Text className="text-white text-xs">Partager</Text></Pressable></View></View>{}<View className="flex-shrink-0 flex flex-col" style={{ backgroundColor: "rgba(5,5,15,0.98)", maxHeight: 220 }}><View className="flex-1 overflow-y-auto px-4 pt-3 pb-1" style={{ maxHeight: 155 }}>{(messages ?? []).map((m) => (
+            <ChatRow key={m._id} msg={m} />
+          ))}<View ref={chatEndRef} /></View><View className="flex items-center gap-2 px-4 py-3">{isAuthenticated ? (
             <>
-              <TextInput
-                value={chatText}
-                onChangeText={setChatText}
-                onSubmitEditing={() => void handleSendMessage()}
-                placeholder="Écrire un message..."
-                placeholderTextColor="#6B7280"
-                style={styles.chatInput}
-                returnKeyType="send"
-              />
-
-              <Pressable
-                onPress={() => void handleSendMessage()}
-                style={styles.sendButton}
-              >
-                <Send size={16} color="#FFFFFF" />
-              </Pressable>
+              <TextInput value={chatText} onChangeText={(value) => setChatText(value)} onKeyPress={(e) => e.nativeEvent.key === "Enter" && void handleSendMsg()} placeholder="Écrire un message..." className="flex-1 px-3 py-2 rounded-full text-sm text-white outline-none" style={{ backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderStyle: "solid" }} />
+              <Pressable onPress={() => void handleSendMsg()} className="w-9 h-9 flex items-center justify-center rounded-full flex-shrink-0" style={{  }}><Send size={14} color="white" /></Pressable>
             </>
           ) : (
-            <View style={styles.signInContainer}>
-              <SignInButton />
+            <View className="flex-1 flex items-center justify-center py-1"><SignInButton /></View>
+          )}</View></View>{}<View>{showGifts && (
+          <>
+            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setShowGifts(false)} className="absolute inset-0 z-50" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} />
+            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }} className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl p-6" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
+              <View className="flex items-center justify-between mb-5"><Text className="text-white font-black text-lg flex items-center gap-2"><Gift size={18} className="text-amber-400" />Envoyer un cadeau</Text><Pressable onPress={() => setShowGifts(false)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><X size={16} className="text-white" /></Pressable></View>
+              <View className="gap-3 mb-4">{GIFTS.map((g) => (
+                  <Pressable key={g.type} onPress={() => void handleGift(g)} className="flex flex-col items-center gap-2 p-3 rounded-2xl active:scale-90 transition-transform" style={{ backgroundColor: `${g.color}18`, borderStyle: "solid" }}><Text className="text-2xl">{g.emoji}</Text><Text className="text-white text-[10px] font-bold">{g.label}</Text><Text className="text-xs font-black" style={{ color: g.color }}>{g.price}pts</Text></Pressable>
+                ))}</View>
+              <Text className="text-white/30 text-xs text-center">Les cadeaux soutiennent directement le créateur</Text>
             </View>
-          )}
-        </View>
+          </>
+        )}</View></View>
+  );
+}
+
+// ── Go Live Form ──────────────────────────────────────────────────────────────
+function GoLiveForm({ onClose, onStarted }: { onClose: () => void; onStarted: (id: Id<"liveStreams">) => void }) {
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("Musique");
+  const [isPublic, setIsPublic] = useState(true);
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const startStream = useMutation(api.liveStreams.startStream);
+
+  const handleStart = async () => {
+    if (!title.trim()) { toast.error("Donnez un titre à votre live"); return; }
+    setLoading(true);
+    try {
+      const id = await startStream({ title, category, tags: [], isPublic });
+      toast.success("Live démarré !");
+      onStarted(id);
+    } catch (e) {
+      toast.error("Erreur au démarrage");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={onClose} className="absolute inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,0.8)" }} />
+      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }} className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl p-6" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
+        <View className="flex items-center justify-between mb-5"><Text className="text-white font-black text-lg flex items-center gap-2"><Radio size={18} className="text-red-400" />Lancer un Live
+          </Text><Pressable onPress={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><X size={16} className="text-white" /></Pressable></View>
+
+        {/* Camera preview mock */}
+        <View className="w-full h-36 rounded-2xl mb-5 flex items-center justify-center relative overflow-hidden" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>{camOn ? (
+            <View className="flex flex-col items-center gap-2"><View className="w-16 h-16 rounded-full flex items-center justify-center" style={{  }}><Video size={28} className="text-white" /></View><Text className="text-white/50 text-xs">Aperçu caméra</Text></View>
+          ) : (
+            <VideoOff size={36} className="text-white/30" />
+          )}<View className="absolute top-3 right-3 flex gap-2"><Pressable onPress={() => setMicOn(!micOn)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: micOn ? "rgba(99,102,241,0.4)" : "rgba(239,68,68,0.4)" }}>{micOn ? <Mic size={14} className="text-white" /> : <MicOff size={14} className="text-white" />}</Pressable><Pressable onPress={() => setCamOn(!camOn)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: camOn ? "rgba(99,102,241,0.4)" : "rgba(239,68,68,0.4)" }}>{camOn ? <Video size={14} className="text-white" /> : <VideoOff size={14} className="text-white" />}</Pressable></View></View>
+
+        <View className="space-y-3 mb-5"><TextInput value={title} onChangeText={(value) => setTitle(value)} placeholder="Titre de votre live..." className="w-full px-4 py-3 rounded-xl text-white text-sm outline-none" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid" }} /><View className="flex gap-2 overflow-x-auto pb-1" style={{  }}>{CATEGORIES.filter(c => c !== "Tout").map((cat) => (
+              <Pressable key={cat} onPress={() => setCategory(cat)} className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all" style={category === cat ? {  } : { backgroundColor: "rgba(255,255,255,0.08)" }}>{cat}</Pressable>
+            ))}</View><View className="flex items-center justify-between px-1"><Text className="text-white/60 text-sm">Live public</Text><View onPress={() => setIsPublic(!isPublic)} className="w-12 h-6 rounded-full flex items-center px-1 transition-all" style={{  }}><View animate={{ x: isPublic ? 24 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} className="w-4 h-4 rounded-full bg-white" /></View></View></View>
+
+        <Pressable onPress={() => void handleStart()} disabled={loading} className="w-full py-4 rounded-2xl font-black text-white flex items-center justify-center gap-2 disabled:opacity-50" style={{ boxShadow: "0 8px 30px rgba(239,68,68,0.4)" }}><Radio size={18} className="animate-pulse" />{loading ? "Démarrage..." : "Go Live !"}</Pressable>
       </View>
+    </>
+  );
+}
 
-      <Modal
-        visible={showGifts}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowGifts(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            onPress={() => setShowGifts(false)}
-            style={StyleSheet.absoluteFill}
-          />
+// ── Stream Card ───────────────────────────────────────────────────────────────
+function StreamCard({ stream, onWatch }: {
+  stream: { _id: string; title: string; hostName: string; category: string; viewerCount: number; likeCount: number; thumbnailUrl?: string; status: string; startedAt?: string };
+  onWatch: () => void;
+}) {
+  const DEMO_THUMB = "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=225&fit=crop";
 
-          <View style={styles.giftSheet}>
-            <View style={styles.sheetHeader}>
-              <View style={styles.sheetTitleRow}>
-                <Gift size={19} color="#F59E0B" />
-
-                <Text style={styles.sheetTitle}>Envoyer un cadeau</Text>
-              </View>
-
-              <Pressable
-                onPress={() => setShowGifts(false)}
-                style={styles.sheetClose}
-              >
-                <X size={18} color="#FFFFFF" />
-              </Pressable>
-            </View>
-
-            <View style={styles.giftsGrid}>
-              {GIFTS.map((gift) => (
-                <Pressable
-                  key={gift.type}
-                  onPress={() => void handleGift(gift)}
-                  style={[
-                    styles.giftCard,
-                    {
-                      borderColor: `${gift.color}66`,
-                      backgroundColor: `${gift.color}18`,
-                    },
-                  ]}
-                >
-                  <Text style={styles.giftEmoji}>{gift.emoji}</Text>
-
-                  <Text style={styles.giftLabel}>{gift.label}</Text>
-
-                  <Text
-                    style={[
-                      styles.giftPrice,
-                      {
-                        color: gift.color,
-                      },
-                    ]}
-                  >
-                    {gift.price} pts
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.giftFooter}>
-              Les cadeaux soutiennent directement le créateur
-            </Text>
-          </View>
-        </View>
-      </Modal>
+  return (
+    <View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} onPress={onWatch} className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+      <View className="relative"><Image className="w-full h-44 object-cover" source={{ uri: stream.thumbnailUrl ?? DEMO_THUMB }} accessibilityLabel={stream.title} /><View className="absolute inset-0" style={{  }} /><View className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: "rgba(239,68,68,0.9)" }}><Radio size={10} color="white" className="animate-pulse" /><Text className="text-white text-xs font-black">LIVE</Text></View><View className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}><Eye size={10} color="white" /><Text className="text-white text-xs">{stream.viewerCount.toLocaleString()}</Text></View><View className="absolute bottom-3 left-0 right-0 flex items-center justify-center"><View className="px-4 py-2 rounded-full flex items-center gap-2" style={{ backgroundColor: "rgba(99,102,241,0.9)" }}><Play size={14} color="white" fill="white" /><Text className="text-white text-sm font-bold">Rejoindre</Text></View></View></View>
+      <View className="flex items-center gap-3 p-3"><View className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white text-sm border-2" style={{ borderColor: "#EF4444" }}>{stream.hostName[0]?.toUpperCase()}</View><View className="flex-1 min-w-0"><Text className="text-white font-semibold text-sm truncate">{stream.title}</Text><View className="flex items-center gap-2"><Text className="text-gray-400 text-xs">{stream.hostName}</Text><Text className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.15)", color: "#A5B4FC" }}>{stream.category}</Text></View></View><View className="flex items-center gap-1 text-xs text-pink-400"><Heart size={11} fill="#F472B6" /><Text>{stream.likeCount}</Text></View></View>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Go Live Form
-// ─────────────────────────────────────────────────────────────────────────────
-
-function GoLiveForm({
-  onClose,
-  onStarted,
-}: {
-  onClose: () => void;
-  onStarted: (id: Id<"liveStreams">) => void;
-}) {
-  const [title, setTitle] = useState("");
-
-  const [category, setCategory] = useState("Musique");
-
-  const [isPublic, setIsPublic] = useState(true);
-
-  const [micOn, setMicOn] = useState(true);
-
-  const [camOn, setCamOn] = useState(true);
-
-  const [loading, setLoading] = useState(false);
-
-  const startStream = useMutation(api.liveStreams.startStream);
-
-  const handleStart = useCallback(async () => {
-    const cleanTitle = title.trim();
-
-    if (!cleanTitle) {
-      Alert.alert("Titre requis", "Donnez un titre à votre live.");
-
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const id = await startStream({
-        title: cleanTitle,
-        category,
-        tags: [],
-        isPublic,
-      });
-
-      Alert.alert("Live démarré", "Votre diffusion est maintenant en direct.");
-
-      onStarted(id);
-    } catch {
-      Alert.alert("Erreur", "Impossible de démarrer le live.");
-    } finally {
-      setLoading(false);
-    }
-  }, [category, isPublic, onStarted, startStream, title]);
-
-  return (
-    <Modal transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-
-        <View style={styles.goLiveSheet}>
-          <View style={styles.sheetHeader}>
-            <View style={styles.sheetTitleRow}>
-              <Radio size={19} color="#F87171" />
-
-              <Text style={styles.sheetTitle}>Lancer un Live</Text>
-            </View>
-
-            <Pressable onPress={onClose} style={styles.sheetClose}>
-              <X size={18} color="#FFFFFF" />
-            </Pressable>
-          </View>
-
-          <View
-            style={[styles.cameraPreview, !camOn && styles.cameraPreviewOff]}
-          >
-            {camOn ? (
-              <>
-                <View style={styles.cameraPreviewIcon}>
-                  <Video size={30} color="#FFFFFF" />
-                </View>
-
-                <Text style={styles.cameraPreviewText}>Aperçu caméra</Text>
-              </>
-            ) : (
-              <VideoOff size={38} color="#6B7280" />
-            )}
-
-            <View style={styles.cameraControls}>
-              <Pressable
-                onPress={() => setMicOn((value) => !value)}
-                style={[
-                  styles.cameraControlButton,
-                  {
-                    backgroundColor: micOn
-                      ? "rgba(99,102,241,0.55)"
-                      : "rgba(239,68,68,0.55)",
-                  },
-                ]}
-              >
-                {micOn ? (
-                  <Mic size={16} color="#FFFFFF" />
-                ) : (
-                  <MicOff size={16} color="#FFFFFF" />
-                )}
-              </Pressable>
-
-              <Pressable
-                onPress={() => setCamOn((value) => !value)}
-                style={[
-                  styles.cameraControlButton,
-                  {
-                    backgroundColor: camOn
-                      ? "rgba(99,102,241,0.55)"
-                      : "rgba(239,68,68,0.55)",
-                  },
-                ]}
-              >
-                {camOn ? (
-                  <Video size={16} color="#FFFFFF" />
-                ) : (
-                  <VideoOff size={16} color="#FFFFFF" />
-                )}
-              </Pressable>
-            </View>
-          </View>
-
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Titre de votre live..."
-            placeholderTextColor="#64748B"
-            style={styles.liveTitleInput}
-          />
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryScroll}
-          >
-            {CATEGORIES.filter((item) => item !== "Tout").map((item) => {
-              const selected = category === item;
-
-              return (
-                <Pressable
-                  key={item}
-                  onPress={() => setCategory(item)}
-                  style={[
-                    styles.categoryChip,
-                    selected && styles.categoryChipActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.categoryChipText,
-                      selected && styles.categoryChipTextActive,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          <Pressable
-            onPress={() => setIsPublic((value) => !value)}
-            style={styles.publicToggleRow}
-          >
-            <Text style={styles.publicToggleLabel}>Live public</Text>
-
-            <View
-              style={[styles.toggleTrack, isPublic && styles.toggleTrackActive]}
-            >
-              <View
-                style={[
-                  styles.toggleThumb,
-                  isPublic && styles.toggleThumbActive,
-                ]}
-              />
-            </View>
-          </Pressable>
-
-          <Pressable
-            disabled={loading}
-            onPress={() => void handleStart()}
-            style={[styles.goLiveButton, loading && styles.disabledButton]}
-          >
-            <Radio size={19} color="#FFFFFF" />
-
-            <Text style={styles.goLiveButtonText}>
-              {loading ? "Démarrage..." : "Go Live !"}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stream Card
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StreamCard({
-  stream,
-  onWatch,
-}: {
-  stream: {
-    _id: string;
-    title: string;
-    hostName: string;
-    category: string;
-    viewerCount: number;
-    likeCount: number;
-    thumbnailUrl?: string;
-    status: string;
-    startedAt?: string;
-  };
-  onWatch: () => void;
-}) {
-  return (
-    <Pressable onPress={onWatch} style={styles.streamCard}>
-      <View style={styles.streamImageWrapper}>
-        <Image
-          source={{
-            uri: stream.thumbnailUrl ?? DEMO_THUMBNAIL,
-          }}
-          style={styles.streamImage}
-          resizeMode="cover"
-        />
-
-        <View style={styles.streamImageOverlay} />
-
-        <View style={styles.streamLiveBadge}>
-          <Radio size={10} color="#FFFFFF" />
-
-          <Text style={styles.streamLiveBadgeText}>LIVE</Text>
-        </View>
-
-        <View style={styles.streamViewerBadge}>
-          <Eye size={11} color="#FFFFFF" />
-
-          <Text style={styles.streamViewerText}>
-            {formatNumber(stream.viewerCount)}
-          </Text>
-        </View>
-
-        <View style={styles.joinLiveButton}>
-          <Play size={14} color="#FFFFFF" fill="#FFFFFF" />
-
-          <Text style={styles.joinLiveButtonText}>Rejoindre</Text>
-        </View>
-      </View>
-
-      <View style={styles.streamCardInfo}>
-        <View style={styles.streamHostAvatar}>
-          <Text style={styles.streamHostAvatarText}>
-            {stream.hostName?.[0]?.toUpperCase() ?? "L"}
-          </Text>
-        </View>
-
-        <View style={styles.streamCardTextContent}>
-          <Text numberOfLines={1} style={styles.streamCardTitle}>
-            {stream.title}
-          </Text>
-
-          <View style={styles.streamCardMeta}>
-            <Text numberOfLines={1} style={styles.streamHostName}>
-              {stream.hostName}
-            </Text>
-
-            <View style={styles.streamCategoryBadge}>
-              <Text style={styles.streamCategoryText}>{stream.category}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.cardLikes}>
-          <Heart size={12} color="#F472B6" fill="#F472B6" />
-
-          <Text style={styles.cardLikesText}>
-            {formatNumber(stream.likeCount)}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// My Live Banner
-// ─────────────────────────────────────────────────────────────────────────────
-
-function MyLiveBanner({
-  streamId,
-  onEnterOwn,
-  onEnd,
-}: {
+// ── My Live Banner (when hosting) ─────────────────────────────────────────────
+function MyLiveBanner({ streamId, onEnterOwn, onEnd }: {
   streamId: Id<"liveStreams">;
   onEnterOwn: () => void;
   onEnd: () => void;
 }) {
-  const stream = useQuery(api.liveStreams.getStream, {
-    streamId,
-  });
-
+  const stream = useQuery(api.liveStreams.getStream, { streamId });
   const endStream = useMutation(api.liveStreams.endStream);
 
-  const handleEnd = useCallback(async () => {
-    try {
-      await endStream({
-        streamId,
-      });
-
-      onEnd();
-    } catch {
-      Alert.alert("Erreur", "Impossible de terminer le live.");
-    }
-  }, [endStream, onEnd, streamId]);
-
-  if (!stream) {
-    return null;
-  }
+  if (!stream) return null;
 
   return (
-    <View style={styles.myLiveBanner}>
-      <View style={styles.liveDot} />
-
-      <View style={styles.myLiveText}>
-        <Text numberOfLines={1} style={styles.myLiveTitle}>
-          {stream.title}
-        </Text>
-
-        <Text style={styles.myLiveSubtitle}>
-          {formatNumber(stream.viewerCount)} spectateurs · EN DIRECT
-        </Text>
-      </View>
-
-      <Pressable onPress={onEnterOwn} style={styles.manageButton}>
-        <Text style={styles.manageButtonText}>Gérer</Text>
-      </Pressable>
-
-      <Pressable onPress={() => void handleEnd()} style={styles.endButton}>
-        <Text style={styles.endButtonText}>Terminer</Text>
-      </Pressable>
+    <View initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mx-4 mb-4 p-4 rounded-2xl flex items-center gap-3" style={{ backgroundColor: "rgba(239,68,68,0.12)", borderWidth: 1, borderColor: "rgba(239,68,68,0.35)", borderStyle: "solid" }}>
+      <View className="w-3 h-3 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+      <View className="flex-1 min-w-0"><Text className="text-white font-bold text-sm truncate">{stream.title}</Text><Text className="text-red-400 text-xs">{stream.viewerCount}spectateurs · EN DIRECT</Text></View>
+      <Pressable onPress={onEnterOwn} className="px-3 py-1.5 rounded-xl text-xs font-bold" style={{ backgroundColor: "rgba(99,102,241,0.3)" }}><Text>Gérer</Text></Pressable>
+      <Pressable onPress={async () => { await endStream({ streamId }); onEnd(); }} className="px-3 py-1.5 rounded-xl text-xs font-bold" style={{ backgroundColor: "rgba(239,68,68,0.3)" }}><Text>Terminer</Text></Pressable>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Page
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function LiveStreamingPage({ onBack }: { onBack: () => void }) {
   const [activeCategory, setActiveCategory] = useState("Tout");
-
   const [watchingId, setWatchingId] = useState<Id<"liveStreams"> | null>(null);
-
   const [showGoLive, setShowGoLive] = useState(false);
 
   const { isAuthenticated } = useConvexAuth();
+  const liveStreams = useQuery(api.liveStreams.listLiveStreams, { status: "live" });
+  const myActiveStream = useQuery(api.liveStreams.getMyActiveStream, isAuthenticated ? {} : "skip");
 
-  const liveStreams = useQuery(api.liveStreams.listLiveStreams, {
-    status: "live",
-  });
-
-  const myActiveStream = useQuery(
-    api.liveStreams.getMyActiveStream,
-    isAuthenticated ? {} : "skip",
+  const filtered = (liveStreams ?? []).filter(s =>
+    activeCategory === "Tout" || s.category === activeCategory
   );
 
-  const filtered = (liveStreams ?? []).filter(
-    (stream) => activeCategory === "Tout" || stream.category === activeCategory,
-  );
-
-  const totalViewers =
-    liveStreams
-      ?.reduce((total, stream) => total + (stream.viewerCount ?? 0), 0)
-      .toLocaleString() ?? "—";
-
+  // If watching a stream
   if (watchingId) {
-    return (
-      <WatchView streamId={watchingId} onClose={() => setWatchingId(null)} />
-    );
+    return <WatchView streamId={watchingId} onClose={() => setWatchingId(null)} />;
   }
 
   return (
-    <View style={styles.page}>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} style={styles.backButton}>
-          <ArrowLeft size={20} color="#FFFFFF" />
-        </Pressable>
-
-        <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>Live Streaming</Text>
-
-          <Text style={styles.headerSubtitle}>
-            {liveStreams === undefined
-              ? "Chargement..."
-              : `${liveStreams.length} stream${
-                  liveStreams.length !== 1 ? "s" : ""
-                } en direct`}
-          </Text>
-        </View>
-
-        <Authenticated>
-          <Pressable
-            onPress={() => setShowGoLive(true)}
-            style={styles.headerGoLive}
-          >
-            <Radio size={14} color="#FFFFFF" />
-
-            <Text style={styles.headerGoLiveText}>Go Live</Text>
-          </Pressable>
-        </Authenticated>
-
-        <Unauthenticated>
-          <SignInButton />
-        </Unauthenticated>
-      </View>
-
-      {myActiveStream && (
+    <View className="h-full flex flex-col overflow-hidden relative" style={{  }}>{}<View className="flex-shrink-0 flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={onBack} className="p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} color="white" /></Pressable><View className="flex-1"><Text className="text-white font-black text-lg">Live Streaming</Text><Text className="text-gray-400 text-xs">{liveStreams === undefined ? "Chargement..." : `${liveStreams.length} stream${liveStreams.length !== 1 ? "s" : ""} en direct`}</Text></View><Authenticated><Pressable onPress={() => setShowGoLive(true)} className="flex items-center gap-2 px-4 py-2 rounded-full font-black text-sm" style={{ boxShadow: "0 4px 20px rgba(239,68,68,0.4)" }}><Radio size={14} color="white" className="animate-pulse" /><Text className="text-white">Go Live</Text></Pressable></Authenticated><Unauthenticated><SignInButton /></Unauthenticated></View>{}{myActiveStream && (
         <MyLiveBanner
           streamId={myActiveStream._id}
           onEnterOwn={() => setWatchingId(myActiveStream._id)}
-          onEnd={() => {
-            setWatchingId(null);
-          }}
+          onEnd={() => {}}
         />
-      )}
-
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Users size={17} color="#6366F1" />
-
-          <Text style={styles.statValue}>{totalViewers}</Text>
-
-          <Text style={styles.statLabel}>En direct</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Radio size={17} color="#EF4444" />
-
-          <Text style={styles.statValue}>{liveStreams?.length ?? "—"}</Text>
-
-          <Text style={styles.statLabel}>Créateurs</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <TrendingUp size={17} color="#10B981" />
-
-          <Text style={styles.statValue}>+23%</Text>
-
-          <Text style={styles.statLabel}>Ce soir</Text>
-        </View>
-      </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesContainer}
-      >
-        {CATEGORIES.map((category) => {
-          const selected = activeCategory === category;
-
-          return (
-            <Pressable
-              key={category}
-              onPress={() => setActiveCategory(category)}
-              style={[
-                styles.mainCategoryChip,
-                selected && styles.mainCategoryChipActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.mainCategoryText,
-                  selected && styles.mainCategoryTextActive,
-                ]}
-              >
-                {category}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <View style={styles.streamListWrapper}>
-        {liveStreams === undefined ? (
-          <View style={styles.loadingState}>
-            <Radio size={30} color="#6366F1" />
-
-            <Text style={styles.loadingText}>Chargement des lives...</Text>
-          </View>
+      )}{}<View className="flex gap-3 px-4 mb-4">{[
+          { icon: Users, label: "En direct", value: liveStreams?.reduce((s, l) => s + l.viewerCount, 0).toLocaleString() ?? "—", color: "#6366F1" },
+          { icon: Radio, label: "Créateurs", value: liveStreams?.length.toString() ?? "—", color: "#EF4444" },
+          { icon: TrendingUp, label: "Ce soir", value: "+23%", color: "#10B981" },
+        ].map(({ icon: Icon, label, value, color }) => (
+          <View key={label} className="flex-1 p-3 rounded-xl text-center" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Icon size={16} color={color} className="mx-auto mb-1" /><Text className="text-white font-bold text-sm">{value}</Text><Text className="text-gray-500 text-xs">{label}</Text></View>
+        ))}</View>{}<View className="flex gap-2 px-4 mb-4 overflow-x-auto" style={{  }}>{CATEGORIES.map((cat) => (
+          <Pressable key={cat} onPress={() => setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0" style={activeCategory === cat ? {  } : { backgroundColor: "rgba(255,255,255,0.06)" }}>{cat}</Pressable>
+        ))}</View>{}<View className="flex-1 overflow-y-auto px-4 pb-6 space-y-4" style={{  }}>{liveStreams === undefined ? (
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-60 w-full rounded-2xl" />)
         ) : filtered.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <Radio size={34} color="#F87171" />
-            </View>
-
-            <Text style={styles.emptyTitle}>Aucun live en cours</Text>
-
-            <Text style={styles.emptySubtitle}>
-              Soyez le premier à lancer un live !
-            </Text>
-
-            <Authenticated>
-              <Pressable
-                onPress={() => setShowGoLive(true)}
-                style={styles.emptyGoLive}
-              >
-                <Text style={styles.emptyGoLiveText}>Démarrer un Live</Text>
-              </Pressable>
-            </Authenticated>
-          </View>
+          <View className="flex flex-col items-center py-12 gap-4"><View className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.12)" }}><Radio size={32} className="text-red-400" /></View><Text className="text-white/50 text-sm">Aucun live en cours</Text><Text className="text-white/25 text-xs text-center">Soyez le premier à lancer un live !</Text><Authenticated><Pressable onPress={() => setShowGoLive(true)} className="px-6 py-3 rounded-2xl font-black text-white" style={{  }}>Démarrer un Live
+              </Pressable></Authenticated></View>
         ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => String(item._id)}
-            renderItem={({ item }) => (
-              <StreamCard
-                stream={{
-                  ...item,
-                  _id: String(item._id),
-                }}
-                onWatch={() => setWatchingId(item._id as Id<"liveStreams">)}
-              />
-            )}
-            contentContainerStyle={styles.streamList}
-            showsVerticalScrollIndicator={false}
+          filtered.map((stream, i) => (
+            <View key={stream._id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+              <StreamCard stream={stream} onWatch={() => setWatchingId(stream._id as Id<"liveStreams">)} />
+            </View>
+          ))
+        )}{}<Authenticated>{!myActiveStream && (
+            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="p-5 rounded-2xl text-center" style={{ backgroundColor: "rgba(239,68,68,0.08)", borderWidth: 1, borderColor: "rgba(239,68,68,0.3)", borderStyle: "dashed" }}>
+              <Radio size={28} className="text-red-400 mx-auto mb-3" />
+              <Text className="text-white font-black text-base">Lancez votre live</Text>
+              <Text className="text-gray-400 text-xs mt-1 mb-4">Partagez votre passion en temps réel</Text>
+              <Pressable onPress={() => setShowGoLive(true)} className="px-8 py-3 rounded-full text-sm font-black" style={{  }}>
+                Go Live !
+              </Pressable>
+            </View>
+          )}</Authenticated></View>{}<View>{showGoLive && (
+          <GoLiveForm
+            onClose={() => setShowGoLive(false)}
+            onStarted={(id) => { setShowGoLive(false); setWatchingId(id); }}
           />
-        )}
-      </View>
-
-      <Authenticated>
-        {!myActiveStream && (
-          <View style={styles.bottomCta}>
-            <Radio size={28} color="#F87171" />
-
-            <Text style={styles.bottomCtaTitle}>Lancez votre live</Text>
-
-            <Text style={styles.bottomCtaSubtitle}>
-              Partagez votre passion en temps réel
-            </Text>
-
-            <Pressable
-              onPress={() => setShowGoLive(true)}
-              style={styles.bottomCtaButton}
-            >
-              <Text style={styles.bottomCtaButtonText}>Go Live !</Text>
-            </Pressable>
-          </View>
-        )}
-      </Authenticated>
-
-      <Modal
-        visible={showGoLive}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowGoLive(false)}
-      >
-        <GoLiveForm
-          onClose={() => setShowGoLive(false)}
-          onStarted={(id) => {
-            setShowGoLive(false);
-            setWatchingId(id);
-          }}
-        />
-      </Modal>
-    </View>
+        )}</View></View>
   );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: "#050716",
-  },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" ? 58 : 28,
-    paddingBottom: 16,
-  },
-
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  headerText: {
-    flex: 1,
-  },
-
-  headerTitle: {
-    color: "#FFFFFF",
-    fontSize: 19,
-    fontWeight: "800",
-  },
-
-  headerSubtitle: {
-    marginTop: 2,
-    color: "#9CA3AF",
-    fontSize: 12,
-  },
-
-  headerGoLive: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: "#DC2626",
-  },
-
-  headerGoLiveText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-
-  statsRow: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-
-  statCard: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-
-  statValue: {
-    marginTop: 5,
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
-  statLabel: {
-    marginTop: 2,
-    color: "#6B7280",
-    fontSize: 10,
-  },
-
-  categoriesContainer: {
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-  },
-
-  mainCategoryChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-
-  mainCategoryChipActive: {
-    backgroundColor: "#6366F1",
-  },
-
-  mainCategoryText: {
-    color: "#9CA3AF",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  mainCategoryTextActive: {
-    color: "#FFFFFF",
-  },
-
-  streamListWrapper: {
-    flex: 1,
-  },
-
-  streamList: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    gap: 14,
-  },
-
-  streamCard: {
-    overflow: "hidden",
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-
-  streamImageWrapper: {
-    height: 190,
-    position: "relative",
-  },
-
-  streamImage: {
-    width: "100%",
-    height: "100%",
-  },
-
-  streamImageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.28)",
-  },
-
-  streamLiveBadge: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: "#EF4444",
-  },
-
-  streamLiveBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "900",
-  },
-
-  streamViewerBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.65)",
-  },
-
-  streamViewerText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-  },
-
-  joinLiveButton: {
-    position: "absolute",
-    bottom: 14,
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: "rgba(99,102,241,0.95)",
-  },
-
-  joinLiveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-
-  streamCardInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    padding: 13,
-  },
-
-  streamHostAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#6366F1",
-    borderWidth: 2,
-    borderColor: "#EF4444",
-  },
-
-  streamHostAvatarText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-  },
-
-  streamCardTextContent: {
-    flex: 1,
-  },
-
-  streamCardTitle: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  streamCardMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginTop: 4,
-  },
-
-  streamHostName: {
-    maxWidth: 100,
-    color: "#9CA3AF",
-    fontSize: 11,
-  },
-
-  streamCategoryBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: "rgba(99,102,241,0.16)",
-  },
-
-  streamCategoryText: {
-    color: "#A5B4FC",
-    fontSize: 10,
-  },
-
-  cardLikes: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-
-  cardLikesText: {
-    color: "#F472B6",
-    fontSize: 11,
-  },
-
-  myLiveBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginHorizontal: 16,
-    marginBottom: 14,
-    padding: 13,
-    borderRadius: 16,
-    backgroundColor: "rgba(239,68,68,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.35)",
-  },
-
-  liveDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#EF4444",
-  },
-
-  myLiveText: {
-    flex: 1,
-  },
-
-  myLiveTitle: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-
-  myLiveSubtitle: {
-    marginTop: 2,
-    color: "#F87171",
-    fontSize: 10,
-  },
-
-  manageButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: "rgba(99,102,241,0.28)",
-  },
-
-  manageButtonText: {
-    color: "#A5B4FC",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
-  endButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: "rgba(239,68,68,0.25)",
-  },
-
-  endButtonText: {
-    color: "#FCA5A5",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
-  loadingState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-
-  loadingText: {
-    color: "#9CA3AF",
-    fontSize: 13,
-  },
-
-  emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-
-  emptyIcon: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(239,68,68,0.12)",
-  },
-
-  emptyTitle: {
-    marginTop: 16,
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-
-  emptySubtitle: {
-    marginTop: 7,
-    color: "#6B7280",
-    fontSize: 12,
-    textAlign: "center",
-  },
-
-  emptyGoLive: {
-    marginTop: 18,
-    paddingHorizontal: 22,
-    paddingVertical: 13,
-    borderRadius: 16,
-    backgroundColor: "#DC2626",
-  },
-
-  emptyGoLiveText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-  },
-
-  bottomCta: {
-    margin: 16,
-    padding: 20,
-    borderRadius: 18,
-    alignItems: "center",
-    backgroundColor: "rgba(239,68,68,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.25)",
-  },
-
-  bottomCtaTitle: {
-    marginTop: 8,
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "900",
-  },
-
-  bottomCtaSubtitle: {
-    marginTop: 5,
-    color: "#9CA3AF",
-    fontSize: 11,
-  },
-
-  bottomCtaButton: {
-    marginTop: 15,
-    paddingHorizontal: 28,
-    paddingVertical: 12,
-    borderRadius: 24,
-    backgroundColor: "#DC2626",
-  },
-
-  bottomCtaButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "900",
-  },
-
-  watchContainer: {
-    flex: 1,
-    backgroundColor: "#000000",
-  },
-
-  watchLoading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    backgroundColor: "#000000",
-  },
-
-  watchLoadingText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-  },
-
-  videoArea: {
-    flex: 1,
-    minHeight: 360,
-    position: "relative",
-  },
-
-  videoImage: {
-    width: "100%",
-    height: "100%",
-    position: "absolute",
-  },
-
-  videoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.25)",
-  },
-
-  reactionsLayer: {
-    ...StyleSheet.absoluteFillObject,
-  },
-
-  floatingReaction: {
-    position: "absolute",
-    bottom: 85,
-  },
-
-  floatingReactionEmoji: {
-    fontSize: 34,
-  },
-
-  watchTopBar: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 54 : 20,
-    left: 16,
-    right: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-
-  roundDarkButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-
-  hostInfo: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-
-  hostAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#6366F1",
-  },
-
-  hostAvatarText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-
-  hostText: {
-    flex: 1,
-  },
-
-  hostName: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-
-  hostCategory: {
-    marginTop: 2,
-    color: "#D1D5DB",
-    fontSize: 10,
-  },
-
-  liveInfo: {
-    alignItems: "flex-end",
-    gap: 6,
-  },
-
-  liveBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 14,
-    backgroundColor: "#EF4444",
-  },
-
-  liveBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "900",
-  },
-
-  viewerBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-
-  viewerBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-  },
-
-  videoBottomInfo: {
-    position: "absolute",
-    left: 16,
-    right: 90,
-    bottom: 16,
-  },
-
-  streamTitle: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-
-  likesInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginTop: 7,
-  },
-
-  likesText: {
-    color: "#D1D5DB",
-    fontSize: 11,
-  },
-
-  watchActions: {
-    position: "absolute",
-    right: 14,
-    bottom: 22,
-    alignItems: "center",
-    gap: 18,
-  },
-
-  watchAction: {
-    alignItems: "center",
-    gap: 4,
-  },
-
-  watchActionText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-  },
-
-  chatSection: {
-    height: 235,
-    backgroundColor: "#080A12",
-  },
-
-  chatList: {
-    flex: 1,
-  },
-
-  chatListContent: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-
-  chatRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 7,
-    paddingVertical: 3,
-  },
-
-  chatAvatar: {
-    width: 21,
-    height: 21,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  chatAvatarText: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "800",
-  },
-
-  chatContent: {
-    flex: 1,
-  },
-
-  chatMessage: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-
-  chatUserName: {
-    fontWeight: "800",
-  },
-
-  chatMessageText: {
-    color: "#D1D5DB",
-  },
-
-  systemMessage: {
-    paddingVertical: 4,
-    alignItems: "center",
-  },
-
-  systemMessageText: {
-    color: "#6B7280",
-    fontSize: 11,
-    fontStyle: "italic",
-  },
-
-  superChat: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginVertical: 4,
-    padding: 10,
-    borderRadius: 12,
-    backgroundColor: "rgba(99,102,241,0.22)",
-    borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.4)",
-  },
-
-  superChatEmoji: {
-    fontSize: 20,
-  },
-
-  superChatContent: {
-    flex: 1,
-  },
-
-  superChatUser: {
-    color: "#C4B5FD",
-    fontSize: 11,
-    fontWeight: "800",
-  },
-
-  superChatText: {
-    marginTop: 2,
-    color: "#FFFFFF",
-    fontSize: 11,
-  },
-
-  superChatAmount: {
-    color: "#FACC15",
-    fontSize: 11,
-    fontWeight: "900",
-  },
-
-  chatInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.06)",
-  },
-
-  chatInput: {
-    flex: 1,
-    minHeight: 40,
-    paddingHorizontal: 15,
-    borderRadius: 22,
-    color: "#FFFFFF",
-    fontSize: 13,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#6366F1",
-  },
-
-  signInContainer: {
-    flex: 1,
-    alignItems: "center",
-  },
-
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.75)",
-  },
-
-  giftSheet: {
-    padding: 20,
-    paddingBottom: Platform.OS === "ios" ? 36 : 24,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: "#0B1020",
-  },
-
-  goLiveSheet: {
-    padding: 20,
-    paddingBottom: Platform.OS === "ios" ? 36 : 24,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: "#0B1020",
-  },
-
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 18,
-  },
-
-  sheetTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-
-  sheetTitle: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-
-  sheetClose: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
-
-  giftsGrid: {
-    flexDirection: "row",
-    gap: 8,
-  },
-
-  giftCard: {
-    flex: 1,
-    minHeight: 100,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-
-  giftEmoji: {
-    fontSize: 25,
-  },
-
-  giftLabel: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-
-  giftPrice: {
-    fontSize: 9,
-    fontWeight: "900",
-  },
-
-  giftFooter: {
-    marginTop: 15,
-    color: "#6B7280",
-    fontSize: 11,
-    textAlign: "center",
-  },
-
-  cameraPreview: {
-    height: 150,
-    marginBottom: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-    overflow: "hidden",
-    backgroundColor: "#17173A",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-
-  cameraPreviewOff: {
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-
-  cameraPreviewIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#6366F1",
-  },
-
-  cameraPreviewText: {
-    marginTop: 8,
-    color: "#9CA3AF",
-    fontSize: 12,
-  },
-
-  cameraControls: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    flexDirection: "row",
-    gap: 8,
-  },
-
-  cameraControlButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  liveTitleInput: {
-    minHeight: 48,
-    paddingHorizontal: 15,
-    marginBottom: 14,
-    borderRadius: 14,
-    color: "#FFFFFF",
-    fontSize: 14,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-
-  categoryScroll: {
-    gap: 8,
-    paddingBottom: 14,
-  },
-
-  categoryChip: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-
-  categoryChipActive: {
-    backgroundColor: "#6366F1",
-  },
-
-  categoryChipText: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
-  categoryChipTextActive: {
-    color: "#FFFFFF",
-  },
-
-  publicToggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-  },
-
-  publicToggleLabel: {
-    color: "#D1D5DB",
-    fontSize: 14,
-  },
-
-  toggleTrack: {
-    width: 50,
-    height: 27,
-    padding: 3,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.15)",
-  },
-
-  toggleTrackActive: {
-    backgroundColor: "#6366F1",
-  },
-
-  toggleThumb: {
-    width: 21,
-    height: 21,
-    borderRadius: 11,
-    backgroundColor: "#FFFFFF",
-  },
-
-  toggleThumbActive: {
-    alignSelf: "flex-end",
-  },
-
-  goLiveButton: {
-    minHeight: 52,
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 9,
-    borderRadius: 17,
-    backgroundColor: "#DC2626",
-  },
-
-  goLiveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-
-  disabledButton: {
-    opacity: 0.5,
-  },
-});

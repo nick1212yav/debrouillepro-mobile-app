@@ -3,7 +3,7 @@ import * as React from "react";
 import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu";
 import { cva } from "class-variance-authority";
 import { ChevronDownIcon } from "lucide-react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 function NavigationMenu({
   className,
@@ -75,7 +75,8 @@ function NavigationMenuTrigger({
     >
       {children}{" "}
       <ChevronDownIcon
-        className="relative top-px ml-1 size-3 group-data-[state=open]:rotate-180"
+        className="relative top-px ml-1 size-3 transition duration-300"
+        accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"
       />
     </NavigationMenuPrimitive.Trigger>
   );
@@ -103,11 +104,9 @@ function NavigationMenuViewport({
   ...props
 }: React.ComponentProps<typeof NavigationMenuPrimitive.Viewport>) {
   return (
-    <View
-      className={cn(
+    <View className={cn(
         "absolute top-full left-0 isolate z-50 flex justify-center",
-      )}
-    >
+      )}>
       <NavigationMenuPrimitive.Viewport
         data-slot="navigation-menu-viewport"
         className={cn(
@@ -149,7 +148,7 @@ function NavigationMenuIndicator({
       )}
       {...props}
     >
-      <View className="bg-border relative top-[60%] h-2 w-2 rounded-tl-sm shadow-md" />
+      <View className="bg-border relative top-[60%] h-2 w-2 rotate-45 rounded-tl-sm shadow-md" />
     </NavigationMenuPrimitive.Indicator>
   );
 }

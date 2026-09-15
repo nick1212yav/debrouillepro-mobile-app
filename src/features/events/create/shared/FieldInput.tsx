@@ -1,4 +1,5 @@
-import { View, TextInput, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { View, TextInput, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+
 interface Props {
   icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
   color: string;
@@ -19,20 +20,6 @@ export function FieldInput({
   required = false,
 }: Props) {
   return (
-    <View
-      className="rounded-2xl p-3.5 mb-2"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-    >
-      <View className="flex items-center gap-2.5">
-        <Icon size={14} style={{ color }} />
-        <TextInput
-         
-          value={value}
-          onChangeText={(text) => onChange(text)}
-          placeholder={required ? `${placeholder} *` : placeholder}
-          className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none"
-        />
-      </View>
-    </View>
+    <View className="rounded-2xl p-3.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2.5"><Icon size={14} style={{ color }} /><TextInput value={value} onChangeText={(value) => onChange(value)} placeholder={required ? `${placeholder} *` : placeholder} className="flex-1 bg-transparent text-white text-sm placeholder:text-white/25 outline-none" /></View></View>
   );
 }

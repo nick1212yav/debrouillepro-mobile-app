@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityNotifications.ts
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 type NotificationType =
@@ -47,9 +46,9 @@ export function useCommunityNotifications() {
     markAllAsRead: async () => {
       try {
         await markAllAsRead({});
-        UIService.openToast("Toutes les notifications marquées comme lues", "success");
+        toast.success("Toutes les notifications marquées comme lues");
       } catch (error) {
-        UIService.openToast("Erreur lors du marquage", "error");
+        toast.error("Erreur lors du marquage");
       }
     },
     sendNotification: async (data: {

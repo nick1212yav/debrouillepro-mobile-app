@@ -16,9 +16,7 @@ export const VerifiedBadge: React.FC<VerifiedBadgeProps> = ({
   if (!verified) return null;
 
   return (
-    <View
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider ${className}`}
-    >
+    <View className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider ${className}`}>
       <ShieldCheck size={10} className="stroke-[2.5]" />
       <Text>{label}</Text>
     </View>

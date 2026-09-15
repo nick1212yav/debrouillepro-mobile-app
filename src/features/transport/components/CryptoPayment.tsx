@@ -1,10 +1,11 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Text } from "react-native";
 
 // src/features/transport/components/CryptoPayment.tsx
 import { useState } from "react";
 import { Coins, Loader2, CheckCircle2, Copy } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 interface CryptoPaymentProps {
   amount: number;
@@ -24,8 +25,8 @@ export function CryptoPayment({
   const cryptoWalletAddress = "0x89223a3F30a6886eD6F9a71011119AA77771234a"; // Exemple d'adresse de dépôt multi-chaîne DébrouillePro [2]
 
   const handleCopyAddress = () => {
-    undefined.writeText(cryptoWalletAddress);
-    UIService.openToast("Adresse copiée dans le presse-papiers ! [2]", "success");
+    Clipboard.setString(cryptoWalletAddress);
+    toast.success("Adresse copiée dans le presse-papiers ! [2]");
   };
 
   const handleVerifyTransaction = () => {
@@ -43,37 +44,14 @@ export function CryptoPayment({
   };
 
   return (
-    <View className="space-y-6">
-      <>
-        {step === "qr_scan" ? (
-          <View
-            key="qr-step"
-            className="space-y-4 text-center"
-          >
-            <View className="space-y-1">
-              <Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest">
-                DébrouillePay [2]
-              </Text>
-              <Text className="text-sm font-bold text-white/60">
-                Paiement Web3 (USDT / USDC) [2]
-              </Text>
-            </View>
+    <View className="space-y-6"><View>{step === "qr_scan" ? (
+          <View key="qr-step" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4 text-center">
+            <View className="space-y-1"><Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest">DébrouillePay [2]
+              </Text><Text className="text-sm font-bold text-white/60">Paiement Web3 (USDT / USDC) [2]
+              </Text></View>
 
             {/* Simuler un QR code de dépôt en CSS pur */}
-            <View className="w-32 h-32 bg-white p-2 rounded-2xl mx-auto flex items-center justify-center relative border border-white/10 shadow-2xl">
-              {/* Dessin géométrique fictif de QR Code */}
-              <View className="w-full h-full border-4 border-black flex flex-col justify-between p-1.5">
-                <View className="flex justify-between">
-                  <View className="w-5 h-5 bg-black" />
-                  <View className="w-5 h-5 bg-black" />
-                </View>
-                <View className="w-4 h-4 bg-black mx-auto" />
-                <View className="flex justify-between">
-                  <View className="w-5 h-5 bg-black" />
-                  <View className="w-3 h-3 bg-black" />
-                </View>
-              </View>
-            </View>
+            <View className="w-32 h-32 bg-white p-2 rounded-2xl mx-auto flex items-center justify-center relative border border-white/10 shadow-2xl">{}<View className="w-full h-full border-4 border-black flex flex-col justify-between p-1.5"><View className="flex justify-between"><View className="w-5 h-5 bg-black" /><View className="w-5 h-5 bg-black" /></View><View className="w-4 h-4 bg-black mx-auto" /><View className="flex justify-between"><View className="w-5 h-5 bg-black" /><View className="w-3 h-3 bg-black" /></View></View></View>
 
             {/* Adresse publique et bouton de copie */}
             <View className="p-3 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between gap-4">
@@ -91,21 +69,27 @@ export function CryptoPayment({
             </View>
 
             <Text className="text-[10px] text-white/40 leading-relaxed max-w-xs mx-auto">
-              <Text>Veuillez transférer exactement</Text>{" "}
+              Veuillez transférer exactement{" "}
               <strong className="text-violet-400">
-                {(amount / 2500).toFixed(2)} <Text>USDT</Text></strong>{" "}
-              <Text>(réseau TRC-20 / ERC-20) à l'adresse ci-dessus, puis cliquez sur Vérifier [2].</Text></Text>
+                {(amount / 2500).toFixed(2)} USDT
+              </strong>{" "}
+              (réseau TRC-20 / ERC-20) à l'adresse ci-dessus, puis cliquez sur
+              Vérifier [2].
+            </Text>
 
             {/* Actions */}
             <View className="flex gap-3 pt-2">
               <Button
+                
                 variant="outline"
                 onPress={onCancel}
                 className="flex-1 h-11 rounded-xl"
                 disabled={verifying}
               >
-                <Text>Annuler</Text></Button>
+                Annuler
+              </Button>
               <Button
+                
                 onPress={handleVerifyTransaction}
                 disabled={verifying}
                 className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 font-bold text-white flex items-center justify-center gap-1.5 shadow-[0_4px_20px_rgba(139,92,246,0.3)]"
@@ -113,29 +97,26 @@ export function CryptoPayment({
                 {verifying ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    <Text>Vérification...</Text></>
+                    Vérification...
+                  </>
                 ) : (
                   <>
                     <Coins size={14} />
-                    <Text>Vérifier le dépôt [2]</Text></>
+                    Vérifier le dépôt [2]
+                  </>
                 )}
               </Button>
             </View>
           </View>
         ) : (
-          <View
-            key="crypto-success"
-            className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center space-y-3"
-          >
+          <View key="crypto-success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center space-y-3">
             <CheckCircle2 size={32} className="text-emerald-400 mx-auto" />
-            <Text className="text-emerald-400 font-black text-sm">
-              Dépôt détecté sur la blockchain ! [2]
+            <Text className="text-emerald-400 font-black text-sm">Dépôt détecté sur la blockchain ! [2]
             </Text>
             <Text className="text-[10px] text-emerald-400/50">
-              <Text>Votre clé d'embarquement DébrouillePro a été émise [2].</Text></Text>
+              Votre clé d'embarquement DébrouillePro a été émise [2].
+            </Text>
           </View>
-        )}
-      </>
-    </View>
+        )}</View></View>
   );
 }

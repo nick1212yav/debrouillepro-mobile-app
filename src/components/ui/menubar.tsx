@@ -1,8 +1,8 @@
-import { Text } from "react-native";
+import { Text, TextProps } from "react-native";
 import * as React from "react";
 import * as MenubarPrimitive from "@radix-ui/react-menubar";
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react-native";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 function Menubar({
   className,
@@ -125,7 +125,7 @@ function MenubarCheckboxItem({
       checked={checked}
       {...props}
     >
-      <Text className="absolute left-2 flex size-3.5 items-center justify-center">
+      <Text className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <MenubarPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
         </MenubarPrimitive.ItemIndicator>
@@ -149,7 +149,7 @@ function MenubarRadioItem({
       )}
       {...props}
     >
-      <Text className="absolute left-2 flex size-3.5 items-center justify-center">
+      <Text className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <MenubarPrimitive.ItemIndicator>
           <CircleIcon className="size-2 fill-current" />
         </MenubarPrimitive.ItemIndicator>
@@ -195,16 +195,12 @@ function MenubarSeparator({
 function MenubarShortcut({
   className,
   ...props
-}: React.ComponentProps<typeof Text>) {
+}: TextProps) {
   return (
-    <Text
-      data-slot="menubar-shortcut"
-      className={cn(
+    <Text data-slot="menubar-shortcut" className={cn(
         "text-muted-foreground ml-auto text-xs tracking-widest",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 

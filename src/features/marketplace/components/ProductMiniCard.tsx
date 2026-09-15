@@ -12,16 +12,10 @@ interface Props {
 
 export function ProductMiniCard({ product, onPress }: Props) {
   return (
-    <Pressable
-      onPress={onPress}
-      className="flex items-center gap-3 p-2 rounded-xl w-full text-left"
-    >
+    <Pressable onPress={onPress} className="flex items-center gap-3 p-2 rounded-xl w-full text-left transition-colors">
       <View className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-black/20">
         {product.images && product.images.length > 0 ? (
-          <Image
-            className="w-full h-full object-cover"
-            loading="lazy" source={{ uri: product.images[0] }} accessibilityLabel={product.title}
-          />
+          <Image className="w-full h-full object-cover"  source={{ uri: product.images[0] }} accessibilityLabel={product.title} />
         ) : (
           <View className="w-full h-full flex items-center justify-center">
             <Package size={20} className="text-white/20" />

@@ -12,16 +12,10 @@ export function PortfolioSheet({
   images: string[];
 }) {
   return (
-    <>
+<View>
       {isOpen && (
-        <Pressable
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70"
-          onPress={onClose}
-        >
-          <Pressable
-            className="w-full max-w-md rounded-t-3xl p-6 bg-[#0D1117] border border-white/10"
-            onPress={(e) => e.stopPropagation()}
-          >
+        <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70" onPress={onClose}>
+          <View className="w-full max-w-md rounded-t-3xl p-6 bg-[#0D1117] border border-white/10" onPress={(e) => e.stopPropagation()}>
             <View className="flex justify-between">
               <Text className="text-white font-bold text-lg">Portfolio</Text>
               <Pressable onPress={onClose}>
@@ -29,9 +23,9 @@ export function PortfolioSheet({
               </Pressable>
             </View>
             <ServiceGallery images={images} title="Portfolio" />
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       )}
-    </>
+    </View>
   );
 }

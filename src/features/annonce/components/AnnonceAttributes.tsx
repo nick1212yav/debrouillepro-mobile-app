@@ -39,21 +39,13 @@ export function AnnonceAttributes({ annonce }: Props) {
   if (attributes.length === 0) return null;
 
   return (
-    <View className="space-y-2">
-      <Text className="text-sm font-medium text-white/50">Caractéristiques</Text>
-      <View className="gap-2">
-        {attributes.map((attr) => (
-          <View
-            key={attr.label}
-            className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/5"
-          >
+    <View className="space-y-2"><Text className="text-sm font-medium text-white/50">Caractéristiques</Text><View className="gap-2">{attributes.map((attr) => (
+          <View key={attr.label} className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/5">
             <Text className="text-xs text-white/40">{attr.label}</Text>
             <Text className="text-xs text-white/80 font-medium">
               {attr.value}
             </Text>
           </View>
-        ))}
-      </View>
-    </View>
+        ))}</View></View>
   );
 }

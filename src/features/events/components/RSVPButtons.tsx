@@ -55,13 +55,7 @@ export function RSVPButtons({ onRSVP, currentStatus }: Props) {
       {buttons.map((btn) => {
         const isActive = status === btn.key;
         return (
-          <Pressable
-            key={btn.key}
-            onPress={() => handleRSVP(btn.key as any)}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold"
-            style={{ backgroundColor: isActive ? btn.activeBg : "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-          >
+          <Pressable key={btn.key} whileTap={{ scale: 0.95 }} onPress={() => handleRSVP(btn.key as any)} disabled={isLoading} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all" style={{ backgroundColor: isActive ? btn.activeBg : "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
             <btn.icon size={14} />
             {btn.label}
           </Pressable>

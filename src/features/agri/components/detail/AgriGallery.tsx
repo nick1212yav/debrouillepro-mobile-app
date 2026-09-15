@@ -26,31 +26,20 @@ export function AgriGallery({ images }: AgriGalleryProps) {
 
   return (
     <View className="relative w-full aspect-[4/3] rounded-[28px] overflow-hidden bg-black/20 border border-white/5">
-      <>
-        <Image
-          key={index}
-          src={images[index]}
-          alt={`Illustration ${index + 1}`}
-          className="w-full h-full object-cover"
-        />
-      </>
+<View>
+        <Image key={index} src={images[index]} alt={`Illustration ${index + 1}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="w-full h-full object-cover" />
+      </View>
 
       {images.length > 1 && (
         <>
-          <Pressable
-            onPress={prev}
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 flex items-center justify-center"
-          >
+          <Pressable onPress={prev} className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center transition-colors">
             <ChevronLeft size={16} className="text-white" />
           </Pressable>
-          <Pressable
-            onPress={next}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 flex items-center justify-center"
-          >
+          <Pressable onPress={next} className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center transition-colors">
             <ChevronRight size={16} className="text-white" />
           </Pressable>
 
-          <View className="absolute bottom-4 right-4 px-2.5 py-1 rounded-full bg-black/50 text-[10px] font-semibold text-white/80 border border-white/5">
+          <View className="absolute bottom-4 right-4 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md text-[10px] font-semibold text-white/80 border border-white/5">
             {index + 1} / {images.length}
           </View>
         </>

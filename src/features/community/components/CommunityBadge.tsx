@@ -50,14 +50,8 @@ export function CommunityBadge({ badges, size = "md", onBadgeClick }: Props) {
       {badges.map((badge) => {
         const Icon = ICON_MAP[badge.icon] || Award;
         return (
-          <Pressable
-            key={badge.id}
-            onPress={() => onBadgeClick?.(badge)}
-            className={`flex items-center gap-1.5 ${container} rounded-xl transition-all hover:scale-110 cursor-pointer bg-white/5 border border-white/5`}
-            style={{ borderColor: `${badge.color}30` }}
-            title={badge.description || badge.name}
-          >
-            <Icon size={icon} style={{ color: badge.color }} />
+          <Pressable key={badge.id} onPress={() => onBadgeClick?.(badge)} className={`flex items-center gap-1.5 ${container} rounded-xl transition-all hover:scale-110 cursor-pointer bg-white/5 border border-white/5`} style={{ borderColor: `${badge.color}30` }} title={badge.description || badge.name}>
+            <Icon size={icon} style={{  }} />
             {size === "lg" && (
               <Text className={`${text} text-white/60 font-medium`}>
                 {badge.name}

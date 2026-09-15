@@ -9,6 +9,9 @@
     "baseUrl": ".",
     "allowImportingTsExtensions": true,
     "noEmit": true,
+
+    "moduleSuffixes": [".native", ".web", ".ios", ".android", ""],
+
     "paths": {
       "@/*": ["./src/*"],
       "@/convex/*": ["./convex/*"]
@@ -20,5 +23,6 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts"
-  ]
+  ],
+  "exclude": ["node_modules", "dist", "build", ".expo", "android", "ios"]
 }

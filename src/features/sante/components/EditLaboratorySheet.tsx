@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditLaboratorySheet.tsx
@@ -13,6 +12,7 @@ import { LaboratoryForm } from "../forms/LaboratoryForm";
 import type { LaboratoryFormValues } from "../forms/LaboratoryForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface EditLaboratorySheetProps {
   open: boolean;
@@ -42,7 +42,7 @@ export function EditLaboratorySheet({
             .map((s) => s.trim())
             .filter(Boolean) || [],
       });
-      UIService.openToast("Laboratoire mis à jour !", "success");
+      toast.success("Laboratoire mis à jour !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -50,7 +50,7 @@ export function EditLaboratorySheet({
         error instanceof Error
           ? error.message
           : "Erreur lors de la mise à jour";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

@@ -1,8 +1,5 @@
-function NativePrompt(message: string): string | null {
-  Alert.alert(message, "Saisie requise");
-  return null;
-}
-import { View, Text, Pressable, TextInput, Alert } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
+
 // src/features/marketplace/create/shared/VariantEditor.tsx
 import { useState } from "react";
 import { Plus, X, Trash2 } from "lucide-react-native";
@@ -46,7 +43,7 @@ export function VariantEditor({
   const addOption = (variantId: string) => {
     const variant = variants.find((v) => v.id === variantId);
     if (!variant) return;
-    const newOption = NativePrompt("Nom de l'option :");
+    const newOption = prompt("Nom de l'option :");
     if (
       newOption &&
       newOption.trim() &&
@@ -73,72 +70,11 @@ export function VariantEditor({
   };
 
   return (
-    <View className="space-y-3">
-      <View className="flex items-center gap-2">
-        <Text className="text-xs text-white/60 font-medium">{label}</Text>
-        <Text className="text-[10px] text-white/20">(optionnel)</Text>
-      </View>
-
-      {variants.map((variant) => (
-        <View
-          key={variant.id}
-          className="p-3 rounded-xl"
-          style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-        >
-          <View className="flex items-center gap-2 mb-2">
-            <TextInput
-              value={variant.name}
-              onChangeText={(text) => updateVariantName(variant.id, text)}
-              placeholder="Nom de la variante (ex: Taille)"
-              className="flex-1 bg-transparent text-white text-sm outline-none placeholder-white/25"
-            />
-            <Pressable
-              onPress={() => removeVariant(variant.id)}
-              className="text-white/20"
-            >
-              <Trash2 size={14} />
-            </Pressable>
-          </View>
-          <View className="flex flex-wrap gap-1.5">
-            {variant.options.map((option) => (
-              <Text
-                key={option}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
-                style={{ backgroundColor: `${color}22`, color }}
-              >
-                {option}
-                <Pressable
-                  onPress={() => removeOption(variant.id, option)}
-                  className=""
-                >
-                  <X size={10} />
-                </Pressable>
-              </Text>
-            ))}
-            <Pressable
-              onPress={() => addOption(variant.id)}
-              className="px-2 py-0.5 rounded-full text-xs text-white/40 border border-white/10"
-            >
-              <Text>+ Ajouter</Text></Pressable>
-          </View>
-        </View>
-      ))}
-
-      <View className="flex gap-2">
-        <TextInput
-          value={newVariantName}
-          onChangeText={(text) => setNewVariantName(text)}
-          placeholder="Nouvelle variante..."
-          className="flex-1 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none placeholder-white/25"
-        />
-        <Pressable
-          onPress={addVariant}
-          disabled={!newVariantName.trim()}
-          className="px-3 py-1.5 rounded-xl text-sm font-medium text-white disabled:opacity-40"
-          style={{  }}
-        >
-          <Plus size={14} className="inline mr-0.5" /> <Text>Ajouter</Text></Pressable>
-      </View>
-    </View>
+    <View className="space-y-3"><View className="flex items-center gap-2"><Text className="text-xs text-white/60 font-medium">{label}</Text><Text className="text-[10px] text-white/20">(optionnel)</Text></View>{variants.map((variant) => (
+        <View key={variant.id} className="p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-2"><TextInput value={variant.name} onChangeText={(value) => updateVariantName(variant.id, value)} placeholder="Nom de la variante (ex: Taille)" className="flex-1 bg-transparent text-white text-sm outline-none placeholder-white/25" /><Pressable onPress={() => removeVariant(variant.id)} className="text-white/20 transition-colors"><Trash2 size={14} /></Pressable></View><View className="flex flex-wrap gap-1.5">{variant.options.map((option) => (
+              <Text key={option} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs" style={{ backgroundColor: `${color}22`, color }}>{option}<Pressable onPress={() => removeOption(variant.id, option)} className="transition-colors"><X size={10} /></Pressable></Text>
+            ))}<Pressable onPress={() => addOption(variant.id)} className="px-2 py-0.5 rounded-full text-xs text-white/40 transition-colors border border-white/10"><Text>+ Ajouter</Text></Pressable></View></View>
+      ))}<View className="flex gap-2"><TextInput value={newVariantName} onChangeText={(value) => setNewVariantName(value)} placeholder="Nouvelle variante..." className="flex-1 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm outline-none placeholder-white/25" /><Pressable onPress={addVariant} disabled={!newVariantName.trim()} className="px-3 py-1.5 rounded-xl text-sm font-medium text-white disabled:opacity-40" style={{  }}><Plus size={14} className="inline mr-0.5" />Ajouter
+        </Pressable></View></View>
   );
 }

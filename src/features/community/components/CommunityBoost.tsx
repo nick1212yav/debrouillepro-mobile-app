@@ -1,13 +1,22 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Pressable } from "react-native";
-
 // src/features/community/components/CommunityBoost.tsx
-import { useState } from "react";
+import React, { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { X, TrendingUp, Send } from "lucide-react-native";
 
 interface Props {
   onBoost: (duration: number, budget: number) => Promise<void>;
-  onClose?: () => void; // ✅ ajout de onClose
+  onClose?: () => void;
 }
 
 const DURATIONS = [
@@ -28,116 +37,358 @@ export function CommunityBoost({ onBoost, onClose }: Props) {
   const [budget, setBudget] = useState(10000);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setIsSubmitting(true);
     try {
       await onBoost(duration, budget);
-      UIService.openToast(`Post boosté pour ${duration} jours avec un budget de ${budget} FCFA`, "success");
+      Alert.alert(
+        "Succès",
+        `Post boosté pour ${duration} jours avec un budget de ${budget} FCFA`,
+      );
       onClose?.();
-    } catch (error) {
-      UIService.openToast("Erreur lors du boost", "error");
+    } catch {
+      Alert.alert("Erreur", "Erreur lors du boost");
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [duration, budget, onBoost, onClose]);
+
+  const estimatedReach = (budget / 1000) * 200;
 
   return (
-    <>
-      <Pressable
-        className="fixed inset-0 z-50 flex items-end justify-center"
-        style={{ backgroundColor: "rgba(0,0,0,0.7)" }}
-        onPress={(e) => e.target === e.currentTarget && onClose?.()}
-      >
-        <View
-          className="w-full max-w-lg rounded-t-3xl overflow-hidden"
-          style={{ backgroundColor: "rgba(15,15,30,0.98)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", maxHeight: "90vh" }}
+    <Modal
+      visible
+      transparent
+      animationType="slide"
+      onRequestClose={() => onClose?.()}
+      statusBarTranslucent
+    >
+      <View style={styles.overlay}>
+        {/* Backdrop */}
+        <Pressable
+          onPress={() => onClose?.()}
+          style={styles.backdrop}
+          accessibilityLabel="Fermer"
+        />
+
+        {/* Sheet */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.sheetWrapper}
         >
-          <View className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-            <Text className="text-white font-bold text-lg">Booster le post</Text>
-            <Pressable
-              onPress={() => onClose?.()}
-              className="p-1 rounded-full"
-            >
-              <X size={20} className="text-white/50" />
-            </Pressable>
-          </View>
+          <View style={styles.sheet}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Booster le post</Text>
+              <Pressable
+                onPress={() => onClose?.()}
+                style={styles.closeButton}
+                hitSlop={6}
+                accessibilityLabel="Fermer"
+              >
+                <X size={20} color="rgba(255,255,255,0.5)" />
+              </Pressable>
+            </View>
 
-          <View
-            className="flex-1 overflow-y-auto px-5 pb-5 flex flex-col gap-5"
-            style={{  }}
-          >
-            <View className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 border border-white/10">
-              <TrendingUp size={24} className="text-purple-400" />
+            {/* Contenu scrollable */}
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Info card */}
+              <View style={styles.infoCard}>
+                <TrendingUp size={24} color="#C084FC" />
+                <View style={styles.infoTextColumn}>
+                  <Text style={styles.infoTitle}>
+                    Augmentez votre visibilité
+                  </Text>
+                  <Text style={styles.infoSubtitle}>
+                    Votre post sera mis en avant auprès de plus de personnes
+                  </Text>
+                </View>
+              </View>
+
+              {/* Durée */}
               <View>
-                <Text className="text-white font-semibold">
-                  Augmentez votre visibilité
+                <Text style={styles.sectionLabel}>Durée</Text>
+                <View style={styles.durationsRow}>
+                  {DURATIONS.map((d) => {
+                    const isSelected = duration === d.value;
+                    return (
+                      <Pressable
+                        key={d.value}
+                        onPress={() => setDuration(d.value)}
+                        style={({ pressed }) => [
+                          styles.durationButton,
+                          isSelected
+                            ? styles.durationButtonSelected
+                            : styles.durationButtonInactive,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.durationText,
+                            isSelected
+                              ? styles.durationTextSelected
+                              : styles.durationTextInactive,
+                          ]}
+                        >
+                          {d.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Budget */}
+              <View>
+                <Text style={styles.sectionLabel}>Budget</Text>
+                <View style={styles.budgetsColumn}>
+                  {BUDGETS.map((b) => {
+                    const isSelected = budget === b.value;
+                    return (
+                      <Pressable
+                        key={b.value}
+                        onPress={() => setBudget(b.value)}
+                        style={({ pressed }) => [
+                          styles.budgetButton,
+                          isSelected
+                            ? styles.budgetButtonSelected
+                            : styles.budgetButtonInactive,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.budgetText,
+                            isSelected
+                              ? styles.budgetTextSelected
+                              : styles.budgetTextInactive,
+                          ]}
+                        >
+                          {b.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Estimation */}
+              <View style={styles.estimateCard}>
+                <Text style={styles.estimateLabel}>Estimation de portée</Text>
+                <Text style={styles.estimateValue}>
+                  ~{estimatedReach} personnes
                 </Text>
-                <Text className="text-white/40 text-xs">
-                  Votre post sera mis en avant auprès de plus de personnes
+              </View>
+            </ScrollView>
+
+            {/* Bouton submit */}
+            <View style={styles.footer}>
+              <Pressable
+                onPress={handleSubmit}
+                disabled={isSubmitting}
+                style={({ pressed }) => [
+                  styles.submitButton,
+                  isSubmitting && styles.disabled,
+                  pressed && styles.pressed,
+                ]}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Send size={15} color="#FFFFFF" />
+                )}
+                <Text style={styles.submitButtonText}>
+                  {isSubmitting ? "Boost en cours..." : "Booster maintenant"}
                 </Text>
-              </View>
-            </View>
-
-            <View>
-              <Text className="text-white/60 text-sm font-medium mb-2">Durée</Text>
-              <View className="flex gap-2">
-                {DURATIONS.map((d) => (
-                  <Pressable
-                    key={d.value}
-                    onPress={() => setDuration(d.value)}
-                    className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-                      duration === d.value
-                        ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-                        : "bg-white/5 text-white/50 hover:bg-white/10"
-                    }`}
-                  >
-                    {d.label}
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            <View>
-              <Text className="text-white/60 text-sm font-medium mb-2">Budget</Text>
-              <View className="gap-2">
-                {BUDGETS.map((b) => (
-                  <Pressable
-                    key={b.value}
-                    onPress={() => setBudget(b.value)}
-                    className={`py-2 rounded-xl text-sm font-medium transition-colors ${
-                      budget === b.value
-                        ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-                        : "bg-white/5 text-white/50 hover:bg-white/10"
-                    }`}
-                  >
-                    {b.label}
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            <View className="p-4 rounded-2xl bg-white/5 border border-white/10">
-              <Text className="text-white/40 text-xs"><Text>Estimation de portée</Text></Text>
-              <Text className="text-white font-bold text-lg">
-                <Text>~</Text>{(budget / 1000) * 200} <Text>personnes</Text></Text>
+              </Pressable>
             </View>
           </View>
-
-          <View className="px-5 pb-5">
-            <Pressable
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-              className="w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{  }}
-            >
-              <Send size={15} className="text-white" />
-              <Text className="text-white">
-                {isSubmitting ? "Boost en cours..." : "Booster maintenant"}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Pressable>
-    </>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
+
+// ── Styles ────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.7)",
+  },
+  sheetWrapper: {
+    width: "100%",
+  },
+  sheet: {
+    width: "100%",
+    maxHeight: "90%",
+    backgroundColor: "rgba(15,15,30,0.98)",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+  headerTitle: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 18,
+  },
+  closeButton: {
+    padding: 4,
+    borderRadius: 999,
+  },
+  scroll: {
+    flexGrow: 0,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 20,
+  },
+  infoCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  infoTextColumn: {
+    flex: 1,
+  },
+  infoTitle: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  infoSubtitle: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+    marginTop: 4,
+  },
+  sectionLabel: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: 8,
+  },
+  durationsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  durationButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  durationButtonSelected: {
+    backgroundColor: "rgba(168,85,247,0.2)",
+    borderColor: "rgba(168,85,247,0.3)",
+  },
+  durationButtonInactive: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: "transparent",
+  },
+  durationText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  durationTextSelected: {
+    color: "#C084FC",
+  },
+  durationTextInactive: {
+    color: "rgba(255,255,255,0.5)",
+  },
+  budgetsColumn: {
+    gap: 8,
+  },
+  budgetButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  budgetButtonSelected: {
+    backgroundColor: "rgba(168,85,247,0.2)",
+    borderColor: "rgba(168,85,247,0.3)",
+  },
+  budgetButtonInactive: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: "transparent",
+  },
+  budgetText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  budgetTextSelected: {
+    color: "#C084FC",
+  },
+  budgetTextInactive: {
+    color: "rgba(255,255,255,0.5)",
+  },
+  estimateCard: {
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  estimateLabel: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 12,
+  },
+  estimateValue: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 18,
+    marginTop: 4,
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
+  submitButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: "#8B5CF6",
+  },
+  submitButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  disabled: {
+    opacity: 0.4,
+  },
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+});

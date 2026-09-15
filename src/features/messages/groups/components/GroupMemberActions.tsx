@@ -37,10 +37,7 @@ export function GroupMemberActions({
   };
 
   return (
-    <Pressable
-      onPress={handleRemove}
-      className="w-full rounded-xl bg-red-500/10 px-4 py-3 text-left text-sm text-red-400"
-    >
+    <Pressable onPress={handleRemove} className="w-full rounded-xl bg-red-500/10 px-4 py-3 text-left text-sm text-red-400">
       Quitter le groupe
     </Pressable>
   );

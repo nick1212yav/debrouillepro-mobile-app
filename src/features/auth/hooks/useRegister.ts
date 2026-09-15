@@ -1,22 +1,24 @@
-import { useRouter } from "expo-router";
-import { UIService } from "@/core/sdk/ui/UIService";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { registerWithEmail } from "../services/firebase/auth.service";
 
 export function useRegister() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   const register = async (email: string, password: string, name: string) => {
     setLoading(true);
     try {
       await registerWithEmail(email, password, name);
-      UIService.openToast("Un email de vérification a été envoyé", "info");
-      UIService.openToast("Compte créé avec succès !", "success");
-      router("/");
+      toast.info("Un email de vérification a été envoyé");
+      toast.success("Compte créé avec succès !");
+      navigate("/");
       return true;
     } catch (error) {
-      UIService.openToast(error instanceof Error ? error.message : "Erreur d'inscription", "error");
+      toast.error(
+        error instanceof Error ? error.message : "Erreur d'inscription",
+      );
       return false;
     } finally {
       setLoading(false);

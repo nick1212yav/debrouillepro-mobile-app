@@ -1,4 +1,5 @@
 import { View, Text, Pressable } from "react-native";
+
 // src/features/sante/components/DoctorPayment.tsx
 import { CreditCard, Wallet, Smartphone, Shield } from "lucide-react-native";
 
@@ -36,21 +37,11 @@ export function DoctorPayment({
   isLoading = false,
 }: DoctorPaymentProps) {
   return (
-    <View className="p-4 rounded-2xl bg-white/5 border border-white/10">
-      <Text className="text-xs text-white/40 font-semibold uppercase tracking-wider mb-3 flex items-center gap-2">
-        <CreditCard size={14} /> Paiement
-      </Text>
-
-      <View className="space-y-3">
-        <View className="flex flex-wrap gap-2">
-          {methods.map((method) => {
+    <View className="p-4 rounded-2xl bg-white/5 border border-white/10"><Text className="text-xs text-white/40 font-semibold uppercase tracking-wider mb-3 flex items-center gap-2"><CreditCard size={14} />Paiement
+      </Text><View className="space-y-3"><View className="flex flex-wrap gap-2">{methods.map((method) => {
             const Icon = iconMap[method.icon] || Wallet;
             return (
-              <Pressable
-                key={method.id}
-                onPress={() => method.enabled && onSelectMethod(method.id)}
-                disabled={!method.enabled}
-                className={`
+              <Pressable key={method.id} onPress={() => method.enabled && onSelectMethod(method.id)} disabled={!method.enabled} className={`
                   flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors
                   ${
                     selectedMethod === method.id
@@ -58,30 +49,8 @@ export function DoctorPayment({
                       : "bg-white/10 text-white/60 border border-white/10"
                   }
                   ${!method.enabled ? "opacity-40 cursor-not-allowed" : "hover:bg-white/20"}
-                `}
-              >
-                <Icon size={12} />
-                {method.name}
-              </Pressable>
+                `}><Icon size={12} />{method.name}</Pressable>
             );
-          })}
-        </View>
-
-        <View className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
-          <Text className="text-white/60 text-sm"><Text>Montant</Text></Text>
-          <Text className="text-white font-bold text-lg">
-            {amount} {currency}
-          </Text>
-        </View>
-
-        <Pressable
-          onPress={onPay}
-          disabled={!selectedMethod || isLoading}
-          className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isLoading ? "Paiement en cours..." : "Payer maintenant"}
-        </Pressable>
-      </View>
-    </View>
+          })}</View><View className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10"><Text className="text-white/60 text-sm">Montant</Text><Text className="text-white font-bold text-lg">{amount}{currency}</Text></View><Pressable onPress={onPay} disabled={!selectedMethod || isLoading} className="w-full py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-orange-600 transition-colors disabled:opacity-50">{isLoading ? "Paiement en cours..." : "Payer maintenant"}</Pressable></View></View>
   );
 }

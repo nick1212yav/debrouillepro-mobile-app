@@ -1,9 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { Pressable } from "react-native";
 
 // src/features/marketplace/components/ProductWishlist.tsx
 import { useState } from "react";
 import { Heart } from "lucide-react-native";
+import { toast } from "sonner";
 
 interface Props {
   productId: string;
@@ -25,20 +25,16 @@ export function ProductWishlist({
     try {
       await onToggle();
       setWishlisted((prev) => !prev);
-      UIService.openToast(wishlisted ? "Retiré des favoris" : "Ajouté aux favoris", "success");
+      toast.success(wishlisted ? "Retiré des favoris" : "Ajouté aux favoris");
     } catch {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Pressable
-      onPress={handleToggle}
-      disabled={loading}
-      className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 disabled:opacity-50"
-    >
+    <Pressable onPress={handleToggle} disabled={loading} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 transition-colors disabled:opacity-50">
       <Heart
         size={18}
         className={wishlisted ? "fill-red-500 text-red-500" : "text-white/60"}

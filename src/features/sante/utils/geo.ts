@@ -66,11 +66,11 @@ export function sortByDistance<T extends { lat: number; lng: number }>(
  */
 export function getCurrentPosition(): Promise<Coordinates> {
   return new Promise((resolve, reject) => {
-    if (!undefined) {
+    if (!navigator.geolocation) {
       reject(new Error("Geolocation not supported"));
       return;
     }
-    undefined.getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       (position) => {
         resolve({
           lat: position.coords.latitude,

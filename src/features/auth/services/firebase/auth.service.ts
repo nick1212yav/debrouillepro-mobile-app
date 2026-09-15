@@ -1,31 +1,44 @@
-// src/features/auth/services/firebase/auth.service.ts
-
+import { View } from "react-native";
 import {
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  signInWithCredential,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   updateProfile,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  signInWithPopup,
+  GoogleAuthProvider,
 } from "firebase/auth";
-
-import type { AuthCredential, User } from "firebase/auth";
+import type { ConfirmationResult, User } from "firebase/auth";
 
 import { auth } from "@/lib/firebase";
 import { mapFirebaseError } from "../../utils/errors";
 
 // ─────────────────────────────────────────────────────────────
-// Types
+// reCAPTCHA singleton
 // ─────────────────────────────────────────────────────────────
 
-export interface PhoneConfirmation {
-  confirm: (code: string) => Promise<User>;
+let recaptchaVerifier: RecaptchaVerifier | null = null;
+
+export function getRecaptchaVerifier(
+  container: View,
+): RecaptchaVerifier {
+  if (!recaptchaVerifier) {
+    recaptchaVerifier = new RecaptchaVerifier(auth, container, {
+      size: "invisible",
+      callback: () => {},
+    });
+  }
+
+  return recaptchaVerifier;
 }
 
-export interface GoogleSignInResult {
-  idToken?: string | null;
-  accessToken?: string | null;
+export function resetRecaptchaVerifier(): void {
+  if (recaptchaVerifier) {
+    recaptchaVerifier.clear();
+    recaptchaVerifier = null;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -45,7 +58,7 @@ export async function loginWithEmail(
 
     return credential.user;
   } catch (error) {
-    console.error("Firebase Login Error:", error);
+    console.error("🔥 Firebase Login Error:", error);
     throw mapFirebaseError(error);
   }
 }
@@ -70,44 +83,33 @@ export async function registerWithEmail(
       displayName: name.trim(),
     });
 
-    try {
-      await sendEmailVerification(credential.user);
-    } catch (verificationError) {
-      console.warn(
-        "Impossible d'envoyer immédiatement l'e-mail de vérification:",
-        verificationError,
-      );
-    }
+    await sendEmailVerification(credential.user);
 
     return credential.user;
   } catch (error) {
-    console.error("Firebase Register Error:", error);
+    console.error("🔥 Firebase Register Error:", error);
     throw mapFirebaseError(error);
   }
 }
 
 // ─────────────────────────────────────────────────────────────
-// Réinitialisation du mot de passe
+// Réinitialisation mot de passe
 // ─────────────────────────────────────────────────────────────
 
 export async function sendPasswordReset(email: string): Promise<void> {
   try {
     await sendPasswordResetEmail(auth, email.trim());
   } catch (error) {
-    console.error("Firebase Reset Password Error:", error);
+    console.error("🔥 Firebase Reset Password Error:", error);
     throw mapFirebaseError(error);
   }
 }
-
-// ─────────────────────────────────────────────────────────────
-// Vérification Email
-// ─────────────────────────────────────────────────────────────
 
 export async function resendVerificationEmail(user: User): Promise<void> {
   try {
     await sendEmailVerification(user);
   } catch (error) {
-    console.error("Firebase Verification Error:", error);
+    console.error("🔥 Firebase Verification Error:", error);
     throw mapFirebaseError(error);
   }
 }
@@ -116,27 +118,30 @@ export async function resendVerificationEmail(user: User): Promise<void> {
 // Connexion Téléphone
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Confirme un code SMS Firebase.
- *
- * Le flux d'envoi du SMS est géré séparément par
- * phone.service.ts afin de permettre l'utilisation
- * d'une implémentation compatible React Native / Expo.
- */
+export async function sendPhoneCode(
+  phoneNumber: string,
+  container: View,
+): Promise<ConfirmationResult> {
+  try {
+    const verifier = getRecaptchaVerifier(container);
+
+    return await signInWithPhoneNumber(auth, phoneNumber, verifier);
+  } catch (error) {
+    console.error("🔥 Firebase Phone Error:", error);
+    throw mapFirebaseError(error);
+  }
+}
+
 export async function verifyPhoneCode(
-  confirmation: PhoneConfirmation,
+  confirmation: ConfirmationResult,
   code: string,
 ): Promise<User> {
-  const normalizedCode = code.trim();
-
-  if (!normalizedCode) {
-    throw new Error("Veuillez saisir le code de vérification.");
-  }
-
   try {
-    return await confirmation.confirm(normalizedCode);
+    const credential = await confirmation.confirm(code);
+
+    return credential.user;
   } catch (error) {
-    console.error("Firebase OTP Error:", error);
+    console.error("🔥 Firebase OTP Error:", error);
     throw mapFirebaseError(error);
   }
 }
@@ -145,35 +150,15 @@ export async function verifyPhoneCode(
 // Google
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Crée la connexion Firebase à partir d'un token Google.
- *
- * Le flux OAuth natif doit être réalisé par le composant
- * ou le service Expo/React Native responsable de Google Sign-In.
- */
-export async function loginWithGoogleTokens(
-  result: GoogleSignInResult,
-): Promise<User> {
-  const idToken = result.idToken ?? null;
-  const accessToken = result.accessToken ?? null;
-
-  if (!idToken && !accessToken) {
-    throw new Error(
-      "Aucun jeton Google valide n'a été fourni pour l'authentification.",
-    );
-  }
-
+export async function loginWithGoogle(): Promise<User> {
   try {
-    const credential: AuthCredential = GoogleAuthProvider.credential(
-      idToken,
-      accessToken,
-    );
+    const provider = new GoogleAuthProvider();
 
-    const userCredential = await signInWithCredential(auth, credential);
+    const credential = await signInWithPopup(auth, provider);
 
-    return userCredential.user;
+    return credential.user;
   } catch (error) {
-    console.error("Firebase Google Error:", error);
+    console.error("🔥 Firebase Google Error:", error);
     throw mapFirebaseError(error);
   }
 }

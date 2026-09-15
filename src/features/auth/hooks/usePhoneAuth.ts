@@ -1,5 +1,5 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { useState, useRef, useCallback } from "react";
+import { toast } from "sonner";
 import type { ConfirmationResult, RecaptchaVerifier } from "firebase/auth";
 import {
   createRecaptchaVerifier,
@@ -34,7 +34,7 @@ export function usePhoneAuth() {
     async (phone: string) => {
       const verifier = initRecaptcha();
       if (!verifier) {
-        UIService.openToast("Erreur de chargement du reCAPTCHA", "error");
+        toast.error("Erreur de chargement du reCAPTCHA");
         return false;
       }
       setLoading(true);
@@ -43,10 +43,10 @@ export function usePhoneAuth() {
         setConfirmation(result);
         setPhoneNumber(phone);
         setStep("otp");
-        UIService.openToast("Code SMS envoyé !", "success");
+        toast.success("Code SMS envoyé !");
         return true;
       } catch (error) {
-        UIService.openToast(getPhoneErrorMessage(error), "error");
+        toast.error(getPhoneErrorMessage(error));
         // Réinitialiser le reCAPTCHA en cas d'erreur
         verifierRef.current?.clear();
         verifierRef.current = null;
@@ -61,19 +61,19 @@ export function usePhoneAuth() {
   const verifyCode = useCallback(
     async (code: string): Promise<boolean> => {
       if (!confirmation) {
-        UIService.openToast("Aucune confirmation en cours", "error");
+        toast.error("Aucune confirmation en cours");
         return false;
       }
       setLoading(true);
       try {
         await verifyPhoneCode(confirmation, code);
-        UIService.openToast("Connexion réussie !", "success");
+        toast.success("Connexion réussie !");
         verifierRef.current?.clear();
         verifierRef.current = null;
         // ✅ UserSync va automatiquement synchroniser l'utilisateur
         return true;
       } catch (error) {
-        UIService.openToast(getPhoneErrorMessage(error), "error");
+        toast.error(getPhoneErrorMessage(error));
         // Réinitialiser le reCAPTCHA en cas d'erreur
         verifierRef.current?.clear();
         verifierRef.current = null;

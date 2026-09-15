@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreateAppointmentSheet.tsx
@@ -15,6 +14,7 @@ import {
 } from "../forms/AppointmentForm";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface CreateAppointmentSheetProps {
@@ -47,11 +47,11 @@ export function CreateAppointmentSheet({
         date: data.date,
         notes: data.notes,
       });
-      UIService.openToast("Rendez-vous créé !", "success");
+      toast.success("Rendez-vous créé !");
       onOpenChange(false);
       onSuccess?.();
     } catch (e) {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
 

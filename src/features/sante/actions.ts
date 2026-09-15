@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { Linking } from "react-native";
-
 // src/features/sante/actions.ts
 import type { ActionConfig } from "@/core/sdk/types/action.types";
+import { toast } from "sonner";
+import { Linking } from "react-native";
 
 export interface SanteActionContext {
   id?: string;
@@ -39,7 +38,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
     icon: "👨‍⚕️",
     permission: "doctor:view",
     execute: async (context) => {
-      if (context.id) undefined.href = `/sante/${context.id}`;
+      if (context.id) Linking.openURL(`/sante/${context.id}`);
     },
   },
   {
@@ -50,7 +49,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
     execute: async (context) => {
       const { doctorId, slot, type, patientId } = context;
       if (!doctorId || !slot || !type || !patientId) {
-        UIService.openToast("doctorId, slot, type et patientId sont requis", "error");
+        toast.error("doctorId, slot, type et patientId sont requis");
         return;
       }
       // Redirection vers la page de réservation avec les paramètres
@@ -61,7 +60,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
         type,
         patientId,
       });
-      undefined.href = `/sante/appointment?${params.toString()}`;
+      Linking.openURL(`/sante/appointment?${params.toString()}`);
     },
   },
   {
@@ -70,7 +69,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
     icon: "🏥",
     permission: "hospital:view",
     execute: async (context) => {
-      if (context.id) undefined.href = `/sante/hospital/${context.id}`;
+      if (context.id) Linking.openURL(`/sante/hospital/${context.id}`);
     },
   },
   {
@@ -79,7 +78,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
     icon: "💊",
     permission: "pharmacy:view",
     execute: async (context) => {
-      if (context.id) undefined.href = `/sante/pharmacy/${context.id}`;
+      if (context.id) Linking.openURL(`/sante/pharmacy/${context.id}`);
     },
   },
   {
@@ -88,7 +87,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
     icon: "🧪",
     permission: "laboratory:view",
     execute: async (context) => {
-      if (context.id) undefined.href = `/sante/laboratory/${context.id}`;
+      if (context.id) Linking.openURL(`/sante/laboratory/${context.id}`);
     },
   },
   {
@@ -97,7 +96,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
     icon: "🚑",
     permission: "emergency:call",
     execute: async (context) => {
-      if (context.number) undefined.href = `tel:${context.number}`;
+      if (context.number) Linking.openURL(`tel:${context.number}`);
     },
   },
   {
@@ -108,7 +107,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
     execute: async (context) => {
       if (context.appointmentId) {
         // Redirection vers la page de téléconsultation
-        undefined.href = `/sante/telemedicine?appointmentId=${context.appointmentId}`;
+        Linking.openURL(`/sante/telemedicine?appointmentId=${context.appointmentId}`);
       }
     },
   },
@@ -118,7 +117,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
     icon: "📂",
     permission: "medicalRecords:view",
     execute: async () => {
-      undefined.href = "/sante/records";
+      Linking.openURL("/sante/records");
     },
   },
   {
@@ -128,7 +127,7 @@ export const SANTE_ACTIONS: SanteActionConfig[] = [
     permission: "prescription:download",
     execute: async (context) => {
       if (context.prescriptionId) {
-        UIService.openToast("Téléchargement de l'ordonnance...", "info");
+        toast.info("Téléchargement de l'ordonnance...");
         // Dans le futur, on pourra appeler une API pour générer un PDF
         // Pour l'instant, on simule un téléchargement
         Linking.openURL(String(`/api/prescriptions/${context.prescriptionId}/download`));

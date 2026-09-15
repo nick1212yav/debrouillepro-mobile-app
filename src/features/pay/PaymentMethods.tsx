@@ -20,15 +20,11 @@ export function PaymentMethods({ selected, onSelect }: Props) {
       {methods.map((m) => {
         const isSelected = selected === m.id;
         return (
-          <Pressable
-            key={m.id}
-            onPress={() => onSelect(m.id)}
-            className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${
+          <Pressable key={m.id} onPress={() => onSelect(m.id)} className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${
               isSelected
                 ? "border-orange-500 bg-orange-500/10"
                 : "border-white/10 bg-white/5 hover:bg-white/10"
-            }`}
-          >
+            }`}>
             <m.icon
               size={18}
               className={isSelected ? "text-orange-400" : "text-white/40"}

@@ -1,7 +1,8 @@
-import { View, Text } from "react-native";
+import { View, Text, NativeSyntheticEvent } from "react-native";
 
 // src/features/transport/components/CardPayment.tsx
 import { useState } from "react";
+import { motion } from "motion/react";
 import { CreditCard, ShieldCheck, Loader2, CheckCircle2 } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +53,8 @@ export function CardPayment({
     setExpiry(clean.substring(0, 5));
   };
 
-  const handleSubmit = (e: unknown) => {
+  const handleSubmit = (e: NativeSyntheticEvent<any>) => {
+    e.preventDefault();
     setLoading(true);
 
     setTimeout(() => {
@@ -67,104 +69,53 @@ export function CardPayment({
   };
 
   return (
-    <View className="space-y-6">
-      <>
-        {!success ? (
+    <View className="space-y-6"><View>{!success ? (
           <motion.form
             key="card-form"
-            onSubmit={handleSubmit}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            onSubmitEditing={handleSubmit}
             className="space-y-4"
           >
-            <View className="text-center space-y-1">
-              <Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest">
-                DébrouillePay [2]
-              </Text>
-              <Text className="text-sm font-bold text-white/60">
-                Paiement par Carte Bancaire [2]
-              </Text>
-            </View>
+            <View className="text-center space-y-1"><Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest">DébrouillePay [2]
+              </Text><Text className="text-sm font-bold text-white/60">Paiement par Carte Bancaire [2]
+              </Text></View>
 
             {/* Titulaire de la carte */}
-            <View className="space-y-1">
-              <Text className="text-xs text-white/40">
-                Nom du titulaire *
-              </Text>
-              <Input
-                required
-                value={cardName}
-                onChange={(text) => setCardName(text)}
-                placeholder="Ex: Jean Mukendi"
-                className="h-11 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20"
-              />
-            </View>
+            <View className="space-y-1"><Text className="text-xs text-white/40">Nom du titulaire *
+              </Text><Input required value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Ex: Jean Mukendi" className="h-11 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20" /></View>
 
             {/* Numéro de carte */}
-            <View className="space-y-1">
-              <Text className="text-xs text-white/40">Numéro de carte *</Text>
-              <View className="relative">
-                <View className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30">
-                  <CreditCard size={16} />
-                </View>
-                <Input
-                  required
-                  value={cardNumber}
-                  onChange={(text) => handleCardNumberChange(text)}
-                  placeholder="0000 0000 0000 0000"
-                  maxLength={19}
-                  className="pl-11 h-11 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20"
-                />
-              </View>
-            </View>
+            <View className="space-y-1"><Text className="text-xs text-white/40">Numéro de carte *</Text><View className="relative"><View className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"><CreditCard size={16} /></View><Input required value={cardNumber} onChange={(e) => handleCardNumberChange(e.target.value)} placeholder="0000 0000 0000 0000" maxLength={19} className="pl-11 h-11 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20" /></View></View>
 
             {/* Expiration et CVC */}
-            <View className="gap-4">
-              <View className="space-y-1">
-                <Text className="text-xs text-white/40">
-                  Expiration (MM/AA) *
-                </Text>
-                <Input
-                  required
-                  value={expiry}
-                  onChange={(text) => handleExpiryChange(text)}
-                  placeholder="MM/AA"
-                  maxLength={5}
-                  className="h-11 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20 text-center"
-                />
-              </View>
-              <View className="space-y-1">
-                <Text className="text-xs text-white/40">CVC *</Text>
-                <Input
-                  required
-                  type="password"
-                  value={cvc}
-                  onChange={(text) =>
+            <View className="gap-4"><View className="space-y-1"><Text className="text-xs text-white/40">Expiration (MM/AA) *
+                </Text><Input required value={expiry} onChange={(e) => handleExpiryChange(e.target.value)} placeholder="MM/AA" maxLength={5} className="h-11 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20 text-center" /></View><View className="space-y-1"><Text className="text-xs text-white/40">CVC *</Text><Input required type="password" value={cvc} onChange={(e) =>
                     setCvc(
-                      text.replace(/[^0-9]/g, "").substring(0, 3),
+                      e.target.value.replace(/[^0-9]/g, "").substring(0, 3),
                     )
-                  }
-                  placeholder="•••"
-                  maxLength={3}
-                  className="h-11 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20 text-center font-mono"
-                />
-              </View>
-            </View>
+                  } placeholder="•••" maxLength={3} className="h-11 rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20 text-center font-mono" /></View></View>
 
             {/* Sécurité */}
             <View className="flex items-center gap-2 text-[10px] text-emerald-400 font-bold bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/15">
               <ShieldCheck size={14} className="flex-shrink-0" />
-              <Text><Text>Chiffrement AES-256 standard de l'industrie [2]</Text></Text>
+              <Text>Chiffrement AES-256 standard de l'industrie [2]</Text>
             </View>
 
             {/* Actions */}
             <View className="flex gap-3 pt-2">
               <Button
+                
                 variant="outline"
                 onPress={onCancel}
                 className="flex-1 h-11 rounded-xl"
                 disabled={loading}
               >
-                <Text>Annuler</Text></Button>
+                Annuler
+              </Button>
               <Button
+                
                 className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 font-bold text-white"
                 disabled={loading}
               >
@@ -177,19 +128,14 @@ export function CardPayment({
             </View>
           </motion.form>
         ) : (
-          <View
-            key="card-success"
-            className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center space-y-3"
-          >
+          <View key="card-success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center space-y-3">
             <CheckCircle2 size={32} className="text-emerald-400 mx-auto" />
-            <Text className="text-emerald-400 font-black text-sm">
-              Paiement autorisé avec succès ! [2]
+            <Text className="text-emerald-400 font-black text-sm">Paiement autorisé avec succès ! [2]
             </Text>
             <Text className="text-[10px] text-emerald-400/50">
-              <Text>Traitement de votre réservation de trajet en cours [2]...</Text></Text>
+              Traitement de votre réservation de trajet en cours [2]...
+            </Text>
           </View>
-        )}
-      </>
-    </View>
+        )}</View></View>
   );
 }

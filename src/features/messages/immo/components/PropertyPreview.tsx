@@ -1,4 +1,5 @@
-import { Pressable, View, Text, Image, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { View, Text, Image, Pressable, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+
 // src/features/messages/immo/components/PropertyPreview.tsx
 
 import React from "react";
@@ -30,52 +31,24 @@ export function PropertyPreview({
   const content = (
     <>
       {cover && (
-        <Image
-         
-         
-          style={compact ? compactImageStyle : imageStyle}
-         source={{ uri: cover }} accessibilityLabel={property.title}/>
+        <Image style={compact ? compactImageStyle : imageStyle} source={{ uri: cover }} accessibilityLabel={property.title} />
       )}
 
-      <View style={contentStyle}>
-        <View style={badgeRowStyle}>
-          <Text style={badgeStyle}>
-            {getTransactionTypeLabel(property.transactionType)}
-          </Text>
-
-          <Text style={typeStyle}>{getPropertyTypeLabel(property.type)}</Text>
-        </View>
-
-        <Text style={titleStyle}>{property.title}</Text>
-
-        <View style={priceStyle}>
-          {formatPropertyPrice(property.price, property.currency)}
-        </View>
-
-        <View style={detailsStyle}>
-          {property.city && <Text><Text>📍</Text>{property.city}</Text>}
-
-          {property.surface !== undefined && (
-            <Text><Text>📐</Text>{property.surface} <Text>m²</Text></Text>
-          )}
-
-          {property.rooms !== undefined && (
-            <Text><Text>🚪</Text>{property.rooms} <Text>pièces</Text></Text>
-          )}
-        </View>
-
-        {property.ownerName && (
+      <View style={contentStyle}><View style={badgeRowStyle}><Text style={badgeStyle}>{getTransactionTypeLabel(property.transactionType)}</Text><Text style={typeStyle}>{getPropertyTypeLabel(property.type)}</Text></View><Text style={titleStyle}>{property.title}</Text><View style={priceStyle}>{formatPropertyPrice(property.price, property.currency)}</View><View style={detailsStyle}>{property.city && <Text>📍 {property.city}</Text>}{property.surface !== undefined && (
+            <Text>📐 {property.surface} m²</Text>
+          )}{property.rooms !== undefined && (
+            <Text>🚪 {property.rooms} pièces</Text>
+          )}</View>{property.ownerName && (
           <View style={ownerStyle}>
             {property.ownerAvatar ? (
-              <Image style={ownerAvatarStyle}  source={{ uri: property.ownerAvatar }} accessibilityLabel=""/>
+              <Image style={ownerAvatarStyle} source={{ uri: property.ownerAvatar }} accessibilityLabel="" />
             ) : (
-              <Text style={ownerPlaceholderStyle}><Text>👤</Text></Text>
+              <Text style={ownerPlaceholderStyle}>👤</Text>
             )}
 
             <Text>{property.ownerName}</Text>
           </View>
-        )}
-      </View>
+        )}</View>
     </>
   );
 
@@ -84,10 +57,7 @@ export function PropertyPreview({
   }
 
   return (
-    <Pressable
-      onPress={() => onPress(property)}
-      style={buttonResetStyle}
-    >
+    <Pressable onPress={() => onPress(property)} style={buttonResetStyle}>
       <View style={cardStyle}>{content}</View>
     </Pressable>
   );
@@ -101,7 +71,7 @@ const cardStyle: ViewStyle | TextStyle | ImageStyle = {
   boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
 };
 
-const buttonResetStyle: ViewStyle | TextStyle | ImageStyle = {
+const buttonResetStyle: TextStyle = {
   width: "100%",
   padding: 0,
   margin: 0,
@@ -111,17 +81,17 @@ const buttonResetStyle: ViewStyle | TextStyle | ImageStyle = {
   cursor: "pointer",
 };
 
-const imageStyle: ViewStyle | TextStyle | ImageStyle = {
+const imageStyle: ImageStyle = {
   width: "100%",
   height: 190,
-  display: "flex",
+  display: "block",
   objectFit: "cover",
 };
 
-const compactImageStyle: ViewStyle | TextStyle | ImageStyle = {
+const compactImageStyle: ImageStyle = {
   width: "100%",
   height: 130,
-  display: "flex",
+  display: "block",
   objectFit: "cover",
 };
 

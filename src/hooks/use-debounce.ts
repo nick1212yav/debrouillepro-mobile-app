@@ -1,3 +1,4 @@
+// src/hooks/use-debounce.ts
 export {
   useDebounce,
   useDebouncedCallback,

@@ -10,7 +10,7 @@ export interface SeatLayout {
     available: boolean;
     selected: boolean;
     premium?: boolean;
-    undefined?: boolean;
+    window?: boolean;
     aisle?: boolean;
   }[];
 }
@@ -40,7 +40,7 @@ export function generateSeatLayout(
       available: isAvailable,
       selected: false,
       premium: i < 4, // Premium pour les premières places
-      undefined: col === 1 || col === cols,
+      window: col === 1 || col === cols,
       aisle: col === 2 || col === 3,
     });
   }

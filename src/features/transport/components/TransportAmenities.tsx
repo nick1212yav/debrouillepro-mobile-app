@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/transport/components/TransportAmenities.tsx
 import {
   Wifi,
@@ -47,26 +48,17 @@ export function TransportAmenities({
   amenities = ["wifi", "climatisation", "chargeur"],
 }: TransportAmenitiesProps) {
   return (
-    <View className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] space-y-3">
-      <Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest">
-        Équipements à bord [2]
-      </Text>
-      <View className="flex flex-wrap gap-2 pt-1">
-        {amenities.map((key) => {
+    <View className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] space-y-3"><Text className="text-[10px] font-black text-violet-400 uppercase tracking-widest">Équipements à bord [2]
+      </Text><View className="flex flex-wrap gap-2 pt-1">{amenities.map((key) => {
           const config = AMENITY_MAP[key.toLowerCase()];
           if (!config) return null;
 
           return (
-            <View
-              key={key}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold ${config.color}`}
-            >
+            <View key={key} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-bold ${config.color}`}>
               {config.icon}
-              <Text>{config.label} <Text>[2]</Text></Text>
+              <Text>{config.label} [2]</Text>
             </View>
           );
-        })}
-      </View>
-    </View>
+        })}</View></View>
   );
 }

@@ -1,4 +1,4 @@
-import { View, Text, Image, Pressable } from "react-native";
+import { View, Text, Image, NativeSyntheticEvent, Pressable, TextInputKeyPressEventData } from "react-native";
 import { useState, useEffect } from "react";
 import { X, Maximize2, Loader2, AlertCircle } from "lucide-react-native";
 
@@ -34,11 +34,11 @@ export function PropertyFloorPlan({ floorPlanUrl, title }: Props) {
   // Fermeture avec Échap
   useEffect(() => {
     if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
       if (e.key === "Escape") handleClose();
     };
-    undefined;
-    return () => undefined;
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open]);
 
   const handleImageLoad = () => setIsLoading(false);
@@ -50,58 +50,25 @@ export function PropertyFloorPlan({ floorPlanUrl, title }: Props) {
   return (
     <>
       {/* Carte miniature cliquable */}
-      <Pressable
-        className="bg-white/5 rounded-2xl p-4"
-        onPress={handleOpen}
-        accessibilityRole="button"
-        tabIndex={0}
-        accessibilityLabel={`Agrandir le plan de ${title}`}
-      >
-        <View className="flex items-center justify-between">
-          <Text className="text-[10px] text-white/40 uppercase tracking-wider">
-            Plan du logement
-          </Text>
-          <Maximize2 size={14} className="text-white/30" />
-        </View>
-
-        <View className="mt-2 rounded-xl overflow-hidden h-32 flex items-center justify-center bg-white/5 border border-white/10 relative">
-          <Image
-           
-           
-            className="w-full h-full object-contain"
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-           source={{ uri: floorPlanUrl }} accessibilityLabel={title}/>
-          {isLoading && !hasError && (
+      <View className="bg-white/5 rounded-2xl p-4 transition-colors active:scale-[0.98]" onPress={handleOpen} accessibilityRole="button" tabIndex={0} accessibilityLabel={`Agrandir le plan de ${title}`}><View className="flex items-center justify-between"><Text className="text-[10px] text-white/40 uppercase tracking-wider">Plan du logement
+          </Text><Maximize2 size={14} className="text-white/30" /></View><View className="mt-2 rounded-xl overflow-hidden h-32 flex items-center justify-center bg-white/5 border border-white/10 relative"><Image className="w-full h-full object-contain" source={{ uri: floorPlanUrl }} accessibilityLabel={title} />{isLoading && !hasError && (
             <View className="absolute inset-0 flex items-center justify-center bg-white/5">
               <Loader2 className="w-6 h-6 text-white/30 animate-spin" />
             </View>
-          )}
-          {hasError && (
+          )}{hasError && (
             <View className="absolute inset-0 flex items-center justify-center bg-white/5 text-white/30">
               <AlertCircle size={20} />
             </View>
-          )}
-        </View>
-      </Pressable>
+          )}</View></View>
 
       {/* Modale plein écran */}
-      <>
+<View>
         {open && (
           <>
-            <Pressable
-              onPress={handleClose}
-              className="fixed inset-0 z-50 bg-black/95"
-            />
+            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={handleClose} className="fixed inset-0 z-50 bg-black/95" />
 
-            <View
-              className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
-            >
-              <Pressable
-                onPress={handleClose}
-                className="absolute top-4 right-4 text-white/70 z-10"
-                accessibilityLabel="Fermer le plan"
-              >
+            <View initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4">
+              <Pressable onPress={handleClose} className="absolute top-4 right-4 text-white/70 z-10 transition-colors" accessibilityLabel="Fermer le plan">
                 <X size={28} />
               </Pressable>
 
@@ -121,13 +88,7 @@ export function PropertyFloorPlan({ floorPlanUrl, title }: Props) {
                     </Text>
                   </View>
                 ) : (
-                  <Image
-                   
-                   
-                    className="max-w-full max-h-full object-contain"
-                    onLoad={handleImageLoad}
-                    onError={handleImageError}
-                   source={{ uri: floorPlanUrl }} accessibilityLabel={`Plan de ${title}`}/>
+                  <Image className="max-w-full max-h-full object-contain" source={{ uri: floorPlanUrl }} accessibilityLabel={`Plan de ${title}`} />
                 )}
               </View>
 
@@ -139,7 +100,7 @@ export function PropertyFloorPlan({ floorPlanUrl, title }: Props) {
             </View>
           </>
         )}
-      </>
+      </View>
     </>
   );
 }

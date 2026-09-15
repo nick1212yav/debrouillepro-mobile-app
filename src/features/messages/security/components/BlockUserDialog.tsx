@@ -1,4 +1,5 @@
-import { View, Text, TextInput, ViewStyle, TextStyle, ImageStyle, Pressable } from "react-native";
+import { View, Text, TextInput, Pressable, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+
 // src/features/messages/security/components/BlockUserDialog.tsx
 
 import React, { useEffect, useState } from "react";
@@ -48,44 +49,11 @@ export function BlockUserDialog({
   };
 
   return (
-    <Pressable accessibilityRole="presentation" onPress={onClose} style={overlayStyle}>
-      <Pressable
-        accessibilityRole="dialog"
-        aria-modal="true"
-       
-        onPress={(event) => event.stopPropagation()}
-        style={dialogStyle}
-       accessibilityLabelledBy="block-user-title">
-        <Text id="block-user-title">{title}</Text>
-
-        <Text style={descriptionStyle}>{description}</Text>
-
-        {!isBlocked && (
-          <Text style={labelStyle}>
-            Motif (facultatif)
-            <TextInput
-              value={reason}
-              onChangeText={(text) => setReason(text)}
-              placeholder="Pourquoi souhaitez-vous bloquer cet utilisateur ?"
-             
-              style={textareaStyle}
-             multiline textAlignVertical="top"/>
-          </Text>
-        )}
-
-        <View style={actionsStyle}>
-          <Pressable onPress={onClose} style={secondaryButtonStyle}>
-            <Text>Annuler</Text></Pressable>
-
-          <Pressable
-            onPress={handleConfirm}
-            style={primaryButtonStyle}
-          >
-            {isBlocked ? "Débloquer" : "Bloquer"}
-          </Pressable>
-        </View>
-      </Pressable>
-    </Pressable>
+    <View accessibilityRole="none" onPress={onClose} style={overlayStyle}><View accessibilityRole="dialog" accessibilityViewIsModal={true} accessibilityLabelledBy="block-user-title" onPress={(event) => event.stopPropagation()} style={dialogStyle}><Text id="block-user-title">{title}</Text><Text style={descriptionStyle}>{description}</Text>{!isBlocked && (
+          <Text style={labelStyle}>Motif (facultatif)
+            <TextInput value={reason} onChangeText={(value) => setReason(value)} placeholder="Pourquoi souhaitez-vous bloquer cet utilisateur ?" style={textareaStyle} multiline textAlignVertical="top" /></Text>
+        )}<View style={actionsStyle}><Pressable onPress={onClose} style={secondaryButtonStyle}>Annuler
+          </Pressable><Pressable onPress={handleConfirm} style={primaryButtonStyle}>{isBlocked ? "Débloquer" : "Bloquer"}</Pressable></View></View></View>
   );
 }
 
@@ -123,7 +91,7 @@ const labelStyle: ViewStyle | TextStyle | ImageStyle = {
   fontWeight: 500,
 };
 
-const textareaStyle: ViewStyle | TextStyle | ImageStyle = {
+const textareaStyle: TextStyle = {
   width: "100%",
   resize: "vertical",
   boxSizing: "border-box",

@@ -12,7 +12,7 @@ const MAX_OUTBOX_ITEMS = 500;
 
 function isBrowser(): boolean {
   return (
-    typeof undefined !== "undefined" && typeof undefined !== "undefined"
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
   );
 }
 
@@ -33,7 +33,7 @@ function readItems(): OutboxItem[] {
   }
 
   try {
-    const raw = undefined.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEY);
 
     if (!raw) {
       return [];
@@ -57,7 +57,7 @@ function writeItems(items: OutboxItem[]): void {
   }
 
   try {
-    undefined.setItem(STORAGE_KEY, JSON.stringify(items));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   } catch {
     // Le stockage offline est optionnel.
   }
@@ -230,9 +230,9 @@ export function isOutboxStorageAvailable(): boolean {
   try {
     const testKey = "__debrouillepro_outbox_test__";
 
-    undefined.setItem(testKey, "1");
+    window.localStorage.setItem(testKey, "1");
 
-    undefined.removeItem(testKey);
+    window.localStorage.removeItem(testKey);
 
     return true;
   } catch {

@@ -1,4 +1,5 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Pressable, Text } from "react-native";
+
 // src/features/messages/MessagesPage.tsx
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -225,11 +226,7 @@ export default function MessagesPage({
 
   if (isLoading) {
     return (
-      <View className={rootClassName} accessibilityLabel="Messagerie">
-        <View className="flex h-full w-full items-center justify-center">
-          <LoadingState />
-        </View>
-      </View>
+      <View className={rootClassName} accessibilityLabel="Messagerie"><View className="flex h-full w-full items-center justify-center"><LoadingState /></View></View>
     );
   }
 
@@ -239,11 +236,7 @@ export default function MessagesPage({
 
   if (!currentUserId) {
     return (
-      <View className={rootClassName} accessibilityLabel="Messagerie">
-        <View className="flex h-full w-full items-center justify-center p-6">
-          <ErrorState />
-        </View>
-      </View>
+      <View className={rootClassName} accessibilityLabel="Messagerie"><View className="flex h-full w-full items-center justify-center p-6"><ErrorState /></View></View>
     );
   }
 
@@ -253,13 +246,7 @@ export default function MessagesPage({
 
   return (
     <>
-      <View className={rootClassName} accessibilityLabel="Messagerie">
-        {/* ==================================================================
-            CONVERSATIONS PANEL
-            ================================================================== */}
-
-        <View
-          className={[
+      <View className={rootClassName} accessibilityLabel="Messagerie">{}<View className={[
             "flex",
             "h-full",
             "min-h-0",
@@ -273,20 +260,8 @@ export default function MessagesPage({
             "lg:w-[380px]",
             "xl:w-[400px]",
             mobilePanel === "chat" ? "hidden md:flex" : "flex",
-          ].join(" ")}
-          accessibilityLabel="Conversations"
-        >
-          {/* ----------------------------------------------------------------
-              HEADER
-              ---------------------------------------------------------------- */}
-
-          <View className="flex items-center justify-between gap-3 px-4 py-4">
-            <View className="flex min-w-0 items-center gap-3">
-              {onBack && (
-                <Pressable
-                 
-                  onPress={onBack}
-                  className={[
+          ].join(" ")} accessibilityLabel="Conversations">{}<View className="flex items-center justify-between gap-3 px-4 py-4"><View className="flex min-w-0 items-center gap-3">{onBack && (
+                <Pressable onPress={onBack} className={[
                     "inline-flex",
                     "h-10",
                     "w-10",
@@ -307,49 +282,12 @@ export default function MessagesPage({
                     "focus:ring-2",
                     "focus:ring-primary",
                     "focus:ring-offset-2",
-                  ].join(" ")}
-                  accessibilityLabel="Retour"
-                 
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="h-5 w-5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15 18l-6-6 6-6"
-                    />
-                  </svg>
-                </Pressable>
-              )}
-
-              <View className="min-w-0">
-                <View className="flex items-center gap-2">
-                  <Text className="truncate text-xl font-semibold tracking-tight text-white">
-                    Messages
-                  </Text>
-
-                  {previews.length > 0 && (
-                    <Text className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/50">
-                      {previews.length}
-                    </Text>
-                  )}
-                </View>
-
-                <Text className="mt-0.5 text-sm text-white/40">
-                  Vos conversations
-                </Text>
-              </View>
-            </View>
-
-            <Pressable
-             
-              onPress={handleNewConversation}
-              className={[
+                  ].join(" ")} accessibilityLabel="Retour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg></Pressable>
+              )}<View className="min-w-0"><View className="flex items-center gap-2"><Text className="truncate text-xl font-semibold tracking-tight text-white">Messages
+                  </Text>{previews.length > 0 && (
+                    <Text className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/50">{previews.length}</Text>
+                  )}</View><Text className="mt-0.5 text-sm text-white/40">Vos conversations
+                </Text></View></View><Pressable onPress={handleNewConversation} className={[
                 "inline-flex",
                 "h-10",
                 "w-10",
@@ -369,90 +307,26 @@ export default function MessagesPage({
                 "focus:ring-2",
                 "focus:ring-primary",
                 "focus:ring-offset-2",
-              ].join(" ")}
-              accessibilityLabel="Nouvelle conversation"
-             
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="h-5 w-5"
-              >
-                <path strokeLinecap="round" d="M12 5v14" />
-                <path strokeLinecap="round" d="M5 12h14" />
-              </svg>
-            </Pressable>
-
-            {/* ----------------------------------------------------------------
-                SEARCH
-                ---------------------------------------------------------------- */}
-
-            <View className="px-3 pb-3">
-              <ConversationSearch
-                conversations={previews}
-                onSelect={handleSearchSelect}
-              />
-            </View>
-          </View>
-
-          {/* ----------------------------------------------------------------
-              CONVERSATION LIST
-              ---------------------------------------------------------------- */}
-
-          <View className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-            {previews.length > 0 ? (
+              ].join(" ")} accessibilityLabel="Nouvelle conversation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" d="M12 5v14" /><path strokeLinecap="round" d="M5 12h14" /></svg></Pressable>{}<View className="px-3 pb-3"><ConversationSearch conversations={previews} onSelect={handleSearchSelect} /></View></View>{}<View className="min-h-0 flex-1 overflow-y-auto px-2 py-2">{previews.length > 0 ? (
               <ConversationList
                 conversations={previews}
                 currentConversationId={selectedConversationId}
                 onSelect={handleSelectConversation}
               />
             ) : (
-              <View className="flex h-full items-center justify-center px-4">
-                <EmptyConversations onNewConversation={handleNewConversation} />
-              </View>
-            )}
-          </View>
-
-          {/* ----------------------------------------------------------------
-              FOOTER
-              ---------------------------------------------------------------- */}
-
-          <View className="hidden shrink-0 border-t border-white/10 px-4 py-3 md:block">
-            <View className="flex items-center justify-between">
-              <Text className="text-xs text-white/30">
-                Messagerie DébrouillePro
-              </Text>
-
-              <Text className="flex items-center gap-1.5 text-[11px] text-white/30">
-                <Text className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Connecté
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ==================================================================
-            CHAT PANEL
-            ================================================================== */}
-
-        <View
-          className={[
+              <View className="flex h-full items-center justify-center px-4"><EmptyConversations onNewConversation={handleNewConversation} /></View>
+            )}</View>{}<View className="hidden shrink-0 border-t border-white/10 px-4 py-3 md:block"><View className="flex items-center justify-between"><Text className="text-xs text-white/30">Messagerie DébrouillePro
+              </Text><Text className="flex items-center gap-1.5 text-[11px] text-white/30"><Text className="h-1.5 w-1.5 rounded-full bg-emerald-400" />Connecté
+              </Text></View></View></View>{}<View className={[
             "h-full",
             "min-h-0",
             "min-w-0",
             "flex-1",
             "bg-black",
             mobilePanel === "conversations" ? "hidden md:flex" : "flex",
-          ].join(" ")}
-          accessibilityLabel={
-            activeConversation
+          ].join(" ")} accessibilityLabel={activeConversation
               ? `Conversation avec ${activeConversation.title}`
-              : "Conversation"
-          }
-        >
-          {selectedConversationId ? (
+              : "Conversation"}>{selectedConversationId ? (
             <ChatView
               conversationId={selectedConversationId}
               currentUserId={currentUserId}
@@ -460,71 +334,10 @@ export default function MessagesPage({
               onInfo={handleCloseConversation}
             />
           ) : (
-            <View className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black p-6">
-              {/* ============================================================
-                  DECORATIVE BACKGROUND
-                  ============================================================ */}
-
-              <View
-                className="absolute inset-0 opacity-40"
-               
-              >
-                <View className="absolute left-[15%] top-[20%] h-64 w-64 rounded-full bg-primary/10" />
-
-                <View className="absolute bottom-[10%] right-[15%] h-72 w-72 rounded-full bg-violet-500/10" />
-              </View>
-
-              {/* ============================================================
-                  CONTENT
-                  ============================================================ */}
-
-              <View className="relative z-10 mx-auto max-w-lg text-center">
-                {/* ICON */}
-
-                <View className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.04] shadow-2xl">
-                  <View className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      className="h-8 w-8 text-primary"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M21 11.5a8.38 8.38 0 0 1-1.1 4.15A8.5 8.5 0 0 1 12.5 20a8.38 8.38 0 0 1-4.15-1.1L3 21l2.1-5.35A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 1 1 21 11.5Z"
-                      />
-                    </svg>
-                  </View>
-                </View>
-
-                {/* BADGE */}
-
-                <View className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/50">
-                  <Text className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  <Text>Messagerie DébrouillePro</Text></View>
-
-                {/* TITLE */}
-
-                <Text className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
-                  Vos messages
-                </Text>
-
-                {/* DESCRIPTION */}
-
-                <Text className="mx-auto mt-4 max-w-md text-sm leading-6 text-white/40">
-                  Sélectionnez une conversation pour commencer à échanger.
-                  <br />
-                  Texte, médias, vocaux, appels, réactions et bien plus encore.
-                </Text>
-
-                {/* CTA */}
-
-                <Pressable
-                 
-                  onPress={handleNewConversation}
-                  className={[
+            <View className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black p-6">{}<View className="pointer-events-none absolute inset-0 opacity-40" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><View className="absolute left-[15%] top-[20%] h-64 w-64 rounded-full bg-primary/10 blur-3xl" /><View className="absolute bottom-[10%] right-[15%] h-72 w-72 rounded-full bg-violet-500/10 blur-3xl" /></View>{}<View className="relative z-10 mx-auto max-w-lg text-center">{}<View className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.04] shadow-2xl backdrop-blur-xl"><View className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-8 w-8 text-primary" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" strokeLinejoin="round" d="M21 11.5a8.38 8.38 0 0 1-1.1 4.15A8.5 8.5 0 0 1 12.5 20a8.38 8.38 0 0 1-4.15-1.1L3 21l2.1-5.35A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 1 1 21 11.5Z" /></svg></View></View>{}<View className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/50 backdrop-blur"><Text className="h-1.5 w-1.5 rounded-full bg-primary" /><Text>Messagerie DébrouillePro</Text></View>{}<Text className="text-3xl font-semibold tracking-tight text-white md:text-4xl">Vos messages
+                </Text>{}<Text className="mx-auto mt-4 max-w-md text-sm leading-6 text-white/40">Sélectionnez une conversation pour commencer à échanger.
+                  <br />Texte, médias, vocaux, appels, réactions et bien plus encore.
+                </Text>{}<Pressable onPress={handleNewConversation} className={[
                     "mt-7",
                     "inline-flex",
                     "items-center",
@@ -546,56 +359,19 @@ export default function MessagesPage({
                     "focus:ring-2",
                     "focus:ring-primary",
                     "focus:ring-offset-2",
-                  ].join(" ")}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="h-4 w-4"
-                  >
-                    <path strokeLinecap="round" d="M12 5v14" />
-                    <path strokeLinecap="round" d="M5 12h14" />
-                  </svg>
-                  <Text>Nouvelle conversation</Text></Pressable>
-
-                {/* FEATURE STRIP */}
-
-                <View className="mx-auto mt-10 flex max-w-md flex-wrap items-center justify-center gap-2">
-                  {["💬 Messages", "🎤 Vocaux", "📎 Médias", "📞 Appels"].map(
+                  ].join(" ")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" d="M12 5v14" /><path strokeLinecap="round" d="M5 12h14" /></svg><Text>Nouvelle conversation</Text></Pressable>{}<View className="mx-auto mt-10 flex max-w-md flex-wrap items-center justify-center gap-2">{["💬 Messages", "🎤 Vocaux", "📎 Médias", "📞 Appels"].map(
                     (featureLabel) => (
-                      <Text
-                        key={featureLabel}
-                        className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-white/30"
-                      >
-                        {featureLabel}
-                      </Text>
+                      <Text key={featureLabel} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-white/30">{featureLabel}</Text>
                     ),
-                  )}
-                </View>
-              </View>
-            </View>
-          )}
-        </View>
-      </View>
+                  )}</View></View></View>
+          )}</View></View>
 
       {/* =====================================================================
           NEW CONVERSATION MODAL
           ===================================================================== */}
 
       {isNewConversationOpen && (
-        <View
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          accessibilityRole="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              handleCloseNewConversation();
-            }
-          }}
-        >
-          <View
-            className={[
+        <View className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md" accessibilityRole="none"><View className={[
               "w-full",
               "max-w-lg",
               "overflow-hidden",
@@ -604,30 +380,9 @@ export default function MessagesPage({
               "border-white/10",
               "bg-background",
               "shadow-2xl",
-            ].join(" ")}
-            accessibilityRole="dialog"
-            aria-modal="true"
-            accessibilityLabel="Nouvelle conversation"
-          >
-            {/* ----------------------------------------------------------------
-                HEADER
-                ---------------------------------------------------------------- */}
-
-            <View className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <View className="min-w-0">
-                <Text className="text-lg font-semibold text-white">
-                  Nouvelle conversation
-                </Text>
-
-                <Text className="mt-0.5 text-sm text-white/40">
-                  Choisissez une personne avec qui discuter.
-                </Text>
-              </View>
-
-              <Pressable
-               
-                onPress={handleCloseNewConversation}
-                className={[
+            ].join(" ")} accessibilityRole="dialog" accessibilityViewIsModal={true} accessibilityLabel="Nouvelle conversation">{}<View className="flex items-center justify-between border-b border-white/10 px-5 py-4"><View className="min-w-0"><Text className="text-lg font-semibold text-white">Nouvelle conversation
+                </Text><Text className="mt-0.5 text-sm text-white/40">Choisissez une personne avec qui discuter.
+                </Text></View><Pressable onPress={handleCloseNewConversation} className={[
                   "inline-flex",
                   "h-9",
                   "w-9",
@@ -642,28 +397,7 @@ export default function MessagesPage({
                   "focus:outline-none",
                   "focus:ring-2",
                   "focus:ring-primary",
-                ].join(" ")}
-                accessibilityLabel="Fermer"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="h-5 w-5"
-                >
-                  <path strokeLinecap="round" d="M6 6l12 12" />
-                  <path strokeLinecap="round" d="M18 6 6 18" />
-                </svg>
-              </Pressable>
-            </View>
-
-            {/* ----------------------------------------------------------------
-                CONTENT
-                ---------------------------------------------------------------- */}
-
-            <View className="max-h-[70vh] overflow-y-auto p-5">
-              {isLoadingUsers ? (
+                ].join(" ")} accessibilityLabel="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" d="M6 6l12 12" /><path strokeLinecap="round" d="M18 6 6 18" /></svg></Pressable></View>{}<View className="max-h-[70vh] overflow-y-auto p-5">{isLoadingUsers ? (
                 <View className="flex min-h-40 items-center justify-center">
                   <LoadingState />
                 </View>
@@ -672,10 +406,7 @@ export default function MessagesPage({
                   users={users ?? []}
                   onCreated={handleConversationCreated}
                 />
-              )}
-            </View>
-          </View>
-        </View>
+              )}</View></View></View>
       )}
     </>
   );

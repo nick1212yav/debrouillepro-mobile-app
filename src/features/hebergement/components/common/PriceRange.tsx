@@ -45,13 +45,6 @@ export const PriceRange: React.FC<PriceRangeProps> = ({
   const style = sizeClasses[size] || sizeClasses.md;
 
   return (
-    <View className={`flex flex-col ${className}`}>
-      <View className="flex items-baseline gap-1">
-        <Text className={style.amount}>
-          {formatPrice(amount)} {currency}
-        </Text>
-        <Text className={style.period}><Text>/</Text>{periodLabel[period] || period}</Text>
-      </View>
-    </View>
+    <View className={`flex flex-col ${className}`}><View className="flex items-baseline gap-1"><Text className={style.amount}>{formatPrice(amount)}{currency}</Text><Text className={style.period}>/ {periodLabel[period] || period}</Text></View></View>
   );
 };

@@ -1,9 +1,6 @@
-// src/features/service/components/ServiceMap.tsx
-
-import { useCallback, useMemo } from "react";
-import { Linking, Platform, Pressable, Text, View } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import { MapPin, Navigation, Wrench } from "lucide-react-native";
+import { View, Text, Pressable, Linking } from "react-native";
+import { useEffect, useRef } from "react";
+import { MapPin, Navigation } from "lucide-react-native";
 
 interface Props {
   location?: string;
@@ -11,158 +8,90 @@ interface Props {
   longitude?: number;
 }
 
-const DEFAULT_LATITUDE_DELTA = 0.012;
-const DEFAULT_LONGITUDE_DELTA = 0.012;
-
 export function ServiceMap({ location, latitude, longitude }: Props) {
-  const hasCoordinates =
-    typeof latitude === "number" &&
-    Number.isFinite(latitude) &&
-    typeof longitude === "number" &&
-    Number.isFinite(longitude);
+  const mapRef = useRef<View>(null);
+  const mapInstanceRef = useRef<any>(null);
 
-  const region = useMemo(() => {
-    if (!hasCoordinates) {
-      return undefined;
-    }
+  useEffect(() => {
+    if (!latitude || !longitude) return;
+    if (!mapRef.current) return;
 
-    return {
-      latitude: latitude as number,
-      longitude: longitude as number,
-      latitudeDelta: DEFAULT_LATITUDE_DELTA,
-      longitudeDelta: DEFAULT_LONGITUDE_DELTA,
+    let isMounted = true;
+
+    const loadMap = async () => {
+      try {
+        const L = await import("leaflet");
+        await import("leaflet/dist/leaflet.css");
+
+        if (!isMounted || !mapRef.current) return;
+
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.remove();
+          mapInstanceRef.current = null;
+        }
+
+        const map = L.map(mapRef.current, {
+          center: [latitude, longitude],
+          zoom: 14,
+          zoomControl: true,
+        });
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap",
+          maxZoom: 19,
+        }).addTo(map);
+
+        const icon = L.divIcon({
+          className: "custom-marker",
+          html: `<div style="
+            background: #F97316;
+            width: 28px;
+            height: 28px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            border: 3px solid white;
+            box-shadow: 0 4px 12px rgba(249,115,22,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <div style="transform: rotate(45deg); color: white; font-size: 12px;">🔧</div>
+          </div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 28],
+          popupAnchor: [0, -28],
+        });
+
+        const marker = L.marker([latitude, longitude], { icon }).addTo(map);
+        marker.bindPopup(`<strong>${location || "Emplacement"}</strong>`);
+
+        mapInstanceRef.current = map;
+        map.invalidateSize();
+      } catch (error) {
+        console.error("Erreur de chargement de la carte:", error);
+      }
     };
-  }, [hasCoordinates, latitude, longitude]);
 
-  const handleDirections = useCallback(async () => {
-    if (!hasCoordinates) {
-      return;
-    }
+    loadMap();
 
-    const destinationLatitude = latitude as number;
-    const destinationLongitude = longitude as number;
-
-    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destinationLatitude},${destinationLongitude}`;
-
-    const nativeMapsUrl =
-      Platform.OS === "ios"
-        ? `http://maps.apple.com/?daddr=${destinationLatitude},${destinationLongitude}`
-        : `geo:${destinationLatitude},${destinationLongitude}?q=${destinationLatitude},${destinationLongitude}`;
-
-    try {
-      const canOpenNativeMaps = await Linking.canOpenURL(nativeMapsUrl);
-
-      if (canOpenNativeMaps) {
-        await Linking.openURL(nativeMapsUrl);
-        return;
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
       }
+    };
+  }, [latitude, longitude, location]);
 
-      const canOpenGoogleMaps = await Linking.canOpenURL(googleMapsUrl);
-
-      if (canOpenGoogleMaps) {
-        await Linking.openURL(googleMapsUrl);
-      }
-    } catch (error) {
-      console.error(
-        "[ServiceMap] Impossible d'ouvrir l'application de navigation:",
-        error,
-      );
-    }
-  }, [hasCoordinates, latitude, longitude]);
-
-  /*
-   * Aucun emplacement GPS exploitable.
-   */
-  if (!hasCoordinates || !region) {
+  if (!latitude || !longitude) {
     return (
-      <View className="rounded-2xl bg-white/5 p-4">
-        <Text className="text-sm font-medium text-white/50">Localisation</Text>
-
-        <View className="mt-3 h-48 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-          <View className="max-w-[85%] flex-row items-center justify-center gap-2">
-            <MapPin size={18} color="rgba(255,255,255,0.35)" />
-
-            <Text
-              numberOfLines={2}
-              className="text-center text-sm text-white/35"
-            >
-              {location?.trim() || "Carte non disponible"}
-            </Text>
-          </View>
-        </View>
-      </View>
+      <View className="bg-white/5 rounded-2xl p-4"><Text className="text-sm font-medium text-white/50">Localisation</Text><View className="mt-2 rounded-xl h-48 flex items-center justify-center bg-white/5 border border-white/10"><View className="flex items-center gap-2 text-white/30"><MapPin size={16} /><Text className="text-sm">{location || "Carte non disponible"}</Text></View></View></View>
     );
   }
 
   return (
-    <View className="gap-3 rounded-2xl bg-white/5 p-4">
-      {/* ============================================================ */}
-      {/* HEADER                                                        */}
-      {/* ============================================================ */}
-
-      <View className="flex-row items-center justify-between">
-        <View className="min-w-0 flex-1">
-          <Text className="text-sm font-medium text-white/50">
-            Localisation
-          </Text>
-
-          {location?.trim() ? (
-            <Text numberOfLines={1} className="mt-1 text-xs text-white/35">
-              {location.trim()}
-            </Text>
-          ) : null}
-        </View>
-
-        <Pressable
-          onPress={() => {
-            void handleDirections();
-          }}
-          className="ml-3 flex-row items-center gap-1.5 rounded-lg bg-white/5 px-3 py-2 active:bg-white/10"
-          accessibilityRole="button"
-          accessibilityLabel="Obtenir un itinéraire"
-        >
-          <Navigation size={13} color="rgba(255,255,255,0.65)" />
-
-          <Text className="text-xs font-medium text-white/65">Itinéraire</Text>
-        </Pressable>
-      </View>
-
-      {/* ============================================================ */}
-      {/* MAP                                                           */}
-      {/* ============================================================ */}
-
-      <View className="h-52 overflow-hidden rounded-xl">
-        <MapView
-          provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-          initialRegion={region}
-          className="h-full w-full"
-          scrollEnabled
-          zoomEnabled
-          rotateEnabled
-          pitchEnabled
-          toolbarEnabled
-        >
-          <Marker
-            coordinate={{
-              latitude: latitude as number,
-              longitude: longitude as number,
-            }}
-            title={location?.trim() || "Emplacement"}
-            description="Localisation du service"
-          >
-            <View className="h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-orange-500 shadow-lg">
-              <Wrench size={17} color="#FFFFFF" />
-            </View>
-          </Marker>
-        </MapView>
-
-        {/* Attribution visuelle */}
-        <View className="absolute bottom-2 right-2 rounded-full bg-black/65 px-2 py-1">
-          <Text className="text-[9px] text-white/55">Carte</Text>
-        </View>
-      </View>
-    </View>
+    <View className="bg-white/5 rounded-2xl p-4 space-y-2"><View className="flex items-center justify-between"><Text className="text-sm font-medium text-white/50">Localisation</Text><Pressable onPress={() => {
+            Linking.openURL(String(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`));
+          }} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-white/60 transition-colors bg-white/5"><Navigation size={12} /><Text>Itinéraire</Text></Pressable></View><View className="rounded-xl overflow-hidden h-48 relative"><View ref={mapRef} className="w-full h-full" /><View className="absolute bottom-2 right-2 bg-black/60 text-white/60 text-[10px] px-2 py-1 rounded-full"><Text>OpenStreetMap</Text></View></View></View>
   );
 }
-
-export default ServiceMap;

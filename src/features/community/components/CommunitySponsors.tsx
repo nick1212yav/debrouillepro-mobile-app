@@ -31,31 +31,14 @@ export function CommunitySponsors({ sponsors, onSelect }: Props) {
   if (!sponsors || sponsors.length === 0) return null;
 
   return (
-    <View className="space-y-3">
-      <View className="flex items-center gap-2">
-        <Award size={16} className="text-white/30" />
-        <Text className="text-sm font-medium text-white/50">Sponsors</Text>
-      </View>
-      <View className="space-y-2">
-        {sponsors.map((sponsor) => {
+    <View className="space-y-3"><View className="flex items-center gap-2"><Award size={16} className="text-white/30" /><Text className="text-sm font-medium text-white/50">Sponsors</Text></View><View className="space-y-2">{sponsors.map((sponsor) => {
           const color = TIER_COLORS[sponsor.tier];
           return (
-            <Pressable
-              key={sponsor.id}
-              onPress={() => onSelect(sponsor.id)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl text-left bg-white/5 border border-white/5"
-            >
+            <Pressable key={sponsor.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} onPress={() => onSelect(sponsor.id)} className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left bg-white/5 border border-white/5">
               {sponsor.logo ? (
-                <Image
-                 
-                 
-                  className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
-                 source={{ uri: sponsor.logo }} accessibilityLabel={sponsor.name}/>
+                <Image className="w-10 h-10 rounded-xl object-cover flex-shrink-0" source={{ uri: sponsor.logo }} accessibilityLabel={sponsor.name} />
               ) : (
-                <View
-                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${color}20` }}
-                >
+                <View className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}20` }}>
                   <Award size={16} style={{ color }} />
                 </View>
               )}
@@ -72,8 +55,6 @@ export function CommunitySponsors({ sponsors, onSelect }: Props) {
               </View>
             </Pressable>
           );
-        })}
-      </View>
-    </View>
+        })}</View></View>
   );
 }

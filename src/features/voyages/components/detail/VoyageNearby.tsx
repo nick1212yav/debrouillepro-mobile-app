@@ -11,9 +11,7 @@ interface VoyageNearbyProps {
 export function VoyageNearby({ trip }: VoyageNearbyProps) {
   // Pour l'instant, un placeholder. Plus tard, on pourra afficher des lieux à proximité.
   return (
-    <View
-      className="rounded-3xl p-6 bg-white/5 border border-white/10"
-    >
+    <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl p-6 bg-white/5 border border-white/10">
       <View className="flex items-center gap-2 mb-4">
         <Compass size={16} className="text-indigo-400" />
         <Text className="text-white font-bold text-base">À proximité</Text>

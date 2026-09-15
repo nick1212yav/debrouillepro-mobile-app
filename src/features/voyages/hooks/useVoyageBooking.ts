@@ -1,10 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/voyages/hooks/useVoyageBooking.ts
 import { useState, useCallback } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 
 export interface Passenger {
   name: string;
@@ -54,7 +53,7 @@ export function useVoyageBooking() {
 
   const goToSummary = useCallback(() => {
     if (!state.passenger.name.trim()) {
-      UIService.openToast("Veuillez saisir le nom du passager", "error");
+      toast.error("Veuillez saisir le nom du passager");
       return;
     }
     setState((prev) => ({ ...prev, step: "summary" }));
@@ -66,7 +65,7 @@ export function useVoyageBooking() {
 
   const confirmBooking = useCallback(async () => {
     if (!state.tripId) {
-      UIService.openToast("Aucun voyage sélectionné", "error");
+      toast.error("Aucun voyage sélectionné");
       return;
     }
 
@@ -81,10 +80,10 @@ export function useVoyageBooking() {
       });
 
       setState((prev) => ({ ...prev, step: "success" }));
-      UIService.openToast("Réservation confirmée !", "success");
+      toast.success("Réservation confirmée !");
       return true;
     } catch {
-      UIService.openToast("Erreur lors de la réservation", "error");
+      toast.error("Erreur lors de la réservation");
       return false;
     }
   }, [state, bookTrip]);

@@ -33,75 +33,10 @@ export function VoyageBookingSummary({
   });
 
   return (
-    <View
-      className="space-y-4"
-    >
-      <View className="p-4 rounded-2xl bg-white/5 border border-white/10">
-        <Text className="text-white font-bold text-sm mb-3">Résumé du voyage</Text>
+    <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+      <View className="p-4 rounded-2xl bg-white/5 border border-white/10"><Text className="text-white font-bold text-sm mb-3">Résumé du voyage</Text><View className="space-y-2 text-sm"><View className="flex items-start gap-2"><MapPin size={14} className="text-indigo-400 mt-0.5" /><View><Text className="text-white/50">Trajet</Text><Text className="text-white font-medium">{trip.from}{" "}<ArrowRight size={12} className="inline text-indigo-400" />{" "}{trip.to}</Text></View></View><View className="flex items-start gap-2"><Calendar size={14} className="text-indigo-400 mt-0.5" /><View><Text className="text-white/50">Date</Text><Text className="text-white font-medium">{formattedDate}</Text></View></View><View className="flex items-start gap-2"><Clock size={14} className="text-indigo-400 mt-0.5" /><View><Text className="text-white/50">Heures</Text><Text className="text-white font-medium">{trip.departure}→ {trip.arrival}</Text></View></View><View className="flex items-start gap-2"><Users size={14} className="text-indigo-400 mt-0.5" /><View><Text className="text-white/50">Passager</Text><Text className="text-white font-medium">{passengerName}</Text></View></View><View className="flex items-start gap-2"><ArmchairIcon size={14} className="text-indigo-400 mt-0.5" /><View><Text className="text-white/50">Sièges</Text><Text className="text-white font-medium">{selectedSeats.join(", ")}</Text></View></View></View></View>
 
-        <View className="space-y-2 text-sm">
-          <View className="flex items-start gap-2">
-            <MapPin size={14} className="text-indigo-400 mt-0.5" />
-            <View>
-              <Text className="text-white/50">Trajet</Text>
-              <Text className="text-white font-medium">
-                {trip.from}{" "}
-                <ArrowRight size={12} className="inline text-indigo-400" />{" "}
-                {trip.to}
-              </Text>
-            </View>
-          </View>
-
-          <View className="flex items-start gap-2">
-            <Calendar size={14} className="text-indigo-400 mt-0.5" />
-            <View>
-              <Text className="text-white/50">Date</Text>
-              <Text className="text-white font-medium">{formattedDate}</Text>
-            </View>
-          </View>
-
-          <View className="flex items-start gap-2">
-            <Clock size={14} className="text-indigo-400 mt-0.5" />
-            <View>
-              <Text className="text-white/50">Heures</Text>
-              <Text className="text-white font-medium">
-                {trip.departure} → {trip.arrival}
-              </Text>
-            </View>
-          </View>
-
-          <View className="flex items-start gap-2">
-            <Users size={14} className="text-indigo-400 mt-0.5" />
-            <View>
-              <Text className="text-white/50">Passager</Text>
-              <Text className="text-white font-medium">{passengerName}</Text>
-            </View>
-          </View>
-
-          <View className="flex items-start gap-2">
-            <ArmchairIcon size={14} className="text-indigo-400 mt-0.5" />
-            <View>
-              <Text className="text-white/50">Sièges</Text>
-              <Text className="text-white font-medium">
-                {selectedSeats.join(", ")}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <View className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
-        <View className="flex items-center justify-between">
-          <Text className="text-white/60 text-sm"><Text>Total à payer</Text></Text>
-          <Text className="text-white font-bold text-xl">
-            {totalPrice.toLocaleString()} {trip.currency || "FCFA"}
-          </Text>
-        </View>
-        <Text className="text-white/30 text-xs mt-1">
-          {selectedSeats.length} <Text>siège</Text>{selectedSeats.length > 1 ? "s" : ""} <Text>×</Text>{" "}
-          {trip.price?.toLocaleString()} {trip.currency || "FCFA"}
-        </Text>
-      </View>
+      <View className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20"><View className="flex items-center justify-between"><Text className="text-white/60 text-sm">Total à payer</Text><Text className="text-white font-bold text-xl">{totalPrice.toLocaleString()}{trip.currency || "FCFA"}</Text></View><Text className="text-white/30 text-xs mt-1">{selectedSeats.length}siège{selectedSeats.length > 1 ? "s" : ""}×{" "}{trip.price?.toLocaleString()}{trip.currency || "FCFA"}</Text></View>
     </View>
   );
 }

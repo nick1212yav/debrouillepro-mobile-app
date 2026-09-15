@@ -1,6 +1,5 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityReactions.ts
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 // ⚠️ Fonctions de réactions : le backend n'est pas encore implémenté.
@@ -9,7 +8,7 @@ export function useCommunityReactions() {
   return {
     addReaction: async (publicationId: Id<"publications">, emoji: string) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      UIService.openToast(`⚠️ Réaction ${emoji} : fonctionnalité à venir`, "info");
+      toast.info(`⚠️ Réaction ${emoji} : fonctionnalité à venir`);
       console.log("Ajout réaction :", { publicationId, emoji });
       // Ne pas throw pour ne pas bloquer l'UI
     },
@@ -19,7 +18,7 @@ export function useCommunityReactions() {
       emoji: string,
     ) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      UIService.openToast(`⚠️ Retrait de réaction ${emoji} : fonctionnalité à venir`, "info");
+      toast.info(`⚠️ Retrait de réaction ${emoji} : fonctionnalité à venir`);
       console.log("Retrait réaction :", { publicationId, emoji });
     },
   };

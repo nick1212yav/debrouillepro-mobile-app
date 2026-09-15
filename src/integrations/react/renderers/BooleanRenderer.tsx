@@ -9,14 +9,6 @@ export function BooleanRenderer({
   disabled,
 }: FieldRendererProps) {
   return (
-    <Text className="flex items-center gap-2">
-      <TextInput
-        checked={!!value}
-        onChangeText={(e) => onChange(e.target.checked)}
-        disabled={disabled}
-        className="w-5 h-5 rounded border-white/10 bg-white/5 text-purple-600"
-      />
-      <Text className="text-sm text-white/70">{field.label}</Text>
-    </Text>
+    <Text className="flex items-center gap-2"><TextInput  onChangeText={(e) => onChange(e.target.checked)} className="w-5 h-5 rounded border-white/10 bg-white/5 text-purple-600 focus:ring-purple-500" editable={!(disabled)} /><Text className="text-sm text-white/70">{field.label}</Text></Text>
   );
 }

@@ -1,6 +1,5 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/community/hooks/useCommunityModeration.ts
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 // ⚠️ Fonctions de modération : le backend n'est pas encore implémenté.
@@ -20,7 +19,7 @@ export function useCommunityModeration() {
     }) => {
       // Simuler un délai
       await new Promise((resolve) => setTimeout(resolve, 500));
-      UIService.openToast("⚠️ Signalement : fonctionnalité à venir", "info");
+      toast.info("⚠️ Signalement : fonctionnalité à venir");
       console.log("Signalement :", { postId, commentId, reason, details });
       // Ne pas throw pour ne pas bloquer l'UI
     },
@@ -37,19 +36,19 @@ export function useCommunityModeration() {
       reason: string;
     }) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      UIService.openToast("⚠️ Modération : fonctionnalité à venir", "info");
+      toast.info("⚠️ Modération : fonctionnalité à venir");
       console.log("Modération :", { contentId, contentType, action, reason });
     },
 
     banUser: async (userId: Id<"users">, reason: string) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      UIService.openToast("⚠️ Bannissement : fonctionnalité à venir", "info");
+      toast.info("⚠️ Bannissement : fonctionnalité à venir");
       console.log("Bannir :", { userId, reason });
     },
 
     muteUser: async (userId: Id<"users">, duration: number) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
-      UIService.openToast("⚠️ Mise en sourdine : fonctionnalité à venir", "info");
+      toast.info("⚠️ Mise en sourdine : fonctionnalité à venir");
       console.log("Mute :", { userId, duration });
     },
   };

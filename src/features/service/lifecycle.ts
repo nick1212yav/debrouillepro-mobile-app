@@ -1,4 +1,4 @@
-import { UIService } from "@/core/sdk/ui/UIService";
+import { toast } from "sonner";
 
 export const lifecycle = {
   beforeCreate: async (data: any) => {
@@ -8,19 +8,19 @@ export const lifecycle = {
     return data;
   },
   afterCreate: async (data: any) => {
-    UIService.openToast("Prestataire créé avec succès !", "success");
+    toast.success("Prestataire créé avec succès !");
     return data;
   },
   beforeUpdate: async (data: any) => {
     return data;
   },
   afterUpdate: async (data: any) => {
-    UIService.openToast("Modifications enregistrées", "success");
+    toast.success("Modifications enregistrées");
   },
   beforeDelete: async (data: any) => {
     return true;
   },
   afterDelete: async () => {
-    UIService.openToast("Prestataire supprimé", "success");
+    toast.success("Prestataire supprimé");
   },
 };

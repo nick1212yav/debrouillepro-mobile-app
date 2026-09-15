@@ -31,6 +31,7 @@ import type {
   PostStatus,
 } from "@/features/community/types";
 import type { AgriProduct } from "@/features/agri/types/product.types";
+import { Linking } from "react-native";
 
 interface Props {
   publication: Publication;
@@ -353,12 +354,12 @@ export function PublicationRenderer({
     };
 
     const handleCall = (phone: string) => {
-      if (phone) undefined.href = `tel:${phone}`;
+      if (phone) Linking.openURL(`tel:${phone}`);
     };
 
     const handleBook = () => {
       const providerId = meta?.providerId;
-      if (providerId) undefined.href = `/service/${providerId}`;
+      if (providerId) Linking.openURL(`/service/${providerId}`);
     };
 
     return (
@@ -412,7 +413,7 @@ export function PublicationRenderer({
 
     const handlePress = () => {
       const productId = meta?.productId || publication._id;
-      undefined.href = `/marketplace/${productId}`;
+      Linking.openURL(`/marketplace/${productId}`);
     };
 
     return (
@@ -494,7 +495,7 @@ export function PublicationRenderer({
       onBookmark ? onBookmark() : console.log("Bookmark:", communityPost._id);
     const handleVote = (optionId: string) => onVote?.(optionId);
     const handleNavigate = () => {
-      undefined.href = `/community/${communityPost._id}`;
+      Linking.openURL(`/community/${communityPost._id}`);
     };
 
     return (
@@ -584,7 +585,7 @@ export function PublicationRenderer({
     };
 
     const handleClick = () => {
-      undefined.href = `/agri/${publication._id}`;
+      Linking.openURL(`/agri/${publication._id}`);
     };
 
     return (

@@ -1,4 +1,5 @@
 import { View, Text, Pressable } from "react-native";
+
 // src/features/marketplace/components/MarketplaceReports.tsx
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
@@ -105,16 +106,13 @@ export function MarketplaceReports() {
 
   if (loading) {
     return (
-      <View className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="text-white/40 animate-spin" />
-      </View>
+      <View className="flex items-center justify-center py-12"><Loader2 size={24} className="text-white/40 animate-spin" /></View>
     );
   }
 
   if (!stats) {
     return (
-      <View className="text-center py-8 text-white/40 text-sm">
-        <Text>Aucune donnée disponible.</Text></View>
+      <View className="text-center py-8 text-white/40 text-sm"><Text>Aucune donnée disponible.</Text></View>
     );
   }
 
@@ -124,161 +122,40 @@ export function MarketplaceReports() {
   );
 
   return (
-    <View className="space-y-6 p-4">
-      {/* En‑tête et période */}
-      <View className="flex items-center justify-between">
-        <Text className="text-white font-bold text-lg">Rapports de vente</Text>
-        <View className="flex gap-1 bg-white/5 rounded-xl p-1">
-          {(["week", "month", "year"] as const).map((p) => (
-            <Pressable
-              key={p}
-              onPress={() => setPeriod(p)}
-              className={`
+    <View className="space-y-6 p-4">{}<View className="flex items-center justify-between"><Text className="text-white font-bold text-lg">Rapports de vente</Text><View className="flex gap-1 bg-white/5 rounded-xl p-1">{(["week", "month", "year"] as const).map((p) => (
+            <Pressable key={p} onPress={() => setPeriod(p)} className={`
                 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
                 ${period === p ? "bg-orange-500 text-white" : "text-white/40 hover:text-white/80"}
-              `}
-            >
-              {p === "week" ? "Semaine" : p === "month" ? "Mois" : "Année"}
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* KPI Cards */}
-      <View className="gap-3">
-        <View className="p-3 rounded-2xl bg-white/5 border border-white/5">
-          <View className="flex items-center justify-between">
-            <DollarSign size={16} className="text-orange-400" />
-            <Text className="text-[10px] text-green-400 flex items-center">
-              <ArrowUp size={10} /> +12%
-            </Text>
-          </View>
-          <Text className="text-white font-bold text-lg mt-1">
-            {stats.totalRevenue.toLocaleString()} FCFA
-          </Text>
-          <Text className="text-white/40 text-[10px]">Chiffre d'affaires</Text>
-        </View>
-        <View className="p-3 rounded-2xl bg-white/5 border border-white/5">
-          <View className="flex items-center justify-between">
-            <ShoppingBag size={16} className="text-blue-400" />
-          </View>
-          <Text className="text-white font-bold text-lg mt-1">
-            {stats.totalOrders}
-          </Text>
-          <Text className="text-white/40 text-[10px]">Commandes</Text>
-        </View>
-        <View className="p-3 rounded-2xl bg-white/5 border border-white/5">
-          <View className="flex items-center justify-between">
-            <Star size={16} className="text-yellow-400" />
-          </View>
-          <Text className="text-white font-bold text-lg mt-1">
-            {stats.averageRating.toFixed(1)} ★
-          </Text>
-          <Text className="text-white/40 text-[10px]">
-            Note moyenne ({stats.totalReviews} avis)
-          </Text>
-        </View>
-        <View className="p-3 rounded-2xl bg-white/5 border border-white/5">
-          <View className="flex items-center justify-between">
-            <TrendingUp size={16} className="text-green-400" />
-          </View>
-          <Text className="text-white font-bold text-lg mt-1">
-            {stats.conversionRate}%
-          </Text>
-          <Text className="text-white/40 text-[10px]">Taux de conversion</Text>
-        </View>
-      </View>
-
-      {/* Graphique des ventes par jour (barres) */}
-      <View className="rounded-2xl bg-white/5 border border-white/5 p-4">
-        <Text className="text-white text-sm font-medium mb-3">
-          Ventes quotidiennes (7 derniers jours)
-        </Text>
-        <View className="flex items-end gap-1 h-32">
-          {stats.salesByDay.map((day) => {
+              `}>{p === "week" ? "Semaine" : p === "month" ? "Mois" : "Année"}</Pressable>
+          ))}</View></View>{}<View className="gap-3"><View className="p-3 rounded-2xl bg-white/5 border border-white/5"><View className="flex items-center justify-between"><DollarSign size={16} className="text-orange-400" /><Text className="text-[10px] text-green-400 flex items-center"><ArrowUp size={10} />+12%
+            </Text></View><Text className="text-white font-bold text-lg mt-1">{stats.totalRevenue.toLocaleString()}FCFA
+          </Text><Text className="text-white/40 text-[10px]">Chiffre d'affaires</Text></View><View className="p-3 rounded-2xl bg-white/5 border border-white/5"><View className="flex items-center justify-between"><ShoppingBag size={16} className="text-blue-400" /></View><Text className="text-white font-bold text-lg mt-1">{stats.totalOrders}</Text><Text className="text-white/40 text-[10px]">Commandes</Text></View><View className="p-3 rounded-2xl bg-white/5 border border-white/5"><View className="flex items-center justify-between"><Star size={16} className="text-yellow-400" /></View><Text className="text-white font-bold text-lg mt-1">{stats.averageRating.toFixed(1)}★
+          </Text><Text className="text-white/40 text-[10px]">Note moyenne ({stats.totalReviews}avis)
+          </Text></View><View className="p-3 rounded-2xl bg-white/5 border border-white/5"><View className="flex items-center justify-between"><TrendingUp size={16} className="text-green-400" /></View><Text className="text-white font-bold text-lg mt-1">{stats.conversionRate}%
+          </Text><Text className="text-white/40 text-[10px]">Taux de conversion</Text></View></View>{}<View className="rounded-2xl bg-white/5 border border-white/5 p-4"><Text className="text-white text-sm font-medium mb-3">Ventes quotidiennes (7 derniers jours)
+        </Text><View className="flex items-end gap-1 h-32">{stats.salesByDay.map((day) => {
             const heightPercent =
               maxRevenue > 0 ? (day.revenue / maxRevenue) * 100 : 0;
             return (
-              <View
-                key={day.date}
-                className="flex-1 flex flex-col items-center gap-1"
-              >
-                <Text className="text-[8px] text-white/30">
-                  {day.revenue.toLocaleString()}
-                </Text>
-                <View
-                  className="w-full rounded-t-lg bg-orange-500/80"
-                  style={{ height: `${heightPercent}%`, minHeight: 4 }}
-                />
-                <Text className="text-[8px] text-white/30">
-                  {new Date(day.date).toLocaleDateString("fr", {
+              <View key={day.date} className="flex-1 flex flex-col items-center gap-1"><Text className="text-[8px] text-white/30">{day.revenue.toLocaleString()}</Text><View className="w-full rounded-t-lg bg-orange-500/80 transition-all" style={{ height: `${heightPercent}%`, minHeight: 4 }} /><Text className="text-[8px] text-white/30">{new Date(day.date).toLocaleDateString("fr", {
                     weekday: "short",
-                  })}
-                </Text>
-              </View>
+                  })}</Text></View>
             );
-          })}
-        </View>
-      </View>
-
-      {/* Répartition par catégorie */}
-      <View className="rounded-2xl bg-white/5 border border-white/5 p-4">
-        <Text className="text-white text-sm font-medium mb-3">
-          Répartition par catégorie
-        </Text>
-        <View className="space-y-2">
-          {stats.salesByCategory.map((cat) => {
+          })}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/5 p-4"><Text className="text-white text-sm font-medium mb-3">Répartition par catégorie
+        </Text><View className="space-y-2">{stats.salesByCategory.map((cat) => {
             const widthPercent =
               maxCategoryRevenue > 0
                 ? (cat.revenue / maxCategoryRevenue) * 100
                 : 0;
             return (
-              <View key={cat.category} className="flex items-center gap-2">
-                <Text className="text-white/60 text-[10px] w-20 truncate">
-                  {cat.category}
-                </Text>
-                <View className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden">
-                  <View
-                    className="h-full rounded-full bg-orange-400/80"
-                    style={{ width: `${widthPercent}%` }}
-                  />
-                </View>
-                <Text className="text-white/60 text-[10px]">
-                  {cat.revenue.toLocaleString()} FCFA
-                </Text>
-              </View>
+              <View key={cat.category} className="flex items-center gap-2"><Text className="text-white/60 text-[10px] w-20 truncate">{cat.category}</Text><View className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden"><View className="h-full rounded-full bg-orange-400/80 transition-all" style={{ width: `${widthPercent}%` }} /></View><Text className="text-white/60 text-[10px]">{cat.revenue.toLocaleString()}FCFA
+                </Text></View>
             );
-          })}
-        </View>
-      </View>
-
-      {/* Avis récents */}
-      <View className="rounded-2xl bg-white/5 border border-white/5 p-4">
-        <Text className="text-white text-sm font-medium mb-3 flex items-center gap-2">
-          <Star size={14} className="text-yellow-400" />
-          Derniers avis
-        </Text>
-        <View className="space-y-2">
-          {stats.recentReviews.map((review) => (
-            <View key={review.id} className="flex items-start gap-2 text-sm">
-              <Text className="text-white font-medium">
-                {review.reviewerName}
-              </Text>
-              <View className="flex text-yellow-400">
-                {Array.from({ length: 5 }, (_, i) => (
+          })}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/5 p-4"><Text className="text-white text-sm font-medium mb-3 flex items-center gap-2"><Star size={14} className="text-yellow-400" />Derniers avis
+        </Text><View className="space-y-2">{stats.recentReviews.map((review) => (
+            <View key={review.id} className="flex items-start gap-2 text-sm"><Text className="text-white font-medium">{review.reviewerName}</Text><View className="flex text-yellow-400">{Array.from({ length: 5 }, (_, i) => (
                   <Text key={i}>{i < review.rating ? "★" : "☆"}</Text>
-                ))}
-              </View>
-              <Text className="text-white/60 text-xs flex-1">
-                {review.comment}
-              </Text>
-              <Text className="text-white/30 text-[10px]">
-                {new Date(review.date).toLocaleDateString("fr")}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    </View>
+                ))}</View><Text className="text-white/60 text-xs flex-1">{review.comment}</Text><Text className="text-white/30 text-[10px]">{new Date(review.date).toLocaleDateString("fr")}</Text></View>
+          ))}</View></View></View>
   );
 }

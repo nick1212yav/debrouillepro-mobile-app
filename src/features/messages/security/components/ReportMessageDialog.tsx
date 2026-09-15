@@ -1,5 +1,6 @@
 import { Picker } from "@react-native-picker/picker";
-import { View, Text, TextInput, ViewStyle, TextStyle, ImageStyle, Pressable } from "react-native";
+import { View, Text, TextInput, Pressable, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+
 // src/features/messages/security/components/ReportMessageDialog.tsx
 
 import React, { useEffect, useState } from "react";
@@ -95,54 +96,13 @@ export function ReportMessageDialog({
   };
 
   return (
-    <Pressable accessibilityRole="presentation" onPress={onClose} style={overlayStyle}>
-      <Pressable
-        accessibilityRole="dialog"
-        aria-modal="true"
-       
-        onPress={(event) => event.stopPropagation()}
-        style={dialogStyle}
-       accessibilityLabelledBy="report-message-title">
-        <Text id="report-message-title">Signaler le message</Text>
-
-        <Text style={descriptionStyle}>Sélectionnez la raison du signalement.</Text>
-
-        <Text style={labelStyle}>
-          Raison
-          <Picker
-           
-            onValueChange={(event) => setReason(event.target.value as ReportReason)}
-            style={inputStyle}
-           selectedValue={reason}>
-            {REPORT_REASONS.map((item) => (
-              <Picker.Item label={`${item.label}`} value={item.value} />
-            ))}
-          </Picker>
-        </Text>
-
-        <Text style={labelStyle}>
-          Détails (facultatif)
-          <TextInput
-            value={description}
-            onChangeText={(text) => setDescription(text)}
-            placeholder="Ajoutez des informations utiles au signalement."
-           
-            style={textareaStyle}
-           multiline textAlignVertical="top"/>
-        </Text>
-
-        <View style={actionsStyle}>
-          <Pressable onPress={onClose} style={secondaryButtonStyle}>
-            <Text>Annuler</Text></Pressable>
-
-          <Pressable
-            onPress={handleConfirm}
-            style={primaryButtonStyle}
-          >
-            <Text>Signaler</Text></Pressable>
-        </View>
-      </Pressable>
-    </Pressable>
+    <View accessibilityRole="none" onPress={onClose} style={overlayStyle}><View accessibilityRole="dialog" accessibilityViewIsModal={true} accessibilityLabelledBy="report-message-title" onPress={(event) => event.stopPropagation()} style={dialogStyle}><Text id="report-message-title">Signaler le message</Text><Text style={descriptionStyle}>Sélectionnez la raison du signalement.</Text><Text style={labelStyle}>Raison
+          <Picker onValueChange={(value) => setReason(value as ReportReason)} style={inputStyle} selectedValue={reason}>{REPORT_REASONS.map((item) => (
+              <Picker.Item label={item.label} value={item.value} />
+            ))}</Picker></Text><Text style={labelStyle}>Détails (facultatif)
+          <TextInput value={description} onChangeText={(value) => setDescription(value)} placeholder="Ajoutez des informations utiles au signalement." style={textareaStyle} multiline textAlignVertical="top" /></Text><View style={actionsStyle}><Pressable onPress={onClose} style={secondaryButtonStyle}>Annuler
+          </Pressable><Pressable onPress={handleConfirm} style={primaryButtonStyle}>Signaler
+          </Pressable></View></View></View>
   );
 }
 
@@ -190,7 +150,7 @@ const inputStyle: ViewStyle | TextStyle | ImageStyle = {
   font: "inherit",
 };
 
-const textareaStyle: ViewStyle | TextStyle | ImageStyle = {
+const textareaStyle: TextStyle = {
   width: "100%",
   boxSizing: "border-box",
   resize: "vertical",

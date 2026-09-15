@@ -1,8 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Pressable, Text, Image, TextInput, ViewStyle, TextStyle, ImageStyle } from "react-native";
+import { View, Pressable, Text, TextInput, Image, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Search,
@@ -1002,31 +1002,11 @@ function SectionTitle({
   action?: () => void;
 }) {
   return (
-    <View className="flex items-end justify-between gap-3 mb-4">
-      <View className="min-w-0">
-        <View className="flex items-center gap-2">
-          <View
-            className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${color}16`, borderStyle: "solid" }}
-          >
-            <Icon size={13} style={{ color }} />
-          </View>
-          <Text className="text-[15px] font-black text-white tracking-tight">
-            {title}
-          </Text>
-        </View>
-        {subtitle && (
+    <View className="flex items-end justify-between gap-3 mb-4"><View className="min-w-0"><View className="flex items-center gap-2"><View className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}16`, borderStyle: "solid" }}><Icon size={13} style={{ color }} /></View><Text className="text-[15px] font-black text-white tracking-tight">{title}</Text></View>{subtitle && (
           <Text className="text-[10px] text-white/35 mt-1 ml-9">{subtitle}</Text>
-        )}
-      </View>
-      {action && (
-        <Pressable
-          onPress={action}
-          className="text-[10px] font-bold text-white/45"
-        >
-          <Text>Tout voir →</Text></Pressable>
-      )}
-    </View>
+        )}</View>{action && (
+        <Pressable onPress={action} className="text-[10px] font-bold text-white/45 transition-colors"><Text>Tout voir →</Text></Pressable>
+      )}</View>
   );
 }
 
@@ -1040,78 +1020,25 @@ function HeroSearch({
   onSurprise: () => void;
 }) {
   return (
-    <View
-      className="relative overflow-hidden rounded-[30px] p-5 sm:p-7"
-      style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.09)", borderStyle: "solid" }}
-    >
-      <View className="absolute -right-20 -top-20 w-56 h-56 rounded-full bg-purple-500/10" />
-      <View className="absolute -left-20 -bottom-24 w-56 h-56 rounded-full bg-cyan-500/10" />
+    <View initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="relative overflow-hidden rounded-[30px] p-5 sm:p-7" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.09)", borderStyle: "solid", boxShadow:
+              "0 24px 80px rgba(0,0,0,0.35), inset 0 1px rgba(255,255,255,0.05)" }}>
+      <View className="absolute -right-20 -top-20 w-56 h-56 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
+      <View className="absolute -left-20 -bottom-24 w-56 h-56 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
 
-      <View className="relative z-10 max-w-3xl">
-        <View
-          className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full mb-4"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-        >
-          <Sparkles size={12} className="text-purple-300" />
-          <Text className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">
-            Découverte intelligente
-          </Text>
-        </View>
-
-        <Text className="text-3xl sm:text-4xl font-black tracking-[-0.04em] text-white leading-[0.98]">
-          Qu'avez-vous envie
-          <Text className="block bg-gradient-to-r from-violet-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent">
-            de découvrir ?
-          </Text>
-        </Text>
-        <Text className="text-xs sm:text-sm text-white/45 mt-3 max-w-xl leading-relaxed">
-          Trouvez une opportunité, un service, un lieu, un événement ou
+      <View className="relative z-10 max-w-3xl"><View className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full mb-4" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Sparkles size={12} className="text-purple-300" /><Text className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">Découverte intelligente
+          </Text></View><Text className="text-3xl sm:text-4xl font-black tracking-[-0.04em] text-white leading-[0.98]">Qu'avez-vous envie
+          <Text className="block bg-gradient-to-r from-violet-300 via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent">de découvrir ?
+          </Text></Text><Text className="text-xs sm:text-sm text-white/45 mt-3 max-w-xl leading-relaxed">Trouvez une opportunité, un service, un lieu, un événement ou
           simplement quelque chose de nouveau à explorer.
-        </Text>
-
-        <View className="flex gap-2 mt-5">
-          <View
-            className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-            style={{ backgroundColor: "rgba(0,0,0,0.28)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}
-          >
-            <Search size={17} className="text-white/35 flex-shrink-0" />
-            <TextInput
-              value={search}
-              onChangeText={(text) => setSearch(text)}
-              placeholder="Emploi, appartement, restaurant, événement…"
-              className="w-full bg-transparent text-sm text-white placeholder:text-white/25 outline-none"
-            />
-          </View>
-          <Pressable
-            onPress={onSurprise}
-           
-            className="w-12 sm:w-auto sm:px-4 rounded-2xl flex items-center justify-center gap-2"
-            style={{ borderWidth: 1, borderColor: "rgba(167,139,250,0.3)", borderStyle: "solid" }}
-          >
-            <Sparkles size={16} className="text-purple-200" />
-            <Text className="hidden sm:inline text-xs font-black text-purple-100">
-              Surprends-moi
-            </Text>
-          </Pressable>
-        </View>
-
-        <View className="flex flex-wrap gap-2 mt-4">
-          {[
+        </Text><View className="flex gap-2 mt-5"><View className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 rounded-2xl" style={{ backgroundColor: "rgba(0,0,0,0.28)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", boxShadow: "inset 0 1px rgba(255,255,255,0.04)" }}><Search size={17} className="text-white/35 flex-shrink-0" /><TextInput value={search} onChangeText={(value) => setSearch(value)} placeholder="Emploi, appartement, restaurant, événement…" className="w-full bg-transparent text-sm text-white placeholder:text-white/25 outline-none" /></View><Pressable onPress={onSurprise} className="w-12 sm:w-auto sm:px-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-transform" style={{ borderWidth: 1, borderColor: "rgba(167,139,250,0.3)", borderStyle: "solid" }}><Sparkles size={16} className="text-purple-200" /><Text className="hidden sm:inline text-xs font-black text-purple-100">Surprends-moi
+            </Text></Pressable></View><View className="flex flex-wrap gap-2 mt-4">{[
             "À proximité",
             "🔥 Tendances",
             "💼 Opportunités",
             "🎟️ Événements",
           ].map((item) => (
-            <Text
-              key={item}
-              className="px-2.5 py-1 rounded-full text-[10px] font-semibold text-white/45"
-              style={{ backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}
-            >
-              {item}
-            </Text>
-          ))}
-        </View>
-      </View>
+            <Text key={item} className="px-2.5 py-1 rounded-full text-[10px] font-semibold text-white/45" style={{ backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}>{item}</Text>
+          ))}</View></View>
     </View>
   );
 }
@@ -1143,19 +1070,9 @@ function TrendingSection({
 
   if (isLoading) {
     return (
-      <View>
-        <SectionTitle
-          icon={TrendingUp}
-          title="Ce qui fait bouger la communauté"
-          subtitle="Les signaux les plus actifs en ce moment"
-          color="#F97316"
-        />
-        <View className="flex gap-3 overflow-hidden">
-          {Array.from({ length: 3 }).map((_, i) => (
+      <View><SectionTitle icon={TrendingUp} title="Ce qui fait bouger la communauté" subtitle="Les signaux les plus actifs en ce moment" color="#F97316" /><View className="flex gap-3 overflow-hidden">{Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-32 min-w-[260px] rounded-3xl" />
-          ))}
-        </View>
-      </View>
+          ))}</View></View>
     );
   }
 
@@ -1165,25 +1082,9 @@ function TrendingSection({
   if (!hasTags && !hasPubs && !hasUsers) return null;
 
   return (
-    <View>
-      <SectionTitle
-        icon={TrendingUp}
-        title="Ce qui fait bouger la communauté"
-        subtitle="Tendances, publications et personnes à découvrir"
-        color="#F97316"
-      />
-
-      {hasTags && (
-        <View
-          className="flex gap-2 overflow-x-auto pb-1 mb-4"
-          style={{  }}
-        >
-          {trendingTags.slice(0, 12).map((tag, i) => (
-            <View
-              key={tag.tag}
-              className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-2xl"
-              style={{ backgroundColor: i === 0 ? "rgba(249,115,22,0.13)" : "rgba(139,92,246,0.09)", borderWidth: 0, borderColor: "rgba(249,115,22,0.26)", borderStyle: "solid" }}
-            >
+    <View><SectionTitle icon={TrendingUp} title="Ce qui fait bouger la communauté" subtitle="Tendances, publications et personnes à découvrir" color="#F97316" />{hasTags && (
+        <View className="flex gap-2 overflow-x-auto pb-1 mb-4" style={{  }}>{trendingTags.slice(0, 12).map((tag, i) => (
+            <View key={tag.tag} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.03 }} className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-2xl" style={{ backgroundColor: i === 0 ? "rgba(249,115,22,0.13)" : "rgba(139,92,246,0.09)", borderWidth: 0, borderColor: "rgba(249,115,22,0.26)", borderStyle: "solid" }}>
               <Hash
                 size={11}
                 className={i === 0 ? "text-orange-300" : "text-purple-300"}
@@ -1191,16 +1092,10 @@ function TrendingSection({
               <Text className="text-xs font-bold text-white/70">{tag.tag}</Text>
               <Text className="text-[9px] text-white/30">{tag.count}</Text>
             </View>
-          ))}
-        </View>
-      )}
-
-      {hasPubs && (
-        <View className="gap-3">
-          {trendingPubs.slice(0, 6).map((pub, i) => (
-            <Pressable
-              key={pub._id}
-              onPress={() => {
+          ))}</View>
+      )}{hasPubs && (
+        <View className="gap-3">{trendingPubs.slice(0, 6).map((pub, i) => (
+            <Pressable key={pub._id} onPress={() => {
                 onTrackClick({
                   sectionId: "trending_publications",
                   itemId: String(pub._id),
@@ -1211,87 +1106,25 @@ function TrendingSection({
                 });
                 if (onViewPublication) onViewPublication(String(pub._id));
                 else onNavigate("decouverte");
-              }}
-              className="group relative overflow-hidden rounded-3xl p-3.5 text-left"
-              style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-            >
-              <View className="flex gap-3">
-                {pub.images.length > 0 ? (
-                  <Image
-                   
-                   
-                    className="w-20 h-20 rounded-2xl object-cover flex-shrink-0"
-                   source={{ uri: pub.images[0] }} accessibilityLabel=""/>
+              }} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className="group relative overflow-hidden rounded-3xl p-3.5 text-left active:scale-[0.99] transition-transform" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+              <View className="flex gap-3">{pub.images.length > 0 ? (
+                  <Image className="w-20 h-20 rounded-2xl object-cover flex-shrink-0" source={{ uri: pub.images[0] }} accessibilityLabel="" />
                 ) : (
-                  <View
-                    className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: "rgba(139,92,246,0.1)" }}
-                  >
-                    <Sparkles size={18} className="text-purple-300/60" />
-                  </View>
-                )}
-                <View className="min-w-0 flex-1">
-                  <Text className="text-sm font-black text-white truncate">
-                    {pub.title}
-                  </Text>
-                  <Text className="text-[10px] text-white/35 mt-1 leading-relaxed">
-                    {pub.description}
-                  </Text>
-                  <View className="flex items-center gap-3 mt-2">
-                    <Text className="text-[9px] text-white/30">
-                      ♡ {pub.likeCount}
-                    </Text>
-                    <Text className="text-[9px] text-white/30">
-                      💬 {pub.commentCount}
-                    </Text>
-                    <Text className="text-[9px] text-white/30">
-                      ◉ {pub.viewCount}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <View className="flex items-center gap-1.5 mt-3">
-                <View className="w-5 h-5 rounded-full bg-white/10 overflow-hidden flex items-center justify-center">
-                  {pub.authorAvatar ? (
-                    <Image
-                     
-                     
-                      className="w-full h-full object-cover"
-                     source={{ uri: pub.authorAvatar }} accessibilityLabel=""/>
+                  <View className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.1)" }}><Sparkles size={18} className="text-purple-300/60" /></View>
+                )}<View className="min-w-0 flex-1"><Text className="text-sm font-black text-white truncate">{pub.title}</Text><Text className="text-[10px] text-white/35 mt-1 leading-relaxed">{pub.description}</Text><View className="flex items-center gap-3 mt-2"><Text className="text-[9px] text-white/30">♡ {pub.likeCount}</Text><Text className="text-[9px] text-white/30">💬 {pub.commentCount}</Text><Text className="text-[9px] text-white/30">◉ {pub.viewCount}</Text></View></View></View>
+              <View className="flex items-center gap-1.5 mt-3"><View className="w-5 h-5 rounded-full bg-white/10 overflow-hidden flex items-center justify-center">{pub.authorAvatar ? (
+                    <Image className="w-full h-full object-cover" source={{ uri: pub.authorAvatar }} accessibilityLabel="" />
                   ) : (
                     <UsersIcon size={9} className="text-white/40" />
-                  )}
-                </View>
-                <Text className="text-[9px] text-white/35 truncate">
-                  {pub.authorName}
-                </Text>
-                {pub.tags.length > 0 && (
-                  <Text className="text-[9px] text-purple-300/70 truncate">
-                    #{pub.tags[0]}
-                  </Text>
-                )}
-              </View>
+                  )}</View><Text className="text-[9px] text-white/35 truncate">{pub.authorName}</Text>{pub.tags.length > 0 && (
+                  <Text className="text-[9px] text-purple-300/70 truncate">#{pub.tags[0]}</Text>
+                )}</View>
             </Pressable>
-          ))}
-        </View>
-      )}
-
-      {hasUsers && (
-        <View className="mt-5">
-          <View className="flex items-center gap-2 mb-3">
-            <UserPlus size={13} className="text-emerald-300" />
-            <Text className="text-xs font-black text-white/75">
-              Personnes à découvrir
-            </Text>
-          </View>
-          <View
-            className="flex gap-3 overflow-x-auto pb-1"
-            style={{  }}
-          >
-            {suggestedUsers.slice(0, 8).map((user, i) => (
-              <Pressable
-                key={user._id}
-                onPress={() => {
+          ))}</View>
+      )}{hasUsers && (
+        <View className="mt-5"><View className="flex items-center gap-2 mb-3"><UserPlus size={13} className="text-emerald-300" /><Text className="text-xs font-black text-white/75">Personnes à découvrir
+            </Text></View><View className="flex gap-3 overflow-x-auto pb-1" style={{  }}>{suggestedUsers.slice(0, 8).map((user, i) => (
+              <Pressable key={user._id} onPress={() => {
                   onTrackClick({
                     sectionId: "trending_people",
                     itemId: String(user._id),
@@ -1302,38 +1135,21 @@ function TrendingSection({
                   });
                   if (onViewProfile) onViewProfile(String(user._id));
                   else onNavigate("network");
-                }}
-                className="flex-shrink-0 w-32 p-3 rounded-2xl text-center"
-                style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-              >
-                <View className="w-12 h-12 mx-auto rounded-full bg-white/10 overflow-hidden flex items-center justify-center mb-2">
-                  {user.avatar ? (
-                    <Image
-                     
-                     
-                      className="w-full h-full object-cover"
-                     source={{ uri: user.avatar }} accessibilityLabel=""/>
+                }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="flex-shrink-0 w-32 p-3 rounded-2xl text-center" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
+                <View className="w-12 h-12 mx-auto rounded-full bg-white/10 overflow-hidden flex items-center justify-center mb-2">{user.avatar ? (
+                    <Image className="w-full h-full object-cover" source={{ uri: user.avatar }} accessibilityLabel="" />
                   ) : (
                     <UsersIcon size={17} className="text-white/30" />
-                  )}
-                </View>
-                <Text className="text-[11px] font-bold text-white truncate">
-                  {user.name}
-                </Text>
+                  )}</View>
+                <Text className="text-[11px] font-bold text-white truncate">{user.name}</Text>
                 {user.city && (
-                  <Text className="text-[9px] text-white/30 truncate mt-0.5">
-                    {user.city}
-                  </Text>
+                  <Text className="text-[9px] text-white/30 truncate mt-0.5">{user.city}</Text>
                 )}
-                <Text className="text-[9px] text-emerald-300/50 mt-1">
-                  {user.followerCount} abonnés
+                <Text className="text-[9px] text-emerald-300/50 mt-1">{user.followerCount}abonnés
                 </Text>
               </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-    </View>
+            ))}</View></View>
+      )}</View>
   );
 }
 
@@ -1415,8 +1231,7 @@ function BackendCardView({
   const color = colors[card.kind] ?? "#8B5CF6";
 
   return (
-    <Pressable
-      onPress={() => {
+    <Pressable onPress={() => {
         const itemId = String(card.id);
         const itemType = card.kind;
         const rawMetadata = {
@@ -1455,25 +1270,13 @@ function BackendCardView({
         }
 
         onNavigate(card.route);
-      }}
-      className={`group relative overflow-hidden text-left rounded-3xl cursor-pointer ${
+      }} whileTap={{ scale: 0.98 }} className={`group relative overflow-hidden text-left rounded-3xl cursor-pointer ${
         compact ? "p-3 min-w-[245px]" : "p-3.5"
-      }`}
-      style={{ borderStyle: "solid" }}
-    >
-      <View className="flex gap-3">
-        {card.image ? (
-          <Image
-           
-           
-            className={`${compact ? "w-16 h-16" : "w-20 h-20"} rounded-2xl object-cover flex-shrink-0 bg-white/5`}
-           source={{ uri: card.image }} accessibilityLabel=""/>
+      }`} style={{ borderStyle: "solid" }}>
+      <View className="flex gap-3">{card.image ? (
+          <Image className={`${compact ? "w-16 h-16" : "w-20 h-20"} rounded-2xl object-cover flex-shrink-0 bg-white/5`} source={{ uri: card.image }} accessibilityLabel="" />
         ) : (
-          <View
-            className={`${compact ? "w-16 h-16" : "w-20 h-20"} rounded-2xl flex items-center justify-center flex-shrink-0`}
-            style={{ backgroundColor: `${color}15` }}
-          >
-            {card.kind === "job" ? (
+          <View className={`${compact ? "w-16 h-16" : "w-20 h-20"} rounded-2xl flex items-center justify-center flex-shrink-0`} style={{ backgroundColor: `${color}15` }}>{card.kind === "job" ? (
               <Briefcase size={20} style={{ color }} />
             ) : card.kind === "immo" ? (
               <Home size={20} style={{ color }} />
@@ -1487,62 +1290,22 @@ function BackendCardView({
               <UtensilsCrossed size={20} style={{ color }} />
             ) : (
               <Sparkles size={20} style={{ color }} />
-            )}
-          </View>
-        )}
-
-        <View className="min-w-0 flex-1">
-          <View className="flex items-start gap-2">
-            <Text className="text-sm font-black text-white truncate flex-1">
-              {card.title}
-            </Text>
-            <ChevronRight
-              size={14}
-              className="text-white/20 flex-shrink-0 mt-0.5"
-            />
-          </View>
-          {card.subtitle && (
-            <Text className="text-[10px] text-white/45 mt-0.5 truncate">
-              {card.subtitle}
-            </Text>
-          )}
-          <Text className="text-[10px] text-white/30 mt-1 leading-relaxed">
-            {card.description}
-          </Text>
-
-          <View className="flex items-center gap-2 mt-2 flex-wrap">
-            {card.priceLabel && (
-              <Text className="text-[10px] font-black" style={{ color }}>
-                {card.priceLabel}
+            )}</View>
+        )}<View className="min-w-0 flex-1"><View className="flex items-start gap-2"><Text className="text-sm font-black text-white truncate flex-1">{card.title}</Text><ChevronRight size={14} className="text-white/20 flex-shrink-0 mt-0.5" /></View>{card.subtitle && (
+            <Text className="text-[10px] text-white/45 mt-0.5 truncate">{card.subtitle}</Text>
+          )}<Text className="text-[10px] text-white/30 mt-1 leading-relaxed">{card.description}</Text><View className="flex items-center gap-2 mt-2 flex-wrap">{card.priceLabel && (
+              <Text className="text-[10px] font-black" style={{ color }}>{card.priceLabel}</Text>
+            )}{card.rating !== undefined && (
+              <Text className="text-[9px] text-amber-300/70">★ {card.rating.toFixed(1)}</Text>
+            )}{card.distanceKm !== undefined && (
+              <Text className="flex items-center gap-1 text-[9px] text-blue-300/65"><Navigation size={9} />{card.distanceKm}km
               </Text>
-            )}
-            {card.rating !== undefined && (
-              <Text className="text-[9px] text-amber-300/70">
-                ★ {card.rating.toFixed(1)}
-              </Text>
-            )}
-            {card.distanceKm !== undefined && (
-              <Text className="flex items-center gap-1 text-[9px] text-blue-300/65">
-                <Navigation size={9} /> {card.distanceKm} km
-              </Text>
-            )}
-            {card.badge && (
-              <Text
-                className="px-1.5 py-0.5 rounded-full text-[8px] font-black"
-                style={{ backgroundColor: `${color}18`, color }}
-              >
-                {card.badge}
-              </Text>
-            )}
-          </View>
-        </View>
-      </View>
+            )}{card.badge && (
+              <Text className="px-1.5 py-0.5 rounded-full text-[8px] font-black" style={{ backgroundColor: `${color}18`, color }}>{card.badge}</Text>
+            )}</View></View></View>
 
       {card.location && (
-        <View className="flex items-center gap-1 mt-2 text-[9px] text-white/25 truncate">
-          <MapPin size={9} />
-          <Text className="truncate">{card.location}</Text>
-        </View>
+        <View className="flex items-center gap-1 mt-2 text-[9px] text-white/25 truncate"><MapPin size={9} /><Text className="truncate">{card.location}</Text></View>
       )}
     </Pressable>
   );
@@ -1582,19 +1345,7 @@ function BackendCardRow({
 }) {
   if (!cards.length) return null;
   return (
-    <View>
-      <SectionTitle
-        icon={icon}
-        title={title}
-        subtitle={subtitle}
-        color={color}
-        action={action}
-      />
-      <View
-        className="flex gap-3 overflow-x-auto pb-1"
-        style={{  }}
-      >
-        {cards.map((card, i) => (
+    <View><SectionTitle icon={icon} title={title} subtitle={subtitle} color={color} action={action} /><View className="flex gap-3 overflow-x-auto pb-1" style={{  }}>{cards.map((card, i) => (
           <BackendCardView
             key={`${card.kind}-${card.id}`}
             card={card}
@@ -1606,9 +1357,7 @@ function BackendCardRow({
             position={i}
             compact
           />
-        ))}
-      </View>
-    </View>
+        ))}</View></View>
   );
 }
 
@@ -1636,28 +1385,14 @@ function ExplorerBackendSections({
 }) {
   if (!data) {
     return (
-      <View className="space-y-3">
-        <Skeleton className="h-6 w-44" />
-        <View className="flex gap-3 overflow-hidden">
-          <Skeleton className="h-28 min-w-[250px] rounded-3xl" />
-          <Skeleton className="h-28 min-w-[250px] rounded-3xl" />
-        </View>
-      </View>
+      <View className="space-y-3"><Skeleton className="h-6 w-44" /><View className="flex gap-3 overflow-hidden"><Skeleton className="h-28 min-w-[250px] rounded-3xl" /><Skeleton className="h-28 min-w-[250px] rounded-3xl" /></View></View>
     );
   }
 
   if (searching) {
     return (
-      <View>
-        <SectionTitle
-          icon={Search}
-          title={`Résultats pour « ${data.search.query} »`}
-          subtitle={`${data.search.count} résultat${data.search.count > 1 ? "s" : ""} dans tout DébrouillePro`}
-          color="#A78BFA"
-        />
-        {data.search.results.length ? (
-          <View className="gap-3">
-            {data.search.results.map((card, i) => (
+      <View><SectionTitle icon={Search} title={`Résultats pour « ${data.search.query} »`} subtitle={`${data.search.count} résultat${data.search.count > 1 ? "s" : ""} dans tout DébrouillePro`} color="#A78BFA" />{data.search.results.length ? (
+          <View className="gap-3">{data.search.results.map((card, i) => (
               <BackendCardView
                 key={`${card.kind}-${card.id}`}
                 card={card}
@@ -1668,130 +1403,24 @@ function ExplorerBackendSections({
                 sectionId="search_results"
                 position={i}
               />
-            ))}
-          </View>
+            ))}</View>
         ) : (
-          <View
-            className="rounded-3xl p-6 text-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-          >
-            <Search size={20} className="mx-auto text-white/20" />
-            <Text className="text-xs font-bold text-white/45 mt-2">
-              Aucun résultat multi-module
-            </Text>
-            <Text className="text-[10px] text-white/25 mt-1">
-              Essayez un métier, une ville, un logement, un produit ou un
+          <View className="rounded-3xl p-6 text-center" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><Search size={20} className="mx-auto text-white/20" /><Text className="text-xs font-bold text-white/45 mt-2">Aucun résultat multi-module
+            </Text><Text className="text-[10px] text-white/25 mt-1">Essayez un métier, une ville, un logement, un produit ou un
               événement.
-            </Text>
-          </View>
-        )}
-      </View>
+            </Text></View>
+        )}</View>
     );
   }
 
   return (
-    <View className="space-y-8">
-      <BackendCardRow
-        title="Pour vous"
-        subtitle="Une sélection calculée à partir de votre contexte et de vos centres d'intérêt"
-        icon={Sparkles}
-        color="#A78BFA"
-        cards={data.forYou}
-        onNavigate={onNavigate}
-        onViewProfile={onViewProfile}
-        onViewPublication={onViewPublication}
-        onTrackClick={onTrackClick}
-        sectionId="for_you"
-      />
-
-      <BackendCardRow
-        title="À proximité"
-        subtitle={
+    <View className="space-y-8"><BackendCardRow title="Pour vous" subtitle="Une sélection calculée à partir de votre contexte et de vos centres d'intérêt" icon={Sparkles} color="#A78BFA" cards={data.forYou} onNavigate={onNavigate} onViewProfile={onViewProfile} onViewPublication={onViewPublication} onTrackClick={onTrackClick} sectionId="for_you" /><BackendCardRow title="À proximité" subtitle={
           data.location.hasCoordinates
             ? `Dans un rayon de ${data.location.radiusKm} km`
             : data.location.city
               ? `Autour de ${data.location.city}`
               : "Activez votre position pour une découverte locale précise"
-        }
-        icon={MapPinned}
-        color="#3B82F6"
-        cards={data.nearby}
-        onNavigate={onNavigate}
-        onViewProfile={onViewProfile}
-        onViewPublication={onViewPublication}
-        onTrackClick={onTrackClick}
-        sectionId="nearby"
-        action={() => onNavigate("carte")}
-      />
-
-      <BackendCardRow
-        title="Opportunités à saisir"
-        subtitle="Jobs, services, immobilier, produits et occasions utiles"
-        icon={Briefcase}
-        color="#8B5CF6"
-        cards={data.opportunities}
-        onNavigate={onNavigate}
-        onViewProfile={onViewProfile}
-        onViewPublication={onViewPublication}
-        onTrackClick={onTrackClick}
-        sectionId="opportunities"
-      />
-
-      <BackendCardRow
-        title="Événements"
-        subtitle="Ce qui arrive bientôt autour de vous"
-        icon={CalendarDays}
-        color="#EC4899"
-        cards={data.events}
-        onNavigate={onNavigate}
-        onViewProfile={onViewProfile}
-        onViewPublication={onViewPublication}
-        onTrackClick={onTrackClick}
-        sectionId="events"
-        action={() => onNavigate("evenements")}
-      />
-
-      <BackendCardRow
-        title="Publications"
-        subtitle="Le contenu qui circule maintenant dans la communauté"
-        icon={Newspaper}
-        color="#06B6D4"
-        cards={data.publications}
-        onNavigate={onNavigate}
-        onViewProfile={onViewProfile}
-        onViewPublication={onViewPublication}
-        onTrackClick={onTrackClick}
-        sectionId="publications"
-        action={() => onNavigate("decouverte")}
-      />
-
-      <BackendCardRow
-        title="Personnes à découvrir"
-        subtitle="Membres, professionnels et créateurs"
-        icon={UsersIcon}
-        color="#10B981"
-        cards={data.people}
-        onNavigate={onNavigate}
-        onViewProfile={onViewProfile}
-        onViewPublication={onViewPublication}
-        onTrackClick={onTrackClick}
-        sectionId="people"
-      />
-
-      <BackendCardRow
-        title="Marketplace"
-        subtitle="Produits disponibles maintenant"
-        icon={ShoppingBag}
-        color="#F97316"
-        cards={data.marketplace}
-        onNavigate={onNavigate}
-        onViewProfile={onViewProfile}
-        onViewPublication={onViewPublication}
-        onTrackClick={onTrackClick}
-        sectionId="marketplace"
-        action={() => onNavigate("marketplace")}
-      />
-    </View>
+        } icon={MapPinned} color="#3B82F6" cards={data.nearby} onNavigate={onNavigate} onViewProfile={onViewProfile} onViewPublication={onViewPublication} onTrackClick={onTrackClick} sectionId="nearby" action={() => onNavigate("carte")} /><BackendCardRow title="Opportunités à saisir" subtitle="Jobs, services, immobilier, produits et occasions utiles" icon={Briefcase} color="#8B5CF6" cards={data.opportunities} onNavigate={onNavigate} onViewProfile={onViewProfile} onViewPublication={onViewPublication} onTrackClick={onTrackClick} sectionId="opportunities" /><BackendCardRow title="Événements" subtitle="Ce qui arrive bientôt autour de vous" icon={CalendarDays} color="#EC4899" cards={data.events} onNavigate={onNavigate} onViewProfile={onViewProfile} onViewPublication={onViewPublication} onTrackClick={onTrackClick} sectionId="events" action={() => onNavigate("evenements")} /><BackendCardRow title="Publications" subtitle="Le contenu qui circule maintenant dans la communauté" icon={Newspaper} color="#06B6D4" cards={data.publications} onNavigate={onNavigate} onViewProfile={onViewProfile} onViewPublication={onViewPublication} onTrackClick={onTrackClick} sectionId="publications" action={() => onNavigate("decouverte")} /><BackendCardRow title="Personnes à découvrir" subtitle="Membres, professionnels et créateurs" icon={UsersIcon} color="#10B981" cards={data.people} onNavigate={onNavigate} onViewProfile={onViewProfile} onViewPublication={onViewPublication} onTrackClick={onTrackClick} sectionId="people" /><BackendCardRow title="Marketplace" subtitle="Produits disponibles maintenant" icon={ShoppingBag} color="#F97316" cards={data.marketplace} onNavigate={onNavigate} onViewProfile={onViewProfile} onViewPublication={onViewPublication} onTrackClick={onTrackClick} sectionId="marketplace" action={() => onNavigate("marketplace")} /></View>
   );
 }
 
@@ -1844,8 +1473,8 @@ export default function ExplorerPage({
   };
 
   useEffect(() => {
-    if (typeof undefined === "undefined" || !undefined) return;
-    undefined.getCurrentPosition(
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
       (position) => {
         setGeo({
           lat: position.coords.latitude,
@@ -1883,7 +1512,10 @@ export default function ExplorerPage({
 
   const handleModuleClick = (mod: Module) => {
     if (!mod.implemented) {
-      UIService.openToast(`${mod.label} arrive bientôt !`, "info");
+      toast(`${mod.label} arrive bientôt !`, {
+        description: "Module en développement.",
+        duration: 2500,
+      });
       return;
     }
     handleTrackClick({
@@ -1901,85 +1533,22 @@ export default function ExplorerPage({
     setSurprise(next);
     setSearch("");
     setCategory("Tous");
-    UIService.openToast("✨ Une idée pour vous", "info");
+    toast("✨ Une idée pour vous", {
+      description: DISCOVERY_SPOTLIGHTS[next].label,
+      duration: 2200,
+    });
   };
 
   const searching = Boolean(search.trim()) || category !== "Tous";
 
   return (
-    <View
-      className="relative h-full w-full overflow-hidden flex flex-col"
-      style={{  }}
-    >
-      <View className="absolute inset-0 overflow-hidden">
-        <View
-          className="absolute -top-32 right-[-5%] w-[420px] h-[420px] rounded-full"
-          style={{  }}
-        />
-        <View
-          className="absolute top-[45%] left-[-15%] w-[360px] h-[360px] rounded-full"
-          style={{  }}
-        />
-      </View>
-
-      <View
-        className="relative z-20 flex-shrink-0 px-4 sm:px-6 pt-5 pb-3"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: "rgba(2,6,23,0.72)" }}
-      >
-        <View className="flex items-center gap-3">
-          <Pressable
-            onPress={onBack}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-          >
-            <ArrowLeft size={17} className="text-white/80" />
-          </Pressable>
-          <View className="min-w-0">
-            <Text className="text-lg font-black text-white tracking-tight">
-              Explorer
-            </Text>
-            <Text className="text-[10px] text-white/35">
-              <Text className="text-purple-300 font-bold">
-                {implementedCount}
-              </Text>{" "}
-              modules · le monde DébrouillePro
-            </Text>
-          </View>
-          <View
-            className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
-            style={{ backgroundColor: "rgba(139,92,246,0.11)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}
-          >
-            <Sparkles size={11} className="text-purple-300" />
-            <Text className="text-[10px] font-black text-purple-300">Pro</Text>
-          </View>
-        </View>
-      </View>
-
-      <View
-        className="relative z-10 flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6"
-        style={{  }}
-      >
-        <View className="max-w-[1400px] mx-auto space-y-8">
-          <HeroSearch
-            search={search}
-            setSearch={setSearch}
-            onSurprise={handleSurprise}
-          />
-
-          {!searching && (
-            <View>
-              <SectionTitle
-                icon={Sparkles}
-                title="Commencez par ce qui vous ressemble"
-                subtitle="Les portes d'entrée les plus utiles aujourd'hui"
-              />
-              <View className="gap-3">
-                {DISCOVERY_SPOTLIGHTS.map((item, i) => {
+    <View className="relative h-full w-full overflow-hidden flex flex-col" style={{  }}><View className="absolute inset-0 pointer-events-none overflow-hidden"><View className="absolute -top-32 right-[-5%] w-[420px] h-[420px] rounded-full" style={{  }} /><View className="absolute top-[45%] left-[-15%] w-[360px] h-[360px] rounded-full" style={{  }} /></View><View className="relative z-20 flex-shrink-0 px-4 sm:px-6 pt-5 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: "rgba(2,6,23,0.72)" }}><View className="flex items-center gap-3"><Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center active:scale-90 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><ArrowLeft size={17} className="text-white/80" /></Pressable><View className="min-w-0"><Text className="text-lg font-black text-white tracking-tight">Explorer
+            </Text><Text className="text-[10px] text-white/35"><Text className="text-purple-300 font-bold">{implementedCount}</Text>{" "}modules · le monde DébrouillePro
+            </Text></View><View className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl" style={{ backgroundColor: "rgba(139,92,246,0.11)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}><Sparkles size={11} className="text-purple-300" /><Text className="text-[10px] font-black text-purple-300">Pro</Text></View></View></View><View className="relative z-10 flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6" style={{  }}><View className="max-w-[1400px] mx-auto space-y-8"><HeroSearch search={search} setSearch={setSearch} onSurprise={handleSurprise} />{!searching && (
+            <View><SectionTitle icon={Sparkles} title="Commencez par ce qui vous ressemble" subtitle="Les portes d'entrée les plus utiles aujourd'hui" /><View className="gap-3">{DISCOVERY_SPOTLIGHTS.map((item, i) => {
                   const Icon = item.icon;
                   return (
-                    <Pressable
-                      key={item.id}
-                      onPress={() => {
+                    <Pressable key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} onPress={() => {
                         handleTrackClick({
                           sectionId: "spotlights",
                           itemId: item.id,
@@ -1989,90 +1558,27 @@ export default function ExplorerPage({
                           metadata: { label: item.label },
                         });
                         onNavigate(item.id);
-                      }}
-                      className="relative overflow-hidden text-left p-4 rounded-3xl"
-                      style={{ borderStyle: "solid" }}
-                    >
-                      <View className="flex items-start justify-between gap-2">
-                        <View
-                          className="w-10 h-10 rounded-2xl flex items-center justify-center"
-                          style={{ backgroundColor: `${item.color}1c` }}
-                        >
-                          <Icon size={20} style={{ color: item.color }} />
-                        </View>
-                        <Text className="text-white/20 text-lg">↗</Text>
-                      </View>
-                      <Text className="text-sm font-black text-white mt-4">
-                        {item.label}
-                      </Text>
-                      <Text className="text-[10px] text-white/35 mt-1 leading-relaxed">
-                        {item.desc}
-                      </Text>
+                      }} className="relative overflow-hidden text-left p-4 rounded-3xl active:scale-[0.98] transition-transform" style={{ borderStyle: "solid" }}>
+                      <View className="flex items-start justify-between gap-2"><View className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${item.color}1c` }}><Icon size={20} style={{  }} /></View><Text className="text-white/20 text-lg">↗</Text></View>
+                      <Text className="text-sm font-black text-white mt-4">{item.label}</Text>
+                      <Text className="text-[10px] text-white/35 mt-1 leading-relaxed">{item.desc}</Text>
                     </Pressable>
                   );
-                })}
-              </View>
-            </View>
-          )}
-
-          {false && !searching && (
-            <View
-              className="relative overflow-hidden rounded-[28px] p-4 sm:p-5"
-              style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-            >
-              <View className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <View
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: "rgba(59,130,246,0.13)", borderWidth: 1, borderColor: "rgba(59,130,246,0.22)", borderStyle: "solid" }}
-                >
-                  <MapPin size={22} className="text-blue-300" />
-                </View>
-                <View className="flex-1 min-w-0">
-                  <Text className="text-sm font-black text-white">
-                    Découvrez ce qui se passe autour de vous
-                  </Text>
-                  <Text className="text-[10px] text-white/35 mt-1">
-                    Services, commerces, événements, logements et opportunités à
+                })}</View></View>
+          )}{false && !searching && (
+            <View className="relative overflow-hidden rounded-[28px] p-4 sm:p-5" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex flex-col sm:flex-row sm:items-center gap-4"><View className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(59,130,246,0.13)", borderWidth: 1, borderColor: "rgba(59,130,246,0.22)", borderStyle: "solid" }}><MapPin size={22} className="text-blue-300" /></View><View className="flex-1 min-w-0"><Text className="text-sm font-black text-white">Découvrez ce qui se passe autour de vous
+                  </Text><Text className="text-[10px] text-white/35 mt-1">Services, commerces, événements, logements et opportunités à
                     proximité.
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => onNavigate("carte")}
-                  className="px-4 py-2.5 rounded-xl text-[10px] font-black text-blue-100"
-                  style={{ backgroundColor: "rgba(59,130,246,0.14)", borderWidth: 1, borderColor: "rgba(59,130,246,0.25)", borderStyle: "solid" }}
-                >
-                  <Text>Explorer la carte →</Text></Pressable>
-              </View>
-            </View>
-          )}
-
-          {!searching && showTrending && (
+                  </Text></View><Pressable onPress={() => onNavigate("carte")} className="px-4 py-2.5 rounded-xl text-[10px] font-black text-blue-100 active:scale-95 transition-transform" style={{ backgroundColor: "rgba(59,130,246,0.14)", borderWidth: 1, borderColor: "rgba(59,130,246,0.25)", borderStyle: "solid" }}><Text>Explorer la carte →</Text></Pressable></View></View>
+          )}{!searching && showTrending && (
             <TrendingSection
               onNavigate={onNavigate}
               onViewProfile={onViewProfile}
               onViewPublication={onViewPublication}
               onTrackClick={handleTrackClick}
             />
-          )}
-
-          <ExplorerBackendSections
-            data={explorerData}
-            searching={searching}
-            onNavigate={onNavigate}
-            onViewProfile={onViewProfile}
-            onViewPublication={onViewPublication}
-            onTrackClick={handleTrackClick}
-          />
-
-          {false && !searching && (
-            <View>
-              <SectionTitle
-                icon={Flame}
-                title="Opportunités à saisir"
-                subtitle="Les univers qui peuvent vous faire gagner du temps, de l'argent ou des connexions"
-              />
-              <View className="gap-3">
-                {[
+          )}<ExplorerBackendSections data={explorerData} searching={searching} onNavigate={onNavigate} onViewProfile={onViewProfile} onViewPublication={onViewPublication} onTrackClick={handleTrackClick} />{false && !searching && (
+            <View><SectionTitle icon={Flame} title="Opportunités à saisir" subtitle="Les univers qui peuvent vous faire gagner du temps, de l'argent ou des connexions" /><View className="gap-3">{[
                   {
                     id: "jobs",
                     label: "Jobs & missions",
@@ -2104,42 +1610,11 @@ export default function ExplorerPage({
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
-                    <Pressable
-                      key={item.id}
-                      onPress={() => onNavigate(item.id)}
-                      className="flex items-center gap-3 p-3.5 rounded-2xl text-left"
-                      style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}
-                    >
-                      <View
-                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{ backgroundColor: `${item.color}15` }}
-                      >
-                        <Icon size={18} style={{ color: item.color }} />
-                      </View>
-                      <View className="min-w-0">
-                        <Text className="text-xs font-black text-white truncate">
-                          {item.label}
-                        </Text>
-                        <Text className="text-[9px] text-white/30 mt-0.5">
-                          {item.desc}
-                        </Text>
-                      </View>
-                    </Pressable>
+                    <Pressable key={item.id} onPress={() => onNavigate(item.id)} className="flex items-center gap-3 p-3.5 rounded-2xl text-left active:scale-[0.98] transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${item.color}15` }}><Icon size={18} style={{  }} /></View><View className="min-w-0"><Text className="text-xs font-black text-white truncate">{item.label}</Text><Text className="text-[9px] text-white/30 mt-0.5">{item.desc}</Text></View></Pressable>
                   );
-                })}
-              </View>
-            </View>
-          )}
-
-          {false && !searching && (
-            <View>
-              <SectionTitle
-                icon={CalendarDays}
-                title="Sortir, apprendre, rencontrer"
-                subtitle="Quelques chemins pour vivre DébrouillePro au-delà du quotidien"
-              />
-              <View className="gap-3">
-                {[
+                })}</View></View>
+          )}{false && !searching && (
+            <View><SectionTitle icon={CalendarDays} title="Sortir, apprendre, rencontrer" subtitle="Quelques chemins pour vivre DébrouillePro au-delà du quotidien" /><View className="gap-3">{[
                   {
                     id: "evenements",
                     label: "Événements",
@@ -2164,200 +1639,72 @@ export default function ExplorerPage({
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
-                    <Pressable
-                      key={item.id}
-                      onPress={() => onNavigate(item.id)}
-                      className="relative overflow-hidden p-5 rounded-3xl text-left"
-                      style={{ borderStyle: "solid" }}
-                    >
-                      <View className="flex items-center justify-between">
-                        <View
-                          className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                          style={{ backgroundColor: `${item.color}18` }}
-                        >
-                          <Icon size={21} style={{ color: item.color }} />
-                        </View>
-                        <Text className="text-white/20">↗</Text>
-                      </View>
-                      <Text className="text-base font-black text-white mt-5">
-                        {item.label}
-                      </Text>
-                      <Text className="text-[10px] text-white/35 mt-1 max-w-xs leading-relaxed">
-                        {item.desc}
-                      </Text>
-                    </Pressable>
+                    <Pressable key={item.id} onPress={() => onNavigate(item.id)} className="relative overflow-hidden p-5 rounded-3xl text-left active:scale-[0.99] transition-transform" style={{ borderStyle: "solid" }}><View className="flex items-center justify-between"><View className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${item.color}18` }}><Icon size={21} style={{  }} /></View><Text className="text-white/20">↗</Text></View><Text className="text-base font-black text-white mt-5">{item.label}</Text><Text className="text-[10px] text-white/35 mt-1 max-w-xs leading-relaxed">{item.desc}</Text></Pressable>
                   );
-                })}
-              </View>
-            </View>
-          )}
-
-          {!searching && (
-            <View>
-              <SectionTitle
-                icon={Compass}
-                title="Les univers DébrouillePro"
-                subtitle={`${implementedCount} modules actifs répartis dans ${EXPLORER_CATEGORIES.length - 1} univers`}
-              />
-              <View className="gap-3">
-                {DISCOVERY_UNIVERSES.map((universe, i) => {
+                })}</View></View>
+          )}{!searching && (
+            <View><SectionTitle icon={Compass} title="Les univers DébrouillePro" subtitle={`${implementedCount} modules actifs répartis dans ${EXPLORER_CATEGORIES.length - 1} univers`} /><View className="gap-3">{DISCOVERY_UNIVERSES.map((universe, i) => {
                   const Icon = universe.icon;
                   const count = MODULES.filter(
                     (m) => m.category === universe.id,
                   ).length;
                   return (
-                    <Pressable
-                      key={universe.id}
-                      onPress={() => setCategory(universe.id)}
-                      className="relative overflow-hidden p-4 rounded-3xl text-left"
-                      style={{ borderStyle: "solid" }}
-                    >
-                      <View
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center"
-                        style={{ backgroundColor: `${universe.color}17` }}
-                      >
-                        <Icon size={19} style={{ color: universe.color }} />
-                      </View>
-                      <Text className="text-xs font-black text-white mt-3">
-                        {universe.id}
-                      </Text>
-                      <Text className="text-[9px] text-white/30 mt-1">
-                        {universe.desc}
-                      </Text>
-                      <View
-                        className="mt-3 text-[9px] font-bold"
-                        style={{  }}
-                      >
-                        {count} <Text>modules →</Text></View>
+                    <Pressable key={universe.id} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.035 }} onPress={() => setCategory(universe.id)} className="relative overflow-hidden p-4 rounded-3xl text-left active:scale-[0.98] transition-transform" style={{ borderStyle: "solid" }}>
+                      <View className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${universe.color}17` }}><Icon size={19} style={{  }} /></View>
+                      <Text className="text-xs font-black text-white mt-3">{universe.id}</Text>
+                      <Text className="text-[9px] text-white/30 mt-1">{universe.desc}</Text>
+                      <View className="mt-3 text-[9px] font-bold" style={{  }}>{count}<Text>modules →</Text></View>
                     </Pressable>
                   );
-                })}
-              </View>
-            </View>
-          )}
-
-          <View>
-            <View className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4">
-              <SectionTitle
-                icon={Search}
-                title={searching ? "Résultats Explorer" : "Tous les modules"}
-                subtitle={
+                })}</View></View>
+          )}<View><View className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4"><SectionTitle icon={Search} title={searching ? "Résultats Explorer" : "Tous les modules"} subtitle={
                   searching
                     ? `${filtered.length} résultat${filtered.length > 1 ? "s" : ""} pour votre recherche`
                     : "Accédez directement à n'importe quel univers"
-                }
-              />
-              {!searching && (
-                <Pressable
-                  onPress={() => setShowTrending((v) => !v)}
-                  className="self-start sm:self-auto px-3 py-2 rounded-xl text-[10px] font-bold"
-                  style={{ backgroundColor: showTrending
-                                        ? "rgba(249,115,22,0.12)"
-                                        : "rgba(255,255,255,0.04)", borderColor: "rgba(249,115,22,0.22)", borderStyle: "solid" }}
-                >
-                  <TrendingUp size={10} className="inline mr-1.5" />
-                  <Text>Tendances</Text></Pressable>
-              )}
-            </View>
-
-            <View
-              className="flex gap-2 overflow-x-auto pb-3"
-              style={{  }}
-            >
-              {EXPLORER_CATEGORIES.map((cat) => (
-                <Pressable
-                  key={cat}
-                  onPress={() => setCategory(cat)}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold"
-                  style={{ backgroundColor: category === cat
-                                          ? "rgba(139,92,246,0.18)"
-                                          : "rgba(255,255,255,0.045)", borderColor: "rgba(139,92,246,0.32)", borderStyle: "solid" }}
-                >
-                  {cat}
-                </Pressable>
-              ))}
-            </View>
-
-            <>
-              {filtered.length === 0 ? (
-                <View
-                  key="empty"
-                  className="flex flex-col items-center justify-center py-16 rounded-3xl"
-                  style={{ backgroundColor: "rgba(255,255,255,0.025)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "dashed" }}
-                >
+                } />{!searching && (
+                <Pressable onPress={() => setShowTrending((v) => !v)} className="self-start sm:self-auto px-3 py-2 rounded-xl text-[10px] font-bold" style={{ backgroundColor: showTrending
+                                      ? "rgba(249,115,22,0.12)"
+                                      : "rgba(255,255,255,0.04)", borderColor: "rgba(249,115,22,0.22)", borderStyle: "solid" }}><TrendingUp size={10} className="inline mr-1.5" /><Text>Tendances</Text></Pressable>
+              )}</View><View className="flex gap-2 overflow-x-auto pb-3" style={{  }}>{EXPLORER_CATEGORIES.map((cat) => (
+                <Pressable key={cat} onPress={() => setCategory(cat)} className="flex-shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold active:scale-95 transition-transform" style={{ backgroundColor: category === cat
+                                        ? "rgba(139,92,246,0.18)"
+                                        : "rgba(255,255,255,0.045)", borderColor: "rgba(139,92,246,0.32)", borderStyle: "solid" }}>{cat}</Pressable>
+              ))}</View><View>{filtered.length === 0 ? (
+                <View key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-16 rounded-3xl" style={{ backgroundColor: "rgba(255,255,255,0.025)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "dashed" }}>
                   <Search size={24} className="text-white/15" />
-                  <Text className="text-white/40 text-sm mt-3">
-                    Aucune découverte ne correspond à votre recherche.
+                  <Text className="text-white/40 text-sm mt-3">Aucune découverte ne correspond à votre recherche.
                   </Text>
-                  <Pressable
-                    onPress={() => {
+                  <Pressable onPress={() => {
                       setSearch("");
                       setCategory("Tous");
-                    }}
-                    className="mt-3 text-[10px] font-bold text-purple-300"
-                  >
-                    <Text>Réinitialiser →</Text></Pressable>
+                    }} className="mt-3 text-[10px] font-bold text-purple-300"><Text>Réinitialiser →</Text></Pressable>
                 </View>
               ) : (
-                <View
-                  key={category + search}
-                  className="gap-3"
-                >
+                <View key={category + search} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="gap-3">
                   {filtered.map((mod, i) => {
                     const Icon = mod.icon;
                     return (
-                      <Pressable
-                        key={mod.id}
-                        onPress={() => handleModuleClick(mod)}
-                        className="relative flex items-start gap-3 p-4 rounded-3xl text-left"
-                        style={{ borderStyle: "solid" }}
-                      >
-                        <View
-                          className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: `${mod.color}19` }}
-                        >
-                          <Icon size={19} style={{ color: mod.color }} />
-                        </View>
-                        <View className="min-w-0">
-                          <View className="flex items-center gap-1 flex-wrap">
-                            <Text className="text-xs font-black text-white truncate">
-                              {mod.label}
-                            </Text>
-                            {mod.isNew && (
-                              <Text
-                                className="px-1.5 py-0.5 rounded-full text-[7px] font-black text-white"
-                                style={{  }}
-                              >
-                                <Text>NEW</Text></Text>
-                            )}
-                          </View>
-                          <Text className="text-[9px] text-white/35 mt-1 leading-relaxed">
-                            {mod.desc}
-                          </Text>
-                        </View>
+                      <Pressable key={mod.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.018, 0.25) }} onPress={() => handleModuleClick(mod)} className="relative flex items-start gap-3 p-4 rounded-3xl text-left active:scale-[0.98] transition-transform" style={{ borderStyle: "solid" }}>
+                        <View className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${mod.color}19` }}><Icon size={19} style={{  }} /></View>
+                        <View className="min-w-0"><View className="flex items-center gap-1 flex-wrap"><Text className="text-xs font-black text-white truncate">{mod.label}</Text>{mod.isNew && (
+                              <Text className="px-1.5 py-0.5 rounded-full text-[7px] font-black text-white" style={{  }}>
+                                NEW
+                              </Text>
+                            )}</View><Text className="text-[9px] text-white/35 mt-1 leading-relaxed">{mod.desc}</Text></View>
                       </Pressable>
                     );
                   })}
                 </View>
-              )}
-            </>
-          </View>
-
-          {!searching && (
-            <View
-              className="relative overflow-hidden rounded-[30px] p-6 sm:p-8 text-center"
-              style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-            >
+              )}</View></View>{!searching && (
+            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative overflow-hidden rounded-[30px] p-6 sm:p-8 text-center" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
               <Sparkles size={18} className="mx-auto text-purple-300" />
               <Text className="text-[10px] font-black uppercase tracking-[0.18em] text-white/35 mt-3">
-                <Text>Et si aujourd'hui…</Text></Text>
-              <Text className="text-xl sm:text-2xl font-black text-white mt-2">
-                {featured.label}
+                Et si aujourd'hui…
               </Text>
+              <Text className="text-xl sm:text-2xl font-black text-white mt-2">{featured.label}</Text>
               <Text className="text-[10px] text-white/35 mt-1">{featured.desc}</Text>
               <View className="flex justify-center gap-2 mt-5">
-                <Pressable
-                  onPress={() => {
+                <Pressable onPress={() => {
                     handleTrackClick({
                       sectionId: "featured_idea",
                       itemId: featured.id,
@@ -2366,24 +1713,14 @@ export default function ExplorerPage({
                       metadata: { label: featured.label },
                     });
                     onNavigate(featured.id);
-                  }}
-                  className="px-5 py-2.5 rounded-xl text-[10px] font-black text-white"
-                  style={{  }}
-                >
-                  <Text>Découvrir maintenant →</Text></Pressable>
-                <Pressable
-                  onPress={handleSurprise}
-                  className="px-4 py-2.5 rounded-xl text-[10px] font-bold text-white/55"
-                  style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-                >
-                  <Text>Une autre idée</Text></Pressable>
+                  }} className="px-5 py-2.5 rounded-xl text-[10px] font-black text-white active:scale-95 transition-transform" style={{ boxShadow: `0 8px 28px ${featured.color}20` }}>
+                  Découvrir maintenant →
+                </Pressable>
+                <Pressable onPress={handleSurprise} className="px-4 py-2.5 rounded-xl text-[10px] font-bold text-white/55" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
+                  Une autre idée
+                </Pressable>
               </View>
             </View>
-          )}
-
-          <View className="h-3" />
-        </View>
-      </View>
-    </View>
+          )}<View className="h-3" /></View></View></View>
   );
 }

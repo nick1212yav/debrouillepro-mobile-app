@@ -1,6 +1,6 @@
-import { Pressable, View, Text, Image, TextInput } from "react-native";
+import { View, Text, TextInput, Image, NativeSyntheticEvent, Pressable, TextInputChangeEventData } from "react-native";
 import React from "react";
-import { Image as ImageIcon, X } from "lucide-react-native";
+import { X } from "lucide-react-native";
 
 interface HealthImageSelectorProps {
   images: string[];
@@ -15,7 +15,7 @@ export const HealthImageSelector: React.FC<HealthImageSelectorProps> = ({
   maxImages = 5,
   label = "Photos / Images",
 }) => {
-  const handleFileUpload = (e: string) => {
+  const handleFileUpload = (e: NativeSyntheticEvent<TextInputChangeEventData>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -43,61 +43,30 @@ export const HealthImageSelector: React.FC<HealthImageSelectorProps> = ({
   };
 
   return (
-    <View className="space-y-2">
-      <Text className="text-white/80 text-xs font-bold uppercase tracking-wider block">
-        {label} ({images.length} / {maxImages})
-      </Text>
-
-      <View className="border border-dashed border-white/10 rounded-2xl p-4 text-center bg-white/5 relative">
-        {images.length === 0 ? (
+    <View className="space-y-2"><Text className="text-white/80 text-xs font-bold uppercase tracking-wider block">{label}({images.length}/ {maxImages})
+      </Text><View className="border border-dashed border-white/10 rounded-2xl p-4 text-center transition-all bg-white/5 relative">{images.length === 0 ? (
           <View className="py-4">
             <ImageIcon size={32} className="mx-auto text-white/20 mb-2" />
             <Text className="text-white/40 text-xs font-semibold">
-              <Text>Cliquez ou glissez-déposez des photos</Text></Text>
-            <TextInput
-             
-             
-              multiple
-              onChangeText={handleFileUpload}
-              className="absolute inset-0 opacity-0"
-            />
+              Cliquez ou glissez-déposez des photos
+            </Text>
+            <TextInput onChangeText={handleFileUpload} className="absolute inset-0 opacity-0" />
           </View>
         ) : (
           <View className="gap-2">
             {images.map((src, i) => (
-              <View
-                key={i}
-                className="relative aspect-square rounded-xl overflow-hidden border border-white/5 bg-black/40"
-              >
-                <Image
-                 
-                 
-                  className="w-full h-full object-cover"
-                 source={{ uri: src }} accessibilityLabel={`Upload ${i + 1}`}/>
-                <Pressable
-                  onPress={() => removeImage(i)}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/80 text-white flex items-center justify-center text-[10px] font-bold"
-                >
+              <View key={i} className="relative aspect-square rounded-xl overflow-hidden border border-white/5 bg-black/40">
+                <Image className="w-full h-full object-cover" source={{ uri: src }} accessibilityLabel={`Upload ${i + 1}`} />
+                <Pressable onPress={() => removeImage(i)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500/80 text-white flex items-center justify-center text-[10px] font-bold">
                   <X size={10} />
                 </Pressable>
               </View>
             ))}
 
             {images.length < maxImages && (
-              <Text className="aspect-square rounded-xl border border-dashed border-white/10 flex items-center justify-center bg-white/5">
-                <ImageIcon size={18} className="text-white/30" />
-                <TextInput
-                 
-                 
-                  multiple
-                  onChangeText={handleFileUpload}
-                  className="hidden"
-                />
-              </Text>
+              <Text className="aspect-square rounded-xl border border-dashed border-white/10 flex items-center justify-center transition-colors bg-white/5"><ImageIcon size={18} className="text-white/30" /><TextInput onChangeText={handleFileUpload} className="hidden" /></Text>
             )}
           </View>
-        )}
-      </View>
-    </View>
+        )}</View></View>
   );
 };

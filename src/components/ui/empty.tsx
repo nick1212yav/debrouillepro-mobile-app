@@ -1,30 +1,22 @@
-import { View } from "react-native";
+import { View, TextProps, ViewProps } from "react-native";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
-function Empty({ className, ...props }: React.ComponentProps<typeof View>) {
+function Empty({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="empty"
-      className={cn(
+    <View data-slot="empty" className={cn(
         "flex min-w-0 flex-1 flex-col items-center justify-center gap-6 rounded-lg border-dashed p-6 text-center text-balance md:p-12",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function EmptyHeader({ className, ...props }: React.ComponentProps<typeof View>) {
+function EmptyHeader({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="empty-header"
-      className={cn(
+    <View data-slot="empty-header" className={cn(
         "flex max-w-sm flex-col items-center gap-2 text-center",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
@@ -47,50 +39,33 @@ function EmptyMedia({
   className,
   variant = "default",
   ...props
-}: React.ComponentProps<typeof View> & VariantProps<typeof emptyMediaVariants>) {
+}: ViewProps & VariantProps<typeof emptyMediaVariants>) {
   return (
-    <View
-      data-slot="empty-icon"
-      data-variant={variant}
-      className={cn(emptyMediaVariants({ variant, className }))}
-      {...props}
-    />
+    <View data-slot="empty-icon" data-variant={variant} className={cn(emptyMediaVariants({ variant, className }))} {...props} />
   );
 }
 
-function EmptyTitle({ className, ...props }: React.ComponentProps<typeof View>) {
+function EmptyTitle({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="empty-title"
-      className={cn("text-lg font-medium tracking-tight", className)}
-      {...props}
-    />
+    <View data-slot="empty-title" className={cn("text-lg font-medium tracking-tight", className)} {...props} />
   );
 }
 
-function EmptyDescription({ className, ...props }: React.ComponentProps<typeof Text>) {
+function EmptyDescription({ className, ...props }: TextProps) {
   return (
-    <View
-      data-slot="empty-description"
-      className={cn(
+    <View data-slot="empty-description" className={cn(
         "text-muted-foreground [&>a:hover]:text-primary text-sm/relaxed [&>a]:underline [&>a]:underline-offset-4",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 
-function EmptyContent({ className, ...props }: React.ComponentProps<typeof View>) {
+function EmptyContent({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="empty-content"
-      className={cn(
+    <View data-slot="empty-content" className={cn(
         "flex w-full max-w-sm min-w-0 flex-col items-center gap-4 text-sm text-balance",
         className,
-      )}
-      {...props}
-    />
+      )} {...props} />
   );
 }
 

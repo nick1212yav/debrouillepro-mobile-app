@@ -13,6 +13,8 @@ import {
   subscribeSync,
   type MessageSyncState,
 } from "../services/sync.service";
+import { NetInfo } from "@react-native-community/netinfo";
+import { AppState } from "react-native";
 
 export interface UseMessageSyncOptions {
   /**
@@ -102,7 +104,7 @@ export function useMessageSync(
       return;
     }
 
-    if (typeof undefined !== "undefined" && !undefined) {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
       setOffline();
       return;
     }
@@ -161,7 +163,7 @@ export function useMessageSync(
    * revient au premier plan.
    */
   useEffect(() => {
-    if (!syncOnFocus || typeof undefined === "undefined") {
+    if (!syncOnFocus || typeof window === "undefined") {
       return;
     }
 
@@ -169,10 +171,10 @@ export function useMessageSync(
       void syncNow();
     };
 
-    undefined;
+    AppState.addEventListener('focus', handleFocus);
 
     return () => {
-      undefined;
+      AppState.removeEventListener('focus', handleFocus);
     };
   }, [syncOnFocus, syncNow]);
 
@@ -180,7 +182,7 @@ export function useMessageSync(
    * Gestion de la connexion réseau.
    */
   useEffect(() => {
-    if (typeof undefined === "undefined") {
+    if (typeof window === "undefined") {
       return;
     }
 
@@ -196,18 +198,18 @@ export function useMessageSync(
       markOffline();
     };
 
-    undefined;
+    NetInfo.addEventListener(handleOnline);
 
-    undefined;
+    NetInfo.addEventListener(handleOffline);
 
-    if (!undefined) {
+    if (!navigator.onLine) {
       markOffline();
     }
 
     return () => {
-      undefined;
+      NetInfo.removeEventListener(handleOnline);
 
-      undefined;
+      NetInfo.removeEventListener(handleOffline);
     };
   }, [markOffline, markSynced, syncOnReconnect, syncNow]);
 

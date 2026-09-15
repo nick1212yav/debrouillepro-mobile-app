@@ -40,23 +40,14 @@ export function TransportFeatures() {
   ];
 
   return (
-    <View className="space-y-3">
-      <Text className="text-[10px] font-black text-white/40 uppercase tracking-widest">
-        Équipements inclus
-      </Text>
-      <View className="gap-2">
-        {list.map((item) => (
-          <View
-            key={item.name}
-            className="flex items-center gap-1.5 p-2 rounded-xl bg-white/[0.01] border border-white/5"
-          >
+    <View className="space-y-3"><Text className="text-[10px] font-black text-white/40 uppercase tracking-widest">Équipements inclus
+      </Text><View className="gap-2">{list.map((item) => (
+          <View key={item.name} className="flex items-center gap-1.5 p-2 rounded-xl bg-white/[0.01] border border-white/5">
             {item.icon}
             <Text className="text-[10px] text-white/80 font-medium tracking-tight truncate">
               {item.name}
             </Text>
           </View>
-        ))}
-      </View>
-    </View>
+        ))}</View></View>
   );
 }

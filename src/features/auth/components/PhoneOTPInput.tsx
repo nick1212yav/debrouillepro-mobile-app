@@ -65,7 +65,9 @@ export function PhoneOTPInput({
     }
   };
 
-  const handlePaste = (event: ClipboardEvent<View>) => {
+  const handlePaste = (event: NativeSyntheticEvent<any>) => {
+    event.preventDefault();
+
     const pasted = event.clipboardData
       .getData("text")
       .replace(/\D/g, "")
@@ -81,24 +83,12 @@ export function PhoneOTPInput({
   };
 
   return (
-    <View
-      className="flex items-center justify-center gap-2"
-      onPaste={handlePaste}
-    >
+    <View className="flex items-center justify-center gap-2">
       {digits.map((digit, index) => (
-        <TextInput
-          key={index}
-          ref={(el) => {
+        <TextInput key={index} ref={(el) => {
             inputRefs.current[index] = el;
-          }}
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={1}
-          value={digit}
-          disabled={disabled}
-          onFocus={(e) => e.target.select()}
-          onChangeText={(text) => {
-            const value = text.replace(/\D/g, "");
+          }} inputMode="numeric" autoComplete="one-time-code" maxLength={1} value={digit} onFocus={(e) => e.target.select()} onChangeText={(value1) => {
+            const value = value1.replace(/\D/g, "");
 
             if (!value) {
               updateValue(index, "");
@@ -106,11 +96,7 @@ export function PhoneOTPInput({
             }
 
             updateValue(index, value[0]);
-          }}
-          onKeyDown={(e) => handleKeyDown(index, e)}
-          className="w-12 h-14 rounded-2xl text-center text-2xl font-bold text-white outline-none"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", borderColor: "rgba(139,92,246,0.55)", borderStyle: "solid" }}
-        />
+          }} onKeyPress={(e) => handleKeyDown(index, e)} className="w-12 h-14 rounded-2xl text-center text-2xl font-bold text-white outline-none transition-all" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderColor: "rgba(139,92,246,0.55)", borderStyle: "solid" }} editable={!(disabled)} />
       ))}
     </View>
   );

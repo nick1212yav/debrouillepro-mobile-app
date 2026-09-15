@@ -1,4 +1,5 @@
 import { View, Text } from "react-native";
+
 // src/features/marketplace/components/ProductPayment.tsx
 import { CreditCard, Smartphone, Bitcoin } from "lucide-react-native";
 
@@ -15,16 +16,9 @@ export function ProductPayment({ methods, currency }: Props) {
   };
 
   return (
-    <View className="space-y-2">
-      <Text className="text-xs text-white/40 font-semibold uppercase tracking-wider">
-        Moyens de paiement
-      </Text>
-      <View className="flex flex-wrap gap-2">
-        {methods.map((method) => (
-          <Text
-            key={method}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-white/5 border border-white/10 text-white/70"
-          >
+    <View className="space-y-2"><Text className="text-xs text-white/40 font-semibold uppercase tracking-wider">Moyens de paiement
+      </Text><View className="flex flex-wrap gap-2">{methods.map((method) => (
+          <Text key={method} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-white/5 border border-white/10 text-white/70">
             {icons[method] || <CreditCard size={14} />}
             {method === "card"
               ? "Carte"
@@ -34,8 +28,6 @@ export function ProductPayment({ methods, currency }: Props) {
                   ? "Crypto"
                   : method}
           </Text>
-        ))}
-      </View>
-    </View>
+        ))}</View></View>
   );
 }

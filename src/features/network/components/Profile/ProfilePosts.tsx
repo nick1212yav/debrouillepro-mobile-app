@@ -1,4 +1,4 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Pressable, Text } from "react-native";
 
 // src/features/network/components/Profile/ProfilePosts.tsx
 import {
@@ -51,25 +51,7 @@ function PostItem({ post, onClick }: { post: Post; onClick?: () => void }) {
   };
 
   return (
-    <Pressable
-      onPress={onClick}
-      className="w-full p-3 rounded-xl text-left bg-white/5 border border-white/5"
-    >
-      <View className="flex items-start gap-2">
-        <View className="mt-0.5 flex-shrink-0">{getIcon()}</View>
-        <View className="flex-1 min-w-0">
-          <Text className="text-white/80 text-sm">{post.content}</Text>
-          <View className="flex items-center gap-3 mt-1.5 text-xs text-white/30">
-            <Text className="flex items-center gap-1">
-              <Calendar size={10} />
-              {date}
-            </Text>
-            <Text>{post.likes} ❤️</Text>
-            <Text>{post.comments} 💬</Text>
-          </View>
-        </View>
-      </View>
-    </Pressable>
+    <Pressable onPress={onClick} className="w-full p-3 rounded-xl text-left bg-white/5 border border-white/5 transition-colors"><View className="flex items-start gap-2"><View className="mt-0.5 flex-shrink-0">{getIcon()}</View><View className="flex-1 min-w-0"><Text className="text-white/80 text-sm">{post.content}</Text><View className="flex items-center gap-3 mt-1.5 text-xs text-white/30"><Text className="flex items-center gap-1"><Calendar size={10} />{date}</Text><Text>{post.likes}❤️</Text><Text>{post.comments}💬</Text></View></View></View></Pressable>
   );
 }
 
@@ -83,14 +65,7 @@ export function ProfilePosts({
 }: ProfilePostsProps) {
   if (isLoading) {
     return (
-      <View className={cn("space-y-3", className)}>
-        <View className="flex items-center gap-2">
-          <Skeleton className="w-8 h-8 rounded-xl" />
-          <Skeleton className="h-4 w-24 rounded-lg" />
-        </View>
-        <Skeleton className="h-16 w-full rounded-xl" />
-        <Skeleton className="h-16 w-full rounded-xl" />
-      </View>
+      <View className={cn("space-y-3", className)}><View className="flex items-center gap-2"><Skeleton className="w-8 h-8 rounded-xl" /><Skeleton className="h-4 w-24 rounded-lg" /></View><Skeleton className="h-16 w-full rounded-xl" /><Skeleton className="h-16 w-full rounded-xl" /></View>
     );
   }
 
@@ -99,20 +74,12 @@ export function ProfilePosts({
   const hasMore = posts.length > maxDisplay;
 
   return (
-    <View
-      className={cn(
+    <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn(
         "rounded-3xl p-5",
         "bg-white/5 border border-white/10",
         className,
-      )}
-    >
-      <View className="flex items-center gap-2 mb-4">
-        <View className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/10 text-white/40">
-          <FileText size={15} />
-        </View>
-        <Text className="text-white font-bold text-sm">Publications</Text>
-        <Text className="text-white/30 text-xs"><Text>(</Text>{posts.length}<Text>)</Text></Text>
-      </View>
+      )}>
+      <View className="flex items-center gap-2 mb-4"><View className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/10 text-white/40"><FileText size={15} /></View><Text className="text-white font-bold text-sm">Publications</Text><Text className="text-white/30 text-xs">({posts.length})</Text></View>
 
       {hasPosts ? (
         <View className="space-y-2">
@@ -124,7 +91,7 @@ export function ProfilePosts({
             />
           ))}
           {hasMore && (
-            <Pressable className="text-xs text-white/40">
+            <Pressable className="text-xs text-white/40 transition-colors">
               Voir les {posts.length} publications
             </Pressable>
           )}

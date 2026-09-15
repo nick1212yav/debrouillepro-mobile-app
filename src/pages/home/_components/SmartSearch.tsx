@@ -1,5 +1,28 @@
-import { View, Pressable, Text, TextInput, GestureResponderEvent } from "react-native";
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+// src/pages/home/_components/SmartSearch.tsx
+import {
+  View,
+  Pressable,
+  Text,
+  TextInput,
+  ScrollView,
+  Animated,
+  Easing,
+  StyleSheet,
+  Platform,
+  Modal,
+  Keyboard,
+  useWindowDimensions,
+  type GestureResponderEvent,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import {
@@ -16,51 +39,22 @@ import {
   Newspaper,
   Calendar,
   Plane,
-  MapPin,
   ChevronRight,
   Sparkles,
   Package,
-  Building2,
-  ShoppingBag,
-  Wallet,
-  Car,
-  Users,
-  Heart,
-  Dumbbell,
-  BookOpen,
-  Zap,
-  Shield,
-  Globe,
-  Music,
-  Camera,
   LayoutGrid,
-  Star,
-  MessageSquare,
-  Bell,
-  Map,
-  Truck,
-  FileText,
-  Award,
-  Video,
-  Cpu,
-  Network,
-  Megaphone,
-  Database,
-  Lock,
-  TreePine,
-  Factory,
-  Church,
-  GraduationCap,
-  BarChart2,
-  Navigation,
-  ShoppingCart,
-  Gift,
-  Compass,
-  Flame,
+  Heart,
+  BookOpen,
+  Wallet,
+  Users,
   Radio,
 } from "lucide-react-native";
 
-// ── Types ──────────────────────────────────────────────────────────────────
+const isBrowser = typeof window !== "undefined";
+
+/* ============================================================
+ * TYPES
+ * ============================================================ */
 
 type ResultCategory =
   | "Immo"
@@ -88,10 +82,11 @@ interface SearchResult {
   page: string;
 }
 
-// ── Module directory (all 80+ modules, for instant navigation) ─────────────
+/* ============================================================
+ * MODULE DIRECTORY (80+ modules)
+ * ============================================================ */
 
 const MODULE_ENTRIES: SearchResult[] = [
-  // ── Habitat & Immobilier ──
   {
     id: "mod-immo",
     category: "Modules",
@@ -99,7 +94,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Locations, ventes, terrains",
     meta: "→ Ouvrir",
     badge: "Immo",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "immo",
   },
   {
@@ -109,7 +104,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Programmes sociaux & coopératives",
     meta: "→ Ouvrir",
     badge: "Logement",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "logement",
   },
   {
@@ -119,7 +114,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Hôtels, AirBnB, auberges",
     meta: "→ Ouvrir",
     badge: "Hôtels",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "hebergement",
   },
   {
@@ -129,7 +124,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Permis de construire, plans d'occupation",
     meta: "→ Ouvrir",
     badge: "Urbain",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "urbanisme",
   },
   {
@@ -139,7 +134,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Projets d'aménagement territorial",
     meta: "→ Ouvrir",
     badge: "Territoire",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "amenagement",
   },
   {
@@ -149,11 +144,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Habitat urbain intelligent",
     meta: "→ Ouvrir",
     badge: "Smart",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "city-habitat",
   },
-
-  // ── Emploi & Entreprise ──
   {
     id: "mod-jobs",
     category: "Modules",
@@ -161,7 +154,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Offres d'emploi & recrutement",
     meta: "→ Ouvrir",
     badge: "Emploi",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "jobs",
   },
   {
@@ -171,7 +164,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Fonctions publiques, CDI, CDD",
     meta: "→ Ouvrir",
     badge: "Formel",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "emploi",
   },
   {
@@ -181,7 +174,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Création, financement, annuaire",
     meta: "→ Ouvrir",
     badge: "Business",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "business",
   },
   {
@@ -191,7 +184,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Achat & vente entre particuliers",
     meta: "→ Ouvrir",
     badge: "Market",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "marketplace",
   },
   {
@@ -201,7 +194,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Boutiques professionnelles",
     meta: "→ Ouvrir",
     badge: "Pro",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "marketplace-pro",
   },
   {
@@ -211,7 +204,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Petites annonces & offres locales",
     meta: "→ Ouvrir",
     badge: "Annonces",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "annonces",
   },
   {
@@ -221,7 +214,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Générer des revenus en ligne",
     meta: "→ Ouvrir",
     badge: "Revenus",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "revenus",
   },
   {
@@ -231,11 +224,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Suivi de vos gains",
     meta: "→ Ouvrir",
     badge: "Dashboard",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "revenus-dashboard",
   },
-
-  // ── Transport & Voyages ──
   {
     id: "mod-transport",
     category: "Modules",
@@ -243,7 +234,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Bus, taxi, moto, covoiturage",
     meta: "→ Ouvrir",
     badge: "Transport",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "transport",
   },
   {
@@ -253,7 +244,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Billets de voyage inter-villes",
     meta: "→ Ouvrir",
     badge: "Voyages",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "voyages",
   },
   {
@@ -263,7 +254,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Explorer des destinations en Afrique",
     meta: "→ Ouvrir",
     badge: "Discover",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "destinations",
   },
   {
@@ -273,7 +264,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Planifier votre itinéraire",
     meta: "→ Ouvrir",
     badge: "Planning",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "planificateur",
   },
   {
@@ -283,7 +274,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Journal de bord de vos aventures",
     meta: "→ Ouvrir",
     badge: "Journal",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "carnet-voyage",
   },
   {
@@ -293,7 +284,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Gérer vos dépenses de voyage",
     meta: "→ Ouvrir",
     badge: "Budget",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "budget-voyage",
   },
   {
@@ -303,7 +294,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Commande et suivi de colis",
     meta: "→ Ouvrir",
     badge: "Livraison",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "livraison",
   },
   {
@@ -313,7 +304,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Suivi GPS et logistique",
     meta: "→ Ouvrir",
     badge: "GPS",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "tracking",
   },
   {
@@ -323,7 +314,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Visualisation cartographique 3D",
     meta: "→ Ouvrir",
     badge: "Map",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "map3d",
   },
   {
@@ -333,11 +324,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Carte locale des services",
     meta: "→ Ouvrir",
     badge: "Carte",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "carte",
   },
-
-  // ── Santé & Bien‑être ──
   {
     id: "mod-sante",
     category: "Modules",
@@ -345,7 +334,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Médecins, pharmacies, téléconsultation",
     meta: "→ Ouvrir",
     badge: "Santé",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "sante",
   },
   {
@@ -355,7 +344,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Programmes d'entraînement",
     meta: "→ Ouvrir",
     badge: "Fitness",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "fitness",
   },
   {
@@ -365,7 +354,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Journal alimentaire & recettes",
     meta: "→ Ouvrir",
     badge: "Nutrition",
-    badgeColor: "#84cc16",
+    badgeColor: "#A3E635",
     page: "nutrition",
   },
   {
@@ -375,7 +364,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Séances de respiration & pleine conscience",
     meta: "→ Ouvrir",
     badge: "Zen",
-    badgeColor: "#a78bfa",
+    badgeColor: "#C4B5FD",
     page: "meditation",
   },
   {
@@ -385,7 +374,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Tableau de bord santé global",
     meta: "→ Ouvrir",
     badge: "Wellness",
-    badgeColor: "#a78bfa",
+    badgeColor: "#C4B5FD",
     page: "bienetre",
   },
   {
@@ -395,7 +384,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Clubs, compétitions, résultats",
     meta: "→ Ouvrir",
     badge: "Sport",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "sport",
   },
   {
@@ -405,11 +394,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Appels d'urgence et secours",
     meta: "→ Ouvrir",
     badge: "Urgence",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "sos",
   },
-
-  // ── Éducation ──
   {
     id: "mod-apprendre",
     category: "Modules",
@@ -417,7 +404,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Cours en ligne & tutoriels",
     meta: "→ Ouvrir",
     badge: "Learn",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "apprendre",
   },
   {
@@ -427,7 +414,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Catalogue complet des formations",
     meta: "→ Ouvrir",
     badge: "Cours",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "cours",
   },
   {
@@ -437,7 +424,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Testez vos connaissances",
     meta: "→ Ouvrir",
     badge: "Quiz",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "quiz",
   },
   {
@@ -447,7 +434,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Diplômes & badges numériques",
     meta: "→ Ouvrir",
     badge: "Certif",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "certifications",
   },
   {
@@ -457,7 +444,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Mentors & groupes d'apprentissage",
     meta: "→ Ouvrir",
     badge: "Mentor",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "mentorat",
   },
   {
@@ -467,7 +454,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Écoles, universités, inscriptions",
     meta: "→ Ouvrir",
     badge: "Académique",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "edu-formelle",
   },
   {
@@ -477,11 +464,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Calendrier scolaire & paroissial",
     meta: "→ Ouvrir",
     badge: "École",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "ecole",
   },
-
-  // ── Finance & Paiements ──
   {
     id: "mod-wallet",
     category: "Modules",
@@ -489,7 +474,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Argent mobile & transferts",
     meta: "→ Ouvrir",
     badge: "Wallet",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "wallet",
   },
   {
@@ -499,7 +484,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Mobile money, cartes, crypto",
     meta: "→ Ouvrir",
     badge: "Pay",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "paiement",
   },
   {
@@ -509,7 +494,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Budget, épargne, investissements",
     meta: "→ Ouvrir",
     badge: "Finance",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "finances",
   },
   {
@@ -519,11 +504,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Tableau de bord global de l'app",
     meta: "→ Ouvrir",
     badge: "Stats",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "dashboard",
   },
-
-  // ── Communauté & Social ──
   {
     id: "mod-community",
     category: "Modules",
@@ -531,7 +514,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Forum, entraide & réseau local",
     meta: "→ Ouvrir",
     badge: "Community",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "community",
   },
   {
@@ -541,7 +524,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Groupes de discussion & clubs",
     meta: "→ Ouvrir",
     badge: "Groupes",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "groupes",
   },
   {
@@ -551,7 +534,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Chat privé & conversations",
     meta: "→ Ouvrir",
     badge: "Chat",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "messages",
   },
   {
@@ -561,7 +544,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Connexions & opportunités business",
     meta: "→ Ouvrir",
     badge: "Network",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "network",
   },
   {
@@ -571,7 +554,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Invitez vos proches & gagnez des points",
     meta: "→ Ouvrir",
     badge: "Parrainage",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "parrainage",
   },
   {
@@ -581,7 +564,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Avis, score & crédibilité",
     meta: "→ Ouvrir",
     badge: "Score",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "reputation",
   },
   {
@@ -591,11 +574,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Projets collaboratifs & hackathons",
     meta: "→ Ouvrir",
     badge: "Collab",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "cocreation",
   },
-
-  // ── Médias & Création ──
   {
     id: "mod-media",
     category: "Modules",
@@ -603,7 +584,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "News, podcasts, vidéos",
     meta: "→ Ouvrir",
     badge: "Media",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "media",
   },
   {
@@ -613,7 +594,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Vidéos en direct & stories",
     meta: "→ Ouvrir",
     badge: "Live",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "live",
   },
   {
@@ -623,7 +604,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Diffusion en direct professionnelle",
     meta: "→ Ouvrir",
     badge: "Stream",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "live-streaming",
   },
   {
@@ -633,7 +614,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Créer articles, posts et pages",
     meta: "→ Ouvrir",
     badge: "Éditeur",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "editeur",
   },
   {
@@ -643,7 +624,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Édition photo & filtres IA",
     meta: "→ Ouvrir",
     badge: "Photo",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "studio",
   },
   {
@@ -653,7 +634,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Créez des stories animées",
     meta: "→ Ouvrir",
     badge: "Stories",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "stories-creator",
   },
   {
@@ -663,7 +644,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Templates prêts à l'emploi",
     meta: "→ Ouvrir",
     badge: "Templates",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "templates",
   },
   {
@@ -673,11 +654,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Créer et gérer vos campagnes pub",
     meta: "→ Ouvrir",
     badge: "Pub",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "pub",
   },
-
-  // ── Événements ──
   {
     id: "mod-evenements",
     category: "Modules",
@@ -685,7 +664,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Concerts, foires, sorties",
     meta: "→ Ouvrir",
     badge: "Events",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "evenements",
   },
   {
@@ -695,7 +674,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Conférences, salons, networking",
     meta: "→ Ouvrir",
     badge: "Pro",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "evenements-pro",
   },
   {
@@ -705,11 +684,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Calendrier personnel & rappels",
     meta: "→ Ouvrir",
     badge: "Agenda",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "agenda",
   },
-
-  // ── Agriculture & Environnement ──
   {
     id: "mod-agri",
     category: "Modules",
@@ -717,7 +694,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Intrants, prix, alertes phytosanitaires",
     meta: "→ Ouvrir",
     badge: "Agri",
-    badgeColor: "#84cc16",
+    badgeColor: "#A3E635",
     page: "agri",
   },
   {
@@ -727,7 +704,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Écologie, climat, biodiversité",
     meta: "→ Ouvrir",
     badge: "Éco",
-    badgeColor: "#84cc16",
+    badgeColor: "#A3E635",
     page: "environnement",
   },
   {
@@ -737,11 +714,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Solaire, électricité, efficacité",
     meta: "→ Ouvrir",
     badge: "Énergie",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "energie",
   },
-
-  // ── Services & Administration ──
   {
     id: "mod-services",
     category: "Modules",
@@ -749,7 +724,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Aide à domicile, nettoyage, bricolage",
     meta: "→ Ouvrir",
     badge: "Services",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "services",
   },
   {
@@ -759,7 +734,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Restaurants, livraison repas",
     meta: "→ Ouvrir",
     badge: "Restau",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "restauration",
   },
   {
@@ -769,7 +744,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Stockage & gestion de documents",
     meta: "→ Ouvrir",
     badge: "Docs",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "documents",
   },
   {
@@ -779,7 +754,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Aide légale & conseils juridiques",
     meta: "→ Ouvrir",
     badge: "Droit",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "juridique",
   },
   {
@@ -789,7 +764,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Accès au droit & procédures",
     meta: "→ Ouvrir",
     badge: "Justice",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "justice",
   },
   {
@@ -799,7 +774,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Actions humanitaires & bénévolat",
     meta: "→ Ouvrir",
     badge: "ONG",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "ong",
   },
   {
@@ -809,7 +784,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Alertes, signalements, prévention",
     meta: "→ Ouvrir",
     badge: "Sécurité",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "securite",
   },
   {
@@ -819,7 +794,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Données ouvertes & statistiques",
     meta: "→ Ouvrir",
     badge: "Data",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "data-publique",
   },
   {
@@ -829,11 +804,9 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Services paroissiaux & annonces",
     meta: "→ Ouvrir",
     badge: "Religion",
-    badgeColor: "#a78bfa",
+    badgeColor: "#C4B5FD",
     page: "eglise",
   },
-
-  // ── Profil & Paramètres ──
   {
     id: "mod-profile",
     category: "Modules",
@@ -841,7 +814,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Votre identité, badge et QR Code",
     meta: "→ Ouvrir",
     badge: "Profil",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "profile",
   },
   {
@@ -851,7 +824,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Plans premium & avantages",
     meta: "→ Ouvrir",
     badge: "Premium",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "premium",
   },
   {
@@ -861,7 +834,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Points fidélité & cashback",
     meta: "→ Ouvrir",
     badge: "Points",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "recompenses",
   },
   {
@@ -871,7 +844,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Vos contenus sauvegardés",
     meta: "→ Ouvrir",
     badge: "Favoris",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "favorites",
   },
   {
@@ -881,7 +854,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Alertes et messages reçus",
     meta: "→ Ouvrir",
     badge: "Notifs",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "notifications",
   },
   {
@@ -891,7 +864,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Langue, thème, confidentialité",
     meta: "→ Ouvrir",
     badge: "Config",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "settings",
   },
   {
@@ -901,7 +874,7 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Découvrir tous les modules",
     meta: "→ Ouvrir",
     badge: "Explorer",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "explorer",
   },
   {
@@ -911,15 +884,16 @@ const MODULE_ENTRIES: SearchResult[] = [
     subtitle: "Raccourcis & actions contextuelles",
     meta: "→ Ouvrir",
     badge: "Actions",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "actions",
   },
 ];
 
-// ── Original content results ───────────────────────────────────────────────
+/* ============================================================
+ * CONTENT RESULTS
+ * ============================================================ */
 
 const CONTENT_RESULTS: SearchResult[] = [
-  // Immo
   {
     id: "i1",
     category: "Immo",
@@ -927,7 +901,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Quartier Joli Site",
     meta: "$450/mois",
     badge: "À louer",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "immo",
   },
   {
@@ -937,7 +911,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Dakar, Sénégal",
     meta: "85 000 FCFA/mois",
     badge: "Nouveau",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "immo",
   },
   {
@@ -947,7 +921,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Cocody, Côte d'Ivoire",
     meta: "$1 200/mois",
     badge: "Premium",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "immo",
   },
   {
@@ -957,11 +931,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "ACI 2000, Mali",
     meta: "$8 000",
     badge: "À vendre",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "immo",
   },
-
-  // Jobs
   {
     id: "j1",
     category: "Jobs/Pro",
@@ -969,7 +941,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "TechAfrique – Dakar",
     meta: "2 500 000 FCFA/mois",
     badge: "Urgent",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "jobs",
   },
   {
@@ -979,7 +951,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Kolwezi Industries",
     meta: "$600/mois",
     badge: "CDI",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "jobs",
   },
   {
@@ -989,7 +961,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Banque Atlantique – Abidjan",
     meta: "350 000 FCFA",
     badge: "CDD",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "jobs",
   },
   {
@@ -999,11 +971,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Dakar, Sénégal",
     meta: "Commission 25%",
     badge: "Flexible",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "jobs",
   },
-
-  // Santé
   {
     id: "s1",
     category: "Santé",
@@ -1011,7 +981,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Clinique Avicenne, Abidjan",
     meta: "Disponible aujourd'hui",
     badge: "En ligne",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "sante",
   },
   {
@@ -1021,7 +991,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Plateau, Dakar",
     meta: "Ouvert 24h/24",
     badge: "Urgence",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "sante",
   },
   {
@@ -1031,11 +1001,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "MediConnect Telehealth",
     meta: "5 000 FCFA / 15 min",
     badge: "Télé",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "sante",
   },
-
-  // Agri
   {
     id: "a1",
     category: "Agri",
@@ -1043,7 +1011,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Coopérative Sahel Vert",
     meta: "12 500 FCFA",
     badge: "Stock OK",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "agri",
   },
   {
@@ -1053,7 +1021,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "AgroInputs Mali",
     meta: "8 000 FCFA",
     badge: "Promo -10%",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "agri",
   },
   {
@@ -1063,11 +1031,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Zone nord Sénégal",
     meta: "Risque élevé",
     badge: "Alerte",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "agri",
   },
-
-  // Media
   {
     id: "m1",
     category: "Media",
@@ -1075,7 +1041,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Politique · il y a 2h",
     meta: "8 min de lecture",
     badge: "Trending",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "media",
   },
   {
@@ -1085,7 +1051,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Business Africa FM",
     meta: "45 min",
     badge: "Nouveau",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "media",
   },
   {
@@ -1095,11 +1061,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Sport · il y a 1h",
     meta: "3 min de lecture",
     badge: "Sport",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "media",
   },
-
-  // Événements
   {
     id: "e1",
     category: "Événements",
@@ -1107,7 +1071,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "CICES, Dakar",
     meta: "15-22 mars 2024",
     badge: "Gratuit",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "evenements",
   },
   {
@@ -1117,7 +1081,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Stade Léopold Sédar Senghor",
     meta: "25 000 FCFA",
     badge: "Chaud 🔥",
-    badgeColor: "#ef4444",
+    badgeColor: "#F87171",
     page: "evenements",
   },
   {
@@ -1127,11 +1091,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Sofitel Abidjan",
     meta: "50 000 FCFA",
     badge: "Pro",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "evenements",
   },
-
-  // Voyages
   {
     id: "v1",
     category: "Voyages",
@@ -1139,7 +1101,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Trans-Sahel Express",
     meta: "18 500 FCFA · 15h30",
     badge: "Bus",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "voyages",
   },
   {
@@ -1149,7 +1111,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Rapid Sahel",
     meta: "9 500 FCFA · 12h",
     badge: "Minibus",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "voyages",
   },
   {
@@ -1159,11 +1121,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Air Afrique Connect",
     meta: "85 000 FCFA · 2h30",
     badge: "Avion",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "voyages",
   },
-
-  // Bien‑être
   {
     id: "be1",
     category: "Bien‑être",
@@ -1171,7 +1131,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Fitness · Niveau intermédiaire",
     meta: "300 kcal",
     badge: "Fitness",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "fitness",
   },
   {
@@ -1181,7 +1141,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "10 min · Débutant",
     meta: "Gratuit",
     badge: "Zen",
-    badgeColor: "#a78bfa",
+    badgeColor: "#C4B5FD",
     page: "meditation",
   },
   {
@@ -1191,11 +1151,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Nutrition · 450 kcal",
     meta: "35 min",
     badge: "Recette",
-    badgeColor: "#84cc16",
+    badgeColor: "#A3E635",
     page: "nutrition",
   },
-
-  // Éducation
   {
     id: "ed1",
     category: "Éducation",
@@ -1203,7 +1161,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "TechAfrika Academy",
     meta: "6h · Débutant → Pro",
     badge: "Populaire",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "cours",
   },
   {
@@ -1213,7 +1171,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Éducation générale · 20 questions",
     meta: "~15 min",
     badge: "Quiz",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "quiz",
   },
   {
@@ -1223,11 +1181,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Reconnue CEDEAO",
     meta: "Gratuit",
     badge: "Certif",
-    badgeColor: "#f59e0b",
+    badgeColor: "#FBBF24",
     page: "certifications",
   },
-
-  // Finance
   {
     id: "fi1",
     category: "Finance",
@@ -1235,7 +1191,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Dakar → Bamako instantané",
     meta: "0.5% de frais",
     badge: "Mobile Money",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "paiement",
   },
   {
@@ -1245,7 +1201,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Groupe 10 personnes · 50 000 FCFA/mois",
     meta: "Rotation mensuelle",
     badge: "Épargne",
-    badgeColor: "#6366f1",
+    badgeColor: "#818CF8",
     page: "finances",
   },
   {
@@ -1255,11 +1211,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Wallet DébrouillApp",
     meta: "125 500 FCFA",
     badge: "Wallet",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "wallet",
   },
-
-  // Communauté
   {
     id: "co1",
     category: "Communauté",
@@ -1267,7 +1221,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "2 340 membres",
     meta: "Très actif",
     badge: "Groupe",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "groupes",
   },
   {
@@ -1277,7 +1231,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Communauté · 5 600 membres",
     meta: "128 posts cette semaine",
     badge: "Forum",
-    badgeColor: "#ec4899",
+    badgeColor: "#F472B6",
     page: "community",
   },
   {
@@ -1287,11 +1241,9 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Mentor certifiée",
     meta: "3 créneaux dispo",
     badge: "Mentor",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "mentorat",
   },
-
-  // Services
   {
     id: "sv1",
     category: "Services",
@@ -1299,7 +1251,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Cuisine africaine · Dakar Plateau",
     meta: "Note 4.8 ★",
     badge: "Ouvert",
-    badgeColor: "#f97316",
+    badgeColor: "#FB923C",
     page: "restauration",
   },
   {
@@ -1309,7 +1261,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Maître Traoré · Abidjan",
     meta: "Consultation 25 000 FCFA",
     badge: "Juridique",
-    badgeColor: "#8b5cf6",
+    badgeColor: "#A78BFA",
     page: "juridique",
   },
   {
@@ -1319,7 +1271,7 @@ const CONTENT_RESULTS: SearchResult[] = [
     subtitle: "Dakar, Sénégal · 4 étoiles",
     meta: "$85/nuit",
     badge: "Hôtel",
-    badgeColor: "#10b981",
+    badgeColor: "#34D399",
     page: "hebergement",
   },
 ];
@@ -1336,85 +1288,67 @@ const TRENDING = [
   "Cours JavaScript",
 ];
 
-const CATEGORY_ICONS: Record<ResultCategory, React.ReactNode> = {
-  Immo: <Home size={13} />,
-  "Jobs/Pro": <Briefcase size={13} />,
-  Santé: <Stethoscope size={13} />,
-  Agri: <Leaf size={13} />,
-  Media: <Newspaper size={13} />,
-  Événements: <Calendar size={13} />,
-  Voyages: <Plane size={13} />,
-  Modules: <LayoutGrid size={13} />,
-  "Bien‑être": <Heart size={13} />,
-  Éducation: <BookOpen size={13} />,
-  Finance: <Wallet size={13} />,
-  Communauté: <Users size={13} />,
-  Services: <Package size={13} />,
-};
-
 const CATEGORY_COLORS: Record<ResultCategory, string> = {
-  Immo: "#10b981",
-  "Jobs/Pro": "#8b5cf6",
-  Santé: "#ef4444",
-  Agri: "#84cc16",
-  Media: "#f97316",
-  Événements: "#ec4899",
-  Voyages: "#6366f1",
-  Modules: "#a78bfa",
-  "Bien‑être": "#f472b6",
-  Éducation: "#38bdf8",
-  Finance: "#34d399",
-  Communauté: "#fb7185",
-  Services: "#fbbf24",
+  Immo: "#34D399",
+  "Jobs/Pro": "#A78BFA",
+  Santé: "#F87171",
+  Agri: "#A3E635",
+  Media: "#FB923C",
+  Événements: "#F472B6",
+  Voyages: "#818CF8",
+  Modules: "#C4B5FD",
+  "Bien‑être": "#F9A8D4",
+  Éducation: "#22D3EE",
+  Finance: "#34D399",
+  Communauté: "#FB7185",
+  Services: "#FBBF24",
 };
-
-// ── Unused icon imports suppressed ─────────────────────────────────────────
-// (MapPin, Music, Camera, Star, MessageSquare, Bell, Map, Truck, FileText,
-//  Award, Video, Cpu, Network, Megaphone, Database, Lock, TreePine, Factory,
-//  Church, GraduationCap, BarChart2, Navigation, ShoppingCart, Gift, Compass,
-//  Flame, ShoppingBag, Car, Zap, Shield, Globe, Building2, Dumbbell, Mic)
-// kept for future use — safe to tree-shake
-void [
-  MapPin,
-  Music,
-  Camera,
-  Star,
-  MessageSquare,
-  Bell,
-  Map,
-  Truck,
-  FileText,
-  Award,
-  Video,
-  Cpu,
-  Network,
-  Megaphone,
-  Database,
-  Lock,
-  TreePine,
-  Factory,
-  Church,
-  GraduationCap,
-  BarChart2,
-  Navigation,
-  ShoppingCart,
-  Gift,
-  Compass,
-  Flame,
-  ShoppingBag,
-  Car,
-  Zap,
-  Shield,
-  Globe,
-  Building2,
-  Dumbbell,
-];
 
 const HISTORY_KEY = "debrouille_search_history";
 
+/* ============================================================
+ * STORAGE SHIM (works native + web)
+ * ============================================================ */
+
+const memoryStore: Record<string, string> = {};
+
+const store = {
+  get(key: string): string | null {
+    if (isBrowser) {
+      try {
+        return window.localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    }
+    return memoryStore[key] ?? null;
+  },
+  set(key: string, value: string) {
+    if (isBrowser) {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch {}
+    } else {
+      memoryStore[key] = value;
+    }
+  },
+  remove(key: string) {
+    if (isBrowser) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {}
+    } else {
+      delete memoryStore[key];
+    }
+  },
+};
+
 function getHistory(): string[] {
   try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]") as string[];
+    const raw = store.get(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -1423,20 +1357,17 @@ function getHistory(): string[] {
 function saveHistory(query: string) {
   const prev = getHistory().filter((h) => h !== query);
   const next = [query, ...prev].slice(0, 8);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  store.set(HISTORY_KEY, JSON.stringify(next));
 }
 
 function removeHistory(query: string) {
   const next = getHistory().filter((h) => h !== query);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  store.set(HISTORY_KEY, JSON.stringify(next));
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
-
-interface SmartSearchProps {
-  onNavigate: (page: string) => void;
-  onAdvancedSearch?: () => void;
-}
+/* ============================================================
+ * HELPERS
+ * ============================================================ */
 
 function normalizeSearchValue(value: unknown): string {
   return String(value ?? "")
@@ -1448,7 +1379,6 @@ function normalizeSearchValue(value: unknown): string {
 
 function categoryFromType(type: unknown): ResultCategory {
   const value = normalizeSearchValue(type);
-
   if (["job", "emploi", "employment"].includes(value)) return "Jobs/Pro";
   if (
     ["property", "immo", "immobilier", "realestate", "real_estate"].includes(
@@ -1471,7 +1401,6 @@ function categoryFromType(type: unknown): ResultCategory {
   if (["media", "article", "video", "podcast"].includes(value)) return "Media";
   if (["fitness", "sport", "nutrition", "bienetre", "wellness"].includes(value))
     return "Bien‑être";
-
   return "Services";
 }
 
@@ -1490,14 +1419,267 @@ function getPageForCategory(category: ResultCategory): string {
     Communauté: "community",
     Services: "services",
   };
-
   return pages[category] ?? "explorer";
+}
+
+function getCategoryIcon(category: ResultCategory, size = 13): ReactNode {
+  const props = { size, color: CATEGORY_COLORS[category] };
+  switch (category) {
+    case "Immo":
+      return <Home {...props} />;
+    case "Jobs/Pro":
+      return <Briefcase {...props} />;
+    case "Santé":
+      return <Stethoscope {...props} />;
+    case "Agri":
+      return <Leaf {...props} />;
+    case "Media":
+      return <Newspaper {...props} />;
+    case "Événements":
+      return <Calendar {...props} />;
+    case "Voyages":
+      return <Plane {...props} />;
+    case "Modules":
+      return <LayoutGrid {...props} />;
+    case "Bien‑être":
+      return <Heart {...props} />;
+    case "Éducation":
+      return <BookOpen {...props} />;
+    case "Finance":
+      return <Wallet {...props} />;
+    case "Communauté":
+      return <Users {...props} />;
+    case "Services":
+      return <Package {...props} />;
+  }
+}
+
+/* ============================================================
+ * FADE UP WRAPPER
+ * ============================================================ */
+
+function FadeUp({
+  delay = 0,
+  distance = 8,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: any;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 380,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================
+ * ANIMATED TRIGGER ICON (mic)
+ * ============================================================ */
+
+function TriggerMicIcon() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.08],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <LinearGradient
+        colors={["#A78BFA", "#7C3AED", "#6366F1"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.triggerMic}
+      >
+        <Mic size={14} color="#fff" strokeWidth={2.4} />
+      </LinearGradient>
+    </Animated.View>
+  );
+}
+
+/* ============================================================
+ * SECTION LABEL
+ * ============================================================ */
+
+function SectionLabel({
+  icon,
+  children,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.sectionLabelRow}>
+      {icon}
+      <Text style={styles.sectionLabelText}>{children}</Text>
+    </View>
+  );
+}
+
+/* ============================================================
+ * RESULT ROW
+ * ============================================================ */
+
+function ResultRow({
+  result,
+  index,
+  compact = false,
+  onSelect,
+}: {
+  result: SearchResult;
+  index: number;
+  compact?: boolean;
+  onSelect: (result: SearchResult) => void;
+}) {
+  const color = result.badgeColor ?? CATEGORY_COLORS[result.category];
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.99,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+  const onPressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  };
+
+  return (
+    <FadeUp delay={Math.min(index * 25, 300)} distance={5}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          onPress={() => onSelect(result)}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          accessibilityLabel={`${result.title} — ${result.category}`}
+          style={[styles.resultRow, compact && styles.resultRowCompact]}
+        >
+          <LinearGradient
+            colors={[`${color}14`, "rgba(255,255,255,0)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+
+          <View
+            style={[
+              compact ? styles.resultIconCompact : styles.resultIcon,
+              { backgroundColor: `${color}22`, borderColor: `${color}44` },
+            ]}
+          >
+            {getCategoryIcon(result.category, compact ? 13 : 14)}
+          </View>
+
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.resultTitle} numberOfLines={1}>
+              {result.title}
+            </Text>
+            <Text style={styles.resultSubtitle} numberOfLines={1}>
+              {result.subtitle}
+            </Text>
+          </View>
+
+          <View style={styles.resultMetaCol}>
+            {result.meta ? (
+              <Text style={styles.resultMeta} numberOfLines={1}>
+                {result.meta}
+              </Text>
+            ) : null}
+            {result.badge ? (
+              <View
+                style={[styles.resultBadge, { backgroundColor: `${color}22` }]}
+              >
+                {result.badge === "En direct" ? (
+                  <Radio size={8} color={color} />
+                ) : null}
+                <Text
+                  style={[styles.resultBadgeText, { color }]}
+                  numberOfLines={1}
+                >
+                  {result.badge}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <ChevronRight size={13} color="rgba(255,255,255,0.3)" />
+        </Pressable>
+      </Animated.View>
+    </FadeUp>
+  );
+}
+
+/* ============================================================
+ * COMPONENT
+ * ============================================================ */
+
+interface SmartSearchProps {
+  onNavigate: (page: string) => void;
+  onAdvancedSearch?: () => void;
 }
 
 export default function SmartSearch({
   onNavigate,
   onAdvancedSearch,
 }: SmartSearchProps) {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [listening, setListening] = useState(false);
@@ -1506,20 +1688,48 @@ export default function SmartSearch({
     "Tout",
   );
   const [isVoiceSupported, setIsVoiceSupported] = useState(false);
+
   const inputRef = useRef<TextInput>(null);
+
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const panelAnim = useRef(new Animated.Value(0)).current;
 
   const liveData = useQuery(
     api.search.smartSearch,
     query.trim().length >= 2 ? { query: query.trim() } : "skip",
   );
 
+  /* ───── voice support detection ───── */
   useEffect(() => {
+    if (!isBrowser) return;
     setIsVoiceSupported(
-      typeof undefined !== "undefined" &&
-        ("SpeechRecognition" in undefined || "webkitSpeechRecognition" in undefined),
+      "SpeechRecognition" in window || "webkitSpeechRecognition" in window,
     );
   }, []);
 
+  /* ───── entrance/exit animation ───── */
+  useEffect(() => {
+    if (open) {
+      backdropAnim.setValue(0);
+      panelAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 1,
+          duration: 240,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(panelAnim, {
+          toValue: 1,
+          stiffness: 340,
+          damping: 30,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [open, backdropAnim, panelAnim]);
+
+  /* ───── live results mapping ───── */
   const liveResults = useMemo<SearchResult[]>(() => {
     if (!liveData) return [];
 
@@ -1581,6 +1791,7 @@ export default function SmartSearch({
     return mapped;
   }, [liveData]);
 
+  /* ───── static results filtering ───── */
   const staticResults = useMemo<SearchResult[]>(() => {
     const normalizedQuery = normalizeSearchValue(query);
     if (normalizedQuery.length < 2) return [];
@@ -1589,7 +1800,6 @@ export default function SmartSearch({
       if (activeCategory !== "Tout" && result.category !== activeCategory) {
         return false;
       }
-
       return [result.title, result.subtitle, result.category, result.badge]
         .filter(Boolean)
         .some((value) => normalizeSearchValue(value).includes(normalizedQuery));
@@ -1652,16 +1862,33 @@ export default function SmartSearch({
 
   const quickModules = MODULE_ENTRIES.slice(0, 12);
 
+  /* ───── actions ───── */
   const handleClose = useCallback(() => {
-    setOpen(false);
-    setQuery("");
-    setListening(false);
-    setActiveCategory("Tout");
-  }, []);
+    Animated.parallel([
+      Animated.timing(backdropAnim, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(panelAnim, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setOpen(false);
+      setQuery("");
+      setListening(false);
+      setActiveCategory("Tout");
+      Keyboard.dismiss();
+    });
+  }, [backdropAnim, panelAnim]);
 
   const handleOpen = useCallback(() => {
     setOpen(true);
-    undefined;
+    setTimeout(() => inputRef.current?.focus(), 200);
   }, []);
 
   const handleSelect = useCallback(
@@ -1677,11 +1904,12 @@ export default function SmartSearch({
   const handleHistorySelect = useCallback((value: string) => {
     setQuery(value);
     setActiveCategory("Tout");
-    undefined;
+    setTimeout(() => inputRef.current?.focus(), 0);
   }, []);
 
   const handleRemoveHistory = useCallback(
     (value: string, event: GestureResponderEvent) => {
+      event.stopPropagation?.();
       removeHistory(value);
       setHistory(getHistory());
     },
@@ -1689,43 +1917,15 @@ export default function SmartSearch({
   );
 
   const handleVoice = useCallback(() => {
-    if (!isVoiceSupported || listening) return;
+    if (!isBrowser || !isVoiceSupported || listening) return;
+
+    const w = window as typeof window & {
+      webkitSpeechRecognition?: new () => any;
+      SpeechRecognition?: new () => any;
+    };
 
     const SpeechRecognitionAPI =
-      (
-        undefined as Window & {
-          webkitSpeechRecognition?: new () => {
-            lang: string;
-            interimResults: boolean;
-            onstart: (() => void) | null;
-            onend: (() => void) | null;
-            onerror: (() => void) | null;
-            onresult:
-              | ((event: {
-                  results: Array<ArrayLike<{ transcript: string }>>;
-                }) => void)
-              | null;
-            start: () => void;
-          };
-        }
-      ).webkitSpeechRecognition ??
-      (
-        undefined as Window & {
-          SpeechRecognition?: new () => {
-            lang: string;
-            interimResults: boolean;
-            onstart: (() => void) | null;
-            onend: (() => void) | null;
-            onerror: (() => void) | null;
-            onresult:
-              | ((event: {
-                  results: Array<ArrayLike<{ transcript: string }>>;
-                }) => void)
-              | null;
-            start: () => void;
-          };
-        }
-      ).SpeechRecognition;
+      w.webkitSpeechRecognition ?? w.SpeechRecognition;
 
     if (!SpeechRecognitionAPI) return;
 
@@ -1735,13 +1935,17 @@ export default function SmartSearch({
     recognition.onstart = () => setListening(true);
     recognition.onend = () => setListening(false);
     recognition.onerror = () => setListening(false);
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: any) => {
       const transcript = event.results[0]?.[0]?.transcript ?? "";
       setQuery(transcript);
       setActiveCategory("Tout");
     };
 
-    recognition.start();
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+    }
   }, [isVoiceSupported, listening]);
 
   const handleSubmit = useCallback((value: string) => {
@@ -1751,408 +1955,578 @@ export default function SmartSearch({
     setHistory(getHistory());
   }, []);
 
+  /* ───── web escape key ───── */
   useEffect(() => {
-    if (!open) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
+    if (!isBrowser || !open) return;
+    const handler = (event: KeyboardEvent) => {
       if (event.key === "Escape") handleClose();
     };
-
-    undefined;
-    return () => undefined;
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [handleClose, open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const previousOverflow = undefined.style.overflow;
-    undefined.style.overflow = "hidden";
-
-    return () => {
-      undefined.style.overflow = previousOverflow;
-    };
-  }, [open]);
 
   const showResults = query.trim().length >= 2;
   const resultCategoryCount = Object.keys(grouped).length;
 
+  const backdropOpacity = backdropAnim;
+  const panelTranslateY = panelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_HEIGHT * 0.04, 0],
+  });
+  const panelScale = panelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.985, 1],
+  });
+
+  /* ========================================================================
+   * RENDER
+   * ====================================================================== */
+
   return (
     <>
-      {/* ===================================================================== */}
-      {/* Trigger                                                               */}
-      {/* ===================================================================== */}
-      <View
-        className="mx-5 mt-3"
-      >
+      {/* ═══════════ TRIGGER ═══════════ */}
+      <FadeUp delay={120} distance={8} style={styles.triggerWrap}>
         <Pressable
-         
           onPress={handleOpen}
           accessibilityLabel="Ouvrir la recherche intelligente"
-          className="group relative flex w-full items-center gap-3 overflow-hidden rounded-[20px] border border-white/[0.08] bg-white/[0.06] px-4 py-3 text-left shadow-[0_8px_30px_rgba(0,0,0,0.12)]"
+          style={({ pressed }) => [styles.trigger, pressed && { opacity: 0.9 }]}
         >
-          <Text className="absolute inset-0 bg-gradient-to-r from-violet-500/[0.04] via-transparent to-indigo-500/[0.04]" />
+          <LinearGradient
+            colors={[
+              "rgba(167,139,250,0.08)",
+              "rgba(255,255,255,0.02)",
+              "rgba(99,102,241,0.08)",
+            ]}
+            locations={[0, 0.5, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={StyleSheet.absoluteFill}
+          />
 
-          <Text className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.06] bg-white/[0.06]">
-            <Search
-              size={17}
-              className="text-white/55"
-            />
-          </Text>
+          <View style={styles.triggerSearchIcon}>
+            <Search size={17} color="rgba(255,255,255,0.6)" />
+          </View>
 
-          <Text className="relative min-w-0 flex-1">
-            <Text className="block truncate text-sm font-medium text-white/40">
-              Rechercher dans 80+ modules...
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.triggerTitle} numberOfLines={1}>
+              Rechercher dans 80+ modules…
             </Text>
-            <Text className="mt-0.5 block text-[9px] text-white/20">
+            <Text style={styles.triggerSub} numberOfLines={1}>
               Services · emplois · immobilier · événements · contenus
             </Text>
-          </Text>
+          </View>
 
-          <Text className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[0_6px_20px_rgba(99,102,241,0.28)]">
-            <Mic size={14} className="text-white" />
-          </Text>
+          <TriggerMicIcon />
         </Pressable>
 
-        {onAdvancedSearch && (
+        {onAdvancedSearch ? (
           <Pressable
-           
             onPress={onAdvancedSearch}
-            className="mt-1.5 flex w-full items-center justify-center gap-1.5 py-1.5 text-[11px] font-medium text-violet-400/70"
+            style={({ pressed }) => [
+              styles.advancedBtn,
+              pressed && { opacity: 0.7 },
+            ]}
           >
-            <Sparkles size={11} />
-            <Text>Recherche avancée</Text><Text className="text-white/15">·</Text>
-            <Text>Tendances</Text></Pressable>
-        )}
-      </View>
+            <Sparkles size={11} color="rgba(196,181,253,0.85)" />
+            <Text style={styles.advancedBtnText}>Recherche avancée</Text>
+            <Text style={styles.advancedBtnDot}>·</Text>
+            <Text style={styles.advancedBtnText}>Tendances</Text>
+          </Pressable>
+        ) : null}
+      </FadeUp>
 
-      {/* ===================================================================== */}
-      {/* Full screen search                                                    */}
-      {/* ===================================================================== */}
-      <>
-        {open && (
-          <View
-            className="fixed inset-0 z-[100] flex flex-col bg-[#030511]/95"
-            accessibilityRole="dialog"
-            aria-modal="true"
-            accessibilityLabel="Recherche DébrouillePro"
-          >
-            {/* Ambient lighting */}
-            <View
-             
-              className="absolute -top-32 left-1/2 h-80 w-[650px] -translate-x-1/2 rounded-full bg-violet-600/[0.10]"
-            />
-            <View
-             
-              className="absolute right-[-120px] top-1/3 h-64 w-64 rounded-full bg-indigo-500/[0.07]"
-            />
+      {/* ═══════════ MODAL ═══════════ */}
+      {open ? (
+        <Modal
+          transparent
+          visible={open}
+          animationType="none"
+          onRequestClose={handleClose}
+          statusBarTranslucent
+        >
+          <View style={StyleSheet.absoluteFill}>
+            {/* Backdrop */}
+            <Animated.View
+              style={[styles.backdrop, { opacity: backdropOpacity }]}
+            >
+              <Pressable
+                onPress={handleClose}
+                style={StyleSheet.absoluteFill}
+                accessibilityLabel="Fermer"
+              />
+            </Animated.View>
 
-            {/* Header */}
-            <View className="relative shrink-0 px-4 pb-3 pt-[max(16px,env(safe-area-inset-top))] sm:px-6">
-              <View className="mx-auto max-w-3xl">
-                <View className="mb-3 flex items-center justify-between">
-                  <View>
-                    <Text className="text-[10px] font-bold uppercase tracking-[0.18em] text-violet-300/70">
-                      DébrouillePro Search
+            {/* Panel */}
+            <Animated.View
+              style={[
+                styles.panel,
+                {
+                  transform: [
+                    { translateY: panelTranslateY },
+                    { scale: panelScale },
+                  ],
+                },
+              ]}
+              accessibilityLabel="Recherche DébrouillePro"
+            >
+              <LinearGradient
+                colors={["#06061A", "#0A0620", "#06061A"]}
+                locations={[0, 0.5, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+
+              {/* Ambient glows */}
+              <View style={styles.ambientGlowTop} pointerEvents="none" />
+              <View style={styles.ambientGlowRight} pointerEvents="none" />
+
+              {/* ─── HEADER ─── */}
+              <View
+                style={[
+                  styles.header,
+                  {
+                    paddingTop: Platform.OS === "android" ? 20 : 40,
+                  },
+                ]}
+              >
+                <View style={styles.headerTopRow}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.headerEyebrow}>
+                      DÉBROUILLEPRO SEARCH
                     </Text>
-                    <Text className="mt-0.5 text-lg font-bold text-white">
-                      Que cherches-tu ?
-                    </Text>
+                    <Text style={styles.headerTitle}>Que cherches-tu ?</Text>
                   </View>
-
                   <Pressable
-                   
                     onPress={handleClose}
+                    hitSlop={8}
                     accessibilityLabel="Fermer la recherche"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.05] text-white/45"
+                    style={({ pressed }) => [
+                      styles.headerCloseBtn,
+                      pressed && { opacity: 0.75 },
+                    ]}
                   >
-                    <X size={17} />
+                    <X size={17} color="rgba(255,255,255,0.75)" />
                   </Pressable>
                 </View>
 
-                <View className="flex items-center gap-2 rounded-[20px] border border-violet-400/25 bg-white/[0.08] px-3 py-2.5 shadow-[0_12px_45px_rgba(0,0,0,0.20)]">
-                  <Search size={18} className="shrink-0 text-violet-300" />
+                {/* Search bar */}
+                <View style={styles.searchBar}>
+                  <Search size={18} color="#C4B5FD" strokeWidth={2.4} />
                   <TextInput
                     ref={inputRef}
                     value={query}
-                    onChangeText={(text) => {
-                      setQuery(text);
+                    onChangeText={(value) => {
+                      setQuery(value);
                       setActiveCategory("Tout");
                     }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") handleSubmit(query);
-                    }}
-                    placeholder="Modules, services, emplois, contenus..."
-                    className="min-w-0 flex-1 bg-transparent py-1 text-sm text-white outline-none placeholder:text-white/25"
-                   
-                    autoCapitalize="off"
-                   
+                    onSubmitEditing={() => handleSubmit(query)}
+                    placeholder="Modules, services, emplois, contenus…"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    style={styles.searchInput}
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    accessibilityLabel="Rechercher"
                   />
-
-                  {query && (
+                  {query ? (
                     <Pressable
-                     
                       onPress={() => setQuery("")}
+                      hitSlop={6}
                       accessibilityLabel="Effacer la recherche"
-                      className="shrink-0 rounded-lg p-1.5 text-white/30"
+                      style={({ pressed }) => [
+                        styles.searchClearBtn,
+                        pressed && { opacity: 0.7 },
+                      ]}
                     >
-                      <X size={15} />
+                      <X size={15} color="rgba(255,255,255,0.6)" />
                     </Pressable>
-                  )}
-
-                  {isVoiceSupported && (
+                  ) : null}
+                  {isVoiceSupported ? (
                     <Pressable
-                     
                       onPress={handleVoice}
                       accessibilityLabel={
                         listening
                           ? "Arrêter la dictée"
                           : "Rechercher avec la voix"
                       }
-                      aria-pressed={listening}
-                      className={`flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70 ${listening ? "bg-red-500/20 text-red-300 ring-1 ring-red-400/30" : "bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-[0_5px_18px_rgba(99,102,241,0.30)] hover:scale-[1.03]"}`}
+                      accessibilityState={{ selected: listening }}
+                      hitSlop={6}
+                      style={({ pressed }) => [
+                        styles.searchMicBtn,
+                        listening && styles.searchMicBtnActive,
+                        pressed && { opacity: 0.85 },
+                      ]}
                     >
                       <Mic
                         size={14}
-                        className={listening ? "animate-pulse" : ""}
+                        color={listening ? "#FCA5A5" : "#fff"}
+                        strokeWidth={2.4}
                       />
                     </Pressable>
-                  )}
+                  ) : null}
                 </View>
 
-                {showResults && results.length > 0 && (
-                  <View
-                    className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]"
-                  >
-                    {allCategories.map((category) => {
-                      const count =
-                        category === "Tout"
-                          ? results.length
-                          : (grouped[category as ResultCategory]?.length ?? 0);
+                {/* Category chips */}
+                {showResults && results.length > 0 ? (
+                  <FadeUp distance={6}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.chipsRow}
+                    >
+                      {allCategories.map((category) => {
+                        const count =
+                          category === "Tout"
+                            ? results.length
+                            : (grouped[category as ResultCategory]?.length ??
+                              0);
 
-                      if (category !== "Tout" && count === 0) return null;
+                        if (category !== "Tout" && count === 0) return null;
 
-                      const color =
-                        category === "Tout"
-                          ? "#a78bfa"
-                          : CATEGORY_COLORS[category as ResultCategory];
+                        const color =
+                          category === "Tout"
+                            ? "#C4B5FD"
+                            : CATEGORY_COLORS[category as ResultCategory];
 
-                      const active = activeCategory === category;
+                        const active = activeCategory === category;
 
-                      return (
-                        <Pressable
-                          key={category}
-                         
-                          onPress={() => setActiveCategory(category)}
-                          className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
-                          style={{ backgroundColor: active
-                                                        ? `${color}22`
-                                                        : "rgba(255,255,255,0.04)", borderColor: active
-                                                        ? `${color}66`
-                                                        : "rgba(255,255,255,0.07)" }}
-                        >
-                          {category !== "Tout" && (
-                            <Text style={{ color }}>
-                              {CATEGORY_ICONS[category as ResultCategory]}
-                            </Text>
-                          )}
-                          {category}
-                          <Text className="text-white/30">{count}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Body */}
-            <View className="relative flex-1 overflow-y-auto px-4 pb-10 [scrollbar-width:none] sm:px-6">
-              <View className="mx-auto max-w-3xl">
-                {!showResults && (
-                  <View className="space-y-7 pt-3">
-                    {/* Quick access */}
-                    <View>
-                      <SectionLabel icon={<LayoutGrid size={12} />}>
-                        <Text>Accès rapide</Text></SectionLabel>
-
-                      <View className="gap-2">
-                        {quickModules.map((module, index) => (
+                        return (
                           <Pressable
-                            key={module.id}
-                            onPress={() => handleSelect(module)}
-                            className="group flex flex-col items-center gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3 text-center"
+                            key={category}
+                            onPress={() => setActiveCategory(category)}
+                            style={({ pressed }) => [
+                              styles.chip,
+                              {
+                                backgroundColor: active
+                                  ? `${color}30`
+                                  : "rgba(255,255,255,0.04)",
+                                borderColor: active
+                                  ? `${color}66`
+                                  : "rgba(255,255,255,0.08)",
+                              },
+                              pressed && { opacity: 0.8 },
+                            ]}
                           >
+                            {category !== "Tout"
+                              ? getCategoryIcon(category as ResultCategory, 11)
+                              : null}
                             <Text
-                              className="flex h-9 w-9 items-center justify-center rounded-xl"
-                              style={{ backgroundColor: `${module.badgeColor ?? "#8b5cf6"}1f` }}
+                              style={[
+                                styles.chipText,
+                                active && { color: "#fff" },
+                              ]}
                             >
-                              <LayoutGrid
-                                size={15}
-                                style={{
-                                  color: module.badgeColor ?? "#a78bfa",
-                                }}
-                              />
+                              {category}
                             </Text>
-                            <Text className="text-[11px] font-medium leading-tight text-white/65">
-                              {module.title}
-                            </Text>
+                            <Text style={styles.chipCount}>{count}</Text>
                           </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </FadeUp>
+                ) : null}
+              </View>
+
+              {/* ─── BODY ─── */}
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.bodyContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Idle state */}
+                {!showResults ? (
+                  <View style={{ gap: 28, paddingTop: 12 }}>
+                    {/* Quick modules */}
+                    <View>
+                      <SectionLabel
+                        icon={
+                          <LayoutGrid
+                            size={12}
+                            color="rgba(255,255,255,0.45)"
+                          />
+                        }
+                      >
+                        Accès rapide
+                      </SectionLabel>
+                      <View style={styles.quickGrid}>
+                        {quickModules.map((module, index) => (
+                          <FadeUp
+                            key={module.id}
+                            delay={index * 25}
+                            distance={8}
+                            style={styles.quickGridItemWrap}
+                          >
+                            <Pressable
+                              onPress={() => handleSelect(module)}
+                              style={({ pressed }) => [
+                                styles.quickModule,
+                                pressed && { opacity: 0.85 },
+                              ]}
+                            >
+                              <LinearGradient
+                                colors={[
+                                  `${module.badgeColor ?? "#A78BFA"}22`,
+                                  `${module.badgeColor ?? "#A78BFA"}08`,
+                                ]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={[
+                                  styles.quickModuleIcon,
+                                  {
+                                    borderColor: `${module.badgeColor ?? "#A78BFA"}44`,
+                                  },
+                                ]}
+                              >
+                                {getCategoryIcon("Modules", 15)}
+                              </LinearGradient>
+                              <Text
+                                style={styles.quickModuleLabel}
+                                numberOfLines={2}
+                              >
+                                {module.title}
+                              </Text>
+                            </Pressable>
+                          </FadeUp>
                         ))}
                       </View>
-
                       <Pressable
-                       
                         onPress={() => setQuery("module")}
-                        className="mt-2 flex w-full items-center justify-center gap-1 py-2 text-[11px] font-semibold text-violet-400"
+                        style={({ pressed }) => [
+                          styles.seeAllBtn,
+                          pressed && { opacity: 0.7 },
+                        ]}
                       >
-                        <Text>Voir tous les modules</Text><ArrowUpRight size={11} />
+                        <Text style={styles.seeAllBtnText}>
+                          Voir tous les modules
+                        </Text>
+                        <ArrowUpRight
+                          size={11}
+                          color="rgba(196,181,253,0.85)"
+                        />
                       </Pressable>
                     </View>
 
                     {/* History */}
-                    {history.length > 0 && (
-                      <View>
-                        <View className="mb-3 flex items-center justify-between">
-                          <SectionLabel icon={<Clock size={12} />}>
-                            <Text>Récent</Text></SectionLabel>
-                          <Pressable
-                           
-                            onPress={() => {
-                              localStorage.removeItem(HISTORY_KEY);
-                              setHistory([]);
-                            }}
-                            className="text-[11px] font-medium text-violet-400"
-                          >
-                            <Text>Effacer</Text></Pressable>
-                        </View>
-
-                        <View className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.025]">
-                          {history.map((item, index) => (
-                            <Pressable
-                              key={item}
-                             
-                              onPress={() => handleHistorySelect(item)}
-                              className={`group flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left transition hover:bg-white/[0.05] ${index !== 0 ? "border-t border-white/[0.05]" : ""}`}
+                    {history.length > 0 ? (
+                      <FadeUp>
+                        <View>
+                          <View style={styles.historyHeader}>
+                            <SectionLabel
+                              icon={
+                                <Clock
+                                  size={12}
+                                  color="rgba(255,255,255,0.45)"
+                                />
+                              }
                             >
-                              <Clock
-                                size={14}
-                                className="shrink-0 text-white/20"
-                              />
-                              <Text className="min-w-0 flex-1 truncate text-sm text-white/60">
-                                {item}
-                              </Text>
-                              <Text
-                                accessibilityRole="button"
-                                tabIndex={0}
-                                accessibilityLabel={`Supprimer ${item}`}
-                                onPress={(event) =>
-                                  handleRemoveHistory(item, event)
-                                }
-                                onKeyDown={(event) => {
-                                  if (
-                                    event.key === "Enter" ||
-                                    event.key === " "
-                                  ) {
-                                    handleRemoveHistory(
-                                      item,
-                                      event as unknown as GestureResponderEvent,
-                                    );
-                                  }
-                                }}
-                                className="rounded-lg p-1 text-white/15 opacity-0"
-                              >
-                                <X size={12} />
-                              </Text>
+                              Récent
+                            </SectionLabel>
+                            <Pressable
+                              onPress={() => {
+                                store.remove(HISTORY_KEY);
+                                setHistory([]);
+                              }}
+                              hitSlop={6}
+                              style={({ pressed }) => [
+                                pressed && { opacity: 0.6 },
+                              ]}
+                            >
+                              <Text style={styles.historyClear}>Effacer</Text>
                             </Pressable>
+                          </View>
+                          <View style={styles.historyCard}>
+                            <LinearGradient
+                              colors={[
+                                "rgba(255,255,255,0.035)",
+                                "rgba(255,255,255,0.015)",
+                              ]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={StyleSheet.absoluteFill}
+                            />
+                            <View
+                              style={styles.historyBorder}
+                              pointerEvents="none"
+                            />
+                            {history.map((item, index) => (
+                              <Pressable
+                                key={item}
+                                onPress={() => handleHistorySelect(item)}
+                                style={({ pressed }) => [
+                                  styles.historyRow,
+                                  index > 0 && styles.historyRowBorder,
+                                  pressed && {
+                                    backgroundColor: "rgba(255,255,255,0.04)",
+                                  },
+                                ]}
+                              >
+                                <Clock
+                                  size={14}
+                                  color="rgba(255,255,255,0.35)"
+                                />
+                                <Text
+                                  style={styles.historyText}
+                                  numberOfLines={1}
+                                >
+                                  {item}
+                                </Text>
+                                <Pressable
+                                  onPress={(e) => handleRemoveHistory(item, e)}
+                                  hitSlop={8}
+                                  accessibilityLabel={`Supprimer ${item}`}
+                                  style={({ pressed }) => [
+                                    styles.historyRemoveBtn,
+                                    pressed && { opacity: 0.7 },
+                                  ]}
+                                >
+                                  <X size={12} color="rgba(255,255,255,0.4)" />
+                                </Pressable>
+                              </Pressable>
+                            ))}
+                          </View>
+                        </View>
+                      </FadeUp>
+                    ) : null}
+
+                    {/* Trending */}
+                    <FadeUp>
+                      <View>
+                        <SectionLabel
+                          icon={
+                            <TrendingUp
+                              size={12}
+                              color="rgba(255,255,255,0.45)"
+                            />
+                          }
+                        >
+                          Tendances
+                        </SectionLabel>
+                        <View style={styles.trendingRow}>
+                          {TRENDING.map((item, index) => (
+                            <FadeUp key={item} delay={index * 35} distance={6}>
+                              <Pressable
+                                onPress={() => setQuery(item)}
+                                style={({ pressed }) => [
+                                  styles.trendingChip,
+                                  pressed && { opacity: 0.85 },
+                                ]}
+                              >
+                                <TrendingUp
+                                  size={11}
+                                  color="rgba(251,146,60,0.85)"
+                                />
+                                <Text style={styles.trendingChipText}>
+                                  {item}
+                                </Text>
+                              </Pressable>
+                            </FadeUp>
                           ))}
                         </View>
                       </View>
-                    )}
+                    </FadeUp>
 
-                    {/* Trending */}
-                    <View>
-                      <SectionLabel icon={<TrendingUp size={12} />}>
-                        <Text>Tendances</Text></SectionLabel>
-                      <View className="flex flex-wrap gap-2">
-                        {TRENDING.map((item, index) => (
-                          <Pressable
-                            key={item}
-                            onPress={() => setQuery(item)}
-                            className="flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/50"
-                          >
-                            <TrendingUp
-                              size={11}
-                              className="text-orange-400/80"
-                            />
-                            {item}
-                          </Pressable>
-                        ))}
-                      </View>
-                    </View>
+                    {/* AI banner */}
+                    <FadeUp>
+                      <View style={styles.aiCard}>
+                        <LinearGradient
+                          colors={[
+                            "rgba(139,92,246,0.2)",
+                            "rgba(99,102,241,0.1)",
+                            "rgba(15,7,32,0.6)",
+                          ]}
+                          locations={[0, 0.5, 1]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={StyleSheet.absoluteFill}
+                        />
+                        <View
+                          style={styles.aiCardBorder}
+                          pointerEvents="none"
+                        />
+                        <View style={styles.aiCardOrb} pointerEvents="none" />
 
-                    {/* AI insight */}
-                    <View className="relative overflow-hidden rounded-2xl border border-violet-400/[0.14] bg-gradient-to-br from-violet-500/[0.11] via-indigo-500/[0.06] to-transparent p-4">
-                      <View
-                       
-                        className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-violet-500/10"
-                      />
-                      <View className="relative flex items-start gap-3">
-                        <Text className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-300">
-                          <Sparkles size={16} />
-                        </Text>
-                        <View className="min-w-0">
-                          <Text className="text-[10px] font-bold uppercase tracking-wider text-violet-300/80">
-                            DébrouilleAI
-                          </Text>
-                          <Text className="mt-1 text-sm leading-relaxed text-white/65">
-                            Je peux t'aider à trouver un emploi, un logement, un
-                            service ou une opportunité plus rapidement.
-                          </Text>
-                          <Pressable
-                           
-                            onPress={() => setQuery("emploi")}
-                            className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-violet-300"
+                        <View style={styles.aiCardRow}>
+                          <LinearGradient
+                            colors={[
+                              "rgba(167,139,250,0.4)",
+                              "rgba(99,102,241,0.15)",
+                            ]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.aiCardIcon}
                           >
-                            <Text>Explorer les opportunités</Text><ArrowUpRight size={11} />
-                          </Pressable>
+                            <Sparkles size={16} color="#C4B5FD" />
+                          </LinearGradient>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={styles.aiCardEyebrow}>
+                              DÉBROUILLE AI
+                            </Text>
+                            <Text style={styles.aiCardText}>
+                              Je peux t'aider à trouver un emploi, un logement,
+                              un service ou une opportunité plus rapidement.
+                            </Text>
+                            <Pressable
+                              onPress={() => setQuery("emploi")}
+                              style={({ pressed }) => [
+                                styles.aiCardBtn,
+                                pressed && { opacity: 0.7 },
+                              ]}
+                            >
+                              <Text style={styles.aiCardBtnText}>
+                                Explorer les opportunités
+                              </Text>
+                              <ArrowUpRight size={11} color="#C4B5FD" />
+                            </Pressable>
+                          </View>
                         </View>
                       </View>
+                    </FadeUp>
+                  </View>
+                ) : null}
+
+                {/* No results */}
+                {showResults && results.length === 0 ? (
+                  <FadeUp>
+                    <View style={styles.noResultsWrap}>
+                      <LinearGradient
+                        colors={[
+                          "rgba(167,139,250,0.14)",
+                          "rgba(99,102,241,0.04)",
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.noResultsIcon}
+                      >
+                        <Search size={24} color="rgba(196,181,253,0.85)" />
+                      </LinearGradient>
+                      <Text style={styles.noResultsTitle}>
+                        Aucun résultat trouvé
+                      </Text>
+                      <Text style={styles.noResultsQuery} numberOfLines={1}>
+                        « {query.trim()} »
+                      </Text>
+                      <Text style={styles.noResultsSub}>
+                        Essaie un autre mot-clé ou explore les modules.
+                      </Text>
                     </View>
-                  </View>
-                )}
+                  </FadeUp>
+                ) : null}
 
-                {showResults && results.length === 0 && (
-                  <View
-                    className="flex flex-col items-center justify-center py-20 text-center"
-                  >
-                    <Text className="flex h-16 w-16 items-center justify-center rounded-3xl border border-white/[0.07] bg-white/[0.04]">
-                      <Search size={24} className="text-white/20" />
-                    </Text>
-                    <Text className="mt-5 text-sm font-medium text-white/50">
-                      Aucun résultat trouvé
-                    </Text>
-                    <Text className="mt-1 max-w-xs truncate text-sm font-semibold text-white">
-                      « {query.trim()} »
-                    </Text>
-                    <Text className="mt-3 text-xs text-white/25">
-                      Essaie un autre mot-clé ou explore les modules.
-                    </Text>
-                  </View>
-                )}
-
-                {showResults && results.length > 0 && (
-                  <View
-                    className="space-y-6 pb-6 pt-2"
-                  >
-                    <View className="flex items-center justify-between">
-                      <Text className="flex items-center gap-1.5 text-[11px] text-white/30">
-                        <Sparkles size={11} className="text-violet-400" />
-                        <Text className="font-semibold text-white/55">
+                {/* Results */}
+                {showResults && results.length > 0 ? (
+                  <View style={{ gap: 24, paddingTop: 8, paddingBottom: 24 }}>
+                    <View style={styles.summaryRow}>
+                      <View style={styles.summaryLeft}>
+                        <Sparkles size={11} color="#C4B5FD" />
+                        <Text style={styles.summaryCount}>
                           {results.length}
                         </Text>
-                        résultat{results.length > 1 ? "s" : ""}
-                      </Text>
-                      <Text className="text-[10px] text-white/20">
+                        <Text style={styles.summaryText}>
+                          résultat{results.length > 1 ? "s" : ""}
+                        </Text>
+                      </View>
+                      <Text style={styles.summaryCategories}>
                         {resultCategoryCount} catégorie
                         {resultCategoryCount > 1 ? "s" : ""}
                       </Text>
@@ -2160,137 +2534,669 @@ export default function SmartSearch({
 
                     {groupedEntries.map(([category, items]) => {
                       const color = CATEGORY_COLORS[category];
-
                       return (
                         <View key={category}>
-                          <View className="mb-2.5 flex items-center gap-2">
-                            <Text
-                              className="flex h-6 w-6 items-center justify-center rounded-lg"
-                              style={{ color, backgroundColor: `${color}18`, borderStyle: "solid" }}
+                          <View style={styles.groupHeader}>
+                            <View
+                              style={[
+                                styles.groupIcon,
+                                {
+                                  backgroundColor: `${color}22`,
+                                  borderColor: `${color}44`,
+                                },
+                              ]}
                             >
-                              {CATEGORY_ICONS[category]}
+                              {getCategoryIcon(category, 12)}
+                            </View>
+                            <Text style={[styles.groupTitle, { color }]}>
+                              {category.toUpperCase()}
                             </Text>
-                            <Text
-                              className="text-[10px] font-bold uppercase tracking-[0.14em]"
-                              style={{ color }}
-                            >
-                              {category}
-                            </Text>
-                            <Text className="ml-auto text-[10px] text-white/20">
+                            <Text style={styles.groupCount}>
                               {items.length}
                             </Text>
                           </View>
 
-                          {category === "Modules" ? (
-                            <View className="gap-1.5">
-                              {items.map((result, index) => (
-                                <ResultRow
-                                  key={result.id}
-                                  result={result}
-                                  index={index}
-                                  compact
-                                  onSelect={handleSelect}
-                                />
-                              ))}
-                            </View>
-                          ) : (
-                            <View className="space-y-1.5">
-                              {items.map((result, index) => (
-                                <ResultRow
-                                  key={result.id}
-                                  result={result}
-                                  index={index}
-                                  onSelect={handleSelect}
-                                />
-                              ))}
-                            </View>
-                          )}
+                          <View style={{ gap: 6 }}>
+                            {items.map((result, index) => (
+                              <ResultRow
+                                key={result.id}
+                                result={result}
+                                index={index}
+                                compact={category === "Modules"}
+                                onSelect={handleSelect}
+                              />
+                            ))}
+                          </View>
                         </View>
                       );
                     })}
                   </View>
-                )}
-              </View>
-            </View>
+                ) : null}
+              </ScrollView>
+            </Animated.View>
           </View>
-        )}
-      </>
+        </Modal>
+      ) : null}
     </>
   );
 }
 
-function SectionLabel({
-  icon,
-  children,
-}: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Text className="mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">
-      {icon}
-      {children}
-    </Text>
-  );
-}
+/* ============================================================
+ * STYLES
+ * ============================================================ */
 
-function ResultRow({
-  result,
-  index,
-  compact = false,
-  onSelect,
-}: {
-  result: SearchResult;
-  index: number;
-  compact?: boolean;
-  onSelect: (result: SearchResult) => void;
-}) {
-  const color = result.badgeColor ?? CATEGORY_COLORS[result.category];
+const styles = StyleSheet.create({
+  /* ── Trigger ────────────────────────────────────── */
+  triggerWrap: {
+    marginHorizontal: 20,
+    marginTop: 12,
+  },
+  trigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  triggerSearchIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  triggerTitle: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: -0.2,
+  },
+  triggerSub: {
+    marginTop: 3,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.3)",
+    fontWeight: "500",
+  },
+  triggerMic: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  advancedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 6,
+    marginTop: 6,
+  },
+  advancedBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(196,181,253,0.85)",
+    letterSpacing: 0.1,
+  },
+  advancedBtnDot: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.2)",
+  },
 
-  return (
-    <Pressable
-      onPress={() => onSelect(result)}
-      className={`group w-full cursor-pointer rounded-xl border border-white/[0.06] bg-white/[0.035] text-left transition-all hover:border-white/[0.13] hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70 ${compact ? "flex items-center gap-2.5 px-3 py-2.5" : "flex items-center gap-3 px-3.5 py-3"}`}
-    >
-      <Text
-        className={`${compact ? "h-8 w-8 rounded-lg" : "h-9 w-9 rounded-xl"} flex shrink-0 items-center justify-center`}
-        style={{ color, backgroundColor: `${color}18`, borderStyle: "solid" }}
-      >
-        {CATEGORY_ICONS[result.category]}
-      </Text>
+  /* ── Backdrop ───────────────────────────────────── */
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.85)",
+  },
 
-      <Text className="min-w-0 flex-1">
-        <Text className="block truncate text-sm font-semibold text-white/85">
-          {result.title}
-        </Text>
-        <Text className="mt-0.5 block truncate text-[11px] text-white/35">
-          {result.subtitle}
-        </Text>
-      </Text>
+  /* ── Panel ──────────────────────────────────────── */
+  panel: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#06061A",
+    overflow: "hidden",
+  },
+  ambientGlowTop: {
+    position: "absolute",
+    top: -140,
+    left: "15%",
+    right: "15%",
+    height: 260,
+    borderRadius: 9999,
+    backgroundColor: "rgba(124,58,237,0.22)",
+  },
+  ambientGlowRight: {
+    position: "absolute",
+    top: "35%",
+    right: -180,
+    width: 260,
+    height: 260,
+    borderRadius: 9999,
+    backgroundColor: "rgba(99,102,241,0.16)",
+  },
 
-      <Text className="flex shrink-0 flex-col items-end gap-1">
-        {result.meta && (
-          <Text className="max-w-[120px] truncate text-[10px] font-semibold text-white/45">
-            {result.meta}
-          </Text>
-        )}
-        {result.badge && (
-          <Text
-            className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
-            style={{ color, backgroundColor: `${color}18` }}
-          >
-            {result.badge === "En direct" && (
-              <Radio size={8} className="animate-pulse" />
-            )}
-            {result.badge}
-          </Text>
-        )}
-      </Text>
+  /* ── Header ─────────────────────────────────────── */
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+    maxWidth: 720,
+    width: "100%",
+    alignSelf: "center",
+  },
+  headerEyebrow: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 2,
+    color: "rgba(196,181,253,0.85)",
+  },
+  headerTitle: {
+    marginTop: 4,
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.5,
+  },
+  headerCloseBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
 
-      <ChevronRight
-        size={13}
-        className="shrink-0 text-white/15"
-      />
-    </Pressable>
-  );
-}
+  /* ── Search bar ─────────────────────────────────── */
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.35)",
+    maxWidth: 720,
+    width: "100%",
+    alignSelf: "center",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 6,
+    fontSize: 14,
+    color: "#fff",
+    fontWeight: "500",
+  },
+  searchClearBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  searchMicBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.4)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.5)",
+  },
+  searchMicBtnActive: {
+    backgroundColor: "rgba(239,68,68,0.25)",
+    borderColor: "rgba(248,113,113,0.5)",
+  },
+
+  /* ── Chips ──────────────────────────────────────── */
+  chipsRow: {
+    gap: 8,
+    paddingVertical: 10,
+    maxWidth: 720,
+    alignSelf: "center",
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.65)",
+    letterSpacing: 0.1,
+  },
+  chipCount: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "700",
+    marginLeft: 2,
+  },
+
+  /* ── Body ───────────────────────────────────────── */
+  bodyContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    maxWidth: 720,
+    width: "100%",
+    alignSelf: "center",
+  },
+
+  /* ── Section label ──────────────────────────────── */
+  sectionLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 12,
+  },
+  sectionLabelText: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 1.8,
+    color: "rgba(255,255,255,0.5)",
+  },
+
+  /* ── Quick grid ─────────────────────────────────── */
+  quickGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  quickGridItemWrap: {
+    flexBasis: "23%",
+    flexGrow: 1,
+    minWidth: 76,
+  },
+  quickModule: {
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+  quickModuleIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  quickModuleLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.7)",
+    textAlign: "center",
+    letterSpacing: 0.1,
+    minHeight: 26,
+  },
+  seeAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 8,
+  },
+  seeAllBtnText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "rgba(196,181,253,0.9)",
+    letterSpacing: 0.1,
+  },
+
+  /* ── History ────────────────────────────────────── */
+  historyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  historyClear: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(196,181,253,0.85)",
+    letterSpacing: 0.1,
+  },
+  historyCard: {
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  historyBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.04)",
+  },
+  historyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  historyRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+  },
+  historyText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.75)",
+    fontWeight: "500",
+  },
+  historyRemoveBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  /* ── Trending ───────────────────────────────────── */
+  trendingRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  trendingChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  trendingChipText: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.65)",
+    letterSpacing: 0.1,
+  },
+
+  /* ── AI card ────────────────────────────────────── */
+  aiCard: {
+    borderRadius: 20,
+    padding: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.28)",
+  },
+  aiCardBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  aiCardOrb: {
+    position: "absolute",
+    top: -60,
+    right: -60,
+    width: 160,
+    height: 160,
+    borderRadius: 9999,
+    backgroundColor: "rgba(139,92,246,0.22)",
+  },
+  aiCardRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  aiCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.4)",
+  },
+  aiCardEyebrow: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    color: "rgba(196,181,253,0.85)",
+  },
+  aiCardText: {
+    marginTop: 6,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "500",
+  },
+  aiCardBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  aiCardBtnText: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: "rgba(196,181,253,0.95)",
+    letterSpacing: 0.1,
+  },
+
+  /* ── No results ─────────────────────────────────── */
+  noResultsWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  noResultsIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.3)",
+    shadowColor: "#7C3AED",
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    marginBottom: 20,
+  },
+  noResultsTitle: {
+    fontSize: 14,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: -0.2,
+  },
+  noResultsQuery: {
+    marginTop: 6,
+    maxWidth: 260,
+    fontSize: 14,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
+  noResultsSub: {
+    marginTop: 10,
+    maxWidth: 260,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: "rgba(255,255,255,0.4)",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+
+  /* ── Results summary ────────────────────────────── */
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 8,
+  },
+  summaryLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  summaryCount: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.1,
+  },
+  summaryText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: 0.1,
+  },
+  summaryCategories: {
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.35)",
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
+
+  /* ── Group header ───────────────────────────────── */
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
+  groupIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  groupTitle: {
+    flex: 1,
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+  },
+  groupCount: {
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.35)",
+    fontWeight: "700",
+  },
+
+  /* ── Result row ─────────────────────────────────── */
+  resultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    overflow: "hidden",
+  },
+  resultRowCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 10,
+  },
+  resultIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  resultIconCompact: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  resultTitle: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.92)",
+    letterSpacing: -0.2,
+  },
+  resultSubtitle: {
+    marginTop: 3,
+    fontSize: 10.5,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "500",
+  },
+  resultMetaCol: {
+    alignItems: "flex-end",
+    gap: 4,
+    maxWidth: 120,
+  },
+  resultMeta: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.55)",
+  },
+  resultBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  resultBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+});

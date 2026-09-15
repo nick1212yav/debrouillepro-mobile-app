@@ -36,18 +36,13 @@ export function VoicePlayer({
 
   return (
     <View className="flex min-w-0 items-center gap-3">
-      <Pressable
-        onPress={() => {
+      <Pressable onPress={() => {
           void toggle();
-        }}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm text-white"
-        accessibilityLabel={isPlaying ? "Mettre en pause" : "Lire le message vocal"}
-      >
+        }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm text-white" accessibilityLabel={isPlaying ? "Mettre en pause" : "Lire le message vocal"}>
         {isPlaying ? "Ⅱ" : "▶"}
       </Pressable>
 
-      <Pressable
-        onPress={() => {
+      <Pressable onPress={() => {
           if (totalDuration <= 0) {
             return;
           }
@@ -55,10 +50,7 @@ export function VoicePlayer({
           const next = progress >= 0.95 ? 0 : currentTime + 5;
 
           seek(next);
-        }}
-        className="min-w-0 flex-1 text-left text-white"
-        accessibilityLabel="Avancer dans le message vocal"
-      >
+        }} className="min-w-0 flex-1 text-left text-white" accessibilityLabel="Avancer dans le message vocal">
         <VoiceWaveform progress={progress} active={isPlaying} />
       </Pressable>
 

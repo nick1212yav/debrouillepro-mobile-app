@@ -1,7 +1,6 @@
 import type { ActionConfig } from "@/core/sdk/types";
 import { api } from "@/convex/_generated/api";
 import { useMutation } from "convex/react";
-import { useRouter } from "expo-router";
 
 // ─── Actions SDK (pour le registre) ───────────────────────────────────────────
 export const annonceActions: ActionConfig[] = [
@@ -16,7 +15,7 @@ export const annonceActions: ActionConfig[] = [
       const navigate = ctx.navigate;
 
       if (navigate && entity?._id) {
-        router.push(`/annonce/${entity._id}`);
+        navigate(`/annonce/${entity._id}`);
       } else {
         console.warn(
           "Impossible de naviguer vers l'annonce : navigate ou entité manquant",

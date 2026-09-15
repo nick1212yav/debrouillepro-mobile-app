@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/sante/forms/ClinicForm.tsx
 import { useForm } from "react-hook-form";
@@ -73,177 +73,103 @@ export function ClinicForm({
 
   return (
     <Form {...form}>
-      <View
-       
-        className="space-y-4 text-left"
-      >
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
+      <View className="space-y-4 text-left"><FormField control={form.control} name="name" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Nom de la clinique *</Text></FormLabel>
+              <FormLabel>Nom de la clinique *</FormLabel>
               <FormControl>
                 <Input placeholder="Clinique du Centre" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone *</Text></FormLabel>
+              <FormLabel>Téléphone *</FormLabel>
               <FormControl>
                 <Input placeholder="+243 123 456 789" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="email" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Email</Text></FormLabel>
+              <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input placeholder="contact@clinique.com" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="address"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="address" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Adresse *</Text></FormLabel>
+              <FormLabel>Adresse *</FormLabel>
               <FormControl>
                 <Input placeholder="45 Avenue de la Paix" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="city"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="city" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Ville *</Text></FormLabel>
+              <FormLabel>Ville *</FormLabel>
               <FormControl>
                 <Input placeholder="Kinshasa" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="country"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="country" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Pays</Text></FormLabel>
+              <FormLabel>Pays</FormLabel>
               <FormControl>
                 <Input placeholder="RDC" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="hours"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="hours" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Horaires *</Text></FormLabel>
+              <FormLabel>Horaires *</FormLabel>
               <FormControl>
                 <Input placeholder="Lun-Ven 08:00 - 19:00" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="specialties"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="specialties" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Spécialités (séparées par des virgules) *</Text></FormLabel>
+              <FormLabel>Spécialités (séparées par des virgules) *</FormLabel>
               <FormControl>
                 <Input placeholder="Médecine Générale, Pédiatrie" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="open"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="open" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
               <View className="space-y-0.5">
-                <FormLabel><Text>Ouvert</Text></FormLabel>
+                <FormLabel>Ouvert</FormLabel>
               </View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="emergency"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="emergency" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
               <View className="space-y-0.5">
-                <FormLabel><Text>Urgences acceptées</Text></FormLabel>
+                <FormLabel>Urgences acceptées</FormLabel>
               </View>
               <FormControl>
                 <Switch
-                  checked={field.value}
+                  
                   onCheckedChange={field.onChange}
                 />
               </FormControl>
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="description" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Description</Text></FormLabel>
+              <FormLabel>Description</FormLabel>
               <FormControl>
                 <Textarea placeholder="Présentation..." {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Intégration du sélecteur d'images réutilisable [2] */}
-        <FormField
-          control={form.control}
-          name="images"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="images" render={({ field }) => (
             <FormItem>
               <FormControl>
                 <HealthImageSelector
@@ -255,14 +181,7 @@ export function ClinicForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Button className="w-full h-11" disabled={isLoading}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isLoading ? "Enregistrement..." : submitLabel}
-        </Button>
-      </View>
+          )} /><Button  className="w-full h-11" disabled={isLoading}>{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isLoading ? "Enregistrement..." : submitLabel}</Button></View>
     </Form>
   );
 }

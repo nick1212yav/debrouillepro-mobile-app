@@ -1,448 +1,1839 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { Picker } from "@react-native-picker/picker";
-import { View, Pressable, Text, TextInput } from "react-native";
-import { useState } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
 import {
-  ArrowLeft, Plus, DollarSign, TrendingUp, TrendingDown,
-  Utensils, Bed, Plane, Camera, ShoppingBag, AlertTriangle,
-  Check, X, ChevronDown, BarChart2, Globe, Wallet,
-  ArrowRightLeft, Coffee, Car,
-} from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { Id } from "@/convex/_generated/dataModel";
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-type Category = "transport" | "hebergement" | "repas" | "loisirs" | "shopping" | "autre";
+import { useMutation, useQuery } from "convex/react";
+
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  ArrowRightLeft,
+  Bed,
+  Car,
+  Check,
+  ChevronDown,
+  Coffee,
+  DollarSign,
+  Globe,
+  Plane,
+  Plus,
+  ShoppingBag,
+  Utensils,
+  Wallet,
+  X,
+} from "lucide-react-native";
+
+import { api } from "@/convex/_generated/api.js";
+import type { Id } from "@/convex/_generated/dataModel";
+import {
+  Authenticated,
+  AuthLoading,
+  Unauthenticated,
+} from "@/lib/convex-auth-compat";
+
+type Category =
+  | "transport"
+  | "hebergement"
+  | "repas"
+  | "loisirs"
+  | "shopping"
+  | "autre";
+
 type Currency = "EUR" | "USD" | "JPY" | "MAD" | "GBP" | "XOF";
 
-const CATEGORY_CONFIG: Record<Category, { label: string; icon: typeof Utensils; color: string; gradient: string }> = {
-  transport:   { label: "Transport",   icon: Plane,       color: "text-blue-400",   gradient: "from-blue-500 to-cyan-500"     },
-  hebergement: { label: "Hébergement", icon: Bed,         color: "text-purple-400", gradient: "from-purple-500 to-pink-500"   },
-  repas:       { label: "Repas",       icon: Utensils,    color: "text-orange-400", gradient: "from-orange-500 to-yellow-500" },
-  loisirs:     { label: "Loisirs",     icon: Camera,      color: "text-green-400",  gradient: "from-green-500 to-teal-500"    },
-  shopping:    { label: "Shopping",    icon: ShoppingBag, color: "text-pink-400",   gradient: "from-pink-500 to-rose-500"     },
-  autre:       { label: "Autre",       icon: Coffee,      color: "text-gray-400",   gradient: "from-gray-500 to-slate-500"    },
+type MainTab = "overview" | "compare" | "converter";
+
+type PlanTab = "overview" | "expenses";
+
+type Props = {
+  onBack: () => void;
 };
 
-const EXCHANGE_RATES: Record<Currency, number> = { EUR: 1, USD: 1.08, JPY: 163, MAD: 10.8, GBP: 0.86, XOF: 655 };
-const CURRENCY_SYMBOLS: Record<Currency, string> = { EUR: "€", USD: "$", JPY: "¥", MAD: "MAD", GBP: "£", XOF: "FCFA" };
+type CategoryConfig = {
+  label: string;
+  Icon: typeof Utensils;
+};
 
-const COST_OF_LIFE = [
-  { city: "Bangkok",   flag: "🇹🇭", daily: 45,  currency: "USD", level: "low"    as const, breakdown: { accommodation: 20, food: 12, transport: 5,  activities: 8  } },
-  { city: "Dakar",     flag: "🇸🇳", daily: 55,  currency: "USD", level: "low"    as const, breakdown: { accommodation: 25, food: 18, transport: 6,  activities: 6  } },
-  { city: "Marrakech", flag: "🇲🇦", daily: 65,  currency: "USD", level: "medium" as const, breakdown: { accommodation: 30, food: 20, transport: 5,  activities: 10 } },
-  { city: "Lisbonne",  flag: "🇵🇹", daily: 90,  currency: "USD", level: "medium" as const, breakdown: { accommodation: 50, food: 22, transport: 8,  activities: 10 } },
-  { city: "Tokyo",     flag: "🇯🇵", daily: 130, currency: "USD", level: "high"   as const, breakdown: { accommodation: 70, food: 35, transport: 15, activities: 10 } },
-  { city: "Paris",     flag: "🇫🇷", daily: 155, currency: "USD", level: "high"   as const, breakdown: { accommodation: 95, food: 35, transport: 12, activities: 13 } },
-];
+const CATEGORIES: Record<Category, CategoryConfig> = {
+  transport: {
+    label: "Transport",
+    Icon: Plane,
+  },
+  hebergement: {
+    label: "Hébergement",
+    Icon: Bed,
+  },
+  repas: {
+    label: "Repas",
+    Icon: Utensils,
+  },
+  loisirs: {
+    label: "Loisirs",
+    Icon: Coffee,
+  },
+  shopping: {
+    label: "Shopping",
+    Icon: ShoppingBag,
+  },
+  autre: {
+    label: "Autre",
+    Icon: Wallet,
+  },
+};
 
-function toEUR(amount: number, currency: Currency): number { return amount / EXCHANGE_RATES[currency]; }
-function formatCurrency(amount: number, currency: Currency): string {
-  const sym = CURRENCY_SYMBOLS[currency];
-  if (currency === "JPY" || currency === "XOF") return `${Math.round(amount).toLocaleString("fr-FR")} ${sym}`;
-  return `${sym}${amount.toFixed(2).replace(".", ",")}`;
+const CURRENCIES: Currency[] = ["EUR", "USD", "JPY", "MAD", "GBP", "XOF"];
+
+const CURRENCY_LABELS: Record<Currency, string> = {
+  EUR: "Euro",
+  USD: "Dollar US",
+  JPY: "Yen japonais",
+  MAD: "Dirham marocain",
+  GBP: "Livre sterling",
+  XOF: "Franc CFA",
+};
+
+const currencySymbol = (currency: Currency): string => {
+  switch (currency) {
+    case "EUR":
+      return "€";
+    case "USD":
+      return "$";
+    case "JPY":
+      return "¥";
+    case "GBP":
+      return "£";
+    case "MAD":
+      return "MAD";
+    case "XOF":
+      return "FCFA";
+    default:
+      return currency;
+  }
+};
+
+function isCurrency(value: unknown): value is Currency {
+  return (
+    value === "EUR" ||
+    value === "USD" ||
+    value === "JPY" ||
+    value === "MAD" ||
+    value === "GBP" ||
+    value === "XOF"
+  );
 }
 
-type Props = { onBack: () => void };
+function isCategory(value: unknown): value is Category {
+  return (
+    value === "transport" ||
+    value === "hebergement" ||
+    value === "repas" ||
+    value === "loisirs" ||
+    value === "shopping" ||
+    value === "autre"
+  );
+}
 
-function BudgetInner({ onBack }: Props) {
-  const [selectedPlanId, setSelectedPlanId] = useState<Id<"travelPlans"> | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "expenses" | "compare" | "converter">("overview");
-  const [showAdd, setShowAdd] = useState(false);
-  const [newLabel, setNewLabel] = useState("");
-  const [newAmount, setNewAmount] = useState("");
-  const [newCategory, setNewCategory] = useState<Category>("repas");
-  const [newCurrency, setNewCurrency] = useState<Currency>("EUR");
-  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
-  const [convertAmount, setConvertAmount] = useState("100");
-  const [fromCurrency, setFromCurrency] = useState<Currency>("EUR");
-  const [toCurrency, setToCurrency] = useState<Currency>("JPY");
+function formatMoney(
+  amount: number,
+  currency: Currency,
+  maximumFractionDigits = 2,
+): string {
+  if (!Number.isFinite(amount)) {
+    return `0 ${currencySymbol(currency)}`;
+  }
 
-  const plans = useQuery(api.travel.listMyTravelPlans, {});
-  const expenses = useQuery(api.travel.listTravelExpenses, selectedPlanId ? { planId: selectedPlanId } : "skip");
-  const addExpense = useMutation(api.travel.addTravelExpense);
+  const fractionDigits =
+    currency === "JPY" || currency === "XOF" ? 0 : maximumFractionDigits;
 
-  const selectedPlan = plans?.find(p => p._id === selectedPlanId) ?? null;
+  const formatted = new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: fractionDigits,
+  }).format(amount);
 
-  const handleAddExpense = async () => {
-    if (!selectedPlanId || !newLabel.trim() || !newAmount) return;
-    try {
-      await addExpense({
-        planId: selectedPlanId,
-        category: newCategory,
-        description: newLabel,
-        amount: parseFloat(newAmount),
-        currency: newCurrency,
-        date: new Date().toISOString().split("T")[0],
-      });
-      UIService.openToast("Dépense ajoutée !", "success");
-      setNewLabel(""); setNewAmount(""); setShowAdd(false);
-    } catch {
-      UIService.openToast("Erreur lors de l'ajout", "error");
-    }
-  };
+  return `${formatted} ${currencySymbol(currency)}`;
+}
 
-  const convertedAmount = (() => {
-    const num = parseFloat(convertAmount) || 0;
-    return (num / EXCHANGE_RATES[fromCurrency]) * EXCHANGE_RATES[toCurrency];
-  })();
+function formatDate(value: unknown): string {
+  if (typeof value !== "string" && typeof value !== "number") {
+    return "Date inconnue";
+  }
 
-  if (selectedPlan && selectedPlanId) {
-    const totalSpent = (expenses ?? []).reduce((a, e) => a + toEUR(e.amount, e.currency as Currency), 0);
-    const budget = selectedPlan.totalBudget ?? 0;
-    const remaining = budget - totalSpent;
-    const pct = budget > 0 ? Math.min(100, (totalSpent / budget) * 100) : 0;
-    const isOverBudget = budget > 0 && remaining < 0;
+  const date = new Date(value);
 
-    const spentByCategory: Record<Category, number> = { transport: 0, hebergement: 0, repas: 0, loisirs: 0, shopping: 0, autre: 0 };
-    for (const exp of (expenses ?? [])) {
-      const cat = (exp.category as Category) in spentByCategory ? (exp.category as Category) : "autre";
-      spentByCategory[cat] += toEUR(exp.amount, exp.currency as Currency);
-    }
+  if (Number.isNaN(date.getTime())) {
+    return "Date inconnue";
+  }
 
-    return (
-      <View className="h-full flex flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
-        <View className="flex items-center gap-3 px-4 pt-12 pb-3 flex-shrink-0">
-          <Pressable onPress={() => setSelectedPlanId(null)} className="p-2 rounded-xl bg-white/10"><ArrowLeft size={20} /></Pressable>
-          <View className="flex-1">
-            <Text className="text-lg font-bold">{selectedPlan.destination}</Text>
-            <Text className="text-xs text-gray-400">Budget voyage</Text>
-          </View>
-          <Pressable onPress={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-green-500 to-teal-500 rounded-xl text-sm font-semibold">
-            <Plus size={16} /> <Text>Dépense</Text></Pressable>
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function parseAmount(value: string): number | null {
+  const normalized = value.replace(",", ".").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function getPlanCurrency(plan: { currency?: string | null }): Currency | null {
+  return isCurrency(plan.currency) ? plan.currency : null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Primitive UI                                                               */
+/* -------------------------------------------------------------------------- */
+
+const GlassCard = memo(function GlassCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <View
+      className={`rounded-3xl border border-white/10 bg-white/[0.045] ${className}`}
+    >
+      {children}
+    </View>
+  );
+});
+
+const SectionTitle = memo(function SectionTitle({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <View className="mb-4">
+      <Text className="text-lg font-bold text-white">{title}</Text>
+
+      {subtitle ? (
+        <Text className="mt-1 text-xs leading-5 text-gray-400">{subtitle}</Text>
+      ) : null}
+    </View>
+  );
+});
+
+const EmptyState = memo(function EmptyState({
+  Icon,
+  title,
+  description,
+  action,
+}: {
+  Icon: typeof Wallet;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <View className="items-center rounded-3xl border border-white/10 bg-white/[0.035] px-6 py-12">
+      <View className="mb-4 h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+        <Icon size={28} color="rgba(255,255,255,0.45)" />
+      </View>
+
+      <Text className="text-center text-base font-semibold text-white">
+        {title}
+      </Text>
+
+      <Text className="mt-2 max-w-[320px] text-center text-sm leading-6 text-gray-400">
+        {description}
+      </Text>
+
+      {action ? <View className="mt-5">{action}</View> : null}
+    </View>
+  );
+});
+
+const LoadingState = memo(function LoadingState() {
+  return (
+    <View className="items-center justify-center px-6 py-16">
+      <ActivityIndicator size="small" color="#60A5FA" />
+
+      <Text className="mt-4 text-sm text-gray-400">
+        Chargement de vos données…
+      </Text>
+    </View>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Header                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const PageHeader = memo(function PageHeader({
+  title,
+  subtitle,
+  onBack,
+  right,
+}: {
+  title: string;
+  subtitle: string;
+  onBack: () => void;
+  right?: React.ReactNode;
+}) {
+  return (
+    <View className="flex-row items-center gap-3 px-4 pb-4 pt-12">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Retour"
+        onPress={onBack}
+        className="h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06]"
+      >
+        <ArrowLeft size={20} color="#FFFFFF" />
+      </Pressable>
+
+      <View className="min-w-0 flex-1">
+        <Text
+          numberOfLines={1}
+          className="text-xl font-bold tracking-tight text-white"
+        >
+          {title}
+        </Text>
+
+        <Text numberOfLines={1} className="mt-0.5 text-xs text-gray-400">
+          {subtitle}
+        </Text>
+      </View>
+
+      {right}
+    </View>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Main tabs                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const MainTabs = memo(function MainTabs({
+  activeTab,
+  onChange,
+}: {
+  activeTab: MainTab;
+  onChange: (tab: MainTab) => void;
+}) {
+  const tabs: Array<{
+    key: MainTab;
+    label: string;
+    Icon: typeof Wallet;
+  }> = [
+    {
+      key: "overview",
+      label: "Mes voyages",
+      Icon: Wallet,
+    },
+    {
+      key: "compare",
+      label: "Analyse",
+      Icon: Globe,
+    },
+    {
+      key: "converter",
+      label: "Devises",
+      Icon: ArrowRightLeft,
+    },
+  ];
+
+  return (
+    <View className="mx-4 mb-4 flex-row rounded-2xl border border-white/10 bg-white/[0.035] p-1">
+      {tabs.map((tab) => {
+        const selected = activeTab === tab.key;
+
+        return (
+          <Pressable
+            key={tab.key}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            onPress={() => onChange(tab.key)}
+            className={`min-h-[44px] flex-1 flex-row items-center justify-center gap-1.5 rounded-xl px-2 ${
+              selected ? "bg-white/[0.10]" : ""
+            }`}
+          >
+            <tab.Icon size={15} color={selected ? "#FFFFFF" : "#8B93A7"} />
+
+            <Text
+              className={`text-xs font-semibold ${
+                selected ? "text-white" : "text-gray-400"
+              }`}
+              numberOfLines={1}
+            >
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+});
+
+const PlanTabs = memo(function PlanTabs({
+  activeTab,
+  onChange,
+}: {
+  activeTab: PlanTab;
+  onChange: (tab: PlanTab) => void;
+}) {
+  const tabs: Array<{
+    key: PlanTab;
+    label: string;
+  }> = [
+    {
+      key: "overview",
+      label: "Catégories",
+    },
+    {
+      key: "expenses",
+      label: "Dépenses",
+    },
+  ];
+
+  return (
+    <View className="mx-4 mb-4 flex-row rounded-2xl border border-white/10 bg-white/[0.035] p-1">
+      {tabs.map((tab) => {
+        const selected = activeTab === tab.key;
+
+        return (
+          <Pressable
+            key={tab.key}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            onPress={() => onChange(tab.key)}
+            className={`min-h-[44px] flex-1 items-center justify-center rounded-xl ${
+              selected ? "bg-white/[0.10]" : ""
+            }`}
+          >
+            <Text
+              className={`text-xs font-semibold ${
+                selected ? "text-white" : "text-gray-400"
+              }`}
+            >
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Travel plan card                                                           */
+/* -------------------------------------------------------------------------- */
+
+const TravelPlanCard = memo(function TravelPlanCard({
+  plan,
+  onPress,
+}: {
+  plan: any;
+  onPress: () => void;
+}) {
+  const currency = getPlanCurrency(plan);
+  const budget = typeof plan.totalBudget === "number" ? plan.totalBudget : null;
+  const spent = typeof plan.expensesTotal === "number" ? plan.expensesTotal : 0;
+
+  const progress =
+    budget !== null && budget > 0
+      ? Math.min(1, Math.max(0, spent / budget))
+      : 0;
+
+  const overBudget = budget !== null && spent > budget;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Ouvrir le budget ${plan.destination}`}
+      onPress={onPress}
+      className="mb-3 rounded-3xl border border-white/10 bg-white/[0.045] p-4 active:bg-white/[0.08]"
+    >
+      <View className="flex-row items-center gap-3">
+        <View className="h-12 w-12 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/10">
+          <Globe size={21} color="#60A5FA" />
         </View>
 
-        {budget > 0 && (
-          <View className="mx-4 mb-3 bg-white/5 rounded-2xl p-4 border border-white/10 flex-shrink-0">
-            <View className="flex items-end justify-between mb-3">
-              <View>
-                <Text className="text-xs text-gray-400 mb-1">Dépensé</Text>
-                <Text className="text-3xl font-bold">{formatCurrency(totalSpent, (selectedPlan.currency as Currency) ?? "EUR")}</Text>
-              </View>
-              <View className="text-right">
-                <Text className="text-xs text-gray-400 mb-1">{isOverBudget ? "Dépassement" : "Restant"}</Text>
-                <Text className={`text-xl font-bold ${isOverBudget ? "text-red-400" : "text-green-400"}`}>
-                  {isOverBudget ? "+" : ""}{formatCurrency(Math.abs(remaining), (selectedPlan.currency as Currency) ?? "EUR")}
+        <View className="min-w-0 flex-1">
+          <Text numberOfLines={1} className="text-base font-bold text-white">
+            {plan.destination}
+          </Text>
+
+          <Text numberOfLines={1} className="mt-1 text-xs text-gray-400">
+            {currency
+              ? formatMoney(spent, currency, 0)
+              : "Devise du voyage indisponible"}
+            {budget !== null && currency
+              ? ` / ${formatMoney(budget, currency, 0)}`
+              : ""}
+          </Text>
+        </View>
+
+        <ArrowRight size={18} color="#667085" />
+      </View>
+
+      {budget !== null && budget > 0 ? (
+        <View className="mt-4">
+          <View className="h-2 overflow-hidden rounded-full bg-white/10">
+            <View
+              className={`h-full rounded-full ${
+                overBudget
+                  ? "bg-red-500"
+                  : progress > 0.8
+                    ? "bg-amber-500"
+                    : "bg-emerald-500"
+              }`}
+              style={{
+                width: `${Math.min(100, progress * 100)}%`,
+              }}
+            />
+          </View>
+
+          <View className="mt-2 flex-row items-center justify-between">
+            <Text className="text-[11px] text-gray-500">
+              {Math.round(progress * 100)} % utilisé
+            </Text>
+
+            {overBudget ? (
+              <View className="flex-row items-center gap-1">
+                <AlertTriangle size={12} color="#F87171" />
+
+                <Text className="text-[11px] font-semibold text-red-400">
+                  Budget dépassé
                 </Text>
               </View>
-            </View>
-            <View className="h-3 bg-white/10 rounded-full overflow-hidden">
-              <View className={`h-full rounded-full ${isOverBudget ? "bg-red-500" : pct > 80 ? "bg-orange-500" : "bg-gradient-to-r from-green-500 to-teal-500"}`} />
-            </View>
-            <View className="flex justify-between mt-1">
-              <Text className="text-xs text-gray-500">0</Text>
-              <Text className="text-xs text-gray-400">{Math.round(pct)}% utilisé</Text>
-              <Text className="text-xs text-gray-500">{formatCurrency(budget, (selectedPlan.currency as Currency) ?? "EUR")}</Text>
-            </View>
-            {isOverBudget && <View className="flex items-center gap-2 mt-3 p-2 bg-red-500/20 border border-red-500/40 rounded-xl text-xs text-red-300"><AlertTriangle size={14} /> <Text>Budget dépassé</Text></View>}
+            ) : null}
           </View>
-        )}
+        </View>
+      ) : null}
+    </Pressable>
+  );
+});
 
-        <View className="flex bg-gray-900/60 mx-4 rounded-xl p-1 mb-3 flex-shrink-0">
-          {([{ key: "expenses", label: "Dépenses" }, { key: "overview", label: "Catégories" }] as const).map(t => (
-            <Pressable key={t.key} onPress={() => setActiveTab(t.key)}
-              className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeTab === t.key ? "bg-white/15 text-white" : "text-gray-400"}`}>
-              {t.label}
-            </Pressable>
-          ))}
+/* -------------------------------------------------------------------------- */
+/* Category analysis                                                          */
+/* -------------------------------------------------------------------------- */
+
+const CategoryRow = memo(function CategoryRow({
+  category,
+  amount,
+  currency,
+  total,
+}: {
+  category: Category;
+  amount: number;
+  currency: Currency | null;
+  total: number;
+}) {
+  const config = CATEGORIES[category];
+  const Icon = config.Icon;
+
+  const percentage =
+    total > 0 ? Math.min(100, Math.max(0, (amount / total) * 100)) : 0;
+
+  return (
+    <View className="mb-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+      <View className="flex-row items-center gap-3">
+        <View className="h-10 w-10 items-center justify-center rounded-xl bg-white/[0.07]">
+          <Icon size={17} color="#CBD5E1" />
         </View>
 
-        <View className="flex-1 overflow-y-auto px-4 pb-8 space-y-3">
-          {activeTab === "overview" && (
-            <>
-              {(Object.keys(CATEGORY_CONFIG) as Category[]).map((cat, i) => {
-                const cfg = CATEGORY_CONFIG[cat];
-                const spent = spentByCategory[cat];
-                return (
-                  <View key={cat}
-                    className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                    <View className="flex items-center gap-3 mb-2">
-                      <View className={`p-2 rounded-xl bg-gradient-to-br ${cfg.gradient} bg-opacity-20`}><cfg.icon size={16} className="text-white" /></View>
-                      <View className="flex-1">
-                        <View className="flex items-center justify-between">
-                          <Text className="text-sm font-semibold">{cfg.label}</Text>
-                          <Text className={`text-xs font-bold ${cfg.color}`}>{formatCurrency(spent, "EUR")}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </>
-          )}
+        <View className="min-w-0 flex-1">
+          <View className="flex-row items-center justify-between gap-3">
+            <Text className="text-sm font-semibold text-white">
+              {config.label}
+            </Text>
 
-          {activeTab === "expenses" && (
-            <>
-              {!expenses && <View className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</View>}
-              {expenses?.length === 0 && (
-                <View className="flex flex-col items-center justify-center py-16 text-gray-500">
-                  <Wallet size={40} className="mb-3 opacity-40" />
-                  <Text className="text-sm">Aucune dépense enregistrée</Text>
-                </View>
-              )}
-              {expenses?.map((exp, i) => {
-                const cat = (exp.category as Category) in CATEGORY_CONFIG ? (exp.category as Category) : "autre";
-                const cfg = CATEGORY_CONFIG[cat];
-                return (
-                  <View key={exp._id}
-                    className="flex items-center gap-3 bg-white/5 rounded-xl p-3 border border-white/10">
-                    <View className={`p-2.5 rounded-xl bg-gradient-to-br ${cfg.gradient} opacity-80`}><cfg.icon size={15} className="text-white" /></View>
-                    <View className="flex-1 min-w-0">
-                      <Text className="text-sm font-medium truncate">{exp.description}</Text>
-                      <Text className="text-xs text-gray-400">{cfg.label} · {new Date(exp.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}</Text>
-                    </View>
-                    <View className="text-right flex-shrink-0">
-                      <Text className="text-sm font-bold">{formatCurrency(exp.amount, exp.currency as Currency)}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </>
-          )}
+            <Text className="text-sm font-bold text-white">
+              {currency ? formatMoney(amount, currency) : "—"}
+            </Text>
+          </View>
+
+          <View className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <View
+              className="h-full rounded-full bg-blue-500"
+              style={{ width: `${percentage}%` }}
+            />
+          </View>
+
+          <Text className="mt-1.5 text-[11px] text-gray-500">
+            {Math.round(percentage)} % des dépenses compatibles
+          </Text>
         </View>
-
-        <>
-          {showAdd && (
-            <Pressable
-              className="absolute inset-0 bg-black/70 flex items-end z-50" onPress={() => setShowAdd(false)}>
-              <Pressable
-                onPress={e => e.stopPropagation()} className="w-full bg-gray-900 rounded-t-3xl p-6 pb-10 space-y-4">
-                <View className="w-12 h-1 bg-white/20 rounded-full mx-auto" />
-                <View className="flex items-center justify-between">
-                  <Text className="text-lg font-bold">Nouvelle dépense</Text>
-                  <Pressable onPress={() => setShowAdd(false)} className="p-2 rounded-xl bg-white/10"><X size={16} /></Pressable>
-                </View>
-                <TextInput value={newLabel} onChangeText={text => setNewLabel(text)}
-                  className="w-full bg-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 outline-none text-sm" placeholder="Description (ex: Dîner restaurant)" />
-                <View className="flex gap-3">
-                  <TextInput value={newAmount} onChangeText={text => setNewAmount(text)}
-                    className="flex-1 bg-white/10 rounded-xl px-4 py-3 text-white placeholder-white/40 outline-none text-sm" placeholder="Montant"  keyboardType="numeric"/>
-                  <Pressable onPress={() => setShowCurrencyPicker(p => !p)}
-                    className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-3 text-sm font-medium">
-                    {newCurrency} <ChevronDown size={14} />
-                  </Pressable>
-                </View>
-                <AnimatePresence>
-                  {showCurrencyPicker && (
-                    <View className="gap-2">
-                      {(Object.keys(CURRENCY_SYMBOLS) as Currency[]).map(c => (
-                        <Pressable key={c} onPress={() => { setNewCurrency(c); setShowCurrencyPicker(false); }}
-                          className={`py-2 rounded-xl text-xs font-medium cursor-pointer transition-all ${newCurrency === c ? "bg-blue-500/30 border border-blue-500/50 text-blue-300" : "bg-white/10 hover:bg-white/20"}`}>
-                          {c} {CURRENCY_SYMBOLS[c]}
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                </AnimatePresence>
-                <View>
-                  <Text className="text-xs text-gray-400 mb-2">Catégorie</Text>
-                  <View className="gap-2">
-                    {(Object.keys(CATEGORY_CONFIG) as Category[]).map(cat => {
-                      const cfg = CATEGORY_CONFIG[cat];
-                      const sel = newCategory === cat;
-                      return (
-                        <Pressable key={cat} onPress={() => setNewCategory(cat)}
-                          className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs transition-all cursor-pointer ${sel ? `bg-gradient-to-br ${cfg.gradient} bg-opacity-20 border-white/30 text-white` : "bg-white/5 border-white/10 text-gray-400"}`}>
-                          <cfg.icon size={16} />{cfg.label}{sel && <Check size={10} />}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-                <Pressable onPress={handleAddExpense} disabled={!newLabel.trim() || !newAmount}
-                  className="w-full py-3 bg-gradient-to-r from-green-500 to-teal-500 rounded-xl font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
-                  <Text>Enregistrer la dépense</Text></Pressable>
-              </Pressable>
-            </Pressable>
-          )}
-        </>
       </View>
+    </View>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Expense row                                                                */
+/* -------------------------------------------------------------------------- */
+
+const ExpenseRow = memo(function ExpenseRow({ expense }: { expense: any }) {
+  const category: Category = isCategory(expense.category)
+    ? expense.category
+    : "autre";
+
+  const config = CATEGORIES[category];
+  const Icon = config.Icon;
+
+  const currency = isCurrency(expense.currency) ? expense.currency : null;
+
+  return (
+    <View className="mb-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+      <View className="flex-row items-center gap-3">
+        <View className="h-11 w-11 items-center justify-center rounded-xl bg-white/[0.07]">
+          <Icon size={17} color="#CBD5E1" />
+        </View>
+
+        <View className="min-w-0 flex-1">
+          <Text numberOfLines={1} className="text-sm font-semibold text-white">
+            {expense.description || "Dépense sans description"}
+          </Text>
+
+          <Text numberOfLines={1} className="mt-1 text-xs text-gray-500">
+            {config.label} · {formatDate(expense.date)}
+          </Text>
+        </View>
+
+        <Text className="text-sm font-bold text-white">
+          {currency ? formatMoney(Number(expense.amount) || 0, currency) : "—"}
+        </Text>
+      </View>
+    </View>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Currency picker                                                            */
+/* -------------------------------------------------------------------------- */
+
+const CurrencyPicker = memo(function CurrencyPicker({
+  visible,
+  selected,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  selected: Currency;
+  onSelect: (currency: Currency) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable className="flex-1 justify-end bg-black/70" onPress={onClose}>
+        <Pressable
+          className="rounded-t-[32px] border-t border-white/10 bg-[#0B1020] px-5 pb-10 pt-5"
+          onPress={(event) => event.stopPropagation()}
+        >
+          <View className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-white/20" />
+
+          <View className="mb-5 flex-row items-center justify-between">
+            <View>
+              <Text className="text-lg font-bold text-white">
+                Choisir une devise
+              </Text>
+
+              <Text className="mt-1 text-xs text-gray-500">
+                Devise enregistrée avec la dépense
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={onClose}
+              className="h-10 w-10 items-center justify-center rounded-xl bg-white/10"
+            >
+              <X size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <View className="gap-2">
+            {CURRENCIES.map((currency) => {
+              const selectedCurrency = currency === selected;
+
+              return (
+                <Pressable
+                  key={currency}
+                  onPress={() => {
+                    onSelect(currency);
+                    onClose();
+                  }}
+                  className={`flex-row items-center rounded-2xl border px-4 py-3.5 ${
+                    selectedCurrency
+                      ? "border-blue-500/50 bg-blue-500/10"
+                      : "border-white/10 bg-white/[0.04]"
+                  }`}
+                >
+                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-white/5">
+                    <Text className="text-sm font-bold text-white">
+                      {currencySymbol(currency)}
+                    </Text>
+                  </View>
+
+                  <View className="ml-3 flex-1">
+                    <Text className="text-sm font-semibold text-white">
+                      {currency}
+                    </Text>
+
+                    <Text className="mt-0.5 text-xs text-gray-500">
+                      {CURRENCY_LABELS[currency]}
+                    </Text>
+                  </View>
+
+                  {selectedCurrency ? (
+                    <Check size={18} color="#60A5FA" />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Add expense modal                                                          */
+/* -------------------------------------------------------------------------- */
+
+const AddExpenseModal = memo(function AddExpenseModal({
+  visible,
+  onClose,
+  label,
+  amount,
+  category,
+  currency,
+  currencyPickerVisible,
+  submitting,
+  onLabelChange,
+  onAmountChange,
+  onCategoryChange,
+  onCurrencyPicker,
+  onSubmit,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  label: string;
+  amount: string;
+  category: Category;
+  currency: Currency;
+  currencyPickerVisible: boolean;
+  submitting: boolean;
+  onLabelChange: (value: string) => void;
+  onAmountChange: (value: string) => void;
+  onCategoryChange: (category: Category) => void;
+  onCurrencyPicker: () => void;
+  onSubmit: () => void;
+}) {
+  const amountValid = parseAmount(amount) !== null;
+  const labelValid = label.trim().length > 0;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View className="flex-1 justify-end bg-black/70">
+        <View className="max-h-[92%] rounded-t-[32px] border-t border-white/10 bg-[#0B1020] px-5 pb-8 pt-5">
+          <View className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-white/20" />
+
+          <View className="mb-5 flex-row items-center justify-between">
+            <View>
+              <Text className="text-xl font-bold text-white">
+                Nouvelle dépense
+              </Text>
+
+              <Text className="mt-1 text-xs text-gray-500">
+                Ajoutez uniquement une dépense réelle.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={onClose}
+              disabled={submitting}
+              className="h-10 w-10 items-center justify-center rounded-xl bg-white/10"
+            >
+              <X size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text className="mb-2 text-xs font-semibold text-gray-400">
+              Description
+            </Text>
+
+            <TextInput
+              value={label}
+              onChangeText={onLabelChange}
+              editable={!submitting}
+              placeholder="Ex. dîner, taxi, hôtel…"
+              placeholderTextColor="#667085"
+              className="mb-4 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-4 text-sm text-white"
+            />
+
+            <Text className="mb-2 text-xs font-semibold text-gray-400">
+              Montant
+            </Text>
+
+            <View className="mb-4 flex-row gap-3">
+              <TextInput
+                value={amount}
+                onChangeText={onAmountChange}
+                editable={!submitting}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor="#667085"
+                className="flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-4 text-base font-bold text-white"
+              />
+
+              <Pressable
+                onPress={onCurrencyPicker}
+                disabled={submitting}
+                className="min-w-[100px] flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-4"
+              >
+                <Text className="text-sm font-bold text-white">{currency}</Text>
+
+                <ChevronDown size={15} color="#94A3B8" />
+              </Pressable>
+            </View>
+
+            <Text className="mb-3 text-xs font-semibold text-gray-400">
+              Catégorie
+            </Text>
+
+            <View className="mb-6 flex-row flex-wrap gap-2">
+              {(Object.keys(CATEGORIES) as Category[]).map((item) => {
+                const config = CATEGORIES[item];
+                const Icon = config.Icon;
+                const selected = category === item;
+
+                return (
+                  <Pressable
+                    key={item}
+                    onPress={() => onCategoryChange(item)}
+                    disabled={submitting}
+                    className={`w-[31%] min-h-[76px] items-center justify-center rounded-2xl border px-2 ${
+                      selected
+                        ? "border-blue-500/50 bg-blue-500/10"
+                        : "border-white/10 bg-white/[0.035]"
+                    }`}
+                  >
+                    <Icon size={18} color={selected ? "#60A5FA" : "#94A3B8"} />
+
+                    <Text
+                      numberOfLines={1}
+                      className={`mt-2 text-[11px] font-semibold ${
+                        selected ? "text-blue-300" : "text-gray-400"
+                      }`}
+                    >
+                      {config.label}
+                    </Text>
+
+                    {selected ? (
+                      <View className="absolute right-2 top-2">
+                        <Check size={11} color="#60A5FA" />
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={!labelValid || !amountValid || submitting}
+              onPress={onSubmit}
+              className={`min-h-[54px] flex-row items-center justify-center gap-2 rounded-2xl ${
+                labelValid && amountValid && !submitting
+                  ? "bg-blue-600"
+                  : "bg-white/10"
+              }`}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Plus size={18} color="#FFFFFF" />
+              )}
+
+              <Text className="text-sm font-bold text-white">
+                {submitting ? "Enregistrement…" : "Enregistrer la dépense"}
+              </Text>
+            </Pressable>
+          </ScrollView>
+
+          <CurrencyPicker
+            visible={currencyPickerVisible}
+            selected={currency}
+            onSelect={() => undefined}
+            onClose={() => undefined}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Add expense modal - controlled picker version                              */
+/* -------------------------------------------------------------------------- */
+
+function AddExpenseSheet({
+  visible,
+  onClose,
+  label,
+  amount,
+  category,
+  currency,
+  pickerVisible,
+  submitting,
+  onLabelChange,
+  onAmountChange,
+  onCategoryChange,
+  onOpenPicker,
+  onClosePicker,
+  onCurrencyChange,
+  onSubmit,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  label: string;
+  amount: string;
+  category: Category;
+  currency: Currency;
+  pickerVisible: boolean;
+  submitting: boolean;
+  onLabelChange: (value: string) => void;
+  onAmountChange: (value: string) => void;
+  onCategoryChange: (value: Category) => void;
+  onOpenPicker: () => void;
+  onClosePicker: () => void;
+  onCurrencyChange: (value: Currency) => void;
+  onSubmit: () => void;
+}) {
+  const amountValid = parseAmount(amount) !== null;
+  const labelValid = label.trim().length > 0;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View className="flex-1 justify-end bg-black/70">
+        <View className="max-h-[92%] rounded-t-[32px] border-t border-white/10 bg-[#0B1020] px-5 pb-8 pt-5">
+          <View className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-white/20" />
+
+          <View className="mb-5 flex-row items-center justify-between">
+            <View className="flex-1">
+              <Text className="text-xl font-bold text-white">
+                Nouvelle dépense
+              </Text>
+
+              <Text className="mt-1 text-xs text-gray-500">
+                Enregistrée directement dans votre voyage.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={onClose}
+              disabled={submitting}
+              className="h-10 w-10 items-center justify-center rounded-xl bg-white/10"
+            >
+              <X size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text className="mb-2 text-xs font-semibold text-gray-400">
+              Description
+            </Text>
+
+            <TextInput
+              value={label}
+              onChangeText={onLabelChange}
+              editable={!submitting}
+              placeholder="Ex. dîner, taxi, hôtel…"
+              placeholderTextColor="#667085"
+              className="mb-4 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-4 text-sm text-white"
+            />
+
+            <Text className="mb-2 text-xs font-semibold text-gray-400">
+              Montant
+            </Text>
+
+            <View className="mb-5 flex-row gap-3">
+              <TextInput
+                value={amount}
+                onChangeText={onAmountChange}
+                editable={!submitting}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor="#667085"
+                className="flex-1 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-4 text-base font-bold text-white"
+              />
+
+              <Pressable
+                onPress={onOpenPicker}
+                disabled={submitting}
+                className="min-w-[100px] flex-row items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-4"
+              >
+                <Text className="text-sm font-bold text-white">{currency}</Text>
+
+                <ChevronDown size={15} color="#94A3B8" />
+              </Pressable>
+            </View>
+
+            <Text className="mb-3 text-xs font-semibold text-gray-400">
+              Catégorie
+            </Text>
+
+            <View className="mb-6 flex-row flex-wrap gap-2">
+              {(Object.keys(CATEGORIES) as Category[]).map((item) => {
+                const config = CATEGORIES[item];
+                const Icon = config.Icon;
+                const selected = category === item;
+
+                return (
+                  <Pressable
+                    key={item}
+                    onPress={() => onCategoryChange(item)}
+                    disabled={submitting}
+                    className={`w-[31%] min-h-[76px] items-center justify-center rounded-2xl border px-2 ${
+                      selected
+                        ? "border-blue-500/50 bg-blue-500/10"
+                        : "border-white/10 bg-white/[0.035]"
+                    }`}
+                  >
+                    <Icon size={18} color={selected ? "#60A5FA" : "#94A3B8"} />
+
+                    <Text
+                      numberOfLines={1}
+                      className={`mt-2 text-[11px] font-semibold ${
+                        selected ? "text-blue-300" : "text-gray-400"
+                      }`}
+                    >
+                      {config.label}
+                    </Text>
+
+                    {selected ? (
+                      <View className="absolute right-2 top-2">
+                        <Check size={11} color="#60A5FA" />
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable
+              disabled={!labelValid || !amountValid || submitting}
+              onPress={onSubmit}
+              className={`min-h-[54px] flex-row items-center justify-center gap-2 rounded-2xl ${
+                labelValid && amountValid && !submitting
+                  ? "bg-blue-600"
+                  : "bg-white/10"
+              }`}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Plus size={18} color="#FFFFFF" />
+              )}
+
+              <Text className="text-sm font-bold text-white">
+                {submitting ? "Enregistrement…" : "Enregistrer la dépense"}
+              </Text>
+            </Pressable>
+          </ScrollView>
+
+          <CurrencyPicker
+            visible={pickerVisible}
+            selected={currency}
+            onSelect={onCurrencyChange}
+            onClose={onClosePicker}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Converter                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const ConverterUnavailable = memo(function ConverterUnavailable() {
+  return (
+    <EmptyState
+      Icon={ArrowRightLeft}
+      title="Conversion en temps réel"
+      description="Aucun taux de change temps réel n'est fourni par le backend actuellement. Aucun taux fictif n'est affiché."
+    />
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Analysis                                                                   */
+/* -------------------------------------------------------------------------- */
+
+const AnalysisView = memo(function AnalysisView({
+  plans,
+}: {
+  plans: any[] | undefined;
+}) {
+  if (!plans) {
+    return <LoadingState />;
+  }
+
+  if (plans.length === 0) {
+    return (
+      <EmptyState
+        Icon={Globe}
+        title="Aucune donnée d'analyse"
+        description="Créez d'abord un voyage pour commencer à analyser vos dépenses."
+      />
     );
   }
 
-  // Main view — list of travel budgets
+  const plansWithBudget = plans.filter(
+    (plan) => typeof plan.totalBudget === "number" && plan.totalBudget > 0,
+  );
+
+  const totalBudget = plansWithBudget.reduce(
+    (sum, plan) => sum + Number(plan.totalBudget || 0),
+    0,
+  );
+
+  const totalSpent = plans.reduce(
+    (sum, plan) => sum + Number(plan.expensesTotal || 0),
+    0,
+  );
+
   return (
-    <View className="h-full flex flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-hidden">
-      <View className="flex items-center gap-3 px-4 pt-12 pb-3 flex-shrink-0">
-        <Pressable onPress={onBack} className="p-2 rounded-xl bg-white/10"><ArrowLeft size={20} /></Pressable>
-        <View className="flex-1">
-          <Text className="text-xl font-bold">Budget Voyage</Text>
-          <Text className="text-xs text-gray-400">{plans?.length ?? 0} voyages suivis</Text>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{
+        paddingHorizontal: 16,
+        paddingBottom: 40,
+      }}
+    >
+      <SectionTitle
+        title="Analyse de vos voyages"
+        subtitle="Synthèse basée uniquement sur les données enregistrées."
+      />
+
+      <View className="mb-4 flex-row gap-3">
+        <GlassCard className="flex-1 p-4">
+          <Text className="text-xs text-gray-500">Voyages</Text>
+
+          <Text className="mt-2 text-2xl font-bold text-white">
+            {plans.length}
+          </Text>
+        </GlassCard>
+
+        <GlassCard className="flex-1 p-4">
+          <Text className="text-xs text-gray-500">Dépenses enregistrées</Text>
+
+          <Text className="mt-2 text-2xl font-bold text-white">
+            {totalSpent.toLocaleString("fr-FR")}
+          </Text>
+
+          <Text className="mt-1 text-[10px] text-gray-500">
+            Somme brute des montants enregistrés
+          </Text>
+        </GlassCard>
+      </View>
+
+      <GlassCard className="mb-4 p-5">
+        <View className="flex-row items-center gap-3">
+          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-500/10">
+            <DollarSign size={20} color="#60A5FA" />
+          </View>
+
+          <View className="flex-1">
+            <Text className="text-base font-bold text-white">
+              Budgets renseignés
+            </Text>
+
+            <Text className="mt-1 text-xs leading-5 text-gray-500">
+              Les devises ne sont pas mélangées artificiellement.
+            </Text>
+          </View>
         </View>
-      </View>
 
-      <View className="flex bg-gray-900/60 mx-4 rounded-xl p-1 mb-3 flex-shrink-0">
-        {([
-          { key: "overview", label: "Mes Voyages", icon: Wallet },
-          { key: "compare",  label: "Coût de vie", icon: Globe  },
-          { key: "converter", label: "Convertisseur", icon: ArrowRightLeft },
-        ] as const).map(t => (
-          <Pressable key={t.key} onPress={() => setActiveTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${activeTab === t.key ? "bg-white/15 text-white" : "text-gray-400"}`}>
-            <t.icon size={12} /> {t.label}
+        <View className="mt-5 flex-row items-end justify-between">
+          <View>
+            <Text className="text-xs text-gray-500">Budget cumulé</Text>
+
+            <Text className="mt-1 text-2xl font-bold text-white">
+              {totalBudget.toLocaleString("fr-FR")}
+            </Text>
+          </View>
+
+          <Text className="text-xs text-gray-500">
+            {plansWithBudget.length} budget(s)
+          </Text>
+        </View>
+      </GlassCard>
+
+      <Text className="mb-3 text-sm font-bold text-white">Vos voyages</Text>
+
+      {plans.map((plan) => {
+        const budget =
+          typeof plan.totalBudget === "number" ? plan.totalBudget : null;
+
+        const spent = Number(plan.expensesTotal || 0);
+
+        const currency = getPlanCurrency(plan);
+
+        const progress =
+          budget && budget > 0 ? Math.min(100, (spent / budget) * 100) : null;
+
+        return (
+          <GlassCard key={plan._id} className="mb-3 p-4">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-1">
+                <Text
+                  numberOfLines={1}
+                  className="text-sm font-bold text-white"
+                >
+                  {plan.destination}
+                </Text>
+
+                <Text className="mt-1 text-xs text-gray-500">
+                  {currency
+                    ? formatMoney(spent, currency, 0)
+                    : "Devise indisponible"}
+                </Text>
+              </View>
+
+              {progress !== null ? (
+                <Text className="text-xs font-bold text-gray-300">
+                  {Math.round(progress)} %
+                </Text>
+              ) : null}
+            </View>
+
+            {progress !== null ? (
+              <View className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                <View
+                  className={`h-full rounded-full ${
+                    progress > 100
+                      ? "bg-red-500"
+                      : progress > 80
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
+                  }`}
+                  style={{
+                    width: `${Math.min(progress, 100)}%`,
+                  }}
+                />
+              </View>
+            ) : null}
+          </GlassCard>
+        );
+      })}
+    </ScrollView>
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Selected plan                                                             */
+/* -------------------------------------------------------------------------- */
+
+function SelectedPlanView({
+  plan,
+  expenses,
+  activeTab,
+  onTabChange,
+  onBack,
+  onAddExpense,
+}: {
+  plan: any;
+  expenses: any[] | undefined;
+  activeTab: PlanTab;
+  onTabChange: (tab: PlanTab) => void;
+  onBack: () => void;
+  onAddExpense: () => void;
+}) {
+  const currency = getPlanCurrency(plan);
+
+  const spent = Number(plan.expensesTotal || 0);
+
+  const budget = typeof plan.totalBudget === "number" ? plan.totalBudget : null;
+
+  const remaining = budget !== null ? budget - spent : null;
+
+  const percentage =
+    budget !== null && budget > 0
+      ? Math.min(100, Math.max(0, (spent / budget) * 100))
+      : 0;
+
+  const isOverBudget = budget !== null && remaining !== null && remaining < 0;
+
+  const categoryTotals = useMemo(() => {
+    const result: Record<Category, number> = {
+      transport: 0,
+      hebergement: 0,
+      repas: 0,
+      loisirs: 0,
+      shopping: 0,
+      autre: 0,
+    };
+
+    if (!expenses || !currency) {
+      return result;
+    }
+
+    for (const expense of expenses) {
+      if (!isCurrency(expense.currency)) {
+        continue;
+      }
+
+      if (expense.currency !== currency) {
+        continue;
+      }
+
+      const category: Category = isCategory(expense.category)
+        ? expense.category
+        : "autre";
+
+      result[category] += Number(expense.amount) || 0;
+    }
+
+    return result;
+  }, [expenses, currency]);
+
+  const compatibleCategoryTotal = useMemo(
+    () => Object.values(categoryTotals).reduce((sum, value) => sum + value, 0),
+    [categoryTotals],
+  );
+
+  return (
+    <View className="flex-1 bg-[#050812]">
+      <PageHeader
+        title={plan.destination}
+        subtitle="Budget voyage"
+        onBack={onBack}
+        right={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ajouter une dépense"
+            onPress={onAddExpense}
+            className="flex-row items-center gap-1.5 rounded-2xl bg-blue-600 px-3.5 py-2.5"
+          >
+            <Plus size={16} color="#FFFFFF" />
+
+            <Text className="text-xs font-bold text-white">Dépense</Text>
           </Pressable>
-        ))}
-      </View>
+        }
+      />
 
-      <View className="flex-1 overflow-y-auto px-4 pb-8 space-y-3">
-        {activeTab === "overview" && (
-          <>
-            {!plans && Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}
-            {plans?.length === 0 && (
-              <View className="flex flex-col items-center py-16 gap-3 text-gray-400">
-                <Wallet size={40} className="opacity-30" />
-                <Text className="text-sm">Aucun voyage. Créez-en un dans le Planificateur.</Text>
-              </View>
-            )}
-            {plans?.map((plan, i) => (
-              <Pressable key={plan._id}
-                onPress={() => { setSelectedPlanId(plan._id); setActiveTab("expenses"); }}
-                className="w-full bg-white/5 rounded-2xl p-4 border border-white/10 text-left">
-                <View className="flex items-center gap-3 mb-3">
-                  <View className="p-2.5 bg-blue-500/20 rounded-xl"><Globe size={18} className="text-blue-400" /></View>
-                  <View className="flex-1">
-                    <Text className="font-semibold">{plan.destination}</Text>
-                    <Text className="text-xs text-gray-400">{plan.expensesTotal.toFixed(0)} {plan.currency ?? "EUR"} dépensé{plan.totalBudget ? ` / ${plan.totalBudget} ${plan.currency ?? "EUR"}` : ""}</Text>
-                  </View>
-                  {plan.totalBudget && plan.expensesTotal > plan.totalBudget && (
-                    <Text className="text-xs text-red-400 flex items-center gap-1"><AlertTriangle size={11} /> Dépassement</Text>
-                  )}
-                </View>
-                {plan.totalBudget && (
-                  <View className="h-2 bg-white/10 rounded-full overflow-hidden">
-                    <View
-                      className={`h-full rounded-full ${plan.expensesTotal > plan.totalBudget ? "bg-red-500" : (plan.expensesTotal / plan.totalBudget) > 0.8 ? "bg-orange-500" : "bg-gradient-to-r from-green-500 to-teal-500"}`}
-                    />
-                  </View>
-                )}
-              </Pressable>
-            ))}
-          </>
-        )}
+      {budget !== null && currency ? (
+        <GlassCard className="mx-4 mb-4 p-5">
+          <View className="flex-row items-end justify-between">
+            <View className="flex-1">
+              <Text className="text-xs text-gray-500">Dépensé</Text>
 
-        {activeTab === "compare" && (
-          <>
-            <View className="bg-white/5 rounded-2xl p-4 border border-white/10">
-              <Text className="text-sm font-semibold flex items-center gap-2 mb-1"><BarChart2 size={16} className="text-cyan-400" /> Coût de vie estimé / jour</Text>
-              <Text className="text-xs text-gray-400">Budget backpacker moyen</Text>
+              <Text className="mt-1 text-3xl font-extrabold text-white">
+                {formatMoney(spent, currency)}
+              </Text>
             </View>
-            {COST_OF_LIFE.map((city, i) => {
-              const levelColor = city.level === "low" ? "text-green-400" : city.level === "medium" ? "text-yellow-400" : "text-red-400";
-              const levelBg = city.level === "low" ? "bg-green-500/20 border-green-500/30" : city.level === "medium" ? "bg-yellow-500/20 border-yellow-500/30" : "bg-red-500/20 border-red-500/30";
-              return (
-                <View key={city.city}
-                  className="bg-white/5 rounded-2xl p-4 border border-white/10">
-                  <View className="flex items-center gap-3 mb-2">
-                    <Text className="text-xl">{city.flag}</Text>
-                    <View className="flex-1">
-                      <View className="flex items-center justify-between">
-                        <Text className="font-semibold text-sm">{city.city}</Text>
-                        <Text className={`text-xs px-2 py-0.5 rounded-full border ${levelBg} ${levelColor} font-medium`}>
-                          {city.level === "low" ? "Économique" : city.level === "medium" ? "Moyen" : "Élevé"}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View className="flex items-center gap-3 mb-2">
-                    <View className="flex-1 h-2.5 bg-white/10 rounded-full overflow-hidden">
-                      <View className={`h-full rounded-full ${city.level === "low" ? "bg-green-500" : city.level === "medium" ? "bg-yellow-500" : "bg-red-500"}`} />
-                    </View>
-                    <Text className={`text-sm font-bold flex-shrink-0 ${levelColor}`}>${city.daily}/jour</Text>
-                  </View>
-                  <View className="gap-1">
-                    {[
-                      { icon: Bed, label: "Hébergement", val: city.breakdown.accommodation },
-                      { icon: Utensils, label: "Repas", val: city.breakdown.food },
-                      { icon: Car, label: "Transport", val: city.breakdown.transport },
-                      { icon: Camera, label: "Activités", val: city.breakdown.activities },
-                    ].map(item => (
-                      <View key={item.label} className="bg-white/5 rounded-lg p-2 text-center">
-                        <item.icon size={12} className="mx-auto text-gray-400 mb-1" />
-                        <Text className="text-xs font-bold">${item.val}</Text>
-                        <Text className="text-[9px] text-gray-500 leading-tight">{item.label}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              );
-            })}
-          </>
-        )}
 
-        {activeTab === "converter" && (
-          <View className="space-y-4">
-            <View className="bg-white/5 rounded-2xl p-4 border border-white/10">
-              <Text className="text-sm font-semibold flex items-center gap-2 mb-4"><ArrowRightLeft size={16} className="text-blue-400" /> Convertisseur de devises</Text>
-              <View className="space-y-3">
-                <View>
-                  <Text className="text-xs text-gray-400 mb-1 block">Montant</Text>
-                  <TextInput value={convertAmount} onChangeText={text => setConvertAmount(text)}
-                    className="w-full bg-white/10 rounded-xl px-4 py-3 text-white text-lg font-bold outline-none"  keyboardType="numeric"/>
-                </View>
-                <View className="gap-3">
-                  <View>
-                    <Text className="text-xs text-gray-400 mb-1 block">De</Text>
-                    <Picker onValueChange={val => setFromCurrency(val as Currency)}
-                      className="w-full bg-white/10 rounded-xl px-4 py-3 text-white outline-none text-sm" selectedValue={fromCurrency}>
-                      {(Object.keys(CURRENCY_SYMBOLS) as Currency[]).map(c => <Picker.Item label={`${c}— ${CURRENCY_SYMBOLS[c]}`} value={c} />)}
-                    </Picker>
-                  </View>
-                  <View>
-                    <Text className="text-xs text-gray-400 mb-1 block">Vers</Text>
-                    <Picker onValueChange={val => setToCurrency(val as Currency)}
-                      className="w-full bg-white/10 rounded-xl px-4 py-3 text-white outline-none text-sm" selectedValue={toCurrency}>
-                      {(Object.keys(CURRENCY_SYMBOLS) as Currency[]).map(c => <Picker.Item label={`${c}— ${CURRENCY_SYMBOLS[c]}`} value={c} />)}
-                    </Picker>
-                  </View>
-                </View>
-                <View className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-2xl p-4 text-center">
-                  <Text className="text-xs text-gray-400 mb-1">{convertAmount || 0} {fromCurrency} =</Text>
-                  <Text className="text-3xl font-bold text-white">
-                    {toCurrency === "JPY" || toCurrency === "XOF" ? Math.round(convertedAmount).toLocaleString("fr-FR") : convertedAmount.toFixed(2)} {CURRENCY_SYMBOLS[toCurrency]}
-                  </Text>
-                  <Text className="text-xs text-gray-500 mt-1">Taux : 1 {fromCurrency} = {(EXCHANGE_RATES[toCurrency] / EXCHANGE_RATES[fromCurrency]).toFixed(4)} {toCurrency}</Text>
-                </View>
-              </View>
-            </View>
-            <View className="bg-white/5 rounded-2xl p-4 border border-white/10">
-              <Text className="text-sm font-semibold mb-3">Taux vs Euro</Text>
-              <View className="space-y-2">
-                {(Object.keys(EXCHANGE_RATES) as Currency[]).map(c => (
-                  <View key={c} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                    <Text className="text-sm font-medium">{c}</Text>
-                    <Text className="text-sm text-gray-300">{CURRENCY_SYMBOLS[c]}</Text>
-                    <Text className="text-sm font-bold text-blue-300"><Text>1€ =</Text>{EXCHANGE_RATES[c] >= 10 ? EXCHANGE_RATES[c].toLocaleString("fr-FR") : EXCHANGE_RATES[c].toFixed(2)} {c}</Text>
-                  </View>
-                ))}
-              </View>
+            <View className="items-end">
+              <Text className="text-xs text-gray-500">
+                {isOverBudget ? "Dépassement" : "Restant"}
+              </Text>
+
+              <Text
+                className={`mt-1 text-xl font-bold ${
+                  isOverBudget ? "text-red-400" : "text-emerald-400"
+                }`}
+              >
+                {formatMoney(Math.abs(remaining || 0), currency)}
+              </Text>
             </View>
           </View>
-        )}
-      </View>
+
+          <View className="mt-5 h-3 overflow-hidden rounded-full bg-white/10">
+            <View
+              className={`h-full rounded-full ${
+                isOverBudget
+                  ? "bg-red-500"
+                  : percentage > 80
+                    ? "bg-amber-500"
+                    : "bg-emerald-500"
+              }`}
+              style={{
+                width: `${percentage}%`,
+              }}
+            />
+          </View>
+
+          <View className="mt-2 flex-row items-center justify-between">
+            <Text className="text-[11px] text-gray-500">0</Text>
+
+            <Text className="text-[11px] font-semibold text-gray-400">
+              {Math.round(percentage)} % utilisé
+            </Text>
+
+            <Text className="text-[11px] text-gray-500">
+              {formatMoney(budget, currency)}
+            </Text>
+          </View>
+
+          {isOverBudget ? (
+            <View className="mt-4 flex-row items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-3">
+              <AlertTriangle size={16} color="#F87171" />
+
+              <Text className="flex-1 text-xs font-semibold text-red-300">
+                Votre budget enregistré est dépassé.
+              </Text>
+            </View>
+          ) : null}
+        </GlassCard>
+      ) : (
+        <GlassCard className="mx-4 mb-4 p-5">
+          <View className="flex-row items-center gap-3">
+            <AlertTriangle size={20} color="#94A3B8" />
+
+            <View className="flex-1">
+              <Text className="text-sm font-semibold text-white">
+                Budget non comparable
+              </Text>
+
+              <Text className="mt-1 text-xs leading-5 text-gray-500">
+                Le budget ou sa devise n'est pas suffisamment renseigné pour
+                effectuer un calcul fiable.
+              </Text>
+            </View>
+          </View>
+        </GlassCard>
+      )}
+
+      <PlanTabs activeTab={activeTab} onChange={onTabChange} />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: 40,
+        }}
+      >
+        {activeTab === "overview" ? (
+          <>
+            <SectionTitle
+              title="Répartition"
+              subtitle={
+                currency
+                  ? "Seules les dépenses dans la devise du budget sont regroupées."
+                  : "Devise du budget indisponible."
+              }
+            />
+
+            {!expenses ? (
+              <LoadingState />
+            ) : expenses.length === 0 ? (
+              <EmptyState
+                Icon={Wallet}
+                title="Aucune dépense"
+                description="Votre voyage ne contient encore aucune dépense enregistrée."
+                action={
+                  <Pressable
+                    onPress={onAddExpense}
+                    className="flex-row items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3"
+                  >
+                    <Plus size={16} color="#FFFFFF" />
+
+                    <Text className="text-sm font-bold text-white">
+                      Ajouter une dépense
+                    </Text>
+                  </Pressable>
+                }
+              />
+            ) : (
+              (Object.keys(CATEGORIES) as Category[]).map((category) => (
+                <CategoryRow
+                  key={category}
+                  category={category}
+                  amount={categoryTotals[category]}
+                  currency={currency}
+                  total={compatibleCategoryTotal}
+                />
+              ))
+            )}
+          </>
+        ) : null}
+
+        {activeTab === "expenses" ? (
+          <>
+            <View className="mb-4 flex-row items-center justify-between">
+              <SectionTitle
+                title="Dépenses"
+                subtitle={
+                  expenses
+                    ? `${expenses.length} enregistrement(s)`
+                    : "Chargement…"
+                }
+              />
+
+              <Pressable
+                onPress={onAddExpense}
+                className="h-10 w-10 items-center justify-center rounded-xl bg-blue-600"
+              >
+                <Plus size={18} color="#FFFFFF" />
+              </Pressable>
+            </View>
+
+            {!expenses ? (
+              <LoadingState />
+            ) : expenses.length === 0 ? (
+              <EmptyState
+                Icon={Wallet}
+                title="Aucune dépense enregistrée"
+                description="Ajoutez votre première dépense pour commencer à suivre réellement ce voyage."
+              />
+            ) : (
+              expenses.map((expense) => (
+                <ExpenseRow key={expense._id} expense={expense} />
+              ))
+            )}
+          </>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* Main authenticated page                                                    */
+/* -------------------------------------------------------------------------- */
+
+function BudgetInner({ onBack }: Props) {
+  const [selectedPlanId, setSelectedPlanId] =
+    useState<Id<"travelPlans"> | null>(null);
+
+  const [activeTab, setActiveTab] = useState<MainTab>("overview");
+
+  const [planTab, setPlanTab] = useState<PlanTab>("expenses");
+
+  const [showAdd, setShowAdd] = useState(false);
+
+  const [newLabel, setNewLabel] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+
+  const [newCategory, setNewCategory] = useState<Category>("repas");
+
+  const [newCurrency, setNewCurrency] = useState<Currency>("EUR");
+
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const plans = useQuery(api.travel.listMyTravelPlans, {});
+
+  const expenses = useQuery(
+    api.travel.listTravelExpenses,
+    selectedPlanId ? { planId: selectedPlanId } : "skip",
+  );
+
+  const addExpense = useMutation(api.travel.addTravelExpense);
+
+  const selectedPlan = useMemo(
+    () => plans?.find((plan) => plan._id === selectedPlanId) ?? null,
+    [plans, selectedPlanId],
+  );
+
+  const resetExpenseForm = useCallback(() => {
+    setNewLabel("");
+    setNewAmount("");
+    setNewCategory("repas");
+
+    if (selectedPlan) {
+      const planCurrency = getPlanCurrency(selectedPlan);
+
+      if (planCurrency) {
+        setNewCurrency(planCurrency);
+      }
+    }
+
+    setShowCurrencyPicker(false);
+  }, [selectedPlan]);
+
+  const closeAddExpense = useCallback(() => {
+    if (submitting) {
+      return;
+    }
+
+    setShowAdd(false);
+    resetExpenseForm();
+  }, [resetExpenseForm, submitting]);
+
+  const openAddExpense = useCallback(() => {
+    if (selectedPlan) {
+      const planCurrency = getPlanCurrency(selectedPlan);
+
+      if (planCurrency) {
+        setNewCurrency(planCurrency);
+      }
+    }
+
+    setShowAdd(true);
+  }, [selectedPlan]);
+
+  const handleAddExpense = useCallback(async () => {
+    if (!selectedPlanId || submitting) {
+      return;
+    }
+
+    const description = newLabel.trim();
+    const amount = parseAmount(newAmount);
+
+    if (!description) {
+      Alert.alert(
+        "Description requise",
+        "Veuillez renseigner la description de la dépense.",
+      );
+      return;
+    }
+
+    if (amount === null) {
+      Alert.alert(
+        "Montant invalide",
+        "Veuillez saisir un montant supérieur à zéro.",
+      );
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      await addExpense({
+        planId: selectedPlanId,
+        category: newCategory,
+        description,
+        amount,
+        currency: newCurrency,
+        date: new Date().toISOString().split("T")[0],
+      });
+
+      setShowAdd(false);
+      resetExpenseForm();
+
+      Alert.alert(
+        "Dépense enregistrée",
+        "La dépense a été ajoutée à votre voyage.",
+      );
+    } catch (error) {
+      console.error("[BudgetVoyagePage] addTravelExpense failed", error);
+
+      Alert.alert(
+        "Enregistrement impossible",
+        "La dépense n'a pas pu être enregistrée. Vérifiez votre connexion et réessayez.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }, [
+    addExpense,
+    newAmount,
+    newCategory,
+    newCurrency,
+    newLabel,
+    resetExpenseForm,
+    selectedPlanId,
+    submitting,
+  ]);
+
+  const handleBackFromPlan = useCallback(() => {
+    setSelectedPlanId(null);
+    setPlanTab("expenses");
+  }, []);
+
+  if (selectedPlan && selectedPlanId) {
+    return (
+      <>
+        <SelectedPlanView
+          plan={selectedPlan}
+          expenses={expenses}
+          activeTab={planTab}
+          onTabChange={setPlanTab}
+          onBack={handleBackFromPlan}
+          onAddExpense={openAddExpense}
+        />
+
+        <AddExpenseSheet
+          visible={showAdd}
+          onClose={closeAddExpense}
+          label={newLabel}
+          amount={newAmount}
+          category={newCategory}
+          currency={newCurrency}
+          pickerVisible={showCurrencyPicker}
+          submitting={submitting}
+          onLabelChange={setNewLabel}
+          onAmountChange={setNewAmount}
+          onCategoryChange={setNewCategory}
+          onOpenPicker={() => setShowCurrencyPicker(true)}
+          onClosePicker={() => setShowCurrencyPicker(false)}
+          onCurrencyChange={setNewCurrency}
+          onSubmit={handleAddExpense}
+        />
+      </>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-[#050812]">
+      <PageHeader
+        title="Budget Voyage"
+        subtitle={
+          plans
+            ? `${plans.length} voyage(s) enregistré(s)`
+            : "Vos finances de voyage"
+        }
+        onBack={onBack}
+      />
+
+      <MainTabs activeTab={activeTab} onChange={setActiveTab} />
+
+      {activeTab === "overview" ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingBottom: 40,
+          }}
+        >
+          <SectionTitle
+            title="Mes voyages"
+            subtitle="Sélectionnez un voyage pour consulter son budget et ses dépenses."
+          />
+
+          {!plans ? (
+            <LoadingState />
+          ) : plans.length === 0 ? (
+            <EmptyState
+              Icon={Wallet}
+              title="Aucun voyage enregistré"
+              description="Aucun budget de voyage réel n'est actuellement disponible dans votre compte."
+            />
+          ) : (
+            plans.map((plan) => (
+              <TravelPlanCard
+                key={plan._id}
+                plan={plan}
+                onPress={() => {
+                  setSelectedPlanId(plan._id);
+                  setPlanTab("expenses");
+                }}
+              />
+            ))
+          )}
+        </ScrollView>
+      ) : null}
+
+      {activeTab === "compare" ? <AnalysisView plans={plans} /> : null}
+
+      {activeTab === "converter" ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingBottom: 40,
+          }}
+        >
+          <SectionTitle
+            title="Devises"
+            subtitle="Les conversions doivent utiliser une source de taux vérifiable."
+          />
+
+          <ConverterUnavailable />
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Authentication shell                                                       */
+/* -------------------------------------------------------------------------- */
+
 export default function BudgetVoyagePage({ onBack }: Props) {
   return (
-    <>
+    <View className="flex-1 bg-[#050812]">
       <Unauthenticated>
-        <View className="h-full flex flex-col items-center justify-center bg-gray-950 text-white gap-4 px-6">
-          <DollarSign size={40} className="text-white/20" />
-          <Text className="text-center text-gray-400 text-sm">Connectez-vous pour suivre vos budgets voyage</Text>
-          <Pressable onPress={onBack} className="flex items-center gap-2 text-sm text-gray-400"><ArrowLeft size={16} /> Retour</Pressable>
+        <View className="flex-1 items-center justify-center px-6">
+          <View className="mb-5 h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-white/5">
+            <DollarSign size={28} color="rgba(255,255,255,0.4)" />
+          </View>
+
+          <Text className="text-center text-lg font-bold text-white">
+            Votre budget voyage
+          </Text>
+
+          <Text className="mt-2 max-w-[320px] text-center text-sm leading-6 text-gray-400">
+            Connectez-vous pour accéder à vos voyages et à vos dépenses réelles.
+          </Text>
+
+          <Pressable
+            onPress={onBack}
+            className="mt-6 flex-row items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3"
+          >
+            <ArrowLeft size={16} color="#CBD5E1" />
+
+            <Text className="text-sm font-semibold text-gray-300">Retour</Text>
+          </Pressable>
         </View>
       </Unauthenticated>
+
       <AuthLoading>
-        <View className="h-full flex flex-col bg-gray-950 px-4 pt-12 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="small" color="#60A5FA" />
+
+          <Text className="mt-4 text-sm text-gray-500">
+            Préparation de votre espace…
+          </Text>
         </View>
       </AuthLoading>
+
       <Authenticated>
         <BudgetInner onBack={onBack} />
       </Authenticated>
-    </>
+    </View>
   );
 }

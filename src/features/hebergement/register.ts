@@ -7,7 +7,7 @@ export const register = {
   initialize: () => {
     console.log(`[HebergementModule] Registering manifest metadata...`);
     const globalContext =
-      typeof undefined !== "undefined" ? (undefined as any) : null;
+      typeof window !== "undefined" ? (window as any) : null;
     if (globalContext && globalContext.__DebrouilleProRegistry__) {
       globalContext.__DebrouilleProRegistry__.registerModule("hebergement", {
         manifest,

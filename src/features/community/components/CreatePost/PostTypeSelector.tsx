@@ -27,16 +27,11 @@ export function PostTypeSelector({ value, onChange }: Props) {
         const Icon = t.icon;
         const active = value === t.value;
         return (
-          <Pressable
-            key={t.value}
-            onPress={() => onChange(t.value)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap border ${
+          <Pressable key={t.value} onPress={() => onChange(t.value)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap border ${
               active
                 ? "bg-purple-500/20 border-purple-400/50"
                 : "bg-white/5 border-white/10 hover:bg-white/10"
-            }`}
-            style={{  }}
-          >
+            }`} style={{  }}>
             <Icon size={12} />
             {t.label}
           </Pressable>

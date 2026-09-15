@@ -48,9 +48,7 @@ export function FilePreview({
 
   if (href) {
     return (
-      <Pressable
-        className="flex max-w-sm items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3" accessibilityHint={href}
-      >
+      <Pressable className="flex max-w-sm items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3" accessibilityHint={href}>
         {content}
       </Pressable>
     );

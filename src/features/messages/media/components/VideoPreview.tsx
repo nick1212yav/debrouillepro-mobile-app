@@ -1,4 +1,3 @@
-import { View } from "react-native";
 interface VideoPreviewProps {
   src: string;
   poster?: string;
@@ -13,7 +12,7 @@ export function VideoPreview({
   className = "",
 }: VideoPreviewProps) {
   return (
-    <View
+    <video
       src={src}
       poster={poster}
       controls={controls}

@@ -1,16 +1,8 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
-function NativeConfirmAlert(message: string): boolean {
-  Alert.alert(message, "Confirmation", [
-    { text: "Annuler", style: "cancel" },
-    { text: "Confirmer", onPress: () => undefined },
-  ]);
-  return false;
-}
-import { View, Text, Pressable, Alert } from "react-native";
+import { View, Pressable, Text } from "react-native";
 
 // src/features/voyages/sheets/VoyageBookingSheet.tsx
 import { useState, useEffect } from "react";
+import { AnimatePresence } from "motion/react";
 import {
   X,
   ChevronLeft,
@@ -24,6 +16,7 @@ import {
   Ticket,
   ArrowRight,
 } from "lucide-react-native";
+import { toast } from "sonner";
 import { useVoyageBooking } from "../hooks/useVoyageBooking";
 import { useVoyageSeats } from "../hooks/useVoyageSeats";
 import { VoyageSeatMap } from "../components/booking/VoyageSeatMap";
@@ -91,13 +84,13 @@ export function VoyageBookingSheet({
   const handleNext = () => {
     if (step === "seats") {
       if (selectedSeats.length === 0) {
-        UIService.openToast("Veuillez sélectionner au moins un siège", "error");
+        toast.error("Veuillez sélectionner au moins un siège");
         return;
       }
       setStep("passenger");
     } else if (step === "passenger") {
       if (!passenger.name.trim()) {
-        UIService.openToast("Veuillez saisir le nom du passager", "error");
+        toast.error("Veuillez saisir le nom du passager");
         return;
       }
       setStep("summary");
@@ -114,7 +107,7 @@ export function VoyageBookingSheet({
   const handlePaymentSuccess = () => {
     setIsPaymentOpen(false);
     setStep("success");
-    UIService.openToast("Paiement effectué !", "success");
+    toast.success("Paiement effectué !");
     onSuccess?.();
   };
 
@@ -125,7 +118,9 @@ export function VoyageBookingSheet({
     }
     if (selectedSeats.length > 0 || passenger.name) {
       if (
-        NativeConfirmAlert("Êtes-vous sûr de vouloir quitter ? Vos sélections seront perdues.")
+        confirm(
+          "Êtes-vous sûr de vouloir quitter ? Vos sélections seront perdues.",
+        )
       ) {
         onClose();
       }
@@ -137,76 +132,31 @@ export function VoyageBookingSheet({
   if (!isOpen) return null;
 
   return (
-    <>
-      <Pressable
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/70"
-        onPress={handleClose}
-      >
-        <Pressable
-          className="w-full max-w-md rounded-t-[32px] overflow-hidden flex flex-col"
-          style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", maxHeight: "calc(10dvh - 24px)", height: "min(800px, calc(10dvh - 24px))" }}
-          onPress={(e) => e.stopPropagation()}
-        >
+<View>
+      <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm" onPress={handleClose}>
+        <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }} className="w-full max-w-md rounded-t-[32px] overflow-hidden flex flex-col" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid", maxHeight: "calc(10dvh - 24px)", height: "min(800px, calc(10dvh - 24px))" }} onPress={(e) => e.stopPropagation()}>
           {/* Handle */}
-          <View className="flex justify-center pt-3 pb-1 flex-shrink-0">
-            <View className="w-10 h-1 rounded-full bg-white/20" />
-          </View>
+          <View className="flex justify-center pt-3 pb-1 flex-shrink-0"><View className="w-10 h-1 rounded-full bg-white/20" /></View>
 
           {/* Header */}
-          <View className="flex items-center gap-3 px-5 py-3 border-b border-white/5 flex-shrink-0">
-            {step !== "seats" && step !== "success" && (
-              <Pressable
-                onPress={handleBack}
-                className="w-9 h-9 rounded-2xl flex items-center justify-center"
-                style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-              >
-                <ChevronLeft size={18} className="text-white/60" />
-              </Pressable>
-            )}
-            <View className="flex-1">
-              <Text className="text-white font-bold text-lg">
-                {step === "seats" && "Choisissez vos sièges"}
-                {step === "passenger" && "Informations passager"}
-                {step === "summary" && "Résumé de la réservation"}
-                {step === "payment" && "Paiement"}
-                {step === "success" && "Confirmation"}
-              </Text>
-              <View className="flex items-center gap-2 mt-0.5">
-                {["seats", "passenger", "summary", "success"].map((s, i) => (
-                  <View
-                    key={s}
-                    className={cn(
+          <View className="flex items-center gap-3 px-5 py-3 border-b border-white/5 flex-shrink-0">{step !== "seats" && step !== "success" && (
+              <Pressable onPress={handleBack} className="w-9 h-9 rounded-2xl flex items-center justify-center transition" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><ChevronLeft size={18} className="text-white/60" /></Pressable>
+            )}<View className="flex-1"><Text className="text-white font-bold text-lg">{step === "seats" && "Choisissez vos sièges"}{step === "passenger" && "Informations passager"}{step === "summary" && "Résumé de la réservation"}{step === "payment" && "Paiement"}{step === "success" && "Confirmation"}</Text><View className="flex items-center gap-2 mt-0.5">{["seats", "passenger", "summary", "success"].map((s, i) => (
+                  <View key={s} className={cn(
                       "h-1 rounded-full transition-all flex-1",
                       step === s
                         ? "bg-indigo-500"
                         : step === "success" && s === "success"
                           ? "bg-emerald-400"
                           : "bg-white/10",
-                    )}
-                  />
-                ))}
-              </View>
-            </View>
-            <Pressable
-              onPress={handleClose}
-              className="w-9 h-9 rounded-2xl flex items-center justify-center"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-            >
-              <X size={18} className="text-white/60" />
-            </Pressable>
-          </View>
+                    )} />
+                ))}</View></View><Pressable onPress={handleClose} className="w-9 h-9 rounded-2xl flex items-center justify-center transition" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><X size={18} className="text-white/60" /></Pressable></View>
 
           {/* Content */}
-          <View
-            className="flex-1 overflow-y-auto px-5 py-4"
-            style={{  }}
-          >
+          <View className="flex-1 overflow-y-auto px-5 py-4" style={{  }}>
             <AnimatePresence mode="wait">
               {step === "seats" && (
-                <View
-                  key="seats"
-                  className="space-y-4"
-                >
+                <View key="seats" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                   <Text className="text-white/50 text-sm">
                     Sélectionnez vos sièges. Les sièges verts sont disponibles.
                   </Text>
@@ -229,9 +179,7 @@ export function VoyageBookingSheet({
               )}
 
               {step === "passenger" && (
-                <View
-                  key="passenger"
-                >
+                <View key="passenger" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                   <VoyagePassengerForm
                     {...({
                       passenger: passenger,
@@ -243,9 +191,7 @@ export function VoyageBookingSheet({
               )}
 
               {step === "summary" && (
-                <View
-                  key="summary"
-                >
+                <View key="summary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                   <VoyageBookingSummary
                     {...({
                       seats: selectedSeats,
@@ -258,9 +204,7 @@ export function VoyageBookingSheet({
               )}
 
               {step === "success" && (
-                <View
-                  key="success"
-                >
+                <View key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
                   <VoyageBookingSuccess
                     {...({
                       bookingId: (booking as any).bookingId || "temp-id",
@@ -279,16 +223,12 @@ export function VoyageBookingSheet({
           {/* Footer actions */}
           {step !== "success" && (
             <View className="flex-shrink-0 border-t border-white/10 px-5 py-4 bg-[#0e0e22]">
-              <Pressable
-                onPress={step === "payment" ? () => {} : handleNext}
-                disabled={step === "payment"}
-                className={cn(
+              <Pressable onPress={step === "payment" ? () => {} : handleNext} disabled={step === "payment"} className={cn(
                   "w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all",
                   step === "seats" && selectedSeats.length === 0
                     ? "bg-white/10 text-white/30 cursor-not-allowed"
                     : "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 shadow-lg shadow-indigo-500/20",
-                )}
-              >
+                )}>
                 {step === "payment" ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
@@ -315,8 +255,8 @@ export function VoyageBookingSheet({
               </Pressable>
             </View>
           )}
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
 
       {/* Payment Sheet */}
       <VoyagePaymentSheet
@@ -328,6 +268,6 @@ export function VoyageBookingSheet({
           onSuccess: handlePaymentSuccess,
         } as any)}
       />
-    </>
+    </View>
   );
 }

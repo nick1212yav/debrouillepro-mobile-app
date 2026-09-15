@@ -28,9 +28,7 @@ export function AgriUnitBadge({
   };
 
   return (
-    <Text
-      className={`inline-flex items-center px-2 py-0.5 rounded bg-white/[0.04] border border-white/5 text-[9px] text-white/50 ${className}`}
-    >
+    <Text className={`inline-flex items-center px-2 py-0.5 rounded bg-white/[0.04] border border-white/5 text-[9px] text-white/50 ${className}`}>
       {quantity.toLocaleString("fr-FR")} {formatUnitLabel(unit, quantity)}
     </Text>
   );

@@ -1,4 +1,4 @@
-import { Text, View, Pressable, Image } from "react-native";
+import { Text, View, Pressable, Image, NativeSyntheticEvent, TextInputKeyPressEventData } from "react-native";
 import { useState, useEffect } from "react";
 import { X, Play, Loader2, AlertCircle } from "lucide-react-native";
 
@@ -41,11 +41,11 @@ export function PropertyVirtualTour({ url, title, type }: Props) {
   // Fermeture avec Échap
   useEffect(() => {
     if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
       if (e.key === "Escape") handleClose();
     };
-    undefined;
-    return () => undefined;
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open]);
 
   const handleLoad = () => setIsLoading(false);
@@ -57,31 +57,18 @@ export function PropertyVirtualTour({ url, title, type }: Props) {
   return (
     <>
       {/* Bouton d'ouverture */}
-      <Pressable
-        onPress={handleOpen}
-        className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium bg-white/10 text-white/60"
-        accessibilityLabel={`Ouvrir la visite virtuelle de ${title}`}
-      >
+      <Pressable onPress={handleOpen} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium bg-white/10 text-white/60 transition-colors active:scale-95" accessibilityLabel={`Ouvrir la visite virtuelle de ${title}`}>
         <Play size={14} /> Visite virtuelle
       </Pressable>
 
       {/* Modale */}
-      <>
+<View>
         {open && (
           <>
-            <Pressable
-              onPress={handleClose}
-              className="fixed inset-0 z-50 bg-black/95"
-            />
+            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={handleClose} className="fixed inset-0 z-50 bg-black/95" />
 
-            <View
-              className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4"
-            >
-              <Pressable
-                onPress={handleClose}
-                className="absolute top-4 right-4 text-white/70 z-10"
-                accessibilityLabel="Fermer"
-              >
+            <View initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4">
+              <Pressable onPress={handleClose} className="absolute top-4 right-4 text-white/70 z-10 transition-colors" accessibilityLabel="Fermer">
                 <X size={28} />
               </Pressable>
 
@@ -105,21 +92,15 @@ export function PropertyVirtualTour({ url, title, type }: Props) {
                 )}
 
                 {detectedType === "iframe" ? (
-                  <View
+                  <iframe
                     src={url}
                     title={title}
                     className="w-full h-full"
                     allowFullScreen
                     allow="autoplay; encrypted-media; gyroscope; accelerometer; xr-spatial-tracking"
-                    onLoad={handleLoad}
-                    onError={handleError}
                   />
                 ) : (
-                  <Image
-                    className="w-full h-full object-contain"
-                    onLoad={handleLoad}
-                    onError={handleError} source={{ uri: url }} accessibilityLabel={title}
-                  />
+                  <Image className="w-full h-full object-contain" source={{ uri: url }} accessibilityLabel={title} />
                 )}
               </View>
 
@@ -131,7 +112,7 @@ export function PropertyVirtualTour({ url, title, type }: Props) {
             </View>
           </>
         )}
-      </>
+      </View>
     </>
   );
 }

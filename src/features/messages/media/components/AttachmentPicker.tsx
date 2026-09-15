@@ -1,86 +1,39 @@
-// src/features/messages/media/components/AttachmentPicker.tsx
-
-import { useCallback, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
+import { Pressable, TextInput, NativeSyntheticEvent, TextInputChangeEventData } from "react-native";
+import { useRef } from "react";
 
 interface AttachmentPickerProps {
-  onFilesSelected: (files: DocumentPicker.DocumentPickerAsset[]) => void;
-  accept?: string[];
+  onFilesSelected: (files: File[]) => void;
+  accept?: string;
   multiple?: boolean;
   disabled?: boolean;
 }
 
-const DEFAULT_TYPES = [
-  "image/*",
-  "video/*",
-  "audio/*",
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/plain",
-];
-
 export function AttachmentPicker({
   onFilesSelected,
-  accept = DEFAULT_TYPES,
+  accept = "image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt",
   multiple = true,
   disabled = false,
 }: AttachmentPickerProps) {
-  const [isPicking, setIsPicking] = useState(false);
+  const inputRef = useRef<TextInput | null>(null);
 
-  const handlePick = useCallback(async () => {
-    if (disabled || isPicking) {
-      return;
+  const handleChange = (event: NativeSyntheticEvent<TextInputChangeEventData>) => {
+    const files = Array.from(event.target.files ?? []);
+
+    if (files.length > 0) {
+      onFilesSelected(files);
     }
 
-    try {
-      setIsPicking(true);
-
-      const result = await DocumentPicker.getDocumentAsync({
-        type: accept,
-        multiple,
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled) {
-        return;
-      }
-
-      if (result.assets.length > 0) {
-        onFilesSelected(result.assets);
-      }
-    } catch (error) {
-      console.error(
-        "[AttachmentPicker] Impossible de sélectionner les fichiers:",
-        error,
-      );
-    } finally {
-      setIsPicking(false);
-    }
-  }, [accept, disabled, isPicking, multiple, onFilesSelected]);
+    event.target.value = "";
+  };
 
   return (
-    <View>
-      <Pressable
-        onPress={() => {
-          void handlePick();
-        }}
-        disabled={disabled || isPicking}
-        accessibilityRole="button"
-        accessibilityLabel="Ajouter une pièce jointe"
-        accessibilityHint="Sélectionner un fichier à joindre au message"
-        className="h-10 w-10 items-center justify-center rounded-xl"
-        style={({ pressed }) => ({
-          opacity: disabled || isPicking ? 0.45 : pressed ? 0.65 : 1,
-          backgroundColor: pressed ? "rgba(255,255,255,0.10)" : "transparent",
-        })}
-      >
-        <Text className="text-lg">{isPicking ? "…" : "📎"}</Text>
+    <>
+      <Pressable disabled={disabled} onPress={() => inputRef.current?.click()} className="flex h-9 w-9 items-center justify-center rounded-full text-lg disabled:opacity-50" accessibilityLabel="Ajouter une pièce jointe">
+        📎
       </Pressable>
-    </View>
+
+      <TextInput ref={inputRef}   onChangeText={handleChange} className="hidden" />
+    </>
   );
 }
 

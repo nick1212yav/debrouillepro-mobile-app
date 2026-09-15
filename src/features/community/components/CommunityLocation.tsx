@@ -17,9 +17,7 @@ export function CommunityLocation({ location, address, city }: Props) {
   const googleMapsUrl = `https://www.google.com/maps?q=${encodeURIComponent(displayText)}`;
 
   return (
-    <Pressable
-      className="flex items-center gap-2 text-sm text-white/60" accessibilityHint={googleMapsUrl}
-    >
+    <Pressable className="flex items-center gap-2 text-sm text-white/60 transition-colors" accessibilityHint={googleMapsUrl}>
       <MapPin size={14} className="text-white/30 flex-shrink-0" />
       <Text className="truncate">{displayText}</Text>
     </Pressable>

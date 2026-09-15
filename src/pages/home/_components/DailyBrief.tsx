@@ -1,4 +1,15 @@
-import { View, Pressable, Text, Image } from "react-native";
+// src/pages/home/_components/DailyBrief.tsx
+import {
+  View,
+  Pressable,
+  Text,
+  Image,
+  Animated,
+  Easing,
+  StyleSheet,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useMemo, useState, useRef, useEffect, type ReactNode } from "react";
 import {
   ArrowRight,
   Bell,
@@ -11,7 +22,6 @@ import {
   Home,
   MapPin,
   Newspaper,
-  RefreshCw,
   Sparkles,
   TrendingUp,
   Users,
@@ -19,7 +29,6 @@ import {
   X,
   Zap,
 } from "lucide-react-native";
-import { useMemo, useState } from "react";
 
 /* ============================================================================
  * TYPES
@@ -28,42 +37,30 @@ import { useMemo, useState } from "react";
 export interface DailyBriefItem {
   id?: string;
   _id?: string;
-
   title?: string;
   content?: string;
   description?: string;
-
   moduleId?: string;
   module?: string;
   type?: string;
-
   authorName?: string;
   authorAvatar?: string;
-
   city?: string;
   location?: string;
-
   createdAt?: number;
   _creationTime?: number;
-
   imageUrl?: string;
   coverUrl?: string;
-
   score?: number;
   finalScore?: number;
-
   [key: string]: unknown;
 }
 
 interface DailyBriefProps {
   items?: DailyBriefItem[];
-
   userName?: string;
-
   city?: string;
-
   onNavigate: (page: string) => void;
-
   onOpenItem?: (item: DailyBriefItem) => void;
 }
 
@@ -84,105 +81,76 @@ const MODULE_META: Record<
 > = {
   jobs: {
     label: "Jobs",
-    color: "#8B5CF6",
+    color: "#A78BFA",
     icon: BriefcaseBusiness,
     route: "jobs",
   },
-
-  immo: {
-    label: "Immobilier",
-    color: "#F97316",
-    icon: Home,
-    route: "immo",
-  },
-
+  immo: { label: "Immobilier", color: "#FB923C", icon: Home, route: "immo" },
   annonces: {
     label: "Annonces",
-    color: "#F59E0B",
+    color: "#FBBF24",
     icon: Newspaper,
     route: "annonces",
   },
-
   boutique: {
     label: "Boutique",
-    color: "#EC4899",
+    color: "#F472B6",
     icon: WalletCards,
     route: "boutique",
   },
-
-  sante: {
-    label: "Santé",
-    color: "#EF4444",
-    icon: HeartPulse,
-    route: "sante",
-  },
-
+  sante: { label: "Santé", color: "#F87171", icon: HeartPulse, route: "sante" },
   health: {
     label: "Santé",
-    color: "#EF4444",
+    color: "#F87171",
     icon: HeartPulse,
     route: "sante",
   },
-
   evenements: {
     label: "Événements",
-    color: "#EC4899",
+    color: "#F472B6",
     icon: CalendarDays,
     route: "evenements",
   },
-
   events: {
     label: "Événements",
-    color: "#EC4899",
+    color: "#F472B6",
     icon: CalendarDays,
     route: "evenements",
   },
-
   community: {
     label: "Communauté",
-    color: "#A855F7",
+    color: "#C084FC",
     icon: Users,
     route: "community",
   },
-
   transport: {
     label: "Transport",
-    color: "#3B82F6",
+    color: "#60A5FA",
     icon: MapPin,
     route: "transport",
   },
-
   agri: {
     label: "Agriculture",
-    color: "#22C55E",
+    color: "#4ADE80",
     icon: TrendingUp,
     route: "agri",
   },
-
   agriculture: {
     label: "Agriculture",
-    color: "#22C55E",
+    color: "#4ADE80",
     icon: TrendingUp,
     route: "agri",
   },
-
   media: {
     label: "Actualités",
-    color: "#06B6D4",
+    color: "#22D3EE",
     icon: Newspaper,
     route: "media",
   },
-
-  live: {
-    label: "Live",
-    color: "#EF4444",
-    icon: Zap,
-    route: "live",
-  },
-
+  live: { label: "Live", color: "#F87171", icon: Zap, route: "live" },
   voyages: {
     label: "Voyages",
-    color: "#6366F1",
+    color: "#818CF8",
     icon: MapPin,
     route: "voyages",
   },
@@ -198,11 +166,10 @@ function getModuleKey(item: DailyBriefItem): string {
 
 function getModuleMeta(item: DailyBriefItem) {
   const key = getModuleKey(item);
-
   return (
     MODULE_META[key] ?? {
       label: "Pour vous",
-      color: "#06B6D4",
+      color: "#22D3EE",
       icon: Sparkles,
       route: key || "home",
     }
@@ -224,12 +191,10 @@ function getItemTitle(item: DailyBriefItem): string {
 
 function getItemDescription(item: DailyBriefItem): string {
   const source = item.description ?? item.content ?? "";
-
   const clean = source
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-
   return clean.length > 120 ? `${clean.slice(0, 117)}…` : clean;
 }
 
@@ -238,65 +203,27 @@ function getTimestamp(item: DailyBriefItem): number {
 }
 
 function relativeTime(timestamp: number): string {
-  if (!timestamp) {
-    return "Récemment";
-  }
-
+  if (!timestamp) return "Récemment";
   const diff = Date.now() - timestamp;
-
   const minutes = Math.floor(diff / 60000);
-
-  if (minutes < 1) {
-    return "À l'instant";
-  }
-
-  if (minutes < 60) {
-    return `Il y a ${minutes} min`;
-  }
-
+  if (minutes < 1) return "À l'instant";
+  if (minutes < 60) return `Il y a ${minutes} min`;
   const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) {
-    return `Il y a ${hours} h`;
-  }
-
+  if (hours < 24) return `Il y a ${hours} h`;
   const days = Math.floor(hours / 24);
-
-  if (days === 1) {
-    return "Hier";
-  }
-
-  if (days < 7) {
-    return `Il y a ${days} j`;
-  }
-
-  return new Date(timestamp).toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "short",
-  });
+  if (days === 1) return "Hier";
+  if (days < 7) return `Il y a ${days} j`;
+  const d = new Date(timestamp);
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
 function getGreeting(): string {
   const hour = new Date().getHours();
-
-  if (hour < 5) {
-    return "Bonne nuit";
-  }
-
-  if (hour < 12) {
-    return "Bonjour";
-  }
-
-  if (hour < 18) {
-    return "Bon après-midi";
-  }
-
+  if (hour < 5) return "Bonne nuit";
+  if (hour < 12) return "Bonjour";
+  if (hour < 18) return "Bon après-midi";
   return "Bonsoir";
 }
-
-/* ============================================================================
- * SMART SUMMARY
- * ========================================================================== */
 
 function buildSummary(items: DailyBriefItem[]): {
   total: number;
@@ -305,28 +232,15 @@ function buildSummary(items: DailyBriefItem[]): {
   newestLabel?: string;
 } {
   const modules = new Set<string>();
-
   for (const item of items) {
     const key = getModuleKey(item);
-
-    if (key) {
-      modules.add(key);
-    }
+    if (key) modules.add(key);
   }
-
   const newest = [...items].sort(
     (a, b) => getTimestamp(b) - getTimestamp(a),
   )[0];
-
-  if (!newest) {
-    return {
-      total: 0,
-      moduleCount: modules.size,
-    };
-  }
-
+  if (!newest) return { total: 0, moduleCount: modules.size };
   const meta = getModuleMeta(newest);
-
   return {
     total: items.length,
     moduleCount: modules.size,
@@ -336,42 +250,184 @@ function buildSummary(items: DailyBriefItem[]): {
 }
 
 /* ============================================================================
+ * ENTRANCE WRAPPER
+ * ========================================================================== */
+
+function FadeUp({
+  delay = 0,
+  distance = 14,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: ReactNode;
+  style?: any;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 480,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [distance, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * PULSING SPARKLE (header logo)
+ * ========================================================================== */
+
+function PulsingSparkle() {
+  const pulse = useRef(new Animated.Value(0)).current;
+  const ring = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    Animated.loop(
+      Animated.timing(ring, {
+        toValue: 1,
+        duration: 2400,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, [pulse, ring]);
+
+  const glowScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.06],
+  });
+  const ringScale = ring.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.9, 1.55],
+  });
+  const ringOpacity = ring.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.65, 0],
+  });
+
+  return (
+    <View style={styles.headerIconWrap}>
+      <Animated.View
+        style={[
+          styles.headerIconRing,
+          { opacity: ringOpacity, transform: [{ scale: ringScale }] },
+        ]}
+      />
+      <Animated.View
+        style={[styles.headerIconHalo, { transform: [{ scale: glowScale }] }]}
+      />
+      <LinearGradient
+        colors={["#A5B4FC", "#818CF8", "#6366F1"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerIconGradient}
+      >
+        <Sparkles size={20} color="#fff" strokeWidth={2.2} />
+      </LinearGradient>
+    </View>
+  );
+}
+
+/* ============================================================================
  * SKELETON
  * ========================================================================== */
 
 function DailyBriefSkeleton() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  const opacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 0.9],
+  });
+
   return (
-    <View className="mx-5 mt-4">
-      <View
-        className="overflow-hidden rounded-[32px] p-4"
-        style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-      >
-        <View className="flex items-center gap-3">
-          <View
-            className="h-12 w-12 animate-pulse rounded-2xl"
-            style={{ backgroundColor: "rgba(255,255,255,.07)" }}
-          />
+    <View style={styles.wrapperOuter}>
+      <View style={styles.surface}>
+        <LinearGradient
+          colors={[
+            "rgba(99,102,241,0.12)",
+            "rgba(15,7,32,0.65)",
+            "rgba(10,6,24,0.9)",
+          ]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.borderRing} pointerEvents="none" />
 
-          <View className="flex-1 space-y-2">
-            <View
-              className="h-3 w-32 animate-pulse rounded-full"
-              style={{ backgroundColor: "rgba(255,255,255,.08)" }}
-            />
-
-            <View
-              className="h-2.5 w-52 animate-pulse rounded-full"
-              style={{ backgroundColor: "rgba(255,255,255,.05)" }}
-            />
+        <View style={styles.skeletonHeader}>
+          <Animated.View style={[styles.skeletonLogo, { opacity }]} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <Animated.View style={[styles.skeletonLine1, { opacity }]} />
+            <Animated.View style={[styles.skeletonLine2, { opacity }]} />
           </View>
         </View>
 
-        <View className="mt-4 space-y-2">
-          {[1, 2, 3].map((item) => (
-            <View
-              key={item}
-              className="h-16 animate-pulse rounded-2xl"
-              style={{ backgroundColor: "rgba(255,255,255,.045)" }}
-            />
+        <View style={{ gap: 10, padding: 12 }}>
+          {[1, 2, 3].map((i) => (
+            <Animated.View key={i} style={[styles.skeletonRow, { opacity }]} />
           ))}
         </View>
       </View>
@@ -380,7 +436,7 @@ function DailyBriefSkeleton() {
 }
 
 /* ============================================================================
- * EMPTY
+ * EMPTY STATE
  * ========================================================================== */
 
 function DailyBriefEmpty({
@@ -388,54 +444,148 @@ function DailyBriefEmpty({
 }: {
   onNavigate: (page: string) => void;
 }) {
+  const float = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(float, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(float, {
+          toValue: 0,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [float]);
+
+  const translateY = float.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -5],
+  });
+
   return (
-    <View
-      className="mx-5 mt-4"
-    >
-      <View
-        className="relative overflow-hidden rounded-[32px] p-5"
-        style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.07)", borderStyle: "solid" }}
-      >
-        <View
-          className="absolute -right-16 -top-16 h-40 w-40 rounded-full"
-          style={{  }}
-        />
+    <FadeUp distance={12}>
+      <View style={styles.wrapperOuter}>
+        <View style={styles.surface}>
+          <LinearGradient
+            colors={[
+              "rgba(99,102,241,0.14)",
+              "rgba(15,7,32,0.7)",
+              "rgba(10,6,24,0.9)",
+            ]}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.borderRing} pointerEvents="none" />
+          <View style={styles.emptyOrb} pointerEvents="none" />
 
-        <View className="relative flex items-center gap-4">
-          <View
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: "rgba(99,102,241,.14)", borderWidth: 1, borderColor: "rgba(129,140,248,.18)", borderStyle: "solid" }}
-          >
-            <Sparkles size={20} className="text-indigo-300" />
+          <View style={styles.emptyRow}>
+            <Animated.View style={{ transform: [{ translateY }] }}>
+              <LinearGradient
+                colors={["rgba(129,140,248,0.35)", "rgba(99,102,241,0.15)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.emptyIcon}
+              >
+                <Sparkles size={20} color="#fff" />
+              </LinearGradient>
+            </Animated.View>
+
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.emptyTitle}>Votre DailyBrief se prépare</Text>
+              <Text style={styles.emptySub}>
+                Dès que votre espace contient des nouveautés, nous vous
+                montrerons l'essentiel ici.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => onNavigate("community")}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.emptyArrowBtn,
+                pressed && styles.pressed,
+              ]}
+            >
+              <ArrowRight size={14} color="rgba(255,255,255,0.7)" />
+            </Pressable>
           </View>
-
-          <View className="min-w-0 flex-1">
-            <Text className="text-[13px] font-bold text-white">
-              Votre DailyBrief se prépare
-            </Text>
-
-            <Text className="mt-1 text-[9px] leading-relaxed text-white/35">
-              Dès que votre espace contient des nouveautés, nous vous montrerons
-              l’essentiel ici.
-            </Text>
-          </View>
-
-          <Pressable
-           
-            onPress={() => onNavigate("community")}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40"
-            style={{ backgroundColor: "rgba(255,255,255,.05)" }}
-          >
-            <ArrowRight size={14} />
-          </Pressable>
         </View>
       </View>
-    </View>
+    </FadeUp>
   );
 }
 
 /* ============================================================================
- * ITEM
+ * SUMMARY TILE
+ * ========================================================================== */
+
+function SummaryTile({
+  icon,
+  label,
+  value,
+  accent,
+  delay,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  accent: string;
+  delay: number;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 460,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.summaryTileWrap,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [10, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.summaryTile}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {icon}
+          <Text style={[styles.summaryLabel, { color: accent }]}>{label}</Text>
+        </View>
+        <Text style={styles.summaryValue} numberOfLines={1}>
+          {value}
+        </Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * BRIEF ITEM
  * ========================================================================== */
 
 function BriefItem({
@@ -450,11 +600,8 @@ function BriefItem({
   onOpenItem?: (item: DailyBriefItem) => void;
 }) {
   const meta = getModuleMeta(item);
-
   const Icon = meta.icon;
-
   const title = getItemTitle(item);
-
   const description = getItemDescription(item);
 
   const hasImage =
@@ -467,107 +614,121 @@ function BriefItem({
         ? item.coverUrl
         : undefined;
 
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 440,
+      delay: 220 + index * 70,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, index]);
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [10, 0],
+  });
+
   const handleClick = () => {
     if (onOpenItem) {
       onOpenItem(item);
       return;
     }
-
     if (meta.route) {
       onNavigate(meta.route);
     }
   };
 
   return (
-    <Pressable
-      onPress={handleClick}
-      className="group relative flex w-full items-center gap-3 overflow-hidden rounded-[22px] p-3 text-left"
-      style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.055)", borderStyle: "solid" }}
-    >
-      {/* Accent */}
-      <View
-        className="absolute bottom-0 left-0 top-0 w-[2px]"
-        style={{ backgroundColor: meta.color, opacity: 0.75 }}
-      />
+    <Animated.View style={{ opacity: anim, transform: [{ translateY }] }}>
+      <Pressable
+        onPress={handleClick}
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        style={({ pressed }) => [
+          styles.itemCard,
+          {
+            borderColor: `${meta.color}33`,
+          },
+          pressed && styles.pressed,
+        ]}
+      >
+        {/* Gradient wash */}
+        <LinearGradient
+          colors={[`${meta.color}14`, "rgba(255,255,255,0)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
 
-      {/* Image / Icon */}
-      {hasImage && image ? (
-        <View
-          className="h-12 w-12 shrink-0 overflow-hidden rounded-[15px]"
-          style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}
-        >
-          <Image
-           
-           
-            className="h-full w-full object-cover"
-            loading="lazy"
-           source={{ uri: image }} accessibilityLabel=""/>
-        </View>
-      ) : (
-        <View
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px]"
-          style={{ backgroundColor: `${meta.color}12`, borderStyle: "solid" }}
-        >
-          <Icon
-            size={18}
-            style={{
-              color: meta.color,
-            }}
-          />
-        </View>
-      )}
+        {/* Accent bar */}
+        <View style={[styles.itemAccent, { backgroundColor: meta.color }]} />
 
-      {/* Content */}
-      <View className="min-w-0 flex-1">
-        <View className="flex items-center gap-1.5">
-          <Text
-            className="text-[8px] font-black uppercase tracking-[0.12em]"
-            style={{
-              color: meta.color,
-            }}
+        {/* Image / Icon */}
+        {hasImage && image ? (
+          <View
+            style={[styles.itemImageWrap, { borderColor: `${meta.color}55` }]}
           >
-            {meta.label}
-          </Text>
-
-          <Text className="text-[8px] text-white/20">•</Text>
-
-          <Text className="text-[8px] text-white/25">
-            {relativeTime(getTimestamp(item))}
-          </Text>
-        </View>
-
-        <Text className="mt-1 text-[11px] font-bold text-white">
-          {title}
-        </Text>
-
-        {description && description !== title && (
-          <Text className="mt-0.5 text-[9px] leading-relaxed text-white/30">
-            {description}
-          </Text>
-        )}
-
-        {item.city && (
-          <View className="mt-1 flex items-center gap-1">
-            <MapPin size={8} className="text-white/25" />
-
-            <Text className="text-[8px] text-white/25">{item.city}</Text>
+            <Image
+              source={{ uri: image }}
+              style={styles.itemImage}
+              accessibilityLabel={title}
+            />
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.itemIconWrap,
+              {
+                backgroundColor: `${meta.color}22`,
+                borderColor: `${meta.color}55`,
+              },
+            ]}
+          >
+            <Icon size={18} color={meta.color} />
           </View>
         )}
-      </View>
 
-      {/* Arrow */}
-      <View
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-        style={{ backgroundColor: "rgba(255,255,255,.04)" }}
-      >
-        <ChevronRight size={12} className="text-white/25" />
-      </View>
-    </Pressable>
+        {/* Content */}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={styles.itemMetaRow}>
+            <Text style={[styles.itemModuleLabel, { color: meta.color }]}>
+              {meta.label}
+            </Text>
+            <Text style={styles.itemMetaDot}>•</Text>
+            <Text style={styles.itemTime}>
+              {relativeTime(getTimestamp(item))}
+            </Text>
+          </View>
+          <Text style={styles.itemTitle} numberOfLines={2}>
+            {title}
+          </Text>
+          {description && description !== title ? (
+            <Text style={styles.itemDescription} numberOfLines={2}>
+              {description}
+            </Text>
+          ) : null}
+          {item.city ? (
+            <View style={styles.itemCityRow}>
+              <MapPin size={9} color="rgba(255,255,255,0.4)" />
+              <Text style={styles.itemCity}>{item.city}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Arrow */}
+        <View style={[styles.itemArrow, { borderColor: `${meta.color}33` }]}>
+          <ChevronRight size={13} color={`${meta.color}CC`} />
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 /* ============================================================================
- * MAIN
+ * MAIN COMPONENT
  * ========================================================================== */
 
 export default function DailyBrief({
@@ -578,10 +739,19 @@ export default function DailyBrief({
   onOpenItem,
 }: DailyBriefProps) {
   const [dismissed, setDismissed] = useState(false);
+  const cardAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(cardAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [cardAnim]);
 
   const cleanItems = useMemo(() => {
     const seen = new Set<string>();
-
     return [...items]
       .filter(Boolean)
       .sort(
@@ -590,11 +760,7 @@ export default function DailyBrief({
       )
       .filter((item) => {
         const key = String(item._id ?? item.id ?? getItemTitle(item));
-
-        if (seen.has(key)) {
-          return false;
-        }
-
+        if (seen.has(key)) return false;
         seen.add(key);
         return true;
       })
@@ -603,195 +769,609 @@ export default function DailyBrief({
 
   const summary = useMemo(() => buildSummary(cleanItems), [cleanItems]);
 
-  if (dismissed) {
-    return null;
-  }
+  if (dismissed) return null;
 
   if (cleanItems.length === 0) {
     return <DailyBriefEmpty onNavigate={onNavigate} />;
   }
 
   const greeting = getGreeting();
-
   const firstName = userName?.trim().split(/\s+/)[0] ?? "";
 
+  const translateY = cardAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [18, 0],
+  });
+  const scale = cardAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.985, 1],
+  });
+
   return (
-    <View
-      className="mx-5 mt-4"
+    <Animated.View
+      style={[
+        styles.wrapperOuter,
+        { opacity: cardAnim, transform: [{ translateY }, { scale }] },
+      ]}
       accessibilityLabel="DailyBrief"
     >
-      <View
-        className="relative overflow-hidden rounded-[32px]"
-        style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}
-      >
-        {/* ====================================================================
-            AMBIENT LIGHT
-           ================================================================== */}
-
-        <View
-          className="absolute -right-20 -top-24 h-60 w-60 rounded-full"
-          style={{  }}
+      <View style={styles.surface}>
+        {/* Base gradient */}
+        <LinearGradient
+          colors={[
+            "rgba(99,102,241,0.16)",
+            "rgba(15,7,32,0.72)",
+            "rgba(10,6,24,0.92)",
+          ]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
         />
 
-        <View
-          className="absolute -bottom-28 -left-10 h-52 w-52 rounded-full"
-          style={{  }}
-        />
+        {/* Top highlight */}
+        <View style={styles.topHighlight} pointerEvents="none" />
 
-        {/* ====================================================================
-            HEADER
-           ================================================================== */}
+        {/* Ambient orbs */}
+        <AmbientOrbs />
 
-        <View className="relative flex items-start gap-3 px-4 pb-3 pt-4">
-          <View
-            className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[17px]"
-            style={{ borderWidth: 1, borderColor: "rgba(165,180,252,.18)", borderStyle: "solid" }}
-          >
-            <Sparkles size={20} className="text-indigo-200" strokeWidth={2} />
+        {/* Border ring */}
+        <View style={styles.borderRing} pointerEvents="none" />
 
-            <Text
-              className="absolute inset-1 rounded-[15px]"
-              style={{ borderWidth: 1, borderColor: "rgba(165,180,252,.35)", borderStyle: "solid" }}
-            />
-          </View>
+        {/* ───── HEADER ───── */}
+        <View style={styles.header}>
+          <PulsingSparkle />
 
-          <View className="min-w-0 flex-1">
-            <View className="flex items-center gap-2">
-              <Text className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-200">
-                DailyBrief
-              </Text>
-
-              <Text
-                className="h-1.5 w-1.5 rounded-full bg-emerald-400"
-               
-              />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={styles.headerEyebrowRow}>
+              <Text style={styles.headerEyebrow}>DAILYBRIEF</Text>
+              <View style={styles.onlineDot} />
             </View>
-
-            <Text className="mt-1 text-[16px] font-black tracking-[-0.02em] text-white">
+            <Text style={styles.headerTitle}>
               {greeting}
               {firstName ? ` ${firstName}` : ""}.
             </Text>
-
-            <Text className="mt-0.5 text-[9px] leading-relaxed text-white/35">
-              Voici ce qui mérite votre attention aujourd’hui
+            <Text style={styles.headerSub}>
+              Voici ce qui mérite votre attention aujourd'hui
               {city ? ` à ${city}` : ""}.
             </Text>
           </View>
 
           <Pressable
-           
             onPress={() => setDismissed(true)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white/25"
-            style={{ backgroundColor: "rgba(255,255,255,.04)" }}
+            hitSlop={8}
             accessibilityLabel="Masquer DailyBrief"
+            style={({ pressed }) => [
+              styles.dismissBtn,
+              pressed && styles.pressed,
+            ]}
           >
-            <X size={12} />
+            <X size={13} color="rgba(255,255,255,0.55)" />
           </Pressable>
         </View>
 
-        {/* ====================================================================
-            QUICK STATS
-           ================================================================== */}
-
-        <View className="relative gap-2 px-3 pb-3">
-          <View
-            className="rounded-2xl px-3 py-2"
-            style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.05)", borderStyle: "solid" }}
-          >
-            <View className="flex items-center gap-1.5">
-              <Bell size={10} className="text-indigo-300" />
-
-              <Text className="text-[8px] font-bold uppercase tracking-wide text-white/25">
-                À voir
-              </Text>
-            </View>
-
-            <Text className="mt-1 text-[15px] font-black text-white">
-              {summary.total}
-            </Text>
-          </View>
-
-          <View
-            className="rounded-2xl px-3 py-2"
-            style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.05)", borderStyle: "solid" }}
-          >
-            <View className="flex items-center gap-1.5">
-              <Flame size={10} className="text-orange-300" />
-
-              <Text className="text-[8px] font-bold uppercase tracking-wide text-white/25">
-                Tendances
-              </Text>
-            </View>
-
-            <Text className="mt-1 text-[15px] font-black text-white">
-              {summary.moduleCount}
-            </Text>
-          </View>
-
-          <View
-            className="rounded-2xl px-3 py-2"
-            style={{ backgroundColor: "rgba(255,255,255,.045)", borderWidth: 1, borderColor: "rgba(255,255,255,.05)", borderStyle: "solid" }}
-          >
-            <View className="flex items-center gap-1.5">
-              <Clock3 size={10} className="text-cyan-300" />
-
-              <Text className="text-[8px] font-bold uppercase tracking-wide text-white/25">
-                Nouveau
-              </Text>
-            </View>
-
-            <Text className="mt-1 truncate text-[10px] font-black text-white">
-              {summary.newestLabel ?? "Pour vous"}
-            </Text>
-          </View>
+        {/* ───── SUMMARY TILES ───── */}
+        <View style={styles.summaryRow}>
+          <SummaryTile
+            icon={<Bell size={11} color="#A5B4FC" />}
+            label="À VOIR"
+            value={String(summary.total)}
+            accent="#A5B4FC"
+            delay={120}
+          />
+          <SummaryTile
+            icon={<Flame size={11} color="#FB923C" />}
+            label="TENDANCES"
+            value={String(summary.moduleCount)}
+            accent="#FB923C"
+            delay={180}
+          />
+          <SummaryTile
+            icon={<Clock3 size={11} color="#67E8F9" />}
+            label="NOUVEAU"
+            value={summary.newestLabel ?? "Pour vous"}
+            accent="#67E8F9"
+            delay={240}
+          />
         </View>
 
-        {/* ====================================================================
-            ITEMS
-           ================================================================== */}
-
-        <View className="relative space-y-2 px-3 pb-3">
-          <>
-            {cleanItems.map((item, index) => (
-              <BriefItem
-                key={String(item._id ?? item.id ?? index)}
-                item={item}
-                index={index}
-                onNavigate={onNavigate}
-                onOpenItem={onOpenItem}
-              />
-            ))}
-          </>
+        {/* ───── ITEMS ───── */}
+        <View style={styles.itemsWrap}>
+          {cleanItems.map((item, index) => (
+            <BriefItem
+              key={String(item._id ?? item.id ?? index)}
+              item={item}
+              index={index}
+              onNavigate={onNavigate}
+              onOpenItem={onOpenItem}
+            />
+          ))}
         </View>
 
-        {/* ====================================================================
-            FOOTER
-           ================================================================== */}
-
-        <View
-          className="relative flex items-center gap-2 border-t px-4 py-3"
-          style={{
-            borderColor: "rgba(255,255,255,.055)",
-          }}
-        >
-          <View
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
-            style={{ backgroundColor: "rgba(99,102,241,.10)" }}
-          >
-            <Sparkles size={10} className="text-indigo-300" />
+        {/* ───── FOOTER ───── */}
+        <FadeUp delay={520} distance={8}>
+          <View style={styles.footer}>
+            <View style={styles.footerIcon}>
+              <Sparkles size={10} color="#A5B4FC" />
+            </View>
+            <Text style={styles.footerText} numberOfLines={1}>
+              Sélection personnalisée à partir de votre espace.
+            </Text>
+            <Pressable
+              onPress={() => onNavigate("community")}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.footerLink,
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Text style={styles.footerLinkText}>Tout voir</Text>
+              <ArrowRight size={10} color="#A5B4FC" />
+            </Pressable>
           </View>
-
-          <Text className="min-w-0 flex-1 truncate text-[8px] font-medium text-white/25">
-            <Text>Sélection personnalisée à partir de votre espace.</Text></Text>
-
-          <Pressable
-            onPress={() => onNavigate("community")}
-            className="flex shrink-0 items-center gap-1 text-[9px] font-bold text-indigo-200"
-          >
-            <Text>Tout voir</Text><ArrowRight size={10} />
-          </Pressable>
-        </View>
+        </FadeUp>
       </View>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * AMBIENT ORBS
+ * ========================================================================== */
+
+function AmbientOrbs() {
+  const orbA = useRef(new Animated.Value(0)).current;
+  const orbB = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = (v: Animated.Value, to: number, dur: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(v, {
+            toValue: to,
+            duration: dur,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(v, {
+            toValue: 0,
+            duration: dur,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    loop(orbA, 1, 5000);
+    loop(orbB, 1, 6000);
+  }, [orbA, orbB]);
+
+  const scaleA = orbA.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.1],
+  });
+  const opacityA = orbA.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.55],
+  });
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 240,
+            height: 240,
+            top: -120,
+            right: -80,
+            backgroundColor: "rgba(99,102,241,0.55)",
+            opacity: opacityA,
+            transform: [{ scale: scaleA }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          {
+            width: 220,
+            height: 220,
+            bottom: -140,
+            left: -60,
+            backgroundColor: "rgba(139,92,246,0.4)",
+          },
+        ]}
+      />
     </View>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  pressed: { opacity: 0.85, transform: [{ scale: 0.985 }] },
+
+  // ── Wrapper / surface
+  wrapperOuter: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderRadius: 32,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 12,
+  },
+  surface: {
+    borderRadius: 32,
+    overflow: "hidden",
+    backgroundColor: "#0B061E",
+  },
+  topHighlight: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  borderRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.2)",
+  },
+  orb: {
+    position: "absolute",
+    borderRadius: 9999,
+  },
+
+  // ── Header icon
+  headerIconWrap: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerIconHalo: {
+    position: "absolute",
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "rgba(129,140,248,0.45)",
+  },
+  headerIconRing: {
+    position: "absolute",
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "rgba(165,180,252,0.55)",
+  },
+  headerIconGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.75,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+  },
+
+  // ── Header
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  headerEyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerEyebrow: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 2,
+    color: "#C7D2FE",
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#34D399",
+    shadowColor: "#34D399",
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  headerTitle: {
+    marginTop: 6,
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.5,
+  },
+  headerSub: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 16,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "500",
+  },
+  dismissBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  // ── Summary row
+  summaryRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 14,
+  },
+  summaryTileWrap: {
+    flex: 1,
+  },
+  summaryTile: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  summaryLabel: {
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  summaryValue: {
+    marginTop: 5,
+    fontSize: 15,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+
+  // ── Items
+  itemsWrap: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  itemCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  itemAccent: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 2,
+    opacity: 0.9,
+  },
+  itemImageWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  itemImage: {
+    width: "100%",
+    height: "100%",
+  },
+  itemIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  itemMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  itemModuleLabel: {
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  itemMetaDot: {
+    fontSize: 8.5,
+    color: "rgba(255,255,255,0.25)",
+  },
+  itemTime: {
+    fontSize: 8.5,
+    color: "rgba(255,255,255,0.35)",
+    fontWeight: "600",
+  },
+  itemTitle: {
+    marginTop: 5,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.2,
+    lineHeight: 16,
+  },
+  itemDescription: {
+    marginTop: 3,
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "500",
+  },
+  itemCityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 5,
+  },
+  itemCity: {
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "600",
+  },
+  itemArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+  },
+
+  // ── Footer
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(0,0,0,0.15)",
+  },
+  footerIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(99,102,241,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.28)",
+  },
+  footerText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 9.5,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  footerLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 4,
+  },
+  footerLinkText: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "#A5B4FC",
+    letterSpacing: 0.1,
+  },
+
+  // ── Empty
+  emptyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 18,
+  },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(165,180,252,0.3)",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  emptyTitle: {
+    fontSize: 13.5,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+  emptySub: {
+    marginTop: 4,
+    fontSize: 10.5,
+    lineHeight: 15,
+    color: "rgba(255,255,255,0.45)",
+    fontWeight: "500",
+  },
+  emptyOrb: {
+    position: "absolute",
+    width: 160,
+    height: 160,
+    borderRadius: 9999,
+    top: -60,
+    right: -60,
+    backgroundColor: "rgba(99,102,241,0.2)",
+  },
+  emptyArrowBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  // ── Skeleton
+  skeletonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 16,
+  },
+  skeletonLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+  skeletonLine1: {
+    height: 12,
+    width: 130,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  skeletonLine2: {
+    height: 10,
+    width: 200,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  skeletonRow: {
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+});

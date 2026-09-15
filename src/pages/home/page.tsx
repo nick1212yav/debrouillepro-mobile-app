@@ -1,58 +1,63 @@
-import { Pressable, View, Text } from "react-native";
-
 // src/pages/home/page.tsx
-import { useState, lazy, Suspense, useEffect, useMemo } from "react";
-import type { ReactElement } from "react";
-import PageTransition from "@/components/PageTransition";
+import { Pressable, View, Text, Platform, StyleSheet } from "react-native";
+import {
+  useState,
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  type ReactElement,
+} from "react";
+import PageTransition from "@/components/PageTransition.tsx";
 import { Sparkles } from "lucide-react-native";
 import { useMutation, useQuery } from "convex/react";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.js";
-import TopBar from "./_components/TopBar";
-import WeatherBar from "./_components/WeatherBar";
-import SmartSearch from "./_components/SmartSearch";
-import AIBanner from "./_components/AIBanner";
-import AIPersonalizedSuggestion from "./_components/AIPersonalizedSuggestion";
-import Stories from "./_components/Stories";
-import HomeWidget from "./_components/HomeWidget";
-import GlobalContextBar from "./_components/GlobalContextBar";
-import DailyBrief, { type DailyBriefItem } from "./_components/DailyBrief";
+import TopBar from "./_components/TopBar.tsx";
+import WeatherBar from "./_components/WeatherBar.tsx";
+import SmartSearch from "./_components/SmartSearch.tsx";
+import AIBanner from "./_components/AIBanner.tsx";
+import AIPersonalizedSuggestion from "./_components/AIPersonalizedSuggestion.tsx";
+import Stories from "./_components/Stories.tsx";
+import HomeWidget from "./_components/HomeWidget.tsx";
+import GlobalContextBar from "./_components/GlobalContextBar.tsx";
+import DailyBrief, { type DailyBriefItem } from "./_components/DailyBrief.tsx";
 import HomeCommandCenter, {
   type HomeCommandItem,
   type HomeCommandModule,
-} from "./_components/HomeCommandCenter";
-import SmartContextSuggestions from "./_components/SmartContextSuggestions";
-import OpportunityRadar from "./_components/OpportunityRadar";
-import NearbyNow from "./_components/NearbyNow";
+} from "./_components/HomeCommandCenter.tsx";
+import SmartContextSuggestions from "./_components/SmartContextSuggestions.tsx";
+import OpportunityRadar from "./_components/OpportunityRadar.tsx";
+import NearbyNow from "./_components/NearbyNow.tsx";
 import HomeActivityPulse, {
   type HomeActivityPulseItem,
-} from "./_components/HomeActivityPulse";
-import StreakWidget from "./_components/StreakWidget";
-import PersonalizedFeed from "./_components/PersonalizedFeed";
-import OfflineBanner from "./_components/OfflineBanner";
-import LandingPage from "./_components/LandingPage";
-import TabBar from "./_components/TabBar";
-import SideDrawer from "./_components/SideDrawer";
-import CreateBottomSheet from "./_components/CreateBottomSheet";
-import AIAssistant from "./_components/AIAssistant";
-import AIFloatingButton from "@/components/ui/ai-floating-button";
+} from "./_components/HomeActivityPulse.tsx";
+import StreakWidget from "./_components/StreakWidget.tsx";
+import PersonalizedFeed from "./_components/PersonalizedFeed.tsx";
+import OfflineBanner from "./_components/OfflineBanner.tsx";
+import LandingPage from "./_components/LandingPage.tsx";
+import TabBar from "./_components/TabBar.tsx";
+import SideDrawer from "./_components/SideDrawer.tsx";
+import CreateBottomSheet from "./_components/CreateBottomSheet.tsx";
+import AIAssistant from "./_components/AIAssistant.tsx";
+import AIFloatingButton from "@/components/ui/ai-floating-button.tsx";
 import OnboardingScreen, {
   hasCompletedOnboarding,
-} from "./_components/OnboardingScreen";
-import OnboardingFlow from "./_components/OnboardingFlow";
-import AdvancedSearch from "./_components/AdvancedSearch";
-import PullToRefresh from "./_components/PullToRefresh";
-import NotificationCenter from "./_components/NotificationCenter";
-import { useBadges } from "@/hooks/use-badges";
-import CommandPalette from "@/components/CommandPalette";
-import Confetti, { useConfetti } from "@/components/Confetti";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "./_components/OnboardingScreen.tsx";
+import OnboardingFlow from "./_components/OnboardingFlow.tsx";
+import AdvancedSearch from "./_components/AdvancedSearch.tsx";
+import PullToRefresh from "./_components/PullToRefresh.tsx";
+import NotificationCenter from "./_components/NotificationCenter.tsx";
+import { useBadges } from "@/hooks/use-badges.ts";
+import CommandPalette from "@/components/CommandPalette.tsx";
+import Confetti, { useConfetti } from "@/components/Confetti.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useHome } from "@/home/hooks/useHome";
 import { HomeFeed } from "@/home/components/HomeFeed";
 import type { HomeSectionItem } from "@/home/types/home-section.types";
 
-// ── Lazy-loaded module pages ───────────────────────────────────────────────────
+// ── Lazy-loaded module pages ─────────────────────────────────────────────────
 const ImmoPage = lazy(() => import("../modules/ImmoPage.tsx"));
 const JobsPage = lazy(() => import("../modules/JobsPage.tsx"));
 const TransportPage = lazy(() => import("../modules/TransportPage.tsx"));
@@ -187,11 +192,8 @@ const ChallengesPage = lazy(() => import("../modules/ChallengesPage.tsx"));
 // ── Module loading skeleton ──────────────────────────────────────────────────
 function ModuleSkeleton() {
   return (
-    <View
-      className="h-full w-full flex flex-col gap-4 px-5 pt-14"
-      style={{  }}
-    >
-      <View className="flex items-center gap-3">
+    <View style={styles.skeletonRoot}>
+      <View style={styles.skeletonHeader}>
         <Skeleton className="w-10 h-10 rounded-2xl" />
         <Skeleton className="h-6 w-40 rounded-xl" />
       </View>
@@ -411,7 +413,6 @@ export default function HomePage() {
   const {
     data: homeData,
     intelligence: homeIntelligence,
-    modules: homeModules,
     preferences: homePreferences,
     isLoading: homeLoading,
     sections: homeSections,
@@ -454,31 +455,25 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!isAuthenticated || smartNotifsSent) return;
-
     setSmartNotifsSent(true);
     sendSmartNotifs({}).catch(() => null);
   }, [isAuthenticated, smartNotifsSent, sendSmartNotifs]);
 
   const handleRefresh = async () => {
     await refreshHome();
-
     await new Promise<void>((resolve) => setTimeout(resolve, 300));
-
     setFeedKey((key) => key + 1);
   };
 
   const homeFeedItems = useMemo<HomeSectionItem[]>(() => {
     const hiddenSections = new Set(homePreferences.hiddenSections);
 
-    // 1. Sections Home disponibles
     const sectionItems: HomeSectionItem[] = homeSections
       .filter((section) => !hiddenSections.has(section.type))
       .flatMap((section) => section.items ?? []);
 
-    // 2. Recommandations disponibles
     const recommendationItems: HomeSectionItem[] = homeRecommendations ?? [];
 
-    // 3. Feed backend actuel — fallback
     const backendFeed: HomeSectionItem[] =
       homeData &&
       typeof homeData === "object" &&
@@ -490,15 +485,6 @@ export default function HomePage() {
         ? (homeData.feed.page as HomeSectionItem[])
         : [];
 
-    /*
-     * Priorité :
-     *
-     * sections + recommendations
-     *        ↓
-     * si aucune donnée
-     *        ↓
-     * feed Convex actuel
-     */
     const primaryItems: HomeSectionItem[] = [
       ...recommendationItems,
       ...sectionItems,
@@ -507,21 +493,12 @@ export default function HomePage() {
     const sourceItems: HomeSectionItem[] =
       primaryItems.length > 0 ? primaryItems : backendFeed;
 
-    // Déduplication
     const seen = new Set<string>();
 
     return sourceItems.filter((item, index) => {
-      const value = item as {
-        id?: string;
-        _id?: string;
-      };
-
+      const value = item as { id?: string; _id?: string };
       const id = value.id ?? value._id ?? `home-feed-item-${index}`;
-
-      if (seen.has(id)) {
-        return false;
-      }
-
+      if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
@@ -531,6 +508,7 @@ export default function HomePage() {
     homeRecommendations,
     homePreferences.hiddenSections,
   ]);
+
   const intelligenceView = useMemo(() => {
     const intelligence = homeIntelligence;
     if (!intelligence) return null;
@@ -573,12 +551,9 @@ export default function HomePage() {
         .map((item) => toRecord(item))
         .map((record, index): HomeCommandModule | null => {
           const id = toString(record.id) ?? toString(record.moduleId);
-
           if (!id) return null;
-
           const shortLabel = toString(record.shortLabel);
           const icon = toString(record.icon);
-
           return {
             id,
             label: toString(record.label) ?? id,
@@ -649,7 +624,6 @@ export default function HomePage() {
   const navigate = (page: string) => {
     if (IMPLEMENTED.includes(page)) {
       setCurrentPage(page as PageKey);
-
       if (email) {
         logActivity({
           type: "view_module",
@@ -658,7 +632,6 @@ export default function HomePage() {
           target: page,
         }).catch(() => null);
       }
-
       awardXp(5, `Module visité : ${page}`, "module_visit").catch(() => null);
       checkBadges("module_visited").catch(() => null);
     }
@@ -673,14 +646,11 @@ export default function HomePage() {
   const withAI = (page: ReactElement, ctx: string) => (
     <PageTransition variant="slide-left">
       <Suspense fallback={<ModuleSkeleton />}>
-        <View className="relative h-full w-full">
+        <View style={styles.aiWrapper}>
           {page}
-
           <AIFloatingButton
             moduleContext={ctx}
-            onNavigate={(pageName) => {
-              navigate(pageName);
-            }}
+            onNavigate={(pageName) => navigate(pageName)}
           />
         </View>
       </Suspense>
@@ -693,7 +663,22 @@ export default function HomePage() {
     </PageTransition>
   );
 
-  // ── Routing ──────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────────
+  // ⚠️ FIX #1 — EARLY RETURN ONBOARDING
+  // Rend l'onboarding EXCLUSIVEMENT (pas de Home en dessous).
+  // Ce bloc doit rester AVANT tous les autres `if (currentPage === ...)`.
+  // ────────────────────────────────────────────────────────────────────────────
+  if (isAuthenticated && showLocalOnboarding) {
+    return (
+      <OnboardingScreen onComplete={() => setShowLocalOnboarding(false)} />
+    );
+  }
+
+  if (isAuthenticated && showOnboardingFlow) {
+    return <OnboardingFlow onComplete={() => fireConfetti()} />;
+  }
+
+  // ── Routing ─────────────────────────────────────────────────────────────────
   if (publicProfileId) {
     return (
       <PageTransition variant="scale">
@@ -937,9 +922,7 @@ export default function HomePage() {
               live: "live-streaming",
               edu: "edu-formelle",
             };
-
             const mapped = idMap[page] ?? page;
-
             if (IMPLEMENTED.includes(mapped)) {
               navigate(mapped);
             }
@@ -951,356 +934,325 @@ export default function HomePage() {
 
   // ── Page d'accueil ──────────────────────────────────────────────────────────
   return (
-    <>
-      {/* ──────────────────────────────────────────────────────────────────────
-          ONBOARDING
-      ────────────────────────────────────────────────────────────────────── */}
-      {isAuthenticated && showLocalOnboarding && (
-        <OnboardingScreen onComplete={() => setShowLocalOnboarding(false)} />
+    <View style={styles.root}>
+      {/* Background glows (subtils) */}
+      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+        <View style={[styles.glow, styles.glowTopRight]} />
+        <View style={[styles.glow, styles.glowBottomLeft]} />
+        <View style={[styles.glow, styles.glowCenter]} />
+      </View>
+
+      <SideDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onNavigate={navigate}
+      />
+      <CreateBottomSheet
+        isOpen={createOpen}
+        onClose={() => setCreateOpen(false)}
+      />
+      <CommandPalette onNavigate={navigate} />
+      {confettiEl}
+
+      {aiOpen && (
+        <AIAssistant
+          onClose={() => setAiOpen(false)}
+          onNavigate={(page) => {
+            navigate(page);
+            setAiOpen(false);
+          }}
+          moduleContext="home"
+        />
       )}
 
-      {isAuthenticated && !showLocalOnboarding && showOnboardingFlow && (
-        <OnboardingFlow
-          onComplete={() => {
-            fireConfetti();
+      {/* FAB AI — FIX #2 : plus de props Framer Motion, shadow natif */}
+      {isAuthenticated && !aiOpen && (
+        <Pressable onPress={() => setAiOpen(true)} style={styles.fabAi}>
+          <Sparkles size={22} color="#fff" />
+          <View style={styles.fabAiBadge}>
+            <Text style={styles.fabAiBadgeText}>AI</Text>
+          </View>
+        </Pressable>
+      )}
+
+      {!isAuthenticated ? (
+        <View style={styles.landingWrap}>
+          <LandingPage />
+        </View>
+      ) : (
+        <PullToRefresh
+          onRefresh={handleRefresh}
+          className="flex-1 min-h-0 min-w-0 pb-28"
+        >
+          <View style={styles.feedWrap}>
+            <TopBar
+              onMenuOpen={() => setDrawerOpen(true)}
+              onProfileOpen={() => navigate("profile")}
+              onNotificationsOpen={() => setNotifCenterOpen(true)}
+              onRecompensesOpen={() => navigate("recompenses")}
+            />
+            <WeatherBar />
+            <SmartSearch
+              onNavigate={navigate}
+              onAdvancedSearch={() => setAdvancedSearchOpen(true)}
+            />
+            <View style={styles.aiBannerWrap}>
+              <AIBanner
+                onOpenAI={() => setAiOpen(true)}
+                onOpenStudio={() => navigate("ai-studio")}
+              />
+              <AIPersonalizedSuggestion
+                onNavigate={navigate}
+                onOpenStudio={() => navigate("ai-studio")}
+              />
+            </View>
+            <Stories />
+
+            <View style={styles.sectionsWrap}>
+              <GlobalContextBar loading={homeLoading} />
+
+              {intelligenceView?.dailyBrief.length ? (
+                <DailyBrief
+                  items={intelligenceView.dailyBrief}
+                  userName={intelligenceView.userName}
+                  onNavigate={navigate}
+                />
+              ) : null}
+
+              <HomeCommandCenter
+                userName={intelligenceView?.userName}
+                items={intelligenceView?.commandItems}
+                modules={intelligenceView?.commandModules}
+                onNavigate={navigate}
+                onSearch={() => setAdvancedSearchOpen(true)}
+                onNotifications={() => setNotifCenterOpen(true)}
+                onMessages={() => navigate("messages")}
+                onCreate={() => setCreateOpen(true)}
+                onSettings={() => navigate("settings")}
+              />
+
+              <SmartContextSuggestions onNavigate={navigate} />
+              <OpportunityRadar onNavigate={navigate} maxItems={4} />
+              <NearbyNow onNavigate={navigate} />
+
+              <HomeActivityPulse
+                items={intelligenceView?.activityItems}
+                stats={intelligenceView?.activityStats}
+                loading={homeLoading}
+                onNavigate={navigate}
+                maxItems={5}
+              />
+
+              <StreakWidget />
+              <HomeWidget onNavigate={navigate} />
+
+              <HomeFeed
+                items={homeFeedItems}
+                isLoading={homeLoading}
+                emptyMessage="Votre espace personnalisé apparaîtra ici."
+                onItemClick={(item) => {
+                  const value = item as unknown as {
+                    moduleId?: string;
+                    route?: string;
+                  };
+
+                  if (value.moduleId && IMPLEMENTED.includes(value.moduleId)) {
+                    navigate(value.moduleId);
+                    return;
+                  }
+
+                  if (value.route) {
+                    const route = value.route
+                      .replace(/^\/+/, "")
+                      .split(/[/?#]/)[0];
+                    if (IMPLEMENTED.includes(route)) {
+                      navigate(route);
+                    }
+                  }
+                }}
+              />
+
+              <PersonalizedFeed
+                key={feedKey}
+                onNavigate={navigate}
+                onCreateOpen={() => setCreateOpen(true)}
+                onViewProfile={(id) => setPublicProfileId(id as Id<"users">)}
+              />
+            </View>
+          </View>
+        </PullToRefresh>
+      )}
+
+      <OfflineBanner />
+
+      {isAuthenticated && (
+        <TabBar
+          active={activeTab}
+          hidden={
+            drawerOpen ||
+            createOpen ||
+            aiOpen ||
+            notifCenterOpen ||
+            advancedSearchOpen ||
+            mapOpen
+          }
+          onChange={(tab) => {
+            setActiveTab(tab);
+            if (tab === "explorer") navigate("explorer");
+            else if (tab === "messages") navigate("messages");
+            else if (tab === "actions") navigate("actions");
+            else if (tab === "create") setCreateOpen(true);
+            else if (tab === "home") goHome();
           }}
         />
       )}
 
-      {/* ──────────────────────────────────────────────────────────────────────
-          HOME ROOT
-          Important :
-          - le root reste fixe
-          - aucun overflow-y ici
-          - le scroll appartient uniquement à PullToRefresh
-      ────────────────────────────────────────────────────────────────────── */}
-      <View
-        className="relative h-full w-full min-h-0 overflow-hidden flex flex-col"
-        style={{  }}
-      >
-        {/* ──────────────────────────────────────────────────────────────────
-            AMBIENT BACKGROUND
-        ────────────────────────────────────────────────────────────────── */}
-        <View
-          className="absolute top-0 right-0 w-64 h-64 rounded-full"
-          style={{  }}
+      {notifCenterOpen && (
+        <NotificationCenter
+          onClose={() => setNotifCenterOpen(false)}
+          onNavigate={(page) => {
+            setNotifCenterOpen(false);
+            navigate(page);
+          }}
         />
+      )}
 
-        <View
-          className="absolute bottom-32 left-0 w-48 h-48 rounded-full"
-          style={{  }}
+      {advancedSearchOpen && (
+        <AdvancedSearch
+          onClose={() => setAdvancedSearchOpen(false)}
+          onNavigate={(page) => {
+            setAdvancedSearchOpen(false);
+            navigate(page);
+          }}
+          onViewProfile={(id) => {
+            setAdvancedSearchOpen(false);
+            setPublicProfileId(id);
+          }}
         />
+      )}
 
-        <View
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full"
-          style={{  }}
-        />
-
-        {/* ──────────────────────────────────────────────────────────────────
-            GLOBAL OVERLAYS
-        ────────────────────────────────────────────────────────────────── */}
-        <SideDrawer
-          isOpen={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          onNavigate={navigate}
-        />
-
-        <CreateBottomSheet
-          isOpen={createOpen}
-          onClose={() => setCreateOpen(false)}
-        />
-
-        <CommandPalette onNavigate={navigate} />
-
-        {confettiEl}
-
-        <>
-          {aiOpen && (
-            <AIAssistant
-              onClose={() => setAiOpen(false)}
-              onNavigate={(page) => {
-                navigate(page);
-                setAiOpen(false);
-              }}
-              moduleContext="home"
-            />
-          )}
-        </>
-
-        {/* ──────────────────────────────────────────────────────────────────
-            FLOATING AI BUTTON
-            Hors du flux scrollable volontairement.
-        ────────────────────────────────────────────────────────────────── */}
-        {isAuthenticated && !aiOpen && (
-          <Pressable
-            onPress={() => setAiOpen(true)}
-            className="absolute bottom-24 right-5 z-30 w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderStyle: "solid" }}
-          >
-            <Sparkles size={22} className="text-white" />
-
-            <Text
-              className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black text-white"
-              style={{  }}
-            >
-              AI
-            </Text>
-          </Pressable>
-        )}
-
-        {/* ══════════════════════════════════════════════════════════════════
-            ⭐ UNIQUE SCROLL CONTAINER
-            ⭐ PullToRefresh possède toute la zone scrollable
-            ⭐ Aucun motion.div parent ne vient perturber le layout
-        ══════════════════════════════════════════════════════════════════ */}
-        <PullToRefresh
-          onRefresh={handleRefresh}
-          className={
-            isAuthenticated
-              ? "flex-1 min-h-0 min-w-0 pb-28"
-              : "flex-1 min-h-0 min-w-0"
-          }
-        >
-          {!isAuthenticated ? (
-            <LandingPage />
-          ) : (
-            /*
-             * IMPORTANT :
-             * Ce div est volontairement un conteneur HTML normal.
-             *
-             * Pas de motion.div ici.
-             * Pas de transform.
-             * Pas d'animation parent.
-             *
-             * Cela permet au navigateur de gérer le scroll nativement.
-             */
-            <View className="w-full min-w-0">
-              {/* ────────────────────────────────────────────────────────────
-                  TOP BAR
-              ──────────────────────────────────────────────────────────── */}
-              <TopBar
-                onMenuOpen={() => setDrawerOpen(true)}
-                onProfileOpen={() => navigate("profile")}
-                onNotificationsOpen={() => setNotifCenterOpen(true)}
-                onRecompensesOpen={() => navigate("recompenses")}
-              />
-
-              {/* ────────────────────────────────────────────────────────────
-                  WEATHER
-              ──────────────────────────────────────────────────────────── */}
-              <WeatherBar />
-
-              {/* ────────────────────────────────────────────────────────────
-                  SMART SEARCH
-              ──────────────────────────────────────────────────────────── */}
-              <SmartSearch
-                onNavigate={navigate}
-                onAdvancedSearch={() => setAdvancedSearchOpen(true)}
-              />
-
-              {/* ────────────────────────────────────────────────────────────
-                  AI HERO
-              ──────────────────────────────────────────────────────────── */}
-              <View className="mt-1">
-                <AIBanner
-                  onOpenAI={() => setAiOpen(true)}
-                  onOpenStudio={() => navigate("ai-studio")}
-                />
-
-                <AIPersonalizedSuggestion
-                  onNavigate={navigate}
-                  onOpenStudio={() => navigate("ai-studio")}
-                />
-              </View>
-
-              {/* ────────────────────────────────────────────────────────────
-                  STORIES
-              ──────────────────────────────────────────────────────────── */}
-              <Stories />
-
-              {/* ════════════════════════════════════════════════════════════
-                  HOME INTELLIGENCE
-              ════════════════════════════════════════════════════════════ */}
-              <View className="mt-3 space-y-3 pb-4">
-                {/* Global context */}
-                <GlobalContextBar loading={homeLoading} />
-
-                {/* Daily brief */}
-                {intelligenceView?.dailyBrief.length ? (
-                  <DailyBrief
-                    items={intelligenceView.dailyBrief}
-                    userName={intelligenceView.userName}
-                    onNavigate={navigate}
-                  />
-                ) : null}
-
-                {/* Command center */}
-                <HomeCommandCenter
-                  userName={intelligenceView?.userName}
-                  items={intelligenceView?.commandItems}
-                  modules={intelligenceView?.commandModules}
-                  onNavigate={navigate}
-                  onSearch={() => setAdvancedSearchOpen(true)}
-                  onNotifications={() => setNotifCenterOpen(true)}
-                  onMessages={() => navigate("messages")}
-                  onCreate={() => setCreateOpen(true)}
-                  onSettings={() => navigate("settings")}
-                />
-
-                {/* Smart contextual suggestions */}
-                <SmartContextSuggestions onNavigate={navigate} />
-
-                {/* Opportunity radar */}
-                <OpportunityRadar onNavigate={navigate} maxItems={4} />
-
-                {/* Nearby */}
-                <NearbyNow onNavigate={navigate} />
-
-                {/* Activity */}
-                <HomeActivityPulse
-                  items={intelligenceView?.activityItems}
-                  stats={intelligenceView?.activityStats}
-                  loading={homeLoading}
-                  onNavigate={navigate}
-                  maxItems={5}
-                />
-
-                {/* Streak */}
-                <StreakWidget />
-
-                {/* Home widget */}
-                <HomeWidget onNavigate={navigate} />
-
-                {/* ════════════════════════════════════════════════════════
-                    PERSONALIZED HOME FEED
-                ════════════════════════════════════════════════════════ */}
-                <HomeFeed
-                  items={homeFeedItems}
-                  isLoading={homeLoading}
-                  emptyMessage="Votre espace personnalisé apparaîtra ici."
-                  onItemClick={(item) => {
-                    const value = item as unknown as {
-                      moduleId?: string;
-                      route?: string;
-                    };
-
-                    if (
-                      value.moduleId &&
-                      IMPLEMENTED.includes(value.moduleId)
-                    ) {
-                      navigate(value.moduleId);
-                      return;
-                    }
-
-                    if (value.route) {
-                      const route = value.route
-                        .replace(/^\/+/, "")
-                        .split(/[/?#]/)[0];
-
-                      if (IMPLEMENTED.includes(route)) {
-                        navigate(route);
-                      }
-                    }
-                  }}
-                />
-
-                {/* ════════════════════════════════════════════════════════
-                    PERSONALIZED SOCIAL FEED
-                ════════════════════════════════════════════════════════ */}
-                <PersonalizedFeed
-                  key={feedKey}
-                  onNavigate={navigate}
-                  onCreateOpen={() => setCreateOpen(true)}
-                  onViewProfile={(id) => setPublicProfileId(id as Id<"users">)}
-                />
-              </View>
-            </View>
-          )}
-        </PullToRefresh>
-
-        {/* ──────────────────────────────────────────────────────────────────
-            OFFLINE STATUS
-        ────────────────────────────────────────────────────────────────── */}
-        <OfflineBanner />
-
-        {/* ──────────────────────────────────────────────────────────────────
-            BOTTOM NAVIGATION
-            Hors du scroll.
-        ────────────────────────────────────────────────────────────────── */}
-        {isAuthenticated && (
-          <TabBar
-            active={activeTab}
-            hidden={
-              drawerOpen ||
-              createOpen ||
-              aiOpen ||
-              notifCenterOpen ||
-              advancedSearchOpen ||
-              mapOpen
-            }
-            onChange={(tab) => {
-              setActiveTab(tab);
-
-              if (tab === "explorer") {
-                navigate("explorer");
-              } else if (tab === "messages") {
-                navigate("messages");
-              } else if (tab === "actions") {
-                navigate("actions");
-              } else if (tab === "create") {
-                setCreateOpen(true);
-              } else if (tab === "home") {
-                goHome();
-              }
-            }}
-          />
-        )}
-
-        {/* ──────────────────────────────────────────────────────────────────
-            NOTIFICATION CENTER
-        ────────────────────────────────────────────────────────────────── */}
-        <>
-          {notifCenterOpen && (
-            <NotificationCenter
-              onClose={() => setNotifCenterOpen(false)}
-              onNavigate={(page) => {
-                setNotifCenterOpen(false);
-                navigate(page);
-              }}
-            />
-          )}
-        </>
-
-        {/* ──────────────────────────────────────────────────────────────────
-            ADVANCED SEARCH
-        ────────────────────────────────────────────────────────────────── */}
-        <>
-          {advancedSearchOpen && (
-            <AdvancedSearch
-              onClose={() => setAdvancedSearchOpen(false)}
-              onNavigate={(page) => {
-                setAdvancedSearchOpen(false);
-                navigate(page);
-              }}
-              onViewProfile={(id) => {
-                setAdvancedSearchOpen(false);
-                setPublicProfileId(id);
-              }}
-            />
-          )}
-        </>
-
-        {/* ──────────────────────────────────────────────────────────────────
-            MAP
-        ────────────────────────────────────────────────────────────────── */}
-        <>
-          {mapOpen && (
-            <Suspense fallback={<ModuleSkeleton />}>
-              <MapInteractivePage onClose={() => setMapOpen(false)} />
-            </Suspense>
-          )}
-        </>
-      </View>
-    </>
+      {mapOpen && (
+        <Suspense fallback={<ModuleSkeleton />}>
+          <MapInteractivePage onClose={() => setMapOpen(false)} />
+        </Suspense>
+      )}
+    </View>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    flexDirection: "column",
+    overflow: "hidden",
+    backgroundColor: "#03050D",
+  },
+
+  /* Glows */
+  glow: {
+    position: "absolute",
+    borderRadius: 999,
+  },
+  glowTopRight: {
+    top: -40,
+    right: -40,
+    width: 240,
+    height: 240,
+    backgroundColor: "rgba(139,92,246,0.08)",
+  },
+  glowBottomLeft: {
+    bottom: 120,
+    left: -60,
+    width: 200,
+    height: 200,
+    backgroundColor: "rgba(14,165,233,0.06)",
+  },
+  glowCenter: {
+    top: "45%",
+    left: "30%",
+    width: 320,
+    height: 320,
+    backgroundColor: "rgba(99,102,241,0.05)",
+  },
+
+  /* FAB AI */
+  fabAi: {
+    position: "absolute",
+    bottom: 96,
+    right: 20,
+    zIndex: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#8B5CF6",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#8B5CF6",
+        shadowOpacity: 0.55,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+      },
+      android: { elevation: 12 },
+      default: {},
+    }),
+  },
+  fabAiBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#10B981",
+  },
+  fabAiBadgeText: {
+    fontSize: 8,
+    fontWeight: "900",
+    color: "#fff",
+  },
+
+  /* Layout helpers */
+  aiWrapper: {
+    flex: 1,
+    width: "100%",
+    position: "relative",
+  },
+  landingWrap: {
+    flex: 1,
+  },
+  feedWrap: {
+    width: "100%",
+  },
+  aiBannerWrap: {
+    marginTop: 4,
+  },
+  sectionsWrap: {
+    marginTop: 12,
+    paddingBottom: 16,
+    gap: 12,
+  },
+
+  /* Skeleton */
+  skeletonRoot: {
+    flex: 1,
+    width: "100%",
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    gap: 16,
+  },
+  skeletonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+});

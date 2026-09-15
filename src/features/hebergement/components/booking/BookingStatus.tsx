@@ -13,9 +13,7 @@ export const BookingStatus: React.FC<BookingStatusProps> = ({
   className = "",
 }) => {
   return (
-    <View
-      className={`flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 ${className}`}
-    >
+    <View className={`flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/10 ${className}`}>
       <Text className="text-xs text-white/50 font-medium">
         Statut de la réservation
       </Text>

@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View } from "react-native";
 
 // src/features/transport/create/CreateFlightForm.tsx
 import { useForm } from "react-hook-form";
@@ -104,14 +104,11 @@ export function CreateFlightForm({
 
   return (
     <Form {...form}>
-      <View className="space-y-4">
-        <FormField
-          control={form.control}
-          name="airlineName"
-          render={({ field }) => (
+      <View className="space-y-4"><FormField control={form.control} name="airlineName" render={({ field }) => (
             <FormItem>
               <FormLabel>
-                <Text>Nom de la compagnie de vol / opérateur charter *</Text></FormLabel>
+                Nom de la compagnie de vol / opérateur charter *
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: Congo Airways, KinAvia"
@@ -121,15 +118,9 @@ export function CreateFlightForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Téléphone d'exploitation *</Text></FormLabel>
+              <FormLabel>Téléphone d'exploitation *</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Ex: +243 890 000 000"
@@ -139,16 +130,9 @@ export function CreateFlightForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="aircraftModel"
-            render={({ field }) => (
+          )} /><View className="gap-4"><FormField control={form.control} name="aircraftModel" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Modèle d'aéronef *</Text></FormLabel>
+                <FormLabel>Modèle d'aéronef *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Cessna Grand Caravan"
@@ -158,14 +142,9 @@ export function CreateFlightForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="flightNumber"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="flightNumber" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Immatriculation / N° de Vol *</Text></FormLabel>
+                <FormLabel>Immatriculation / N° de Vol *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 9Q-ABC"
@@ -175,17 +154,9 @@ export function CreateFlightForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="originAirport"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="originAirport" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Aéroport / Piste de départ *</Text></FormLabel>
+                <FormLabel>Aéroport / Piste de départ *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Aéroport de N'dolo, Kinshasa"
@@ -195,14 +166,9 @@ export function CreateFlightForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="destinationAirport"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="destinationAirport" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Aéroport / Piste d'arrivée *</Text></FormLabel>
+                <FormLabel>Aéroport / Piste d'arrivée *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: Aérodrome de Kikwit"
@@ -212,57 +178,39 @@ export function CreateFlightForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-2">
-          <FormField
-            control={form.control}
-            name="seatsAvailable"
-            render={({ field }) => (
+            )} /></View><View className="gap-2"><FormField control={form.control} name="seatsAvailable" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Sièges libres *</Text></FormLabel>
+                <FormLabel>Sièges libres *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseInt(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseInt(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="pricePerSeat"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="pricePerSeat" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Prix du siège *</Text></FormLabel>
+                <FormLabel>Prix du siège *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="currency" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Devise</Text></FormLabel>
+                <FormLabel>Devise</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -273,24 +221,16 @@ export function CreateFlightForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent className="bg-[#1a1a2e] border-white/10 text-white">
-                    <SelectItem value="FCFA"><Text>FCFA</Text></SelectItem>
-                    <SelectItem value="USD"><Text>USD</Text></SelectItem>
-                    <SelectItem value="EUR"><Text>EUR</Text></SelectItem>
+                    <SelectItem value="FCFA">FCFA</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="departureTime"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="departureTime" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Heure de décollage *</Text></FormLabel>
+                <FormLabel>Heure de décollage *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Ex: 06:30"
@@ -300,43 +240,29 @@ export function CreateFlightForm({
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="maxLuggageWeightKg"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="maxLuggageWeightKg" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Poids max bagages (kg) *</Text></FormLabel>
+                <FormLabel>Poids max bagages (kg) *</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     className="bg-white/5 border-white/10 text-white"
                     {...field}
-                    onChange={(text) =>
-                      field.onChange(parseFloat(text) || 0)
+                    onChange={(e) =>
+                      field.onChange(parseFloat(e.target.value) || 0)
                     }
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <Button
-          className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base"
-          disabled={isLoading}
-        >
-          {isLoading ? (
+            )} /></View><Button  className="w-full h-12 rounded-xl bg-violet-600 text-white font-bold text-base transition-all active:scale-95" disabled={isLoading}>{isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <Text>Enregistrement...</Text></>
+              Enregistrement...
+            </>
           ) : (
             "✈️ Enregistrer la liaison aérienne"
-          )}
-        </Button>
-      </View>
+          )}</Button></View>
     </Form>
   );
 }

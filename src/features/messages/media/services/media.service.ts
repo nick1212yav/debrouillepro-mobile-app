@@ -154,7 +154,7 @@ export const mediaService = {
       return {};
     }
 
-    if (typeof undefined === "undefined") {
+    if (typeof window === "undefined") {
       return {};
     }
 
@@ -185,12 +185,12 @@ export const mediaService = {
       return undefined;
     }
 
-    if (typeof undefined === "undefined") {
+    if (typeof window === "undefined") {
       return undefined;
     }
 
     return new Promise((resolve) => {
-      const video = undefined("video");
+      const video = document.createElement("video");
       const url = URL.createObjectURL(file);
 
       video.preload = "metadata";

@@ -10,7 +10,7 @@ export interface ModuleCapabilities {
   review?: boolean | ((context: any) => boolean);
   livestream?: boolean | ((context: any) => boolean);
   videoCall?: boolean | ((context: any) => boolean);
-  undefined?: boolean | ((context: any) => boolean);
+  document?: boolean | ((context: any) => boolean);
   whatsapp?: boolean | ((context: any) => boolean);
   email?: boolean | ((context: any) => boolean);
   voice?: boolean | ((context: any) => boolean);

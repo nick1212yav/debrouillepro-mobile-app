@@ -16,21 +16,11 @@ export const AccommodationSearch: React.FC<AccommodationSearchProps> = ({
   className = "",
 }) => {
   return (
-    <View
-      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 focus-within:border-indigo-500/50 transition-all ${className}`}
-    >
+    <View className={`flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 focus-within:border-indigo-500/50 transition-all ${className}`}>
       <Search size={16} className="text-white/40 shrink-0" />
-      <TextInput
-        value={query}
-        onChangeText={(text) => onQueryChange(text)}
-        placeholder={placeholder}
-        className="flex-1 bg-transparent text-white text-xs outline-none placeholder:text-white/30"
-      />
+      <TextInput value={query} onChangeText={(value) => onQueryChange(value)} placeholder={placeholder} className="flex-1 bg-transparent text-white text-xs outline-none placeholder:text-white/30" />
       {query && (
-        <Pressable
-          onPress={() => onQueryChange("")}
-          className="p-1 rounded-lg text-white/40"
-        >
+        <Pressable onPress={() => onQueryChange("")} className="p-1 rounded-lg text-white/40 transition-all">
           <X size={12} />
         </Pressable>
       )}

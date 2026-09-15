@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/EditHospitalSheet.tsx
@@ -13,6 +12,7 @@ import { HospitalForm } from "../forms/HospitalForm";
 import type { HospitalFormValues } from "../forms/HospitalForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface EditHospitalSheetProps {
   open: boolean;
@@ -42,7 +42,7 @@ export function EditHospitalSheet({
             .map((s) => s.trim())
             .filter(Boolean) || [],
       });
-      UIService.openToast("Hôpital mis à jour !", "success");
+      toast.success("Hôpital mis à jour !");
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
@@ -50,7 +50,7 @@ export function EditHospitalSheet({
         error instanceof Error
           ? error.message
           : "Erreur lors de la mise à jour";
-      UIService.openToast(message, "error");
+      toast.error(message);
     }
   };
 

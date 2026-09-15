@@ -1,9 +1,8 @@
-import { useRouter } from "expo-router";
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Pressable, Text, GestureResponderEvent } from "react-native";
+import { View, Pressable, Text, Share, GestureResponderEvent } from "react-native";
 
 // src/features/network/components/NetworkCard.tsx
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Heart,
   MessageCircle,
@@ -20,6 +19,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react-native";
+import { toast } from "sonner";
 import {
   formatTime,
   parseMeta,
@@ -28,6 +28,7 @@ import type { Publication } from "@/features/publications/types";
 import { NetworkAvatar } from "./common/NetworkAvatar";
 import { NetworkGallery } from "./NetworkGallery";
 import { cn } from "@/lib/utils";
+import { Clipboard } from "@react-native-clipboard/clipboard";
 
 type NetworkAction =
   | "offer"
@@ -147,13 +148,7 @@ function ActionBadge({ action }: { action: NetworkAction }) {
   const config = ACTION_CONFIG[action];
   const Icon = config.icon;
   return (
-    <View
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
-      style={{ backgroundColor: config.bg, borderStyle: "solid" }}
-    >
-      <Icon size={12} />
-      {config.label}
-    </View>
+    <View className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: config.bg, borderStyle: "solid" }}><Icon size={12} />{config.label}</View>
   );
 }
 
@@ -173,21 +168,11 @@ function InteractionButton({
   activeColor?: string;
 }) {
   return (
-    <Pressable
-      onPress={onClick}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-white/60"
-    >
-      <Icon
-        size={14}
-        className={cn(active && activeColor, active && "fill-current")}
-      />
-      {label && (
+    <Pressable onPress={onClick} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 transition text-white/60"><Icon size={14} className={cn(active && activeColor, active && "fill-current")} />{label && (
         <Text className={active ? activeColor : "text-white/60"}>{label}</Text>
-      )}
-      {count !== undefined && count > 0 && (
+      )}{count !== undefined && count > 0 && (
         <Text className="text-white/40 text-[10px]">{count}</Text>
-      )}
-    </Pressable>
+      )}</Pressable>
   );
 }
 
@@ -216,7 +201,7 @@ export function NetworkCard({
   isLiked = false,
   isBookmarked = false,
 }: NetworkCardProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const meta = parseMeta(publication.meta);
   const action = getActionFromMeta(meta);
   const actionConfig = ACTION_CONFIG[action];
@@ -233,174 +218,80 @@ export function NetworkCard({
   const viewCount = publication.viewCount || 0;
 
   const handleCardClick = () => {
-    router.push(`/network/${publication._id}`);
+    navigate(`/network/${publication._id}`);
   };
 
   const handleViewProfile = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     if (publication.authorId) {
-      router.push(`/network/profile/${publication.authorId}`);
+      navigate(`/network/profile/${publication.authorId}`);
     } else {
-      UIService.openToast("Profil non disponible", "info");
+      toast.info("Profil non disponible");
     }
   };
 
   const handleShare = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     if (onShare) onShare();
-    else if (undefined) {
-      undefined
+    else if (navigator.share) {
+      Share.share({ message: String(publication.description || "") + "\n" + "\n" + String(window.location.href), title: publication.title || "Publication réseau" })
         .catch(() => {});
     } else {
-      undefined
-        ?.writeText(undefined.href)
-        .then(() => UIService.openToast("Lien copié", "success"))
-        .catch(() => UIService.openToast("Partagez cette publication", "info"));
+      Clipboard.setString(window.location.href)
+        .then(() => toast.success("Lien copié"))
+        .catch(() => toast.info("Partagez cette publication"));
     }
   };
 
   const handleLike = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     onLike();
   };
 
   const handleComment = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     if (onComment) onComment();
-    else router.push(`/network/${publication._id}`);
+    else navigate(`/network/${publication._id}`);
   };
 
   const handleBookmark = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     if (onBookmark) onBookmark();
   };
 
   const handlePrimaryAction = (e: GestureResponderEvent) => {
+    e.stopPropagation();
     if (onActionClick) onActionClick(action);
-    else router.push(`/network/${publication._id}`);
+    else navigate(`/network/${publication._id}`);
   };
 
   return (
-    <Pressable
-      className="group rounded-3xl overflow-hidden"
-      style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}
-      onPress={handleCardClick}
-    >
-      <View className="p-4 flex items-center gap-3">
-        <NetworkAvatar
-          avatar={authorAvatar}
-          name={authorName}
-          size={44}
-          verified={meta.verified}
-        />
-        <View className="flex-1 min-w-0">
-          <View className="flex items-center gap-2">
-            <Text className="text-white font-semibold text-sm truncate">
-              {authorName}
-            </Text>
-            {meta.verified && (
+    <View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + index * 0.06 }} className="group rounded-3xl overflow-hidden transition-transform duration-300" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={handleCardClick}>
+      <View className="p-4 flex items-center gap-3"><NetworkAvatar avatar={authorAvatar} name={authorName} size={44} verified={meta.verified} /><View className="flex-1 min-w-0"><View className="flex items-center gap-2"><Text className="text-white font-semibold text-sm truncate">{authorName}</Text>{meta.verified && (
               <Text className="text-emerald-400 text-xs font-medium">✓</Text>
-            )}
-            <View className="ml-auto flex-shrink-0">
-              <ActionBadge action={action} />
-            </View>
-          </View>
-          {headline && (
+            )}<View className="ml-auto flex-shrink-0"><ActionBadge action={action} /></View></View>{headline && (
             <Text className="text-white/50 text-xs truncate">{headline}</Text>
-          )}
-          <View className="flex items-center gap-2 text-white/30 text-[10px] mt-0.5">
-            <Calendar size={10} />
-            <Text>{formatTime(createdAt)}</Text>
-            {location && (
+          )}<View className="flex items-center gap-2 text-white/30 text-[10px] mt-0.5"><Calendar size={10} /><Text>{formatTime(createdAt)}</Text>{location && (
               <>
                 <Text className="w-1 h-1 rounded-full bg-white/20" />
                 <MapPin size={10} />
                 <Text>{location}</Text>
               </>
-            )}
-          </View>
-        </View>
-        <Pressable
-          onPress={handleViewProfile}
-          className="text-xs font-medium text-indigo-400 opacity-0"
-        >
-          <Text>Voir profil</Text></Pressable>
-      </View>
+            )}</View></View><Pressable onPress={handleViewProfile} className="text-xs font-medium text-indigo-400 transition opacity-0"><Text>Voir profil</Text></Pressable></View>
 
-      <View className="px-4 pb-2 space-y-2">
-        {publication.title && (
-          <Text className="text-white font-bold text-lg leading-snug">
-            {publication.title}
-          </Text>
-        )}
-        {publication.description && (
-          <Text className="text-white/70 text-sm leading-relaxed">
-            {publication.description}
-          </Text>
-        )}
-      </View>
+      <View className="px-4 pb-2 space-y-2">{publication.title && (
+          <Text className="text-white font-bold text-lg leading-snug">{publication.title}</Text>
+        )}{publication.description && (
+          <Text className="text-white/70 text-sm leading-relaxed">{publication.description}</Text>
+        )}</View>
 
       {images.length > 0 && (
-        <View className="px-4 pb-4">
-          <NetworkGallery
-            images={images}
-            alt={publication.title || "Publication Network"}
-          />
-        </View>
+        <View className="px-4 pb-4"><NetworkGallery images={images} alt={publication.title || "Publication Network"} /></View>
       )}
 
-      <View className="px-4 pb-1 flex items-center gap-4 text-white/40 text-xs">
-        <Text className="flex items-center gap-1">
-          <Heart size={12} className="text-red-400 fill-red-400/30" />
-          {likeCount}
-        </Text>
-        <Text className="flex items-center gap-1">
-          <MessageCircle size={12} />
-          {commentCount}
-        </Text>
-        <Text className="flex items-center gap-1">
-          <Eye size={12} />
-          {viewCount}
-        </Text>
-      </View>
+      <View className="px-4 pb-1 flex items-center gap-4 text-white/40 text-xs"><Text className="flex items-center gap-1"><Heart size={12} className="text-red-400 fill-red-400/30" />{likeCount}</Text><Text className="flex items-center gap-1"><MessageCircle size={12} />{commentCount}</Text><Text className="flex items-center gap-1"><Eye size={12} />{viewCount}</Text></View>
 
-      <View className="px-4 py-3 border-t border-white/5 flex items-center justify-between">
-        <View className="flex items-center gap-1">
-          <InteractionButton
-            icon={Heart}
-            label="Aimer"
-            count={likeCount}
-            onPress={handleLike}
-            active={isLiked}
-            activeColor="text-red-400"
-          />
-          <InteractionButton
-            icon={MessageCircle}
-            label="Commenter"
-            count={commentCount}
-            onPress={handleComment}
-          />
-        </View>
-        <View className="flex items-center gap-1.5">
-          <Pressable
-            onPress={handleShare}
-            className="p-2 rounded-xl text-white/40"
-          >
-            <Share2 size={14} />
-          </Pressable>
-          <Pressable
-            onPress={handleBookmark}
-            className="p-2 rounded-xl text-white/40"
-          >
-            <Bookmark
-              size={14}
-              className={isBookmarked ? "fill-indigo-400 text-indigo-400" : ""}
-            />
-          </Pressable>
-          <Pressable
-            onPress={handlePrimaryAction}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white"
-            style={{  }}
-          >
-            {actionConfig.ctaLabel}
-          </Pressable>
-        </View>
-      </View>
-    </Pressable>
+      <View className="px-4 py-3 border-t border-white/5 flex items-center justify-between"><View className="flex items-center gap-1"><InteractionButton icon={Heart} label="Aimer" count={likeCount} onPress={handleLike} active={isLiked} activeColor="text-red-400" /><InteractionButton icon={MessageCircle} label="Commenter" count={commentCount} onPress={handleComment} /></View><View className="flex items-center gap-1.5"><Pressable onPress={handleShare} className="p-2 rounded-xl transition text-white/40"><Share2 size={14} /></Pressable><Pressable onPress={handleBookmark} className="p-2 rounded-xl transition text-white/40"><Bookmark size={14} className={isBookmarked ? "fill-indigo-400 text-indigo-400" : ""} /></Pressable><Pressable whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onPress={handlePrimaryAction} className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-all" style={{ boxShadow: `0 4px 12px ${actionConfig.color}40` }}>{actionConfig.ctaLabel}</Pressable></View></View>
+    </View>
   );
 }

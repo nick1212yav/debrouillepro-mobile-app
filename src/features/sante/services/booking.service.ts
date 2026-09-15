@@ -1,8 +1,7 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-
 // src/features/sante/services/booking.service.ts
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { AppointmentType } from "../types/appointment.types";
 import { appointmentSchema } from "../validators/appointment.validator";
@@ -42,10 +41,10 @@ export function useBookAppointment() {
         date: data.date?.toISOString(),
         notes: data.notes,
       });
-      UIService.openToast("Rendez-vous confirmé !", "success");
+      toast.success("Rendez-vous confirmé !");
       return appointmentSchema.parse(result);
     } catch (e) {
-      UIService.openToast(e instanceof Error ? e.message : "Erreur", "error");
+      toast.error(e instanceof Error ? e.message : "Erreur");
       throw e;
     }
   };
@@ -57,9 +56,9 @@ export function useCancelAppointment() {
   return async (id: Id<"medicalAppointments">) => {
     try {
       await mutate({ id });
-      UIService.openToast("Annulé", "success");
+      toast.success("Annulé");
     } catch (e) {
-      UIService.openToast(e instanceof Error ? e.message : "Erreur", "error");
+      toast.error(e instanceof Error ? e.message : "Erreur");
       throw e;
     }
   };

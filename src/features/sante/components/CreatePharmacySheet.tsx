@@ -1,4 +1,3 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View } from "react-native";
 
 // src/features/sante/components/CreatePharmacySheet.tsx
@@ -12,6 +11,7 @@ import {
 import { PharmacyForm, type PharmacyFormValues } from "../forms/PharmacyForm";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
 
 interface CreatePharmacySheetProps {
   open: boolean;
@@ -37,11 +37,11 @@ export function CreatePharmacySheet({
         images: [],
         products: [],
       });
-      UIService.openToast("Pharmacie créée", "success");
+      toast.success("Pharmacie créée");
       onOpenChange(false);
       onSuccess?.();
     } catch (e) {
-      UIService.openToast("Erreur", "error");
+      toast.error("Erreur");
     }
   };
   return (

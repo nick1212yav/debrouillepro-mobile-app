@@ -72,9 +72,7 @@ export function PresenceStatus({
 
   if (presence.status === "online") {
     return (
-      <Text
-        className={`inline-flex items-center gap-1.5 text-xs text-emerald-400 ${className}`}
-      >
+      <Text className={`inline-flex items-center gap-1.5 text-xs text-emerald-400 ${className}`}>
         <Text className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
         En ligne
         {showDevice && presence.device && (
@@ -86,9 +84,7 @@ export function PresenceStatus({
 
   if (presence.status === "away") {
     return (
-      <Text
-        className={`inline-flex items-center gap-1.5 text-xs text-amber-400 ${className}`}
-      >
+      <Text className={`inline-flex items-center gap-1.5 text-xs text-amber-400 ${className}`}>
         <Text className="h-1.5 w-1.5 rounded-full bg-amber-400" />
         Absent
         {showDevice && presence.device && (

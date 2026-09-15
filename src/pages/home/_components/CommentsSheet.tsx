@@ -1,19 +1,25 @@
-import { UIService } from "@/core/sdk/ui/UIService";
-import { View, Text, Pressable, Image, TextInput } from "react-native";
-
 // src/pages/home/_components/CommentsSheet.tsx
-import { useState, useRef } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  TextInput,
+  Image,
+  ScrollView,
+  Animated,
+  Easing,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.js";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { SignInButton } from "@/components/ui/signin";
+import { SignInButton } from "@/components/ui/signin.tsx";
+import { toast } from "sonner";
 import {
   MessageCircle,
   Send,
@@ -26,10 +32,12 @@ import {
   Sparkles,
   CornerDownRight,
   ShieldCheck,
+  Loader2,
 } from "lucide-react-native";
-import { cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns";
-import { fr } from "date-fns/locale";
+
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 interface CommentsSheetProps {
   open: boolean;
@@ -38,10 +46,62 @@ interface CommentsSheetProps {
   publicationTitle?: string;
 }
 
+interface CommentShape {
+  _id: Id<"comments">;
+  text: string;
+  _creationTime: number;
+  authorId: Id<"users">;
+  author: { name?: string; avatar?: string } | null;
+  parentId?: Id<"comments">;
+}
+
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
+
+const AVATAR_COLORS = [
+  "#818CF8",
+  "#A78BFA",
+  "#F472B6",
+  "#34D399",
+  "#FBBF24",
+  "#60A5FA",
+];
+
+function getAvatarColor(name?: string): string {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function timeAgoFromTimestamp(ts: number): string {
+  const diff = Date.now() - ts;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return "à l'instant";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `il y a ${min} min`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `il y a ${hr} h`;
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `il y a ${day} j`;
+  const wk = Math.floor(day / 7);
+  if (wk < 5) return `il y a ${wk} sem.`;
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `il y a ${mo} mois`;
+  return `il y a ${Math.floor(day / 365)} an${day >= 730 ? "s" : ""}`;
+}
+
+/* ============================================================================
+ * AVATAR
+ * ========================================================================== */
+
 function Avatar({
   name,
   avatar,
-  size = 32,
+  size = 36,
 }: {
   name?: string;
   avatar?: string;
@@ -50,38 +110,64 @@ function Avatar({
   if (avatar) {
     return (
       <Image
-       
-       
-        className="rounded-full object-cover"
-        style={{ width: size, height: size }}
-       source={{ uri: avatar }} accessibilityLabel={name ?? "?"}/>
+        source={{ uri: avatar }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.1)",
+        }}
+        accessibilityLabel={name ?? "Avatar"}
+      />
     );
   }
+
   const initials = name ? name.slice(0, 2).toUpperCase() : "?";
+  const color = getAvatarColor(name);
+
   return (
-    <View
-      className="rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-      style={{ width: size, height: size }}
+    <LinearGradient
+      colors={[color, `${color}AA`]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.15)",
+      }}
     >
-      {initials}
-    </View>
+      <Text
+        style={{
+          color: "#fff",
+          fontSize: size * 0.36,
+          fontWeight: "900",
+          letterSpacing: -0.3,
+        }}
+      >
+        {initials}
+      </Text>
+    </LinearGradient>
   );
 }
 
+/* ============================================================================
+ * COMMENT ITEM
+ * ========================================================================== */
+
 function CommentItem({
   comment,
+  index,
   currentUserId,
   onDelete,
   onReply,
 }: {
-  comment: {
-    _id: Id<"comments">;
-    text: string;
-    _creationTime: number;
-    authorId: Id<"users">;
-    author: { name?: string; avatar?: string } | null;
-    parentId?: Id<"comments">;
-  };
+  comment: CommentShape;
+  index: number;
   currentUserId: Id<"users"> | null;
   onDelete: (id: Id<"comments">) => void;
   onReply: (name: string) => void;
@@ -89,121 +175,353 @@ function CommentItem({
   const [liked, setLiked] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const isOwn = currentUserId === comment.authorId;
-  const timeAgo = formatDistanceToNow(new Date(comment._creationTime), {
-    addSuffix: true,
-    locale: fr,
+  const timeAgo = timeAgoFromTimestamp(comment._creationTime);
+
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 420,
+      delay: Math.min(index * 55, 500),
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim, index]);
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 0],
   });
 
+  const isReply = Boolean(comment.parentId);
+
   return (
-    <View
-      className={cn(
-        "group flex gap-3",
-        comment.parentId && "ml-8 sm:ml-10 pl-3 border-l border-white/10",
-      )}
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [{ translateY }],
+      }}
     >
-      <View className="relative flex-shrink-0">
+      <View style={[styles.commentRow, isReply && styles.commentRowReply]}>
+        {isReply ? (
+          <View style={styles.replySpine}>
+            <CornerDownRight size={12} color="rgba(255,255,255,0.18)" />
+          </View>
+        ) : null}
+
         <Avatar
           name={comment.author?.name}
           avatar={comment.author?.avatar}
           size={36}
         />
-        {comment.parentId && (
-          <View className="absolute -left-4 top-4 text-white/15">
-            <CornerDownRight size={12} />
-          </View>
-        )}
-      </View>
 
-      <View className="flex-1 min-w-0">
-        <View
-          className={cn(
-            "relative rounded-2xl rounded-tl-md px-3.5 py-2.5 transition-all",
-            "bg-white/[0.045] border border-white/[0.055]",
-            "group-hover:bg-white/[0.065] group-hover:border-white/[0.08]",
-          )}
-        >
-          <View className="flex items-center gap-2 mb-1">
-            <Text className="text-white text-xs font-bold truncate">
-              {comment.author?.name ?? "Utilisateur"}
-            </Text>
-            <Text className="text-white/25 text-[10px] flex-shrink-0">
-              {timeAgo}
-            </Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {/* Bubble */}
+          <View style={styles.commentBubble}>
+            <View style={styles.commentHeader}>
+              <Text style={styles.commentAuthor} numberOfLines={1}>
+                {comment.author?.name ?? "Utilisateur"}
+              </Text>
+              <Text style={styles.commentTime}>{timeAgo}</Text>
 
-            <View className="ml-auto relative flex-shrink-0">
               <Pressable
-               
                 onPress={() => setMenuOpen((v) => !v)}
-                className="opacity-0 p-1 rounded-lg text-white/25"
+                hitSlop={8}
                 accessibilityLabel="Options"
+                style={({ pressed }) => [
+                  styles.menuTrigger,
+                  pressed && { opacity: 0.7 },
+                ]}
               >
-                <MoreHorizontal size={14} />
+                <MoreHorizontal size={14} color="rgba(255,255,255,0.4)" />
               </Pressable>
-
-              <>
-                {menuOpen && (
-                  <View
-                    className="absolute right-0 top-7 z-10 min-w-[130px] rounded-xl overflow-hidden p-1"
-                    style={{ backgroundColor: "rgba(20,20,35,.98)", borderWidth: 1, borderColor: "rgba(255,255,255,.09)", borderStyle: "solid" }}
-                  >
-                    {isOwn && (
-                      <Pressable
-                       
-                        onPress={() => {
-                          setMenuOpen(false);
-                          onDelete(comment._id);
-                        }}
-                        className="w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-red-300/70"
-                      >
-                        <Trash2 size={12} />
-                        <Text>Supprimer</Text></Pressable>
-                    )}
-                    {!isOwn && (
-                      <Pressable
-                       
-                        onPress={() => setMenuOpen(false)}
-                        className="w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] text-white/50"
-                      >
-                        <Text>Signaler</Text></Pressable>
-                    )}
-                  </View>
-                )}
-              </>
             </View>
+
+            <Text style={styles.commentText}>{comment.text}</Text>
           </View>
 
-          <Text className="text-white/78 text-[13px] leading-[1.55]">
-            {comment.text}
-          </Text>
-        </View>
+          {/* Actions */}
+          <View style={styles.commentActions}>
+            <Pressable
+              onPress={() => setLiked((v) => !v)}
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                liked && styles.actionBtnLiked,
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              <Heart
+                size={11}
+                color={liked ? "#FCA5A5" : "rgba(255,255,255,0.5)"}
+                fill={liked ? "#FCA5A5" : "none"}
+              />
+              <Text
+                style={[styles.actionBtnText, liked && { color: "#FCA5A5" }]}
+              >
+                {liked ? "Aimé" : "J'aime"}
+              </Text>
+            </Pressable>
 
-        <View className="flex items-center gap-1 mt-1 pl-1">
-          <Pressable
-           
-            onPress={() => setLiked((v) => !v)}
-            className={cn(
-              "h-7 px-2 rounded-lg flex items-center gap-1.5 text-[10px] transition-all",
-              liked
-                ? "text-rose-300 bg-rose-500/10"
-                : "text-white/28 hover:text-white/55 hover:bg-white/5",
-            )}
-          >
-            <Heart size={11} fill={liked ? "currentColor" : "none"} />
-            {liked ? "Aimé" : "J'aime"}
-          </Pressable>
+            <Pressable
+              onPress={() => onReply(comment.author?.name ?? "Utilisateur")}
+              hitSlop={6}
+              style={({ pressed }) => [
+                styles.actionBtn,
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              <Reply size={11} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.actionBtnText}>Répondre</Text>
+            </Pressable>
+          </View>
 
-          <Pressable
-           
-            onPress={() => onReply(comment.author?.name ?? "Utilisateur")}
-            className="h-7 px-2 rounded-lg flex items-center gap-1.5 text-[10px] text-white/28"
-          >
-            <Reply size={11} />
-            <Text>Répondre</Text></Pressable>
+          {/* Menu */}
+          {menuOpen ? (
+            <View style={styles.menu}>
+              {isOwn ? (
+                <Pressable
+                  onPress={() => {
+                    setMenuOpen(false);
+                    onDelete(comment._id);
+                  }}
+                  style={({ pressed }) => [
+                    styles.menuItem,
+                    pressed && { backgroundColor: "rgba(239,68,68,0.1)" },
+                  ]}
+                >
+                  <Trash2 size={12} color="#FCA5A5" />
+                  <Text style={styles.menuItemTextDanger}>Supprimer</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={() => setMenuOpen(false)}
+                  style={({ pressed }) => [
+                    styles.menuItem,
+                    pressed && { backgroundColor: "rgba(255,255,255,0.06)" },
+                  ]}
+                >
+                  <Text style={styles.menuItemText}>Signaler</Text>
+                </Pressable>
+              )}
+            </View>
+          ) : null}
         </View>
       </View>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * SKELETON
+ * ========================================================================== */
+
+function SkeletonComment({ index }: { index: number }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          delay: index * 100,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse, index]);
+
+  const opacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.85],
+  });
+
+  return (
+    <Animated.View style={[styles.skeletonRow, { opacity }]}>
+      <View style={styles.skeletonAvatar} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={styles.skeletonLineShort} />
+        <View style={styles.skeletonBubble} />
+      </View>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * EMPTY STATE
+ * ========================================================================== */
+
+function EmptyState({ isAuthenticated }: { isAuthenticated: boolean }) {
+  const float = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(float, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(float, {
+          toValue: 0,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [float]);
+
+  const translateY = float.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -6],
+  });
+
+  return (
+    <View style={styles.emptyWrap}>
+      <Animated.View
+        style={[styles.emptyIconWrap, { transform: [{ translateY }] }]}
+      >
+        <LinearGradient
+          colors={["rgba(99,102,241,0.22)", "rgba(139,92,246,0.1)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.emptyIconGradient}
+        >
+          <MessageCircle size={27} color="rgba(255,255,255,0.65)" />
+        </LinearGradient>
+        <View style={styles.emptySparkle}>
+          <Sparkles size={12} color="rgba(165,180,252,0.85)" />
+        </View>
+      </Animated.View>
+
+      <Text style={styles.emptyTitle}>La discussion commence ici</Text>
+      <Text style={styles.emptySub}>
+        Partagez votre avis, posez une question ou apportez une information
+        utile.
+      </Text>
+
+      {!isAuthenticated ? (
+        <View style={{ marginTop: 20 }}>
+          <SignInButton />
+        </View>
+      ) : null}
     </View>
   );
 }
+
+/* ============================================================================
+ * PULSING HEADER ICON
+ * ========================================================================== */
+
+function HeaderIcon({ count }: { count: number }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  const countAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [pulse]);
+
+  useEffect(() => {
+    countAnim.setValue(0.7);
+    Animated.spring(countAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 30,
+      bounciness: 12,
+    }).start();
+  }, [count, countAnim]);
+
+  const glow = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.12],
+  });
+
+  return (
+    <View style={styles.headerIconWrap}>
+      <Animated.View
+        style={[styles.headerIconHalo, { transform: [{ scale: glow }] }]}
+      />
+      <LinearGradient
+        colors={["#818CF8", "#6366F1", "#7C3AED"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerIconGradient}
+      >
+        <MessageCircle size={18} color="#fff" />
+      </LinearGradient>
+
+      {count > 0 ? (
+        <Animated.View
+          style={[styles.countBadge, { transform: [{ scale: countAnim }] }]}
+        >
+          <Text style={styles.countBadgeText}>
+            {count > 99 ? "99+" : count}
+          </Text>
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * LOADING SPINNER
+ * ========================================================================== */
+
+function LoadingSpinner() {
+  const rotate = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rotate, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ).start();
+  }, [rotate]);
+
+  const rotation = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+      <Loader2 size={15} color="#fff" />
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * MAIN COMPONENT
+ * ========================================================================== */
 
 export default function CommentsSheet({
   open,
@@ -211,10 +529,18 @@ export default function CommentsSheet({
   publicationId,
   publicationTitle,
 }: CommentsSheetProps) {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [mounted, setMounted] = useState(open);
+
   const inputRef = useRef<TextInput>(null);
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const focusAnim = useRef(new Animated.Value(0)).current;
 
   const { isAuthenticated } = useFirebaseAuth();
 
@@ -227,7 +553,57 @@ export default function CommentsSheet({
   const addComment = useMutation(api.comments.createComment);
   const removeComment = useMutation(api.comments.remove);
 
-  const handleSend = async () => {
+  /* ───── entrance / exit ───── */
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      backdropAnim.setValue(0);
+      slideAnim.setValue(0);
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 360,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(backdropAnim, {
+          toValue: 0,
+          duration: 220,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 260,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start(() => setMounted(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  /* ───── focus animation ───── */
+  useEffect(() => {
+    Animated.timing(focusAnim, {
+      toValue: focused ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [focused, focusAnim]);
+
+  /* ───── actions ───── */
+  const handleSend = useCallback(async () => {
     if (!text.trim() || !publicationId || sending) return;
 
     setSending(true);
@@ -236,299 +612,842 @@ export default function CommentsSheet({
       setText("");
       setReplyTo(null);
     } catch {
-      UIService.openToast("Impossible d'envoyer le commentaire", "error");
+      toast.error("Impossible d'envoyer le commentaire");
     } finally {
       setSending(false);
     }
-  };
+  }, [addComment, publicationId, sending, text]);
 
-  const handleDelete = async (commentId: Id<"comments">) => {
-    try {
-      await removeComment({ commentId });
-      UIService.openToast("Commentaire supprimé", "success");
-    } catch {
-      UIService.openToast("Impossible de supprimer", "error");
-    }
-  };
+  const handleDelete = useCallback(
+    async (commentId: Id<"comments">) => {
+      try {
+        await removeComment({ commentId });
+        toast.success("Commentaire supprimé");
+      } catch {
+        toast.error("Impossible de supprimer");
+      }
+    },
+    [removeComment],
+  );
 
-  const handleReply = (name: string) => {
+  const handleReply = useCallback((name: string) => {
     setReplyTo(name);
     setText(`@${name} `);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
+    setTimeout(() => inputRef.current?.focus(), 80);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (sending) return;
+    onClose();
+  }, [onClose, sending]);
+
+  if (!mounted) return null;
+
+  const translateY = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SCREEN_HEIGHT, 0],
+  });
 
   const commentCount = comments?.length ?? 0;
 
+  const borderColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.1)", "rgba(129,140,248,0.55)"],
+  });
+  const bgColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.045)", "rgba(99,102,241,0.08)"],
+  });
+
+  /* ========================================================================
+   * RENDER
+   * ====================================================================== */
+
   return (
-    <Sheet
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <SheetContent
-        side="bottom"
-        className="rounded-t-[32px] sm:rounded-t-[38px] border-0 flex flex-col overflow-hidden"
-        style={{ maxHeight: "min(88vh, 820px)", padding: 0 }}
-      >
-        {/* Premium top edge + ambient glow */}
-        <View
-          className="absolute top-0 left-0 right-0 h-px z-20"
-          style={{  }}
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {/* ───── BACKDROP ───── */}
+      <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
+        <Pressable
+          onPress={handleClose}
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel="Fermer"
         />
-        <View
-          className="absolute -top-28 left-1/2 -translate-x-1/2 h-52 w-[70%] rounded-full"
-          style={{ backgroundColor: "rgba(99,102,241,.08)" }}
+      </Animated.View>
+
+      {/* ───── SHEET ───── */}
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            maxHeight: Math.min(SCREEN_HEIGHT * 0.88, 820),
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        {/* Base gradient */}
+        <LinearGradient
+          colors={["#0C0A1F", "#0A0818", "#070512"]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
         />
 
-        {/* Handle */}
-        <View className="relative z-10 flex justify-center pt-3 pb-1">
-          <View className="w-11 h-1.5 rounded-full bg-white/15" />
+        {/* Top ambient glow */}
+        <View style={styles.topGlow} pointerEvents="none">
+          <LinearGradient
+            colors={["rgba(99,102,241,0.25)", "rgba(99,102,241,0)"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={{ flex: 1, borderRadius: 999 }}
+          />
         </View>
 
-        {/* Header */}
-        <SheetHeader className="relative z-10 px-5 sm:px-6 pt-3 pb-4 border-b border-white/[0.07] flex-shrink-0">
-          <View className="flex items-center justify-between gap-4">
-            <View className="flex items-center gap-3 min-w-0">
-              <View
-                className="h-10 w-10 rounded-[14px] flex items-center justify-center flex-shrink-0"
-                style={{ borderWidth: 1, borderColor: "rgba(139,92,246,.22)", borderStyle: "solid" }}
-              >
-                <MessageCircle size={18} className="text-indigo-300" />
-              </View>
+        {/* Top light line */}
+        <View style={styles.topLine} pointerEvents="none" />
 
-              <View className="min-w-0 text-left">
-                <SheetTitle className="text-white font-black text-[17px] flex items-center gap-2">
-                  <Text>Discussion</Text>{comments && (
-                    <Text
-                      key={commentCount}
-                      className="inline-flex items-center justify-center min-w-6 h-5 px-1.5 rounded-full bg-indigo-500/15 border border-indigo-500/20 text-indigo-300 text-[10px] font-bold"
-                    >
-                      {commentCount}
-                    </Text>
-                  )}
-                </SheetTitle>
+        {/* Border ring */}
+        <View style={styles.borderRing} pointerEvents="none" />
 
-                {publicationTitle && (
-                  <Text className="text-white/30 text-[11px] text-left mt-0.5">
-                    {publicationTitle}
-                  </Text>
-                )}
-              </View>
+        {/* ───── HANDLE ───── */}
+        <View style={styles.handleWrap}>
+          <View style={styles.handleBar} />
+        </View>
+
+        {/* ───── HEADER ───── */}
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <HeaderIcon count={commentCount} />
+
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.headerTitle}>Discussion</Text>
+              {publicationTitle ? (
+                <Text style={styles.headerSub} numberOfLines={1}>
+                  {publicationTitle}
+                </Text>
+              ) : null}
             </View>
 
             <Pressable
-             
-              onPress={onClose}
-              className="h-9 w-9 rounded-xl flex items-center justify-center text-white/40 border border-transparent flex-shrink-0"
+              onPress={handleClose}
               accessibilityLabel="Fermer"
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.closeBtn,
+                pressed && { opacity: 0.75 },
+              ]}
             >
-              <X size={17} />
+              <X size={17} color="rgba(255,255,255,0.75)" />
             </Pressable>
           </View>
 
-          <View className="mt-3 flex items-center gap-2 text-[10px] text-white/22">
-            <ShieldCheck size={11} className="text-emerald-300/50" />
-            <Text>Une conversation respectueuse et utile à tous.</Text>
+          <View style={styles.headerNote}>
+            <ShieldCheck size={11} color="rgba(52,211,153,0.7)" />
+            <Text style={styles.headerNoteText}>
+              Une conversation respectueuse et utile à tous.
+            </Text>
           </View>
-        </SheetHeader>
+        </View>
 
-        {/* Comments list */}
-        <View
-          className="relative z-10 flex-1 overflow-y-auto px-4 sm:px-6 py-5"
-          style={{  }}
+        {/* ───── COMMENTS ───── */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.commentsScroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {!comments ? (
-            <View className="space-y-5">
+            <View style={{ gap: 18 }}>
               {[0, 1, 2, 3].map((i) => (
-                <View key={i} className="flex gap-3 animate-pulse">
-                  <View className="w-9 h-9 rounded-full bg-white/8 flex-shrink-0" />
-                  <View className="flex-1 space-y-2">
-                    <View className="h-3 w-28 rounded bg-white/8" />
-                    <View className="h-12 w-[82%] rounded-2xl bg-white/[0.045]" />
-                  </View>
-                </View>
+                <SkeletonComment key={i} index={i} />
               ))}
             </View>
           ) : commentCount === 0 ? (
-            <View
-              className="h-full min-h-[300px] flex flex-col items-center justify-center text-center"
-            >
-              <View
-                className="relative mb-5 h-16 w-16 rounded-[22px] flex items-center justify-center"
-                style={{ borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}
-              >
-                <MessageCircle size={27} className="text-white/22" />
-                <Sparkles
-                  size={12}
-                  className="absolute right-2 top-2 text-indigo-300/50"
-                />
-              </View>
-
-              <Text className="text-white/65 text-sm font-bold">
-                La discussion commence ici
-              </Text>
-              <Text className="text-white/25 text-xs mt-1.5 max-w-[260px] leading-5">
-                Partagez votre avis, posez une question ou apportez une
-                information utile.
-              </Text>
-
-              {!isAuthenticated && (
-                <View className="mt-5">
-                  <SignInButton />
-                </View>
-              )}
-            </View>
+            <EmptyState isAuthenticated={isAuthenticated} />
           ) : (
-            <View className="max-w-3xl mx-auto">
-              <View className="flex items-center gap-2 mb-5">
-                <View className="h-px flex-1 bg-white/[0.06]" />
-                <Text className="text-[9px] font-black uppercase tracking-[.16em] text-white/20">
+            <View style={{ maxWidth: 720, width: "100%", alignSelf: "center" }}>
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>
                   {commentCount} contribution{commentCount > 1 ? "s" : ""}
                 </Text>
-                <View className="h-px flex-1 bg-white/[0.06]" />
+                <View style={styles.dividerLine} />
               </View>
 
-              <>
-                {comments.map((comment) => (
-                  <View key={comment._id} className="mb-4 last:mb-0">
-                    <CommentItem
-                      comment={comment}
-                      currentUserId={currentUser?._id ?? null}
-                      onDelete={handleDelete}
-                      onReply={handleReply}
-                    />
-                  </View>
+              <View style={{ gap: 16 }}>
+                {comments.map((comment, index) => (
+                  <CommentItem
+                    key={comment._id}
+                    comment={comment as CommentShape}
+                    index={index}
+                    currentUserId={currentUser?._id ?? null}
+                    onDelete={handleDelete}
+                    onReply={handleReply}
+                  />
                 ))}
-              </>
+              </View>
             </View>
           )}
-        </View>
+        </ScrollView>
 
-        {/* Composer */}
+        {/* ───── COMPOSER ───── */}
         <View
-          className="relative z-20 flex-shrink-0 px-4 sm:px-6 py-3.5 border-t border-white/[0.07]"
-          style={{  }}
+          style={[
+            styles.composer,
+            {
+              paddingBottom: Platform.OS === "android" ? 16 : Math.max(16, 28),
+            },
+          ]}
         >
           {isAuthenticated ? (
-            <View className="max-w-3xl mx-auto">
-              <>
-                {replyTo && (
-                  <View
-                    className="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-xl"
-                    style={{ backgroundColor: "rgba(99,102,241,.08)", borderWidth: 1, borderColor: "rgba(99,102,241,.15)", borderStyle: "solid" }}
-                  >
-                    <Reply size={11} className="text-indigo-300" />
-                    <Text className="text-[11px] text-indigo-200/75 flex-1">
-                      Réponse à <strong>{replyTo}</strong>
-                    </Text>
-                    <Pressable
-                     
-                      onPress={() => {
-                        setReplyTo(null);
-                        setText("");
-                      }}
-                      className="h-5 w-5 rounded-md flex items-center justify-center text-white/35"
-                    >
-                      <X size={11} />
-                    </Pressable>
-                  </View>
-                )}
-              </>
+            <View style={{ maxWidth: 720, width: "100%", alignSelf: "center" }}>
+              {/* Reply banner */}
+              {replyTo ? (
+                <ReplyBanner
+                  name={replyTo}
+                  onClear={() => {
+                    setReplyTo(null);
+                    setText("");
+                  }}
+                />
+              ) : null}
 
-              <View className="flex items-end gap-2">
+              <View style={styles.composerRow}>
                 <Avatar
                   name={currentUser?.name}
                   avatar={currentUser?.avatar}
                   size={36}
                 />
 
-                <View
-                  className={cn(
-                    "flex-1 relative rounded-[20px] transition-all",
-                    "bg-white/[0.045] border border-white/[0.08]",
-                    "focus-within:border-indigo-500/35 focus-within:bg-white/[0.06]",
-                  )}
+                <Animated.View
+                  style={[
+                    styles.inputWrapper,
+                    { borderColor, backgroundColor: bgColor },
+                  ]}
                 >
                   <TextInput
                     ref={inputRef}
                     value={text}
-                    onChangeText={(text) => setText(text)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        void handleSend();
-                      }
-                    }}
+                    onChangeText={setText}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => setFocused(false)}
+                    onSubmitEditing={() => void handleSend()}
                     placeholder={
                       replyTo
                         ? `Répondre à ${replyTo}...`
                         : "Écrire un commentaire..."
                     }
-                   
+                    placeholderTextColor="rgba(255,255,255,0.3)"
                     maxLength={1000}
-                    className="w-full bg-transparent px-4 py-3 pr-11 text-[13px] text-white placeholder:text-white/22 outline-none leading-5"
-                    style={{  }}
-                   multiline textAlignVertical="top"/>
-
+                    accessibilityLabel="Commentaire"
+                    multiline
+                    style={styles.input}
+                    textAlignVertical="top"
+                  />
                   <Pressable
-                   
-                    className="absolute right-2 bottom-2 h-7 w-7 rounded-lg flex items-center justify-center text-white/20"
+                    hitSlop={8}
                     accessibilityLabel="Emoji"
+                    style={styles.emojiBtn}
                   >
-                    <Smile size={14} />
+                    <Smile size={14} color="rgba(255,255,255,0.4)" />
                   </Pressable>
-                </View>
+                </Animated.View>
 
                 <Pressable
                   onPress={() => void handleSend()}
                   disabled={!text.trim() || sending}
-                  className={cn(
-                    "w-10 h-10 rounded-[15px] flex items-center justify-center flex-shrink-0 transition-all",
-                    text.trim() && !sending
-                      ? "text-white shadow-lg"
-                      : "bg-white/7 text-white/20",
-                  )}
-                  style={
-                    text.trim() && !sending
-                      ? {  }
-                      : undefined
-                  }
                   accessibilityLabel="Envoyer"
+                  style={({ pressed }) => [
+                    styles.sendBtnOuter,
+                    (!text.trim() || sending) && styles.sendBtnDisabled,
+                    pressed && text.trim() && !sending && styles.pressed,
+                  ]}
                 >
-                  {sending ? (
-                    <View className="w-4 h-4 border-2 border-white/25 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Send size={15} />
-                  )}
+                  <LinearGradient
+                    colors={
+                      text.trim() && !sending
+                        ? ["#818CF8", "#6366F1", "#7C3AED"]
+                        : ["#232132", "#181625"]
+                    }
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.sendBtnGradient}
+                  >
+                    {sending ? (
+                      <LoadingSpinner />
+                    ) : (
+                      <Send
+                        size={15}
+                        color={text.trim() ? "#fff" : "rgba(255,255,255,0.3)"}
+                      />
+                    )}
+                  </LinearGradient>
                 </Pressable>
               </View>
 
-              <View className="flex items-center justify-between mt-1.5 pl-11">
-                <Text className="text-[9px] text-white/16">
-                  <Text>Entrée pour envoyer · Maj + Entrée pour une nouvelle ligne</Text></Text>
+              <View style={styles.composerHintRow}>
+                <Text style={styles.composerHint}>
+                  Entrée pour envoyer · Maj + Entrée = nouvelle ligne
+                </Text>
                 <Text
-                  className={cn(
-                    "text-[9px]",
-                    text.length > 900 ? "text-amber-300/60" : "text-white/16",
-                  )}
+                  style={[
+                    styles.composerCounter,
+                    text.length > 900 && { color: "#FCD34D" },
+                  ]}
                 >
-                  {text.length}<Text>/1000</Text></Text>
+                  {text.length}/1000
+                </Text>
               </View>
             </View>
           ) : (
-            <View
-              className="flex items-center justify-center gap-3 py-1.5"
-            >
-              <View className="h-8 w-8 rounded-xl bg-white/5 flex items-center justify-center">
-                <MessageCircle size={14} className="text-white/30" />
+            <View style={styles.signInRow}>
+              <View style={styles.signInIcon}>
+                <MessageCircle size={14} color="rgba(255,255,255,0.55)" />
               </View>
-              <Text className="text-white/35 text-xs">
-                <Text>Connectez-vous pour participer à la discussion</Text></Text>
+              <Text style={styles.signInText}>
+                Connectez-vous pour participer à la discussion
+              </Text>
               <SignInButton />
             </View>
           )}
         </View>
-      </SheetContent>
-    </Sheet>
+      </Animated.View>
+    </View>
   );
 }
+
+/* ============================================================================
+ * REPLY BANNER
+ * ========================================================================== */
+
+function ReplyBanner({ name, onClear }: { name: string; onClear: () => void }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.replyBanner,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-8, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <Reply size={12} color="#A5B4FC" />
+      <Text style={styles.replyBannerText} numberOfLines={1}>
+        Réponse à <Text style={{ fontWeight: "900" }}>{name}</Text>
+      </Text>
+      <Pressable onPress={onClear} hitSlop={8}>
+        <X size={12} color="rgba(255,255,255,0.55)" />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  pressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
+
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.65)",
+  },
+
+  sheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    overflow: "hidden",
+    backgroundColor: "#0A0818",
+    shadowColor: "#000",
+    shadowOpacity: 0.75,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: -20 },
+    elevation: 24,
+  },
+
+  topGlow: {
+    position: "absolute",
+    top: -110,
+    left: "15%",
+    right: "15%",
+    height: 180,
+    opacity: 0.9,
+  },
+
+  topLine: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "rgba(129,140,248,0.35)",
+  },
+
+  borderRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.15)",
+  },
+
+  handleWrap: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 6,
+    zIndex: 10,
+  },
+  handleBar: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  // ── HEADER
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.07)",
+    zIndex: 10,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  headerIconWrap: {
+    width: 40,
+    height: 40,
+  },
+  headerIconHalo: {
+    position: "absolute",
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "rgba(129,140,248,0.35)",
+  },
+  headerIconGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.7,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  countBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    paddingHorizontal: 5,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#6366F1",
+    borderWidth: 2,
+    borderColor: "#0C0A1F",
+  },
+  countBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.3,
+  },
+  headerSub: {
+    marginTop: 2,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  headerNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+  },
+  headerNoteText: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+
+  // ── COMMENTS
+  commentsScroll: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    paddingBottom: 24,
+  },
+
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  dividerText: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    color: "rgba(255,255,255,0.3)",
+  },
+
+  // ── COMMENT ROW
+  commentRow: {
+    flexDirection: "row",
+    gap: 12,
+    position: "relative",
+  },
+  commentRowReply: {
+    marginLeft: 28,
+  },
+  replySpine: {
+    position: "absolute",
+    left: -18,
+    top: 12,
+  },
+
+  commentBubble: {
+    borderRadius: 18,
+    borderTopLeftRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  commentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  commentAuthor: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#fff",
+    flexShrink: 1,
+  },
+  commentTime: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.35)",
+    fontWeight: "600",
+    flexShrink: 0,
+  },
+  menuTrigger: {
+    marginLeft: "auto",
+    padding: 4,
+    borderRadius: 8,
+  },
+  commentText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.85)",
+    fontWeight: "500",
+  },
+
+  commentActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    paddingLeft: 4,
+  },
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    height: 26,
+  },
+  actionBtnLiked: {
+    backgroundColor: "rgba(244,63,94,0.12)",
+  },
+  actionBtnText: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.5)",
+  },
+
+  menu: {
+    position: "absolute",
+    top: 30,
+    right: 0,
+    minWidth: 140,
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: "rgba(20,18,40,0.98)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    shadowColor: "#000",
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    zIndex: 10,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  menuItemText: {
+    fontSize: 11.5,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.65)",
+  },
+  menuItemTextDanger: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: "#FCA5A5",
+  },
+
+  // ── SKELETON
+  skeletonRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  skeletonAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  skeletonLineShort: {
+    height: 11,
+    width: 110,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  skeletonBubble: {
+    height: 48,
+    width: "82%",
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  // ── EMPTY
+  emptyWrap: {
+    minHeight: 300,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
+  emptyIconWrap: {
+    position: "relative",
+    marginBottom: 20,
+  },
+  emptyIconGradient: {
+    width: 68,
+    height: 68,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  emptySparkle: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.8)",
+    textAlign: "center",
+    letterSpacing: -0.2,
+  },
+  emptySub: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 19,
+    color: "rgba(255,255,255,0.45)",
+    textAlign: "center",
+    maxWidth: 280,
+    fontWeight: "500",
+  },
+
+  // ── COMPOSER
+  composer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(10,8,24,0.7)",
+    zIndex: 20,
+  },
+  composerRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+  },
+  inputWrapper: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 20,
+    borderWidth: 1,
+    position: "relative",
+    paddingRight: 40,
+  },
+  input: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingRight: 44,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#fff",
+    minHeight: 44,
+    maxHeight: 120,
+  },
+  emojiBtn: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  sendBtnOuter: {
+    borderRadius: 15,
+    overflow: "hidden",
+    shadowColor: "#6366F1",
+    shadowOpacity: 0.55,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  sendBtnDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  sendBtnGradient: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  composerHintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+    paddingLeft: 46,
+  },
+  composerHint: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.28)",
+    fontWeight: "500",
+    flexShrink: 1,
+  },
+  composerCounter: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.28)",
+    fontWeight: "700",
+    marginLeft: 8,
+  },
+
+  // ── REPLY BANNER
+  replyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: "rgba(99,102,241,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.25)",
+    marginBottom: 10,
+  },
+  replyBannerText: {
+    flex: 1,
+    fontSize: 11,
+    color: "rgba(196,181,253,0.95)",
+    fontWeight: "600",
+  },
+
+  // ── SIGN IN PROMPT
+  signInRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 6,
+  },
+  signInIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  signInText: {
+    flex: 1,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "500",
+  },
+});

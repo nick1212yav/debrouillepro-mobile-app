@@ -1,14 +1,11 @@
-import { View, Text } from "react-native";
+import { View, ViewProps } from "react-native";
 import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
-function Table({ className, ...props }: React.ComponentProps<typeof View>) {
+function Table({ className, ...props }: ViewProps) {
   return (
-    <View
-      data-slot="table-container"
-      className="relative w-full overflow-x-auto"
-    >
-      <View
+    <View data-slot="table-container" className="relative w-full overflow-x-auto">
+      <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
@@ -17,9 +14,9 @@ function Table({ className, ...props }: React.ComponentProps<typeof View>) {
   );
 }
 
-function TableHeader({ className, ...props }: React.ComponentProps<typeof View>) {
+function TableHeader({ className, ...props }: ViewProps) {
   return (
-    <View
+    <thead
       data-slot="table-header"
       className={cn("[&_tr]:border-b", className)}
       {...props}
@@ -27,9 +24,9 @@ function TableHeader({ className, ...props }: React.ComponentProps<typeof View>)
   );
 }
 
-function TableBody({ className, ...props }: React.ComponentProps<typeof View>) {
+function TableBody({ className, ...props }: ViewProps) {
   return (
-    <View
+    <tbody
       data-slot="table-body"
       className={cn("[&_tr:last-child]:border-0", className)}
       {...props}
@@ -37,9 +34,9 @@ function TableBody({ className, ...props }: React.ComponentProps<typeof View>) {
   );
 }
 
-function TableFooter({ className, ...props }: React.ComponentProps<typeof View>) {
+function TableFooter({ className, ...props }: ViewProps) {
   return (
-    <View
+    <tfoot
       data-slot="table-footer"
       className={cn(
         "bg-muted/50 border-t font-medium [&>tr]:last:border-b-0",
@@ -50,9 +47,9 @@ function TableFooter({ className, ...props }: React.ComponentProps<typeof View>)
   );
 }
 
-function TableRow({ className, ...props }: React.ComponentProps<typeof View>) {
+function TableRow({ className, ...props }: ViewProps) {
   return (
-    <View
+    <tr
       data-slot="table-row"
       className={cn(
         "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
@@ -63,9 +60,9 @@ function TableRow({ className, ...props }: React.ComponentProps<typeof View>) {
   );
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<typeof View>) {
+function TableHead({ className, ...props }: ViewProps) {
   return (
-    <Text
+    <th
       data-slot="table-head"
       className={cn(
         "text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
@@ -76,9 +73,9 @@ function TableHead({ className, ...props }: React.ComponentProps<typeof View>) {
   );
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<typeof View>) {
+function TableCell({ className, ...props }: ViewProps) {
   return (
-    <View
+    <td
       data-slot="table-cell"
       className={cn(
         "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
@@ -92,9 +89,9 @@ function TableCell({ className, ...props }: React.ComponentProps<typeof View>) {
 function TableCaption({
   className,
   ...props
-}: React.ComponentProps<typeof View>) {
+}: ViewProps) {
   return (
-    <Text
+    <caption
       data-slot="table-caption"
       className={cn("text-muted-foreground mt-4 text-sm", className)}
       {...props}

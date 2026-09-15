@@ -10,15 +10,10 @@ export function DateRenderer({
   disabled,
 }: FieldRendererProps) {
   return (
-    <TextInput
-      value={value ? new Date(value).toISOString().split("T")[0] : ""}
-      onChangeText={(text) =>
+    <TextInput value={value ? new Date(value).toISOString().split("T")[0] : ""} onChangeText={(value) =>
         onChange(
-          text ? new Date(text).getTime() : undefined,
+          value ? new Date(value).getTime() : undefined,
         )
-      }
-      disabled={disabled}
-      className={`w-full bg-white/5 border ${error ? "border-red-400" : "border-white/10"} rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:border-purple-400 transition-colors disabled:opacity-50`}
-    />
+      } className={`w-full bg-white/5 border ${error ? "border-red-400" : "border-white/10"} rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:border-purple-400 transition-colors disabled:opacity-50`} editable={!(disabled)} />
   );
 }

@@ -28,10 +28,7 @@ export function TransportStats() {
   return (
     <View className="gap-2">
       {stats.map((st) => (
-        <View
-          key={st.label}
-          className="p-3 rounded-2xl border border-white/5 bg-white/[0.02] flex flex-col items-center text-center"
-        >
+        <View key={st.label} className="p-3 rounded-2xl border border-white/5 bg-white/[0.02] flex flex-col items-center text-center">
           {st.icon}
           <Text className="text-[9px] text-white/40 mt-1.5 font-bold uppercase tracking-tight">
             {st.label}

@@ -26,36 +26,22 @@ export function CommunityFooter({
 }: Props) {
   return (
     <View className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
-      <Pressable
-        onPress={onLike}
-        className="flex items-center gap-1.5 text-xs font-medium"
-        style={{  }}
-      >
+      <Pressable onPress={onLike} className="flex items-center gap-1.5 text-xs font-medium transition-colors" style={{  }}>
         <Heart size={16} className={isLiked ? "fill-red-500" : ""} />
         {likeCount > 0 && <Text>{likeCount}</Text>}
       </Pressable>
 
-      <Pressable
-        onPress={onComment}
-        className="flex items-center gap-1.5 text-xs font-medium text-white/40"
-      >
+      <Pressable onPress={onComment} className="flex items-center gap-1.5 text-xs font-medium text-white/40 transition-colors">
         <MessageCircle size={16} />
         {commentCount > 0 && <Text>{commentCount}</Text>}
       </Pressable>
 
-      <Pressable
-        onPress={onShare}
-        className="flex items-center gap-1.5 text-xs font-medium text-white/40"
-      >
+      <Pressable onPress={onShare} className="flex items-center gap-1.5 text-xs font-medium text-white/40 transition-colors">
         <Share2 size={16} />
         {shareCount > 0 && <Text>{shareCount}</Text>}
       </Pressable>
 
-      <Pressable
-        onPress={onBookmark}
-        className="flex items-center gap-1.5 text-xs font-medium"
-        style={{  }}
-      >
+      <Pressable onPress={onBookmark} className="flex items-center gap-1.5 text-xs font-medium transition-colors" style={{  }}>
         <Bookmark size={16} className={isBookmarked ? "fill-amber-400" : ""} />
       </Pressable>
     </View>

@@ -1,3 +1,4 @@
+import { GestureResponderEvent } from "react-native";
 import { useRef, useCallback } from "react";
 
 /**
@@ -8,7 +9,7 @@ export function useSwipeBack(onBack: () => void, threshold = 80) {
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
+  const onTouchStart = useCallback((e: GestureResponderEvent) => {
     const touch = e.touches[0];
     // Only capture touches starting near the left edge (within 30px)
     if (touch.clientX <= 30) {
@@ -17,7 +18,7 @@ export function useSwipeBack(onBack: () => void, threshold = 80) {
     }
   }, []);
 
-  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+  const onTouchEnd = useCallback((e: GestureResponderEvent) => {
     if (touchStartX.current === null || touchStartY.current === null) return;
     const touch = e.changedTouches[0];
     const deltaX = touch.clientX - touchStartX.current;

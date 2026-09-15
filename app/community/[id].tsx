@@ -1,17 +1,19 @@
-import { useLocalSearchParams, useRouter, Link } from "expo-router";
+// app/community/[id].tsx
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { UIService } from "@/core/sdk/ui/UIService";
-
-function NativeConfirmAlert(message: string): boolean {
-  Alert.alert(message, "Confirmation", [
-    { text: "Annuler", style: "cancel" },
-    { text: "Confirmer", onPress: () => undefined },
-  ]);
-  return false;
-}
-import { View, Text, Pressable, Alert } from "react-native";
-// src/pages/modules/CommunityDetailPage.tsx
 import { useState, useEffect, Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  Alert,
+  Modal,
+  ScrollView,
+  Platform,
+  StyleSheet,
+} from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +28,7 @@ import {
   Bookmark,
   Pencil,
   Trash2,
-  Link,
+  Link as LinkIcon,
   Flag,
   EyeOff,
   X,
@@ -55,7 +57,31 @@ import { adaptCommunityPost } from "@/features/community/adapter";
 import type { CommunityPost } from "@/features/community/types";
 import type { Id } from "@/convex/_generated/dataModel";
 
-// ── ErrorBoundary ──────────────────────────────────────────────────────────
+// ── Constantes ────────────────────────────────────────────────────────────
+const APP_SHARE_BASE_URL = "https://app-template.com";
+
+function buildShareUrl(postId: string | undefined): string {
+  return `${APP_SHARE_BASE_URL}/community/${postId ?? ""}`;
+}
+
+// ── Confirmation native (corrigée : ne retourne plus toujours false) ─────
+function NativeConfirmAlert(
+  message: string,
+  onConfirm: () => void | Promise<void>,
+): void {
+  Alert.alert("Confirmation", message, [
+    { text: "Annuler", style: "cancel" },
+    {
+      text: "Confirmer",
+      style: "destructive",
+      onPress: () => {
+        void onConfirm();
+      },
+    },
+  ]);
+}
+
+// ── ErrorBoundary ────────────────────────────────────────────────────────
 class ErrorBoundary extends Component<{
   children: ReactNode;
   fallback: ReactNode;
@@ -75,7 +101,7 @@ class ErrorBoundary extends Component<{
   }
 }
 
-// ── Composants désactivés (placeholders) ──────────────────────────────────
+// ── Composants désactivés (placeholders) ─────────────────────────────────
 const CommunityMedia = () => null;
 const CommunityVideo = () => null;
 const CommunityVoice = () => null;
@@ -136,7 +162,6 @@ export default function CommunityDetailPage() {
   const [showMenu, setShowMenu] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
 
-  // États pour les réactions (exemple)
   const [reactions, setReactions] = useState<Record<string, number>>({});
   const [userReaction, setUserReaction] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -158,7 +183,6 @@ export default function CommunityDetailPage() {
   const { moderateText } = useCommunityAI();
 
   useEffect(() => {
-    console.log("🔍 publication =", publication);
     if (publication === undefined) {
       setLoading(true);
       return;
@@ -166,15 +190,11 @@ export default function CommunityDetailPage() {
     if (publication) {
       try {
         const adapted = adaptCommunityPost(publication);
-        console.log("✅ adapted =", adapted);
-        console.log("POST IMAGES =", adapted.images);
-        console.log("META IMAGES =", adapted.meta?.images);
         setPost(adapted);
         setLoading(false);
         trackView({ publicationId: publication._id }).catch((err) =>
           console.warn("⚠️ trackView error:", err),
         );
-        // Simuler des réactions (à remplacer par des données réelles)
         setReactions({ "❤️": adapted.likeCount || 0 });
         setUserReaction(adapted.likedByMe ? "❤️" : null);
       } catch (err) {
@@ -183,14 +203,12 @@ export default function CommunityDetailPage() {
         setLoading(false);
       }
     } else {
-      console.log("⚠️ publication = null");
       setPost(null);
       setLoading(false);
     }
   }, [publication, trackView]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
-
+  // ── Handlers ─────────────────────────────────────────────────────────
   const handleLike = async () => {
     if (!post) return;
     try {
@@ -200,7 +218,7 @@ export default function CommunityDetailPage() {
         likedByMe: !post.likedByMe,
         likeCount: post.likedByMe ? post.likeCount - 1 : post.likeCount + 1,
       });
-    } catch (error) {
+    } catch {
       UIService.openToast("Erreur lors du like", "error");
     }
   };
@@ -213,8 +231,11 @@ export default function CommunityDetailPage() {
         ...post,
         bookmarkedByMe: !post.bookmarkedByMe,
       });
-      UIService.openToast(post.bookmarkedByMe ? "Retiré des favoris" : "Ajouté aux favoris", "success");
-    } catch (error) {
+      UIService.openToast(
+        post.bookmarkedByMe ? "Retiré des favoris" : "Ajouté aux favoris",
+        "success",
+      );
+    } catch {
       UIService.openToast("Erreur lors de l'enregistrement", "error");
     }
   };
@@ -223,21 +244,28 @@ export default function CommunityDetailPage() {
   const handleReport = () => setShowReport(true);
   const handleBoost = () => setShowBoost(true);
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!post) return;
-    if (!NativeConfirmAlert("Voulez-vous vraiment supprimer ce post ?")) return;
-    try {
-      await deletePost({ publicationId: post._id });
-      UIService.openToast("Post supprimé", "success");
-      router.back();
-    } catch (error) {
-      UIService.openToast("Erreur lors de la suppression", "error");
-    }
+    NativeConfirmAlert("Voulez-vous vraiment supprimer ce post ?", async () => {
+      try {
+        await deletePost({ publicationId: post._id });
+        UIService.openToast("Post supprimé", "success");
+        router.back();
+      } catch {
+        UIService.openToast("Erreur lors de la suppression", "error");
+      }
+    });
   };
 
-  const handleCopyLink = () => {
-    undefined.writeText(undefined.href);
-    UIService.openToast("Lien copié !", "success");
+  // ✅ Corrigé : utilise expo-clipboard au lieu de `undefined.writeText`
+  const handleCopyLink = async () => {
+    if (!post) return;
+    try {
+      await Clipboard.setStringAsync(buildShareUrl(post._id));
+      UIService.openToast("Lien copié !", "success");
+    } catch {
+      UIService.openToast("Impossible de copier le lien", "error");
+    }
     setShowMenu(false);
   };
 
@@ -256,7 +284,7 @@ export default function CommunityDetailPage() {
     try {
       await addComment(text);
       UIService.openToast("Commentaire ajouté", "success");
-    } catch (error) {
+    } catch {
       UIService.openToast("Erreur lors de l'ajout du commentaire", "error");
     }
   };
@@ -265,7 +293,7 @@ export default function CommunityDetailPage() {
     try {
       await addReply(text, parentId as Id<"comments">);
       UIService.openToast("Réponse ajoutée", "success");
-    } catch (error) {
+    } catch {
       UIService.openToast("Erreur lors de l'ajout de la réponse", "error");
     }
   };
@@ -280,31 +308,33 @@ export default function CommunityDetailPage() {
     try {
       await moderateText(reason);
       UIService.openToast("Signalement envoyé", "success");
-    } catch (error) {
+    } catch {
       UIService.openToast("Erreur lors du signalement", "error");
     }
   };
 
-  const handleStatsLikes = () => UIService.openToast("Liste des likes à venir", "info");
+  const handleStatsLikes = () =>
+    UIService.openToast("Liste des likes à venir", "info");
   const handleStatsComments = () => setShowComments(!showComments);
   const handleStatsShares = () => setShowShare(true);
-  const handleStatsBookmarks = () => UIService.openToast("Liste des favoris à venir", "info");
+  const handleStatsBookmarks = () =>
+    UIService.openToast("Liste des favoris à venir", "info");
 
   const handleVote = async (optionId: string) => {
     if (!post) return;
     try {
       await votePoll({ publicationId: post._id, optionId });
       UIService.openToast("Vote enregistré !", "success");
-    } catch (error) {
+    } catch {
       UIService.openToast("Erreur lors du vote", "error");
     }
   };
 
-  const handleAnswer = async (answer: string) => {
+  const handleAnswer = async (_answer: string) => {
     UIService.openToast("Réponse aux questions bientôt disponible", "info");
   };
 
-  const handleLikeComment = async (commentId: string) => {
+  const handleLikeComment = async (_commentId: string) => {
     UIService.openToast("Like des commentaires bientôt disponible", "info");
   };
 
@@ -312,11 +342,9 @@ export default function CommunityDetailPage() {
     router.push(`/profile/${authorId}`);
   };
 
-  // ── Handler pour les réactions multiples ──────────────────────────────
   const handleReaction = (emoji: string) => {
     if (!post) return;
     if (emoji === userReaction) {
-      // Retirer la réaction
       setUserReaction(null);
       setReactions((prev) => {
         const newReactions = { ...prev };
@@ -326,25 +354,20 @@ export default function CommunityDetailPage() {
         }
         return newReactions;
       });
-      // Appeler le like standard pour décrémenter (ou une mutation dédiée)
       handleLike();
     } else {
-      // Ajouter ou changer la réaction
       setUserReaction(emoji);
       setReactions((prev) => ({
         ...prev,
         [emoji]: (prev[emoji] || 0) + 1,
       }));
-      // Mettre à jour le like si pas déjà liké
       if (!post.likedByMe) {
         handleLike();
       }
       UIService.openToast(`Réaction ${emoji} ajoutée`, "success");
-      // Ici, appeler une mutation Convex pour stocker la réaction
     }
   };
 
-  // ── Handler pour le suivi ──────────────────────────────────────────────
   const handleFollow = () => {
     setIsFollowing(true);
     UIService.openToast("Vous suivez maintenant cet auteur", "success");
@@ -355,14 +378,10 @@ export default function CommunityDetailPage() {
     UIService.openToast("Vous ne suivez plus cet auteur", "info");
   };
 
-  // ── États de chargement et d'erreur ─────────────────────────────────────
-
+  // ── Loading ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View
-        className="h-full flex flex-col"
-       
-      >
+      <View style={styles.screen}>
         <View className="px-4 pt-12 pb-3">
           <Skeleton className="w-10 h-10 rounded-2xl" />
         </View>
@@ -376,43 +395,51 @@ export default function CommunityDetailPage() {
     );
   }
 
+  // ── Post introuvable ────────────────────────────────────────────────
   if (!post) {
     return (
-      <View
-        className="h-full flex flex-col items-center justify-center"
-       
-      >
-        <Pressable onPress={() => router.back()} className="self-start ml-4 mb-4">
-          <ArrowLeft size={24} className="text-white/60" />
+      <View style={[styles.screen, styles.center]}>
+        <Pressable
+          onPress={() => router.back()}
+          className="self-start ml-4 mb-4"
+        >
+          <ArrowLeft size={24} color="rgba(255,255,255,0.6)" />
         </Pressable>
         <Text className="text-white/40">Post introuvable</Text>
       </View>
     );
   }
 
-  // ── Mode debug ──────────────────────────────────────────────────────────
+  // ── Debug ────────────────────────────────────────────────────────────
   if (debugMode) {
     return (
-      <View className="p-6 text-white min-h-screen bg-black">
-        <Text className="text-xl font-bold mb-4">🔍 Données du post (debug)</Text>
-        <pre className="text-xs bg-white/10 p-4 rounded-xl overflow-auto max-h-[80vh] border border-white/10">
-          {JSON.stringify(post, null, 2)}
-        </pre>
+      <View style={styles.debugScreen}>
+        <Text style={styles.debugTitle}>🔍 Données du post (debug)</Text>
+        <ScrollView
+          style={styles.debugScroll}
+          contentContainerStyle={styles.debugScrollContent}
+        >
+          <Text selectable style={styles.debugPre}>
+            {JSON.stringify(post, null, 2)}
+          </Text>
+        </ScrollView>
         <Pressable
           onPress={() => setDebugMode(false)}
-          className="mt-6 px-4 py-2 bg-purple-500/20 rounded-xl"
+          style={styles.debugButton}
         >
-          <Text>Retour au rendu normal</Text></Pressable>
+          <Text style={styles.debugButtonText}>Retour au rendu normal</Text>
+        </Pressable>
         <Pressable
           onPress={() => router.back()}
-          className="mt-6 ml-4 px-4 py-2 bg-white/10 rounded-xl"
+          style={[styles.debugButton, { marginTop: 12 }]}
         >
-          <Text>← Retour</Text></Pressable>
+          <Text style={styles.debugButtonText}>← Retour</Text>
+        </Pressable>
       </View>
     );
   }
 
-  // ── Sécurisation de `post.meta` ──────────────────────────────────────────
+  // ── Meta sécurisée ──────────────────────────────────────────────────
   const meta = post.meta ?? {};
   const safeMeta = {
     location: meta.location ?? "",
@@ -430,16 +457,16 @@ export default function CommunityDetailPage() {
     postType: meta.postType ?? "text",
   };
   const images = safeMeta.images.length > 0 ? safeMeta.images : post.images;
+  const shareUrl = buildShareUrl(post._id);
 
-  // ── Rendu principal ─────────────────────────────────────────────────────
-
+  // ── Contenu ─────────────────────────────────────────────────────────
   const renderContent = () => (
-    <View
-      className="space-y-4"
-    >
+    <View className="space-y-4">
       <ErrorBoundary
         fallback={
-          <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityHeader</Text></View>
+          <View className="text-red-400 p-4">
+            <Text>❌ Erreur dans CommunityHeader</Text>
+          </View>
         }
       >
         <CommunityHeader
@@ -447,7 +474,7 @@ export default function CommunityDetailPage() {
           authorName={post.authorName || "Anonyme"}
           authorAvatar={post.authorAvatar}
           createdAt={post._creationTime}
-          isVerified={false} // à remplacer par une vraie valeur
+          isVerified={false}
           isFollowing={isFollowing}
           onFollow={handleFollow}
           onUnfollow={handleUnfollow}
@@ -459,7 +486,8 @@ export default function CommunityDetailPage() {
         <ErrorBoundary
           fallback={
             <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityGallery</Text></View>
+              <Text>❌ Erreur dans CommunityGallery</Text>
+            </View>
           }
         >
           <CommunityGallery images={images} title={post.title || "Post"} />
@@ -479,7 +507,8 @@ export default function CommunityDetailPage() {
         <ErrorBoundary
           fallback={
             <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityHashtags</Text></View>
+              <Text>❌ Erreur dans CommunityHashtags</Text>
+            </View>
           }
         >
           <CommunityHashtags tags={post.tags} />
@@ -490,7 +519,8 @@ export default function CommunityDetailPage() {
         <ErrorBoundary
           fallback={
             <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityLocation</Text></View>
+              <Text>❌ Erreur dans CommunityLocation</Text>
+            </View>
           }
         >
           <CommunityLocation location={safeMeta.location} />
@@ -499,7 +529,9 @@ export default function CommunityDetailPage() {
       {safeMeta.latitude && safeMeta.longitude && (
         <ErrorBoundary
           fallback={
-            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityMap</Text></View>
+            <View className="text-red-400 p-4">
+              <Text>❌ Erreur dans CommunityMap</Text>
+            </View>
           }
         >
           <CommunityMap
@@ -511,13 +543,15 @@ export default function CommunityDetailPage() {
 
       {post.type === "evenement" && safeMeta.eventDate && (
         <View className="flex items-center gap-2 text-sm text-white/60 bg-white/5 rounded-xl p-3">
-          <Calendar size={16} className="text-purple-400" />
-          <Text>{new Date(safeMeta.eventDate).toLocaleDateString()}</Text>
+          <Calendar size={16} color="#A78BFA" />
+          <Text style={styles.inlineText}>
+            {new Date(safeMeta.eventDate).toLocaleDateString()}
+          </Text>
           {safeMeta.eventLocation && (
             <>
               <Text className="text-white/20">|</Text>
-              <MapPin size={16} className="text-purple-400" />
-              <Text>{safeMeta.eventLocation}</Text>
+              <MapPin size={16} color="#A78BFA" />
+              <Text style={styles.inlineText}>{safeMeta.eventLocation}</Text>
             </>
           )}
         </View>
@@ -526,7 +560,9 @@ export default function CommunityDetailPage() {
       {post.type === "poll" && safeMeta.pollOptions.length > 0 && (
         <ErrorBoundary
           fallback={
-            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityPoll</Text></View>
+            <View className="text-red-400 p-4">
+              <Text>❌ Erreur dans CommunityPoll</Text>
+            </View>
           }
         >
           <CommunityPoll
@@ -541,7 +577,8 @@ export default function CommunityDetailPage() {
         <ErrorBoundary
           fallback={
             <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityQuestion</Text></View>
+              <Text>❌ Erreur dans CommunityQuestion</Text>
+            </View>
           }
         >
           <CommunityQuestion
@@ -554,7 +591,8 @@ export default function CommunityDetailPage() {
       <ErrorBoundary
         fallback={
           <View className="text-red-400 p-4">
-            <Text>❌ Erreur dans CommunityStatistics</Text></View>
+            <Text>❌ Erreur dans CommunityStatistics</Text>
+          </View>
         }
       >
         <CommunityStatistics
@@ -573,7 +611,8 @@ export default function CommunityDetailPage() {
       <ErrorBoundary
         fallback={
           <View className="text-red-400 p-4">
-            <Text>❌ Erreur dans CommunityActions</Text></View>
+            <Text>❌ Erreur dans CommunityActions</Text>
+          </View>
         }
       >
         <CommunityActions
@@ -597,7 +636,8 @@ export default function CommunityDetailPage() {
         <ErrorBoundary
           fallback={
             <View className="text-red-400 p-4">
-              <Text>❌ Erreur dans CommunityComments</Text></View>
+              <Text>❌ Erreur dans CommunityComments</Text>
+            </View>
           }
         >
           <CommunityComments
@@ -612,55 +652,44 @@ export default function CommunityDetailPage() {
       )}
 
       <View className="flex items-center justify-between pt-4 border-t border-white/10">
-        <Pressable
-          onPress={handleLike}
-          className="flex items-center gap-2 text-white/60"
-        >
+        <Pressable onPress={handleLike} style={styles.footerAction}>
           <Heart
             size={18}
-            className={post.likedByMe ? "fill-red-500 text-red-500" : ""}
+            color={post.likedByMe ? "#EF4444" : "rgba(255,255,255,0.6)"}
+            fill={post.likedByMe ? "#EF4444" : "transparent"}
           />
-          <Text>{post.likeCount}</Text>
+          <Text style={styles.footerActionText}>{post.likeCount}</Text>
         </Pressable>
         <Pressable
           onPress={() => setShowComments(!showComments)}
-          className="flex items-center gap-2 text-white/60"
+          style={styles.footerAction}
         >
-          <MessageCircle size={18} />
-          <Text>{post.commentCount}</Text>
+          <MessageCircle size={18} color="rgba(255,255,255,0.6)" />
+          <Text style={styles.footerActionText}>{post.commentCount}</Text>
         </Pressable>
-        <Pressable
-          onPress={handleShare}
-          className="flex items-center gap-2 text-white/60"
-        >
-          <Share2 size={18} />
+        <Pressable onPress={handleShare} style={styles.footerAction}>
+          <Share2 size={18} color="rgba(255,255,255,0.6)" />
         </Pressable>
-        <Pressable
-          onPress={handleBookmark}
-          className="flex items-center gap-2 text-white/60"
-        >
+        <Pressable onPress={handleBookmark} style={styles.footerAction}>
           <Bookmark
             size={18}
-            className={
-              post.bookmarkedByMe ? "fill-purple-400 text-purple-400" : ""
-            }
+            color={post.bookmarkedByMe ? "#A78BFA" : "rgba(255,255,255,0.6)"}
+            fill={post.bookmarkedByMe ? "#A78BFA" : "transparent"}
           />
         </Pressable>
       </View>
     </View>
   );
 
+  // ── Rendu principal ─────────────────────────────────────────────────
   return (
-    <View
-      className="h-full flex flex-col"
-     
-    >
+    <View style={styles.screen}>
       <View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3 relative">
         <Pressable
           onPress={() => router.back()}
           className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
         >
-          <ArrowLeft size={20} className="text-white" />
+          <ArrowLeft size={20} color="white" />
         </Pressable>
         <Text className="text-white font-bold text-lg flex-1 truncate">
           Publication
@@ -669,13 +698,14 @@ export default function CommunityDetailPage() {
           onPress={() => setShowMenu(!showMenu)}
           className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5"
         >
-          <MoreVertical size={20} className="text-white/60" />
+          <MoreVertical size={20} color="rgba(255,255,255,0.6)" />
         </Pressable>
         <Pressable
           onPress={() => setDebugMode(true)}
           className="text-[10px] text-white/20 px-2 py-1"
         >
-          <Text>debug</Text></Pressable>
+          <Text style={styles.debugLink}>debug</Text>
+        </Pressable>
 
         {showMenu && (
           <View className="absolute right-4 top-16 z-50 w-48 rounded-xl bg-zinc-900/95 border border-white/10 shadow-xl overflow-hidden">
@@ -684,21 +714,28 @@ export default function CommunityDetailPage() {
                 onPress={handleEdit}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80"
               >
-                <Pencil size={16} />
-                <Text>Modifier</Text></Pressable>
+                <Pencil size={16} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.menuText}>Modifier</Text>
+              </Pressable>
               <Pressable
                 onPress={handleDelete}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400"
               >
-                <Trash2 size={16} />
-                <Text>Supprimer</Text></Pressable>
-              <hr className="border-white/5" />
+                <Trash2 size={16} color="#F87171" />
+                <Text style={[styles.menuText, { color: "#F87171" }]}>
+                  Supprimer
+                </Text>
+              </Pressable>
+              {/* ✅ <hr> remplacé par une View avec bordure */}
+              <View style={styles.divider} />
               <Pressable
                 onPress={handleCopyLink}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80"
               >
-                <Link size={16} />
-                <Text>Copier le lien</Text></Pressable>
+                {/* ✅ LinkIcon (alias de Link lucide) pour éviter tout conflit */}
+                <LinkIcon size={16} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.menuText}>Copier le lien</Text>
+              </Pressable>
               <Pressable
                 onPress={() => {
                   setShowMenu(false);
@@ -706,28 +743,31 @@ export default function CommunityDetailPage() {
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80"
               >
-                <Flag size={16} />
-                <Text>Signaler</Text></Pressable>
+                <Flag size={16} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.menuText}>Signaler</Text>
+              </Pressable>
               <Pressable
                 onPress={handleHide}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80"
               >
-                <EyeOff size={16} />
-                <Text>Masquer</Text></Pressable>
+                <EyeOff size={16} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.menuText}>Masquer</Text>
+              </Pressable>
             </View>
             <Pressable
               onPress={() => setShowMenu(false)}
-              className="absolute top-2 right-2 text-white/30"
+              className="absolute top-2 right-2"
             >
-              <X size={16} />
+              <X size={16} color="rgba(255,255,255,0.3)" />
             </Pressable>
           </View>
         )}
       </View>
 
-      <View
-        className="flex-1 overflow-y-auto px-4 pb-8 space-y-5"
-       
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
         <ErrorBoundary
           fallback={
@@ -744,27 +784,31 @@ export default function CommunityDetailPage() {
         >
           {renderContent()}
         </ErrorBoundary>
-      </View>
+      </ScrollView>
 
       {showShare && (
         <CommunityShare
           title={post.title || "Post"}
           description={post.description}
-          url={undefined.href}
+          url={shareUrl}
           onClose={() => setShowShare(false)}
         />
       )}
 
-      {showReport && (
-        <View className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <View className="bg-zinc-900 rounded-2xl p-6 max-w-sm w-full border border-white/10">
-            <Text className="text-white font-bold text-lg mb-2">
-              Signaler ce post
-            </Text>
-            <Text className="text-white/60 text-sm mb-4">
+      {/* ✅ Modal de signalement — utilise <Modal> au lieu de `fixed inset-0` */}
+      <Modal
+        visible={showReport}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowReport(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Signaler ce post</Text>
+            <Text style={styles.modalSubtitle}>
               Pourquoi signalez-vous ce contenu ?
             </Text>
-            <View className="space-y-2">
+            <View style={styles.modalOptions}>
               {[
                 "Spam",
                 "Contenu inapproprié",
@@ -775,28 +819,32 @@ export default function CommunityDetailPage() {
                 <Pressable
                   key={reason}
                   onPress={() => {
-                    reportContent({ postId: post._id, reason });
+                    void reportContent({ postId: post._id, reason });
                     setShowReport(false);
                   }}
-                  className="w-full text-left px-4 py-2 rounded-xl text-white/80"
+                  style={styles.modalOption}
                 >
-                  {reason}
+                  <Text style={styles.modalOptionText}>{reason}</Text>
                 </Pressable>
               ))}
             </View>
             <Pressable
               onPress={() => setShowReport(false)}
-              className="mt-4 text-white/40 text-sm"
+              style={styles.modalCancel}
             >
-              <Text>Annuler</Text></Pressable>
+              <Text style={styles.modalCancelText}>Annuler</Text>
+            </Pressable>
           </View>
         </View>
-      )}
+      </Modal>
 
       {showBoost && (
         <CommunityBoost
           onBoost={async (duration) => {
-            UIService.openToast(`Post boosté pour ${duration} jours !`, "success");
+            UIService.openToast(
+              `Post boosté pour ${duration} jours !`,
+              "success",
+            );
             setShowBoost(false);
           }}
           onClose={() => setShowBoost(false)}
@@ -805,3 +853,139 @@ export default function CommunityDetailPage() {
     </View>
   );
 }
+
+// ── Styles ──────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
+  center: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+    gap: 20,
+  },
+  inlineText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+  },
+  footerAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  footerActionText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+  },
+  menuText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
+  },
+  debugLink: {
+    color: "rgba(255,255,255,0.2)",
+    fontSize: 10,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    marginVertical: 4,
+  },
+
+  // Debug screen
+  debugScreen: {
+    flex: 1,
+    padding: 24,
+    backgroundColor: "#000000",
+  },
+  debugTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
+  debugScroll: {
+    maxHeight: "70%",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  debugScrollContent: {
+    padding: 16,
+  },
+  debugPre: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  debugButton: {
+    marginTop: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(168,85,247,0.2)",
+    alignSelf: "flex-start",
+  },
+  debugButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+  },
+
+  // Modal de signalement
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "#18181B",
+    padding: 24,
+  },
+  modalTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  modalOptions: {
+    gap: 8,
+  },
+  modalOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  modalOptionText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
+  },
+  modalCancel: {
+    marginTop: 16,
+    alignSelf: "center",
+  },
+  modalCancelText: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 14,
+  },
+});

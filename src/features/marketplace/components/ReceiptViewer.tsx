@@ -1,8 +1,9 @@
-import { UIService } from "@/core/sdk/ui/UIService";
 import { View, Text, Pressable } from "react-native";
+
 // src/features/marketplace/components/ReceiptViewer.tsx
 import { useState, useEffect } from "react";
 import { Loader2, ArrowLeft, Download, Printer } from "lucide-react-native";
+import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 import { formatDate, formatPrice } from "../utils/formatter";
 
@@ -107,37 +108,30 @@ export function ReceiptViewer({
   const handlePrint = () => {
     setIsPrinting(true);
     setTimeout(() => {
-      undefined;
+      window.print();
       setIsPrinting(false);
     }, 300);
   };
 
   const handleDownload = () => {
-    UIService.openToast("Téléchargement en cours de développement...", "info");
+    toast.info("Téléchargement en cours de développement...");
   };
 
   if (!receiptId) {
     return (
-      <View className="text-white/40 text-center p-8">
-        <Text>Aucun reçu à afficher</Text>
-      </View>
+      <View className="text-white/40 text-center p-8"><Text>Aucun reçu à afficher</Text></View>
     );
   }
 
   if (isLoading) {
     return (
-      <View className="flex items-center justify-center p-8">
-        <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
-        <Text className="ml-3 text-white/40">Chargement...</Text>
-      </View>
+      <View className="flex items-center justify-center p-8"><Loader2 className="w-8 h-8 text-white/40 animate-spin" /><Text className="ml-3 text-white/40">Chargement...</Text></View>
     );
   }
 
   if (!receiptData) {
     return (
-      <View className="text-white/40 text-center p-8">
-        <Text>Reçu introuvable</Text>
-      </View>
+      <View className="text-white/40 text-center p-8"><Text>Reçu introuvable</Text></View>
     );
   }
 
@@ -145,159 +139,31 @@ export function ReceiptViewer({
   const items = receiptData.items || [];
 
   return (
-    <View className="flex flex-col gap-4">
-      {/* En‑tête */}
-      <View className="flex items-center justify-between">
-        <View className="flex items-center gap-3">
-          {onClose && (
-            <Pressable
-              onPress={onClose}
-              className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/5"
-            >
-              <ArrowLeft size={16} className="text-white" />
-            </Pressable>
-          )}
-          <Text className="text-white font-bold text-lg">Reçu</Text>
-        </View>
-        <View className="flex items-center gap-2">
-          <Pressable
-            onPress={handlePrint}
-            className="p-2 rounded-xl bg-white/5"
-            accessibilityLabel="Imprimer"
-          >
-            <Printer size={18} className="text-white/60" />
-          </Pressable>
-          <Pressable
-            onPress={handleDownload}
-            className="p-2 rounded-xl bg-white/5"
-            accessibilityLabel="Télécharger"
-          >
-            <Download size={18} className="text-white/60" />
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Corps du reçu */}
-      <View
-        className="bg-white/5 rounded-2xl p-6 space-y-4 border border-white/5"
-        id="receipt-content"
-      >
-        {/* En‑tête du reçu */}
-        <View className="text-center border-b border-white/10 pb-4">
-          <Text className="text-white font-bold text-xl">DÉBROUILLE PRO</Text>
-          <Text className="text-white/40 text-xs">Reçu officiel</Text>
-        </View>
-
-        {/* Infos */}
-        <View className="gap-3 text-sm">
-          <View>
-            <Text className="text-white/40">Référence</Text>
-            <Text className="text-white font-medium">{receiptData.id}</Text>
-          </View>
-          <View>
-            <Text className="text-white/40">Date</Text>
-            <Text className="text-white font-medium">{receiptData.date}</Text>
-          </View>
-          <View>
-            <Text className="text-white/40">Statut</Text>
-            <Text
-              className={`font-medium ${
+    <View className="flex flex-col gap-4">{}<View className="flex items-center justify-between"><View className="flex items-center gap-3">{onClose && (
+            <Pressable onPress={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/5 transition-colors"><ArrowLeft size={16} className="text-white" /></Pressable>
+          )}<Text className="text-white font-bold text-lg">Reçu</Text></View><View className="flex items-center gap-2"><Pressable onPress={handlePrint} className="p-2 rounded-xl bg-white/5 transition-colors" accessibilityLabel="Imprimer"><Printer size={18} className="text-white/60" /></Pressable><Pressable onPress={handleDownload} className="p-2 rounded-xl bg-white/5 transition-colors" accessibilityLabel="Télécharger"><Download size={18} className="text-white/60" /></Pressable></View></View>{}<View className="bg-white/5 rounded-2xl p-6 space-y-4 border border-white/5" id="receipt-content">{}<View className="text-center border-b border-white/10 pb-4"><Text className="text-white font-bold text-xl">DÉBROUILLE PRO</Text><Text className="text-white/40 text-xs">Reçu officiel</Text></View>{}<View className="gap-3 text-sm"><View><Text className="text-white/40">Référence</Text><Text className="text-white font-medium">{receiptData.id}</Text></View><View><Text className="text-white/40">Date</Text><Text className="text-white font-medium">{receiptData.date}</Text></View><View><Text className="text-white/40">Statut</Text><Text className={`font-medium ${
                 receiptData.status === "delivered" ||
                 receiptData.status === "completed"
                   ? "text-green-400"
                   : "text-yellow-400"
-              }`}
-            >
-              {receiptData.status}
-            </Text>
-          </View>
-          {type === "order" && (
+              }`}>{receiptData.status}</Text></View>{type === "order" && (
             <>
-              <View>
-                <Text className="text-white/40">Client</Text>
-                <Text className="text-white font-medium">{receiptData.buyer}</Text>
-              </View>
-              <View>
-                <Text className="text-white/40">Vendeur</Text>
-                <Text className="text-white font-medium">{receiptData.seller}</Text>
-              </View>
+              <View><Text className="text-white/40">Client</Text><Text className="text-white font-medium">{receiptData.buyer}</Text></View>
+              <View><Text className="text-white/40">Vendeur</Text><Text className="text-white font-medium">{receiptData.seller}</Text></View>
             </>
-          )}
-          {type === "transaction" && (
+          )}{type === "transaction" && (
             <>
-              <View>
-                <Text className="text-white/40">Type</Text>
-                <Text className="text-white font-medium">{receiptData.type}</Text>
-              </View>
-              <View>
-                <Text className="text-white/40">Contrepartie</Text>
-                <Text className="text-white font-medium">
-                  {receiptData.counterparty}
-                </Text>
-              </View>
+              <View><Text className="text-white/40">Type</Text><Text className="text-white font-medium">{receiptData.type}</Text></View>
+              <View><Text className="text-white/40">Contrepartie</Text><Text className="text-white font-medium">{receiptData.counterparty}</Text></View>
             </>
-          )}
-        </View>
-
-        {/* Détails */}
-        {type === "order" && (
-          <View className="space-y-2">
-            <View className="flex justify-between text-sm border-b border-white/5 pb-2">
-              <Text className="text-white/40">Article</Text>
-              <Text className="text-white/40">Qté</Text>
-              <Text className="text-white/40">Prix</Text>
-            </View>
-            {/* ✅ Utilisation de `items` (sécurisé) */}
-            {items.map((item: any, idx: number) => (
-              <View key={idx} className="flex justify-between text-sm">
-                <Text className="text-white">{item.name}</Text>
-                <Text className="text-white/60">{item.quantity}</Text>
-                <Text className="text-white">
-                  {formatPrice(item.price, receiptData.currency)}
-                </Text>
-              </View>
-            ))}
-            <View className="flex justify-between border-t border-white/10 pt-2 mt-2">
-              <Text className="text-white font-bold">Total</Text>
-              <Text className="text-white font-bold">
-                {formatPrice(receiptData.total || 0, receiptData.currency)}
-              </Text>
-            </View>
-            <View>
-              <Text className="text-white/40 text-sm">Moyen de paiement</Text>
-              <Text className="text-white text-sm">{receiptData.paymentMethod}</Text>
-            </View>
-          </View>
-        )}
-
-        {type === "transaction" && (
-          <View className="space-y-2">
-            <View>
-              <Text className="text-white/40">Description</Text>
-              <Text className="text-white">{receiptData.description}</Text>
-            </View>
-            <View className="flex justify-between border-t border-white/10 pt-2 mt-2">
-              <Text className="text-white font-bold">Montant</Text>
-              <Text className="text-white font-bold">
-                {formatPrice(receiptData.amount || 0, receiptData.currency)}
-              </Text>
-            </View>
-            <View>
-              <Text className="text-white/40">Référence</Text>
-              <Text className="text-white text-sm">{receiptData.reference}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Pied de page */}
-        <View className="border-t border-white/10 pt-4 text-center text-white/30 text-xs">
-          <Text>
-            <Text>Ce reçu fait foi de transaction. Conservez-le pour vos archives.</Text></Text>
-          <Text className="mt-1"><Text>DÉBROUILLE PRO -</Text>{new Date().getFullYear()}</Text>
-        </View>
-      </View>
-
-      <style>{`
+          )}</View>{}{type === "order" && (
+          <View className="space-y-2"><View className="flex justify-between text-sm border-b border-white/5 pb-2"><Text className="text-white/40">Article</Text><Text className="text-white/40">Qté</Text><Text className="text-white/40">Prix</Text></View>{}{items.map((item: any, idx: number) => (
+              <View key={idx} className="flex justify-between text-sm"><Text className="text-white">{item.name}</Text><Text className="text-white/60">{item.quantity}</Text><Text className="text-white">{formatPrice(item.price, receiptData.currency)}</Text></View>
+            ))}<View className="flex justify-between border-t border-white/10 pt-2 mt-2"><Text className="text-white font-bold">Total</Text><Text className="text-white font-bold">{formatPrice(receiptData.total || 0, receiptData.currency)}</Text></View><View><Text className="text-white/40 text-sm">Moyen de paiement</Text><Text className="text-white text-sm">{receiptData.paymentMethod}</Text></View></View>
+        )}{type === "transaction" && (
+          <View className="space-y-2"><View><Text className="text-white/40">Description</Text><Text className="text-white">{receiptData.description}</Text></View><View className="flex justify-between border-t border-white/10 pt-2 mt-2"><Text className="text-white font-bold">Montant</Text><Text className="text-white font-bold">{formatPrice(receiptData.amount || 0, receiptData.currency)}</Text></View><View><Text className="text-white/40">Référence</Text><Text className="text-white text-sm">{receiptData.reference}</Text></View></View>
+        )}{}<View className="border-t border-white/10 pt-4 text-center text-white/30 text-xs"><Text>Ce reçu fait foi de transaction. Conservez-le pour vos archives.
+          </Text><Text className="mt-1">DÉBROUILLE PRO - {new Date().getFullYear()}</Text></View></View><style>{`
         @media print {
           body * { visibility: hidden; }
           #receipt-content, #receipt-content * { visibility: visible; }
@@ -309,7 +175,6 @@ export function ReceiptViewer({
           #receipt-content .border-white\\/5 { border-color: #ddd !important; }
           #receipt-content .border-white\\/10 { border-color: #ccc !important; }
         }
-      `}</style>
-    </View>
+      `}</style></View>
   );
 }

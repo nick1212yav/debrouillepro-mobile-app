@@ -1,4 +1,4 @@
-import { Pressable, View, Text } from "react-native";
+import { Pressable, View } from "react-native";
 
 // src/features/sante/forms/MedicalRecordForm.tsx
 import { useForm } from "react-hook-form";
@@ -92,17 +92,9 @@ export function MedicalRecordForm({
 
   return (
     <Form {...form}>
-      <View
-       
-        className="space-y-4 text-left"
-      >
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="patientId"
-            render={({ field }) => (
+      <View className="space-y-4 text-left"><View className="gap-4"><FormField control={form.control} name="patientId" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Patient</Text></FormLabel>
+                <FormLabel>Patient</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -122,15 +114,9 @@ export function MedicalRecordForm({
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="doctorId"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="doctorId" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Médecin (optionnel)</Text></FormLabel>
+                <FormLabel>Médecin (optionnel)</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -141,7 +127,7 @@ export function MedicalRecordForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value=""><Text>Aucun</Text></SelectItem>
+                    <SelectItem value="">Aucun</SelectItem>
                     {doctors.map((d) => (
                       <SelectItem key={d.id} value={d.id}>
                         {d.name}
@@ -151,17 +137,9 @@ export function MedicalRecordForm({
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <View className="gap-4">
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
+            )} /></View><View className="gap-4"><FormField control={form.control} name="type" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Type</Text></FormLabel>
+                <FormLabel>Type</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
@@ -181,44 +159,25 @@ export function MedicalRecordForm({
                 </Select>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="date"
-            render={({ field }) => (
+            )} /><FormField control={form.control} name="date" render={({ field }) => (
               <FormItem>
-                <FormLabel><Text>Date</Text></FormLabel>
+                <FormLabel>Date</FormLabel>
                 <FormControl>
                   <Input type="date" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
-            )}
-          />
-        </View>
-
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
+            )} /></View><FormField control={form.control} name="title" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Titre</Text></FormLabel>
+              <FormLabel>Titre</FormLabel>
               <FormControl>
                 <Input placeholder="Consultation cardiologique" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="summary"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="summary" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Résumé</Text></FormLabel>
+              <FormLabel>Résumé</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Résumé de la consultation..."
@@ -228,15 +187,9 @@ export function MedicalRecordForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="details"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="details" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Détails (optionnel)</Text></FormLabel>
+              <FormLabel>Détails (optionnel)</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Informations détaillées..."
@@ -246,15 +199,9 @@ export function MedicalRecordForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="tags"
-          render={({ field }) => (
+          )} /><FormField control={form.control} name="tags" render={({ field }) => (
             <FormItem>
-              <FormLabel><Text>Tags (séparés par des virgules)</Text></FormLabel>
+              <FormLabel>Tags (séparés par des virgules)</FormLabel>
               <FormControl>
                 <Input
                   placeholder="cardiologie, suivi, hypertension"
@@ -263,14 +210,7 @@ export function MedicalRecordForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        {/* Intégration du sélecteur d'images de pièces jointes [2] */}
-        <FormField
-          control={form.control}
-          name="attachments"
-          render={({ field }) => (
+          )} />{}<FormField control={form.control} name="attachments" render={({ field }) => (
             <FormItem>
               <FormControl>
                 <HealthImageSelector
@@ -282,16 +222,7 @@ export function MedicalRecordForm({
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-
-        <Pressable
-          disabled={isLoading}
-          className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-blue-500 to-blue-600 disabled:opacity-50 h-11"
-        >
-          {isLoading ? "Enregistrement..." : submitLabel}
-        </Pressable>
-      </View>
+          )} /><Pressable disabled={isLoading} className="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-blue-500 to-blue-600 transition-colors disabled:opacity-50 h-11">{isLoading ? "Enregistrement..." : submitLabel}</Pressable></View>
     </Form>
   );
 }
