@@ -1,362 +1,1771 @@
-import { View, Pressable, Text, TextInput } from "react-native";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  ArrowLeft, Star, MessageCircle, Users, BookOpen, Search,
-  CheckCircle, Clock, Video, ChevronRight, Send, X, Heart,
-  Flame, Award, TrendingUp, ThumbsUp, Pin, PlusCircle,
-  Calendar, Globe, Zap, Crown, Filter
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import {
+  ArrowLeft,
+  Award,
+  BookOpen,
+  Calendar,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  Filter,
+  Globe,
+  MessageCircle,
+  PlusCircle,
+  Search,
+  Send,
+  Star,
+  Users,
+  Video,
+  X,
 } from "lucide-react-native";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { toast } from "sonner";
 import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
 
-type Props = { onBack: () => void };
+import { api } from "@/convex/_generated/api";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { SignInButton } from "@/components/ui/signin";
 
-type Mentor = {
-  id: string;
-  name: string;
-  avatar: string;
-  title: string;
-  specialties: string[];
-  rating: number;
-  reviews: number;
-  sessions: number;
-  price: string;
-  available: boolean;
-  languages: string[];
-  bio: string;
-  badges: string[];
-  responseTime: string;
-  color: string;
+type Props = {
+  onBack: () => void;
 };
 
-type ForumPost = {
-  id: string;
-  author: string;
-  avatar: string;
-  category: string;
-  title: string;
-  content: string;
-  likes: number;
-  replies: number;
-  time: string;
-  pinned?: boolean;
-  tags: string[];
-};
+type Tab = "Mentors" | "Forum" | "Tableau de Bord";
 
-const MENTORS: Mentor[] = [
-  {
-    id: "m1",
-    name: "Dr. Aminata Diallo",
-    avatar: "👩🏾‍💻",
-    title: "Senior Software Engineer · Google",
-    specialties: ["Développement Web", "React", "TypeScript"],
-    rating: 4.9,
-    reviews: 128,
-    sessions: 340,
-    price: "Gratuit",
-    available: true,
-    languages: ["Français", "Anglais", "Wolof"],
-    bio: "10 ans d'expérience en développement web. Passionnée par la transmission des savoirs et l'accompagnement de la prochaine génération de développeurs africains.",
-    badges: ["Top Mentor", "Expert Certifié"],
-    responseTime: "< 2h",
-    color: "#6366F1",
-  },
-  {
-    id: "m2",
-    name: "Kofi Mensah",
-    avatar: "🧑🏿‍🏫",
-    title: "Coach Fitness & Nutritionniste",
-    specialties: ["Fitness", "Nutrition", "Bien-être"],
-    rating: 4.8,
-    reviews: 95,
-    sessions: 210,
-    price: "500 FCFA/h",
-    available: true,
-    languages: ["Français", "Anglais"],
-    bio: "Certifié NSCA et ISSA, j'accompagne mes apprenants vers une santé optimale à travers des programmes personnalisés adaptés à chaque individu.",
-    badges: ["Certifié", "Populaire"],
-    responseTime: "< 1h",
-    color: "#10B981",
-  },
-  {
-    id: "m3",
-    name: "Fatima Zahra Benali",
-    avatar: "👩🏽‍🎓",
-    title: "Expert Finance & Investissement",
-    specialties: ["Finance", "Investissement", "Entrepreneuriat"],
-    rating: 4.7,
-    reviews: 76,
-    sessions: 180,
-    price: "1000 FCFA/h",
-    available: false,
-    languages: ["Français", "Arabe"],
-    bio: "MBA Finance, 8 ans en banque d'investissement. J'aide les entrepreneurs africains à structurer leur financement et à maximiser leurs rendements.",
-    badges: ["Expert Finance"],
-    responseTime: "< 4h",
-    color: "#F59E0B",
-  },
-  {
-    id: "m4",
-    name: "Ibrahima Sow",
-    avatar: "🧑🏾‍💼",
-    title: "Digital Marketing Manager",
-    specialties: ["Marketing Digital", "SEO", "Réseaux Sociaux"],
-    rating: 4.6,
-    reviews: 54,
-    sessions: 130,
-    price: "750 FCFA/h",
-    available: true,
-    languages: ["Français", "Anglais"],
-    bio: "Spécialiste Growth Hacking avec des résultats prouvés pour des startups africaines. Je t'aide à construire ta présence en ligne de zéro.",
-    badges: ["Growth Hacker"],
-    responseTime: "< 3h",
-    color: "#EF4444",
-  },
-  {
-    id: "m5",
-    name: "Mariama Camara",
-    avatar: "👩🏿‍🌾",
-    title: "Agronome & Experte Agriculture",
-    specialties: ["Agriculture", "Agro-business", "Environnement"],
-    rating: 4.9,
-    reviews: 41,
-    sessions: 95,
-    price: "Gratuit",
-    available: true,
-    languages: ["Français", "Peulh"],
-    bio: "Docteure en agronomie, je mets mon expertise au service des agriculteurs africains pour améliorer leurs rendements et adopter des pratiques durables.",
-    badges: ["Top Mentor", "Bénévole"],
-    responseTime: "< 6h",
-    color: "#84CC16",
-  },
+type JsonRecord = Record<string, unknown>;
+
+const TABS: Tab[] = ["Mentors", "Forum", "Tableau de Bord"];
+
+const SPECIALTIES = [
+  "Tous",
+  "Développement Web",
+  "Fitness",
+  "Finance",
+  "Marketing",
+  "Agriculture",
 ];
 
-const FORUM_POSTS: ForumPost[] = [
-  {
-    id: "p1",
-    author: "Moussa Traoré",
-    avatar: "🧑🏾",
-    category: "Développement Web",
-    title: "Comment débuter avec React en 2025 ?",
-    content: "Je viens de terminer le cours JavaScript fondamentaux et je cherche les meilleures ressources pour commencer React. Des suggestions ?",
-    likes: 34,
-    replies: 12,
-    time: "2h",
-    pinned: true,
-    tags: ["React", "Débutant", "Ressources"],
-  },
-  {
-    id: "p2",
-    author: "Aisha Bah",
-    avatar: "👩🏽",
-    category: "Fitness",
-    title: "Programme pour perdre 5 kg sans matériel ?",
-    content: "Je suis en appartement sans accès à une salle de sport. Quelqu'un a un programme efficace à partager ? Merci d'avance !",
-    likes: 28,
-    replies: 9,
-    time: "4h",
-    tags: ["Fitness", "Maison", "Programme"],
-  },
-  {
-    id: "p3",
-    author: "Oumar Diop",
-    avatar: "🧑🏿",
-    category: "Finance",
-    title: "Meilleure façon d'investir 50 000 FCFA ?",
-    content: "J'ai économisé 50 000 FCFA et je veux les faire fructifier. Je suis débutant en investissement. Quelles options recommandez-vous ?",
-    likes: 45,
-    replies: 18,
-    time: "6h",
-    tags: ["Finance", "Investissement", "Débutant"],
-  },
-  {
-    id: "p4",
-    author: "Kadiatou Balde",
-    avatar: "👩🏾",
-    category: "Marketing",
-    title: "Comment augmenter ses abonnés Instagram organiquement ?",
-    content: "Mon compte business est stagnant à 200 abonnés depuis 3 mois. Quelqu'un a des stratégies qui ont marché ?",
-    likes: 22,
-    replies: 7,
-    time: "1j",
-    tags: ["Instagram", "Croissance", "Marketing"],
-  },
-  {
-    id: "p5",
-    author: "Seydou Koné",
-    avatar: "🧑🏽",
-    category: "Général",
-    title: "Partage : j'ai obtenu ma certification Web ! 🎉",
-    content: "Après 3 mois de travail acharné, j'ai finalement décroché ma certification en développement web. Merci à tout le forum pour le soutien !",
-    likes: 67,
-    replies: 24,
-    time: "2j",
-    tags: ["Succès", "Certif", "Motivation"],
-  },
+const FORUM_CATEGORIES = [
+  "Tout",
+  "Développement Web",
+  "Fitness",
+  "Finance",
+  "Marketing",
+  "Agriculture",
+  "Général",
 ];
 
-const FORUM_CATEGORIES = ["Tout", "Développement Web", "Fitness", "Finance", "Marketing", "Agriculture", "Général"];
+function asRecord(value: unknown): JsonRecord {
+  if (typeof value === "object" && value !== null) {
+    return value as JsonRecord;
+  }
 
-const TABS = ["Mentors", "Forum", "Tableau de Bord"] as const;
-type Tab = typeof TABS[number];
+  return {};
+}
 
-const MY_PROGRESS = [
-  { course: "Développement Web", progress: 50, color: "#6366F1", icon: "💻" },
-  { course: "Coach Fitness", progress: 75, color: "#10B981", icon: "🏋️" },
-  { course: "Guide Voyageur", progress: 50, color: "#06B6D4", icon: "✈️" },
-];
+function firstString(object: JsonRecord, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = object[key];
 
-const MY_SESSIONS = [
-  { mentor: "Dr. Aminata Diallo", avatar: "👩🏾‍💻", topic: "Introduction à React Hooks", date: "Demain 15h00", color: "#6366F1" },
-  { mentor: "Kofi Mensah", avatar: "🧑🏿‍🏫", topic: "Plan nutritionnel personnalisé", date: "Sam 10h00", color: "#10B981" },
-];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
 
-export default function MentoratPage({ onBack }: Props) {
-  const [tab, setTab] = useState<Tab>("Mentors");
-  const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
-  const [forumFilter, setForumFilter] = useState("Tout");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [messageText, setMessageText] = useState("");
-  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  const [showNewPost, setShowNewPost] = useState(false);
-  const [specialtyFilter, setSpecialtyFilter] = useState("Tous");
-  const [showRequestModal, setShowRequestModal] = useState(false);
+  return undefined;
+}
 
-  const convexMentors = useQuery(api.education.listMentors, {});
-  const myMentorSessions = useQuery(api.education.getMyMentorSessions, {});
-  const stats = useQuery(api.education.getEducationStats, {});
+function firstNumber(object: JsonRecord, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = object[key];
 
-  // Use static data as default, supplement with Convex data
-  const specialties = ["Tous", "Développement Web", "Fitness", "Finance", "Marketing", "Agriculture"];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
 
-  const filteredMentors = MENTORS.filter((m) => {
-    const matchSpec = specialtyFilter === "Tous" || m.specialties.some((s) => s === specialtyFilter);
-    const matchSearch = searchQuery === "" || m.name.toLowerCase().includes(searchQuery.toLowerCase()) || m.specialties.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchSpec && matchSearch;
-  });
+  return undefined;
+}
 
-  const filteredPosts = FORUM_POSTS.filter((p) =>
-    forumFilter === "Tout" || p.category === forumFilter
-  );
+function firstBoolean(object: JsonRecord, keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = object[key];
 
-  const toggleLike = (id: string) => {
-    setLikedPosts((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); } else { next.add(id); }
-      return next;
-    });
-  };
+    if (typeof value === "boolean") {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function firstStringArray(object: JsonRecord, keys: string[]): string[] {
+  for (const key of keys) {
+    const value = object[key];
+
+    if (Array.isArray(value)) {
+      const result = value.filter(
+        (item): item is string =>
+          typeof item === "string" && item.trim().length > 0,
+      );
+
+      if (result.length > 0) {
+        return result;
+      }
+    }
+  }
+
+  return [];
+}
+
+function formatDate(value: unknown): string | undefined {
+  if (typeof value !== "string" && typeof value !== "number") {
+    return undefined;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function getMentorName(mentor: unknown): string {
+  const object = asRecord(mentor);
 
   return (
-    <View className="h-full flex flex-col overflow-hidden" style={{  }}>{}<View className="flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={onBack} className="p-2 rounded-xl text-white/60"><ArrowLeft size={20} /></Pressable><View className="flex-1"><Text className="text-white font-bold text-xl">Mentorat & Communauté</Text><Text className="text-white/50 text-xs">Apprenez ensemble, grandissez ensemble</Text></View><View className="flex items-center gap-1 px-3 py-1.5 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.15)" }}><Users size={13} className="text-indigo-400" /><Text className="text-indigo-400 font-bold text-sm">2.4k</Text></View></View>{}<View className="flex gap-1 px-4 pb-3">{TABS.map((t) => (
-          <Pressable key={t} onPress={() => setTab(t)} className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all" style={{ backgroundColor: tab === t ? "rgba(99,102,241,0.3)" : "rgba(255,255,255,0.05)", borderColor: "rgba(99,102,241,0.5)", borderStyle: "solid" }}>{t}</Pressable>
-        ))}</View><View className="flex-1 overflow-y-auto px-4 pb-6">{}{tab === "Mentors" && (
-          <View className="space-y-4">{}<View className="flex items-center gap-2 px-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Search size={15} className="text-white/40 flex-shrink-0" /><TextInput value={searchQuery} onChangeText={(value) => setSearchQuery(value)} placeholder="Rechercher un mentor ou une spécialité…" className="flex-1 bg-transparent text-white text-sm py-3 outline-none placeholder:text-white/30" />{searchQuery && (
-                <Pressable onPress={() => setSearchQuery("")} className="text-white/40"><X size={14} /></Pressable>
-              )}</View>{}<View className="flex gap-2 overflow-x-auto pb-1">{specialties.map((s) => (
-                <Pressable key={s} onPress={() => setSpecialtyFilter(s)} className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all" style={{ backgroundColor: specialtyFilter === s ? "rgba(99,102,241,0.35)" : "rgba(255,255,255,0.06)", borderColor: "rgba(99,102,241,0.5)", borderStyle: "solid" }}>{s}</Pressable>
-              ))}</View>{}<View className="rounded-2xl p-4 flex items-center gap-3" style={{ borderWidth: 1, borderColor: "rgba(99,102,241,0.3)", borderStyle: "solid" }}><Crown size={22} className="text-amber-400 flex-shrink-0" /><View><View className="text-white font-semibold text-sm"><Text>Mentor de la semaine</Text></View><View className="text-white/60 text-xs mt-0.5"><Text>Dr. Aminata Diallo · 4.9 ⭐ · 340 sessions</Text></View></View><ChevronRight size={16} className="text-white/40 ml-auto flex-shrink-0" /></View>{}{filteredMentors.map((mentor, i) => (
-              <View key={mentor.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} onPress={() => setSelectedMentor(mentor)} className="rounded-2xl p-4" style={{ backgroundColor: `${mentor.color}10`, borderStyle: "solid" }}>
-                <View className="flex items-start gap-3"><View className="relative flex-shrink-0"><View className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl" style={{ backgroundColor: `${mentor.color}20` }}>{mentor.avatar}</View>{mentor.available && (
-                      <View className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#0a0a1a] bg-emerald-400" />
-                    )}</View><View className="flex-1 min-w-0"><View className="flex items-center gap-2 flex-wrap"><Text className="text-white font-semibold text-sm">{mentor.name}</Text>{mentor.badges.slice(0, 1).map((b) => (
-                        <Badge key={b} className="text-xs border-0 px-1.5 py-0" style={{ backgroundColor: `${mentor.color}25` }}>{b}</Badge>
-                      ))}</View><View className="text-white/50 text-xs mt-0.5 truncate">{mentor.title}</View><View className="flex flex-wrap gap-1 mt-1.5">{mentor.specialties.map((s) => (
-                        <Text key={s} className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.6)" }}>{s}</Text>
-                      ))}</View><View className="flex items-center gap-3 mt-2"><View className="flex items-center gap-1 text-amber-400 text-xs"><Star size={11} className="fill-amber-400" /><Text className="font-bold">{mentor.rating}</Text><Text className="text-white/30">({mentor.reviews})</Text></View><View className="flex items-center gap-1 text-white/40 text-xs"><Video size={11} /><Text>{mentor.sessions}sessions</Text></View><View className="ml-auto font-semibold text-sm" style={{  }}>{mentor.price}</View></View></View></View>
-              </View>
-            ))}{filteredMentors.length === 0 && (
-              <View className="text-center py-12 text-white/40"><Users size={36} className="mx-auto mb-3 opacity-40" /><View className="text-sm"><Text>Aucun mentor trouvé</Text></View></View>
-            )}</View>
-        )}{}{tab === "Forum" && (
-          <View className="space-y-4">{}<Pressable onPress={() => setShowNewPost(true)} className="w-full flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: "rgba(99,102,241,0.12)", borderWidth: 1, borderColor: "rgba(99,102,241,0.4)", borderStyle: "dashed" }}><PlusCircle size={18} className="text-indigo-400" /><Text className="text-indigo-300 text-sm">Poser une question ou partager…</Text></Pressable>{}<View className="flex gap-2 overflow-x-auto pb-1">{FORUM_CATEGORIES.map((cat) => (
-                <Pressable key={cat} onPress={() => setForumFilter(cat)} className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all" style={{ backgroundColor: forumFilter === cat ? "rgba(99,102,241,0.35)" : "rgba(255,255,255,0.06)", borderColor: "rgba(99,102,241,0.5)", borderStyle: "solid" }}>{cat}</Pressable>
-              ))}</View>{}{filteredPosts.map((post, i) => (
-              <View key={post.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="rounded-2xl p-4" style={{ backgroundColor: post.pinned ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.04)", borderColor: "rgba(99,102,241,0.3)", borderStyle: "solid" }}>
-                <View className="flex items-center gap-2 mb-2"><View className="w-8 h-8 rounded-full flex items-center justify-center text-lg" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>{post.avatar}</View><View><View className="text-white text-xs font-semibold">{post.author}</View><View className="text-white/30 text-xs"><Text>il y a</Text>{post.time}</View></View><View className="ml-auto flex items-center gap-2">{post.pinned && <Pin size={12} className="text-indigo-400" />}<Badge className="text-xs border-0 px-2 py-0" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>{post.category}</Badge></View></View>
-                <Text className="text-white font-semibold text-sm mb-1">{post.title}</Text>
-                <Text className="text-white/50 text-xs leading-relaxed mb-3">{post.content}</Text>
-                <View className="flex flex-wrap gap-1 mb-3">{post.tags.map((tag) => (
-                    <Text key={tag} className="text-xs px-2 py-0.5 rounded-full text-indigo-300" style={{ backgroundColor: "rgba(99,102,241,0.15)" }}>#{tag}</Text>
-                  ))}</View>
-                <View className="flex items-center gap-4"><Pressable onPress={() => toggleLike(post.id)} className="flex items-center gap-1.5 transition-all" style={{  }}><Heart size={14} className={likedPosts.has(post.id) ? "fill-red-500" : ""} /><Text className="text-xs">{post.likes + (likedPosts.has(post.id) ? 1 : 0)}</Text></Pressable><Pressable className="flex items-center gap-1.5 text-white/40 transition-all" onPress={() => toast.info("Ouverture du fil de discussion…")}><MessageCircle size={14} /><Text className="text-xs">{post.replies}</Text></Pressable><Pressable className="ml-auto text-white/30 transition-all" onPress={() => toast.success("Post partagé !")}><TrendingUp size={14} /></Pressable></View>
-              </View>
-            ))}</View>
-        )}{}{tab === "Tableau de Bord" && (
-          <View className="space-y-5">{}<View className="gap-2">{[
-                { icon: <BookOpen size={14} className="text-indigo-400" />, value: stats?.coursesEnrolled?.toString() ?? "—",    label: "Cours actifs" },
-                { icon: <Award size={14} className="text-amber-400" />,    value: stats?.certificates?.toString() ?? "—",    label: "Certifs" },
-                { icon: <Users size={14} className="text-emerald-400" />,  value: stats?.mentorSessions?.toString() ?? "—",    label: "Sessions" },
-              ].map((s) => (
-                <View key={s.label} className="rounded-xl p-3 text-center" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="flex justify-center mb-1">{s.icon}</View><View className="text-white font-bold text-lg">{s.value}</View><View className="text-white/40 text-xs">{s.label}</View></View>
-              ))}</View>{}<View><View className="flex items-center justify-between mb-3"><Text className="text-white/70 text-sm font-semibold uppercase tracking-wider">Mes Cours en cours</Text><ChevronRight size={14} className="text-white/30" /></View><View className="space-y-3">{MY_PROGRESS.map((c) => (
-                  <View key={c.course} className="rounded-xl p-3" style={{ backgroundColor: `${c.color}12`, borderStyle: "solid" }}><View className="flex items-center gap-2 mb-2"><Text className="text-lg">{c.icon}</Text><Text className="text-white font-medium text-sm">{c.course}</Text><Text className="ml-auto text-xs font-bold" style={{ color: c.color }}>{c.progress}%</Text></View><Progress value={c.progress} className="h-1.5" /></View>
-                ))}</View></View>{}<View><View className="flex items-center justify-between mb-3"><Text className="text-white/70 text-sm font-semibold uppercase tracking-wider">Prochaines sessions</Text><Zap size={14} className="text-amber-400" /></View><View className="space-y-3">{MY_SESSIONS.map((s) => (
-                  <View key={s.topic} className="rounded-xl p-3 flex items-center gap-3" style={{ backgroundColor: `${s.color}10`, borderStyle: "solid" }}><View className="text-2xl">{s.avatar}</View><View className="flex-1 min-w-0"><View className="text-white font-medium text-sm">{s.mentor}</View><View className="text-white/50 text-xs truncate">{s.topic}</View></View><View className="flex items-center gap-1 text-xs" style={{  }}><Calendar size={11} /><Text>{s.date}</Text></View></View>
-                ))}</View></View>{}<View><Text className="text-white/70 text-sm font-semibold uppercase tracking-wider mb-3">Derniers badges</Text><View className="flex gap-3 overflow-x-auto pb-1">{[
-                  { icon: "🎯", label: "Premier Pas", color: "#94A3B8" },
-                  { icon: "💯", label: "Perfectionniste", color: "#A855F7" },
-                  { icon: "🔥", label: "En Série", color: "#6366F1" },
-                  { icon: "🧘", label: "Équilibre", color: "#6366F1" },
-                  { icon: "🎨", label: "Créateur", color: "#94A3B8" },
-                ].map((b) => (
-                  <View key={b.label} className="flex-shrink-0 flex flex-col items-center gap-1.5 p-3 rounded-2xl" style={{ backgroundColor: `${b.color}15`, borderStyle: "solid", minWidth: 72 }}><Text className="text-2xl">{b.icon}</Text><Text className="text-white/60 text-xs text-center leading-tight">{b.label}</Text></View>
-                ))}</View></View>{}<View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(245,158,11,0.1)", borderWidth: 1, borderColor: "rgba(245,158,11,0.25)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-2"><Crown size={16} className="text-amber-400" /><Text className="text-white font-semibold text-sm">Classement hebdomadaire</Text></View><View className="flex items-center gap-3 mb-3"><View className="text-center"><View className="text-2xl"><Text>🥇</Text></View><View className="text-white/60 text-xs"><Text>Amadou K.</Text></View></View><View className="text-center"><View className="text-2xl"><Text>🥈</Text></View><View className="text-white/60 text-xs"><Text>Fatou D.</Text></View></View><View className="text-center"><View className="text-2xl"><Text>🥉</Text></View><View className="text-white/60 text-xs"><Text>Moussa T.</Text></View></View><View className="ml-auto text-right"><View className="text-white/50 text-xs"><Text>Votre rang</Text></View><View className="text-white font-bold text-lg"><Text>#5</Text></View></View></View><Progress value={32} className="h-1.5" /><View className="text-white/40 text-xs mt-1"><Text>+3 positions possibles cette semaine</Text></View></View></View>
-        )}</View>{}<View>{selectedMentor && (
-          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} onPress={() => setSelectedMentor(null)}>
-            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring" as const, damping: 28, stiffness: 300 }} className="w-full max-h-[88vh] overflow-y-auto rounded-t-3xl pb-8" style={{  }} onPress={(e) => e.stopPropagation()}>
-              <View className="p-5"><View className="w-12 h-1 rounded-full mx-auto mb-5" style={{ backgroundColor: "rgba(255,255,255,0.15)" }} />{}<View className="flex items-start gap-4 mb-4"><View className="relative flex-shrink-0"><View className="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl" style={{ backgroundColor: `${selectedMentor.color}20` }}>{selectedMentor.avatar}</View>{selectedMentor.available && (
-                      <View className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-[#0f0f1e] bg-emerald-400 flex items-center justify-center"><CheckCircle size={10} color="white" /></View>
-                    )}</View><View className="flex-1"><Text className="text-white font-bold text-lg">{selectedMentor.name}</Text><View className="text-white/50 text-sm">{selectedMentor.title}</View><View className="flex gap-2 mt-2 flex-wrap">{selectedMentor.badges.map((b) => (
-                        <Badge key={b} className="text-xs border-0" style={{ backgroundColor: `${selectedMentor.color}25` }}>{b}</Badge>
-                      ))}</View></View></View>{}<View className="gap-3 mb-4">{[
-                    { label: "Note",     value: `${selectedMentor.rating}⭐` },
-                    { label: "Avis",     value: selectedMentor.reviews },
-                    { label: "Sessions", value: selectedMentor.sessions },
-                  ].map((s) => (
-                    <View key={s.label} className="rounded-xl p-2.5 text-center" style={{ backgroundColor: `${selectedMentor.color}12`, borderStyle: "solid" }}><View className="text-white font-bold text-sm">{s.value}</View><View className="text-white/40 text-xs">{s.label}</View></View>
-                  ))}</View>{}<Text className="text-white/60 text-sm leading-relaxed mb-4">{selectedMentor.bio}</Text>{}<View className="space-y-2 mb-5"><View className="flex items-center gap-2 text-sm"><Clock size={14} className="text-white/40" /><Text className="text-white/60">Temps de réponse :</Text><Text className="text-white">{selectedMentor.responseTime}</Text></View><View className="flex items-center gap-2 text-sm"><Globe size={14} className="text-white/40" /><Text className="text-white/60">Langues :</Text><Text className="text-white">{selectedMentor.languages.join(", ")}</Text></View><View className="flex items-center gap-2 text-sm"><Filter size={14} className="text-white/40" /><Text className="text-white/60">Spécialités :</Text><Text className="text-white">{selectedMentor.specialties.join(", ")}</Text></View></View>{}<View className="rounded-xl p-3 mb-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><TextInput value={messageText} onChangeText={(value) => setMessageText(value)} placeholder={`Écrivez un message à ${selectedMentor.name.split(" ")[0]}…`} className="w-full bg-transparent text-white text-sm outline-none placeholder:text-white/30" multiline textAlignVertical="top" /></View>{}<View className="gap-3"><Button className="flex items-center gap-2" style={{ backgroundColor: `${selectedMentor.color}35` }} onPress={() => {
-                      setShowRequestModal(true);
-                    }}><Video size={15} />Réserver session
-                  </Button><Button className="flex items-center gap-2" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} onPress={() => {
-                      if (!messageText.trim()) { toast.error("Écrivez un message d'abord"); return; }
-                      toast.success(`Message envoyé à ${selectedMentor.name.split(" ")[0]} !`);
-                      setMessageText("");
-                      setSelectedMentor(null);
-                    }}><Send size={15} />Envoyer
-                  </Button></View></View>
-            </View>
-          </View>
-        )}</View>{}<View>{showRequestModal && selectedMentor && (
-          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[60] flex items-center justify-center px-6" style={{ backgroundColor: "rgba(0,0,0,0.8)" }} onPress={() => setShowRequestModal(false)}>
-            <View initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.85, opacity: 0 }} transition={{ type: "spring" as const, stiffness: 260, damping: 22 }} className="w-full max-w-sm rounded-3xl p-6 text-center" style={{ borderStyle: "solid" }} onPress={(e) => e.stopPropagation()}>
-              <View className="text-5xl mb-3">{selectedMentor.avatar}</View>
-              <Text className="text-white font-bold text-lg mb-1">Demande de session</Text>
-              <Text className="text-white/60 text-sm mb-5">Confirmer votre demande de session avec <Text className="text-white font-semibold">{selectedMentor.name}</Text>?
-                <br /><Text className="text-xs mt-1 inline-block" style={{ color: selectedMentor.price === "Gratuit" ? "#10B981" : selectedMentor.color }}>Tarif : {selectedMentor.price}</Text></Text>
-              <View className="gap-3"><Button className="" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} onPress={() => setShowRequestModal(false)}>Annuler
-                </Button><Button className="flex items-center justify-center gap-2" style={{ backgroundColor: `${selectedMentor.color}35` }} onPress={() => {
-                    toast.success(`Demande envoyée à ${selectedMentor.name.split(" ")[0]} ! Réponse sous ${selectedMentor.responseTime}`);
-                    setShowRequestModal(false);
-                    setSelectedMentor(null);
-                  }}><CheckCircle size={15} />Confirmer
-                </Button></View>
-            </View>
-          </View>
-        )}</View>{}<View>{showNewPost && (
-          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} onPress={() => setShowNewPost(false)}>
-            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring" as const, damping: 28, stiffness: 300 }} className="w-full rounded-t-3xl pb-8" style={{  }} onPress={(e) => e.stopPropagation()}>
-              <View className="p-5"><View className="w-12 h-1 rounded-full mx-auto mb-4" style={{ backgroundColor: "rgba(255,255,255,0.15)" }} /><Text className="text-white font-bold text-lg mb-4">Nouvelle discussion</Text><View className="space-y-3"><TextInput placeholder="Titre de votre question…" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none placeholder:text-white/30" /><TextInput placeholder="Décrivez votre question ou partagez votre expérience…" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none placeholder:text-white/30" multiline textAlignVertical="top" /></View><Button className="w-full mt-4 flex items-center justify-center gap-2" style={{ backgroundColor: "rgba(99,102,241,0.35)" }} onPress={() => {
-                    toast.success("Post publié dans le forum !");
-                    setShowNewPost(false);
-                  }}><Send size={15} />Publier
-                </Button></View>
-            </View>
-          </View>
-        )}</View></View>
+    firstString(object, ["name", "fullName", "displayName", "mentorName"]) ??
+    "Mentor"
   );
 }
+
+function getMentorTitle(mentor: unknown): string | undefined {
+  const object = asRecord(mentor);
+
+  return firstString(object, [
+    "title",
+    "profession",
+    "jobTitle",
+    "role",
+    "headline",
+  ]);
+}
+
+function getMentorDescription(mentor: unknown): string | undefined {
+  const object = asRecord(mentor);
+
+  return firstString(object, ["bio", "description", "about"]);
+}
+
+function getMentorSpecialties(mentor: unknown): string[] {
+  const object = asRecord(mentor);
+
+  return firstStringArray(object, [
+    "specialties",
+    "skills",
+    "expertise",
+    "categories",
+  ]);
+}
+
+function getMentorLanguages(mentor: unknown): string[] {
+  const object = asRecord(mentor);
+
+  return firstStringArray(object, ["languages", "language"]);
+}
+
+function getMentorRating(mentor: unknown): number | undefined {
+  return firstNumber(asRecord(mentor), ["rating", "averageRating"]);
+}
+
+function getMentorReviews(mentor: unknown): number | undefined {
+  return firstNumber(asRecord(mentor), [
+    "reviews",
+    "reviewCount",
+    "reviewsCount",
+  ]);
+}
+
+function getMentorSessions(mentor: unknown): number | undefined {
+  return firstNumber(asRecord(mentor), [
+    "sessions",
+    "sessionCount",
+    "sessionsCount",
+  ]);
+}
+
+function getMentorAvailability(mentor: unknown): boolean | undefined {
+  return firstBoolean(asRecord(mentor), ["available", "isAvailable", "online"]);
+}
+
+function getMentorPrice(mentor: unknown): string | undefined {
+  const object = asRecord(mentor);
+
+  const direct = firstString(object, ["price", "priceLabel", "hourlyRate"]);
+
+  if (direct) {
+    return direct;
+  }
+
+  const amount = firstNumber(object, ["priceAmount", "hourlyRateAmount"]);
+
+  if (amount !== undefined) {
+    const currency = firstString(object, ["currency", "priceCurrency"]);
+
+    return currency ? `${amount} ${currency}` : String(amount);
+  }
+
+  return undefined;
+}
+
+function getSessionTitle(session: unknown): string {
+  const object = asRecord(session);
+
+  return (
+    firstString(object, ["title", "topic", "subject", "name"]) ??
+    "Session de mentorat"
+  );
+}
+
+function getSessionMentor(session: unknown): string | undefined {
+  const object = asRecord(session);
+
+  return firstString(object, ["mentorName", "mentor", "mentorTitle"]);
+}
+
+function getSessionDate(session: unknown): string | undefined {
+  const object = asRecord(session);
+
+  const raw =
+    object.date ?? object.startDate ?? object.scheduledAt ?? object.startTime;
+
+  return formatDate(raw);
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Users;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.statCard}>
+      <View style={styles.statIcon}>
+        <Icon size={17} color="#A78BFA" />
+      </View>
+
+      <Text style={styles.statValue} numberOfLines={1}>
+        {value}
+      </Text>
+
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function LoadingState({ label = "Chargement..." }: { label?: string }) {
+  return (
+    <View style={styles.loadingState}>
+      <ActivityIndicator size="small" color="#8B5CF6" />
+
+      <Text style={styles.loadingText}>{label}</Text>
+    </View>
+  );
+}
+
+function EmptyState({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof Users;
+  title: string;
+  description: string;
+}) {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIcon}>
+        <Icon size={28} color="#64748B" />
+      </View>
+
+      <Text style={styles.emptyTitle}>{title}</Text>
+
+      <Text style={styles.emptyDescription}>{description}</Text>
+    </View>
+  );
+}
+
+function MentorCard({
+  mentor,
+  onPress,
+}: {
+  mentor: unknown;
+  onPress: () => void;
+}) {
+  const name = getMentorName(mentor);
+  const title = getMentorTitle(mentor);
+  const specialties = getMentorSpecialties(mentor);
+  const rating = getMentorRating(mentor);
+  const reviews = getMentorReviews(mentor);
+  const sessions = getMentorSessions(mentor);
+  const available = getMentorAvailability(mentor);
+  const price = getMentorPrice(mentor);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.mentorCard, pressed && styles.pressed]}
+    >
+      <View style={styles.mentorAvatar}>
+        <Users size={22} color="#A78BFA" />
+
+        {available === true && <View style={styles.onlineIndicator} />}
+      </View>
+
+      <View style={styles.mentorContent}>
+        <Text style={styles.mentorName} numberOfLines={1}>
+          {name}
+        </Text>
+
+        {title ? (
+          <Text style={styles.mentorTitle} numberOfLines={2}>
+            {title}
+          </Text>
+        ) : null}
+
+        {specialties.length > 0 ? (
+          <View style={styles.chipRow}>
+            {specialties.slice(0, 3).map((item) => (
+              <View key={item} style={styles.chip}>
+                <Text style={styles.chipText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={styles.mentorMeta}>
+          {rating !== undefined ? (
+            <View style={styles.metaItem}>
+              <Star size={12} color="#FBBF24" />
+
+              <Text style={styles.metaText}>{rating.toFixed(1)}</Text>
+            </View>
+          ) : null}
+
+          {reviews !== undefined ? (
+            <Text style={styles.metaMuted}>({reviews})</Text>
+          ) : null}
+
+          {sessions !== undefined ? (
+            <View style={styles.metaItem}>
+              <Video size={12} color="#64748B" />
+
+              <Text style={styles.metaMuted}>{sessions} sessions</Text>
+            </View>
+          ) : null}
+
+          {price ? (
+            <Text style={styles.priceText} numberOfLines={1}>
+              {price}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      <ChevronRight size={17} color="#475569" />
+    </Pressable>
+  );
+}
+
+function MentorDetail({
+  mentor,
+  onClose,
+}: {
+  mentor: unknown;
+  onClose: () => void;
+}) {
+  const name = getMentorName(mentor);
+  const title = getMentorTitle(mentor);
+  const description = getMentorDescription(mentor);
+  const specialties = getMentorSpecialties(mentor);
+  const languages = getMentorLanguages(mentor);
+  const rating = getMentorRating(mentor);
+  const reviews = getMentorReviews(mentor);
+  const sessions = getMentorSessions(mentor);
+  const available = getMentorAvailability(mentor);
+  const price = getMentorPrice(mentor);
+
+  return (
+    <Modal
+      visible
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalScreen}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Profil du mentor</Text>
+
+          <Pressable onPress={onClose} style={styles.modalClose}>
+            <X size={19} color="#CBD5E1" />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.modalContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.detailIdentity}>
+            <View style={styles.detailAvatar}>
+              <Users size={32} color="#A78BFA" />
+
+              {available === true && <View style={styles.detailOnline} />}
+            </View>
+
+            <Text style={styles.detailName}>{name}</Text>
+
+            {title ? <Text style={styles.detailTitle}>{title}</Text> : null}
+          </View>
+
+          <View style={styles.detailStats}>
+            {rating !== undefined && (
+              <StatCard icon={Star} label="Note" value={rating.toFixed(1)} />
+            )}
+
+            {reviews !== undefined && (
+              <StatCard
+                icon={MessageCircle}
+                label="Avis"
+                value={String(reviews)}
+              />
+            )}
+
+            {sessions !== undefined && (
+              <StatCard
+                icon={Video}
+                label="Sessions"
+                value={String(sessions)}
+              />
+            )}
+          </View>
+
+          {description ? (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>Présentation</Text>
+
+              <Text style={styles.detailDescription}>{description}</Text>
+            </View>
+          ) : null}
+
+          {specialties.length > 0 && (
+            <View style={styles.detailSection}>
+              <Text style={styles.detailSectionTitle}>Spécialités</Text>
+
+              <View style={styles.chipRow}>
+                {specialties.map((item) => (
+                  <View key={item} style={styles.detailChip}>
+                    <Filter size={12} color="#A78BFA" />
+
+                    <Text style={styles.detailChipText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {languages.length > 0 && (
+            <View style={styles.detailSection}>
+              <View style={styles.detailRow}>
+                <Globe size={15} color="#64748B" />
+
+                <Text style={styles.detailLabel}>Langues</Text>
+
+                <Text style={styles.detailValue}>{languages.join(", ")}</Text>
+              </View>
+            </View>
+          )}
+
+          {price ? (
+            <View style={styles.detailPrice}>
+              <Text style={styles.detailPriceLabel}>
+                Tarif communiqué par le backend
+              </Text>
+
+              <Text style={styles.detailPriceValue}>{price}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.unavailableAction}>
+            <Video size={18} color="#64748B" />
+
+            <Text style={styles.unavailableActionText}>
+              La réservation d'une session nécessite un contrat backend de
+              réservation/paiement vérifié. Aucun faux rendez-vous n'est créé.
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function ForumUnavailable() {
+  return (
+    <View style={styles.section}>
+      <View style={styles.forumHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>Forum & Communauté</Text>
+
+          <Text style={styles.sectionSubtitle}>Discussions et entraide</Text>
+        </View>
+
+        <MessageCircle size={19} color="#64748B" />
+      </View>
+
+      <View style={styles.backendNotice}>
+        <MessageCircle size={22} color="#64748B" />
+
+        <Text style={styles.backendNoticeTitle}>Forum non connecté</Text>
+
+        <Text style={styles.backendNoticeText}>
+          Le fichier fourni ne contient aucun query ou mutation Convex
+          permettant de charger ou de publier des discussions de forum. Les
+          anciennes discussions statiques ont donc été retirées.
+        </Text>
+      </View>
+
+      <View style={styles.categoryPreview}>
+        {FORUM_CATEGORIES.map((category) => (
+          <View key={category} style={styles.categoryChipDisabled}>
+            <Text style={styles.categoryChipText}>{category}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+export default function MentoratPage({ onBack }: Props) {
+  const { isAuthenticated, loading: authLoading } = useFirebaseAuth();
+
+  const [tab, setTab] = useState<Tab>("Mentors");
+
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [specialtyFilter, setSpecialtyFilter] = useState("Tous");
+
+  const [selectedMentor, setSelectedMentor] = useState<unknown | null>(null);
+
+  const mentorsQuery = useQuery(
+    api.education.listMentors,
+    isAuthenticated ? {} : "skip",
+  );
+
+  const sessionsQuery = useQuery(
+    api.education.getMyMentorSessions,
+    isAuthenticated ? {} : "skip",
+  );
+
+  const statsQuery = useQuery(
+    api.education.getEducationStats,
+    isAuthenticated ? {} : "skip",
+  );
+
+  const mentors = useMemo(() => {
+    if (!mentorsQuery) {
+      return [];
+    }
+
+    return Array.isArray(mentorsQuery) ? mentorsQuery : [];
+  }, [mentorsQuery]);
+
+  const sessions = useMemo(() => {
+    if (!sessionsQuery) {
+      return [];
+    }
+
+    return Array.isArray(sessionsQuery) ? sessionsQuery : [];
+  }, [sessionsQuery]);
+
+  const filteredMentors = useMemo(() => {
+    const search = searchQuery.trim().toLowerCase();
+
+    return mentors.filter((mentor) => {
+      const name = getMentorName(mentor).toLowerCase();
+
+      const title = (getMentorTitle(mentor) ?? "").toLowerCase();
+
+      const specialties = getMentorSpecialties(mentor);
+
+      const matchSpecialty =
+        specialtyFilter === "Tous" ||
+        specialties.some(
+          (item) => item.toLowerCase() === specialtyFilter.toLowerCase(),
+        );
+
+      const matchSearch =
+        !search ||
+        name.includes(search) ||
+        title.includes(search) ||
+        specialties.some((item) => item.toLowerCase().includes(search));
+
+      return matchSpecialty && matchSearch;
+    });
+  }, [mentors, searchQuery, specialtyFilter]);
+
+  const dashboardStats = useMemo(() => {
+    const stats = asRecord(statsQuery);
+
+    const courses = firstNumber(stats, [
+      "coursesEnrolled",
+      "courses",
+      "enrolledCourses",
+    ]);
+
+    const certificates = firstNumber(stats, [
+      "certificates",
+      "certificateCount",
+    ]);
+
+    const mentorSessions = firstNumber(stats, [
+      "mentorSessions",
+      "mentorSessionCount",
+    ]);
+
+    return {
+      courses,
+      certificates,
+      mentorSessions,
+    };
+  }, [statsQuery]);
+
+  if (authLoading) {
+    return (
+      <View style={styles.authLoading}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+
+        <Text style={styles.loadingText}>Vérification de la session...</Text>
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.authScreen}>
+        <View style={styles.authIcon}>
+          <Users size={32} color="#A78BFA" />
+        </View>
+
+        <Text style={styles.authTitle}>Connexion requise</Text>
+
+        <Text style={styles.authDescription}>
+          Connectez-vous pour accéder au mentorat et aux données d'éducation
+          associées à votre compte.
+        </Text>
+
+        <SignInButton />
+
+        <Pressable onPress={onBack} style={styles.backLink}>
+          <ArrowLeft size={15} color="#64748B" />
+
+          <Text style={styles.backLinkText}>Retour</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={onBack}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
+          <ArrowLeft size={20} color="#FFFFFF" />
+        </Pressable>
+
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>Mentorat & Communauté</Text>
+
+          <Text style={styles.headerSubtitle}>
+            Apprendre, transmettre, progresser
+          </Text>
+        </View>
+
+        <View style={styles.headerBadge}>
+          <Users size={14} color="#A78BFA" />
+
+          <Text style={styles.headerBadgeText}>
+            {mentorsQuery === undefined ? "—" : mentors.length}
+          </Text>
+        </View>
+      </View>
+
+      {/* NAVIGATION */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabsContent}
+        style={styles.tabsScroll}
+      >
+        {TABS.map((item) => {
+          const active = tab === item;
+
+          return (
+            <Pressable
+              key={item}
+              onPress={() => setTab(item)}
+              style={[styles.mainTab, active && styles.mainTabActive]}
+              accessibilityRole="tab"
+              accessibilityState={{
+                selected: active,
+              }}
+            >
+              <Text
+                style={[styles.mainTabText, active && styles.mainTabTextActive]}
+              >
+                {item}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* MENTORS */}
+        {tab === "Mentors" && (
+          <View style={styles.section}>
+            <View style={styles.searchBox}>
+              <Search size={16} color="#64748B" />
+
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Rechercher un mentor ou une spécialité..."
+                placeholderTextColor="#475569"
+                style={styles.searchInput}
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery("")}>
+                  <X size={15} color="#64748B" />
+                </Pressable>
+              )}
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterContent}
+            >
+              {SPECIALTIES.map((specialty) => {
+                const active = specialtyFilter === specialty;
+
+                return (
+                  <Pressable
+                    key={specialty}
+                    onPress={() => setSpecialtyFilter(specialty)}
+                    style={[
+                      styles.filterChip,
+                      active && styles.filterChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterText,
+                        active && styles.filterTextActive,
+                      ]}
+                    >
+                      {specialty}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.realDataNotice}>
+              <CheckCircle size={17} color="#34D399" />
+
+              <Text style={styles.realDataNoticeText}>
+                Les mentors affichés proviennent du service d'éducation
+                connecté.
+              </Text>
+            </View>
+
+            {mentorsQuery === undefined ? (
+              <LoadingState label="Chargement des mentors..." />
+            ) : filteredMentors.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="Aucun mentor disponible"
+                description={
+                  mentors.length === 0
+                    ? "Aucun mentor n'est actuellement retourné par le backend."
+                    : "Aucun mentor ne correspond à votre recherche."
+                }
+              />
+            ) : (
+              <View style={styles.cardList}>
+                {filteredMentors.map((mentor, index) => (
+                  <MentorCard
+                    key={String(
+                      asRecord(mentor)._id ?? asRecord(mentor).id ?? index,
+                    )}
+                    mentor={mentor}
+                    onPress={() => setSelectedMentor(mentor)}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* FORUM */}
+        {tab === "Forum" && <ForumUnavailable />}
+
+        {/* DASHBOARD */}
+        {tab === "Tableau de Bord" && (
+          <View style={styles.section}>
+            <View style={styles.dashboardHero}>
+              <Award size={22} color="#A78BFA" />
+
+              <Text style={styles.dashboardHeroTitle}>Mon parcours</Text>
+
+              <Text style={styles.dashboardHeroText}>
+                Votre tableau de bord est alimenté par les données d'éducation
+                disponibles pour votre compte.
+              </Text>
+            </View>
+
+            {statsQuery === undefined ? (
+              <LoadingState label="Chargement des statistiques..." />
+            ) : (
+              <View style={styles.statsGrid}>
+                <StatCard
+                  icon={BookOpen}
+                  label="Cours actifs"
+                  value={
+                    dashboardStats.courses !== undefined
+                      ? String(dashboardStats.courses)
+                      : "—"
+                  }
+                />
+
+                <StatCard
+                  icon={Award}
+                  label="Certifications"
+                  value={
+                    dashboardStats.certificates !== undefined
+                      ? String(dashboardStats.certificates)
+                      : "—"
+                  }
+                />
+
+                <StatCard
+                  icon={Users}
+                  label="Sessions mentor"
+                  value={
+                    dashboardStats.mentorSessions !== undefined
+                      ? String(dashboardStats.mentorSessions)
+                      : "—"
+                  }
+                />
+              </View>
+            )}
+
+            <View style={styles.dashboardSection}>
+              <View style={styles.sectionHeading}>
+                <View>
+                  <Text style={styles.sectionTitle}>Mes sessions</Text>
+
+                  <Text style={styles.sectionSubtitle}>
+                    Sessions retournées par le backend
+                  </Text>
+                </View>
+
+                <Calendar size={17} color="#64748B" />
+              </View>
+
+              {sessionsQuery === undefined ? (
+                <LoadingState label="Chargement des sessions..." />
+              ) : sessions.length === 0 ? (
+                <EmptyState
+                  icon={Calendar}
+                  title="Aucune session"
+                  description="Aucune session de mentorat n'est actuellement retournée pour votre compte."
+                />
+              ) : (
+                <View style={styles.cardList}>
+                  {sessions.slice(0, 10).map((session, index) => {
+                    const title = getSessionTitle(session);
+
+                    const mentor = getSessionMentor(session);
+
+                    const date = getSessionDate(session);
+
+                    return (
+                      <View
+                        key={`${title}-${index}`}
+                        style={styles.sessionCard}
+                      >
+                        <View style={styles.sessionIcon}>
+                          <Video size={18} color="#60A5FA" />
+                        </View>
+
+                        <View style={styles.sessionContent}>
+                          <Text style={styles.sessionTitle} numberOfLines={2}>
+                            {title}
+                          </Text>
+
+                          {mentor ? (
+                            <Text
+                              style={styles.sessionMentor}
+                              numberOfLines={1}
+                            >
+                              {mentor}
+                            </Text>
+                          ) : null}
+
+                          {date ? (
+                            <View style={styles.sessionMeta}>
+                              <Clock size={11} color="#64748B" />
+
+                              <Text style={styles.sessionMetaText}>{date}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
+            <View style={styles.integrityNotice}>
+              <CheckCircle size={16} color="#34D399" />
+
+              <Text style={styles.integrityText}>
+                Aucun cours, badge, classement ou progression fictive n'est
+                affiché lorsque le backend ne fournit pas la donnée.
+              </Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      {selectedMentor !== null && (
+        <MentorDetail
+          mentor={selectedMentor}
+          onClose={() => setSelectedMentor(null)}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#050812",
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.07)",
+  },
+
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  headerText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  headerTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  headerSubtitle: {
+    color: "#64748B",
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  headerBadge: {
+    minWidth: 42,
+    height: 34,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    borderRadius: 11,
+    backgroundColor: "rgba(139,92,246,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.20)",
+  },
+
+  headerBadgeText: {
+    color: "#C4B5FD",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  tabsScroll: {
+    flexGrow: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+
+  tabsContent: {
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+
+  mainTab: {
+    minHeight: 37,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 13,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  mainTabActive: {
+    backgroundColor: "rgba(99,102,241,0.22)",
+    borderColor: "rgba(99,102,241,0.40)",
+  },
+
+  mainTabText: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  mainTabTextActive: {
+    color: "#FFFFFF",
+  },
+
+  scroll: {
+    flex: 1,
+  },
+
+  content: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+
+  section: {
+    gap: 13,
+  },
+
+  searchBox: {
+    minHeight: 45,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingHorizontal: 13,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  searchInput: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 11,
+    paddingVertical: 9,
+  },
+
+  filterContent: {
+    gap: 7,
+    paddingVertical: 2,
+  },
+
+  filterChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 99,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  filterChipActive: {
+    backgroundColor: "rgba(99,102,241,0.25)",
+    borderColor: "rgba(99,102,241,0.42)",
+  },
+
+  filterText: {
+    color: "#64748B",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  filterTextActive: {
+    color: "#FFFFFF",
+  },
+
+  realDataNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 13,
+    backgroundColor: "rgba(52,211,153,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.13)",
+  },
+
+  realDataNoticeText: {
+    flex: 1,
+    color: "#6EE7B7",
+    fontSize: 9,
+    lineHeight: 14,
+  },
+
+  cardList: {
+    gap: 10,
+  },
+
+  mentorCard: {
+    minHeight: 91,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 13,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.075)",
+  },
+
+  mentorAvatar: {
+    position: "relative",
+    width: 49,
+    height: 49,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 15,
+    backgroundColor: "rgba(139,92,246,0.12)",
+  },
+
+  onlineIndicator: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 13,
+    height: 13,
+    borderRadius: 99,
+    backgroundColor: "#34D399",
+    borderWidth: 2,
+    borderColor: "#050812",
+  },
+
+  mentorContent: {
+    flex: 1,
+    marginHorizontal: 11,
+  },
+
+  mentorName: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  mentorTitle: {
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 14,
+    marginTop: 3,
+  },
+
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 7,
+  },
+
+  chip: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.055)",
+  },
+
+  chipText: {
+    color: "#94A3B8",
+    fontSize: 7,
+    fontWeight: "700",
+  },
+
+  mentorMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 7,
+  },
+
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+
+  metaText: {
+    color: "#CBD5E1",
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  metaMuted: {
+    color: "#475569",
+    fontSize: 8,
+  },
+
+  priceText: {
+    color: "#A78BFA",
+    fontSize: 8,
+    fontWeight: "900",
+    marginLeft: "auto",
+  },
+
+  pressed: {
+    opacity: 0.7,
+  },
+
+  loadingState: {
+    minHeight: 130,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  loadingText: {
+    color: "#64748B",
+    fontSize: 9,
+  },
+
+  emptyState: {
+    alignItems: "center",
+    paddingHorizontal: 25,
+    paddingVertical: 40,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  emptyIcon: {
+    width: 57,
+    height: 57,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    marginBottom: 11,
+  },
+
+  emptyTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  emptyDescription: {
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 14,
+    textAlign: "center",
+    marginTop: 5,
+  },
+
+  modalScreen: {
+    flex: 1,
+    backgroundColor: "#050812",
+  },
+
+  modalHeader: {
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.07)",
+  },
+
+  modalTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  modalClose: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  modalContent: {
+    padding: 18,
+    paddingBottom: 40,
+  },
+
+  detailIdentity: {
+    alignItems: "center",
+  },
+
+  detailAvatar: {
+    position: "relative",
+    width: 82,
+    height: 82,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 27,
+    backgroundColor: "rgba(139,92,246,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.22)",
+  },
+
+  detailOnline: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 17,
+    height: 17,
+    borderRadius: 99,
+    backgroundColor: "#34D399",
+    borderWidth: 3,
+    borderColor: "#050812",
+  },
+
+  detailName: {
+    color: "#FFFFFF",
+    fontSize: 21,
+    fontWeight: "900",
+    marginTop: 12,
+    textAlign: "center",
+  },
+
+  detailTitle: {
+    color: "#64748B",
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 4,
+    textAlign: "center",
+  },
+
+  detailStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+    marginTop: 18,
+  },
+
+  statCard: {
+    flex: 1,
+    minWidth: 90,
+    minHeight: 90,
+    padding: 11,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  statIcon: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
+    backgroundColor: "rgba(139,92,246,0.10)",
+  },
+
+  statValue: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 8,
+  },
+
+  statLabel: {
+    color: "#64748B",
+    fontSize: 8,
+    marginTop: 2,
+  },
+
+  detailSection: {
+    marginTop: 19,
+  },
+
+  detailSectionTitle: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+
+  detailDescription: {
+    color: "#94A3B8",
+    fontSize: 10,
+    lineHeight: 17,
+  },
+
+  detailChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 9,
+    backgroundColor: "rgba(139,92,246,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.14)",
+  },
+
+  detailChipText: {
+    color: "#C4B5FD",
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  detailLabel: {
+    color: "#64748B",
+    fontSize: 9,
+  },
+
+  detailValue: {
+    flex: 1,
+    color: "#CBD5E1",
+    fontSize: 9,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+
+  detailPrice: {
+    marginTop: 18,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(139,92,246,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.15)",
+  },
+
+  detailPriceLabel: {
+    color: "#64748B",
+    fontSize: 8,
+  },
+
+  detailPriceValue: {
+    color: "#C4B5FD",
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+
+  unavailableAction: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    marginTop: 18,
+    padding: 13,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  unavailableActionText: {
+    flex: 1,
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 14,
+  },
+
+  forumHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  sectionTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  sectionSubtitle: {
+    color: "#64748B",
+    fontSize: 9,
+    marginTop: 3,
+  },
+
+  backendNotice: {
+    alignItems: "center",
+    padding: 25,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  backendNoticeTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    marginTop: 11,
+  },
+
+  backendNoticeText: {
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 15,
+    textAlign: "center",
+    marginTop: 6,
+  },
+
+  categoryPreview: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+
+  categoryChipDisabled: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+
+  categoryChipText: {
+    color: "#475569",
+    fontSize: 8,
+    fontWeight: "700",
+  },
+
+  dashboardHero: {
+    padding: 18,
+    borderRadius: 19,
+    backgroundColor: "rgba(139,92,246,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.17)",
+  },
+
+  dashboardHeroTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 8,
+  },
+
+  dashboardHeroText: {
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 15,
+    marginTop: 4,
+  },
+
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+  },
+
+  dashboardSection: {
+    gap: 12,
+    marginTop: 4,
+  },
+
+  sectionHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  sessionCard: {
+    minHeight: 74,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  sessionIcon: {
+    width: 43,
+    height: 43,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 13,
+    backgroundColor: "rgba(96,165,250,0.10)",
+  },
+
+  sessionContent: {
+    flex: 1,
+    marginLeft: 11,
+  },
+
+  sessionTitle: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  sessionMentor: {
+    color: "#64748B",
+    fontSize: 9,
+    marginTop: 3,
+  },
+
+  sessionMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 5,
+  },
+
+  sessionMetaText: {
+    color: "#475569",
+    fontSize: 8,
+  },
+
+  integrityNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    padding: 13,
+    borderRadius: 14,
+    backgroundColor: "rgba(52,211,153,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.10)",
+  },
+
+  integrityText: {
+    flex: 1,
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 14,
+  },
+
+  authLoading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#050812",
+  },
+
+  authScreen: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    backgroundColor: "#050812",
+  },
+
+  authIcon: {
+    width: 72,
+    height: 72,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 23,
+    backgroundColor: "rgba(139,92,246,0.10)",
+    marginBottom: 17,
+  },
+
+  authTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+
+  authDescription: {
+    color: "#64748B",
+    fontSize: 10,
+    lineHeight: 16,
+    textAlign: "center",
+    marginTop: 7,
+    marginBottom: 19,
+  },
+
+  backLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 15,
+    padding: 10,
+  },
+
+  backLinkText: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+});

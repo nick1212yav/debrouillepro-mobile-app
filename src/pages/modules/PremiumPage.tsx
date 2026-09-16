@@ -1,321 +1,3001 @@
-import { View, Text, Pressable } from "react-native";
-import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { useConvexAuth } from "@/lib/convex-auth-compat";
-import { api } from "@/convex/_generated/api.js";
+// src/pages/modules/PremiumPage.tsx
+
 import {
-  ArrowLeft, Crown, Zap, Building2, Check, X, Star,
-  Shield, Sparkles, TrendingUp, Users, Package, Wifi,
-  ChevronRight, AlertCircle, Calendar, CreditCard,
-  BarChart2, Headphones, RefreshCw, Lock, Gift, Flame,
-  CheckCircle,
-} from "lucide-react-native";
-import { toast } from "sonner";
-import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useMemo, useState } from "react";
+import type { ComponentType, ReactNode } from "react";
+
+import { useMutation, useQuery } from "convex/react";
+
+import { api } from "@/convex/_generated/api.js";
+
+import {
+  Authenticated,
+  AuthLoading,
+  Unauthenticated,
+} from "@/lib/convex-auth-compat";
+
 import { SignInButton } from "@/components/ui/signin.tsx";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { format, parseISO } from "date-fns";
-import { fr } from "date-fns/locale";
+
+import {
+  AlertCircle,
+  BarChart3,
+  Building2,
+  Calendar,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  CreditCard,
+  Crown,
+  Gift,
+  Headphones,
+  Lock,
+  Package,
+  RefreshCw,
+  Shield,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Wifi,
+  X,
+  Zap,
+} from "lucide-react-native";
+
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 type PlanId = "gratuit" | "pro" | "business";
+
 type BillingCycle = "mensuel" | "annuel";
+
+type PlanFeatureValue = boolean | string;
 
 type PlanFeature = {
   label: string;
-  gratuit: boolean | string;
-  pro: boolean | string;
-  business: boolean | string;
+  gratuit: PlanFeatureValue;
+  pro: PlanFeatureValue;
+  business: PlanFeatureValue;
 };
 
 type Plan = {
   id: PlanId;
   nom: string;
   tagline: string;
-  prix: { mensuel: number; annuel: number };
-  couleur: string;
-  gradient: string;
-  icon: React.ElementType;
+  prix: {
+    mensuel: number;
+    annuel: number;
+  };
+  accent: string;
+  icon: ComponentType<{
+    size?: number;
+    color?: string;
+    strokeWidth?: number;
+  }>;
   badge?: string;
   populaire?: boolean;
 };
 
+type Perk = {
+  icon: ComponentType<{
+    size?: number;
+    color?: string;
+    strokeWidth?: number;
+  }>;
+  label: string;
+  color: string;
+};
+
+type PremiumPageProps = {
+  onBack: () => void;
+};
+
+/* ============================================================================
+ * PLAN CONFIGURATION
+ *
+ * Ces valeurs correspondent à la configuration affichée par le fichier
+ * source fourni. Elles ne constituent pas une preuve qu'un moyen de paiement
+ * ou une devise particulière est déjà opérationnel partout.
+ * ========================================================================== */
+
 const PLANS: Plan[] = [
-  { id: "gratuit", nom: "Gratuit", tagline: "L'essentiel pour démarrer", prix: { mensuel: 0, annuel: 0 }, couleur: "#9CA3AF", gradient: "linear-gradient(135deg, #374151, #1F2937)", icon: Zap },
-  { id: "pro", nom: "Pro", tagline: "Pour les utilisateurs actifs", prix: { mensuel: 2500, annuel: 24000 }, couleur: "#8B5CF6", gradient: "linear-gradient(135deg, #8B5CF6, #6366F1)", icon: Crown, badge: "Populaire", populaire: true },
-  { id: "business", nom: "Business", tagline: "Pour les entrepreneurs", prix: { mensuel: 7500, annuel: 72000 }, couleur: "#F59E0B", gradient: "linear-gradient(135deg, #F59E0B, #F97316)", icon: Building2, badge: "Premium" },
+  {
+    id: "gratuit",
+    nom: "Gratuit",
+    tagline: "L'essentiel pour démarrer",
+    prix: {
+      mensuel: 0,
+      annuel: 0,
+    },
+    accent: "#9CA3AF",
+    icon: Zap,
+  },
+  {
+    id: "pro",
+    nom: "Pro",
+    tagline: "Pour les utilisateurs actifs",
+    prix: {
+      mensuel: 2500,
+      annuel: 24000,
+    },
+    accent: "#8B5CF6",
+    icon: Crown,
+    badge: "Populaire",
+    populaire: true,
+  },
+  {
+    id: "business",
+    nom: "Business",
+    tagline: "Pour les entrepreneurs",
+    prix: {
+      mensuel: 7500,
+      annuel: 72000,
+    },
+    accent: "#F59E0B",
+    icon: Building2,
+    badge: "Premium",
+  },
 ];
 
 const FEATURES: PlanFeature[] = [
-  { label: "Modules de base",           gratuit: true,         pro: true,           business: true },
-  { label: "Messages",                  gratuit: "20/mois",    pro: "Illimités",    business: "Illimités" },
-  { label: "Stockage documents",        gratuit: "100 Mo",     pro: "5 Go",         business: "50 Go" },
-  { label: "Annonces marketplace",      gratuit: "3 actives",  pro: "20 actives",   business: "Illimitées" },
-  { label: "Boost d'annonces",          gratuit: false,        pro: "2/mois",       business: "Illimités" },
-  { label: "Badge Premium profil",      gratuit: false,        pro: true,           business: true },
-  { label: "IA Assistant avancé",       gratuit: "10 req/jour",pro: "Illimité",     business: "Illimité + priorité" },
-  { label: "Analytics avancés",         gratuit: false,        pro: true,           business: true },
-  { label: "Export de données",         gratuit: false,        pro: "CSV",          business: "CSV + PDF" },
-  { label: "Support client",            gratuit: "Communauté", pro: "Email 48h",    business: "Prioritaire 4h" },
-  { label: "Accès anticipé features",   gratuit: false,        pro: true,           business: true },
-  { label: "Dashboard vendeur Pro",     gratuit: false,        pro: false,          business: true },
-  { label: "API & intégrations",        gratuit: false,        pro: false,          business: true },
-  { label: "Compte multi-utilisateurs", gratuit: false,        pro: false,          business: "Jusqu'à 5" },
+  {
+    label: "Modules de base",
+    gratuit: true,
+    pro: true,
+    business: true,
+  },
+  {
+    label: "Messages",
+    gratuit: "20/mois",
+    pro: "Illimités",
+    business: "Illimités",
+  },
+  {
+    label: "Stockage documents",
+    gratuit: "100 Mo",
+    pro: "5 Go",
+    business: "50 Go",
+  },
+  {
+    label: "Annonces marketplace",
+    gratuit: "3 actives",
+    pro: "20 actives",
+    business: "Illimitées",
+  },
+  {
+    label: "Boost d'annonces",
+    gratuit: false,
+    pro: "2/mois",
+    business: "Illimités",
+  },
+  {
+    label: "Badge Premium profil",
+    gratuit: false,
+    pro: true,
+    business: true,
+  },
+  {
+    label: "IA Assistant avancé",
+    gratuit: "10 req/jour",
+    pro: "Illimité",
+    business: "Illimité + priorité",
+  },
+  {
+    label: "Analytics avancés",
+    gratuit: false,
+    pro: true,
+    business: true,
+  },
+  {
+    label: "Export de données",
+    gratuit: false,
+    pro: "CSV",
+    business: "CSV + PDF",
+  },
+  {
+    label: "Support client",
+    gratuit: "Communauté",
+    pro: "Email 48h",
+    business: "Prioritaire 4h",
+  },
+  {
+    label: "Accès anticipé features",
+    gratuit: false,
+    pro: true,
+    business: true,
+  },
+  {
+    label: "Dashboard vendeur Pro",
+    gratuit: false,
+    pro: false,
+    business: true,
+  },
+  {
+    label: "API & intégrations",
+    gratuit: false,
+    pro: false,
+    business: true,
+  },
+  {
+    label: "Compte multi-utilisateurs",
+    gratuit: false,
+    pro: false,
+    business: "Jusqu'à 5",
+  },
 ];
 
-const PLAN_PERKS: Record<PlanId, { icon: React.ElementType; label: string; color: string }[]> = {
+const PLAN_PERKS: Record<PlanId, Perk[]> = {
   gratuit: [
-    { icon: Zap,        label: "Accès aux modules essentiels", color: "#9CA3AF" },
-    { icon: Users,      label: "Communauté de base",           color: "#9CA3AF" },
-    { icon: Package,    label: "3 annonces marketplace",       color: "#9CA3AF" },
+    {
+      icon: Zap,
+      label: "Accès aux modules essentiels",
+      color: "#9CA3AF",
+    },
+    {
+      icon: Users,
+      label: "Communauté de base",
+      color: "#9CA3AF",
+    },
+    {
+      icon: Package,
+      label: "3 annonces marketplace",
+      color: "#9CA3AF",
+    },
   ],
+
   pro: [
-    { icon: Crown,      label: "Badge Pro sur ton profil",             color: "#8B5CF6" },
-    { icon: Sparkles,   label: "IA illimitée",                         color: "#6366F1" },
-    { icon: BarChart2,  label: "Analytics complets",                   color: "#8B5CF6" },
-    { icon: Shield,     label: "Support email prioritaire",            color: "#6366F1" },
-    { icon: Wifi,       label: "Sync hors-ligne avancée",              color: "#8B5CF6" },
-    { icon: Gift,       label: "Accès anticipé aux nouvelles features",color: "#6366F1" },
+    {
+      icon: Crown,
+      label: "Badge Pro sur le profil",
+      color: "#8B5CF6",
+    },
+    {
+      icon: Sparkles,
+      label: "IA avancée",
+      color: "#6366F1",
+    },
+    {
+      icon: BarChart3,
+      label: "Analytics complets",
+      color: "#8B5CF6",
+    },
+    {
+      icon: Shield,
+      label: "Support email prioritaire",
+      color: "#6366F1",
+    },
+    {
+      icon: Wifi,
+      label: "Synchronisation hors ligne avancée",
+      color: "#8B5CF6",
+    },
+    {
+      icon: Gift,
+      label: "Accès anticipé aux fonctionnalités",
+      color: "#6366F1",
+    },
   ],
+
   business: [
-    { icon: Building2,  label: "Dashboard vendeur complet", color: "#F59E0B" },
-    { icon: TrendingUp, label: "Rapports financiers PDF",   color: "#F97316" },
-    { icon: Users,      label: "Jusqu'à 5 collaborateurs",  color: "#F59E0B" },
-    { icon: Headphones, label: "Support prioritaire 4h",    color: "#F97316" },
-    { icon: Zap,        label: "API & intégrations tierces",color: "#F59E0B" },
-    { icon: Flame,      label: "Boosts illimités",          color: "#F97316" },
+    {
+      icon: Building2,
+      label: "Dashboard vendeur complet",
+      color: "#F59E0B",
+    },
+    {
+      icon: TrendingUp,
+      label: "Rapports financiers",
+      color: "#F97316",
+    },
+    {
+      icon: Users,
+      label: "Jusqu'à 5 collaborateurs",
+      color: "#F59E0B",
+    },
+    {
+      icon: Headphones,
+      label: "Support prioritaire",
+      color: "#F97316",
+    },
+    {
+      icon: Zap,
+      label: "API & intégrations tierces",
+      color: "#F59E0B",
+    },
+    {
+      icon: Gift,
+      label: "Boosts selon les limites du plan",
+      color: "#F97316",
+    },
   ],
 };
 
-function FeatureValue({ value }: { value: boolean | string }) {
-  if (value === true)  return <Check size={15} className="text-green-400 mx-auto" />;
-  if (value === false) return <X size={13} className="text-white/20 mx-auto" />;
-  return <Text className="text-white/70 text-[11px] text-center">{value}</Text>;
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
+
+function formatAmount(amount: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
-interface PremiumPageProps { onBack: () => void; }
+function getPlan(id: PlanId): Plan {
+  return PLANS.find((plan) => plan.id === id) ?? PLANS[0];
+}
 
-export default function PremiumPage({ onBack }: PremiumPageProps) {
+function getPlanPrice(plan: Plan, billing: BillingCycle): string {
+  const amount = plan.prix[billing];
+
+  if (amount === 0) {
+    return "Gratuit";
+  }
+
+  return `${formatAmount(amount)} FCFA`;
+}
+
+function getMonthlyEquivalent(plan: Plan): string | null {
+  if (plan.prix.annuel <= 0) {
+    return null;
+  }
+
+  return `${formatAmount(Math.round(plan.prix.annuel / 12))} FCFA/mois`;
+}
+
+function getAnnualSaving(plan: Plan): number | null {
+  if (plan.prix.mensuel <= 0) {
+    return null;
+  }
+
+  const saving = plan.prix.mensuel * 12 - plan.prix.annuel;
+
+  return saving > 0 ? saving : null;
+}
+
+function formatSubscriptionDate(value?: string | null): string {
+  if (!value) {
+    return "Non communiqué";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Non communiqué";
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+/* ============================================================================
+ * FEATURE VALUE
+ * ========================================================================== */
+
+function FeatureValue({ value }: { value: PlanFeatureValue }) {
+  if (value === true) {
+    return (
+      <View style={styles.featureCheck}>
+        <Check size={13} color="#4ADE80" strokeWidth={3} />
+      </View>
+    );
+  }
+
+  if (value === false) {
+    return (
+      <View style={styles.featureUnavailable}>
+        <X size={12} color="rgba(255,255,255,0.2)" />
+      </View>
+    );
+  }
+
   return (
-    <View className="h-full flex flex-col" style={{  }}><AuthLoading><View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><Skeleton className="h-8 w-40" /></View><View className="px-4 pt-4 space-y-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}</View></AuthLoading><Unauthenticated><View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><Text className="text-white font-black">Premium</Text></View><View className="flex-1 flex flex-col items-center justify-center gap-4 px-6"><Crown size={40} className="text-purple-400" /><Text className="text-white/60 text-sm text-center">Connectez-vous pour gérer votre abonnement</Text><SignInButton /></View></Unauthenticated><Authenticated><PremiumInner onBack={onBack} /></Authenticated></View>
+    <Text style={styles.featureValue} numberOfLines={2}>
+      {value}
+    </Text>
   );
 }
+
+/* ============================================================================
+ * HEADER
+ * ========================================================================== */
+
+function PageHeader({
+  onBack,
+  currentPlan,
+}: {
+  onBack: () => void;
+  currentPlan: Plan;
+}) {
+  const CurrentIcon = currentPlan.icon;
+
+  return (
+    <View style={styles.header}>
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="Retour"
+        style={styles.headerBack}
+      >
+        <ArrowLeft size={19} color="#FFFFFF" />
+      </Pressable>
+
+      <View style={styles.headerCenter}>
+        <Text style={styles.headerTitle}>Premium</Text>
+
+        <Text style={styles.headerSubtitle}>Abonnements et plans</Text>
+      </View>
+
+      {currentPlan.id !== "gratuit" && (
+        <View
+          style={[
+            styles.currentPlanBadge,
+            {
+              borderColor: currentPlan.accent + "55",
+              backgroundColor: currentPlan.accent + "18",
+            },
+          ]}
+        >
+          <CurrentIcon size={13} color={currentPlan.accent} />
+
+          <Text
+            style={[
+              styles.currentPlanText,
+              {
+                color: currentPlan.accent,
+              },
+            ]}
+          >
+            {currentPlan.nom}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * BILLING SELECTOR
+ * ========================================================================== */
+
+function BillingSelector({
+  billing,
+  onChange,
+}: {
+  billing: BillingCycle;
+  onChange: (value: BillingCycle) => void;
+}) {
+  return (
+    <View style={styles.billingWrapper}>
+      <View style={styles.billingSelector}>
+        <Pressable
+          onPress={() => onChange("mensuel")}
+          style={[
+            styles.billingOption,
+            billing === "mensuel" && styles.billingOptionActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.billingText,
+              billing === "mensuel" && styles.billingTextActive,
+            ]}
+          >
+            Mensuel
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => onChange("annuel")}
+          style={[
+            styles.billingOption,
+            billing === "annuel" && styles.billingOptionActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.billingText,
+              billing === "annuel" && styles.billingTextActive,
+            ]}
+          >
+            Annuel
+          </Text>
+
+          <View style={styles.savingBadge}>
+            <Text style={styles.savingBadgeText}>-20%</Text>
+          </View>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * PLAN CARD
+ * ========================================================================== */
+
+function PlanCard({
+  plan,
+  currentPlan,
+  billing,
+  onSelect,
+}: {
+  plan: Plan;
+  currentPlan: PlanId;
+  billing: BillingCycle;
+  onSelect: (planId: PlanId) => void;
+}) {
+  const Icon = plan.icon;
+
+  const isCurrent = plan.id === currentPlan;
+
+  const saving = billing === "annuel" ? getAnnualSaving(plan) : null;
+
+  return (
+    <View style={[styles.planCard, plan.populaire && styles.planCardPopular]}>
+      <View
+        style={[
+          styles.planAccent,
+          {
+            backgroundColor: plan.accent,
+          },
+        ]}
+      />
+
+      {plan.badge && (
+        <View
+          style={[
+            styles.planBadge,
+            {
+              backgroundColor: plan.accent + "20",
+              borderColor: plan.accent + "40",
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.planBadgeText,
+              {
+                color: plan.accent,
+              },
+            ]}
+          >
+            {plan.badge}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.planBody}>
+        <View style={styles.planIdentity}>
+          <View
+            style={[
+              styles.planIcon,
+              {
+                backgroundColor: plan.accent + "18",
+                borderColor: plan.accent + "35",
+              },
+            ]}
+          >
+            <Icon size={23} color={plan.accent} />
+          </View>
+
+          <View style={styles.planIdentityText}>
+            <Text style={styles.planName}>{plan.nom}</Text>
+
+            <Text style={styles.planTagline}>{plan.tagline}</Text>
+          </View>
+        </View>
+
+        <View style={styles.priceBlock}>
+          <View style={styles.priceLine}>
+            <Text style={styles.price}>{getPlanPrice(plan, billing)}</Text>
+
+            {plan.id !== "gratuit" && (
+              <Text style={styles.pricePeriod}>
+                /{billing === "annuel" ? "an" : "mois"}
+              </Text>
+            )}
+          </View>
+
+          {billing === "annuel" && getMonthlyEquivalent(plan) && (
+            <Text style={styles.monthlyEquivalent}>
+              Équivalent à {getMonthlyEquivalent(plan)}
+            </Text>
+          )}
+
+          {saving && (
+            <Text style={styles.annualSaving}>
+              Économie de {formatAmount(saving)} FCFA/an
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.perks}>
+          {PLAN_PERKS[plan.id].map((perk) => {
+            const PerkIcon = perk.icon;
+
+            return (
+              <View key={perk.label} style={styles.perkRow}>
+                <View
+                  style={[
+                    styles.perkIcon,
+                    {
+                      backgroundColor: perk.color + "18",
+                    },
+                  ]}
+                >
+                  <PerkIcon size={12} color={perk.color} />
+                </View>
+
+                <Text style={styles.perkText} numberOfLines={2}>
+                  {perk.label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {isCurrent ? (
+          <View style={styles.currentButton}>
+            <CheckCircle2 size={16} color={plan.accent} />
+
+            <Text
+              style={[
+                styles.currentButtonText,
+                {
+                  color: plan.accent,
+                },
+              ]}
+            >
+              Plan actuel
+            </Text>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => onSelect(plan.id)}
+            style={[
+              styles.planButton,
+              {
+                backgroundColor: plan.accent,
+              },
+            ]}
+            accessibilityRole="button"
+          >
+            <Sparkles size={15} color="#FFFFFF" />
+
+            <Text style={styles.planButtonText}>
+              {plan.id === "gratuit"
+                ? "Choisir Gratuit"
+                : plan.id === "business"
+                  ? "Passer à Business"
+                  : "Passer à Pro"}
+            </Text>
+
+            <ChevronRight size={15} color="#FFFFFF" />
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * COMPARISON
+ * ========================================================================== */
+
+function ComparisonTable() {
+  return (
+    <View style={styles.comparisonCard}>
+      <View style={styles.comparisonHeader}>
+        <Text style={styles.comparisonTitle}>Comparaison détaillée</Text>
+
+        <Text style={styles.comparisonSubtitle}>
+          Comparez les fonctionnalités disponibles par plan.
+        </Text>
+      </View>
+
+      <View style={styles.comparisonColumns}>
+        <View style={styles.comparisonFeatureColumn}>
+          <Text style={styles.columnHeader}>Fonctionnalité</Text>
+        </View>
+
+        {PLANS.map((plan) => (
+          <View key={plan.id} style={styles.comparisonPlanColumn}>
+            <Text
+              style={[
+                styles.columnHeader,
+                {
+                  color: plan.accent,
+                },
+              ]}
+            >
+              {plan.nom}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {FEATURES.map((feature, index) => (
+        <View
+          key={feature.label}
+          style={[
+            styles.comparisonRow,
+            index % 2 === 1 && styles.comparisonRowAlt,
+          ]}
+        >
+          <View style={styles.comparisonFeatureColumn}>
+            <Text style={styles.comparisonFeatureText}>{feature.label}</Text>
+          </View>
+
+          <View style={styles.comparisonPlanColumn}>
+            <FeatureValue value={feature.gratuit} />
+          </View>
+
+          <View style={styles.comparisonPlanColumn}>
+            <FeatureValue value={feature.pro} />
+          </View>
+
+          <View style={styles.comparisonPlanColumn}>
+            <FeatureValue value={feature.business} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * BENEFITS
+ * ========================================================================== */
+
+function BenefitsTab({ currentPlan }: { currentPlan: Plan }) {
+  const Icon = currentPlan.icon;
+
+  const benefits: Array<{
+    title: string;
+    description: string;
+    icon: ComponentType<{
+      size?: number;
+      color?: string;
+      strokeWidth?: number;
+    }>;
+    color: string;
+  }> = [
+    {
+      title: "IA Assistant avancé",
+      description:
+        "Fonctionnalités IA selon les limites et capacités prévues par votre plan.",
+      icon: Sparkles,
+      color: "#8B5CF6",
+    },
+    {
+      title: "Analytics",
+      description:
+        "Accédez aux outils analytiques prévus par votre niveau d'abonnement.",
+      icon: BarChart3,
+      color: "#3B82F6",
+    },
+    {
+      title: "Protection et sécurité",
+      description:
+        "Des fonctionnalités de protection et de contrôle supplémentaires selon le plan.",
+      icon: Shield,
+      color: "#10B981",
+    },
+    {
+      title: "Support",
+      description: "Le niveau de support dépend du plan sélectionné.",
+      icon: Headphones,
+      color: "#EC4899",
+    },
+    {
+      title: "Accès anticipé",
+      description:
+        "Certaines nouvelles fonctionnalités peuvent être proposées en accès anticipé.",
+      icon: Zap,
+      color: "#F97316",
+    },
+    {
+      title: "Collaboration",
+      description:
+        "Les fonctions collaboratives disponibles dépendent du plan Business.",
+      icon: Users,
+      color: "#6366F1",
+    },
+  ];
+
+  return (
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <View
+        style={[
+          styles.benefitHero,
+          {
+            borderColor: currentPlan.accent + "35",
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.benefitHeroIcon,
+            {
+              backgroundColor: currentPlan.accent + "18",
+            },
+          ]}
+        >
+          <Icon size={29} color={currentPlan.accent} />
+        </View>
+
+        <View style={styles.benefitHeroContent}>
+          <Text style={styles.benefitHeroTitle}>Plan {currentPlan.nom}</Text>
+
+          <Text style={styles.benefitHeroText}>{currentPlan.tagline}</Text>
+        </View>
+      </View>
+
+      {currentPlan.id !== "gratuit" && (
+        <View style={styles.activeValueCard}>
+          <View style={styles.activeValueHeader}>
+            <View>
+              <Text style={styles.activeValueTitle}>Votre plan actif</Text>
+
+              <Text style={styles.activeValueSubtitle}>
+                Fonctionnalités associées
+              </Text>
+            </View>
+
+            <CheckCircle2 size={20} color="#4ADE80" />
+          </View>
+
+          <View style={styles.activeValueGrid}>
+            {PLAN_PERKS[currentPlan.id].slice(0, 4).map((perk) => {
+              const PerkIcon = perk.icon;
+
+              return (
+                <View key={perk.label} style={styles.activeValueItem}>
+                  <PerkIcon size={14} color={perk.color} />
+
+                  <Text style={styles.activeValueItemText} numberOfLines={2}>
+                    {perk.label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      <View style={styles.benefitList}>
+        {benefits.map((benefit) => {
+          const BenefitIcon = benefit.icon;
+
+          return (
+            <View key={benefit.title} style={styles.benefitCard}>
+              <View
+                style={[
+                  styles.benefitIcon,
+                  {
+                    backgroundColor: benefit.color + "18",
+                  },
+                ]}
+              >
+                <BenefitIcon size={19} color={benefit.color} />
+              </View>
+
+              <View style={styles.benefitContent}>
+                <Text style={styles.benefitTitle}>{benefit.title}</Text>
+
+                <Text style={styles.benefitDescription}>
+                  {benefit.description}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+}
+
+/* ============================================================================
+ * MANAGEMENT
+ * ========================================================================== */
+
+function ManagementTab({
+  subscription,
+  currentPlan,
+  onAutoRenew,
+  onUpgrade,
+  onCancel,
+}: {
+  subscription:
+    | {
+        status?: string;
+        billingCycle?: BillingCycle;
+        renewsAt?: string;
+        paymentMethod?: string;
+        autoRenew?: boolean;
+      }
+    | null
+    | undefined;
+  currentPlan: Plan;
+  onAutoRenew: () => void;
+  onUpgrade: () => void;
+  onCancel: () => void;
+}) {
+  if (subscription === undefined) {
+    return (
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <View style={styles.loadingStack}>
+          <SkeletonBlock />
+          <SkeletonBlock />
+          <SkeletonBlock />
+        </View>
+      </ScrollView>
+    );
+  }
+
+  const isActive = subscription?.status === "active";
+
+  if (!isActive) {
+    return (
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <View style={styles.noSubscription}>
+          <View style={styles.noSubscriptionIcon}>
+            <Package size={31} color="rgba(255,255,255,0.32)" />
+          </View>
+
+          <Text style={styles.noSubscriptionTitle}>Aucun abonnement actif</Text>
+
+          <Text style={styles.noSubscriptionText}>
+            Choisissez un plan pour accéder aux fonctionnalités correspondantes.
+          </Text>
+        </View>
+
+        <Pressable onPress={onUpgrade} style={styles.managementPrimaryButton}>
+          <Crown size={16} color="#FFFFFF" />
+
+          <Text style={styles.managementPrimaryText}>Voir les plans</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
+
+  const PlanIcon = currentPlan.icon;
+
+  const billingLabel =
+    subscription.billingCycle === "annuel" ? "Annuel" : "Mensuel";
+
+  const selectedPrice = subscription.billingCycle
+    ? currentPlan.prix[subscription.billingCycle]
+    : 0;
+
+  return (
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <View
+        style={[
+          styles.subscriptionCard,
+          {
+            borderColor: currentPlan.accent + "38",
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.subscriptionTopLine,
+            {
+              backgroundColor: currentPlan.accent,
+            },
+          ]}
+        />
+
+        <View style={styles.subscriptionHeader}>
+          <View
+            style={[
+              styles.subscriptionIcon,
+              {
+                backgroundColor: currentPlan.accent + "18",
+              },
+            ]}
+          >
+            <PlanIcon size={20} color={currentPlan.accent} />
+          </View>
+
+          <View style={styles.subscriptionIdentity}>
+            <Text style={styles.subscriptionPlan}>Plan {currentPlan.nom}</Text>
+
+            <Text style={styles.subscriptionBilling}>
+              {billingLabel}
+              {selectedPrice > 0
+                ? ` · ${formatAmount(selectedPrice)} FCFA`
+                : ""}
+            </Text>
+          </View>
+
+          <View style={styles.activeBadge}>
+            <View style={styles.activeDot} />
+
+            <Text style={styles.activeBadgeText}>Actif</Text>
+          </View>
+        </View>
+
+        <View style={styles.subscriptionRows}>
+          <SubscriptionRow
+            icon={Calendar}
+            label="Renouvellement"
+            value={formatSubscriptionDate(subscription.renewsAt)}
+          />
+
+          <SubscriptionRow
+            icon={CreditCard}
+            label="Moyen de paiement"
+            value={subscription.paymentMethod ?? "Non communiqué"}
+          />
+
+          <SubscriptionRow
+            icon={RefreshCw}
+            label="Renouvellement automatique"
+            value={subscription.autoRenew ? "Activé" : "Désactivé"}
+          />
+        </View>
+      </View>
+
+      <View style={styles.managementActions}>
+        <ManagementAction
+          icon={RefreshCw}
+          title={
+            subscription.autoRenew
+              ? "Désactiver le renouvellement"
+              : "Activer le renouvellement"
+          }
+          subtitle={
+            subscription.autoRenew
+              ? "Votre abonnement ne sera plus renouvelé automatiquement."
+              : "Permettre le renouvellement automatique."
+          }
+          color="#3B82F6"
+          onPress={onAutoRenew}
+        />
+
+        {currentPlan.id !== "business" && (
+          <ManagementAction
+            icon={ChevronRight}
+            title="Passer à Business"
+            subtitle="Consulter le plan Business."
+            color="#F59E0B"
+            onPress={onUpgrade}
+          />
+        )}
+      </View>
+
+      <View style={styles.managementSecurity}>
+        <Shield size={17} color="#4ADE80" />
+
+        <Text style={styles.managementSecurityText}>
+          Les informations de paiement et le traitement financier dépendent du
+          système de paiement réellement connecté au backend.
+        </Text>
+      </View>
+
+      <Pressable onPress={onCancel} style={styles.cancelSubscriptionButton}>
+        <AlertCircle size={16} color="#F87171" />
+
+        <Text style={styles.cancelSubscriptionText}>Annuler l'abonnement</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+/* ============================================================================
+ * SUBSCRIPTION ROW
+ * ========================================================================== */
+
+function SubscriptionRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: ComponentType<{
+    size?: number;
+    color?: string;
+    strokeWidth?: number;
+  }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.subscriptionRow}>
+      <View style={styles.subscriptionRowIcon}>
+        <Icon size={14} color="rgba(255,255,255,0.42)" />
+      </View>
+
+      <View style={styles.subscriptionRowContent}>
+        <Text style={styles.subscriptionRowLabel}>{label}</Text>
+
+        <Text style={styles.subscriptionRowValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * MANAGEMENT ACTION
+ * ========================================================================== */
+
+function ManagementAction({
+  icon: Icon,
+  title,
+  subtitle,
+  color,
+  onPress,
+}: {
+  icon: ComponentType<{
+    size?: number;
+    color?: string;
+    strokeWidth?: number;
+  }>;
+  title: string;
+  subtitle: string;
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.managementAction,
+        pressed && styles.managementActionPressed,
+      ]}
+    >
+      <View
+        style={[
+          styles.managementActionIcon,
+          {
+            backgroundColor: color + "18",
+          },
+        ]}
+      >
+        <Icon size={16} color={color} />
+      </View>
+
+      <View style={styles.managementActionContent}>
+        <Text style={styles.managementActionTitle}>{title}</Text>
+
+        <Text style={styles.managementActionSubtitle}>{subtitle}</Text>
+      </View>
+
+      <ChevronRight size={16} color="rgba(255,255,255,0.25)" />
+    </Pressable>
+  );
+}
+
+/* ============================================================================
+ * SKELETON
+ * ========================================================================== */
+
+function SkeletonBlock() {
+  return <View style={styles.skeletonSubscription} />;
+}
+
+/* ============================================================================
+ * UPGRADE MODAL
+ * ========================================================================== */
+
+function UpgradeModal({
+  visible,
+  plan,
+  billing,
+  saving,
+  onClose,
+  onConfirm,
+}: {
+  visible: boolean;
+  plan: Plan | null;
+  billing: BillingCycle;
+  saving: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!plan) {
+    return null;
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => {
+        if (!saving) {
+          onClose();
+        }
+      }}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable
+          onPress={() => {
+            if (!saving) {
+              onClose();
+            }
+          }}
+          style={styles.modalBackdrop}
+        />
+
+        <View style={styles.modalCard}>
+          <View style={styles.modalHandle} />
+
+          <View style={styles.modalHeader}>
+            <View
+              style={[
+                styles.modalPlanIcon,
+                {
+                  backgroundColor: plan.accent + "18",
+                },
+              ]}
+            >
+              <plan.icon size={25} color={plan.accent} />
+            </View>
+
+            <View style={styles.modalHeaderText}>
+              <Text style={styles.modalTitle}>Passer à {plan.nom}</Text>
+
+              <Text style={styles.modalSubtitle}>
+                {getPlanPrice(plan, billing)} /{" "}
+                {billing === "annuel" ? "an" : "mois"}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={onClose}
+              disabled={saving}
+              style={styles.modalClose}
+            >
+              <X size={18} color="rgba(255,255,255,0.55)" />
+            </Pressable>
+          </View>
+
+          <View style={styles.confirmationBox}>
+            <CreditCard size={17} color="#A78BFA" />
+
+            <Text style={styles.confirmationText}>
+              Vous allez demander l'activation du plan {plan.nom}. Le traitement
+              du paiement dépend du flux financier réellement implémenté par le
+              backend.
+            </Text>
+          </View>
+
+          <View style={styles.modalPerks}>
+            {PLAN_PERKS[plan.id].slice(0, 4).map((perk) => {
+              const PerkIcon = perk.icon;
+
+              return (
+                <View key={perk.label} style={styles.modalPerk}>
+                  <PerkIcon size={13} color={perk.color} />
+
+                  <Text style={styles.modalPerkText}>{perk.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          <Pressable
+            onPress={onConfirm}
+            disabled={saving}
+            style={[
+              styles.confirmButton,
+              {
+                backgroundColor: plan.accent,
+              },
+              saving && styles.disabledButton,
+            ]}
+          >
+            <Sparkles size={16} color="#FFFFFF" />
+
+            <Text style={styles.confirmButtonText}>
+              {saving ? "Traitement..." : "Confirmer"}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={onClose}
+            disabled={saving}
+            style={styles.modalSecondaryButton}
+          >
+            <Text style={styles.modalSecondaryText}>Retour</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+ * CANCEL MODAL
+ * ========================================================================== */
+
+function CancelModal({
+  visible,
+  currentPlan,
+  saving,
+  onClose,
+  onConfirm,
+}: {
+  visible: boolean;
+  currentPlan: Plan;
+  saving: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => {
+        if (!saving) {
+          onClose();
+        }
+      }}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable
+          onPress={() => {
+            if (!saving) {
+              onClose();
+            }
+          }}
+          style={styles.modalBackdrop}
+        />
+
+        <View style={styles.modalCard}>
+          <View style={styles.modalHandle} />
+
+          <View style={styles.cancelHeader}>
+            <View style={styles.cancelIcon}>
+              <AlertCircle size={23} color="#F87171" />
+            </View>
+
+            <View style={styles.modalHeaderText}>
+              <Text style={styles.modalTitle}>Annuler l'abonnement ?</Text>
+
+              <Text style={styles.modalSubtitle}>
+                Plan actuel : {currentPlan.nom}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.cancelWarning}>
+            <Lock size={16} color="#F87171" />
+
+            <Text style={styles.cancelWarningText}>
+              L'annulation modifie l'état de votre abonnement selon les règles
+              appliquées par le backend.
+            </Text>
+          </View>
+
+          <View style={styles.cancelActions}>
+            <Pressable
+              onPress={onClose}
+              disabled={saving}
+              style={styles.keepPlanButton}
+            >
+              <Text style={styles.keepPlanText}>Garder mon plan</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={onConfirm}
+              disabled={saving}
+              style={[
+                styles.confirmCancelButton,
+                saving && styles.disabledButton,
+              ]}
+            >
+              <Text style={styles.confirmCancelText}>
+                {saving ? "Traitement..." : "Confirmer"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+ * MAIN
+ * ========================================================================== */
 
 function PremiumInner({ onBack }: PremiumPageProps) {
   const subscription = useQuery(api.subscriptions.getMySubscription, {});
+
   const subscribeToPlan = useMutation(api.subscriptions.subscribeToPlan);
+
   const cancelSubscription = useMutation(api.subscriptions.cancelSubscription);
+
   const toggleAutoRenew = useMutation(api.subscriptions.toggleAutoRenew);
 
   const [tab, setTab] = useState<"plans" | "avantages" | "gestion">("plans");
+
   const [billing, setBilling] = useState<BillingCycle>("annuel");
+
   const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
+
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
   const [showCancel, setShowCancel] = useState(false);
 
-  const currentPlan: PlanId = subscription?.planId ?? "gratuit";
+  const [mutationBusy, setMutationBusy] = useState(false);
 
-  const handleUpgrade = (planId: PlanId) => {
-    if (planId === currentPlan) return;
+  const currentPlanId: PlanId =
+    subscription?.planId === "pro" || subscription?.planId === "business"
+      ? subscription.planId
+      : "gratuit";
+
+  const currentPlan = useMemo(() => getPlan(currentPlanId), [currentPlanId]);
+
+  const selectedPlanData = selectedPlan ? getPlan(selectedPlan) : null;
+
+  const requestPlanChange = (planId: PlanId) => {
+    if (planId === currentPlanId) {
+      return;
+    }
+
     setSelectedPlan(planId);
-    setShowConfirm(true);
+    setShowUpgrade(true);
   };
 
-  const confirmUpgrade = async () => {
-    if (!selectedPlan) return;
+  const confirmPlanChange = async () => {
+    if (!selectedPlan || mutationBusy) {
+      return;
+    }
+
+    setMutationBusy(true);
+
     try {
-      await subscribeToPlan({ planId: selectedPlan, billingCycle: billing });
-      setShowConfirm(false);
-      toast.success("Abonnement mis à jour avec succès !");
+      await subscribeToPlan({
+        planId: selectedPlan,
+        billingCycle: billing,
+      });
+
+      setShowUpgrade(false);
+      setSelectedPlan(null);
+
+      Alert.alert(
+        "Abonnement",
+        "La demande de changement d'abonnement a été traitée par le backend.",
+      );
     } catch {
-      toast.error("Erreur lors de la mise à jour de l'abonnement");
+      Alert.alert(
+        "Abonnement",
+        "Impossible de modifier l'abonnement. Vérifiez votre connexion puis réessayez.",
+      );
+    } finally {
+      setMutationBusy(false);
     }
   };
 
-  const handleCancel = async () => {
+  const confirmCancel = async () => {
+    if (mutationBusy) {
+      return;
+    }
+
+    setMutationBusy(true);
+
     try {
       await cancelSubscription({});
+
       setShowCancel(false);
-      toast.success("Abonnement annulé");
+
+      Alert.alert(
+        "Abonnement",
+        "La demande d'annulation a été traitée par le backend.",
+      );
     } catch {
-      toast.error("Aucun abonnement actif à annuler");
+      Alert.alert("Abonnement", "Impossible d'annuler l'abonnement.");
+    } finally {
+      setMutationBusy(false);
     }
   };
 
-  const handleToggleAutoRenew = async () => {
+  const handleAutoRenew = async () => {
+    if (mutationBusy) {
+      return;
+    }
+
+    setMutationBusy(true);
+
     try {
       await toggleAutoRenew({});
-      toast.success("Renouvellement automatique mis à jour");
+
+      Alert.alert(
+        "Renouvellement",
+        "Le renouvellement automatique a été mis à jour.",
+      );
     } catch {
-      toast.error("Erreur");
+      Alert.alert(
+        "Renouvellement",
+        "Impossible de modifier le renouvellement automatique.",
+      );
+    } finally {
+      setMutationBusy(false);
     }
   };
 
-  const getPrix = (plan: Plan) => {
-    const p = plan.prix[billing];
-    if (p === 0) return "Gratuit";
-    return `${p.toLocaleString()} FCFA`;
-  };
-
-  const getPerMonth = (plan: Plan) => {
-    if (plan.prix.mensuel === 0) return null;
-    if (billing === "annuel") return `${Math.round(plan.prix.annuel / 12).toLocaleString()} FCFA/mois`;
-    return null;
-  };
-
-  const annualSaving = (plan: Plan) => {
-    if (plan.prix.mensuel === 0) return null;
-    const saved = plan.prix.mensuel * 12 - plan.prix.annuel;
-    return saved > 0 ? saved : null;
-  };
-
-  const currentPlanData = PLANS.find(p => p.id === currentPlan)!;
-
   return (
-    <>
-      {/* Ambient glows */}
-      <View className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-48 pointer-events-none" style={{  }} />
+    <View style={styles.screen}>
+      {/* Ambient premium background */}
+      <View pointerEvents="none" style={styles.ambientTop} />
 
-      {/* Header */}
-      <View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-white font-black text-lg leading-tight">Premium</Text><Text className="text-white/40 text-xs">Abonnements & plans</Text></View>{currentPlan !== "gratuit" && (
-          <View className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl" style={{ backgroundColor: currentPlanData.gradient, boxShadow: `0 0 12px ${currentPlanData.couleur}40` }}><currentPlanData.icon size={13} className="text-white" /><Text className="text-white font-bold text-xs">{currentPlanData.nom}</Text></View>
-        )}</View>
+      <PageHeader onBack={onBack} currentPlan={currentPlan} />
 
-      {/* Tabs */}
-      <View className="flex-shrink-0 flex gap-1 px-4 py-3">{[
-          { id: "plans" as const, label: "Nos plans", icon: Crown },
-          { id: "avantages" as const, label: "Avantages", icon: Star },
-          { id: "gestion" as const, label: "Mon abonnement", icon: CreditCard },
-        ].map(({ id, label, icon: Icon }) => (
-          <Pressable key={id} onPress={() => setTab(id)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all" style={tab === id ? {  } : { backgroundColor: "rgba(255,255,255,0.06)" }}><Icon size={12} />{label}</Pressable>
-        ))}</View>
+      {/* ====================================================================
+       * TABS
+       * ================================================================== */}
 
-      <View className="flex-1 overflow-y-auto" style={{  }}>{}{tab === "plans" && (
-          <View className="px-4 pb-8">{}<View className="flex items-center justify-center gap-3 mb-6"><Pressable onPress={() => setBilling("mensuel")} className="px-4 py-2 rounded-xl text-sm font-semibold transition-all" style={billing === "mensuel" ? { backgroundColor: "rgba(255,255,255,0.12)" } : {  }}><Text>Mensuel</Text></Pressable><View className="relative w-14 h-7 rounded-full flex items-center px-1" onPress={() => setBilling(billing === "mensuel" ? "annuel" : "mensuel")} style={{  }}><View animate={{ x: billing === "annuel" ? 28 : 0 }} transition={{ type: "spring", stiffness: 400, damping: 30 }} className="w-5 h-5 rounded-full bg-white" /></View><Pressable onPress={() => setBilling("annuel")} className="px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5" style={billing === "annuel" ? { backgroundColor: "rgba(255,255,255,0.12)" } : {  }}><Text>Annuel</Text><Text className="px-1.5 py-0.5 rounded-full text-[9px] font-black" style={{ color: "#fff" }}>-20%</Text></Pressable></View><View className="flex flex-col gap-4">{PLANS.map((plan) => {
-                const isCurrent = plan.id === currentPlan;
-                const Icon = plan.icon;
-                const saving = annualSaving(plan);
-                return (
-                  <View key={plan.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="relative rounded-2xl overflow-hidden" style={{ borderColor: "rgba(139,92,246,0.6)", borderStyle: "solid" }}>
-                    <View className="h-1.5 w-full" style={{ backgroundColor: plan.gradient }} />
-                    {plan.badge && (
-                      <View className="absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-black text-white" style={{ backgroundColor: plan.gradient }}>{plan.badge}</View>
-                    )}
-                    <View className="p-5" style={{ backgroundColor: plan.populaire ? "rgba(139,92,246,0.06)" : "rgba(255,255,255,0.03)" }}><View className="flex items-center gap-3 mb-4"><View className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: plan.gradient }}><Icon size={22} className="text-white" /></View><View><Text className="text-white font-black text-lg">{plan.nom}</Text><Text className="text-white/50 text-xs">{plan.tagline}</Text></View></View><View className="mb-4"><View className="flex items-end gap-1"><Text className="text-white font-black text-3xl">{getPrix(plan)}</Text>{plan.prix.mensuel > 0 && <Text className="text-white/40 text-sm mb-1">/{billing === "annuel" ? "an" : "mois"}</Text>}</View>{billing === "annuel" && getPerMonth(plan) && <Text className="text-white/50 text-xs">{getPerMonth(plan)}</Text>}{billing === "annuel" && saving && <Text className="text-green-400 text-xs font-semibold mt-0.5">Économise {saving.toLocaleString()}FCFA/an</Text>}</View><View className="flex flex-col gap-2 mb-5">{PLAN_PERKS[plan.id].map((perk) => (
-                          <View key={perk.label} className="flex items-center gap-2"><View className="w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${perk.color}22` }}><perk.icon size={11} style={{  }} /></View><Text className="text-white/70 text-xs">{perk.label}</Text></View>
-                        ))}</View>{isCurrent ? (
-                        <View className="w-full py-3 rounded-2xl flex items-center justify-center gap-2" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><CheckCircle size={15} style={{  }} /><Text className="font-bold text-sm" style={{ color: plan.couleur }}>Plan actuel</Text></View>
-                      ) : plan.id === "gratuit" ? (
-                        <Pressable onPress={() => setShowCancel(true)} className="w-full py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Text className="text-white/50 font-semibold text-sm">Rétrograder</Text></Pressable>
-                      ) : (
-                        <Pressable onPress={() => handleUpgrade(plan.id)} className="w-full py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all" style={{ backgroundColor: plan.gradient, boxShadow: `0 4px 20px ${plan.couleur}44` }}><Sparkles size={15} className="text-white" /><Text className="text-white font-black text-sm">{plan.id === "business" ? "Passer à Business" : "Upgrader maintenant"}</Text></Pressable>
-                      )}</View>
-                  </View>
-                );
-              })}</View>{}<View className="mt-6 rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Text className="text-white font-bold text-sm px-4 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}>Comparaison détaillée</Text><View className="px-4 py-2" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)" }}><Text className="text-white/30 text-xs">Fonctionnalité</Text>{PLANS.map((p) => <Text key={p.id} className="text-center text-xs font-bold" style={{ color: p.couleur }}>{p.nom}</Text>)}</View>{FEATURES.map((f, idx) => (
-                <View key={f.label} className="px-4 py-2.5 items-center" style={{ backgroundColor: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)" }}><Text className="text-white/60 text-[11px] pr-2">{f.label}</Text><View className="flex justify-center"><FeatureValue value={f.gratuit} /></View><View className="flex justify-center"><FeatureValue value={f.pro} /></View><View className="flex justify-center"><FeatureValue value={f.business} /></View></View>
-              ))}</View></View>
-        )}{}{tab === "avantages" && (
-          <View className="px-4 pb-8"><View initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-2xl p-5 mb-5 flex items-center gap-4" style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.3)", borderStyle: "solid" }}><View className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ boxShadow: "0 8px 24px rgba(139,92,246,0.5)" }}><Crown size={30} className="text-white" /></View><View><Text className="text-white font-black text-lg">Badge {currentPlanData.nom}</Text><Text className="text-white/60 text-sm">Visible sur ton profil et toutes tes contributions</Text></View></View>{}{currentPlan !== "gratuit" && (
-              <View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-4 mb-5" style={{ backgroundColor: "rgba(16,185,129,0.08)", borderWidth: 1, borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}>
-                <Text className="text-xs text-green-400 font-bold uppercase tracking-wider mb-3">Valeur débloquée ce mois</Text>
-                <View className="gap-3">{[
-                    { label: "Boosts", value: currentPlan === "business" ? "Illimités" : "2 offerts", color: "#F59E0B" },
-                    { label: "Stockage", value: currentPlan === "business" ? "50 Go" : "5 Go", color: "#3B82F6" },
-                    { label: "IA Requêtes", value: "Illimitées", color: "#8B5CF6" },
-                  ].map((stat) => (
-                    <View key={stat.label} className="flex flex-col items-center gap-1 p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Text className="text-xs font-black" style={{ color: stat.color }}>{stat.value}</Text><Text className="text-[10px] text-white/40">{stat.label}</Text></View>
-                  ))}</View>
-              </View>
-            )}{[
-              { titre: "IA Assistant illimitée",  desc: "Accès illimité à l'assistant IA dans tous les modules.", icon: Sparkles, color: "#8B5CF6" },
-              { titre: "Analytics & Insights",    desc: "Tableau de bord complet avec graphiques et statistiques détaillées.", icon: BarChart2, color: "#3B82F6" },
-              { titre: "Stockage 5 Go",           desc: "Coffre-fort sécurisé avec 5 Go pour tes documents.", icon: Shield, color: "#10B981" },
-              { titre: "Support prioritaire",     desc: "Réponse en moins de 48h par email avec une équipe dédiée.", icon: Headphones, color: "#EC4899" },
-              { titre: "Accès anticipé",          desc: "Teste les nouvelles fonctionnalités avant tout le monde.", icon: Flame, color: "#F97316" },
-              { titre: "Messages illimités",      desc: "Envoie et reçois autant de messages que tu veux.", icon: Users, color: "#6366F1" },
-            ].map((b, idx) => (
-              <View key={b.titre} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.06 }} className="flex items-start gap-4 rounded-2xl p-4 mb-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}>
-                <View className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${b.color}22` }}><b.icon size={20} style={{  }} /></View>
-                <View><Text className="text-white font-bold text-sm">{b.titre}</Text><Text className="text-white/50 text-xs leading-relaxed mt-0.5">{b.desc}</Text></View>
-              </View>
-            ))}</View>
-        )}{}{tab === "gestion" && (
-          <View className="px-4 pb-8">{subscription === undefined ? (
-              <View className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}</View>
-            ) : subscription && subscription.status === "active" ? (
-              <>
-                <View initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl overflow-hidden mb-5">
-                  <View className="h-1.5" style={{ backgroundColor: currentPlanData.gradient }} />
-                  <View className="p-4" style={{ backgroundColor: "rgba(139,92,246,0.08)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid", borderTopWidth: 0 }}><View className="flex items-center justify-between mb-3"><View className="flex items-center gap-2"><View className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: currentPlanData.gradient }}><currentPlanData.icon size={18} className="text-white" /></View><View><Text className="text-white font-black">Plan {currentPlanData.nom}{subscription.billingCycle === "annuel" ? "Annuel" : "Mensuel"}</Text><Text className="text-white/50 text-xs">{PLANS.find(p => p.id === currentPlan)?.prix[subscription.billingCycle].toLocaleString()}FCFA / {subscription.billingCycle === "annuel" ? "an" : "mois"}</Text></View></View><Text className="px-2.5 py-1 rounded-full text-xs font-bold text-green-400" style={{ backgroundColor: "rgba(16,185,129,0.15)" }}>Actif</Text></View><View className="gap-3">{[
-                        { icon: Calendar,   label: "Renouvellement",       value: subscription.renewsAt ? format(parseISO(subscription.renewsAt), "d MMM yyyy", { locale: fr }) : "—" },
-                        { icon: CreditCard, label: "Moyen de paiement",    value: subscription.paymentMethod ?? "Mobile Money" },
-                        { icon: RefreshCw,  label: "Auto-renouvellement",  value: subscription.autoRenew ? "Activé" : "Désactivé" },
-                        { icon: Gift,       label: "Points bonus",         value: "+500 pts/mois" },
-                      ].map(({ icon: Icon, label, value }) => (
-                        <View key={label} className="flex items-center gap-2 p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Icon size={13} className="text-white/40 flex-shrink-0" /><View><Text className="text-white/40 text-[10px]">{label}</Text><Text className="text-white font-semibold text-xs">{value}</Text></View></View>
-                      ))}</View></View>
-                </View>
+      <View style={styles.tabs}>
+        <TabButton
+          label="Plans"
+          active={tab === "plans"}
+          icon={Crown}
+          onPress={() => setTab("plans")}
+        />
 
-                <View className="flex flex-col gap-2 mb-5">{[
-                    { icon: RefreshCw, label: "Gérer le renouvellement automatique", color: "#3B82F6", action: handleToggleAutoRenew },
-                    { icon: ChevronRight, label: "Passer à Business", color: "#F59E0B", action: () => handleUpgrade("business") },
-                  ].map(({ icon: Icon, label, color, action }) => (
-                    <Pressable key={label} onPress={() => void action()} className="flex items-center gap-3 px-4 py-3.5 rounded-xl active:scale-99 transition-all" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}22` }}><Icon size={15} style={{ color }} /></View><Text className="text-white/80 text-sm font-semibold flex-1 text-left">{label}</Text><ChevronRight size={15} className="text-white/30" /></Pressable>
-                  ))}</View>
-              </>
-            ) : (
-              <View className="flex flex-col items-center py-10 gap-3"><Package size={36} className="text-white/20" /><Text className="text-white/60 text-sm">Aucun abonnement actif</Text><Pressable onPress={() => setTab("plans")} className="px-4 py-2 rounded-xl text-sm font-bold text-white" style={{  }}><Text>Voir les plans</Text></Pressable></View>
-            )}<Pressable onPress={() => setShowCancel(true)} className="w-full py-3 rounded-2xl flex items-center justify-center gap-2" style={{ backgroundColor: "rgba(239,68,68,0.08)", borderWidth: 1, borderColor: "rgba(239,68,68,0.15)", borderStyle: "solid" }}><AlertCircle size={15} className="text-red-400" /><Text className="text-red-400 font-semibold text-sm">Annuler l'abonnement</Text></Pressable></View>
-        )}</View>
+        <TabButton
+          label="Avantages"
+          active={tab === "avantages"}
+          icon={Sparkles}
+          onPress={() => setTab("avantages")}
+        />
 
-      {/* Upgrade confirm sheet */}
-<View>
-        {showConfirm && selectedPlan && (() => {
-          const plan = PLANS.find((p) => p.id === selectedPlan)!;
-          return (
-            <>
-              <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setShowConfirm(false)} className="absolute inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} />
-              <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl p-6" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                <View className="w-12 h-1 rounded-full bg-white/20 mx-auto mb-5" />
-                <View className="flex items-center gap-3 mb-5"><View className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: plan.gradient }}><plan.icon size={26} className="text-white" /></View><View><Text className="text-white font-black text-xl">Passer à {plan.nom}</Text><Text className="text-white/50 text-sm">{getPrix(plan)}/ {billing === "annuel" ? "an" : "mois"}</Text></View></View>
-                <View className="rounded-xl p-3 mb-5" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-white/60 text-xs leading-relaxed">Tu seras débité immédiatement via Mobile Money. Ton plan actuel sera remplacé. Tu peux annuler à tout moment.
-                  </Text></View>
-                <Pressable onPress={() => void confirmUpgrade()} className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all mb-3" style={{ backgroundColor: plan.gradient, boxShadow: `0 4px 20px ${plan.couleur}44` }}><Sparkles size={16} className="text-white" /><Text className="text-white font-black">Confirmer le paiement</Text></Pressable>
-                <Pressable onPress={() => setShowConfirm(false)} className="w-full py-3 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><Text className="text-white/50 text-sm">Annuler</Text></Pressable>
-              </View>
-            </>
-          );
-        })()}
+        <TabButton
+          label="Mon abonnement"
+          active={tab === "gestion"}
+          icon={CreditCard}
+          onPress={() => setTab("gestion")}
+        />
       </View>
 
-      {/* Cancel confirm sheet */}
-<View>
-        {showCancel && (
-          <>
-            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setShowCancel(false)} className="absolute inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} />
-            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl p-6" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-              <View className="w-12 h-1 rounded-full bg-white/20 mx-auto mb-5" />
-              <View className="flex items-center gap-3 mb-4"><View className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.15)" }}><AlertCircle size={22} className="text-red-400" /></View><View><Text className="text-white font-black text-lg">Annuler l'abonnement ?</Text><Text className="text-white/50 text-sm">Tu perdras tous tes avantages</Text></View></View>
-              <View className="flex flex-col gap-2 mb-5">
-                {["Badge Premium sur ton profil", "IA illimitée", "Analytics & insights", "Stockage 5 Go"].map((item) => (
-                  <View key={item} className="flex items-center gap-2">
-                    <Lock size={12} className="text-red-400" />
-                    <Text className="text-white/60 text-xs">{item} sera désactivé</Text>
-                  </View>
-                ))}
-              </View>
-              <View className="flex gap-3">
-                <Pressable onPress={() => setShowCancel(false)} className="flex-1 py-3 rounded-2xl flex items-center justify-center active:scale-95 transition-all" style={{  }}>
-                  <Text className="text-white font-bold text-sm">Garder mon plan</Text>
-                </Pressable>
-                <Pressable onPress={() => void handleCancel()} className="flex-1 py-3 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.12)", borderWidth: 1, borderColor: "rgba(239,68,68,0.2)", borderStyle: "solid" }}>
-                  <Text className="text-red-400 text-sm">Confirmer</Text>
-                </Pressable>
-              </View>
+      {/* ====================================================================
+       * PLANS
+       * ================================================================== */}
+
+      {tab === "plans" && (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.plansIntro}>
+            <View>
+              <Text style={styles.plansTitle}>Choisissez votre plan</Text>
+
+              <Text style={styles.plansSubtitle}>
+                Une expérience adaptée aux particuliers, professionnels et
+                entreprises.
+              </Text>
             </View>
-          </>
-        )}
-      </View>
-    </>
+          </View>
+
+          <BillingSelector billing={billing} onChange={setBilling} />
+
+          <View style={styles.planList}>
+            {PLANS.map((plan) => (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                currentPlan={currentPlanId}
+                billing={billing}
+                onSelect={requestPlanChange}
+              />
+            ))}
+          </View>
+
+          <ComparisonTable />
+
+          <View style={styles.transparencyNotice}>
+            <Shield size={17} color="#60A5FA" />
+
+            <Text style={styles.transparencyText}>
+              Les fonctionnalités, tarifs, limites, devises et moyens de
+              paiement doivent être configurés et vérifiés côté backend avant
+              leur déploiement commercial dans chaque marché.
+            </Text>
+          </View>
+
+          <View style={styles.bottomSpace} />
+        </ScrollView>
+      )}
+
+      {/* ====================================================================
+       * BENEFITS
+       * ================================================================== */}
+
+      {tab === "avantages" && <BenefitsTab currentPlan={currentPlan} />}
+
+      {/* ====================================================================
+       * MANAGEMENT
+       * ================================================================== */}
+
+      {tab === "gestion" && (
+        <ManagementTab
+          subscription={subscription}
+          currentPlan={currentPlan}
+          onAutoRenew={() => {
+            void handleAutoRenew();
+          }}
+          onUpgrade={() => {
+            if (currentPlanId === "pro") {
+              requestPlanChange("business");
+            } else {
+              setTab("plans");
+            }
+          }}
+          onCancel={() => setShowCancel(true)}
+        />
+      )}
+
+      {/* ====================================================================
+       * MODALS
+       * ================================================================== */}
+
+      <UpgradeModal
+        visible={showUpgrade}
+        plan={selectedPlanData}
+        billing={billing}
+        saving={mutationBusy}
+        onClose={() => {
+          if (!mutationBusy) {
+            setShowUpgrade(false);
+          }
+        }}
+        onConfirm={() => {
+          void confirmPlanChange();
+        }}
+      />
+
+      <CancelModal
+        visible={showCancel}
+        currentPlan={currentPlan}
+        saving={mutationBusy}
+        onClose={() => {
+          if (!mutationBusy) {
+            setShowCancel(false);
+          }
+        }}
+        onConfirm={() => {
+          void confirmCancel();
+        }}
+      />
+    </View>
   );
 }
+
+/* ============================================================================
+ * TAB BUTTON
+ * ========================================================================== */
+
+function TabButton({
+  label,
+  active,
+  icon: Icon,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  icon: ComponentType<{
+    size?: number;
+    color?: string;
+    strokeWidth?: number;
+  }>;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{
+        selected: active,
+      }}
+      style={[styles.tabButton, active && styles.tabButtonActive]}
+    >
+      <Icon size={15} color={active ? "#A78BFA" : "rgba(255,255,255,0.38)"} />
+
+      <Text
+        style={[styles.tabButtonText, active && styles.tabButtonTextActive]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/* ============================================================================
+ * PAGE
+ * ========================================================================== */
+
+export default function PremiumPage({ onBack }: PremiumPageProps) {
+  return (
+    <View style={styles.root}>
+      <AuthLoading>
+        <View style={styles.screen}>
+          <View style={styles.header}>
+            <Pressable onPress={onBack} style={styles.headerBack}>
+              <ArrowLeft size={19} color="#FFFFFF" />
+            </Pressable>
+
+            <View style={styles.headerCenter}>
+              <View style={styles.loadingTitle} />
+
+              <View style={styles.loadingSubtitle} />
+            </View>
+          </View>
+
+          <View style={styles.loadingContent}>
+            <SkeletonBlock />
+            <SkeletonBlock />
+            <SkeletonBlock />
+          </View>
+        </View>
+      </AuthLoading>
+
+      <Unauthenticated>
+        <View style={styles.screen}>
+          <View style={styles.header}>
+            <Pressable
+              onPress={onBack}
+              accessibilityRole="button"
+              accessibilityLabel="Retour"
+              style={styles.headerBack}
+            >
+              <ArrowLeft size={19} color="#FFFFFF" />
+            </Pressable>
+
+            <View style={styles.headerCenter}>
+              <Text style={styles.headerTitle}>Premium</Text>
+
+              <Text style={styles.headerSubtitle}>Abonnements et plans</Text>
+            </View>
+          </View>
+
+          <View style={styles.authRequired}>
+            <View style={styles.authIcon}>
+              <Crown size={32} color="#A78BFA" />
+            </View>
+
+            <Text style={styles.authTitle}>Votre espace Premium</Text>
+
+            <Text style={styles.authText}>
+              Connectez-vous pour consulter et gérer votre abonnement.
+            </Text>
+
+            <SignInButton />
+
+            <Pressable onPress={onBack} style={styles.authBackButton}>
+              <ArrowLeft size={15} color="rgba(255,255,255,0.6)" />
+
+              <Text style={styles.authBackText}>Retour</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Unauthenticated>
+
+      <Authenticated>
+        <PremiumInner onBack={onBack} />
+      </Authenticated>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#050812",
+  },
+
+  screen: {
+    flex: 1,
+    backgroundColor: "#050812",
+  },
+
+  ambientTop: {
+    position: "absolute",
+    top: -100,
+    alignSelf: "center",
+    width: 300,
+    height: 220,
+    borderRadius: 150,
+    backgroundColor: "rgba(124,58,237,0.06)",
+  },
+
+  header: {
+    minHeight: 72,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(5,8,18,0.98)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.07)",
+  },
+
+  headerBack: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  headerCenter: {
+    flex: 1,
+  },
+
+  headerTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  headerSubtitle: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.38)",
+    fontSize: 9,
+    fontWeight: "600",
+  },
+
+  currentPlanBadge: {
+    minHeight: 31,
+    paddingHorizontal: 9,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+  },
+
+  currentPlanText: {
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  /* ==========================================================================
+   * TABS
+   * ======================================================================== */
+
+  tabs: {
+    minHeight: 59,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    flexDirection: "row",
+    gap: 6,
+    backgroundColor: "rgba(8,10,22,0.98)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+
+  tabButton: {
+    flex: 1,
+    minHeight: 43,
+    paddingHorizontal: 5,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  tabButtonActive: {
+    backgroundColor: "rgba(139,92,246,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.22)",
+  },
+
+  tabButtonText: {
+    color: "rgba(255,255,255,0.38)",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  tabButtonTextActive: {
+    color: "#FFFFFF",
+  },
+
+  /* ==========================================================================
+   * SCROLL
+   * ======================================================================== */
+
+  scroll: {
+    flex: 1,
+  },
+
+  content: {
+    padding: 15,
+    paddingBottom: 35,
+  },
+
+  plansIntro: {
+    marginBottom: 15,
+  },
+
+  plansTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+
+  plansSubtitle: {
+    maxWidth: 380,
+    marginTop: 5,
+    color: "rgba(255,255,255,0.38)",
+    fontSize: 10,
+    lineHeight: 16,
+  },
+
+  /* ==========================================================================
+   * BILLING
+   * ======================================================================== */
+
+  billingWrapper: {
+    alignItems: "center",
+    marginBottom: 15,
+  },
+
+  billingSelector: {
+    padding: 4,
+    borderRadius: 15,
+    flexDirection: "row",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  billingOption: {
+    minHeight: 38,
+    paddingHorizontal: 14,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+
+  billingOptionActive: {
+    backgroundColor: "rgba(139,92,246,0.16)",
+  },
+
+  billingText: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  billingTextActive: {
+    color: "#FFFFFF",
+  },
+
+  savingBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
+    backgroundColor: "rgba(34,197,94,0.12)",
+  },
+
+  savingBadgeText: {
+    color: "#4ADE80",
+    fontSize: 7,
+    fontWeight: "900",
+  },
+
+  /* ==========================================================================
+   * PLAN CARDS
+   * ======================================================================== */
+
+  planList: {
+    gap: 12,
+  },
+
+  planCard: {
+    overflow: "hidden",
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.075)",
+  },
+
+  planCardPopular: {
+    borderColor: "rgba(139,92,246,0.35)",
+    backgroundColor: "rgba(139,92,246,0.045)",
+  },
+
+  planAccent: {
+    height: 3,
+    width: "100%",
+  },
+
+  planBadge: {
+    position: "absolute",
+    top: 13,
+    right: 13,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 99,
+    borderWidth: 1,
+  },
+
+  planBadgeText: {
+    fontSize: 8,
+    fontWeight: "900",
+  },
+
+  planBody: {
+    padding: 15,
+  },
+
+  planIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingRight: 70,
+  },
+
+  planIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  planIdentityText: {
+    flex: 1,
+  },
+
+  planName: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  planTagline: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 9,
+    lineHeight: 14,
+  },
+
+  priceBlock: {
+    marginTop: 17,
+    marginBottom: 15,
+  },
+
+  priceLine: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 4,
+  },
+
+  price: {
+    color: "#FFFFFF",
+    fontSize: 27,
+    fontWeight: "900",
+    letterSpacing: -0.6,
+  },
+
+  pricePeriod: {
+    marginBottom: 4,
+    color: "rgba(255,255,255,0.32)",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  monthlyEquivalent: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 9,
+  },
+
+  annualSaving: {
+    marginTop: 5,
+    color: "#4ADE80",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  perks: {
+    gap: 8,
+    marginBottom: 15,
+  },
+
+  perkRow: {
+    minHeight: 27,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  perkIcon: {
+    width: 25,
+    height: 25,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  perkText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.62)",
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: "600",
+  },
+
+  currentButton: {
+    minHeight: 48,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  currentButtonText: {
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  planButton: {
+    minHeight: 48,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+
+  planButtonText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  /* ==========================================================================
+   * COMPARISON
+   * ======================================================================== */
+
+  comparisonCard: {
+    marginTop: 15,
+    overflow: "hidden",
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  comparisonHeader: {
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+
+  comparisonTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  comparisonSubtitle: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 9,
+  },
+
+  comparisonColumns: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+
+  comparisonRow: {
+    minHeight: 49,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  comparisonRowAlt: {
+    backgroundColor: "rgba(255,255,255,0.014)",
+  },
+
+  comparisonFeatureColumn: {
+    flex: 1.45,
+    paddingHorizontal: 10,
+  },
+
+  comparisonPlanColumn: {
+    flex: 0.85,
+    minWidth: 58,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  columnHeader: {
+    color: "rgba(255,255,255,0.35)",
+    fontSize: 8,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  comparisonFeatureText: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 8,
+    lineHeight: 12,
+  },
+
+  featureValue: {
+    color: "rgba(255,255,255,0.64)",
+    fontSize: 7,
+    lineHeight: 10,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+
+  featureCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(34,197,94,0.1)",
+  },
+
+  featureUnavailable: {
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.025)",
+  },
+
+  transparencyNotice: {
+    marginTop: 14,
+    padding: 13,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    backgroundColor: "rgba(96,165,250,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.12)",
+  },
+
+  transparencyText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.34)",
+    fontSize: 9,
+    lineHeight: 15,
+  },
+
+  /* ==========================================================================
+   * BENEFITS
+   * ======================================================================== */
+
+  benefitHero: {
+    padding: 15,
+    borderRadius: 21,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(139,92,246,0.055)",
+    borderWidth: 1,
+  },
+
+  benefitHeroIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  benefitHeroContent: {
+    flex: 1,
+  },
+
+  benefitHeroTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  benefitHeroText: {
+    marginTop: 4,
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  activeValueCard: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 19,
+    backgroundColor: "rgba(34,197,94,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.12)",
+  },
+
+  activeValueHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  activeValueTitle: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  activeValueSubtitle: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 8,
+  },
+
+  activeValueGrid: {
+    marginTop: 12,
+    gap: 7,
+  },
+
+  activeValueItem: {
+    minHeight: 36,
+    paddingHorizontal: 9,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  activeValueItemText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  benefitList: {
+    marginTop: 13,
+    gap: 9,
+  },
+
+  benefitCard: {
+    padding: 13,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+  },
+
+  benefitIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  benefitContent: {
+    flex: 1,
+  },
+
+  benefitTitle: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  benefitDescription: {
+    marginTop: 4,
+    color: "rgba(255,255,255,0.36)",
+    fontSize: 9,
+    lineHeight: 15,
+  },
+
+  /* ==========================================================================
+   * MANAGEMENT
+   * ======================================================================== */
+
+  subscriptionCard: {
+    overflow: "hidden",
+    borderRadius: 21,
+    backgroundColor: "rgba(139,92,246,0.055)",
+    borderWidth: 1,
+  },
+
+  subscriptionTopLine: {
+    height: 3,
+    width: "100%",
+  },
+
+  subscriptionHeader: {
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  subscriptionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  subscriptionIdentity: {
+    flex: 1,
+  },
+
+  subscriptionPlan: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  subscriptionBilling: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.38)",
+    fontSize: 9,
+  },
+
+  activeBadge: {
+    minHeight: 27,
+    paddingHorizontal: 8,
+    borderRadius: 99,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(34,197,94,0.1)",
+  },
+
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#4ADE80",
+  },
+
+  activeBadgeText: {
+    color: "#4ADE80",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+
+  subscriptionRows: {
+    padding: 10,
+    gap: 7,
+  },
+
+  subscriptionRow: {
+    minHeight: 52,
+    padding: 9,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  subscriptionRowIcon: {
+    width: 31,
+    height: 31,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  subscriptionRowContent: {
+    flex: 1,
+  },
+
+  subscriptionRowLabel: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  subscriptionRowValue: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  managementActions: {
+    marginTop: 13,
+    gap: 8,
+  },
+
+  managementAction: {
+    minHeight: 68,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+  },
+
+  managementActionPressed: {
+    opacity: 0.75,
+  },
+
+  managementActionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  managementActionContent: {
+    flex: 1,
+  },
+
+  managementActionTitle: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  managementActionSubtitle: {
+    marginTop: 3,
+    color: "rgba(255,255,255,0.32)",
+    fontSize: 8,
+    lineHeight: 13,
+  },
+
+  managementSecurity: {
+    marginTop: 13,
+    padding: 12,
+    borderRadius: 16,
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: "rgba(34,197,94,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.1)",
+  },
+
+  managementSecurityText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.33)",
+    fontSize: 8,
+    lineHeight: 14,
+  },
+
+  cancelSubscriptionButton: {
+    marginTop: 14,
+    minHeight: 48,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: "rgba(239,68,68,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.13)",
+  },
+
+  cancelSubscriptionText: {
+    color: "#F87171",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  noSubscription: {
+    paddingVertical: 50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  noSubscriptionIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 23,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  noSubscriptionTitle: {
+    marginTop: 17,
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+
+  noSubscriptionText: {
+    maxWidth: 330,
+    marginTop: 7,
+    color: "rgba(255,255,255,0.35)",
+    fontSize: 10,
+    lineHeight: 16,
+    textAlign: "center",
+  },
+
+  managementPrimaryButton: {
+    minHeight: 48,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: "#4F46E5",
+  },
+
+  managementPrimaryText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  /* ==========================================================================
+   * MODALS
+   * ======================================================================== */
+
+  modalRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.78)",
+  },
+
+  modalCard: {
+    maxHeight: "88%",
+    paddingHorizontal: 17,
+    paddingTop: 10,
+    paddingBottom: 24,
+    borderTopLeftRadius: 27,
+    borderTopRightRadius: 27,
+    backgroundColor: "#0E1020",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  modalHandle: {
+    alignSelf: "center",
+    width: 43,
+    height: 4,
+    marginBottom: 17,
+    borderRadius: 99,
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  modalPlanIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  modalHeaderText: {
+    flex: 1,
+  },
+
+  modalTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  modalSubtitle: {
+    marginTop: 4,
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 9,
+  },
+
+  modalClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  confirmationBox: {
+    marginTop: 17,
+    padding: 13,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    backgroundColor: "rgba(139,92,246,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.13)",
+  },
+
+  confirmationText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.46)",
+    fontSize: 9,
+    lineHeight: 15,
+  },
+
+  modalPerks: {
+    marginTop: 12,
+    gap: 6,
+  },
+
+  modalPerk: {
+    minHeight: 31,
+    paddingHorizontal: 9,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  modalPerkText: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  confirmButton: {
+    minHeight: 50,
+    marginTop: 17,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+
+  confirmButtonText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  modalSecondaryButton: {
+    minHeight: 46,
+    marginTop: 8,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  modalSecondaryText: {
+    color: "rgba(255,255,255,0.48)",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  cancelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  cancelIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(239,68,68,0.1)",
+  },
+
+  cancelWarning: {
+    marginTop: 17,
+    padding: 13,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    backgroundColor: "rgba(239,68,68,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.11)",
+  },
+
+  cancelWarningText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.44)",
+    fontSize: 9,
+    lineHeight: 15,
+  },
+
+  cancelActions: {
+    marginTop: 17,
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  keepPlanButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  keepPlanText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  confirmCancelButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(239,68,68,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.18)",
+  },
+
+  confirmCancelText: {
+    color: "#F87171",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  disabledButton: {
+    opacity: 0.5,
+  },
+
+  /* ==========================================================================
+   * AUTH
+   * ======================================================================== */
+
+  authRequired: {
+    flex: 1,
+    paddingHorizontal: 25,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  authIcon: {
+    width: 76,
+    height: 76,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.18)",
+  },
+
+  authTitle: {
+    marginTop: 18,
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  authText: {
+    maxWidth: 350,
+    marginTop: 7,
+    marginBottom: 18,
+    color: "rgba(255,255,255,0.38)",
+    fontSize: 10,
+    lineHeight: 17,
+    textAlign: "center",
+  },
+
+  authBackButton: {
+    marginTop: 14,
+    minHeight: 42,
+    paddingHorizontal: 15,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  authBackText: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  /* ==========================================================================
+   * LOADING
+   * ======================================================================== */
+
+  loadingContent: {
+    padding: 15,
+    gap: 12,
+  },
+
+  skeletonSubscription: {
+    width: "100%",
+    height: 190,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  loadingTitle: {
+    width: 120,
+    height: 13,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  loadingSubtitle: {
+    width: 90,
+    height: 8,
+    marginTop: 6,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  loadingStack: {
+    gap: 12,
+  },
+
+  bottomSpace: {
+    height: 25,
+  },
+});

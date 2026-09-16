@@ -1339,28 +1339,69 @@ export default defineSchema({
   // ─────────────────────────────────────────────────────────────────────────
   medicalAppointments: defineTable({
     userId: v.id("users"),
+
+    // Nouveau : référence canonique du professionnel.
+    // Optional pour préserver les anciens rendez-vous déjà en base.
+    professionalId: v.optional(v.id("medicalProfessionals")),
+
     doctorName: v.string(),
     specialty: v.string(),
     clinicName: v.optional(v.string()),
-    date: v.string(), // ISO 8601
+
+    // Date/heure ISO du rendez-vous.
+    date: v.string(),
+
+    // Nouveau : créneau réservé.
+    slotStart: v.optional(v.string()),
+    slotEnd: v.optional(v.string()),
+
+    // Nouveau : timestamp canonique optionnel.
+    scheduledAt: v.optional(v.string()),
+
     durationMinutes: v.number(),
+
     type: v.union(
       v.literal("consultation"),
       v.literal("teleconsultation"),
       v.literal("suivi"),
     ),
+
     notes: v.optional(v.string()),
+
     status: v.union(
       v.literal("scheduled"),
       v.literal("completed"),
       v.literal("cancelled"),
     ),
+
     reminder: v.boolean(),
     location: v.optional(v.string()),
+
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_date", ["date"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_professional_date", ["professionalId", "date"]),
+
+  medicalAvailability: defineTable({
+    professionalId: v.id("medicalProfessionals"),
+
+    // Format strict : YYYY-MM-DD
+    date: v.string(),
+
+    slots: v.array(
+      v.object({
+        start: v.string(), // HH:mm
+        end: v.string(), // HH:mm
+      }),
+    ),
+
+    updatedAt: v.number(),
+  })
+    .index("by_professional", ["professionalId"])
+    .index("by_professional_date", ["professionalId", "date"]),
 
   workoutSessions: defineTable({
     userId: v.id("users"),
@@ -3132,31 +3173,6 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
 
-  emergencyAlerts: defineTable({
-    userId: v.id("users"),
-    type: v.union(
-      v.literal("medical"),
-      v.literal("security"),
-      v.literal("fire"),
-      v.literal("natural_disaster"),
-      v.literal("accident"),
-      v.literal("other"),
-    ),
-    description: v.string(),
-    latitude: v.optional(v.number()),
-    longitude: v.optional(v.number()),
-    address: v.optional(v.string()),
-    status: v.union(
-      v.literal("active"),
-      v.literal("resolved"),
-      v.literal("false_alarm"),
-    ),
-    resolvedAt: v.optional(v.string()),
-  })
-    .index("by_user", ["userId"])
-    .index("by_type", ["type"])
-    .index("by_status", ["status"]),
-
   urbanProjects: defineTable({
     authorId: v.id("users"),
     title: v.string(),
@@ -3194,10 +3210,23 @@ export default defineSchema({
     .index("by_status", ["status"]),
 
   // ─────────────────────────────────────────────────────────────────────────
-  // FINANCES & WALLET
+  // FINANCES & WALLET — LEDGER
   // ─────────────────────────────────────────────────────────────────────────
+  //
+  // IMPORTANT :
+  // - Cette table représente le ledger financier interne.
+  // - Elle ne doit JAMAIS être modifiée directement par le client pour
+  //   confirmer un paiement.
+  // - Une entrée "completed" doit provenir d'un événement financier
+  //   réellement confirmé par le Payment Core.
+  // - Les mutations publiques de type addWalletTransaction doivent
+  //   disparaître du flux utilisateur.
+  //
   walletTransactions: defineTable({
+    // Propriétaire du mouvement financier.
     userId: v.id("users"),
+
+    // Nature comptable du mouvement.
     type: v.union(
       v.literal("deposit"),
       v.literal("withdrawal"),
@@ -3206,21 +3235,697 @@ export default defineSchema({
       v.literal("refund"),
       v.literal("reward"),
     ),
+
+    // Montant dans la devise indiquée.
+    //
+    // IMPORTANT :
+    // La valeur doit être interprétée exactement comme définie par
+    // le Payment Core. Aucun calcul de change implicite.
     amount: v.number(),
+
+    // ISO 4217 : USD, CDF, EUR, etc.
     currency: v.string(),
+
     description: v.string(),
+
+    // Etat comptable.
     status: v.union(
       v.literal("pending"),
       v.literal("completed"),
       v.literal("failed"),
     ),
-    referenceId: v.optional(v.string()), // order ID, delivery ID, etc.
+
+    // Référence métier éventuelle :
+    // orderId, bookingId, missionId, etc.
+    referenceId: v.optional(v.string()),
+
+    // Contrepartie interne éventuelle.
     counterpartId: v.optional(v.id("users")),
+
+    // Date de finalisation comptable.
     completedAt: v.optional(v.string()),
-    provider: v.optional(v.string()),
+
+    // Rail/provider externe.
+    provider: v.optional(
+      v.union(
+        v.literal("orange_money"),
+        v.literal("mpesa"),
+        v.literal("airtel_money"),
+        v.literal("mtn_momo"),
+        v.literal("internal"),
+      ),
+    ),
+
+    // Payment Core.
+    //
+    // Ces références permettent de reconstruire la chaîne :
+    //
+    // paymentIntent
+    //      ↓
+    // paymentAttempt
+    //      ↓
+    // walletTransaction
+    //
+    paymentIntentId: v.optional(v.id("paymentIntents")),
+    paymentAttemptId: v.optional(v.id("paymentAttempts")),
+
+    // Identifiant externe fourni par le provider.
+    //
+    // Il ne doit jamais être généré artificiellement par le client.
+    externalReference: v.optional(v.string()),
+
+    // Identifiant technique du ledger.
+    //
+    // Généré côté serveur pour assurer la traçabilité.
+    ledgerReference: v.optional(v.string()),
+
+    // Métadonnées non sensibles.
+    //
+    // Ne jamais y stocker :
+    // - secret API
+    // - token OAuth
+    // - PIN
+    // - mot de passe
+    // - clé privée
+    // - données KYC sensibles
+    metadata: v.optional(v.record(v.string(), v.string())),
   })
     .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_currency", ["userId", "currency"])
+    .index("by_payment_intent", ["paymentIntentId"])
+    .index("by_payment_attempt", ["paymentAttemptId"])
+    .index("by_external_reference", ["externalReference"])
+    .index("by_ledger_reference", ["ledgerReference"]),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PAYMENT CORE — PAYMENT INTENTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Un Payment Intent représente UNE opération financière métier.
+  //
+  // Exemple :
+  //
+  //   utilisateur souhaite créditer son wallet de 50 USD
+  //
+  //             ↓
+  //
+  //       PaymentIntent
+  //             ↓
+  //       PaymentAttempt
+  //             ↓
+  //       Provider réel
+  //             ↓
+  //       Confirmation vérifiée
+  //             ↓
+  //       Ledger
+  //
+  // IMPORTANT :
+  //
+  // PaymentIntent ≠ preuve de paiement.
+  //
+  // Le client peut demander la création d'un Intent.
+  // Le client ne peut jamais déclarer que cet Intent est réussi.
+  //
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  paymentIntents: defineTable({
+    /**
+     * Propriétaire de l'opération.
+     */
+    userId: v.id("users"),
+
+    /**
+     * Type métier de l'opération.
+     */
+    type: v.union(
+      v.literal("wallet_topup"),
+      v.literal("wallet_withdrawal"),
+      v.literal("merchant_payment"),
+      v.literal("peer_transfer"),
+      v.literal("refund"),
+    ),
+
+    /**
+     * Direction financière.
+     *
+     * inbound  = argent entrant dans le wallet / système
+     * outbound = argent sortant du wallet / système
+     */
+    direction: v.union(v.literal("inbound"), v.literal("outbound")),
+
+    /**
+     * Montant exact demandé.
+     *
+     * Aucun arrondi implicite.
+     * Aucun calcul de change implicite.
+     */
+    amount: v.number(),
+
+    /**
+     * Devise exacte de l'opération.
+     *
+     * Exemple :
+     * USD
+     * CDF
+     */
+    currency: v.string(),
+
+    /**
+     * Provider sélectionné.
+     *
+     * Le Payment Core ne considère pas un provider comme
+     * disponible simplement parce qu'il existe dans le schema :
+     * l'adapter doit être configuré et opérationnel côté serveur.
+     */
+    provider: v.union(
+      v.literal("orange_money"),
+      v.literal("mpesa"),
+      v.literal("airtel_money"),
+      v.literal("mtn_momo"),
+    ),
+
+    /**
+     * Référence du payeur / bénéficiaire.
+     *
+     * Peut contenir un numéro de téléphone.
+     *
+     * DONNÉE POTENTIELLEMENT SENSIBLE :
+     * ne jamais l'exposer inutilement dans les queries publiques.
+     */
+    customerReference: v.optional(v.string()),
+
+    /**
+     * Référence métier de l'opération.
+     *
+     * Exemples :
+     * - orderId
+     * - bookingId
+     * - serviceId
+     * - invoiceId
+     */
+    referenceId: v.optional(v.string()),
+
+    /**
+     * Clé d'idempotence fournie par le client.
+     *
+     * IMPORTANT :
+     *
+     * L'idempotence métier est scoped au propriétaire :
+     *
+     *   userId + idempotencyKey
+     *
+     * doivent identifier une même opération logique.
+     *
+     * Le serveur doit refuser la création d'un nouvel Intent
+     * lorsque cette paire existe déjà.
+     */
+    idempotencyKey: v.string(),
+
+    /**
+     * Etat du Payment Intent.
+     *
+     * created:
+     *   Intent créé, aucune soumission confirmée.
+     *
+     * requires_action:
+     *   Une action utilisateur est nécessaire.
+     *
+     * processing:
+     *   Le provider traite l'opération.
+     *
+     * succeeded:
+     *   Succès confirmé par le Payment Core.
+     *
+     * failed:
+     *   Echec confirmé.
+     *
+     * cancelled:
+     *   Opération annulée.
+     *
+     * expired:
+     *   Intent arrivé à expiration.
+     */
+    status: v.union(
+      v.literal("created"),
+      v.literal("requires_action"),
+      v.literal("processing"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+      v.literal("expired"),
+    ),
+
+    /**
+     * Référence externe finale.
+     *
+     * Cette valeur doit provenir du provider.
+     *
+     * Elle ne doit jamais être fabriquée côté client.
+     */
+    externalReference: v.optional(v.string()),
+
+    /**
+     * Code d'erreur normalisé.
+     *
+     * Aucun secret ni détail interne sensible.
+     */
+    failureCode: v.optional(v.string()),
+
+    /**
+     * Message technique non sensible destiné à l'application.
+     */
+    failureMessage: v.optional(v.string()),
+
+    /**
+     * Action attendue de l'utilisateur.
+     *
+     * Exemple :
+     *
+     * {
+     *   type: "approve_mobile_money",
+     *   message: "Confirmez la demande sur votre téléphone"
+     * }
+     *
+     * Aucun token, secret ou credential ne doit être stocké ici.
+     */
+    nextAction: v.optional(
+      v.object({
+        type: v.union(v.literal("approve_mobile_money"), v.literal("none")),
+        message: v.optional(v.string()),
+      }),
+    ),
+
+    /**
+     * Timestamp de création.
+     */
+    createdAt: v.number(),
+
+    /**
+     * Timestamp de dernière modification.
+     */
+    updatedAt: v.number(),
+
+    /**
+     * Timestamp du succès réellement confirmé.
+     */
+    succeededAt: v.optional(v.number()),
+
+    /**
+     * Timestamp de l'échec réellement confirmé.
+     */
+    failedAt: v.optional(v.number()),
+
+    /**
+     * Timestamp d'expiration.
+     */
+    expiresAt: v.optional(v.number()),
+  })
+    /**
+     * Toutes les opérations d'un utilisateur.
+     */
+    .index("by_user", ["userId"])
+
+    /**
+     * Filtrage utilisateur + état.
+     */
+    .index("by_user_status", ["userId", "status"])
+
+    /**
+     * Recherche globale par état.
+     */
+    .index("by_status", ["status"])
+
+    /**
+     * Recherche par provider.
+     */
+    .index("by_provider", ["provider"])
+
+    /**
+     * Index historique / compatibilité.
+     *
+     * NE DOIT PAS être utilisé seul pour garantir
+     * l'idempotence métier.
+     */
+    .index("by_idempotency", ["idempotencyKey"])
+
+    /**
+     * INDEX D'IDEMPOTENCE PRINCIPAL.
+     *
+     * Une opération logique est identifiée par :
+     *
+     *   userId + idempotencyKey
+     */
+    .index("by_user_idempotency", ["userId", "idempotencyKey"])
+
+    /**
+     * Recherche par référence externe.
+     */
+    .index("by_external_reference", ["externalReference"])
+
+    /**
+     * Recherche par référence métier.
+     */
+    .index("by_reference", ["referenceId"]),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PAYMENT CORE — PAYMENT ATTEMPTS
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Un Payment Intent peut avoir plusieurs tentatives.
+  //
+  // Exemple :
+  //
+  //   Intent #1
+  //      │
+  //      ├── Attempt #1 → timeout
+  //      │
+  //      ├── Attempt #2 → processing
+  //      │
+  //      └── Attempt #3 → succeeded
+  //
+  // Le retry crée une nouvelle tentative technique,
+  // PAS un nouveau paiement métier.
+  //
+  // IMPORTANT :
+  //
+  // Une tentative ne devient "succeeded" qu'après
+  // confirmation réelle du provider.
+  //
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  paymentAttempts: defineTable({
+    /**
+     * Payment Intent parent.
+     */
+    paymentIntentId: v.id("paymentIntents"),
+
+    /**
+     * Propriétaire.
+     *
+     * Doit correspondre au userId du PaymentIntent.
+     */
+    userId: v.id("users"),
+
+    /**
+     * Provider utilisé pour cette tentative.
+     */
+    provider: v.union(
+      v.literal("orange_money"),
+      v.literal("mpesa"),
+      v.literal("airtel_money"),
+      v.literal("mtn_momo"),
+    ),
+
+    /**
+     * Numéro séquentiel de tentative.
+     *
+     * Exemple :
+     * 1 → première tentative
+     * 2 → premier retry
+     * 3 → deuxième retry
+     */
+    attemptNumber: v.number(),
+
+    /**
+     * Etat technique de la tentative.
+     */
+    status: v.union(
+      v.literal("created"),
+      v.literal("submitted"),
+      v.literal("processing"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+      v.literal("unknown"),
+    ),
+
+    /**
+     * Identifiant réel de transaction fourni par le provider.
+     *
+     * JAMAIS généré artificiellement.
+     */
+    providerTransactionId: v.optional(v.string()),
+
+    /**
+     * Référence provider complémentaire.
+     */
+    providerReference: v.optional(v.string()),
+
+    /**
+     * Code d'erreur normalisé.
+     */
+    errorCode: v.optional(v.string()),
+
+    /**
+     * Message d'erreur non sensible.
+     */
+    errorMessage: v.optional(v.string()),
+
+    /**
+     * Création de la tentative.
+     */
+    createdAt: v.number(),
+
+    /**
+     * Dernière modification.
+     */
+    updatedAt: v.number(),
+
+    /**
+     * Moment où la requête a effectivement été envoyée
+     * au provider.
+     */
+    submittedAt: v.optional(v.number()),
+
+    /**
+     * Moment de confirmation réelle.
+     */
+    succeededAt: v.optional(v.number()),
+
+    /**
+     * Moment de l'échec confirmé.
+     */
+    failedAt: v.optional(v.number()),
+  })
+    /**
+     * Toutes les tentatives d'un Intent.
+     */
+    .index("by_intent", ["paymentIntentId"])
+
+    /**
+     * Intent + état.
+     *
+     * Permet notamment de rechercher rapidement
+     * une tentative active.
+     */
+    .index("by_intent_status", ["paymentIntentId", "status"])
+
+    /**
+     * Toutes les tentatives d'un utilisateur.
+     */
+    .index("by_user", ["userId"])
+
+    /**
+     * Tentatives par provider.
+     */
+    .index("by_provider", ["provider"])
+
+    /**
+     * Recherche directe d'une transaction provider.
+     */
+    .index("by_provider_transaction", ["providerTransactionId"])
+
+    /**
+     * Recherche par état.
+     */
     .index("by_status", ["status"]),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PAYMENT CORE — PROVIDER EVENTS / WEBHOOKS
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Journal des événements reçus depuis les providers.
+  //
+  // Cette table permet :
+  //
+  // - idempotence
+  // - audit
+  // - réconciliation
+  // - diagnostic
+  // - retry contrôlé
+  // - traçabilité réglementaire
+  //
+  // IMPORTANT :
+  //
+  // Un même événement provider ne doit jamais être appliqué
+  // deux fois au ledger.
+  //
+  // La vérification cryptographique du webhook doit avoir lieu
+  // AVANT l'insertion de l'événement ici.
+  //
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  paymentProviderEvents: defineTable({
+    /**
+     * Provider source.
+     */
+    provider: v.union(
+      v.literal("orange_money"),
+      v.literal("mpesa"),
+      v.literal("airtel_money"),
+      v.literal("mtn_momo"),
+    ),
+
+    /**
+     * Identifiant événement fourni par le provider.
+     *
+     * Cet identifiant est la clé d'idempotence externe.
+     */
+    providerEventId: v.string(),
+
+    /**
+     * Identifiant de transaction provider.
+     *
+     * Peut être absent pour certains événements techniques.
+     */
+    providerTransactionId: v.optional(v.string()),
+
+    /**
+     * Payment Intent associé.
+     *
+     * Peut être absent si l'événement n'a pas encore pu
+     * être réconcilié.
+     */
+    paymentIntentId: v.optional(v.id("paymentIntents")),
+
+    /**
+     * Payment Attempt associé.
+     */
+    paymentAttemptId: v.optional(v.id("paymentAttempts")),
+
+    /**
+     * Type d'événement normalisé.
+     */
+    eventType: v.union(
+      v.literal("payment_pending"),
+      v.literal("payment_processing"),
+      v.literal("payment_succeeded"),
+      v.literal("payment_failed"),
+      v.literal("payment_cancelled"),
+      v.literal("payment_reversed"),
+      v.literal("unknown"),
+    ),
+
+    /**
+     * Etat du traitement interne.
+     */
+    processingStatus: v.union(
+      v.literal("received"),
+      v.literal("processed"),
+      v.literal("ignored"),
+      v.literal("failed"),
+    ),
+
+    /**
+     * Signature reçue du provider.
+     *
+     * IMPORTANT :
+     *
+     * La présence d'une signature ne signifie PAS
+     * qu'elle est valide.
+     *
+     * Elle doit être cryptographiquement vérifiée
+     * avant que l'événement puisse avoir un effet financier.
+     */
+    signature: v.optional(v.string()),
+
+    /**
+     * Empreinte du payload.
+     *
+     * Permet de détecter une modification du contenu
+     * lors des opérations d'audit.
+     */
+    payloadHash: v.optional(v.string()),
+
+    /**
+     * Payload brut minimisé.
+     *
+     * Aucun secret ne doit être conservé ici.
+     *
+     * INTERDIT :
+     * - access token
+     * - API key
+     * - PIN
+     * - mot de passe
+     * - clé privée
+     * - credential
+     */
+    rawPayload: v.optional(v.string()),
+
+    /**
+     * Erreur interne de traitement.
+     *
+     * Aucun secret dans ce champ.
+     */
+    processingError: v.optional(v.string()),
+
+    /**
+     * Timestamp de réception.
+     */
+    receivedAt: v.number(),
+
+    /**
+     * Timestamp de traitement final.
+     */
+    processedAt: v.optional(v.number()),
+  })
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * IDEMPOTENCE PROVIDER
+     * ═══════════════════════════════════════════════════════════════════════
+     *
+     * Un couple :
+     *
+     *   provider + providerEventId
+     *
+     * représente un événement logique unique.
+     */
+    .index("by_provider_event", ["provider", "providerEventId"])
+
+    /**
+     * Recherche par provider.
+     */
+    .index("by_provider", ["provider"])
+
+    /**
+     * Recherche par transaction provider.
+     */
+    .index("by_provider_transaction", ["providerTransactionId"])
+
+    /**
+     * Recherche par Payment Intent.
+     */
+    .index("by_intent", ["paymentIntentId"])
+
+    /**
+     * Recherche par Payment Attempt.
+     */
+    .index("by_attempt", ["paymentAttemptId"])
+
+    /**
+     * File des événements selon leur état de traitement.
+     */
+    .index("by_processing_status", ["processingStatus"])
+
+    /**
+     * Ordre chronologique des événements.
+     */
+    .index("by_received_at", ["receivedAt"]),
+  // ─────────────────────────────────────────────────────────────────────────
+  // FINANCES — BUDGETS
+  // ─────────────────────────────────────────────────────────────────────────
 
   budgets: defineTable({
     userId: v.id("users"),
@@ -3472,6 +4177,116 @@ export default defineSchema({
     relation: v.string(),
     isPrimary: v.boolean(),
   }).index("by_user", ["userId"]),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // SOS — ALERTES D'URGENCE
+  // ─────────────────────────────────────────────────────────────────────────
+
+  emergencyAlerts: defineTable({
+    userId: v.id("users"),
+
+    status: v.union(
+      v.literal("active"),
+      v.literal("cancelled"),
+      v.literal("resolved"),
+      v.literal("expired"),
+    ),
+
+    message: v.string(),
+
+    latitude: v.optional(v.number()),
+    longitude: v.optional(v.number()),
+    accuracy: v.optional(v.number()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+
+    expiresAt: v.number(),
+
+    resolvedAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    expiredAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_createdAt", ["userId", "createdAt"])
+    .index("by_status_expiresAt", ["status", "expiresAt"]),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // SOS — DESTINATAIRES SNAPSHOT
+  // ─────────────────────────────────────────────────────────────────────────
+
+  emergencyAlertRecipients: defineTable({
+    alertId: v.id("emergencyAlerts"),
+    userId: v.id("users"),
+
+    /**
+     * Snapshot du contact au moment du SOS.
+     * Une modification ultérieure du carnet de contacts
+     * ne modifie donc pas l'historique.
+     */
+    name: v.string(),
+    phone: v.string(),
+    relation: v.string(),
+    isPrimary: v.boolean(),
+
+    status: v.union(
+      v.literal("pending_dispatch"),
+      v.literal("queued"),
+      v.literal("sent"),
+      v.literal("delivered"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+    ),
+
+    provider: v.optional(v.string()),
+    providerMessageId: v.optional(v.string()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+
+    dispatchedAt: v.optional(v.number()),
+    deliveredAt: v.optional(v.number()),
+    failedAt: v.optional(v.number()),
+    failureReason: v.optional(v.string()),
+  })
+    .index("by_alert", ["alertId"])
+    .index("by_user", ["userId"])
+    .index("by_alert_status", ["alertId", "status"])
+    .index("by_status", ["status"]),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // SOS — CHECK-IN DE SÉCURITÉ
+  // ─────────────────────────────────────────────────────────────────────────
+
+  safetyCheckIns: defineTable({
+    userId: v.id("users"),
+
+    status: v.union(
+      v.literal("created"),
+      v.literal("pending_dispatch"),
+      v.literal("sent"),
+      v.literal("delivered"),
+      v.literal("failed"),
+    ),
+
+    message: v.string(),
+
+    latitude: v.optional(v.number()),
+    longitude: v.optional(v.number()),
+    accuracy: v.optional(v.number()),
+
+    recipientCount: v.number(),
+
+    createdAt: v.number(),
+
+    dispatchedAt: v.optional(v.number()),
+    deliveredAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_createdAt", ["userId", "createdAt"])
+    .index("by_status", ["status"]),
+
   // ─────────────────────────────────────────────────────────────────────────
   // AI INTERACTIONS
   // ─────────────────────────────────────────────────────────────────────────
@@ -3571,6 +4386,476 @@ export default defineSchema({
     status: v.string(),
     date: v.string(),
   }).index("by_user", ["userId"]),
+  // ===========================================================================
+  // URBANISME — SOURCES RÉELLES
+  // ===========================================================================
+  //
+  // Architecture :
+  //
+  //   Source réelle
+  //       ↓
+  //   Opportunité
+  //       ↓
+  //   Marché / Appel d'offres
+  //       ↓
+  //   Qualification
+  //       ↓
+  //   Dossier
+  //       ↓
+  //   Documents
+  //       ↓
+  //   Soumission
+  //       ↓
+  //   Audit
+  //
+  // Aucune donnée publique ne doit être considérée comme officielle
+  // sans rattachement à une source.
+  // ===========================================================================
+
+  urbanSources: defineTable({
+    name: v.string(),
+
+    type: v.union(
+      v.literal("official_portal"),
+      v.literal("institution"),
+      v.literal("municipality"),
+      v.literal("public_company"),
+      v.literal("partner"),
+      v.literal("manual"),
+      v.literal("other"),
+    ),
+
+    organization: v.optional(v.string()),
+
+    country: v.optional(v.string()),
+    region: v.optional(v.string()),
+    city: v.optional(v.string()),
+
+    url: v.optional(v.string()),
+
+    verified: v.boolean(),
+    active: v.boolean(),
+
+    lastCheckedAt: v.optional(v.number()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_type", ["type"])
+    .index("by_active", ["active"])
+    .index("by_verified", ["verified"])
+    .index("by_country", ["country"]),
+
+  // ===========================================================================
+  // URBANISME — OPPORTUNITÉS
+  // ===========================================================================
+
+  urbanOpportunities: defineTable({
+    sourceId: v.id("urbanSources"),
+
+    title: v.string(),
+    description: v.string(),
+
+    category: v.union(
+      v.literal("voirie"),
+      v.literal("batiment"),
+      v.literal("assainissement"),
+      v.literal("eau"),
+      v.literal("electricite"),
+      v.literal("transport"),
+      v.literal("amenagement"),
+      v.literal("urbanisme"),
+      v.literal("infrastructure"),
+      v.literal("environnement"),
+      v.literal("etudes"),
+      v.literal("services"),
+      v.literal("autre"),
+    ),
+
+    country: v.string(),
+    region: v.optional(v.string()),
+    city: v.optional(v.string()),
+
+    estimatedValue: v.optional(v.number()),
+    currency: v.optional(v.string()),
+
+    sourceReference: v.string(),
+    sourceUrl: v.optional(v.string()),
+
+    discoveredAt: v.number(),
+    publishedAt: v.optional(v.number()),
+    deadlineAt: v.optional(v.number()),
+
+    status: v.union(
+      v.literal("new"),
+      v.literal("reviewing"),
+      v.literal("qualified"),
+      v.literal("rejected"),
+      v.literal("converted"),
+      v.literal("closed"),
+    ),
+
+    priority: v.union(
+      v.literal("low"),
+      v.literal("normal"),
+      v.literal("high"),
+      v.literal("critical"),
+    ),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_source", ["sourceId"])
+    .index("by_status", ["status"])
+    .index("by_category", ["category"])
+    .index("by_country", ["country"])
+    .index("by_deadline", ["deadlineAt"])
+    .index("by_priority", ["priority"])
+
+    // Identifiant métier de la publication dans sa source.
+    .index("by_source_reference", ["sourceId", "sourceReference"]),
+
+  // ===========================================================================
+  // MARCHÉS / APPELS D'OFFRES
+  // ===========================================================================
+
+  urbanTenders: defineTable({
+    opportunityId: v.id("urbanOpportunities"),
+    sourceId: v.id("urbanSources"),
+
+    reference: v.string(),
+
+    title: v.string(),
+    description: v.string(),
+
+    procedureType: v.union(
+      v.literal("appel_offres"),
+      v.literal("consultation"),
+      v.literal("demande_de_prix"),
+      v.literal("concours"),
+      v.literal("entente_directe"),
+      v.literal("autre"),
+    ),
+
+    category: v.string(),
+
+    contractingAuthority: v.string(),
+
+    country: v.string(),
+    region: v.optional(v.string()),
+    city: v.optional(v.string()),
+
+    estimatedAmount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+
+    publishedAt: v.optional(v.number()),
+    clarificationDeadlineAt: v.optional(v.number()),
+
+    /**
+     * Optionnel côté ingestion :
+     *
+     * certaines sources publient d'abord un marché sans date limite
+     * exploitable ou nécessitent une synchronisation ultérieure.
+     */
+    submissionDeadlineAt: v.optional(v.number()),
+
+    openingDateAt: v.optional(v.number()),
+
+    sourceReference: v.string(),
+    sourceUrl: v.optional(v.string()),
+
+    status: v.union(
+      v.literal("draft"),
+      v.literal("open"),
+      v.literal("deadline_passed"),
+      v.literal("under_evaluation"),
+      v.literal("awarded"),
+      v.literal("cancelled"),
+      v.literal("unknown"),
+    ),
+
+    verifiedAt: v.optional(v.number()),
+    lastSourceCheckAt: v.optional(v.number()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_opportunity", ["opportunityId"])
+    .index("by_source", ["sourceId"])
+    .index("by_reference", ["reference"])
+
+    // Recherche exacte d'un marché dans une source donnée.
+    .index("by_source_reference", ["sourceId", "reference"])
+
+    .index("by_status", ["status"])
+    .index("by_category", ["category"])
+    .index("by_country", ["country"])
+    .index("by_submission_deadline", ["submissionDeadlineAt"])
+    .index("by_authority", ["contractingAuthority"]),
+
+  // ===========================================================================
+  // QUALIFICATION DES MARCHÉS
+  // ===========================================================================
+
+  urbanTenderQualifications: defineTable({
+    tenderId: v.id("urbanTenders"),
+    userId: v.id("users"),
+
+    decision: v.union(
+      v.literal("pending"),
+      v.literal("eligible"),
+      v.literal("not_eligible"),
+      v.literal("needs_review"),
+    ),
+
+    technicalFit: v.optional(v.number()),
+    financialFit: v.optional(v.number()),
+    geographicFit: v.optional(v.number()),
+    experienceFit: v.optional(v.number()),
+
+    requiredExperience: v.optional(v.string()),
+
+    /**
+     * Aligné avec urban.ts :
+     * le moteur de qualification stocke actuellement ces champs
+     * sous forme de texte structuré.
+     *
+     * Si nous voulons plus tard une checklist native,
+     * nous pourrons migrer vers des tableaux dans un changement
+     * de modèle explicite.
+     */
+    requiredDocuments: v.optional(v.string()),
+    missingDocuments: v.optional(v.string()),
+
+    notes: v.optional(v.string()),
+
+    reviewedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tender", ["tenderId"])
+    .index("by_user", ["userId"])
+    .index("by_tender_and_user", ["tenderId", "userId"])
+    .index("by_decision", ["decision"]),
+
+  // ===========================================================================
+  // DOSSIERS DE CANDIDATURE
+  // ===========================================================================
+
+  urbanTenderDossiers: defineTable({
+    tenderId: v.id("urbanTenders"),
+
+    /**
+     * Propriétaire réel du dossier.
+     * Toujours défini côté serveur à partir de l'utilisateur authentifié.
+     */
+    ownerId: v.id("users"),
+
+    name: v.string(),
+
+    status: v.union(
+      v.literal("draft"),
+      v.literal("preparation"),
+      v.literal("ready"),
+      v.literal("submitted"),
+      v.literal("closed"),
+    ),
+
+    responsibleUserId: v.optional(v.id("users")),
+
+    notes: v.optional(v.string()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tender", ["tenderId"])
+    .index("by_owner", ["ownerId"])
+
+    // Recherche directe d'un dossier appartenant à un utilisateur
+    // pour un marché donné.
+    .index("by_tender_and_owner", ["tenderId", "ownerId"])
+
+    .index("by_responsible", ["responsibleUserId"])
+    .index("by_status", ["status"]),
+
+  // ===========================================================================
+  // DOCUMENTS DES DOSSIERS
+  // ===========================================================================
+
+  urbanTenderDocuments: defineTable({
+    dossierId: v.id("urbanTenderDossiers"),
+
+    uploadedBy: v.id("users"),
+
+    name: v.string(),
+
+    category: v.union(
+      v.literal("administratif"),
+      v.literal("technique"),
+      v.literal("financier"),
+      v.literal("juridique"),
+      v.literal("experience"),
+      v.literal("certification"),
+      v.literal("offre"),
+      v.literal("autre"),
+    ),
+
+    /**
+     * Source primaire recommandée :
+     * Convex Storage.
+     *
+     * url reste disponible pour les documents externes
+     * explicitement référencés.
+     */
+    storageId: v.optional(v.id("_storage")),
+    url: v.optional(v.string()),
+
+    mimeType: v.optional(v.string()),
+    sizeBytes: v.optional(v.number()),
+
+    required: v.boolean(),
+
+    /**
+     * Important :
+     * "verified" ne signifie pas que le fichier existe.
+     * Il signifie qu'une vérification métier a été effectuée.
+     */
+    verified: v.boolean(),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_dossier", ["dossierId"])
+    .index("by_uploader", ["uploadedBy"])
+    .index("by_category", ["category"])
+    .index("by_dossier_and_category", ["dossierId", "category"]),
+
+  // ===========================================================================
+  // SOUMISSIONS
+  // ===========================================================================
+
+  urbanTenderSubmissions: defineTable({
+    tenderId: v.id("urbanTenders"),
+    dossierId: v.id("urbanTenderDossiers"),
+    submittedBy: v.id("users"),
+
+    submissionReference: v.string(),
+
+    amount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+
+    status: v.union(
+      v.literal("draft"),
+      v.literal("submitted"),
+      v.literal("acknowledged"),
+      v.literal("under_evaluation"),
+      v.literal("clarification_requested"),
+      v.literal("awarded"),
+      v.literal("not_selected"),
+      v.literal("cancelled"),
+    ),
+
+    submittedAt: v.optional(v.number()),
+    acknowledgedAt: v.optional(v.number()),
+
+    officialReference: v.optional(v.string()),
+    officialSourceUrl: v.optional(v.string()),
+
+    notes: v.optional(v.string()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_tender", ["tenderId"])
+    .index("by_dossier", ["dossierId"])
+    .index("by_submitter", ["submittedBy"])
+
+    /**
+     * Index critique pour :
+     *
+     * getMyTenderSubmission(dossierId)
+     *
+     * et pour empêcher les doublons actifs.
+     */
+    .index("by_dossier_and_submitter", ["dossierId", "submittedBy"])
+
+    .index("by_status", ["status"])
+    .index("by_tender_and_status", ["tenderId", "status"]),
+
+  // ===========================================================================
+  // VEILLES UTILISATEUR
+  // ===========================================================================
+
+  urbanWatchlists: defineTable({
+    userId: v.id("users"),
+
+    name: v.string(),
+
+    keywords: v.array(v.string()),
+    categories: v.array(v.string()),
+
+    countries: v.array(v.string()),
+    regions: v.array(v.string()),
+    cities: v.array(v.string()),
+
+    minAmount: v.optional(v.number()),
+    maxAmount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+
+    active: v.boolean(),
+
+    notifyNewOpportunity: v.boolean(),
+    notifyDeadline: v.boolean(),
+    notifyStatusChange: v.boolean(),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_active", ["userId", "active"]),
+
+  // ===========================================================================
+  // HISTORIQUE / AUDIT DU PIPELINE
+  // ===========================================================================
+
+  urbanTenderEvents: defineTable({
+    tenderId: v.id("urbanTenders"),
+
+    actorId: v.optional(v.id("users")),
+
+    type: v.union(
+      v.literal("created"),
+      v.literal("updated"),
+      v.literal("verified"),
+      v.literal("qualified"),
+      v.literal("rejected"),
+      v.literal("dossier_created"),
+      v.literal("document_added"),
+      v.literal("submission_created"),
+      v.literal("submitted"),
+      v.literal("status_changed"),
+      v.literal("deadline_changed"),
+      v.literal("awarded"),
+      v.literal("not_selected"),
+      v.literal("note_added"),
+    ),
+
+    fromStatus: v.optional(v.string()),
+    toStatus: v.optional(v.string()),
+
+    message: v.optional(v.string()),
+
+    metadata: v.optional(v.record(v.string(), v.string())),
+
+    createdAt: v.number(),
+  })
+    .index("by_tender", ["tenderId"])
+    .index("by_actor", ["actorId"])
+    .index("by_type", ["type"])
+    .index("by_created_at", ["createdAt"]),
+
+  // ===========================================================================
+  // HISTORIQUE / AUDIT DU PIPELINE
+  // ===========================================================================
 
   energySettings: defineTable({
     userId: v.id("users"),
@@ -3942,103 +5227,241 @@ export default defineSchema({
     .index("by_provider", ["providerId"])
     .index("by_user", ["userId"]),
 
-  // ─── Trips / Voyages ────────────────────────────────────────────────────────
+  // ===========================================================================
+  // VOYAGES — TRANSPORT INTER-VILLES
+  // ===========================================================================
+
   trips: defineTable({
+    // -------------------------------------------------------------------------
+    // Opérateur
+    // -------------------------------------------------------------------------
     operator: v.string(),
     operatorLogo: v.optional(v.string()),
+
+    // -------------------------------------------------------------------------
+    // Transport
+    // -------------------------------------------------------------------------
     type: v.union(v.literal("Bus"), v.literal("Minibus"), v.literal("Avion")),
+
+    // -------------------------------------------------------------------------
+    // Itinéraire
+    // -------------------------------------------------------------------------
     from: v.string(),
     to: v.string(),
+
+    // -------------------------------------------------------------------------
+    // Horaires
+    // -------------------------------------------------------------------------
     departure: v.string(),
     arrival: v.string(),
+
+    // Date canonique du départ.
+    // Format recommandé : YYYY-MM-DD
+    departureDate: v.string(),
+
+    // -------------------------------------------------------------------------
+    // Durée / tarification
+    // -------------------------------------------------------------------------
     durationMinutes: v.number(),
     price: v.number(),
     currency: v.string(),
+
+    // -------------------------------------------------------------------------
+    // Capacité
+    // -------------------------------------------------------------------------
     availableSeats: v.number(),
     totalSeats: v.number(),
+
+    // -------------------------------------------------------------------------
+    // Présentation
+    // -------------------------------------------------------------------------
     amenities: v.array(v.string()),
     rating: v.number(),
     reviewCount: v.number(),
+
     imageUrl: v.optional(v.string()),
     color: v.optional(v.string()),
-    departureDate: v.string(),
   })
+    // Recherche classique par route.
     .index("by_route", ["from", "to"])
-    .index("by_date", ["departureDate"]),
+
+    // Recherche directe par date.
+    .index("by_date", ["departureDate"])
+
+    // Recherche production :
+    // route + date sans devoir charger toutes les dates de cette route.
+    .index("by_route_and_date", ["from", "to", "departureDate"]),
+
+  // ===========================================================================
+  // RÉSERVATIONS
+  // ===========================================================================
 
   tripBookings: defineTable({
     tripId: v.id("trips"),
     userId: v.id("users"),
+
+    // Nombre de places achetées.
     seats: v.number(),
+
+    // Montant calculé côté serveur.
     totalPrice: v.number(),
+
     status: v.union(
       v.literal("pending"),
       v.literal("confirmed"),
       v.literal("cancelled"),
     ),
+
+    // Numéros de sièges affichés dans le billet.
     seatNumbers: v.array(v.string()),
+
     passengerName: v.string(),
     passengerPhone: v.optional(v.string()),
+
     bookedAt: v.string(),
   })
     .index("by_trip", ["tripId"])
+    .index("by_user", ["userId"])
+
+    // Utile pour contrôler rapidement les réservations actives
+    // d'un trajet.
+    .index("by_trip_and_status", ["tripId", "status"])
+
+    // Empêche la création de plusieurs réservations
+    // pour le même utilisateur et le même trajet lorsque
+    // cette contrainte est contrôlée côté mutation.
+    .index("by_user_and_trip", ["userId", "tripId"]),
+
+  // ===========================================================================
+  // SIÈGES — SOURCE DE VÉRITÉ
+  // ===========================================================================
+
+  /*
+   * Un siège = un document.
+   *
+   * C'est volontairement séparé de tripBookings.seatNumbers.
+   * Un tableau dans tripBookings permet d'afficher les sièges,
+   * mais ne constitue pas une source de vérité suffisamment robuste
+   * pour gérer les conflits de réservation siège par siège.
+   */
+  tripSeats: defineTable({
+    tripId: v.id("trips"),
+
+    // Identifiant métier du siège :
+    // "1A", "1B", "12A", "12B", etc.
+    seatNumber: v.string(),
+
+    status: v.union(
+      v.literal("available"),
+      v.literal("held"),
+      v.literal("booked"),
+      v.literal("blocked"),
+    ),
+
+    // Réservation actuellement associée au siège.
+    bookingId: v.optional(v.id("tripBookings")),
+
+    // Utilisateur ayant temporairement ou définitivement
+    // réservé le siège.
+    userId: v.optional(v.id("users")),
+
+    // Permet de gérer les réservations temporaires.
+    heldUntil: v.optional(v.number()),
+
+    updatedAt: v.number(),
+  })
+    .index("by_trip", ["tripId"])
+
+    // Recherche exacte d'un siège dans un trajet.
+    .index("by_trip_and_seat", ["tripId", "seatNumber"])
+
+    .index("by_trip_and_status", ["tripId", "status"])
+
+    .index("by_booking", ["bookingId"])
+
     .index("by_user", ["userId"]),
 
-  // ─── Trips / Voyages ────────────────────────────────────────────────────────
-
-  // ... tables existantes trips, tripBookings, destinations, destinationSaves ...
-
-  // ═══ NOUVELLES TABLES À AJOUTER ═══
+  // ===========================================================================
+  // FAVORIS TRAJETS
+  // ===========================================================================
 
   tripSaves: defineTable({
     userId: v.id("users"),
     tripId: v.id("trips"),
-    savedAt: v.optional(v.string()), // optionnel, pour tracer la date
+    savedAt: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_trip", ["tripId"])
-    .index("by_user_and_trip", ["userId", "tripId"]), // utile pour toggle
+    .index("by_user_and_trip", ["userId", "tripId"]),
+
+  // ===========================================================================
+  // AVIS VOYAGEURS
+  // ===========================================================================
 
   tripReviews: defineTable({
     tripId: v.id("trips"),
     reviewerId: v.id("users"),
+
     authorName: v.string(),
+
     rating: v.number(),
     comment: v.string(),
-    bookingId: v.id("tripBookings"), // pour vérifier que l'utilisateur a bien réservé
+
+    // Permet de démontrer que l'avis provient
+    // d'une réservation réelle.
+    bookingId: v.id("tripBookings"),
+
     createdAt: v.string(),
   })
     .index("by_trip", ["tripId"])
     .index("by_reviewer", ["reviewerId"])
     .index("by_booking", ["bookingId"])
-    .index("by_trip_and_rating", ["tripId", "rating"]), // pour filtrer par note
 
-  // ─── Destinations ───────────────────────────────────────────────────────────
+    // Permet les lectures/tri par note.
+    .index("by_trip_and_rating", ["tripId", "rating"]),
+
+  // ===========================================================================
+  // DESTINATIONS
+  // ===========================================================================
+
   destinations: defineTable({
     name: v.string(),
     country: v.string(),
     continent: v.string(),
+
     imageUrl: v.optional(v.string()),
+
     budget: v.string(),
     rating: v.number(),
     reviewCount: v.number(),
+
     description: v.string(),
     highlights: v.array(v.string()),
+
     trending: v.boolean(),
-    color: v.optional(v.string()),
+
+    color: v.string(),
     currency: v.string(),
     language: v.string(),
+
     flightHours: v.number(),
   })
-    .index("by_trending", ["trending"])
-    .index("by_continent", ["continent"]),
+    .index("by_continent", ["continent"])
+
+    // Utile pour les destinations mises en avant.
+    .index("by_trending", ["trending"]),
+
+  // ===========================================================================
+  // FAVORIS DESTINATIONS
+  // ===========================================================================
 
   destinationSaves: defineTable({
     userId: v.id("users"),
     destinationId: v.id("destinations"),
   })
     .index("by_user", ["userId"])
-    .index("by_destination", ["destinationId"]),
+    .index("by_destination", ["destinationId"])
+    .index("by_user_and_destination", ["userId", "destinationId"]),
 
   // ─── User Settings ──────────────────────────────────────────────────────────
   userSettings: defineTable({

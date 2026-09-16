@@ -1,346 +1,1855 @@
-import { View, Pressable, Text } from "react-native";
-import { useState, useMemo } from "react";
-import { useQuery } from "convex/react";
-import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
-import { api } from "@/convex/_generated/api.js";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { SignInButton } from "@/components/ui/signin.tsx";
+import React, { useMemo, useState } from "react";
 import {
-  ArrowLeft, TrendingUp, TrendingDown, DollarSign, Crown, ShoppingBag,
-  BarChart2, PieChart, Zap, Flame, Star, AlertCircle, CheckCircle,
-  ArrowUpRight, ArrowDownLeft, Calendar, Target, Award, Sparkles,
-  ChevronRight, ChevronDown, ChevronUp, RefreshCw, Download, Filter,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useQuery } from "convex/react";
+import {
+  AlertCircle,
+  ArrowDownLeft,
+  ArrowLeft,
+  ArrowUpRight,
+  BarChart3,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  CircleDollarSign,
+  Crown,
+  Database,
+  Info,
+  RefreshCw,
+  ShoppingBag,
+  Sparkles,
+  WalletCards,
 } from "lucide-react-native";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+import { api } from "@/convex/_generated/api.js";
+import {
+  AuthLoading,
+  Authenticated,
+  Unauthenticated,
+} from "@/lib/convex-auth-compat";
+import { SignInButton } from "@/components/ui/signin.tsx";
+
 type Period = "7j" | "30j" | "90j" | "12m";
-type Source = "all" | "premium" | "contenu" | "marketplace";
 
-interface RevenuePoint { date: string; premium: number; contenu: number; marketplace: number; }
-interface SourceStat { id: Source; label: string; icon: React.ReactNode; color: string; total: number; trend: number; txCount: number; }
-interface Goal { id: string; label: string; current: number; target: number; deadline: string; source: Source; }
-interface Insight { id: string; type: "up" | "down" | "tip"; message: string; }
+type RevenueEntry = {
+  _id: string;
+  _creationTime: number;
+  userId: string;
+  streamId?: string;
+  amount: number;
+  currency: string;
+  description: string;
+  date: string;
+  category: string;
+};
 
-// ── Seed data for chart visualization fallback ────────────────────────────────
-function generateFallbackPoints(period: Period): RevenuePoint[] {
+type RevenueStream = {
+  _id: string;
+  _creationTime: number;
+  userId: string;
+  source: string;
+  description: string;
+  amount: number;
+  currency: string;
+  frequency: "unique" | "hebdomadaire" | "mensuel" | "annuel";
+  lastReceivedAt?: string;
+  active: boolean;
+};
+
+type Props = {
+  onBack: () => void;
+  onNavigate?: (page: string) => void;
+};
+
+type CurrencyTotal = {
+  currency: string;
+  total: number;
+  count: number;
+};
+
+type CategoryTotal = {
+  key: string;
+  label: string;
+  total: number;
+  count: number;
+};
+
+type Bucket = {
+  key: string;
+  label: string;
+  total: number;
+};
+
+const PERIOD_LABELS: Record<Period, string> = {
+  "7j": "7 jours",
+  "30j": "30 jours",
+  "90j": "90 jours",
+  "12m": "12 mois",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  premium: "Premium",
+  abonnement: "Abonnements",
+  contenu: "Contenu",
+  tips: "Tips",
+  marketplace: "Marketplace",
+  vente: "Ventes",
+  freelance: "Freelance",
+  location: "Location",
+  salaire: "Salaire",
+  autre: "Autre",
+};
+
+function normalize(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatMoney(value: number, currency: string): string {
+  return `${formatNumber(value)} ${currency}`;
+}
+
+function safeDate(value: string): Date | null {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
+}
+
+function startOfDay(date: Date): Date {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function subtractDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() - days);
+  return result;
+}
+
+function subtractMonths(date: Date, months: number): Date {
+  const result = new Date(date);
+  result.setMonth(result.getMonth() - months);
+  return result;
+}
+
+function getPeriodStart(period: Period, now: Date): Date {
   switch (period) {
     case "7j":
-      return [
-        { date: "Lun", premium: 4200, contenu: 1200, marketplace: 8500 },
-        { date: "Mar", premium: 4200, contenu: 3400, marketplace: 12300 },
-        { date: "Mer", premium: 4200, contenu: 800, marketplace: 6700 },
-        { date: "Jeu", premium: 4200, contenu: 2100, marketplace: 14200 },
-        { date: "Ven", premium: 8400, contenu: 5600, marketplace: 9800 },
-        { date: "Sam", premium: 4200, contenu: 1900, marketplace: 18900 },
-        { date: "Dim", premium: 4200, contenu: 3200, marketplace: 11400 },
-      ];
+      return startOfDay(subtractDays(now, 6));
+
     case "30j":
-      return Array.from({ length: 10 }, (_, i) => ({
-        date: `S${i + 1}`,
-        premium: 12600 + (i % 3 === 0 ? 8400 : 0),
-        contenu: 5000 + i * 1200,
-        marketplace: 30000 + i * 4000,
-      }));
+      return startOfDay(subtractDays(now, 29));
+
     case "90j":
-      return ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep"].map((d, i) => ({
-        date: d,
-        premium: 42000 + (i % 4 === 0 ? 42000 : 0),
-        contenu: 20000 + i * 5000,
-        marketplace: 100000 + i * 15000,
-      }));
+      return startOfDay(subtractDays(now, 89));
+
     case "12m":
-      return ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"].map((d, i) => ({
-        date: d,
-        premium: 126000 + (i % 2 === 0 ? 42000 : 0),
-        contenu: 80000 + i * 12000,
-        marketplace: 400000 + i * 40000,
-      }));
+      return startOfDay(subtractMonths(now, 11));
   }
 }
 
-const GOALS: Goal[] = [
-  { id: "g1", label: "Revenus mensuels", current: 127400, target: 200000, deadline: "31 Déc", source: "all" },
-  { id: "g2", label: "Abonnements Premium", current: 8, target: 20, deadline: "31 Déc", source: "premium" },
-  { id: "g3", label: "Ventes Marketplace", current: 34, target: 50, deadline: "31 Déc", source: "marketplace" },
-  { id: "g4", label: "Revenus de contenu", current: 43200, target: 80000, deadline: "31 Déc", source: "contenu" },
-];
-
-const INSIGHTS: Insight[] = [
-  { id: "i1", type: "up", message: "Tu as gagné 24% de plus ce mois vs le mois dernier" },
-  { id: "i2", type: "tip", message: "Active les boosts Marketplace le weekend pour +35% de ventes" },
-  { id: "i3", type: "up", message: "Le contenu Live génère 3x plus de tips que les posts" },
-  { id: "i4", type: "down", message: "3 produits n'ont pas eu de ventes cette semaine" },
-  { id: "i5", type: "tip", message: "Propose un plan Annuel pour augmenter la rétention Premium" },
-];
-
-const COLORS = { premium: "#f59e0b", contenu: "#8b5cf6", marketplace: "#06b6d4" } as const;
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function fmt(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1000) return `${(n / 1000).toFixed(0)}k`;
-  return n.toString();
-}
-function fmtFCFA(n: number) { return `${fmt(n)} FCFA`; }
-
-// ── MiniSparkline ──────────────────────────────────────────────────────────────
-function SparklineChart({ data, color }: { data: number[]; color: string }) {
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const w = 80; const h = 28;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * h;
-    return `${x},${y}`;
-  }).join(" ");
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+function isWithinPeriod(date: Date, start: Date, end: Date): boolean {
+  return date >= start && date <= end;
 }
 
-// ── BarStack ──────────────────────────────────────────────────────────────────
-function BarStack({ points }: { points: RevenuePoint[] }) {
-  const maxTotal = Math.max(...points.map(p => p.premium + p.contenu + p.marketplace));
-  return (
-    <View className="flex items-end gap-1 h-28 w-full">{points.map((p, i) => {
-        const total = p.premium + p.contenu + p.marketplace;
-        const pct = total / maxTotal;
-        return (
-          <View key={i} className="flex-1 flex flex-col justify-end gap-px" style={{ height: `${pct * 100}%` }}><View style={{ flex: p.marketplace, backgroundColor: COLORS.marketplace, borderRadius: "2px 2px 0 0" }} /><View style={{ flex: p.contenu, backgroundColor: COLORS.contenu }} /><View style={{ flex: p.premium, backgroundColor: COLORS.premium }} /></View>
-        );
-      })}</View>
-  );
+function getCategoryLabel(category: string): string {
+  const normalized = normalize(category);
+
+  return (SOURCE_LABELS[normalized] ?? category.trim()) || "Non catégorisé";
 }
 
-// ── DonutChart ────────────────────────────────────────────────────────────────
-function DonutChart({ premium, contenu, marketplace }: { premium: number; contenu: number; marketplace: number }) {
-  const total = premium + contenu + marketplace;
-  if (total === 0) {
-    return (
-      <svg viewBox="0 0 100 100" className="w-28 h-28">
-        <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="12" />
-        <text x="50" y="46" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold">0 FCFA</text>
-        <text x="50" y="57" textAnchor="middle" fill="#9ca3af" fontSize="6">Total</text>
-      </svg>
-    );
+function getCategoryKey(category: string): string {
+  const normalized = normalize(category);
+
+  if (normalized === "premium" || normalized === "abonnement") {
+    return "premium";
   }
-  const prem = (premium / total) * 360;
-  const cont = (contenu / total) * 360;
-  function polarToXY(deg: number, r: number) {
-    const rad = (deg - 90) * (Math.PI / 180);
-    return { x: 50 + r * Math.cos(rad), y: 50 + r * Math.sin(rad) };
+
+  if (normalized === "contenu" || normalized === "tips") {
+    return "contenu";
   }
-  function arc(start: number, end: number, color: string) {
-    if (end - start < 0.5) return null;
-    const s = polarToXY(start, 38);
-    const e = polarToXY(end, 38);
-    const large = end - start > 180 ? 1 : 0;
-    return <path key={color} d={`M ${s.x} ${s.y} A 38 38 0 ${large} 1 ${e.x} ${e.y}`} fill="none" stroke={color} strokeWidth="12" />;
+
+  if (
+    normalized === "marketplace" ||
+    normalized === "vente" ||
+    normalized === "ventes"
+  ) {
+    return "marketplace";
   }
-  const a1 = 0;
-  const a2 = a1 + prem;
-  const a3 = a2 + cont;
-  const a4 = a3 + ((marketplace / total) * 360);
-  return (
-    <svg viewBox="0 0 100 100" className="w-28 h-28">
-      {arc(a1, a2, COLORS.premium)}
-      {arc(a2, a3, COLORS.contenu)}
-      {arc(a3, a4, COLORS.marketplace)}
-      <text x="50" y="46" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold">{fmtFCFA(total)}</text>
-      <text x="50" y="57" textAnchor="middle" fill="#9ca3af" fontSize="6">Total</text>
-    </svg>
-  );
+
+  return normalized || "autre";
 }
 
-// ── Loading skeleton ─────────────────────────────────────────────────────────
-function RevenueSkeleton() {
-  return (
-    <View className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 p-4 space-y-4"><Skeleton className="h-12 w-full bg-white/10 rounded-xl" /><Skeleton className="h-10 w-full bg-white/5 rounded-xl" /><Skeleton className="h-52 w-full bg-white/5 rounded-2xl" /><View className="gap-3">{Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-32 bg-white/5 rounded-xl" />
-        ))}</View><Skeleton className="h-36 w-full bg-white/5 rounded-2xl" /></View>
-  );
-}
+function getBucket(date: Date, period: Period): { key: string; label: string } {
+  if (period === "12m") {
+    const year = date.getFullYear();
+    const month = date.getMonth();
 
-// ── Inner page (authenticated) ───────────────────────────────────────────────
-function RevenusDashboardInner({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (page: string) => void }) {
-  const [period, setPeriod] = useState<Period>("30j");
-  const [source, setSource] = useState<Source>("all");
-  const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
-  const [expandGoals, setExpandGoals] = useState(true);
-
-  // Load data from Convex
-  const summary = useQuery(api.revenues.getRevenueSummary, {});
-  const streams = useQuery(api.revenues.getMyStreams, {});
-  const entries = useQuery(api.revenues.getMyEntries, {});
-
-  // Build chart points from entries or use fallback
-  const points = useMemo(() => {
-    if (!entries || entries.length === 0) {
-      return generateFallbackPoints(period);
-    }
-    // Group entries by category into revenue point structure
-    // Map categories to our chart sources
-    const categoryToSource: Record<string, keyof Omit<RevenuePoint, "date">> = {
-      premium: "premium",
-      abonnement: "premium",
-      contenu: "contenu",
-      tips: "contenu",
-      marketplace: "marketplace",
-      vente: "marketplace",
+    return {
+      key: `${year}-${String(month + 1).padStart(2, "0")}`,
+      label: date.toLocaleDateString("fr-FR", {
+        month: "short",
+      }),
     };
-
-    // Build from fallback but overlay real totals
-    const fallback = generateFallbackPoints(period);
-    const realTotal = entries.reduce((sum, e) => sum + e.amount, 0);
-    if (realTotal > 0) {
-      // Scale the fallback proportionally to match real revenue
-      const fallbackTotal = fallback.reduce((sum, p) => sum + p.premium + p.contenu + p.marketplace, 0);
-      const scale = realTotal / fallbackTotal;
-      return fallback.map((p) => ({
-        ...p,
-        premium: Math.round(p.premium * scale),
-        contenu: Math.round(p.contenu * scale),
-        marketplace: Math.round(p.marketplace * scale),
-      }));
-    }
-    return fallback;
-  }, [entries, period]);
-
-  // Compute totals from Convex data or chart points
-  const totals = useMemo(() => {
-    const sum = (key: keyof Omit<RevenuePoint, "date">) => points.reduce((a, p) => a + p[key], 0);
-    return { premium: sum("premium"), contenu: sum("contenu"), marketplace: sum("marketplace") };
-  }, [points]);
-
-  const grandTotal = summary?.monthlyTotal ?? (totals.premium + totals.contenu + totals.marketplace);
-  const allTimeTotal = summary?.allTimeTotal ?? grandTotal;
-  const activeStreamCount = summary?.activeStreams ?? 0;
-
-  // Compute trend (compare monthly to projected)
-  const projectedMonthly = summary?.projectedMonthly ?? 0;
-  const trendPct = projectedMonthly > 0 && grandTotal > 0
-    ? Math.round(((grandTotal - projectedMonthly) / projectedMonthly) * 100)
-    : 15;
-
-  const sources: SourceStat[] = [
-    {
-      id: "premium", label: "Abonnements", icon: <Crown size={16} />, color: COLORS.premium,
-      total: totals.premium, trend: 12, txCount: streams?.filter((s) => s.source === "premium" || s.frequency === "mensuel").length ?? 0,
-    },
-    {
-      id: "contenu", label: "Contenu", icon: <Sparkles size={16} />, color: COLORS.contenu,
-      total: totals.contenu, trend: 28, txCount: streams?.filter((s) => s.source === "contenu").length ?? 0,
-    },
-    {
-      id: "marketplace", label: "Marketplace", icon: <ShoppingBag size={16} />, color: COLORS.marketplace,
-      total: totals.marketplace, trend: 19, txCount: streams?.filter((s) => s.source === "marketplace").length ?? 0,
-    },
-  ];
-
-  const filteredPoints = useMemo(() => {
-    if (source === "all") return points;
-    return points.map(p => ({
-      ...p,
-      premium: source === "premium" ? p.premium : 0,
-      contenu: source === "contenu" ? p.contenu : 0,
-      marketplace: source === "marketplace" ? p.marketplace : 0,
-    }));
-  }, [points, source]);
-
-  const sparkData = (key: keyof Omit<RevenuePoint, "date">) => points.map(p => p[key]);
-
-  // Adjust goals with real data when available
-  const adjustedGoals = useMemo((): Goal[] => {
-    if (!summary) return GOALS;
-    return GOALS.map((g) => {
-      if (g.id === "g1") return { ...g, current: summary.monthlyTotal };
-      if (g.id === "g2") return { ...g, current: summary.activeStreams };
-      return g;
-    });
-  }, [summary]);
-
-  if (summary === undefined) {
-    return <RevenueSkeleton />;
   }
 
+  if (period === "90j") {
+    const start = new Date(date);
+    const day = start.getDate();
+    const bucketDay = day - ((day - 1) % 7);
+
+    start.setDate(bucketDay);
+
+    return {
+      key: `${start.getFullYear()}-${start.getMonth()}-${start.getDate()}`,
+      label: start.toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "short",
+      }),
+    };
+  }
+
+  return {
+    key: `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`,
+    label: date.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+    }),
+  };
+}
+
+function LoadingScreen(): React.ReactElement {
   return (
-    <View className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white overflow-y-auto pb-24">{}<View className="sticky top-0 z-30 bg-gray-950/90 backdrop-blur-lg border-b border-white/5 px-4 py-3 flex items-center gap-3"><Pressable onPress={onBack} className="p-2 rounded-full bg-white/10 transition-colors"><ArrowLeft size={18} /></Pressable><View className="flex-1"><Text className="font-bold text-lg leading-tight">Tableau de Bord Revenus</Text><Text className="text-xs text-gray-400">{activeStreamCount > 0
-              ? `${activeStreamCount} source${activeStreamCount > 1 ? "s" : ""} active${activeStreamCount > 1 ? "s" : ""}`
-              : "Vue consolidée de toutes vos sources"}</Text></View><Pressable className="p-2 rounded-full bg-white/10 transition-colors"><Download size={16} /></Pressable><Pressable className="p-2 rounded-full bg-white/10 transition-colors"><RefreshCw size={16} /></Pressable></View><View className="px-4 pt-4 space-y-5">{}<View className="flex gap-2 bg-white/5 rounded-xl p-1">{(["7j", "30j", "90j", "12m"] as const).map(p => (
-            <Pressable key={p} onPress={() => setPeriod(p)} className={`flex-1 text-sm py-1.5 rounded-lg transition-all cursor-pointer font-medium ${period === p ? "bg-white text-gray-900" : "text-gray-400 hover:text-white"}`}>{p}</Pressable>
-          ))}</View>{}<View key={period} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl bg-gradient-to-br from-emerald-600/30 to-teal-800/30 border border-emerald-500/20 p-5"><View className="flex items-start justify-between mb-4"><View><Text className="text-gray-300 text-sm mb-1">Revenus totaux ({period})</Text><Text className="text-4xl font-bold text-white">{fmtFCFA(grandTotal)}</Text></View><View className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm font-semibold ${trendPct >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>{trendPct >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{trendPct >= 0 ? "+" : ""}{trendPct}<Text>%</Text></View></View>{}<View className="flex items-center gap-6"><DonutChart premium={totals.premium} contenu={totals.contenu} marketplace={totals.marketplace} /><View className="flex-1 space-y-2">{sources.map(s => (
-                <View key={s.id} className="flex items-center gap-2 text-sm"><View className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }} /><Text className="text-gray-300 flex-1">{s.label}</Text><Text className="font-semibold">{fmtFCFA(s.total)}</Text></View>
-              ))}</View></View></View>{}<View><View className="flex items-center justify-between mb-3"><Text className="font-semibold text-sm text-gray-300 uppercase tracking-wide">Par source</Text><View className="flex gap-1">{(["all", "premium", "contenu", "marketplace"] as const).map(s => (
-                <Pressable key={s} onPress={() => setSource(s)} className={`text-xs px-2 py-1 rounded-lg cursor-pointer transition-all ${source === s ? "bg-white text-gray-900 font-bold" : "bg-white/10 text-gray-400 hover:text-white"}`}>{s === "all" ? "Tous" : s.charAt(0).toUpperCase() + s.slice(1)}</Pressable>
-              ))}</View></View><View className="gap-3">{sources.map(s => (
-              <Pressable key={s.id} whileTap={{ scale: 0.97 }} onPress={() => { if (onNavigate) onNavigate(s.id === "premium" ? "premium" : s.id === "contenu" ? "revenus" : "marketplace-pro"); }} className="rounded-xl p-3 border border-white/10 bg-white/5 flex flex-col gap-2 transition-all text-left">
-                <View className="flex items-center justify-between"><View className="p-1.5 rounded-lg" style={{ backgroundColor: `${s.color}22` }}><Text style={{ color: s.color }}>{s.icon}</Text></View><Text className="text-xs text-emerald-400 font-semibold">+{s.trend}%</Text></View>
-                <View><Text className="text-xs text-gray-400">{s.label}</Text><Text className="font-bold text-sm leading-tight">{fmtFCFA(s.total)}</Text></View>
-                <SparklineChart data={sparkData(s.id as keyof Omit<RevenuePoint, "date">)} color={s.color} />
-              </Pressable>
-            ))}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/10 p-4"><View className="flex items-center justify-between mb-3"><Text className="font-semibold text-sm">Évolution cumulée</Text><View className="flex gap-3 text-xs text-gray-400"><Text><Text className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: COLORS.premium }} />Abonnem.</Text><Text><Text className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: COLORS.contenu }} />Contenu</Text><Text><Text className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: COLORS.marketplace }} />Market.</Text></View></View><BarStack points={filteredPoints} /><View className="flex justify-between mt-2">{filteredPoints.map((p, i) => (
-              <Text key={i} className="text-xs text-gray-500 flex-1 text-center">{p.date}</Text>
-            ))}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden"><Pressable onPress={() => setExpandGoals(v => !v)} className="w-full flex items-center justify-between px-4 py-3"><View className="flex items-center gap-2"><Target size={18} className="text-yellow-400" /><Text className="font-semibold text-sm">Objectifs de revenus</Text></View>{expandGoals ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}</Pressable><View>{expandGoals && (
-              <View initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                <View className="px-4 pb-4 space-y-3">{adjustedGoals.map(g => {
-                    const pct = Math.min(100, Math.round((g.current / g.target) * 100));
-                    const src = sources.find(s => s.id === g.source);
-                    return (
-                      <View key={g.id} className="space-y-1.5"><View className="flex items-center justify-between text-sm"><View className="flex items-center gap-1.5">{src && <Text style={{ color: src.color }}>{src.icon}</Text>}<Text className="text-gray-200">{g.label}</Text></View><View className="text-right"><Text className="font-semibold text-white text-xs">{pct}%</Text><Text className="text-gray-500 text-xs ml-1">avant {g.deadline}</Text></View></View><View className="h-2 bg-white/10 rounded-full overflow-hidden"><View initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, ease: "easeOut" }} className="h-full rounded-full" style={{ backgroundColor: src?.color ?? "#10b981" }} /></View><View className="flex justify-between text-xs text-gray-500"><Text>{typeof g.current === "number" && g.current > 1000 ? fmtFCFA(g.current) : g.current}</Text><Text>{typeof g.target === "number" && g.target > 1000 ? fmtFCFA(g.target) : g.target}</Text></View></View>
-                    );
-                  })}</View>
-              </View>
-            )}</View></View>{}<View><View className="flex items-center gap-2 mb-3"><Sparkles size={16} className="text-purple-400" /><Text className="font-semibold text-sm">Insights automatiques</Text></View><View className="space-y-2">{INSIGHTS.map(ins => (
-              <View key={ins.id} layout onPress={() => setExpandedInsight(expandedInsight === ins.id ? null : ins.id)} className={`rounded-xl p-3 border cursor-pointer transition-all ${
-                  ins.type === "up" ? "bg-emerald-500/10 border-emerald-500/20" :
-                  ins.type === "down" ? "bg-red-500/10 border-red-500/20" :
-                  "bg-blue-500/10 border-blue-500/20"
-                }`}>
-                <View className="flex items-start gap-2">{ins.type === "up" && <TrendingUp size={16} className="text-emerald-400 mt-0.5 shrink-0" />}{ins.type === "down" && <AlertCircle size={16} className="text-red-400 mt-0.5 shrink-0" />}{ins.type === "tip" && <Zap size={16} className="text-blue-400 mt-0.5 shrink-0" />}<Text className="text-sm text-gray-200">{ins.message}</Text></View>
-              </View>
-            ))}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/10 p-4"><View className="flex items-center gap-2 mb-3"><Calendar size={16} className="text-teal-400" /><Text className="font-semibold text-sm">Comparaison Mois / Mois</Text></View><View className="gap-3">{sources.map(s => {
-              const prev = Math.round(s.total * 0.8);
-              const diff = s.total - prev;
-              const pct = prev > 0 ? Math.round((diff / prev) * 100) : 0;
-              return (
-                <View key={s.id} className="rounded-xl bg-white/5 p-3 text-center"><Text className="text-xs text-gray-400 mb-1">{s.label}</Text><Text className="font-bold text-sm">{fmt(s.total)}</Text><Text className="text-xs text-gray-500">vs {fmt(prev)}</Text><View className={`mt-1 text-xs font-semibold flex items-center justify-center gap-0.5 ${pct >= 0 ? "text-emerald-400" : "text-red-400"}`}>{pct >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownLeft size={12} />}{pct >= 0 ? "+" : ""}{pct}<Text>%</Text></View></View>
-              );
-            })}</View></View>{}<View className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden"><Text className="px-4 pt-3 pb-2 text-xs text-gray-400 font-semibold uppercase tracking-wide">Accès rapide</Text>{[
-            { label: "Abonnements Premium", page: "premium", icon: <Crown size={16} className="text-yellow-400" />, sub: "Gérer vos plans" },
-            { label: "Revenus de Contenu", page: "revenus", icon: <Sparkles size={16} className="text-purple-400" />, sub: "Tips, dons & retraits" },
-            { label: "Marketplace Pro", page: "marketplace-pro", icon: <ShoppingBag size={16} className="text-cyan-400" />, sub: "Produits & commandes" },
-          ].map(link => (
-            <Pressable key={link.page} onPress={() => onNavigate && onNavigate(link.page)} className="w-full flex items-center gap-3 px-4 py-3 border-t border-white/5 transition-all"><View className="p-2 rounded-lg bg-white/5">{link.icon}</View><View className="flex-1 text-left"><Text className="text-sm font-medium">{link.label}</Text><Text className="text-xs text-gray-400">{link.sub}</Text></View><ChevronRight size={16} className="text-gray-500" /></Pressable>
-          ))}</View>{}<View className="rounded-xl bg-white/5 border border-white/10 p-3 flex items-center gap-3"><CheckCircle size={18} className="text-emerald-400 shrink-0" /><Text className="text-xs text-gray-400">Toutes vos données financières sont chiffrées et sécurisées localement.</Text></View></View></View>
+    <View style={styles.centerScreen}>
+      <View style={styles.loadingOrb}>
+        <ActivityIndicator size="small" color="#60a5fa" />
+      </View>
+
+      <Text style={styles.loadingTitle}>Chargement de vos revenus</Text>
+
+      <Text style={styles.loadingText}>
+        Récupération des données depuis DébrouillePro.
+      </Text>
+    </View>
   );
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────
-interface Props { onBack: () => void; onNavigate?: (page: string) => void; }
+function ErrorState(): React.ReactElement {
+  return (
+    <View style={styles.stateCard}>
+      <View style={styles.stateIconDanger}>
+        <AlertCircle size={22} color="#f87171" />
+      </View>
 
-export default function RevenusDashboardPage({ onBack, onNavigate }: Props) {
+      <Text style={styles.stateTitle}>Données indisponibles</Text>
+
+      <Text style={styles.stateText}>
+        Le tableau de bord ne peut pas afficher les données financières pour le
+        moment.
+      </Text>
+
+      <Text style={styles.stateHint}>
+        Aucune donnée n'est inventée pour remplacer la source financière.
+      </Text>
+    </View>
+  );
+}
+
+function EmptyState(): React.ReactElement {
+  return (
+    <View style={styles.stateCard}>
+      <View style={styles.stateIcon}>
+        <WalletCards size={22} color="#60a5fa" />
+      </View>
+
+      <Text style={styles.stateTitle}>Aucun revenu enregistré</Text>
+
+      <Text style={styles.stateText}>
+        Votre tableau de bord apparaîtra automatiquement dès qu'un revenu réel
+        sera enregistré.
+      </Text>
+
+      <Text style={styles.stateHint}>
+        Les chiffres de démonstration ne sont pas utilisés.
+      </Text>
+    </View>
+  );
+}
+
+function SourceIcon({
+  source,
+  color,
+}: {
+  source: string;
+  color: string;
+}): React.ReactElement {
+  const normalized = normalize(source);
+
+  if (normalized === "premium" || normalized === "abonnement") {
+    return <Crown size={17} color={color} />;
+  }
+
+  if (
+    normalized === "marketplace" ||
+    normalized === "vente" ||
+    normalized === "ventes"
+  ) {
+    return <ShoppingBag size={17} color={color} />;
+  }
+
+  if (normalized === "contenu" || normalized === "tips") {
+    return <Sparkles size={17} color={color} />;
+  }
+
+  return <CircleDollarSign size={17} color={color} />;
+}
+
+function RevenueBar({
+  value,
+  max,
+}: {
+  value: number;
+  max: number;
+}): React.ReactElement {
+  const percentage =
+    max > 0 ? Math.max(3, Math.min(100, (value / max) * 100)) : 3;
+
+  return (
+    <View style={styles.barTrack}>
+      <View
+        style={[
+          styles.barFill,
+          {
+            width: `${percentage}%`,
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+function AuthenticatedDashboard({
+  onBack,
+  onNavigate,
+}: Props): React.ReactElement {
+  const [period, setPeriod] = useState<Period>("30j");
+  const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
+  const [showStreams, setShowStreams] = useState(false);
+
+  const entriesResult = useQuery(api.revenues.getMyEntries, {});
+
+  const streamsResult = useQuery(api.revenues.getMyStreams, {});
+
+  const entries = entriesResult as RevenueEntry[] | undefined;
+
+  const streams = streamsResult as RevenueStream[] | undefined;
+
+  const isLoading = entriesResult === undefined || streamsResult === undefined;
+
+  const now = useMemo(() => new Date(), []);
+
+  const currencies = useMemo(() => {
+    if (!entries) {
+      return [];
+    }
+
+    const values = new Set<string>();
+
+    for (const entry of entries) {
+      const currency = entry.currency.trim();
+
+      if (currency) {
+        values.add(currency);
+      }
+    }
+
+    return Array.from(values).sort();
+  }, [entries]);
+
+  const effectiveCurrency =
+    selectedCurrency && currencies.includes(selectedCurrency)
+      ? selectedCurrency
+      : (currencies[0] ?? null);
+
+  const periodStart = useMemo(() => getPeriodStart(period, now), [period, now]);
+
+  const periodEnd = useMemo(() => now, [now]);
+
+  const validEntries = useMemo(() => {
+    if (!entries) {
+      return [];
+    }
+
+    return entries
+      .map((entry) => {
+        const date = safeDate(entry.date);
+
+        if (!date) {
+          return null;
+        }
+
+        return {
+          entry,
+          date,
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          entry: RevenueEntry;
+          date: Date;
+        } => item !== null,
+      );
+  }, [entries]);
+
+  const filteredEntries = useMemo(() => {
+    return validEntries.filter(({ entry, date }) => {
+      if (!isWithinPeriod(date, periodStart, periodEnd)) {
+        return false;
+      }
+
+      if (effectiveCurrency && entry.currency !== effectiveCurrency) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [effectiveCurrency, periodEnd, periodStart, validEntries]);
+
+  const allCurrencyTotals = useMemo(() => {
+    if (!entries) {
+      return [];
+    }
+
+    const map = new Map<string, CurrencyTotal>();
+
+    for (const entry of entries) {
+      const currency = entry.currency.trim();
+
+      if (!currency) {
+        continue;
+      }
+
+      const current = map.get(currency);
+
+      if (current) {
+        current.total += entry.amount;
+        current.count += 1;
+      } else {
+        map.set(currency, {
+          currency,
+          total: entry.amount,
+          count: 1,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [entries]);
+
+  const periodTotal = useMemo(() => {
+    return filteredEntries.reduce((sum, item) => sum + item.entry.amount, 0);
+  }, [filteredEntries]);
+
+  const transactionCount = filteredEntries.length;
+
+  const categoryTotals = useMemo<CategoryTotal[]>(() => {
+    const map = new Map<string, CategoryTotal>();
+
+    for (const { entry } of filteredEntries) {
+      const key = getCategoryKey(entry.category);
+      const label = getCategoryLabel(entry.category);
+
+      const current = map.get(key);
+
+      if (current) {
+        current.total += entry.amount;
+        current.count += 1;
+      } else {
+        map.set(key, {
+          key,
+          label,
+          total: entry.amount,
+          count: 1,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [filteredEntries]);
+
+  const buckets = useMemo<Bucket[]>(() => {
+    const map = new Map<string, Bucket>();
+
+    for (const { entry, date } of filteredEntries) {
+      const bucket = getBucket(date, period);
+      const current = map.get(bucket.key);
+
+      if (current) {
+        current.total += entry.amount;
+      } else {
+        map.set(bucket.key, {
+          key: bucket.key,
+          label: bucket.label,
+          total: entry.amount,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
+  }, [filteredEntries, period]);
+
+  const chartMax = useMemo(() => {
+    return Math.max(0, ...buckets.map((bucket) => bucket.total));
+  }, [buckets]);
+
+  const previousPeriodTotal = useMemo(() => {
+    if (!entries || !effectiveCurrency) {
+      return null;
+    }
+
+    const duration = periodEnd.getTime() - periodStart.getTime();
+
+    const previousEnd = new Date(periodStart.getTime() - 1);
+
+    const previousStart = new Date(previousEnd.getTime() - duration);
+
+    let total = 0;
+
+    for (const { entry, date } of validEntries) {
+      if (entry.currency !== effectiveCurrency) {
+        continue;
+      }
+
+      if (date >= previousStart && date <= previousEnd) {
+        total += entry.amount;
+      }
+    }
+
+    return total;
+  }, [effectiveCurrency, entries, periodEnd, periodStart, validEntries]);
+
+  const periodChange = useMemo(() => {
+    if (previousPeriodTotal === null || previousPeriodTotal === 0) {
+      return null;
+    }
+
+    return ((periodTotal - previousPeriodTotal) / previousPeriodTotal) * 100;
+  }, [periodTotal, previousPeriodTotal]);
+
+  const activeStreams = useMemo(() => {
+    if (!streams) {
+      return [];
+    }
+
+    return streams.filter((stream) => stream.active);
+  }, [streams]);
+
+  const activeStreamAmount = useMemo(() => {
+    if (!effectiveCurrency) {
+      return null;
+    }
+
+    return activeStreams
+      .filter((stream) => stream.currency === effectiveCurrency)
+      .reduce((sum, stream) => sum + stream.amount, 0);
+  }, [activeStreams, effectiveCurrency]);
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!entries || !streams) {
+    return <ErrorState />;
+  }
+
+  return (
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+            onPress={onBack}
+            style={({ pressed }) => [
+              styles.iconButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <ArrowLeft size={20} color="#ffffff" />
+          </Pressable>
+
+          <View style={styles.headerText}>
+            <Text style={styles.eyebrow}>FINANCES PERSONNELLES</Text>
+
+            <Text style={styles.title}>Revenus</Text>
+
+            <Text style={styles.subtitle}>
+              Données issues de vos enregistrements réels
+            </Text>
+          </View>
+
+          <View style={styles.liveIndicator}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>LIVE</Text>
+          </View>
+        </View>
+
+        <View style={styles.trustCard}>
+          <View style={styles.trustIcon}>
+            <Database size={17} color="#60a5fa" />
+          </View>
+
+          <View style={styles.trustContent}>
+            <Text style={styles.trustTitle}>Source de vérité</Text>
+
+            <Text style={styles.trustText}>
+              Ce tableau affiche uniquement les revenus enregistrés dans votre
+              compte. Aucun chiffre de démonstration n'est ajouté.
+            </Text>
+          </View>
+        </View>
+
+        {currencies.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>DEVISE</Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chips}
+            >
+              {currencies.map((currency) => {
+                const selected = currency === effectiveCurrency;
+
+                return (
+                  <Pressable
+                    key={currency}
+                    onPress={() => setSelectedCurrency(currency)}
+                    style={[styles.chip, selected && styles.chipActive]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        selected && styles.chipTextActive,
+                      ]}
+                    >
+                      {currency}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>PÉRIODE</Text>
+
+          <View style={styles.periodRow}>
+            {(["7j", "30j", "90j", "12m"] as Period[]).map((value) => {
+              const selected = period === value;
+
+              return (
+                <Pressable
+                  key={value}
+                  onPress={() => setPeriod(value)}
+                  style={[
+                    styles.periodButton,
+                    selected && styles.periodButtonActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.periodText,
+                      selected && styles.periodTextActive,
+                    ]}
+                  >
+                    {value}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.heroCard}>
+          <View style={styles.heroTop}>
+            <View>
+              <Text style={styles.heroLabel}>REVENUS ENREGISTRÉS</Text>
+
+              <Text style={styles.heroAmount}>
+                {effectiveCurrency
+                  ? formatMoney(periodTotal, effectiveCurrency)
+                  : "—"}
+              </Text>
+
+              <Text style={styles.heroPeriod}>{PERIOD_LABELS[period]}</Text>
+            </View>
+
+            <View style={styles.heroIcon}>
+              <BarChart3 size={24} color="#6ee7b7" />
+            </View>
+          </View>
+
+          <View style={styles.heroDivider} />
+
+          <View style={styles.heroStats}>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatValue}>{transactionCount}</Text>
+
+              <Text style={styles.heroStatLabel}>opérations</Text>
+            </View>
+
+            <View style={styles.heroStatDivider} />
+
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatValue}>{categoryTotals.length}</Text>
+
+              <Text style={styles.heroStatLabel}>catégories</Text>
+            </View>
+
+            <View style={styles.heroStatDivider} />
+
+            <View style={styles.heroStat}>
+              {periodChange === null ? (
+                <>
+                  <Text style={styles.heroStatValue}>—</Text>
+
+                  <Text style={styles.heroStatLabel}>comparaison</Text>
+                </>
+              ) : (
+                <>
+                  <View style={styles.changeRow}>
+                    {periodChange >= 0 ? (
+                      <ArrowUpRight size={15} color="#6ee7b7" />
+                    ) : (
+                      <ArrowDownLeft size={15} color="#fca5a5" />
+                    )}
+
+                    <Text
+                      style={[
+                        styles.heroStatValue,
+                        periodChange >= 0 ? styles.positive : styles.negative,
+                      ]}
+                    >
+                      {periodChange >= 0 ? "+" : ""}
+                      {periodChange.toFixed(1)}%
+                    </Text>
+                  </View>
+
+                  <Text style={styles.heroStatLabel}>
+                    vs période précédente
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {entries.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>Évolution réelle</Text>
+
+                  <Text style={styles.sectionSubtitle}>
+                    Agrégation des opérations enregistrées
+                  </Text>
+                </View>
+
+                <RefreshCw size={17} color="#64748b" />
+              </View>
+
+              <View style={styles.chartCard}>
+                {buckets.length === 0 ? (
+                  <View style={styles.emptyChart}>
+                    <Info size={20} color="#64748b" />
+
+                    <Text style={styles.emptyChartText}>
+                      Aucune opération dans cette période.
+                    </Text>
+                  </View>
+                ) : (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chartScroll}
+                  >
+                    {buckets.map((bucket) => (
+                      <View key={bucket.key} style={styles.chartColumn}>
+                        <Text style={styles.chartValue} numberOfLines={1}>
+                          {formatNumber(bucket.total)}
+                        </Text>
+
+                        <View style={styles.chartArea}>
+                          <RevenueBar value={bucket.total} max={chartMax} />
+                        </View>
+
+                        <Text style={styles.chartLabel} numberOfLines={1}>
+                          {bucket.label}
+                        </Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>Répartition</Text>
+
+                  <Text style={styles.sectionSubtitle}>
+                    Par catégorie réelle
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.listCard}>
+                {categoryTotals.map((category, index) => {
+                  const percentage =
+                    periodTotal > 0 ? (category.total / periodTotal) * 100 : 0;
+
+                  return (
+                    <View
+                      key={category.key}
+                      style={[
+                        styles.categoryRow,
+                        index < categoryTotals.length - 1 && styles.rowBorder,
+                      ]}
+                    >
+                      <View style={styles.categoryIcon}>
+                        <SourceIcon source={category.key} color="#93c5fd" />
+                      </View>
+
+                      <View style={styles.categoryContent}>
+                        <View style={styles.categoryTop}>
+                          <Text style={styles.categoryName} numberOfLines={1}>
+                            {category.label}
+                          </Text>
+
+                          <Text style={styles.categoryAmount}>
+                            {effectiveCurrency
+                              ? formatMoney(category.total, effectiveCurrency)
+                              : formatNumber(category.total)}
+                          </Text>
+                        </View>
+
+                        <RevenueBar value={category.total} max={periodTotal} />
+
+                        <View style={styles.categoryBottom}>
+                          <Text style={styles.mutedText}>
+                            {category.count} opération
+                            {category.count > 1 ? "s" : ""}
+                          </Text>
+
+                          <Text style={styles.percentageText}>
+                            {percentage.toFixed(1)}%
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </>
+        )}
+
+        <View style={styles.section}>
+          <Pressable
+            onPress={() => setShowStreams((value) => !value)}
+            style={styles.collapsibleHeader}
+          >
+            <View style={styles.sectionHeaderLeft}>
+              <View style={styles.smallIconBox}>
+                <CalendarDays size={17} color="#a78bfa" />
+              </View>
+
+              <View>
+                <Text style={styles.sectionTitle}>Revenus récurrents</Text>
+
+                <Text style={styles.sectionSubtitle}>
+                  Sources configurées dans votre compte
+                </Text>
+              </View>
+            </View>
+
+            {showStreams ? (
+              <ChevronUp size={19} color="#64748b" />
+            ) : (
+              <ChevronDown size={19} color="#64748b" />
+            )}
+          </Pressable>
+
+          {showStreams && (
+            <View style={styles.streamCard}>
+              {activeStreams.length === 0 ? (
+                <Text style={styles.emptyStreamText}>
+                  Aucune source récurrente active.
+                </Text>
+              ) : (
+                activeStreams.map((stream, index) => (
+                  <View
+                    key={stream._id}
+                    style={[
+                      styles.streamRow,
+                      index < activeStreams.length - 1 && styles.rowBorder,
+                    ]}
+                  >
+                    <View style={styles.streamIcon}>
+                      <CircleDollarSign size={18} color="#a78bfa" />
+                    </View>
+
+                    <View style={styles.streamContent}>
+                      <Text style={styles.streamName} numberOfLines={1}>
+                        {stream.source}
+                      </Text>
+
+                      <Text style={styles.streamDescription} numberOfLines={2}>
+                        {stream.description}
+                      </Text>
+
+                      <Text style={styles.streamFrequency}>
+                        {stream.frequency}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.streamAmount}>
+                      {formatMoney(stream.amount, stream.currency)}
+                    </Text>
+                  </View>
+                ))
+              )}
+
+              {effectiveCurrency && activeStreamAmount !== null && (
+                <View style={styles.streamSummary}>
+                  <Text style={styles.streamSummaryLabel}>
+                    Total récurrent actif
+                  </Text>
+
+                  <Text style={styles.streamSummaryAmount}>
+                    {formatMoney(activeStreamAmount, effectiveCurrency)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        {allCurrencyTotals.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Vue par devise</Text>
+
+                <Text style={styles.sectionSubtitle}>
+                  Les devises restent séparées pour éviter toute conversion
+                  implicite.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.currencyGrid}>
+              {allCurrencyTotals.map((currency) => (
+                <Pressable
+                  key={currency.currency}
+                  onPress={() => setSelectedCurrency(currency.currency)}
+                  style={[
+                    styles.currencyCard,
+                    effectiveCurrency === currency.currency &&
+                      styles.currencyCardActive,
+                  ]}
+                >
+                  <Text style={styles.currencyCode}>{currency.currency}</Text>
+
+                  <Text style={styles.currencyAmount}>
+                    {formatNumber(currency.total)}
+                  </Text>
+
+                  <Text style={styles.currencyCount}>
+                    {currency.count} opération
+                    {currency.count > 1 ? "s" : ""}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={styles.integrityCard}>
+          <View style={styles.integrityIcon}>
+            <Database size={18} color="#34d399" />
+          </View>
+
+          <View style={styles.integrityContent}>
+            <Text style={styles.integrityTitle}>Intégrité des données</Text>
+
+            <Text style={styles.integrityText}>
+              Les montants affichés proviennent des enregistrements de revenus
+              de votre compte. Les données absentes restent absentes : aucune
+              valeur fictive n'est utilisée.
+            </Text>
+          </View>
+        </View>
+
+        <Pressable
+          onPress={() => onNavigate?.("revenus")}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <WalletCards size={17} color="#cbd5e1" />
+
+          <Text style={styles.secondaryButtonText}>Gérer mes revenus</Text>
+        </Pressable>
+
+        <View style={styles.bottomSpace} />
+      </ScrollView>
+    </View>
+  );
+}
+
+export default function RevenusDashboardPage(props: Props): React.ReactElement {
   return (
     <>
       <AuthLoading>
-        <RevenueSkeleton />
+        <LoadingScreen />
       </AuthLoading>
+
       <Unauthenticated>
-        <View className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex flex-col items-center justify-center gap-4 p-6">
-          <Pressable onPress={onBack} className="absolute top-4 left-4 p-2 rounded-full bg-white/10 transition-colors">
-            <ArrowLeft size={18} className="text-white" />
-          </Pressable>
-          <BarChart2 size={48} className="text-emerald-400/60" />
-          <Text className="text-lg font-bold text-white">Tableau de Bord Revenus</Text>
-          <Text className="text-sm text-gray-400 text-center">Connectez-vous pour voir vos revenus et statistiques</Text>
-          <SignInButton />
+        <View style={styles.screen}>
+          <View style={styles.unauthenticated}>
+            <Pressable
+              onPress={props.onBack}
+              style={({ pressed }) => [
+                styles.iconButton,
+                styles.absoluteBack,
+                pressed && styles.pressed,
+              ]}
+            >
+              <ArrowLeft size={20} color="#ffffff" />
+            </Pressable>
+
+            <View style={styles.authIcon}>
+              <WalletCards size={34} color="#60a5fa" />
+            </View>
+
+            <Text style={styles.authTitle}>Tableau de bord Revenus</Text>
+
+            <Text style={styles.authText}>
+              Connectez-vous pour accéder à vos données financières réelles.
+            </Text>
+
+            <SignInButton />
+          </View>
         </View>
       </Unauthenticated>
+
       <Authenticated>
-        <RevenusDashboardInner onBack={onBack} onNavigate={onNavigate} />
+        <AuthenticatedDashboard {...props} />
       </Authenticated>
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#050812",
+  },
+
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 40,
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+
+  headerText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  eyebrow: {
+    color: "#64748b",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    marginBottom: 3,
+  },
+
+  title: {
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "800",
+  },
+
+  subtitle: {
+    color: "#94a3b8",
+    fontSize: 11,
+    marginTop: 3,
+  },
+
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  pressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.97 }],
+  },
+
+  liveIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: "rgba(52,211,153,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.15)",
+  },
+
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#34d399",
+    marginRight: 5,
+  },
+
+  liveText: {
+    color: "#6ee7b7",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  trustCard: {
+    flexDirection: "row",
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(96,165,250,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.14)",
+    marginBottom: 18,
+  },
+
+  trustIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(96,165,250,0.10)",
+  },
+
+  trustContent: {
+    flex: 1,
+    marginLeft: 10,
+  },
+
+  trustTitle: {
+    color: "#dbeafe",
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 3,
+  },
+
+  trustText: {
+    color: "#94a3b8",
+    fontSize: 11,
+    lineHeight: 17,
+  },
+
+  section: {
+    marginBottom: 18,
+  },
+
+  sectionLabel: {
+    color: "#64748b",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    marginBottom: 8,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  sectionHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+
+  sectionTitle: {
+    color: "#f8fafc",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  sectionSubtitle: {
+    color: "#64748b",
+    fontSize: 10,
+    marginTop: 3,
+    lineHeight: 15,
+  },
+
+  chips: {
+    gap: 8,
+  },
+
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  chipActive: {
+    backgroundColor: "#2563eb",
+    borderColor: "#3b82f6",
+  },
+
+  chipText: {
+    color: "#94a3b8",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  chipTextActive: {
+    color: "#ffffff",
+  },
+
+  periodRow: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  periodButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+
+  periodButtonActive: {
+    backgroundColor: "#ffffff",
+  },
+
+  periodText: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  periodTextActive: {
+    color: "#0f172a",
+  },
+
+  heroCard: {
+    padding: 18,
+    borderRadius: 22,
+    backgroundColor: "rgba(16,185,129,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.18)",
+    marginBottom: 20,
+  },
+
+  heroTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  heroLabel: {
+    color: "#94a3b8",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+
+  heroAmount: {
+    color: "#ffffff",
+    fontSize: 30,
+    fontWeight: "900",
+    marginTop: 7,
+  },
+
+  heroPeriod: {
+    color: "#64748b",
+    fontSize: 11,
+    marginTop: 3,
+  },
+
+  heroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(52,211,153,0.10)",
+  },
+
+  heroDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    marginVertical: 17,
+  },
+
+  heroStats: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  heroStat: {
+    flex: 1,
+  },
+
+  heroStatValue: {
+    color: "#f8fafc",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  heroStatLabel: {
+    color: "#64748b",
+    fontSize: 9,
+    marginTop: 3,
+  },
+
+  heroStatDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginHorizontal: 9,
+  },
+
+  changeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+
+  positive: {
+    color: "#6ee7b7",
+  },
+
+  negative: {
+    color: "#fca5a5",
+  },
+
+  chartCard: {
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    paddingVertical: 16,
+  },
+
+  chartScroll: {
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+
+  chartColumn: {
+    width: 54,
+    alignItems: "center",
+  },
+
+  chartValue: {
+    color: "#64748b",
+    fontSize: 8,
+    width: 54,
+    textAlign: "center",
+    marginBottom: 7,
+  },
+
+  chartArea: {
+    height: 130,
+    width: "100%",
+    justifyContent: "flex-end",
+  },
+
+  chartLabel: {
+    color: "#64748b",
+    fontSize: 8,
+    width: 54,
+    textAlign: "center",
+    marginTop: 7,
+  },
+
+  barTrack: {
+    height: 7,
+    borderRadius: 5,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  barFill: {
+    height: "100%",
+    borderRadius: 5,
+    backgroundColor: "#3b82f6",
+  },
+
+  emptyChart: {
+    minHeight: 130,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+
+  emptyChartText: {
+    color: "#64748b",
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 8,
+  },
+
+  listCard: {
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  categoryRow: {
+    flexDirection: "row",
+    padding: 14,
+  },
+
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+
+  categoryIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(96,165,250,0.08)",
+    marginRight: 10,
+  },
+
+  categoryContent: {
+    flex: 1,
+  },
+
+  categoryTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  categoryName: {
+    color: "#e2e8f0",
+    fontSize: 12,
+    fontWeight: "700",
+    flex: 1,
+    marginRight: 8,
+  },
+
+  categoryAmount: {
+    color: "#f8fafc",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  categoryBottom: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+
+  mutedText: {
+    color: "#64748b",
+    fontSize: 9,
+  },
+
+  percentageText: {
+    color: "#93c5fd",
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  collapsibleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  smallIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.08)",
+    marginRight: 10,
+  },
+
+  streamCard: {
+    marginTop: 8,
+    borderRadius: 17,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  streamRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 13,
+  },
+
+  streamIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.08)",
+    marginRight: 10,
+  },
+
+  streamContent: {
+    flex: 1,
+    marginRight: 8,
+  },
+
+  streamName: {
+    color: "#e2e8f0",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  streamDescription: {
+    color: "#64748b",
+    fontSize: 9,
+    lineHeight: 14,
+    marginTop: 2,
+  },
+
+  streamFrequency: {
+    color: "#a78bfa",
+    fontSize: 9,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+
+  streamAmount: {
+    color: "#f8fafc",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  streamSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 13,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(167,139,250,0.04)",
+  },
+
+  streamSummaryLabel: {
+    color: "#94a3b8",
+    fontSize: 10,
+  },
+
+  streamSummaryAmount: {
+    color: "#c4b5fd",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  emptyStreamText: {
+    color: "#64748b",
+    fontSize: 11,
+    padding: 16,
+    textAlign: "center",
+  },
+
+  currencyGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+  },
+
+  currencyCard: {
+    width: "48%",
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  currencyCardActive: {
+    backgroundColor: "rgba(37,99,235,0.10)",
+    borderColor: "rgba(59,130,246,0.30)",
+  },
+
+  currencyCode: {
+    color: "#60a5fa",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+
+  currencyAmount: {
+    color: "#f8fafc",
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+
+  currencyCount: {
+    color: "#64748b",
+    fontSize: 9,
+    marginTop: 3,
+  },
+
+  integrityCard: {
+    flexDirection: "row",
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(52,211,153,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.12)",
+    marginBottom: 12,
+  },
+
+  integrityIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(52,211,153,0.08)",
+  },
+
+  integrityContent: {
+    flex: 1,
+    marginLeft: 10,
+  },
+
+  integrityTitle: {
+    color: "#a7f3d0",
+    fontSize: 11,
+    fontWeight: "800",
+    marginBottom: 3,
+  },
+
+  integrityText: {
+    color: "#64748b",
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  secondaryButton: {
+    minHeight: 48,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  secondaryButtonText: {
+    color: "#cbd5e1",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  stateCard: {
+    marginTop: 20,
+    padding: 22,
+    borderRadius: 20,
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  stateIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(96,165,250,0.08)",
+  },
+
+  stateIconDanger: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(248,113,113,0.08)",
+  },
+
+  stateTitle: {
+    color: "#f8fafc",
+    fontSize: 15,
+    fontWeight: "800",
+    marginTop: 12,
+  },
+
+  stateText: {
+    color: "#94a3b8",
+    fontSize: 11,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 6,
+  },
+
+  stateHint: {
+    color: "#475569",
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 9,
+  },
+
+  centerScreen: {
+    flex: 1,
+    backgroundColor: "#050812",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 28,
+  },
+
+  loadingOrb: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(96,165,250,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.14)",
+  },
+
+  loadingTitle: {
+    color: "#e2e8f0",
+    fontSize: 14,
+    fontWeight: "800",
+    marginTop: 14,
+  },
+
+  loadingText: {
+    color: "#64748b",
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 5,
+  },
+
+  unauthenticated: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 28,
+  },
+
+  absoluteBack: {
+    position: "absolute",
+    top: 18,
+    left: 16,
+  },
+
+  authIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(96,165,250,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.14)",
+  },
+
+  authTitle: {
+    color: "#ffffff",
+    fontSize: 19,
+    fontWeight: "800",
+    marginTop: 18,
+    textAlign: "center",
+  },
+
+  authText: {
+    color: "#64748b",
+    fontSize: 11,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 7,
+    marginBottom: 18,
+  },
+
+  bottomSpace: {
+    height: 20,
+  },
+});

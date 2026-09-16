@@ -1,40 +1,293 @@
-import { View, Pressable, Text } from "react-native";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
-  Moon,
-  Sun,
-  Monitor,
-  Type,
-  LayoutGrid,
-  Check,
-  Palette,
-  Sparkles,
-  RotateCcw,
-  Eye,
-  Contrast,
-  WandSparkles,
+  Alert,
+  Animated,
+  Easing,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
   Accessibility,
-  Smartphone,
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Contrast,
+  Eye,
+  LayoutGrid,
+  Monitor,
+  Moon,
+  Palette,
+  RotateCcw,
   Save,
+  Smartphone,
+  Sparkles,
+  Sun,
+  Type,
+  WandSparkles,
 } from "lucide-react-native";
-import { useAppearance, ACCENT_PALETTES } from "@/hooks/use-appearance.ts";
+
+import { ACCENT_PALETTES, useAppearance } from "@/hooks/use-appearance.ts";
+
 import type {
   AccentColor,
-  ColorMode,
-  TextSize,
-  Density,
   ColorBlindMode,
+  ColorMode,
+  Density,
+  TextSize,
 } from "@/hooks/use-appearance.ts";
-import { toast } from "sonner";
-import { useMemo, useState } from "react";
 
 interface ThemePageProps {
   onBack: () => void;
 }
 
-function SectionLabel({ label, sub }: { label: string; sub?: string }) {
+type IconComponent = React.ComponentType<{
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}>;
+
+const COLORS = {
+  background: "#020412",
+  backgroundSecondary: "#070A17",
+  surface: "rgba(255,255,255,0.045)",
+  surfaceStrong: "rgba(255,255,255,0.075)",
+  border: "rgba(255,255,255,0.08)",
+  borderStrong: "rgba(255,255,255,0.14)",
+  white: "#FFFFFF",
+  textSecondary: "rgba(255,255,255,0.56)",
+  textMuted: "rgba(255,255,255,0.32)",
+  textFaint: "rgba(255,255,255,0.20)",
+};
+
+const PREVIEW_ITEMS = [
+  {
+    emoji: "🏠",
+    title: "Appartement F3 Gombe",
+    subtitle: "1 500 $/mois · Kinshasa",
+    tag: "Immo",
+  },
+  {
+    emoji: "💼",
+    title: "Développeur React Native",
+    subtitle: "2 200 $/mois · Télétravail",
+    tag: "Emploi",
+  },
+  {
+    emoji: "🎟️",
+    title: "Festival de la ville",
+    subtitle: "Samedi · 18:00",
+    tag: "Événement",
+  },
+] as const;
+
+const TEXT_OPTIONS: ReadonlyArray<{
+  key: TextSize;
+  label: string;
+  description: string;
+  sampleSize: number;
+}> = [
+  {
+    key: "petit",
+    label: "Petit",
+    description: "14 px",
+    sampleSize: 14,
+  },
+  {
+    key: "normal",
+    label: "Normal",
+    description: "16 px",
+    sampleSize: 17,
+  },
+  {
+    key: "grand",
+    label: "Grand",
+    description: "18 px",
+    sampleSize: 20,
+  },
+];
+
+const DENSITY_OPTIONS: ReadonlyArray<{
+  key: Density;
+  label: string;
+  description: string;
+  rows: number;
+  rowHeight: number;
+  Icon: IconComponent;
+}> = [
+  {
+    key: "compact",
+    label: "Compact",
+    description: "Plus de contenu visible",
+    rows: 5,
+    rowHeight: 5,
+    Icon: LayoutGrid,
+  },
+  {
+    key: "confortable",
+    label: "Confortable",
+    description: "Espaces généreux",
+    rows: 3,
+    rowHeight: 9,
+    Icon: Smartphone,
+  },
+];
+
+const COLOR_BLIND_OPTIONS: ReadonlyArray<{
+  key: ColorBlindMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: "none",
+    label: "Normal",
+    description: "Aucun filtre",
+  },
+  {
+    key: "deuteranopia",
+    label: "Deutéranopie",
+    description: "Daltonisme rouge-vert",
+  },
+  {
+    key: "protanopia",
+    label: "Protanopie",
+    description: "Insensibilité au rouge",
+  },
+  {
+    key: "tritanopia",
+    label: "Tritanopie",
+    description: "Daltonisme bleu-jaune",
+  },
+  {
+    key: "achromatopsia",
+    label: "Achromatopsie",
+    description: "Absence de perception des couleurs",
+  },
+];
+
+function hexToRgba(hex: string, alpha: number): string {
+  const normalized = hex.replace("#", "");
+
+  if (normalized.length !== 6) {
+    return `rgba(255,255,255,${alpha})`;
+  }
+
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+
+  return `rgba(${red},${green},${blue},${alpha})`;
+}
+
+function SectionLabel({
+  label,
+  description,
+  accent,
+}: {
+  label: string;
+  description?: string;
+  accent: string;
+}) {
   return (
-    <View className="mb-3 px-1"><Text className="text-[10px] font-black text-white/30 uppercase tracking-[0.18em]">{label}</Text>{sub && <Text className="text-xs text-white/35 mt-1">{sub}</Text>}</View>
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionTitleRow}>
+        <View style={[styles.sectionIndicator, { backgroundColor: accent }]} />
+
+        <Text style={styles.sectionLabel}>{label}</Text>
+      </View>
+
+      {description ? (
+        <Text style={styles.sectionDescription}>{description}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function AnimatedPressable({
+  children,
+  onPress,
+  style,
+  accessibilityLabel,
+  accessibilityRole = "button",
+  disabled = false,
+}: {
+  children: React.ReactNode;
+  onPress: () => void;
+  style?: object;
+  accessibilityLabel?: string;
+  accessibilityRole?: "button" | "radio";
+  disabled?: boolean;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = useCallback(() => {
+    Animated.spring(scale, {
+      toValue: 0.975,
+      useNativeDriver: true,
+      speed: 30,
+      bounciness: 5,
+    }).start();
+  }, [scale]);
+
+  const handlePressOut = useCallback(() => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 24,
+      bounciness: 7,
+    }).start();
+  }, [scale]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          transform: [{ scale }],
+          opacity: disabled ? 0.45 : 1,
+        },
+      ]}
+    >
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole={accessibilityRole}
+        disabled={disabled}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function SelectionBadge({
+  accent,
+  visible,
+}: {
+  accent: string;
+  visible: boolean;
+}) {
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <View
+      style={[
+        styles.selectionBadge,
+        {
+          backgroundColor: accent,
+          shadowColor: accent,
+        },
+      ]}
+    >
+      <Check size={12} color="#FFFFFF" strokeWidth={3} />
+    </View>
   );
 }
 
@@ -49,304 +302,1851 @@ function LivePreview({
   textSize: TextSize;
   density: Density;
 }) {
-  const p = ACCENT_PALETTES[accent];
+  const palette = ACCENT_PALETTES[accent];
+
   const isLight = colorMode === "clair";
   const isCompact = density === "compact";
 
-  const bg = isLight ? "#eef0f7" : "#090b18";
-  const cardBg = isLight ? "#ffffff" : "#121526";
-  const textPrimary = isLight ? "#171827" : "#ffffff";
-  const textSecondary = isLight ? "#65687b" : "rgba(255,255,255,0.42)";
-  const fontSize = textSize === "petit" ? 11 : textSize === "grand" ? 14 : 12;
-  const pad = isCompact ? "8px 10px" : "12px 14px";
+  const backgroundColor = isLight ? "#EEF0F7" : "#080B19";
+  const cardColor = isLight ? "#FFFFFF" : "#121627";
+  const primaryText = isLight ? "#161827" : "#FFFFFF";
+  const secondaryText = isLight ? "#65697B" : "rgba(255,255,255,0.46)";
+
+  const titleSize = textSize === "petit" ? 11 : textSize === "grand" ? 14 : 12;
+
+  const subtitleSize = Math.max(titleSize - 2, 9);
 
   return (
-    <View layout className="relative rounded-[24px] overflow-hidden" style={{ backgroundColor: bg, borderStyle: "solid", boxShadow: `0 18px 50px ${p.glow}` }}>
-      <View className="absolute -top-16 -right-12 w-44 h-44 rounded-full pointer-events-none" style={{  }} />
+    <View
+      style={[
+        styles.preview,
+        {
+          backgroundColor,
+          borderColor: hexToRgba(palette.hex, 0.22),
+          shadowColor: palette.hex,
+        },
+      ]}
+    >
+      <View
+        pointerEvents="none"
+        style={[
+          styles.previewGlow,
+          {
+            backgroundColor: hexToRgba(palette.hex, 0.14),
+          },
+        ]}
+      />
 
-      <View className="relative flex items-center gap-2 px-3.5 py-3" style={{ backgroundColor: `${p.hex}18` }}><View className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ boxShadow: `0 6px 16px ${p.glow}` }}><Sparkles size={13} className="text-white" /></View><Text className="font-black" style={{ color: textPrimary, fontSize: fontSize + 1 }}>Débrouille Pro
-        </Text><View className="ml-auto flex gap-1.5">{[p.gradFrom, p.gradTo, `${p.hex}66`].map((c, i) => (
-            <View key={i} className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c }} />
-          ))}</View></View>
+      <View
+        style={[
+          styles.previewHeader,
+          {
+            backgroundColor: hexToRgba(palette.hex, 0.1),
+            borderBottomColor: hexToRgba(palette.hex, 0.14),
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.previewLogo,
+            {
+              backgroundColor: palette.hex,
+              shadowColor: palette.hex,
+            },
+          ]}
+        >
+          <Sparkles size={13} color="#FFFFFF" strokeWidth={2.4} />
+        </View>
 
-      {[
-        {
-          emoji: "🏠",
-          title: "Appartement F3 Gombe",
-          sub: "1 500 $/mois · Kinshasa",
-          tag: "Immo",
-        },
-        {
-          emoji: "💼",
-          title: "Développeur React Native",
-          sub: "2 200 $/mois · Télétravail",
-          tag: "Emploi",
-        },
-        {
-          emoji: "🎟️",
-          title: "Festival de la ville",
-          sub: "Samedi · 18:00",
-          tag: "Événement",
-        },
-      ].map((item, i) => (
-        <View key={item.title} className="flex items-center gap-2 border-b" style={{ padding: pad, backgroundColor: i % 2 === 0 ? cardBg : `${cardBg}cc`, borderColor: `${p.hex}18` }}><View className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0" style={{ backgroundColor: `${p.hex}18` }}>{item.emoji}</View><View className="flex-1 min-w-0"><Text className="font-bold truncate" style={{ color: textPrimary, fontSize }}>{item.title}</Text><Text className="truncate" style={{
-                color: textSecondary,
-                fontSize: Math.max(fontSize - 1, 9),
-              }}>{item.sub}</Text></View><View className="shrink-0 px-2 py-1 rounded-full text-white font-bold" style={{ fontSize: Math.max(fontSize - 2, 8) }}>{item.tag}</View></View>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.previewBrand,
+            {
+              color: primaryText,
+              fontSize: titleSize + 1,
+            },
+          ]}
+        >
+          Débrouille Pro
+        </Text>
+
+        <View style={styles.previewPalette}>
+          <View
+            style={[styles.previewDot, { backgroundColor: palette.gradFrom }]}
+          />
+          <View
+            style={[styles.previewDot, { backgroundColor: palette.gradTo }]}
+          />
+          <View
+            style={[
+              styles.previewDot,
+              { backgroundColor: hexToRgba(palette.hex, 0.48) },
+            ]}
+          />
+        </View>
+      </View>
+
+      {PREVIEW_ITEMS.map((item, index) => (
+        <View
+          key={item.title}
+          style={[
+            styles.previewItem,
+            {
+              paddingVertical: isCompact ? 9 : 13,
+              backgroundColor:
+                index % 2 === 0
+                  ? cardColor
+                  : isLight
+                    ? "#F8F9FC"
+                    : "rgba(18,22,39,0.78)",
+              borderBottomColor: hexToRgba(palette.hex, 0.08),
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.previewEmoji,
+              {
+                backgroundColor: hexToRgba(palette.hex, 0.11),
+              },
+            ]}
+          >
+            <Text style={styles.previewEmojiText}>{item.emoji}</Text>
+          </View>
+
+          <View style={styles.previewItemContent}>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.previewItemTitle,
+                {
+                  color: primaryText,
+                  fontSize: titleSize,
+                },
+              ]}
+            >
+              {item.title}
+            </Text>
+
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.previewItemSubtitle,
+                {
+                  color: secondaryText,
+                  fontSize: subtitleSize,
+                },
+              ]}
+            >
+              {item.subtitle}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.previewTag,
+              {
+                backgroundColor: hexToRgba(palette.hex, 0.12),
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.previewTagText,
+                {
+                  color: palette.hex,
+                  fontSize: Math.max(subtitleSize - 1, 8),
+                },
+              ]}
+            >
+              {item.tag}
+            </Text>
+          </View>
+        </View>
       ))}
 
-      <View className="flex justify-around px-2 py-2.5" style={{ backgroundColor: cardBg }}>{["🏠", "🔍", "➕", "💬", "👤"].map((icon, i) => (
-          <View key={i} className="w-8 h-8 rounded-xl flex items-center justify-center text-sm" style={{ backgroundColor: i === 0 ? `${p.hex}25` : "transparent" }}>{icon}</View>
-        ))}</View>
+      <View style={[styles.previewBottomBar, { backgroundColor: cardColor }]}>
+        {["⌂", "⌕", "+", "◌", "◉"].map((icon, index) => (
+          <View
+            key={`${icon}-${index}`}
+            style={[
+              styles.previewNavItem,
+              index === 0 && {
+                backgroundColor: hexToRgba(palette.hex, 0.14),
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.previewNavIcon,
+                {
+                  color:
+                    index === 0
+                      ? palette.hex
+                      : isLight
+                        ? "#7B7E8F"
+                        : "rgba(255,255,255,0.40)",
+                },
+              ]}
+            >
+              {icon}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
 
-function AccentSwatch({
-  colorKey,
+function AccentCard({
   palette,
-  isActive,
-  onClick,
+  active,
+  onPress,
 }: {
-  colorKey: AccentColor;
   palette: (typeof ACCENT_PALETTES)[AccentColor];
-  isActive: boolean;
-  onClick: () => void;
+  active: boolean;
+  onPress: () => void;
 }) {
   return (
-    <Pressable aria-pressed={isActive} onPress={onClick} whileTap={{ scale: 0.94 }} whileHover={{ y: -2 }} className="relative flex flex-col items-center gap-2 p-3 rounded-2xl" style={{ backgroundColor: isActive ? `${palette.hex}18` : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid", boxShadow: isActive ? `0 0 22px ${palette.glow}` : "none" }}>
-      <View className="w-full h-11 rounded-xl" style={{ boxShadow: `inset 0 1px 0 rgba(255,255,255,.18)` }} />
+    <AnimatedPressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel={`Couleur ${palette.label}`}
+      style={[
+        styles.accentCard,
+        active && {
+          backgroundColor: hexToRgba(palette.hex, 0.1),
+          borderColor: hexToRgba(palette.hex, 0.42),
+          shadowColor: palette.hex,
+          shadowOpacity: 0.22,
+          shadowRadius: 18,
+          elevation: 5,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.accentPreview,
+          {
+            backgroundColor: palette.hex,
+            shadowColor: palette.hex,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.accentPreviewHighlight,
+            {
+              backgroundColor: "rgba(255,255,255,0.20)",
+            },
+          ]}
+        />
 
-      <Text className="text-xs font-bold" style={{
-          color: isActive ? palette.hex : "rgba(255,255,255,0.45)",
-        }}>{palette.label}</Text>
-
-<View>
-        {isActive && (
-          <View initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0, opacity: 0 }} className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: palette.hex, boxShadow: `0 4px 12px ${palette.glow}` }}>
-            <Check size={10} className="text-white" />
-          </View>
-        )}
+        <View
+          style={[
+            styles.accentGradientPoint,
+            {
+              backgroundColor: palette.gradTo,
+            },
+          ]}
+        />
       </View>
-    </Pressable>
+
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.accentLabel,
+          {
+            color: active ? palette.hex : COLORS.textSecondary,
+          },
+        ]}
+      >
+        {palette.label}
+      </Text>
+
+      <SelectionBadge accent={palette.hex} visible={active} />
+    </AnimatedPressable>
   );
 }
 
-function ChoiceButton({
+function ColorModeCard({
   active,
   accent,
-  icon: Icon,
+  Icon,
   label,
   description,
-  onClick,
+  onPress,
 }: {
   active: boolean;
   accent: string;
-  icon: typeof Moon;
+  Icon: IconComponent;
   label: string;
   description: string;
-  onClick: () => void;
+  onPress: () => void;
 }) {
   return (
-    <Pressable aria-pressed={active} onPress={onClick} whileTap={{ scale: 0.96 }} className="flex flex-col items-center gap-2 p-4 rounded-2xl" style={{ backgroundColor: active ? `${accent}18` : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid", boxShadow: active ? `0 0 18px ${accent}18` : "none" }}>
-      <Icon
-        size={21}
-        style={{  }}
-      />
-      <View className="text-center"><View className="text-xs font-bold" style={{  }}>{label}</View><View className="text-[10px] text-white/25 mt-0.5">{description}</View></View>
-      {active && <Check size={12} style={{  }} />}
-    </Pressable>
+    <AnimatedPressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel={`${label}: ${description}`}
+      style={[
+        styles.choiceCard,
+        active && {
+          backgroundColor: hexToRgba(accent, 0.11),
+          borderColor: hexToRgba(accent, 0.35),
+          shadowColor: accent,
+          shadowOpacity: 0.12,
+          shadowRadius: 16,
+          elevation: 4,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.choiceIcon,
+          {
+            backgroundColor: active
+              ? hexToRgba(accent, 0.17)
+              : "rgba(255,255,255,0.055)",
+          },
+        ]}
+      >
+        <Icon
+          size={21}
+          color={active ? accent : COLORS.textSecondary}
+          strokeWidth={2}
+        />
+      </View>
+
+      <View style={styles.choiceContent}>
+        <Text
+          style={[
+            styles.choiceLabel,
+            {
+              color: active ? COLORS.white : COLORS.textSecondary,
+            },
+          ]}
+        >
+          {label}
+        </Text>
+
+        <Text style={styles.choiceDescription}>{description}</Text>
+      </View>
+
+      <SelectionBadge accent={accent} visible={active} />
+    </AnimatedPressable>
+  );
+}
+
+function TextSizeCard({
+  active,
+  accent,
+  label,
+  description,
+  sampleSize,
+  onPress,
+}: {
+  active: boolean;
+  accent: string;
+  label: string;
+  description: string;
+  sampleSize: number;
+  onPress: () => void;
+}) {
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel={`Taille du texte ${label}`}
+      style={[
+        styles.textSizeCard,
+        active && {
+          backgroundColor: hexToRgba(accent, 0.09),
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.textIconBox,
+          {
+            backgroundColor: active
+              ? hexToRgba(accent, 0.16)
+              : "rgba(255,255,255,0.055)",
+          },
+        ]}
+      >
+        <Type
+          size={17}
+          color={active ? accent : COLORS.textSecondary}
+          strokeWidth={2.2}
+        />
+      </View>
+
+      <View style={styles.textSizeContent}>
+        <Text
+          style={[
+            styles.textSizeLabel,
+            {
+              color: active ? COLORS.white : COLORS.textSecondary,
+            },
+          ]}
+        >
+          {label}
+        </Text>
+
+        <Text style={styles.textSizeDescription}>{description}</Text>
+      </View>
+
+      <Text
+        style={[
+          styles.textSample,
+          {
+            color: active ? accent : COLORS.textFaint,
+            fontSize: sampleSize,
+          },
+        ]}
+      >
+        Aa
+      </Text>
+
+      <SelectionBadge accent={accent} visible={active} />
+    </AnimatedPressable>
+  );
+}
+
+function DensityCard({
+  active,
+  accent,
+  label,
+  description,
+  rows,
+  rowHeight,
+  Icon,
+  onPress,
+}: {
+  active: boolean;
+  accent: string;
+  label: string;
+  description: string;
+  rows: number;
+  rowHeight: number;
+  Icon: IconComponent;
+  onPress: () => void;
+}) {
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel={`${label}: ${description}`}
+      style={[
+        styles.densityCard,
+        active && {
+          backgroundColor: hexToRgba(accent, 0.09),
+          borderColor: hexToRgba(accent, 0.32),
+        },
+      ]}
+    >
+      <View style={styles.densityPreview}>
+        {Array.from({ length: rows }).map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.densityLine,
+              {
+                height: rowHeight,
+                backgroundColor: active
+                  ? index === 0
+                    ? hexToRgba(accent, 0.72)
+                    : hexToRgba(accent, 0.25)
+                  : "rgba(255,255,255,0.10)",
+              },
+            ]}
+          />
+        ))}
+      </View>
+
+      <View style={styles.densityFooter}>
+        <View style={styles.densityLabelRow}>
+          <Icon
+            size={15}
+            color={active ? accent : COLORS.textSecondary}
+            strokeWidth={2.2}
+          />
+
+          <Text
+            style={[
+              styles.densityLabel,
+              {
+                color: active ? COLORS.white : COLORS.textSecondary,
+              },
+            ]}
+          >
+            {label}
+          </Text>
+        </View>
+
+        <Text style={styles.densityDescription}>{description}</Text>
+      </View>
+
+      <SelectionBadge accent={accent} visible={active} />
+    </AnimatedPressable>
+  );
+}
+
+function AccessibilityToggle({
+  enabled,
+  accent,
+  onPress,
+}: {
+  enabled: boolean;
+  accent: string;
+  onPress: () => void;
+}) {
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel="Contraste élevé"
+      style={[
+        styles.accessibilityToggle,
+        enabled && {
+          backgroundColor: hexToRgba(accent, 0.1),
+          borderColor: hexToRgba(accent, 0.32),
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.accessibilityIcon,
+          {
+            backgroundColor: enabled
+              ? hexToRgba(accent, 0.17)
+              : "rgba(255,255,255,0.055)",
+          },
+        ]}
+      >
+        <Contrast
+          size={18}
+          color={enabled ? accent : COLORS.textSecondary}
+          strokeWidth={2.1}
+        />
+      </View>
+
+      <View style={styles.accessibilityContent}>
+        <Text style={styles.accessibilityTitle}>Contraste élevé</Text>
+
+        <Text style={styles.accessibilityDescription}>
+          Améliore la lisibilité de l'interface
+        </Text>
+      </View>
+
+      <View
+        style={[
+          styles.switchTrack,
+          {
+            backgroundColor: enabled ? accent : "rgba(255,255,255,0.12)",
+          },
+        ]}
+      >
+        <Animated.View
+          style={[
+            styles.switchThumb,
+            {
+              transform: [
+                {
+                  translateX: enabled ? 18 : 2,
+                },
+              ],
+            },
+          ]}
+        />
+      </View>
+    </AnimatedPressable>
+  );
+}
+
+function ColorBlindOption({
+  active,
+  accent,
+  label,
+  description,
+  onPress,
+}: {
+  active: boolean;
+  accent: string;
+  label: string;
+  description: string;
+  onPress: () => void;
+}) {
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel={`${label}: ${description}`}
+      style={[
+        styles.colorBlindOption,
+        active && {
+          backgroundColor: hexToRgba(accent, 0.07),
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.colorBlindIcon,
+          {
+            backgroundColor: active
+              ? hexToRgba(accent, 0.15)
+              : "rgba(255,255,255,0.05)",
+          },
+        ]}
+      >
+        <Eye
+          size={15}
+          color={active ? accent : COLORS.textSecondary}
+          strokeWidth={2}
+        />
+      </View>
+
+      <View style={styles.colorBlindContent}>
+        <Text
+          style={[
+            styles.colorBlindLabel,
+            {
+              color: active ? COLORS.white : COLORS.textSecondary,
+            },
+          ]}
+        >
+          {label}
+        </Text>
+
+        <Text style={styles.colorBlindDescription}>{description}</Text>
+      </View>
+
+      {active ? <Check size={15} color={accent} strokeWidth={3} /> : null}
+    </AnimatedPressable>
   );
 }
 
 export default function ThemePage({ onBack }: ThemePageProps) {
   const { prefs, update, reset } = useAppearance();
-  const accent = ACCENT_PALETTES[prefs.accent];
-  const accentHex = accent.hex;
+
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const headerOpacity = useRef(new Animated.Value(0)).current;
+  const headerTranslate = useRef(new Animated.Value(-12)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentTranslate = useRef(new Animated.Value(16)).current;
+  const advancedAnimation = useRef(new Animated.Value(0)).current;
+
+  const palette = ACCENT_PALETTES[prefs.accent];
+  const accentHex = palette.hex;
+
   const colorModes = useMemo(
-    () => [
-      { key: "sombre" as ColorMode, label: "Sombre", Icon: Moon, desc: "Nuit" },
-      { key: "clair" as ColorMode, label: "Clair", Icon: Sun, desc: "Jour" },
-      {
-        key: "systeme" as ColorMode,
-        label: "Système",
-        Icon: Monitor,
-        desc: "Auto",
-      },
-    ],
+    () =>
+      [
+        {
+          key: "sombre" as ColorMode,
+          label: "Sombre",
+          description: "Ambiance nuit",
+          Icon: Moon,
+        },
+        {
+          key: "clair" as ColorMode,
+          label: "Clair",
+          description: "Ambiance jour",
+          Icon: Sun,
+        },
+        {
+          key: "systeme" as ColorMode,
+          label: "Système",
+          description: "Suit ton appareil",
+          Icon: Monitor,
+        },
+      ] as const,
     [],
   );
 
-  const handleReset = () => {
-    reset();
-    toast.success("Apparence réinitialisée");
-  };
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(headerOpacity, {
+        toValue: 1,
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(headerTranslate, {
+        toValue: 0,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 520,
+        delay: 80,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentTranslate, {
+        toValue: 0,
+        duration: 620,
+        delay: 80,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [contentOpacity, contentTranslate, headerOpacity, headerTranslate]);
+
+  const toggleAdvanced = useCallback(() => {
+    const nextValue = !showAdvanced;
+
+    setShowAdvanced(nextValue);
+
+    Animated.timing(advancedAnimation, {
+      toValue: nextValue ? 1 : 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [advancedAnimation, showAdvanced]);
+
+  const handleReset = useCallback(() => {
+    Alert.alert(
+      "Réinitialiser l'apparence",
+      "Toutes tes préférences visuelles seront restaurées à leurs valeurs par défaut.",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Réinitialiser",
+          style: "destructive",
+          onPress: () => {
+            reset();
+          },
+        },
+      ],
+    );
+  }, [reset]);
+
+  const advancedHeight = advancedAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 390],
+  });
+
+  const advancedOpacity = advancedAnimation.interpolate({
+    inputRange: [0, 0.35, 1],
+    outputRange: [0, 0.7, 1],
+  });
 
   return (
-    <View className="flex flex-col h-full min-h-0 overflow-hidden" style={{  }}><View initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 px-5 pt-safe-or-4 pb-4 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(2,6,23,0.72)" }}><Pressable onPress={onBack} accessibilityLabel="Retour" className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.055)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><ArrowLeft className="w-5 h-5 text-white/80" /></Pressable><View className="flex-1 min-w-0"><Text className="text-base sm:text-lg font-black text-white flex items-center gap-2 truncate"><Palette className="w-4 h-4 shrink-0" style={{  }} />Thème & Personnalisation
-          </Text><Text className="text-xs text-white/35 truncate">Ton interface, ton confort, tes préférences
-          </Text></View><Pressable onPress={handleReset} accessibilityLabel="Réinitialiser les préférences d'apparence" className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><RotateCcw className="w-4 h-4 text-white/40" /></Pressable></View><View className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-7" style={{  }}><View initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-[28px] p-5 sm:p-6" style={{ borderStyle: "solid" }}><View className="absolute -right-20 -top-24 w-64 h-64 rounded-full pointer-events-none" style={{  }} /><View className="relative z-10 flex items-start gap-4"><View className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ boxShadow: `0 14px 35px ${accent.glow}` }}><WandSparkles size={24} className="text-white" /></View><View className="min-w-0"><View className="text-[9px] uppercase tracking-[0.2em] font-black mb-1" style={{  }}><Text>Personnalisation</Text></View><Text className="text-2xl font-black text-white leading-tight">Fais de Débrouille Pro
-                <Text style={{ color: accentHex }}>ton espace.</Text></Text><Text className="text-xs sm:text-sm text-white/40 leading-relaxed mt-2 max-w-xl">Ajuste les couleurs, la lisibilité et la densité. Les
-                modifications sont appliquées immédiatement.
-              </Text></View></View></View><View><SectionLabel label="Aperçu en temps réel" sub="Voici comment ton interface évolue" /><LivePreview accent={prefs.accent} colorMode={prefs.colorMode} textSize={prefs.textSize} density={prefs.density} /></View><View><SectionLabel label="Couleur d'accent" sub="Boutons, badges, actions et éléments mis en avant" /><View className="gap-2">{(
-              Object.entries(ACCENT_PALETTES) as [
-                AccentColor,
-                (typeof ACCENT_PALETTES)[AccentColor],
-              ][]
-            ).map(([key, palette]) => (
-              <AccentSwatch
+    <View style={styles.screen}>
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            opacity: headerOpacity,
+            transform: [
+              {
+                translateY: headerTranslate,
+              },
+            ],
+          },
+        ]}
+      >
+        <AnimatedPressable
+          onPress={onBack}
+          accessibilityLabel="Retour"
+          style={styles.headerButton}
+        >
+          <ArrowLeft
+            size={20}
+            color="rgba(255,255,255,0.82)"
+            strokeWidth={2.2}
+          />
+        </AnimatedPressable>
+
+        <View style={styles.headerCenter}>
+          <View style={styles.headerTitleRow}>
+            <View
+              style={[
+                styles.headerIcon,
+                {
+                  backgroundColor: hexToRgba(accentHex, 0.14),
+                },
+              ]}
+            >
+              <Palette size={15} color={accentHex} strokeWidth={2.2} />
+            </View>
+
+            <Text numberOfLines={1} style={styles.headerTitle}>
+              Thème & Personnalisation
+            </Text>
+          </View>
+
+          <Text numberOfLines={1} style={styles.headerSubtitle}>
+            Ton interface. Ton confort. Ton expérience.
+          </Text>
+        </View>
+
+        <AnimatedPressable
+          onPress={handleReset}
+          accessibilityLabel="Réinitialiser les préférences d'apparence"
+          style={styles.headerButton}
+        >
+          <RotateCcw size={17} color="rgba(255,255,255,0.42)" strokeWidth={2} />
+        </AnimatedPressable>
+      </Animated.View>
+
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        style={{
+          opacity: contentOpacity,
+          transform: [
+            {
+              translateY: contentTranslate,
+            },
+          ],
+        }}
+      >
+        <View
+          style={[
+            styles.hero,
+            {
+              borderColor: hexToRgba(accentHex, 0.2),
+            },
+          ]}
+        >
+          <View
+            pointerEvents="none"
+            style={[
+              styles.heroGlow,
+              {
+                backgroundColor: hexToRgba(accentHex, 0.14),
+              },
+            ]}
+          />
+
+          <View style={styles.heroContent}>
+            <View
+              style={[
+                styles.heroIcon,
+                {
+                  backgroundColor: accentHex,
+                  shadowColor: accentHex,
+                },
+              ]}
+            >
+              <WandSparkles size={25} color="#FFFFFF" strokeWidth={2} />
+            </View>
+
+            <View style={styles.heroText}>
+              <Text style={[styles.heroEyebrow, { color: accentHex }]}>
+                PERSONNALISATION
+              </Text>
+
+              <Text style={styles.heroTitle}>
+                Fais de Débrouille Pro{" "}
+                <Text style={{ color: accentHex }}>ton espace.</Text>
+              </Text>
+
+              <Text style={styles.heroDescription}>
+                Ajuste les couleurs, la lisibilité, l'ambiance et la densité.
+                Chaque choix est appliqué immédiatement.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.heroFooter}>
+            <View
+              style={[
+                styles.heroStatusDot,
+                {
+                  backgroundColor: accentHex,
+                },
+              ]}
+            />
+
+            <Text style={styles.heroStatusText}>
+              Personnalisation en temps réel
+            </Text>
+
+            <Sparkles size={14} color={accentHex} strokeWidth={2} />
+          </View>
+        </View>
+
+        <View>
+          <SectionLabel
+            label="Aperçu en temps réel"
+            description="Découvre instantanément l'effet de tes choix."
+            accent={accentHex}
+          />
+
+          <LivePreview
+            accent={prefs.accent}
+            colorMode={prefs.colorMode}
+            textSize={prefs.textSize}
+            density={prefs.density}
+          />
+        </View>
+
+        <View>
+          <SectionLabel
+            label="Couleur d'accent"
+            description="Actions, boutons, badges et éléments mis en avant."
+            accent={accentHex}
+          />
+
+          <View style={styles.accentGrid}>
+            {(
+              Object.entries(ACCENT_PALETTES) as Array<
+                [AccentColor, (typeof ACCENT_PALETTES)[AccentColor]]
+              >
+            ).map(([key, item]) => (
+              <AccentCard
                 key={key}
-                colorKey={key}
-                palette={palette}
-                isActive={prefs.accent === key}
+                palette={item}
+                active={prefs.accent === key}
                 onPress={() => update("accent", key)}
               />
-            ))}</View></View><View><SectionLabel label="Mode couleur" sub="Choisis l'ambiance qui te convient" /><View className="gap-2">{colorModes.map(({ key, label, Icon, desc }) => (
-              <ChoiceButton
+            ))}
+          </View>
+        </View>
+
+        <View>
+          <SectionLabel
+            label="Mode couleur"
+            description="Choisis l'ambiance qui te convient."
+            accent={accentHex}
+          />
+
+          <View style={styles.verticalGap}>
+            {colorModes.map(({ key, label, description, Icon }) => (
+              <ColorModeCard
                 key={key}
                 active={prefs.colorMode === key}
                 accent={accentHex}
-                icon={Icon}
+                Icon={Icon}
                 label={label}
-                description={desc}
+                description={description}
                 onPress={() => update("colorMode", key)}
               />
-            ))}</View></View><View><SectionLabel label="Taille du texte" sub="Une interface plus petite ou plus confortable" /><View className="rounded-[24px] overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>{[
+            ))}
+          </View>
+        </View>
+
+        <View>
+          <SectionLabel
+            label="Taille du texte"
+            description="Une interface plus petite ou plus confortable."
+            accent={accentHex}
+          />
+
+          <View style={styles.optionGroup}>
+            {TEXT_OPTIONS.map((option, index) => (
+              <TextSizeCard
+                key={option.key}
+                active={prefs.textSize === option.key}
+                accent={accentHex}
+                label={option.label}
+                description={option.description}
+                sampleSize={option.sampleSize}
+                onPress={() => update("textSize", option.key)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View>
+          <SectionLabel
+            label="Densité d'affichage"
+            description="Plus de contenu ou plus d'espace entre les éléments."
+            accent={accentHex}
+          />
+
+          <View style={styles.densityGrid}>
+            {DENSITY_OPTIONS.map((option) => (
+              <DensityCard
+                key={option.key}
+                active={prefs.density === option.key}
+                accent={accentHex}
+                label={option.label}
+                description={option.description}
+                rows={option.rows}
+                rowHeight={option.rowHeight}
+                Icon={option.Icon}
+                onPress={() => update("density", option.key)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View>
+          <AnimatedPressable
+            onPress={toggleAdvanced}
+            accessibilityLabel="Ouvrir les options d'accessibilité"
+            style={styles.accessibilityHeader}
+          >
+            <View
+              style={[
+                styles.accessibilityHeaderIcon,
+                {
+                  backgroundColor: hexToRgba(accentHex, 0.12),
+                },
+              ]}
+            >
+              <Accessibility size={18} color={accentHex} strokeWidth={2} />
+            </View>
+
+            <View style={styles.accessibilityHeaderText}>
+              <Text style={styles.accessibilityHeaderTitle}>Accessibilité</Text>
+
+              <Text style={styles.accessibilityHeaderDescription}>
+                Contraste élevé et modes daltonisme
+              </Text>
+            </View>
+
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    rotate: advancedAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["0deg", "180deg"],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <ChevronDown
+                size={19}
+                color={showAdvanced ? accentHex : COLORS.textMuted}
+                strokeWidth={2}
+              />
+            </Animated.View>
+          </AnimatedPressable>
+
+          <Animated.View
+            style={[
+              styles.advancedContainer,
               {
-                key: "petit" as TextSize,
-                label: "Petit",
-                sample: "Aa",
-                size: "text-xs",
-                desc: "14px",
+                height: advancedHeight,
+                opacity: advancedOpacity,
               },
-              {
-                key: "normal" as TextSize,
-                label: "Normal",
-                sample: "Aa",
-                size: "text-base",
-                desc: "16px",
-              },
-              {
-                key: "grand" as TextSize,
-                label: "Grand",
-                sample: "Aa",
-                size: "text-xl",
-                desc: "18px",
-              },
-            ].map(({ key, label, sample, size, desc }, i, arr) => {
-              const active = prefs.textSize === key;
+            ]}
+          >
+            <View style={styles.advancedInner}>
+              <AccessibilityToggle
+                enabled={prefs.highContrast}
+                accent={accentHex}
+                onPress={() => update("highContrast", !prefs.highContrast)}
+              />
 
-              return (
-                <Pressable key={key} onPress={() => update("textSize", key)} whileTap={{ scale: 0.99 }} aria-pressed={active} className="w-full flex items-center gap-3 px-4 py-3.5" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: active ? `${accentHex}10` : "transparent" }}>
-                  <View className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: active
-                                          ? `${accentHex}20`
-                                          : "rgba(255,255,255,0.06)" }}><Type size={16} style={{  }} /></View>
-
-                  <View className="flex-1 text-left"><Text className="text-sm font-bold" style={{
-                        color: active ? "white" : "rgba(255,255,255,0.6)",
-                      }}>{label}</Text><Text className="text-xs text-white/25 ml-2">{desc}</Text></View>
-
-                  <Text className={`font-black ${size} mr-2`} style={{
-                      color: active ? accentHex : "rgba(255,255,255,0.2)",
-                    }}>{sample}</Text>
-
-                  {active && <Check size={14} style={{  }} />}
-                </Pressable>
-              );
-            })}</View></View><View><SectionLabel label="Densité d'affichage" sub="Plus de contenu ou plus d'espace entre les éléments" /><View className="gap-3">{[
-              {
-                key: "compact" as Density,
-                label: "Compact",
-                Icon: LayoutGrid,
-                desc: "Plus de contenu visible",
-                rows: 5,
-              },
-              {
-                key: "confortable" as Density,
-                label: "Confortable",
-                Icon: Smartphone,
-                desc: "Espaces généreux",
-                rows: 3,
-              },
-            ].map(({ key, label, Icon, desc, rows }) => {
-              const active = prefs.density === key;
-
-              return (
-                <Pressable key={key} onPress={() => update("density", key)} whileTap={{ scale: 0.96 }} aria-pressed={active} className="flex flex-col items-center gap-3 p-4 rounded-[24px]" style={{ backgroundColor: active
-                                      ? `${accentHex}18`
-                                      : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid", boxShadow: active ? `0 0 20px ${accentHex}12` : "none" }}>
-                  <View className="w-full flex flex-col gap-1.5">{Array.from({ length: rows }).map((_, i) => (
-                      <View key={i} className="rounded-full" style={{ height: key === "compact" ? 6 : 10, backgroundColor: active
-                                                  ? `${accentHex}${i === 0 ? "66" : "28"}`
-                                                  : "rgba(255,255,255,0.1)" }} />
-                    ))}</View>
-
-                  <View className="text-center"><View className="text-sm font-black flex items-center justify-center gap-1.5" style={{  }}><Icon size={14} />{label}</View><View className="text-[10px] text-white/30 mt-1">{desc}</View></View>
-
-                  {active && <Check size={13} style={{  }} />}
-                </Pressable>
-              );
-            })}</View></View><View><Pressable onPress={() => setShowAdvanced((value) => !value)} className="w-full flex items-center gap-3 text-left"><View className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${accentHex}12`, borderStyle: "solid" }}><Accessibility size={17} style={{  }} /></View><View className="flex-1"><Text className="text-sm font-black text-white">Accessibilité</Text><Text className="text-[11px] text-white/30">Contraste élevé et modes daltonisme
-              </Text></View><View animate={{ rotate: showAdvanced ? 180 : 0 }} transition={{ duration: 0.2 }}><Check size={15} className={showAdvanced ? "opacity-100" : "opacity-20"} style={{  }} /></View></Pressable><View>{showAdvanced && (
-              <View initial={{ opacity: 0, height: 0, y: -6 }} animate={{ opacity: 1, height: "auto", y: 0 }} exit={{ opacity: 0, height: 0, y: -6 }} className="overflow-hidden">
-                <View className="pt-4"><Pressable onPress={() => update("highContrast", !prefs.highContrast)} whileTap={{ scale: 0.98 }} aria-pressed={prefs.highContrast} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl mb-3" style={{ backgroundColor: prefs.highContrast
-                                        ? `${accentHex}18`
-                                        : "rgba(255,255,255,0.035)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: prefs.highContrast
-                                              ? `${accentHex}22`
-                                              : "rgba(255,255,255,0.06)" }}><Contrast size={18} style={{  }} /></View><View className="flex-1 text-left"><View className="text-sm font-bold" style={{  }}><Text>Contraste élevé</Text></View><View className="text-[11px] text-white/30"><Text>Améliore la lisibilité</Text></View></View>{prefs.highContrast && (
-                      <Check size={14} style={{  }} />
-                    )}</Pressable><View className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>{[
-                      {
-                        key: "none" as ColorBlindMode,
-                        label: "Normal",
-                        desc: "Aucun filtre",
-                      },
-                      {
-                        key: "deuteranopia" as ColorBlindMode,
-                        label: "Deutéranopie",
-                        desc: "Daltonisme rouge-vert",
-                      },
-                      {
-                        key: "protanopia" as ColorBlindMode,
-                        label: "Protanopie",
-                        desc: "Insensibilité au rouge",
-                      },
-                      {
-                        key: "tritanopia" as ColorBlindMode,
-                        label: "Tritanopie",
-                        desc: "Daltonisme bleu-jaune",
-                      },
-                      {
-                        key: "achromatopsia" as ColorBlindMode,
-                        label: "Achromatopsie",
-                        desc: "Absence de perception des couleurs",
-                      },
-                    ].map(({ key, label, desc }, i, arr) => {
-                      const active = prefs.colorBlindMode === key;
-
-                      return (
-                        <Pressable key={key} onPress={() => update("colorBlindMode", key)} whileTap={{ scale: 0.99 }} aria-pressed={active} className="w-full flex items-center gap-3 px-4 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)", backgroundColor: active
-                                                      ? `${accentHex}10`
-                                                      : "transparent" }}>
-                          <View className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: active
-                                                          ? `${accentHex}22`
-                                                          : "rgba(255,255,255,0.06)" }}><Eye size={15} style={{  }} /></View>
-
-                          <View className="flex-1 text-left"><View className="text-sm font-bold" style={{  }}>{label}</View><View className="text-[11px] text-white/30">{desc}</View></View>
-
-                          {active && (
-                            <Check size={13} style={{  }} />
-                          )}
-                        </Pressable>
-                      );
-                    })}</View></View>
+              <View style={styles.colorBlindGroup}>
+                {COLOR_BLIND_OPTIONS.map((option) => (
+                  <ColorBlindOption
+                    key={option.key}
+                    active={prefs.colorBlindMode === option.key}
+                    accent={accentHex}
+                    label={option.label}
+                    description={option.description}
+                    onPress={() => update("colorBlindMode", option.key)}
+                  />
+                ))}
               </View>
-            )}</View></View><View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-[24px] px-4 py-3.5 flex items-center gap-3" style={{ backgroundColor: `${accentHex}0d`, borderStyle: "solid" }}><View className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${accentHex}18` }}><Save size={15} style={{  }} /></View><View className="flex-1"><Text className="text-xs font-bold text-white/65">Préférences synchronisées
-            </Text><Text className="text-[10px] text-white/30 mt-0.5">Tes choix sont sauvegardés automatiquement et suivent ton
-              expérience Débrouille Pro.
-            </Text></View><Sparkles size={15} style={{  }} /></View><Text className="text-center text-[10px] text-white/15 pb-5">Personnalise ton expérience à tout moment.
-        </Text></View></View>
+            </View>
+          </Animated.View>
+        </View>
+
+        <View
+          style={[
+            styles.syncCard,
+            {
+              backgroundColor: hexToRgba(accentHex, 0.065),
+              borderColor: hexToRgba(accentHex, 0.16),
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.syncIcon,
+              {
+                backgroundColor: hexToRgba(accentHex, 0.13),
+              },
+            ]}
+          >
+            <Save size={16} color={accentHex} strokeWidth={2} />
+          </View>
+
+          <View style={styles.syncContent}>
+            <Text style={styles.syncTitle}>Préférences synchronisées</Text>
+
+            <Text style={styles.syncDescription}>
+              Tes choix sont sauvegardés automatiquement par ton système de
+              préférences.
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.syncPulse,
+              {
+                backgroundColor: accentHex,
+              },
+            ]}
+          >
+            <Check size={11} color="#FFFFFF" strokeWidth={3} />
+          </View>
+        </View>
+
+        <View style={styles.bottomBrand}>
+          <Sparkles size={13} color={COLORS.textFaint} strokeWidth={1.8} />
+
+          <Text style={styles.bottomBrandText}>
+            Personnalise ton expérience à tout moment.
+          </Text>
+
+          <Sparkles size={13} color={COLORS.textFaint} strokeWidth={1.8} />
+        </View>
+      </Animated.ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  header: {
+    minHeight: 76,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" ? 8 : 10,
+    paddingBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.065)",
+    backgroundColor: "rgba(3,7,20,0.96)",
+  },
+
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.052)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.075)",
+  },
+
+  headerCenter: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  headerIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  headerTitle: {
+    flex: 1,
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+
+  headerSubtitle: {
+    marginTop: 3,
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 42,
+    gap: 30,
+  },
+
+  hero: {
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: 30,
+    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    padding: 20,
+  },
+
+  heroGlow: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    right: -105,
+    top: -115,
+  },
+
+  heroContent: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 15,
+  },
+
+  heroIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    elevation: 8,
+  },
+
+  heroText: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  heroEyebrow: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 2.2,
+    marginBottom: 5,
+  },
+
+  heroTitle: {
+    color: COLORS.white,
+    fontSize: 24,
+    lineHeight: 29,
+    fontWeight: "900",
+    letterSpacing: -0.7,
+  },
+
+  heroDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 9,
+    maxWidth: 560,
+  },
+
+  heroFooter: {
+    marginTop: 19,
+    paddingTop: 13,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  heroStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+
+  heroStatusText: {
+    flex: 1,
+    color: COLORS.textMuted,
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  sectionHeader: {
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  sectionIndicator: {
+    width: 4,
+    height: 16,
+    borderRadius: 2,
+  },
+
+  sectionLabel: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1.3,
+    textTransform: "uppercase",
+  },
+
+  sectionDescription: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 5,
+    marginLeft: 12,
+  },
+
+  preview: {
+    overflow: "hidden",
+    borderRadius: 26,
+    borderWidth: 1,
+    shadowOpacity: 0.16,
+    shadowRadius: 30,
+    shadowOffset: {
+      width: 0,
+      height: 14,
+    },
+    elevation: 5,
+  },
+
+  previewGlow: {
+    position: "absolute",
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    right: -85,
+    top: -95,
+  },
+
+  previewHeader: {
+    minHeight: 58,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    borderBottomWidth: 1,
+  },
+
+  previewLogo: {
+    width: 31,
+    height: 31,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOpacity: 0.32,
+    shadowRadius: 12,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    elevation: 4,
+  },
+
+  previewBrand: {
+    flex: 1,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+
+  previewPalette: {
+    flexDirection: "row",
+    gap: 5,
+  },
+
+  previewDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+
+  previewItem: {
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    borderBottomWidth: 1,
+  },
+
+  previewEmoji: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  previewEmojiText: {
+    fontSize: 16,
+  },
+
+  previewItemContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  previewItemTitle: {
+    fontWeight: "800",
+  },
+
+  previewItemSubtitle: {
+    marginTop: 2,
+  },
+
+  previewTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 99,
+  },
+
+  previewTagText: {
+    fontWeight: "800",
+  },
+
+  previewBottomBar: {
+    height: 54,
+    paddingHorizontal: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+
+  previewNavItem: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  previewNavIcon: {
+    fontSize: 19,
+    fontWeight: "700",
+  },
+
+  accentGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+  },
+
+  accentCard: {
+    width: "31.8%",
+    minWidth: 96,
+    flexGrow: 1,
+    position: "relative",
+    padding: 9,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+  },
+
+  accentPreview: {
+    height: 44,
+    borderRadius: 12,
+    overflow: "hidden",
+    position: "relative",
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    elevation: 3,
+  },
+
+  accentPreviewHighlight: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 15,
+  },
+
+  accentGradientPoint: {
+    position: "absolute",
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    right: -15,
+    bottom: -24,
+    opacity: 0.8,
+  },
+
+  accentLabel: {
+    marginTop: 8,
+    marginHorizontal: 2,
+    fontSize: 11,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+
+  selectionBadge: {
+    position: "absolute",
+    right: 7,
+    top: 7,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOpacity: 0.28,
+    shadowRadius: 9,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 4,
+  },
+
+  verticalGap: {
+    gap: 9,
+  },
+
+  choiceCard: {
+    minHeight: 70,
+    padding: 10,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+  },
+
+  choiceIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  choiceContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  choiceLabel: {
+    fontSize: 13,
+    fontWeight: "850",
+  },
+
+  choiceDescription: {
+    marginTop: 3,
+    color: COLORS.textMuted,
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  optionGroup: {
+    overflow: "hidden",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+    backgroundColor: "rgba(255,255,255,0.025)",
+  },
+
+  textSizeCard: {
+    minHeight: 64,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.045)",
+  },
+
+  textIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  textSizeContent: {
+    flex: 1,
+  },
+
+  textSizeLabel: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  textSizeDescription: {
+    marginTop: 2,
+    color: COLORS.textMuted,
+    fontSize: 10,
+  },
+
+  textSample: {
+    fontWeight: "900",
+    marginRight: 8,
+  },
+
+  densityGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  densityCard: {
+    flex: 1,
+    minHeight: 150,
+    padding: 13,
+    borderRadius: 23,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  densityPreview: {
+    padding: 10,
+    minHeight: 72,
+    justifyContent: "space-between",
+    borderRadius: 15,
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
+
+  densityLine: {
+    width: "100%",
+    borderRadius: 99,
+  },
+
+  densityFooter: {
+    marginTop: 12,
+  },
+
+  densityLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  densityLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  densityDescription: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    lineHeight: 13,
+    marginTop: 4,
+  },
+
+  accessibilityHeader: {
+    minHeight: 64,
+    paddingHorizontal: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+  },
+
+  accessibilityHeaderIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  accessibilityHeaderText: {
+    flex: 1,
+  },
+
+  accessibilityHeaderTitle: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  accessibilityHeaderDescription: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  advancedContainer: {
+    overflow: "hidden",
+  },
+
+  advancedInner: {
+    paddingTop: 4,
+    gap: 11,
+  },
+
+  accessibilityToggle: {
+    minHeight: 72,
+    padding: 10,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  accessibilityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  accessibilityContent: {
+    flex: 1,
+  },
+
+  accessibilityTitle: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  accessibilityDescription: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  switchTrack: {
+    width: 42,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+  },
+
+  switchThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000000",
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 3,
+  },
+
+  colorBlindGroup: {
+    overflow: "hidden",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+    backgroundColor: "rgba(255,255,255,0.025)",
+  },
+
+  colorBlindOption: {
+    minHeight: 58,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.045)",
+  },
+
+  colorBlindIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  colorBlindContent: {
+    flex: 1,
+  },
+
+  colorBlindLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  colorBlindDescription: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    marginTop: 2,
+  },
+
+  syncCard: {
+    minHeight: 66,
+    padding: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  syncIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  syncContent: {
+    flex: 1,
+  },
+
+  syncTitle: {
+    color: "rgba(255,255,255,0.76)",
+    fontSize: 11,
+    fontWeight: "850",
+  },
+
+  syncDescription: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    lineHeight: 13,
+    marginTop: 3,
+  },
+
+  syncPulse: {
+    width: 25,
+    height: 25,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  bottomBrand: {
+    paddingTop: 2,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  bottomBrandText: {
+    color: COLORS.textFaint,
+    fontSize: 9,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+});

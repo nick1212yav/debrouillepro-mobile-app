@@ -1,188 +1,1345 @@
-import { View, Pressable, Text, TextInput } from "react-native";
-import { useState, useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import L from "leaflet";
 import {
-  ArrowLeft, Map, Layers, Compass, Search, Navigation, Locate,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import MapView, { Circle, Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import * as Location from "expo-location";
+import {
+  ArrowLeft,
+  Compass,
+  Layers,
+  LocateFixed,
+  Map as MapIcon,
+  Navigation,
+  Search,
+  X,
 } from "lucide-react-native";
 
-// Fix default icon paths
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
+type MapTab = "Carte" | "Couches" | "Explorer";
 
-// Colored div icon factory
-function makeIcon(color: string) {
-  return L.divIcon({
-    className: "",
-    html: `<div style="
-      width:32px;height:32px;border-radius:50% 50% 50% 0;
-      background:${color};
-      border:3px solid rgba(255,255,255,0.9);
-      box-shadow:0 4px 14px rgba(0,0,0,0.5);
-      display:flex;align-items:center;justify-content:center;
-      transform:rotate(-45deg);
-    ">
-      <span style="transform:rotate(45deg);display:block;width:8px;height:8px;border-radius:50%;background:white;"></span>
-    </div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -36],
-  });
-}
+type LayerId = "satellite" | "routes" | "terrain" | "traffic" | "population";
 
-// Fly-to component for geolocation
-function FlyTo({ lat, lng }: { lat: number; lng: number }) {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo([lat, lng], 15, { duration: 1.5 });
-  }, [lat, lng, map]);
-  return null;
-}
+type PoiCategory =
+  | "Tout"
+  | "Hôpitaux"
+  | "Écoles"
+  | "Marchés"
+  | "Banques"
+  | "Hôtels";
 
-const POI_CATEGORIES = ["Tout", "Hôpitaux", "Écoles", "Marchés", "Banques", "Hôtels"] as const;
-type PoiCategory = (typeof POI_CATEGORIES)[number];
-
-type Poi = {
-  id: number;
-  name: string;
-  category: Exclude<PoiCategory, "Tout">;
-  lat: number;
-  lng: number;
-  color: string;
+type Coordinate = {
+  latitude: number;
+  longitude: number;
 };
 
-const POIS: Poi[] = [
-  { id: 1, name: "CHU de Cocody", category: "Hôpitaux", lat: 5.368, lng: -3.968, color: "#EF4444" },
-  { id: 2, name: "UFHB – Campus", category: "Écoles", lat: 5.349, lng: -3.994, color: "#6366F1" },
-  { id: 3, name: "Marché Adjamé", category: "Marchés", lat: 5.372, lng: -4.025, color: "#F97316" },
-  { id: 4, name: "SGBCI Plateau", category: "Banques", lat: 5.320, lng: -4.022, color: "#10B981" },
-  { id: 5, name: "Hôtel Ivoire", category: "Hôtels", lat: 5.336, lng: -3.980, color: "#8B5CF6" },
-  { id: 6, name: "Marché de Treichville", category: "Marchés", lat: 5.299, lng: -4.012, color: "#F97316" },
-  { id: 7, name: "Lycée Classique", category: "Écoles", lat: 5.380, lng: -4.040, color: "#6366F1" },
-  { id: 8, name: "Clinique Sainte Marie", category: "Hôpitaux", lat: 5.342, lng: -3.962, color: "#EF4444" },
+type MapPoint = {
+  id: string;
+  name: string;
+  category: Exclude<PoiCategory, "Tout">;
+  latitude: number;
+  longitude: number;
+  address?: string;
+};
+
+type Layer = {
+  id: LayerId;
+  label: string;
+  description: string;
+  active: boolean;
+  available: boolean;
+};
+
+const CATEGORIES: Array<{
+  id: PoiCategory;
+  label: string;
+}> = [
+  {
+    id: "Tout",
+    label: "Tout",
+  },
+  {
+    id: "Hôpitaux",
+    label: "Hôpitaux",
+  },
+  {
+    id: "Écoles",
+    label: "Écoles",
+  },
+  {
+    id: "Marchés",
+    label: "Marchés",
+  },
+  {
+    id: "Banques",
+    label: "Banques",
+  },
+  {
+    id: "Hôtels",
+    label: "Hôtels",
+  },
 ];
 
-const LAYERS = [
-  { id: "satellite", label: "Satellite", active: false },
-  { id: "routes", label: "Routes", active: true },
-  { id: "terrain", label: "Terrain 3D", active: true },
-  { id: "traffic", label: "Trafic", active: false },
-  { id: "population", label: "Densité pop.", active: false },
+const INITIAL_LAYERS: Layer[] = [
+  {
+    id: "satellite",
+    label: "Satellite",
+    description: "Imagerie satellite",
+    active: false,
+    available: false,
+  },
+  {
+    id: "routes",
+    label: "Routes",
+    description: "Réseau routier",
+    active: true,
+    available: true,
+  },
+  {
+    id: "terrain",
+    label: "Terrain",
+    description: "Relief et altitude",
+    active: false,
+    available: false,
+  },
+  {
+    id: "traffic",
+    label: "Trafic",
+    description: "Conditions de circulation",
+    active: false,
+    available: false,
+  },
+  {
+    id: "population",
+    label: "Densité",
+    description: "Données démographiques",
+    active: false,
+    available: false,
+  },
 ];
 
-// Abidjan center
-const ABIDJAN_CENTER: [number, number] = [5.354, -4.008];
+const DEFAULT_REGION = {
+  latitude: 0,
+  longitude: 20,
+  latitudeDelta: 45,
+  longitudeDelta: 55,
+};
+
+function isValidCoordinate(
+  coordinate: Coordinate | null | undefined,
+): coordinate is Coordinate {
+  if (!coordinate) {
+    return false;
+  }
+
+  return (
+    Number.isFinite(coordinate.latitude) &&
+    Number.isFinite(coordinate.longitude) &&
+    coordinate.latitude >= -90 &&
+    coordinate.latitude <= 90 &&
+    coordinate.longitude >= -180 &&
+    coordinate.longitude <= 180
+  );
+}
+
+function getCategoryLabel(category: PoiCategory): string {
+  return category;
+}
+
+function getCategoryIconColor(category: PoiCategory): string {
+  switch (category) {
+    case "Hôpitaux":
+      return "#EF4444";
+    case "Écoles":
+      return "#818CF8";
+    case "Marchés":
+      return "#FB923C";
+    case "Banques":
+      return "#34D399";
+    case "Hôtels":
+      return "#A78BFA";
+    default:
+      return "#22D3EE";
+  }
+}
+
+function formatCoordinates(coordinate: Coordinate): string {
+  const lat = coordinate.latitude.toFixed(5);
+  const lng = coordinate.longitude.toFixed(5);
+
+  return `${lat}, ${lng}`;
+}
+
+function MapMarker({
+  point,
+  onPress,
+}: {
+  point: MapPoint;
+  onPress: () => void;
+}) {
+  const color = getCategoryIconColor(point.category);
+
+  return (
+    <Marker
+      coordinate={{
+        latitude: point.latitude,
+        longitude: point.longitude,
+      }}
+      title={point.name}
+      description={point.address ?? getCategoryLabel(point.category)}
+      onPress={onPress}
+    >
+      <View
+        style={[
+          styles.markerOuter,
+          {
+            borderColor: color,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.markerInner,
+            {
+              backgroundColor: color,
+            },
+          ]}
+        />
+      </View>
+    </Marker>
+  );
+}
+
+function EmptyExplorer({
+  search,
+  category,
+}: {
+  search: string;
+  category: PoiCategory;
+}) {
+  return (
+    <View style={styles.emptyExplorer}>
+      <View style={styles.emptyExplorerIcon}>
+        <MapIcon size={28} color="#475569" />
+      </View>
+
+      <Text style={styles.emptyExplorerTitle}>Aucun lieu disponible</Text>
+
+      <Text style={styles.emptyExplorerText}>
+        {search.trim()
+          ? `Aucun résultat réel ne correspond à « ${search.trim()} ».`
+          : category !== "Tout"
+            ? `Aucun ${category.toLowerCase()} n'est actuellement disponible dans les données cartographiques.`
+            : "Les points d'intérêt apparaîtront ici lorsqu'ils seront fournis par la source de données réelle."}
+      </Text>
+    </View>
+  );
+}
+
+function LayerRow({ layer, onToggle }: { layer: Layer; onToggle: () => void }) {
+  return (
+    <View style={styles.layerRow}>
+      <View style={[styles.layerIcon, layer.active && styles.layerIconActive]}>
+        <Layers size={17} color={layer.active ? "#22D3EE" : "#64748B"} />
+      </View>
+
+      <View style={styles.layerContent}>
+        <Text style={styles.layerTitle}>{layer.label}</Text>
+
+        <Text style={styles.layerDescription}>{layer.description}</Text>
+      </View>
+
+      <Pressable
+        onPress={layer.available ? onToggle : undefined}
+        disabled={!layer.available}
+        accessibilityRole="switch"
+        accessibilityState={{
+          checked: layer.active,
+          disabled: !layer.available,
+        }}
+        style={[
+          styles.switch,
+          layer.active && styles.switchActive,
+          !layer.available && styles.switchDisabled,
+        ]}
+      >
+        <View
+          style={[styles.switchThumb, layer.active && styles.switchThumbActive]}
+        />
+      </Pressable>
+    </View>
+  );
+}
 
 export default function Map3DPage({ onBack }: { onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<MapTab>("Carte");
+
   const [activeCategory, setActiveCategory] = useState<PoiCategory>("Tout");
-  const [layers, setLayers] = useState(LAYERS);
+
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("Carte");
-  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
-  const [flyTarget, setFlyTarget] = useState<{ lat: number; lng: number } | null>(null);
+
+  const [layers, setLayers] = useState<Layer[]>(INITIAL_LAYERS);
+
+  const [userPosition, setUserPosition] = useState<Coordinate | null>(null);
+
+  const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
+
+  const [selectedPoint, setSelectedPoint] = useState<MapPoint | null>(null);
+
   const [locating, setLocating] = useState(false);
-  const mapRef = useRef<L.Map | null>(null);
 
-  const toggleLayer = (id: string) => setLayers(prev => prev.map(l => l.id === id ? { ...l, active: !l.active } : l));
+  const [locationPermission, setLocationPermission] = useState<
+    "unknown" | "granted" | "denied"
+  >("unknown");
 
-  const visiblePois = POIS.filter(p => {
-    const matchCategory = activeCategory === "Tout" || p.category === activeCategory;
-    const matchSearch = search === "" || p.name.toLowerCase().includes(search.toLowerCase());
-    return matchCategory && matchSearch;
-  });
+  /*
+   * IMPORTANT :
+   * Aucun POI fictif n'est injecté ici.
+   *
+   * Les points d'intérêt doivent provenir
+   * d'une source backend réelle.
+   *
+   * Une fois api.map.* confirmé dans
+   * convex/map.ts, cette collection doit
+   * être alimentée par cette source.
+   */
+  const points: MapPoint[] = [];
 
-  const handleLocate = () => {
-    if (!("geolocation" in navigator)) return;
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setUserPos(coords);
-        setFlyTarget(coords);
-        setLocating(false);
-      },
-      () => {
-        setFlyTarget({ lat: ABIDJAN_CENTER[0], lng: ABIDJAN_CENTER[1] });
-        setLocating(false);
-      },
-      { timeout: 8000 }
+  const filteredPoints = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return points.filter((point) => {
+      const categoryMatch =
+        activeCategory === "Tout" || point.category === activeCategory;
+
+      if (!categoryMatch) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return [point.name, point.address, point.category]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [points, activeCategory, search]);
+
+  const toggleLayer = (layerId: LayerId) => {
+    setLayers((current) =>
+      current.map((layer) =>
+        layer.id === layerId
+          ? {
+              ...layer,
+              active: layer.available ? !layer.active : layer.active,
+            }
+          : layer,
+      ),
     );
   };
 
+  const locateUser = async () => {
+    if (locating) {
+      return;
+    }
+
+    try {
+      setLocating(true);
+
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+
+      if (!servicesEnabled) {
+        Alert.alert(
+          "Localisation désactivée",
+          "Activez les services de localisation de votre appareil puis réessayez.",
+        );
+        return;
+      }
+
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== "granted") {
+        setLocationPermission("denied");
+
+        Alert.alert(
+          "Permission requise",
+          "La localisation est nécessaire uniquement pour centrer la carte sur votre position.",
+        );
+
+        return;
+      }
+
+      setLocationPermission("granted");
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const coordinate: Coordinate = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+
+      if (!isValidCoordinate(coordinate)) {
+        throw new Error("Coordonnées GPS invalides.");
+      }
+
+      setUserPosition(coordinate);
+
+      setMapRegion({
+        latitude: coordinate.latitude,
+        longitude: coordinate.longitude,
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.08,
+      });
+    } catch {
+      Alert.alert(
+        "Localisation",
+        "Impossible de récupérer votre position actuellement.",
+      );
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const centerOnPoint = (point: MapPoint) => {
+    if (
+      !isValidCoordinate({
+        latitude: point.latitude,
+        longitude: point.longitude,
+      })
+    ) {
+      return;
+    }
+
+    setSelectedPoint(point);
+
+    setMapRegion({
+      latitude: point.latitude,
+      longitude: point.longitude,
+      latitudeDelta: 0.025,
+      longitudeDelta: 0.025,
+    });
+
+    setActiveTab("Carte");
+  };
+
+  const resetSearch = () => {
+    setSearch("");
+    setActiveCategory("Tout");
+  };
+
+  useEffect(() => {
+    if (activeTab === "Explorer" && selectedPoint) {
+      setSelectedPoint(null);
+    }
+  }, [activeTab, selectedPoint]);
+
   return (
-    <View className="h-full flex flex-col overflow-hidden" style={{  }}>{}<View className="flex items-center gap-3 px-4 pt-12 pb-3"><Pressable onPress={onBack} className="p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,.08)" }}><ArrowLeft size={18} color="white" /></Pressable><View className="flex-1"><Text className="text-white font-bold text-lg">Carte 3D Interactive</Text><Text className="text-gray-400 text-xs">Explorer · Mesurer · Interagir</Text></View><Pressable onPress={handleLocate} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(6,182,212,.15)" }}>{locating ? (
-            <View animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" as const }}>
-              <Navigation size={16} color="#06B6D4" />
-            </View>
-          ) : (
-            <Locate size={16} color="#06B6D4" />
-          )}</Pressable></View>{}<View className="flex gap-1 mx-4 mb-3 p-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,.04)" }}>{["Carte", "Couches", "Explorer"].map(tab => (
-          <Pressable key={tab} onPress={() => setActiveTab(tab)} className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: activeTab === tab ? "rgba(255,255,255,.1)" : "transparent" }}>{tab}</Pressable>
-        ))}</View>{}{activeTab === "Carte" && (
-        <View className="flex-1 flex flex-col overflow-hidden px-4 pb-4">{}<View className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,.06)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}><Search size={14} color="#9CA3AF" /><TextInput value={search} onChangeText={value => setSearch(value)} placeholder="Rechercher un lieu..." className="flex-1 bg-transparent text-white text-sm outline-none" /></View>{}<View className="flex gap-2 mb-3 overflow-x-auto" style={{  }}>{POI_CATEGORIES.map(cat => (
-              <Pressable key={cat} onPress={() => setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={{ backgroundColor: activeCategory === cat ? "#06B6D4" : "rgba(255,255,255,.06)" }}>{cat}</Pressable>
-            ))}</View>{}<View className="flex-1 relative rounded-2xl overflow-hidden" style={{ borderWidth: 1, borderColor: "rgba(6,182,212,.2)", borderStyle: "solid", minHeight: 280 }}><MapContainer center={ABIDJAN_CENTER} zoom={13} className="h-full w-full" ref={mapRef} zoomControl={false}><TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' />{flyTarget && <FlyTo lat={flyTarget.lat} lng={flyTarget.lng} />}{}{userPos && (
-                <Marker
-                  position={[userPos.lat, userPos.lng]}
-                  icon={L.divIcon({
-                    className: "",
-                    html: `<div style="
-                      width:18px;height:18px;border-radius:50%;
-                      background:#06B6D4;
-                      border:3px solid white;
-                      box-shadow:0 0 0 6px rgba(6,182,212,0.3);
-                    "></div>`,
-                    iconSize: [18, 18],
-                    iconAnchor: [9, 9],
-                  })}
-                >
-                  <Popup><Text className="font-bold text-xs">Votre position</Text></Popup>
-                </Marker>
-              )}{}{visiblePois.map(poi => (
-                <Marker
-                  key={poi.id}
-                  position={[poi.lat, poi.lng]}
-                  icon={makeIcon(poi.color)}
-                >
-                  <Popup>
-                    <View className="text-xs"><Text className="font-bold">{poi.name}</Text><Text className="text-gray-500">{poi.category}</Text></View>
-                  </Popup>
-                </Marker>
-              ))}</MapContainer>{}<View className="absolute bottom-3 left-3 z-[500] px-2 py-1 rounded-lg text-xs text-cyan-400" style={{ backgroundColor: "rgba(0,0,0,.7)" }}><Text>Abidjan ·</Text>{visiblePois.length}<Text>POI</Text></View></View></View>
-      )}{}{activeTab === "Couches" && (
-        <View className="flex-1 overflow-y-auto px-4 pb-6 space-y-3">
-          <Text className="text-gray-400 text-xs">Activez les couches à afficher sur la carte :</Text>
-          {layers.map(layer => (
-            <View key={layer.id} className="flex items-center gap-3 p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,.04)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}>
-              <Layers size={16} color={layer.active ? "#06B6D4" : "#9CA3AF"} />
-              <Text className="text-white text-sm flex-1">{layer.label}</Text>
-              <Pressable onPress={() => toggleLayer(layer.id)} className="w-12 h-6 rounded-full relative transition-all" style={{ backgroundColor: layer.active ? "#06B6D4" : "rgba(255,255,255,.1)" }}>
-                <View className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" style={{ left: layer.active ? "calc(100% - 20px)" : "4px" }} />
+    <View style={styles.screen}>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Pressable
+            onPress={onBack}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+          >
+            <ArrowLeft size={18} color="#FFFFFF" />
+          </Pressable>
+
+          <View style={styles.titleBlock}>
+            <Text style={styles.title}>Carte</Text>
+
+            <Text style={styles.subtitle}>
+              Explorer · Localiser · Comprendre
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={locateUser}
+            disabled={locating}
+            style={[
+              styles.locationButton,
+              locating && styles.locationButtonLoading,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Me localiser"
+          >
+            {locating ? (
+              <ActivityIndicator size="small" color="#22D3EE" />
+            ) : (
+              <LocateFixed size={17} color="#22D3EE" />
+            )}
+          </Pressable>
+        </View>
+
+        <View style={styles.tabs}>
+          {(["Carte", "Couches", "Explorer"] as MapTab[]).map((tab) => {
+            const active = activeTab === tab;
+
+            return (
+              <Pressable
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                style={[styles.tab, active && styles.tabActive]}
+              >
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>
+                  {tab}
+                </Text>
               </Pressable>
-            </View>
-          ))}
+            );
+          })}
         </View>
-      )}{}{activeTab === "Explorer" && (
-        <View className="flex-1 overflow-y-auto px-4 pb-6 space-y-3">
-          <Text className="text-gray-400 text-xs">{visiblePois.length} points d'intérêt</Text>
-          {POIS.map((poi, i) => (
-            <View key={poi.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,.04)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }} onPress={() => {
-                setFlyTarget({ lat: poi.lat, lng: poi.lng });
-                setActiveTab("Carte");
-              }}>
-              <View className="w-8 h-8 rounded-full" style={{ backgroundColor: poi.color }} />
-              <View className="flex-1">
-                <Text className="text-white font-medium text-sm">{poi.name}</Text>
-                <Text className="text-xs" style={{ color: poi.color }}>{poi.category}</Text>
+      </View>
+
+      {activeTab === "Carte" ? (
+        <View style={styles.mapContainer}>
+          <View style={styles.searchContainer}>
+            <Search size={15} color="#64748B" />
+
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Rechercher un lieu…"
+              placeholderTextColor="#475569"
+              style={styles.searchInput}
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+
+            {search ? (
+              <Pressable onPress={resetSearch}>
+                <X size={15} color="#64748B" />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryRow}
+          >
+            {CATEGORIES.map((category) => {
+              const active = activeCategory === category.id;
+
+              return (
+                <Pressable
+                  key={category.id}
+                  onPress={() => setActiveCategory(category.id)}
+                  style={[
+                    styles.categoryChip,
+                    active && styles.categoryChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      active && styles.categoryTextActive,
+                    ]}
+                  >
+                    {category.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.mapCard}>
+            <MapView
+              provider={PROVIDER_DEFAULT}
+              style={StyleSheet.absoluteFillObject}
+              initialRegion={DEFAULT_REGION}
+              region={mapRegion}
+              onRegionChangeComplete={setMapRegion}
+              showsUserLocation={locationPermission === "granted"}
+              showsMyLocationButton={false}
+              showsCompass={true}
+              showsScale={true}
+              rotateEnabled={true}
+              pitchEnabled={true}
+              toolbarEnabled={false}
+              loadingEnabled={true}
+              loadingBackgroundColor="#050812"
+            >
+              {userPosition ? (
+                <Circle
+                  center={{
+                    latitude: userPosition.latitude,
+                    longitude: userPosition.longitude,
+                  }}
+                  radius={80}
+                  fillColor="rgba(34,211,238,0.10)"
+                  strokeColor="rgba(34,211,238,0.28)"
+                  strokeWidth={1}
+                />
+              ) : null}
+
+              {filteredPoints.map((point) => (
+                <MapMarker
+                  key={point.id}
+                  point={point}
+                  onPress={() => setSelectedPoint(point)}
+                />
+              ))}
+            </MapView>
+
+            <View style={styles.mapStatus}>
+              <View style={styles.statusDot} />
+
+              <Text style={styles.mapStatusText}>
+                {filteredPoints.length} point
+                {filteredPoints.length !== 1 ? "s" : ""} réel
+                {filteredPoints.length !== 1 ? "s" : ""}
+              </Text>
+            </View>
+
+            {filteredPoints.length === 0 ? (
+              <View style={styles.mapEmptyOverlay}>
+                <MapIcon size={25} color="#64748B" />
+
+                <Text style={styles.mapEmptyTitle}>
+                  Données cartographiques
+                </Text>
+
+                <Text style={styles.mapEmptyText}>
+                  Aucun point d'intérêt vérifié n'est disponible dans la source
+                  actuellement.
+                </Text>
               </View>
-              <Compass size={14} color="#9CA3AF" />
-            </View>
-          ))}
+            ) : null}
+
+            {selectedPoint ? (
+              <View style={styles.selectedPointCard}>
+                <View style={styles.selectedPointHeader}>
+                  <View
+                    style={[
+                      styles.selectedPointIcon,
+                      {
+                        backgroundColor: `${getCategoryIconColor(
+                          selectedPoint.category,
+                        )}18`,
+                      },
+                    ]}
+                  >
+                    <Navigation
+                      size={15}
+                      color={getCategoryIconColor(selectedPoint.category)}
+                    />
+                  </View>
+
+                  <View style={styles.selectedPointBody}>
+                    <Text style={styles.selectedPointTitle} numberOfLines={1}>
+                      {selectedPoint.name}
+                    </Text>
+
+                    <Text style={styles.selectedPointCategory}>
+                      {selectedPoint.category}
+                    </Text>
+                  </View>
+
+                  <Pressable onPress={() => setSelectedPoint(null)}>
+                    <X size={15} color="#64748B" />
+                  </Pressable>
+                </View>
+
+                {selectedPoint.address ? (
+                  <Text style={styles.selectedPointAddress}>
+                    {selectedPoint.address}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.mapFooter}>
+            <Compass size={14} color="#64748B" />
+
+            <Text style={styles.mapFooterText}>
+              Appuyez sur le bouton de localisation pour centrer la carte sur
+              votre position.
+            </Text>
+          </View>
         </View>
-      )}</View>
+      ) : null}
+
+      {activeTab === "Couches" ? (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.layersContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.sectionIntro}>
+            <View style={styles.sectionIcon}>
+              <Layers size={20} color="#22D3EE" />
+            </View>
+
+            <View style={styles.sectionIntroBody}>
+              <Text style={styles.sectionTitle}>Couches cartographiques</Text>
+
+              <Text style={styles.sectionText}>
+                Les couches sont activées uniquement lorsqu'une source
+                cartographique compatible est réellement disponible.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.layerList}>
+            {layers.map((layer) => (
+              <LayerRow
+                key={layer.id}
+                layer={layer}
+                onToggle={() => toggleLayer(layer.id)}
+              />
+            ))}
+          </View>
+
+          <View style={styles.integrityNotice}>
+            <Text style={styles.integrityTitle}>Intégrité des données</Text>
+
+            <Text style={styles.integrityText}>
+              Aucun trafic, relief, satellite ou indicateur démographique n'est
+              simulé. Une couche indisponible reste désactivée jusqu'à connexion
+              d'une source réelle.
+            </Text>
+          </View>
+        </ScrollView>
+      ) : null}
+
+      {activeTab === "Explorer" ? (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.explorerContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.explorerHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Explorer</Text>
+
+              <Text style={styles.sectionText}>
+                {filteredPoints.length} point
+                {filteredPoints.length !== 1 ? "s" : ""} disponible
+                {filteredPoints.length !== 1 ? "s" : ""}
+              </Text>
+            </View>
+
+            <MapIcon size={20} color="#22D3EE" />
+          </View>
+
+          {filteredPoints.length === 0 ? (
+            <EmptyExplorer search={search} category={activeCategory} />
+          ) : (
+            <View style={styles.pointList}>
+              {filteredPoints.map((point) => {
+                const color = getCategoryIconColor(point.category);
+
+                return (
+                  <Pressable
+                    key={point.id}
+                    onPress={() => centerOnPoint(point)}
+                    style={({ pressed }) => [
+                      styles.pointRow,
+                      pressed && styles.pointRowPressed,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.pointIcon,
+                        {
+                          backgroundColor: `${color}16`,
+                          borderColor: `${color}35`,
+                        },
+                      ]}
+                    >
+                      <Navigation size={15} color={color} />
+                    </View>
+
+                    <View style={styles.pointBody}>
+                      <Text style={styles.pointName} numberOfLines={1}>
+                        {point.name}
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.pointCategory,
+                          {
+                            color,
+                          },
+                        ]}
+                      >
+                        {point.category}
+                      </Text>
+
+                      {point.address ? (
+                        <Text style={styles.pointAddress} numberOfLines={1}>
+                          {point.address}
+                        </Text>
+                      ) : null}
+                    </View>
+
+                    <Compass size={15} color="#475569" />
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+      ) : null}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#050812",
+  },
+
+  header: {
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 9,
+    backgroundColor: "#050812",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.055)",
+  },
+
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  titleBlock: {
+    flex: 1,
+  },
+
+  title: {
+    color: "#F8FAFC",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+
+  subtitle: {
+    marginTop: 3,
+    color: "#64748B",
+    fontSize: 7.5,
+  },
+
+  locationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(34,211,238,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(34,211,238,0.16)",
+  },
+
+  locationButtonLoading: {
+    opacity: 0.75,
+  },
+
+  tabs: {
+    marginTop: 10,
+    padding: 3,
+    borderRadius: 13,
+    flexDirection: "row",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+
+  tab: {
+    flex: 1,
+    minHeight: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  tabActive: {
+    backgroundColor: "rgba(255,255,255,0.075)",
+  },
+
+  tabText: {
+    color: "#64748B",
+    fontSize: 8,
+    fontWeight: "750",
+  },
+
+  tabTextActive: {
+    color: "#F8FAFC",
+  },
+
+  mapContainer: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+  },
+
+  searchContainer: {
+    minHeight: 43,
+    paddingHorizontal: 11,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  searchInput: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 8.5,
+    paddingVertical: 0,
+  },
+
+  categoryRow: {
+    gap: 6,
+    paddingVertical: 8,
+  },
+
+  categoryChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  categoryChipActive: {
+    backgroundColor: "rgba(34,211,238,0.11)",
+    borderColor: "rgba(34,211,238,0.30)",
+  },
+
+  categoryText: {
+    color: "#64748B",
+    fontSize: 7,
+    fontWeight: "800",
+  },
+
+  categoryTextActive: {
+    color: "#22D3EE",
+  },
+
+  mapCard: {
+    flex: 1,
+    minHeight: 280,
+    overflow: "hidden",
+    borderRadius: 20,
+    backgroundColor: "#0A0F1D",
+    borderWidth: 1,
+    borderColor: "rgba(34,211,238,0.16)",
+  },
+
+  mapStatus: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(2,6,23,0.84)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#22D3EE",
+  },
+
+  mapStatusText: {
+    color: "#CBD5E1",
+    fontSize: 6.5,
+    fontWeight: "800",
+  },
+
+  mapEmptyOverlay: {
+    position: "absolute",
+    left: 24,
+    right: 24,
+    top: "50%",
+    transform: [
+      {
+        translateY: -45,
+      },
+    ],
+    padding: 16,
+    alignItems: "center",
+    borderRadius: 17,
+    backgroundColor: "rgba(2,6,23,0.90)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  mapEmptyTitle: {
+    marginTop: 8,
+    color: "#CBD5E1",
+    fontSize: 9,
+    fontWeight: "850",
+  },
+
+  mapEmptyText: {
+    marginTop: 4,
+    color: "#64748B",
+    fontSize: 7,
+    lineHeight: 11,
+    textAlign: "center",
+  },
+
+  markerOuter: {
+    width: 31,
+    height: 31,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(2,6,23,0.90)",
+    borderWidth: 2,
+  },
+
+  markerInner: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+  },
+
+  selectedPointCard: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    bottom: 10,
+    padding: 11,
+    borderRadius: 15,
+    backgroundColor: "rgba(2,6,23,0.94)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  selectedPointHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  selectedPointIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  selectedPointBody: {
+    flex: 1,
+  },
+
+  selectedPointTitle: {
+    color: "#F8FAFC",
+    fontSize: 8.5,
+    fontWeight: "850",
+  },
+
+  selectedPointCategory: {
+    marginTop: 2,
+    color: "#64748B",
+    fontSize: 6.5,
+  },
+
+  selectedPointAddress: {
+    marginTop: 7,
+    color: "#64748B",
+    fontSize: 7,
+  },
+
+  mapFooter: {
+    paddingTop: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  mapFooterText: {
+    flex: 1,
+    color: "#475569",
+    fontSize: 6.5,
+    lineHeight: 10,
+  },
+
+  scroll: {
+    flex: 1,
+  },
+
+  layersContent: {
+    padding: 14,
+    paddingBottom: 35,
+  },
+
+  sectionIntro: {
+    padding: 13,
+    borderRadius: 17,
+    flexDirection: "row",
+    gap: 9,
+    backgroundColor: "rgba(34,211,238,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(34,211,238,0.10)",
+  },
+
+  sectionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(34,211,238,0.08)",
+  },
+
+  sectionIntroBody: {
+    flex: 1,
+  },
+
+  sectionTitle: {
+    color: "#E2E8F0",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  sectionText: {
+    marginTop: 4,
+    color: "#64748B",
+    fontSize: 7.5,
+    lineHeight: 12,
+  },
+
+  layerList: {
+    marginTop: 11,
+    gap: 7,
+  },
+
+  layerRow: {
+    minHeight: 70,
+    padding: 10,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.055)",
+  },
+
+  layerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+
+  layerIconActive: {
+    backgroundColor: "rgba(34,211,238,0.08)",
+  },
+
+  layerContent: {
+    flex: 1,
+  },
+
+  layerTitle: {
+    color: "#CBD5E1",
+    fontSize: 8.5,
+    fontWeight: "850",
+  },
+
+  layerDescription: {
+    marginTop: 3,
+    color: "#475569",
+    fontSize: 6.5,
+  },
+
+  switch: {
+    width: 42,
+    height: 24,
+    padding: 3,
+    borderRadius: 999,
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
+  switchActive: {
+    backgroundColor: "#0891B2",
+  },
+
+  switchDisabled: {
+    opacity: 0.45,
+  },
+
+  switchThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#64748B",
+  },
+
+  switchThumbActive: {
+    alignSelf: "flex-end",
+    backgroundColor: "#FFFFFF",
+  },
+
+  integrityNotice: {
+    marginTop: 11,
+    padding: 12,
+    borderRadius: 15,
+    backgroundColor: "rgba(99,102,241,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.09)",
+  },
+
+  integrityTitle: {
+    color: "#A5B4FC",
+    fontSize: 7.5,
+    fontWeight: "850",
+  },
+
+  integrityText: {
+    marginTop: 5,
+    color: "#475569",
+    fontSize: 7,
+    lineHeight: 11,
+  },
+
+  explorerContent: {
+    padding: 14,
+    paddingBottom: 35,
+  },
+
+  explorerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  pointList: {
+    gap: 7,
+  },
+
+  pointRow: {
+    minHeight: 69,
+    padding: 10,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.055)",
+  },
+
+  pointRowPressed: {
+    opacity: 0.7,
+    transform: [
+      {
+        scale: 0.992,
+      },
+    ],
+  },
+
+  pointIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  pointBody: {
+    flex: 1,
+  },
+
+  pointName: {
+    color: "#E2E8F0",
+    fontSize: 8.5,
+    fontWeight: "850",
+  },
+
+  pointCategory: {
+    marginTop: 2,
+    fontSize: 6.5,
+    fontWeight: "800",
+  },
+
+  pointAddress: {
+    marginTop: 3,
+    color: "#475569",
+    fontSize: 6.5,
+  },
+
+  emptyExplorer: {
+    minHeight: 270,
+    paddingHorizontal: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.055)",
+  },
+
+  emptyExplorerIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  emptyExplorerTitle: {
+    marginTop: 12,
+    color: "#CBD5E1",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  emptyExplorerText: {
+    maxWidth: 330,
+    marginTop: 5,
+    color: "#475569",
+    fontSize: 7.5,
+    lineHeight: 12,
+    textAlign: "center",
+  },
+});

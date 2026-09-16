@@ -1,118 +1,1036 @@
-import { View, Text, Pressable } from "react-native";
-import { useState } from "react";
-import { ArrowLeft, Zap, Sun, Battery, TrendingDown, MapPin, BarChart2, Leaf, DollarSign, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
+import React, { useMemo, useState } from "react";
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { Authenticated } from "@/lib/convex-auth-compat";
-import { toast } from "sonner";
+import { Authenticated, Unauthenticated } from "@/lib/convex-auth-compat";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Battery,
+  CheckCircle,
+  DollarSign,
+  Leaf,
+  RefreshCw,
+  Sun,
+  Zap,
+} from "lucide-react-native";
 
-const ENERGY_SOURCES = [
-  { name: "Panneau solaire principal", type: "Solaire", production: 4.2, unit: "kWh/jour", status: "Actif", efficiency: 87, color: "#FBBF24" },
-  { name: "Réseau CIE", type: "Réseau", production: 0, unit: "kWh/jour", status: "En attente", efficiency: 100, color: "#6366F1" },
-  { name: "Batterie stockage", type: "Stockage", production: 12, unit: "kWh stock.", status: "Chargée à 78%", efficiency: 78, color: "#10B981" },
+/* -------------------------------------------------------------------------- */
+/* Types                                                                      */
+/* -------------------------------------------------------------------------- */
+
+type EnergyTab = "dashboard" | "consumption" | "providers";
+
+/* -------------------------------------------------------------------------- */
+/* Constants                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const TABS: {
+  id: EnergyTab;
+  label: string;
+}[] = [
+  {
+    id: "dashboard",
+    label: "Tableau de bord",
+  },
+  {
+    id: "consumption",
+    label: "Consommation",
+  },
+  {
+    id: "providers",
+    label: "Fournisseurs",
+  },
 ];
 
-const CONSUMPTION_DATA = [
-  { label: "Climatiseur", kwh: 5.2, cost: 1560, percent: 35, color: "#EF4444" },
-  { label: "Réfrigérateur", kwh: 2.8, cost: 840, percent: 19, color: "#F97316" },
-  { label: "Éclairage", kwh: 1.5, cost: 450, percent: 10, color: "#FBBF24" },
-  { label: "Télévision", kwh: 1.2, cost: 360, percent: 8, color: "#6366F1" },
-  { label: "Autres", kwh: 4.2, cost: 1260, percent: 28, color: "#8B5CF6" },
-];
+/* -------------------------------------------------------------------------- */
+/* Small reusable components                                                  */
+/* -------------------------------------------------------------------------- */
 
-const PROVIDERS = [
-  { name: "CIE", type: "Électricité nationale", tariff: "300 FCFA/kWh", coverage: "National", reliability: 72, contact: "25 20 26 00" },
-  { name: "SolarAfrica CI", type: "Solaire résidentiel", tariff: "À partir de 800K FCFA", coverage: "Abidjan + villes", reliability: 95, contact: "07 00 00 01" },
-  { name: "GreenPower CI", type: "Kits solaires", tariff: "À partir de 200K FCFA", coverage: "National (kit)", reliability: 90, contact: "05 00 00 02" },
-];
-
-const ALERTS = [
-  { type: "warning", msg: "Consommation +18% vs mois dernier", time: "Aujourd'hui" },
-  { type: "success", msg: "Panneau solaire: performance optimale", time: "Il y a 2h" },
-  { type: "info", msg: "Délestage prévu: Zone 3 – 14h-16h", time: "Il y a 3h" },
-];
-
-function EnergieSettings() {
-  const settings = useQuery(api.urban.getEnergySettings);
-  const saveSettings = useMutation(api.urban.saveEnergySettings);
-
-  const autoSave = settings?.autoSave ?? true;
-  const solarAlerts = settings?.solarAlerts ?? true;
-
-  const toggle = async (field: "autoSave" | "solarAlerts") => {
-    try {
-      await saveSettings({
-        autoSave: field === "autoSave" ? !autoSave : autoSave,
-        solarAlerts: field === "solarAlerts" ? !solarAlerts : solarAlerts,
-      });
-    } catch {
-      toast.error("Erreur lors de la sauvegarde");
-    }
-  };
-
+function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      {[
-        { label: "Mode économie auto", desc: "Réduit la consommation aux heures de pointe", val: autoSave, field: "autoSave" as const },
-        { label: "Alertes solaires", desc: "Notifications en cas de baisse de production", val: solarAlerts, field: "solarAlerts" as const },
-      ].map(({ label, desc, val, field }) => (
-        <View key={label} className="flex items-center gap-3 p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex-1"><Text className="text-white font-semibold text-sm">{label}</Text><Text className="text-gray-400 text-xs">{desc}</Text></View><Pressable onPress={() => { void toggle(field); }} className="w-12 h-6 rounded-full transition-all relative" style={{ backgroundColor: val ? "#FBBF24" : "rgba(255,255,255,0.1)" }}><View className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all" style={{ left: val ? "calc(100% - 20px)" : "4px" }} /></Pressable></View>
-      ))}
-    </>
+    <Text
+      style={{
+        color: "#FFFFFF",
+        fontSize: 15,
+        fontWeight: "800",
+        marginBottom: 11,
+      }}
+    >
+      {children}
+    </Text>
   );
 }
 
-export default function EnergiePage({ onBack }: { onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState("Tableau de bord");
+function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <View
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 24,
+        paddingVertical: 55,
+      }}
+    >
+      {icon}
 
-  const totalConsumption = CONSUMPTION_DATA.reduce((s, c) => s + c.kwh, 0);
-  const totalCost = CONSUMPTION_DATA.reduce((s, c) => s + c.cost, 0);
-  const solarProduction = 4.2;
-  const savings = solarProduction * 300;
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.55)",
+          fontSize: 14,
+          fontWeight: "700",
+          textAlign: "center",
+          marginTop: 14,
+        }}
+      >
+        {title}
+      </Text>
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.3)",
+          fontSize: 11,
+          lineHeight: 17,
+          textAlign: "center",
+          marginTop: 6,
+        }}
+      >
+        {description}
+      </Text>
+    </View>
+  );
+}
+
+function MetricCard({
+  icon,
+  label,
+  value,
+  caption,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  caption: string;
+  accent: string;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        minWidth: 105,
+        padding: 13,
+        borderRadius: 18,
+        backgroundColor: "rgba(255,255,255,0.045)",
+        borderWidth: 1,
+        borderColor: `${accent}45`,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          marginBottom: 8,
+        }}
+      >
+        {icon}
+
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.42)",
+            fontSize: 10,
+            fontWeight: "600",
+          }}
+        >
+          {label}
+        </Text>
+      </View>
+
+      <Text
+        numberOfLines={1}
+        style={{
+          color: "#FFFFFF",
+          fontSize: 17,
+          fontWeight: "900",
+        }}
+      >
+        {value}
+      </Text>
+
+      <Text
+        style={{
+          color: accent,
+          fontSize: 9,
+          fontWeight: "700",
+          marginTop: 3,
+        }}
+      >
+        {caption}
+      </Text>
+    </View>
+  );
+}
+
+function StatusBadge({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "success" | "warning" | "neutral";
+}) {
+  const colors = {
+    success: {
+      text: "#34D399",
+      bg: "rgba(16,185,129,0.13)",
+      border: "rgba(16,185,129,0.22)",
+    },
+    warning: {
+      text: "#FBBF24",
+      bg: "rgba(245,158,11,0.13)",
+      border: "rgba(245,158,11,0.22)",
+    },
+    neutral: {
+      text: "rgba(255,255,255,0.58)",
+      bg: "rgba(255,255,255,0.06)",
+      border: "rgba(255,255,255,0.09)",
+    },
+  };
+
+  const color = colors[tone];
 
   return (
-    <View className="h-full flex flex-col overflow-hidden" style={{  }}><View className="flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={onBack} className="p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} color="white" /></Pressable><View className="flex-1"><Text className="text-white font-bold text-lg">Énergie & Solaire</Text><Text className="text-gray-400 text-xs">Gérez votre consommation</Text></View><Pressable className="p-2 rounded-full" style={{ backgroundColor: "rgba(251,191,36,0.15)" }}><RefreshCw size={16} color="#FBBF24" /></Pressable></View><View className="flex gap-3 px-4 mb-4"><View className="flex-1 p-3 rounded-2xl" style={{ borderWidth: 1, borderColor: "rgba(251,191,36,0.3)", borderStyle: "solid" }}><View className="flex items-center gap-1 mb-1"><Sun size={12} color="#FBBF24" /><Text className="text-gray-400 text-xs">Production</Text></View><Text className="text-white font-bold text-base">{solarProduction}kWh</Text><Text className="text-yellow-400 text-xs">{"Aujourd'hui"}</Text></View><View className="flex-1 p-3 rounded-2xl" style={{ borderWidth: 1, borderColor: "rgba(239,68,68,0.3)", borderStyle: "solid" }}><View className="flex items-center gap-1 mb-1"><Zap size={12} color="#EF4444" /><Text className="text-gray-400 text-xs">Consommation</Text></View><Text className="text-white font-bold text-base">{totalConsumption.toFixed(1)}kWh</Text><Text className="text-red-400 text-xs">Ce jour</Text></View><View className="flex-1 p-3 rounded-2xl" style={{ borderWidth: 1, borderColor: "rgba(16,185,129,0.3)", borderStyle: "solid" }}><View className="flex items-center gap-1 mb-1"><Leaf size={12} color="#10B981" /><Text className="text-gray-400 text-xs">Économies</Text></View><Text className="text-white font-bold text-base">{savings.toLocaleString()}</Text><Text className="text-green-400 text-xs">FCFA/mois</Text></View></View><View className="flex gap-1 mx-4 mb-4 p-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>{["Tableau de bord", "Consommation", "Fournisseurs"].map(tab => (
-          <Pressable key={tab} onPress={() => setActiveTab(tab)} className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: activeTab === tab ? "rgba(255,255,255,0.1)" : "transparent" }}>{tab}</Pressable>
-        ))}</View><View className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">{activeTab === "Tableau de bord" && (
-          <>
-            {ALERTS.map((a, i) => (
-              <View key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: a.type === "warning" ? "rgba(245,158,11,0.08)" : a.type === "success" ? "rgba(16,185,129,0.08)" : "rgba(99,102,241,0.08)", borderColor: "rgba(245,158,11,0.2)", borderStyle: "solid" }}>{a.type === "warning" ? <AlertTriangle size={14} color="#F59E0B" /> : a.type === "success" ? <CheckCircle size={14} color="#10B981" /> : <Zap size={14} color="#6366F1" />}<View className="flex-1"><Text className="text-white text-xs">{a.msg}</Text><Text className="text-gray-500 text-xs">{a.time}</Text></View></View>
-            ))}
-            <Text className="text-white font-semibold text-sm">{"Sources d'énergie"}</Text>
-            {ENERGY_SOURCES.map((s, i) => (
-              <View key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <View className="flex items-center justify-between mb-2"><View className="flex items-center gap-2"><View className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: `${s.color}20` }}>{s.type === "Solaire" ? <Sun size={14} color={s.color} /> : s.type === "Stockage" ? <Battery size={14} color={s.color} /> : <Zap size={14} color={s.color} />}</View><View><Text className="text-white font-semibold text-sm">{s.name}</Text><Text className="text-gray-400 text-xs">{s.status}</Text></View></View><Text className="text-white font-bold text-sm">{s.production}{s.unit}</Text></View>
-                <View className="w-full h-1.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><View className="h-full rounded-full" style={{ width: `${s.efficiency}%`, backgroundColor: s.color }} /></View>
-                <Text className="text-gray-500 text-xs mt-1">{s.efficiency}% efficacité</Text>
-              </View>
-            ))}
-            <Text className="text-white font-semibold text-sm">Paramètres</Text>
-            <Authenticated>
-              <EnergieSettings />
-            </Authenticated>
-          </>
-        )}{activeTab === "Consommation" && (
-          <>
-            <View className="p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center justify-between mb-4"><Text className="text-white font-bold">Répartition mensuelle</Text><Text className="text-gray-400 text-sm">{totalCost.toLocaleString()}FCFA</Text></View>{CONSUMPTION_DATA.map((item, i) => (
-                <View key={item.label} className="mb-3"><View className="flex justify-between mb-1"><Text className="text-gray-300 text-xs">{item.label}</Text><Text className="text-white text-xs font-medium">{item.kwh}kWh · {item.cost.toLocaleString()}FCFA</Text></View><View className="w-full h-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><View initial={{ width: 0 }} animate={{ width: `${item.percent}%` }} transition={{ delay: i * 0.1, duration: 0.6 }} className="h-full rounded-full" style={{ backgroundColor: item.color }} /></View></View>
-              ))}</View>
-            <View className="p-4 rounded-2xl" style={{ backgroundColor: "rgba(16,185,129,0.08)", borderWidth: 1, borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-2"><Leaf size={16} color="#10B981" /><Text className="text-white font-bold">{"Conseils d'économie"}</Text></View>{["Éteignez le climatiseur la nuit – économisez 20%", "Utilisez LED au lieu d'ampoules classiques", "Débranchez les appareils en veille"].map((tip, i) => (
-                <View key={i} className="flex items-center gap-2 mt-2"><CheckCircle size={12} color="#10B981" /><Text className="text-gray-300 text-xs">{tip}</Text></View>
-              ))}</View>
-          </>
-        )}{activeTab === "Fournisseurs" && (
-          <>
-            {PROVIDERS.map((p, i) => (
-              <View key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className="p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <View className="flex items-center justify-between mb-2"><Text className="text-white font-bold text-sm">{p.name}</Text><View className="flex items-center gap-1"><View className="w-2 h-2 rounded-full" style={{ backgroundColor: p.reliability > 85 ? "#10B981" : "#F59E0B" }} /><Text className="text-xs" style={{ color: p.reliability > 85 ? "#10B981" : "#F59E0B" }}>{p.reliability}% fiabilité</Text></View></View>
-                <Text className="text-gray-400 text-xs mb-2">{p.type}</Text>
-                <View className="flex items-center justify-between mb-3"><View className="flex items-center gap-1"><DollarSign size={10} color="#FBBF24" /><Text className="text-yellow-400 text-xs">{p.tariff}</Text></View><View className="flex items-center gap-1"><MapPin size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{p.coverage}</Text></View></View>
-                <Pressable className="w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2" style={{ backgroundColor: "rgba(251,191,36,0.15)", borderWidth: 1, borderColor: "rgba(251,191,36,0.3)", borderStyle: "solid" }}><Text>Contacter:</Text>{p.contact}</Pressable>
-              </View>
-            ))}
-            <View className="p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "dashed" }}><View className="flex items-center gap-2 mb-2"><Sun size={16} color="#FBBF24" /><Text className="text-white font-bold text-sm">Calculez votre retour sur investissement</Text></View><Text className="text-gray-400 text-xs mb-3">Un panneau solaire de 3kWh peut vous faire économiser 90 000 FCFA/mois</Text><Pressable className="w-full py-2 rounded-xl text-sm font-bold" style={{ backgroundColor: "#FBBF24" }}>Simuler mon installation
-              </Pressable></View>
-          </>
-        )}</View></View>
+    <View
+      style={{
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderRadius: 999,
+        backgroundColor: color.bg,
+        borderWidth: 1,
+        borderColor: color.border,
+      }}
+    >
+      <Text
+        style={{
+          color: color.text,
+          fontSize: 9,
+          fontWeight: "800",
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Settings                                                                   */
+/* -------------------------------------------------------------------------- */
+
+function EnergieSettings() {
+  const settings = useQuery(api.urban.getEnergySettings);
+
+  const saveSettings = useMutation(api.urban.saveEnergySettings);
+
+  const [saving, setSaving] = useState(false);
+
+  const autoSave = settings?.autoSave ?? false;
+  const solarAlerts = settings?.solarAlerts ?? false;
+
+  const toggle = async (field: "autoSave" | "solarAlerts") => {
+    if (saving) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await saveSettings({
+        autoSave: field === "autoSave" ? !autoSave : autoSave,
+
+        solarAlerts: field === "solarAlerts" ? !solarAlerts : solarAlerts,
+      });
+    } catch {
+      Alert.alert("Paramètres", "Impossible d'enregistrer ce changement.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (settings === undefined) {
+    return (
+      <View
+        style={{
+          padding: 16,
+          borderRadius: 18,
+          backgroundColor: "rgba(255,255,255,0.04)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.07)",
+        }}
+      >
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.4)",
+            fontSize: 11,
+          }}
+        >
+          Chargement des paramètres…
+        </Text>
+      </View>
+    );
+  }
+
+  const items = [
+    {
+      label: "Mode économie automatique",
+      description:
+        "Utilise les paramètres disponibles pour réduire la consommation.",
+      value: autoSave,
+      field: "autoSave" as const,
+    },
+    {
+      label: "Alertes solaires",
+      description: "Active les alertes liées aux données solaires disponibles.",
+      value: solarAlerts,
+      field: "solarAlerts" as const,
+    },
+  ];
+
+  return (
+    <View style={{ gap: 9 }}>
+      {items.map((item) => (
+        <View
+          key={item.field}
+          style={{
+            minHeight: 68,
+            padding: 14,
+            borderRadius: 17,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            backgroundColor: "rgba(255,255,255,0.04)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.08)",
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 12,
+                fontWeight: "700",
+              }}
+            >
+              {item.label}
+            </Text>
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.38)",
+                fontSize: 10,
+                lineHeight: 15,
+                marginTop: 3,
+              }}
+            >
+              {item.description}
+            </Text>
+          </View>
+
+          <Pressable
+            disabled={saving}
+            onPress={() => {
+              void toggle(item.field);
+            }}
+            accessibilityRole="switch"
+            accessibilityState={{
+              checked: item.value,
+              disabled: saving,
+            }}
+            style={{
+              width: 48,
+              height: 28,
+              borderRadius: 999,
+              justifyContent: "center",
+              paddingHorizontal: 4,
+              backgroundColor: item.value ? "#FBBF24" : "rgba(255,255,255,0.1)",
+              opacity: saving ? 0.55 : 1,
+            }}
+          >
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                backgroundColor: "#FFFFFF",
+                alignSelf: item.value ? "flex-end" : "flex-start",
+              }}
+            />
+          </Pressable>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dashboard                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function DashboardTab() {
+  /*
+   * Important:
+   * Aucun chiffre énergétique n'est inventé ici.
+   *
+   * Lorsque les APIs de mesure seront connectées,
+   * cette section pourra afficher :
+   * - production réelle
+   * - consommation réelle
+   * - stockage réel
+   * - économies calculées sur données réelles
+   */
+
+  return (
+    <View>
+      <View
+        style={{
+          padding: 16,
+          borderRadius: 22,
+          backgroundColor: "rgba(255,255,255,0.045)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.08)",
+          marginBottom: 18,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <View
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 14,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(251,191,36,0.13)",
+            }}
+          >
+            <Zap size={19} color="#FBBF24" />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 14,
+                fontWeight: "800",
+              }}
+            >
+              Centre énergétique
+            </Text>
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.38)",
+                fontSize: 10,
+                marginTop: 3,
+              }}
+            >
+              Données énergétiques connectées
+            </Text>
+          </View>
+
+          <StatusBadge label="EN ATTENTE DE DONNÉES" tone="neutral" />
+        </View>
+
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.48)",
+            fontSize: 11,
+            lineHeight: 17,
+            marginTop: 14,
+          }}
+        >
+          Aucun compteur, équipement solaire ou batterie n'est actuellement
+          associé à ce compte par une source de données vérifiée.
+        </Text>
+      </View>
+
+      <SectionTitle>Vue énergétique</SectionTitle>
+
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 9,
+          marginBottom: 20,
+        }}
+      >
+        <MetricCard
+          icon={<Sun size={13} color="#FBBF24" />}
+          label="Production"
+          value="—"
+          caption="Aucune donnée"
+          accent="#FBBF24"
+        />
+
+        <MetricCard
+          icon={<Zap size={13} color="#EF4444" />}
+          label="Consommation"
+          value="—"
+          caption="Aucune donnée"
+          accent="#EF4444"
+        />
+
+        <MetricCard
+          icon={<Battery size={13} color="#34D399" />}
+          label="Stockage"
+          value="—"
+          caption="Aucune donnée"
+          accent="#34D399"
+        />
+      </View>
+
+      <SectionTitle>État du système</SectionTitle>
+
+      <EmptyState
+        icon={<Battery size={42} color="rgba(255,255,255,0.16)" />}
+        title="Aucun équipement connecté"
+        description="Connecte une source énergétique ou un équipement pris en charge lorsque l'intégration correspondante sera disponible."
+      />
+
+      <SectionTitle>Paramètres</SectionTitle>
+
+      <Authenticated>
+        <EnergieSettings />
+      </Authenticated>
+
+      <Unauthenticated>
+        <View
+          style={{
+            padding: 15,
+            borderRadius: 17,
+            backgroundColor: "rgba(255,255,255,0.04)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.07)",
+          }}
+        >
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.5)",
+              fontSize: 11,
+              lineHeight: 17,
+            }}
+          >
+            Connecte-toi pour gérer les paramètres énergétiques associés à ton
+            compte.
+          </Text>
+        </View>
+      </Unauthenticated>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Consumption                                                                */
+/* -------------------------------------------------------------------------- */
+
+function ConsumptionTab() {
+  return (
+    <View>
+      <View
+        style={{
+          padding: 17,
+          borderRadius: 22,
+          backgroundColor: "rgba(255,255,255,0.045)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.08)",
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
+          <BarIcon />
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 14,
+                fontWeight: "800",
+              }}
+            >
+              Analyse de consommation
+            </Text>
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.38)",
+                fontSize: 10,
+                marginTop: 3,
+              }}
+            >
+              Répartition par équipement
+            </Text>
+          </View>
+        </View>
+
+        <View
+          style={{
+            padding: 15,
+            borderRadius: 16,
+            backgroundColor: "rgba(255,255,255,0.035)",
+          }}
+        >
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.52)",
+              fontSize: 11,
+              lineHeight: 17,
+            }}
+          >
+            Les données de consommation ne sont pas disponibles pour ce compte.
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ marginTop: 16 }}>
+        <SectionTitle>Conseils</SectionTitle>
+
+        <View
+          style={{
+            padding: 15,
+            borderRadius: 18,
+            backgroundColor: "rgba(16,185,129,0.07)",
+            borderWidth: 1,
+            borderColor: "rgba(16,185,129,0.17)",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 9,
+              marginBottom: 7,
+            }}
+          >
+            <Leaf size={16} color="#34D399" />
+
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 13,
+                fontWeight: "800",
+              }}
+            >
+              Optimisation énergétique
+            </Text>
+          </View>
+
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.45)",
+              fontSize: 11,
+              lineHeight: 17,
+            }}
+          >
+            Les recommandations personnalisées seront calculées lorsqu'une
+            source de consommation réelle sera disponible.
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function BarIcon() {
+  return (
+    <View
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 13,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(99,102,241,0.13)",
+      }}
+    >
+      <Zap size={18} color="#818CF8" />
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Providers                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function ProvidersTab() {
+  return (
+    <View>
+      <View
+        style={{
+          padding: 18,
+          borderRadius: 22,
+          backgroundColor: "rgba(255,255,255,0.045)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.08)",
+        }}
+      >
+        <View
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 15,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(251,191,36,0.12)",
+            marginBottom: 13,
+          }}
+        >
+          <Sun size={20} color="#FBBF24" />
+        </View>
+
+        <Text
+          style={{
+            color: "#FFFFFF",
+            fontSize: 15,
+            fontWeight: "800",
+          }}
+        >
+          Fournisseurs énergétiques
+        </Text>
+
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.42)",
+            fontSize: 11,
+            lineHeight: 18,
+            marginTop: 6,
+          }}
+        >
+          Aucun catalogue fournisseur vérifié n'est actuellement connecté à
+          cette interface.
+        </Text>
+
+        <View
+          style={{
+            marginTop: 15,
+            padding: 12,
+            borderRadius: 13,
+            backgroundColor: "rgba(255,255,255,0.035)",
+          }}
+        >
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.36)",
+              fontSize: 10,
+              lineHeight: 16,
+            }}
+          >
+            Les fournisseurs, tarifs, zones de couverture, coordonnées et
+            niveaux de service devront provenir d'une source backend vérifiée
+            avant d'être affichés.
+          </Text>
+        </View>
+      </View>
+
+      <View style={{ marginTop: 16 }}>
+        <SectionTitle>Simulation</SectionTitle>
+
+        <EmptyState
+          icon={<DollarSign size={40} color="rgba(255,255,255,0.16)" />}
+          title="Simulation indisponible"
+          description="Un calcul de retour sur investissement nécessite des données réelles concernant l'installation, le tarif et la consommation."
+        />
+      </View>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Main page                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export default function EnergiePage({ onBack }: { onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<EnergyTab>("dashboard");
+
+  /*
+   * Le refresh visuel est volontairement limité :
+   * aucune promesse de synchronisation tant qu'aucune
+   * query de mesure énergétique n'est disponible.
+   */
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    if (refreshing) {
+      return;
+    }
+
+    setRefreshing(true);
+
+    /*
+     * Pas de faux refetch.
+     *
+     * Lorsque les queries de télémétrie seront branchées,
+     * cette action pourra déclencher leur invalidation /
+     * synchronisation réelle.
+     */
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 350);
+  };
+
+  const currentContent = useMemo(() => {
+    if (activeTab === "consumption") {
+      return <ConsumptionTab />;
+    }
+
+    if (activeTab === "providers") {
+      return <ProvidersTab />;
+    }
+
+    return <DashboardTab />;
+  }, [activeTab]);
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: "#050812",
+      }}
+    >
+      {/* Ambient background */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          width: 280,
+          height: 280,
+          borderRadius: 140,
+          top: -170,
+          right: -110,
+          backgroundColor: "rgba(251,191,36,0.055)",
+        }}
+      />
+
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          width: 240,
+          height: 240,
+          borderRadius: 120,
+          bottom: -130,
+          left: -120,
+          backgroundColor: "rgba(16,185,129,0.035)",
+        }}
+      />
+
+      {/* Header */}
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: Platform.OS === "ios" ? 18 : 14,
+          paddingBottom: 12,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 11,
+          }}
+        >
+          <Pressable
+            onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+            style={({ pressed }) => ({
+              width: 41,
+              height: 41,
+              borderRadius: 14,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: pressed
+                ? "rgba(255,255,255,0.13)"
+                : "rgba(255,255,255,0.08)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.1)",
+            })}
+          >
+            <ArrowLeft size={19} color="#FFFFFF" />
+          </Pressable>
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 20,
+                fontWeight: "900",
+              }}
+            >
+              Énergie
+            </Text>
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.4)",
+                fontSize: 11,
+                marginTop: 2,
+              }}
+            >
+              Production · consommation · stockage
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={handleRefresh}
+            accessibilityRole="button"
+            accessibilityLabel="Actualiser les données"
+            style={{
+              width: 41,
+              height: 41,
+              borderRadius: 14,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(251,191,36,0.12)",
+              borderWidth: 1,
+              borderColor: "rgba(251,191,36,0.2)",
+            }}
+          >
+            <RefreshCw
+              size={16}
+              color="#FBBF24"
+              style={{
+                transform: [
+                  {
+                    rotate: refreshing ? "180deg" : "0deg",
+                  },
+                ],
+              }}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Tabs */}
+      <View
+        style={{
+          paddingHorizontal: 16,
+          marginBottom: 10,
+        }}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            gap: 6,
+          }}
+        >
+          {TABS.map((tab) => {
+            const active = activeTab === tab.id;
+
+            return (
+              <Pressable
+                key={tab.id}
+                onPress={() => setActiveTab(tab.id)}
+                style={{
+                  paddingHorizontal: 14,
+                  minHeight: 38,
+                  borderRadius: 12,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: active
+                    ? "rgba(251,191,36,0.15)"
+                    : "rgba(255,255,255,0.045)",
+                  borderWidth: 1,
+                  borderColor: active
+                    ? "rgba(251,191,36,0.3)"
+                    : "rgba(255,255,255,0.07)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: active ? "#FBBF24" : "rgba(255,255,255,0.45)",
+                    fontSize: 10,
+                    fontWeight: "800",
+                  }}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Content */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: 35,
+        }}
+      >
+        {currentContent}
+
+        <View
+          style={{
+            marginTop: 24,
+            padding: 13,
+            borderRadius: 15,
+            backgroundColor: "rgba(255,255,255,0.025)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.05)",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <AlertTriangle size={13} color="rgba(255,255,255,0.3)" />
+
+            <Text
+              style={{
+                flex: 1,
+                color: "rgba(255,255,255,0.3)",
+                fontSize: 9,
+                lineHeight: 14,
+              }}
+            >
+              Les informations énergétiques affichées doivent provenir de
+              sources connectées et vérifiées. Aucun indicateur fictif n'est
+              utilisé.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

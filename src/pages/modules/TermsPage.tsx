@@ -1,29 +1,91 @@
-import { View, Pressable, Text, TextInput } from "react-native";
+import React, { memo, useCallback, useMemo, useRef, useState } from "react";
+
+import {
+  Animated,
+  Easing,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+
 import {
   ArrowLeft,
-  FileText,
   ChevronDown,
-  ShieldCheck,
-  Scale,
-  LockKeyhole,
-  CreditCard,
-  Copyright,
-  AlertTriangle,
-  RefreshCw,
-  Gavel,
-  Mail,
   CheckCircle2,
+  Copyright,
+  CreditCard,
+  FileText,
+  Gavel,
+  LockKeyhole,
+  Mail,
+  RefreshCw,
+  Scale,
   Search,
+  ShieldCheck,
+  AlertTriangle,
 } from "lucide-react-native";
+
 import { useAppearance, ACCENT_PALETTES } from "@/hooks/use-appearance.ts";
-import { useMemo, useState } from "react";
+
+/**
+ * ============================================================================
+ * DÉBROUILLE PRO — CONDITIONS GÉNÉRALES D'UTILISATION
+ * ============================================================================
+ *
+ * VERSION NATIVE PREMIUM
+ *
+ * Principes :
+ * - React Native uniquement
+ * - Aucun DOM
+ * - Aucun className
+ * - Aucun CSS Web
+ * - Aucun react-router-dom
+ * - Aucun data-href
+ * - Aucun faux bouton
+ * - Animations avec Animated de React Native
+ * - Accessibilité native
+ * - Recherche locale déterministe
+ * - Accordéon individuel ou global
+ * - Email réellement ouvrable via Linking
+ *
+ * ============================================================================
+ */
 
 interface TermsPageProps {
   onBack: () => void;
 }
 
-const SECTIONS = [
+type SectionIcon =
+  | typeof CheckCircle2
+  | typeof FileText
+  | typeof LockKeyhole
+  | typeof ShieldCheck
+  | typeof CreditCard
+  | typeof Copyright
+  | typeof AlertTriangle
+  | typeof RefreshCw
+  | typeof Gavel
+  | typeof Mail;
+
+interface TermsSection {
+  readonly id: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly content: string;
+  readonly icon: SectionIcon;
+}
+
+const LEGAL_EMAIL = "legal@debrouille.pro";
+
+const DOCUMENT_VERSION = "1er juin 2025";
+
+const SECTIONS: readonly TermsSection[] = [
   {
+    id: "acceptation",
     title: "1. Acceptation des conditions",
     icon: CheckCircle2,
     summary: "Les règles qui encadrent l'utilisation de Débrouille Pro.",
@@ -31,7 +93,9 @@ const SECTIONS = [
 
 Ces CGU s'appliquent à tous les utilisateurs, visiteurs et toute autre personne qui accède ou utilise le service.`,
   },
+
   {
+    id: "service",
     title: "2. Description du service",
     icon: FileText,
     summary: "Une plateforme numérique multi-services.",
@@ -39,7 +103,9 @@ Ces CGU s'appliquent à tous les utilisateurs, visiteurs et toute autre personne
 
 Le service est fourni "tel quel" et peut évoluer sans préavis.`,
   },
+
   {
+    id: "compte",
     title: "3. Compte utilisateur",
     icon: LockKeyhole,
     summary: "Responsabilités liées à ton compte.",
@@ -47,7 +113,9 @@ Le service est fourni "tel quel" et peut évoluer sans préavis.`,
 
 Tu t'engages à fournir des informations exactes, complètes et à jour lors de ton inscription. Débrouille Pro se réserve le droit de suspendre ou supprimer tout compte en cas de violation de ces CGU.`,
   },
+
   {
+    id: "contenu",
     title: "4. Contenu des utilisateurs",
     icon: ShieldCheck,
     summary: "Publier, partager et respecter les droits des autres.",
@@ -55,7 +123,9 @@ Tu t'engages à fournir des informations exactes, complètes et à jour lors de 
 
 Tu t'engages à ne pas publier de contenu illégal, diffamatoire, trompeur, indécent, ou portant atteinte aux droits de tiers. Tout contenu violant ces règles peut être supprimé sans préavis.`,
   },
+
   {
+    id: "paiements",
     title: "5. Transactions et paiements",
     icon: CreditCard,
     summary: "Règles applicables aux transactions numériques.",
@@ -63,7 +133,9 @@ Tu t'engages à ne pas publier de contenu illégal, diffamatoire, trompeur, ind�
 
 Toutes les transactions sont enregistrées et peuvent être consultées dans ton historique de portefeuille.`,
   },
+
   {
+    id: "propriete",
     title: "6. Propriété intellectuelle",
     icon: Copyright,
     summary: "Protection de la plateforme et de ses contenus.",
@@ -71,7 +143,9 @@ Toutes les transactions sont enregistrées et peuvent être consultées dans ton
 
 Tu ne peux pas reproduire, distribuer, modifier ou créer des œuvres dérivées sans notre accord écrit préalable.`,
   },
+
   {
+    id: "responsabilite",
     title: "7. Limitation de responsabilité",
     icon: AlertTriangle,
     summary: "Les limites de responsabilité prévues par les CGU.",
@@ -79,7 +153,9 @@ Tu ne peux pas reproduire, distribuer, modifier ou créer des œuvres dérivées
 
 La responsabilité totale de Débrouille Pro ne pourra en aucun cas dépasser le montant que tu as payé pour le service au cours des 12 derniers mois.`,
   },
+
   {
+    id: "modification",
     title: "8. Modification des CGU",
     icon: RefreshCw,
     summary: "Comment les conditions peuvent évoluer.",
@@ -87,7 +163,9 @@ La responsabilité totale de Débrouille Pro ne pourra en aucun cas dépasser le
 
 Nous t'informerons des changements importants par notification push ou email.`,
   },
+
   {
+    id: "droit",
     title: "9. Droit applicable et juridiction",
     icon: Gavel,
     summary: "Le cadre juridique applicable.",
@@ -95,123 +173,1193 @@ Nous t'informerons des changements importants par notification push ou email.`,
 
 Pour les utilisateurs résidant dans d'autres pays, les lois locales impératives restent applicables dans la mesure où elles s'appliquent.`,
   },
+
   {
+    id: "contact",
     title: "10. Contact",
     icon: Mail,
     summary: "Une question sur les conditions ?",
     content: `Pour toute question concernant ces CGU, contacte notre équipe juridique à :
 
-Email : legal@debrouille.pro
+Email : ${LEGAL_EMAIL}
 Adresse : Débrouille Pro SAS, Avenue de la Justice, Kolwezi, Lualaba, RDC`,
   },
-] as const;
+];
 
-type Section = (typeof SECTIONS)[number];
+/**
+ * ============================================================================
+ * HELPERS
+ * ============================================================================
+ */
 
-function AccordionItem({
+function normalizeSearch(value: string): string {
+  return value.trim().toLocaleLowerCase("fr-FR");
+}
+
+function buildSearchableText(section: TermsSection): string {
+  return [section.title, section.summary, section.content]
+    .join(" ")
+    .toLocaleLowerCase("fr-FR");
+}
+
+/**
+ * ============================================================================
+ * SECTION ACCORDÉON
+ * ============================================================================
+ */
+
+interface AccordionItemProps {
+  section: TermsSection;
+  index: number;
+  open: boolean;
+  accent: string;
+  onToggle: () => void;
+}
+
+const AccordionItem = memo(function AccordionItem({
   section,
   index,
   open,
-  onToggle,
   accent,
-}: {
-  section: Section;
-  index: number;
-  open: boolean;
-  onToggle: () => void;
-  accent: string;
-}) {
+  onToggle,
+}: AccordionItemProps) {
   const Icon = section.icon;
 
-  return (
-    <View layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.035 }} className="border-b last:border-0" style={{ borderColor: "rgba(255,255,255,0.055)" }}>
-      <Pressable onPress={onToggle} accessibilityState={{ expanded: open }} className="w-full flex items-center gap-3 px-4 py-4 text-left active:scale-[0.995] transition-transform"><View className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: open ? `${accent}20` : "rgba(255,255,255,0.045)", borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Icon size={17} style={{  }} accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" /></View><View className="flex-1 min-w-0"><Text className="text-sm font-bold transition-colors" style={{ color: open ? "#fff" : "rgba(255,255,255,0.82)" }}>{section.title}</Text><Text className="text-[10px] text-white/30 mt-0.5 truncate">{section.summary}</Text></View><View animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.22 }} className="shrink-0"><ChevronDown size={17} className="text-white/30" /></View></Pressable>
+  const rotation = useRef(new Animated.Value(open ? 1 : 0)).current;
 
-<View>
-        {open && (
-          <View initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25, ease: "easeOut" }} className="overflow-hidden">
-            <View className="px-4 pb-5 pl-[68px]"><View className="rounded-2xl p-4" style={{ backgroundColor: `${accent}08`, borderStyle: "solid" }}><Text className="text-sm text-white/55 leading-7">{section.content}</Text></View></View>
+  const contentOpacity = useRef(new Animated.Value(open ? 1 : 0)).current;
+
+  const contentHeight = useRef(new Animated.Value(open ? 1 : 0)).current;
+
+  const previousOpen = useRef(open);
+
+  React.useEffect(() => {
+    if (previousOpen.current === open) {
+      return;
+    }
+
+    previousOpen.current = open;
+
+    Animated.parallel([
+      Animated.timing(rotation, {
+        toValue: open ? 1 : 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+
+      Animated.timing(contentOpacity, {
+        toValue: open ? 1 : 0,
+        duration: open ? 220 : 140,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+
+      Animated.timing(contentHeight, {
+        toValue: open ? 1 : 0,
+        duration: open ? 260 : 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [contentHeight, contentOpacity, open, rotation]);
+
+  const chevronRotation = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "180deg"],
+  });
+
+  const sectionAccentBackground = open
+    ? `${accent}20`
+    : "rgba(255,255,255,0.045)";
+
+  return (
+    <View
+      style={[styles.accordionItem, index === 0 && styles.accordionItemFirst]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{
+          expanded: open,
+        }}
+        accessibilityLabel={`${section.title}. ${open ? "Réduire" : "Développer"}`}
+        onPress={onToggle}
+        style={({ pressed }) => [
+          styles.accordionHeader,
+          pressed && styles.accordionHeaderPressed,
+        ]}
+      >
+        <View
+          style={[
+            styles.sectionIcon,
+            {
+              backgroundColor: sectionAccentBackground,
+              borderColor: open ? `${accent}35` : "rgba(255,255,255,0.06)",
+            },
+          ]}
+        >
+          <Icon
+            size={17}
+            color={open ? accent : "rgba(255,255,255,0.58)"}
+            accessibilityElementsHidden
+          />
+        </View>
+
+        <View style={styles.sectionHeaderText}>
+          <Text
+            numberOfLines={2}
+            style={[
+              styles.sectionTitle,
+              open && {
+                color: "#FFFFFF",
+              },
+            ]}
+          >
+            {section.title}
+          </Text>
+
+          <Text numberOfLines={2} style={styles.sectionSummary}>
+            {section.summary}
+          </Text>
+        </View>
+
+        <Animated.View
+          style={{
+            transform: [
+              {
+                rotate: chevronRotation,
+              },
+            ],
+          }}
+        >
+          <ChevronDown size={18} color="rgba(255,255,255,0.32)" />
+        </Animated.View>
+      </Pressable>
+
+      <Animated.View
+        style={[
+          styles.animatedContent,
+          {
+            opacity: contentOpacity,
+            maxHeight: contentHeight.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 520],
+            }),
+          },
+        ]}
+        pointerEvents={open ? "auto" : "none"}
+      >
+        <View style={styles.contentInner}>
+          <View
+            style={[
+              styles.contentCard,
+              {
+                backgroundColor: `${accent}08`,
+                borderColor: `${accent}16`,
+              },
+            ]}
+          >
+            <Text style={styles.contentText}>{section.content}</Text>
           </View>
-        )}
+        </View>
+      </Animated.View>
+    </View>
+  );
+});
+
+/**
+ * ============================================================================
+ * SEARCH EMPTY STATE
+ * ============================================================================
+ */
+
+function SearchEmptyState({
+  accent,
+  onReset,
+}: {
+  accent: string;
+  onReset: () => void;
+}) {
+  return (
+    <View style={styles.searchEmpty}>
+      <View
+        style={[
+          styles.searchEmptyIcon,
+          {
+            backgroundColor: `${accent}12`,
+            borderColor: `${accent}20`,
+          },
+        ]}
+      >
+        <Search size={21} color={accent} />
       </View>
+
+      <Text style={styles.searchEmptyTitle}>Aucun passage trouvé</Text>
+
+      <Text style={styles.searchEmptyText}>
+        Aucun contenu des CGU ne correspond à votre recherche.
+      </Text>
+
+      <Pressable
+        onPress={onReset}
+        style={({ pressed }) => [
+          styles.resetButton,
+          {
+            backgroundColor: `${accent}15`,
+            borderColor: `${accent}25`,
+          },
+          pressed && styles.buttonPressed,
+        ]}
+      >
+        <Text style={[styles.resetButtonText, { color: accent }]}>
+          Réinitialiser la recherche
+        </Text>
+      </Pressable>
     </View>
   );
 }
 
+/**
+ * ============================================================================
+ * MAIN PAGE
+ * ============================================================================
+ */
+
 export default function TermsPage({ onBack }: TermsPageProps) {
   const { prefs } = useAppearance();
-  const palette = ACCENT_PALETTES[prefs.accent];
-  const hex = palette.hex;
 
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const palette = ACCENT_PALETTES[prefs.accent];
+
+  const accent = palette.hex;
+
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set<string>());
+
   const [query, setQuery] = useState("");
 
+  const normalizedQuery = normalizeSearch(query);
+
   const filteredSections = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-
-    if (!normalized) return SECTIONS;
-
-    return SECTIONS.filter((section) =>
-      `${section.title} ${section.summary} ${section.content}`
-        .toLowerCase()
-        .includes(normalized),
-    );
-  }, [query]);
-
-  const expandAll = () => {
-    if (filteredSections.length === 1) {
-      setOpenIndex(0);
-      return;
+    if (!normalizedQuery) {
+      return SECTIONS;
     }
 
-    setOpenIndex(openIndex === -1 ? null : -1);
-  };
+    return SECTIONS.filter((section) =>
+      buildSearchableText(section).includes(normalizedQuery),
+    );
+  }, [normalizedQuery]);
+
+  const allVisibleOpen =
+    filteredSections.length > 0 &&
+    filteredSections.every((section) => openIds.has(section.id));
+
+  const toggleSection = useCallback((id: string) => {
+    setOpenIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setOpenIds((current) => {
+      const next = new Set(current);
+
+      if (allVisibleOpen) {
+        filteredSections.forEach((section) => next.delete(section.id));
+      } else {
+        filteredSections.forEach((section) => next.add(section.id));
+      }
+
+      return next;
+    });
+  }, [allVisibleOpen, filteredSections]);
+
+  const resetSearch = useCallback(() => {
+    setQuery("");
+    setOpenIds(new Set<string>());
+  }, []);
+
+  const openLegalEmail = useCallback(async () => {
+    const url = `mailto:${LEGAL_EMAIL}`;
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+
+      if (!supported) {
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch {
+      // L'OS ne permet pas d'ouvrir le client mail.
+      // Aucun faux succès n'est affiché.
+    }
+  }, []);
 
   return (
-    <View className="flex flex-col h-full min-h-0 overflow-hidden" style={{  }}>{}<View initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 px-5 pt-12 pb-4 shrink-0 border-b" style={{ borderColor: "rgba(255,255,255,0.065)", backgroundColor: "rgba(2,6,23,0.72)" }}><Pressable onPress={onBack} accessibilityLabel="Retour" className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><ArrowLeft size={18} className="text-white" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" /></Pressable><View className="flex-1 min-w-0"><Text className="text-lg font-black text-white flex items-center gap-2 truncate"><FileText size={17} style={{  }} accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" />Conditions Générales
-          </Text><Text className="text-xs text-white/35 mt-0.5">Utilisation de Débrouille Pro · Mise à jour : 1er juin 2025
-          </Text></View><View className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full shrink-0" style={{ backgroundColor: `${hex}12`, borderStyle: "solid" }}><ShieldCheck size={12} style={{  }} /><Text className="text-[10px] font-bold" style={{ color: hex }}>Document officiel
-          </Text></View></View>{}<View className="flex-1 min-h-0 overflow-y-auto px-5 py-5" style={{  }}>{}<View initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-[28px] p-6 mb-5" style={{ borderStyle: "solid" }}><View className="absolute -top-20 -right-12 w-56 h-56 rounded-full pointer-events-none" style={{  }} /><View className="relative z-10"><View className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ boxShadow: `0 12px 35px ${palette.glow}` }}><Scale size={25} className="text-white" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" /></View><View className="flex items-center gap-2 mb-2"><Text className="text-[9px] uppercase tracking-[0.18em] font-black" style={{ color: hex }}>Cadre d'utilisation
-              </Text><Text className="w-1 h-1 rounded-full bg-white/20" /><Text className="text-[9px] text-white/30">Version en vigueur
-              </Text></View><Text className="text-2xl sm:text-3xl font-black text-white leading-tight">Des règles claires pour une
-              <Text style={{ color: hex }}>expérience de confiance.</Text></Text><Text className="text-sm text-white/45 leading-relaxed mt-3 max-w-2xl">Ces Conditions Générales d'Utilisation définissent les règles
+    <View style={styles.screen}>
+      {/* ================================================================
+          HEADER
+          ================================================================ */}
+
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+            onPress={onBack}
+            style={({ pressed }) => [
+              styles.headerBackButton,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <ArrowLeft size={19} color="#FFFFFF" />
+          </Pressable>
+
+          <View style={styles.headerTitleContainer}>
+            <View style={styles.headerTitleRow}>
+              <FileText size={17} color={accent} />
+
+              <Text numberOfLines={1} style={styles.headerTitle}>
+                Conditions Générales
+              </Text>
+            </View>
+
+            <Text style={styles.headerSubtitle}>
+              Utilisation de Débrouille Pro · Mise à jour : {DOCUMENT_VERSION}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.officialBadge,
+              {
+                backgroundColor: `${accent}12`,
+                borderColor: `${accent}22`,
+              },
+            ]}
+          >
+            <ShieldCheck size={12} color={accent} />
+
+            <Text style={[styles.officialBadgeText, { color: accent }]}>
+              Document
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ================================================================
+          BODY
+          ================================================================ */}
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ================================================================
+            HERO
+            ================================================================ */}
+
+        <View style={styles.hero}>
+          <View
+            style={[
+              styles.heroGlow,
+              {
+                backgroundColor: `${accent}10`,
+              },
+            ]}
+          />
+
+          <View style={styles.heroContent}>
+            <View
+              style={[
+                styles.heroIcon,
+                {
+                  backgroundColor: `${accent}18`,
+                  borderColor: `${accent}25`,
+                },
+              ]}
+            >
+              <Scale size={25} color="#FFFFFF" />
+            </View>
+
+            <View style={styles.heroEyebrowRow}>
+              <Text style={[styles.heroEyebrow, { color: accent }]}>
+                CADRE D'UTILISATION
+              </Text>
+
+              <View style={styles.heroDot} />
+
+              <Text style={styles.heroVersion}>Version en vigueur</Text>
+            </View>
+
+            <Text style={styles.heroTitle}>
+              Des règles claires pour une{" "}
+              <Text style={{ color: accent }}>expérience de confiance.</Text>
+            </Text>
+
+            <Text style={styles.heroDescription}>
+              Ces Conditions Générales d'Utilisation définissent les règles
               applicables à l'accès et à l'utilisation de Débrouille Pro. Prends
               quelques minutes pour les parcourir.
-            </Text><View className="flex flex-wrap gap-2 mt-5"><View className="inline-flex items-center gap-2 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.055)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><ShieldCheck size={13} style={{  }} /><Text className="text-[10px] text-white/55">10 sections</Text></View><View className="inline-flex items-center gap-2 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.055)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><Gavel size={13} style={{  }} /><Text className="text-[10px] text-white/55">Droit congolais
-                </Text></View></View></View></View>{}<View initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="gap-2 mb-5">{[
-            { icon: ShieldCheck, label: "Utilisation responsable" },
-            { icon: LockKeyhole, label: "Compte utilisateur" },
-            { icon: Scale, label: "Cadre juridique" },
+            </Text>
+
+            <View style={styles.heroStats}>
+              <View style={styles.heroStat}>
+                <ShieldCheck size={14} color={accent} />
+
+                <Text style={styles.heroStatText}>10 sections</Text>
+              </View>
+
+              <View style={styles.heroStat}>
+                <Gavel size={14} color={accent} />
+
+                <Text style={styles.heroStatText}>Droit congolais</Text>
+              </View>
+
+              <View style={styles.heroStat}>
+                <FileText size={14} color={accent} />
+
+                <Text style={styles.heroStatText}>
+                  Version {DOCUMENT_VERSION}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ================================================================
+            PRINCIPES
+            ================================================================ */}
+
+        <View style={styles.principles}>
+          {[
+            {
+              icon: ShieldCheck,
+              label: "Utilisation responsable",
+            },
+            {
+              icon: LockKeyhole,
+              label: "Compte utilisateur",
+            },
+            {
+              icon: Scale,
+              label: "Cadre juridique",
+            },
           ].map(({ icon: Icon, label }) => (
-            <View key={label} className="flex items-center gap-2.5 rounded-2xl px-3.5 py-3" style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Icon size={15} style={{  }} /><Text className="text-[10px] font-semibold text-white/45">{label}</Text></View>
-          ))}</View>{}<View className="flex gap-2 mb-3"><View className="flex items-center gap-2 flex-1 min-w-0 rounded-2xl px-3.5" style={{ backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><Search size={15} className="text-white/25 shrink-0" /><TextInput value={query} onChangeText={(value) => setQuery(value)} placeholder="Rechercher dans les CGU…" accessibilityLabel="Rechercher dans les conditions générales" className="w-full bg-transparent py-3 text-xs text-white outline-none placeholder:text-white/20" /></View><Pressable onPress={expandAll} className="px-3.5 rounded-2xl text-[10px] font-bold text-white/55 active:scale-95 transition-transform" style={{ backgroundColor: `${hex}12`, borderStyle: "solid" }}>{openIndex === -1 ? "Réduire" : "Tout ouvrir"}</Pressable></View>{}<View layout className="rounded-[28px] overflow-hidden mb-5" style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>{filteredSections.length > 0 ? (
+            <View key={label} style={styles.principleCard}>
+              <View
+                style={[
+                  styles.principleIcon,
+                  {
+                    backgroundColor: `${accent}10`,
+                  },
+                ]}
+              >
+                <Icon size={15} color={accent} />
+              </View>
+
+              <Text numberOfLines={1} style={styles.principleText}>
+                {label}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ================================================================
+            SEARCH
+            ================================================================ */}
+
+        <View style={styles.searchActions}>
+          <View
+            style={[
+              styles.searchBox,
+              {
+                borderColor:
+                  normalizedQuery.length > 0
+                    ? `${accent}35`
+                    : "rgba(255,255,255,0.07)",
+              },
+            ]}
+          >
+            <Search
+              size={16}
+              color={
+                normalizedQuery.length > 0 ? accent : "rgba(255,255,255,0.25)"
+              }
+            />
+
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Rechercher dans les CGU…"
+              placeholderTextColor="rgba(255,255,255,0.22)"
+              accessibilityLabel="Rechercher dans les conditions générales"
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+              style={styles.searchInput}
+            />
+
+            {query.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Effacer la recherche"
+                onPress={() => setQuery("")}
+                style={styles.clearSearch}
+              >
+                <Text style={styles.clearSearchText}>×</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              allVisibleOpen
+                ? "Réduire toutes les sections"
+                : "Ouvrir toutes les sections"
+            }
+            onPress={toggleAll}
+            disabled={filteredSections.length === 0}
+            style={({ pressed }) => [
+              styles.expandButton,
+              {
+                backgroundColor: `${accent}12`,
+                borderColor: `${accent}20`,
+              },
+              filteredSections.length === 0 && styles.disabledButton,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Text style={[styles.expandButtonText, { color: accent }]}>
+              {allVisibleOpen ? "Tout réduire" : "Tout ouvrir"}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* ================================================================
+            RESULT COUNT
+            ================================================================ */}
+
+        {query.length > 0 ? (
+          <Text style={styles.resultCount}>
+            {filteredSections.length} section
+            {filteredSections.length !== 1 ? "s" : ""} trouvée
+            {filteredSections.length !== 1 ? "s" : ""}
+          </Text>
+        ) : null}
+
+        {/* ================================================================
+            ACCORDION
+            ================================================================ */}
+
+        <View style={styles.accordion}>
+          {filteredSections.length > 0 ? (
             filteredSections.map((section, index) => (
               <AccordionItem
-                key={section.title}
+                key={section.id}
                 section={section}
                 index={index}
-                open={
-                  openIndex === -1 ||
-                  (openIndex !== null &&
-                    filteredSections[openIndex]?.title === section.title)
-                }
-                onToggle={() => {
-                  const current = filteredSections.findIndex(
-                    (item) => item.title === section.title,
-                  );
-                  setOpenIndex(openIndex === current ? null : current);
-                }}
-                accent={hex}
+                open={openIds.has(section.id)}
+                accent={accent}
+                onToggle={() => toggleSection(section.id)}
               />
             ))
           ) : (
-            <View className="px-6 py-12 text-center"><View className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: `${hex}12`, borderStyle: "solid" }}><Search size={18} style={{  }} /></View><Text className="text-sm font-bold text-white/65">Aucun passage trouvé
-              </Text><Text className="text-xs text-white/30 mt-1">Essaie un autre mot-clé.
-              </Text></View>
-          )}</View>{}<View initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-[28px] p-5 mb-5 relative overflow-hidden" style={{ borderStyle: "solid" }}><View className="relative z-10"><View className="flex items-start gap-3"><View className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${hex}18`, borderStyle: "solid" }}><Mail size={17} style={{  }} /></View><View className="min-w-0"><Text className="text-sm font-black text-white">Une question sur les CGU ?
-                </Text><Text className="text-xs text-white/35 mt-1 leading-relaxed">Notre équipe juridique peut répondre à tes questions.
-                </Text><Pressable className="inline-flex items-center gap-2 mt-3 text-xs font-bold" style={{  }} data-href="mailto:legal@debrouille.pro"><Text>legal@debrouille.pro</Text><Mail size={12} /></Pressable></View></View></View></View>{}<View className="text-center pb-5"><View className="flex items-center justify-center gap-2 mb-2"><View className="w-6 h-6 rounded-lg flex items-center justify-center" style={{  }}><FileText size={11} className="text-white" /></View><Text className="text-xs font-black text-white/50">Débrouille Pro
-            </Text></View><Text className="text-[10px] text-white/20">© 2025 Débrouille Pro SAS · Kolwezi, RDC · legal@debrouille.pro
-          </Text></View></View></View>
+            <SearchEmptyState accent={accent} onReset={resetSearch} />
+          )}
+        </View>
+
+        {/* ================================================================
+            CONTACT JURIDIQUE
+            ================================================================ */}
+
+        <View style={styles.contactCard}>
+          <View
+            style={[
+              styles.contactIcon,
+              {
+                backgroundColor: `${accent}18`,
+                borderColor: `${accent}25`,
+              },
+            ]}
+          >
+            <Mail size={18} color={accent} />
+          </View>
+
+          <View style={styles.contactContent}>
+            <Text style={styles.contactTitle}>Une question sur les CGU ?</Text>
+
+            <Text style={styles.contactDescription}>
+              Notre équipe juridique peut répondre à tes questions concernant
+              les présentes conditions.
+            </Text>
+
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={`Contacter l'équipe juridique à ${LEGAL_EMAIL}`}
+              onPress={() => {
+                void openLegalEmail();
+              }}
+              style={({ pressed }) => [
+                styles.emailButton,
+                pressed && styles.buttonPressed,
+              ]}
+            >
+              <Text style={[styles.emailText, { color: accent }]}>
+                {LEGAL_EMAIL}
+              </Text>
+
+              <Mail size={13} color={accent} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* ================================================================
+            FOOTER
+            ================================================================ */}
+
+        <View style={styles.footer}>
+          <View
+            style={[
+              styles.footerLogo,
+              {
+                backgroundColor: accent,
+              },
+            ]}
+          >
+            <FileText size={12} color="#FFFFFF" />
+          </View>
+
+          <Text style={styles.footerBrand}>Débrouille Pro</Text>
+
+          <Text style={styles.footerText}>
+            © 2025 Débrouille Pro SAS · Kolwezi, RDC
+            {"\n"}
+            {LEGAL_EMAIL}
+          </Text>
+        </View>
+
+        <View style={styles.bottomSpace} />
+      </ScrollView>
+    </View>
   );
 }
+
+/**
+ * ============================================================================
+ * STYLES — DARK PREMIUM NATIVE
+ * ============================================================================
+ */
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#050812",
+  },
+
+  header: {
+    paddingTop: 52,
+    paddingHorizontal: 16,
+    paddingBottom: 13,
+    backgroundColor: "rgba(2,6,23,0.98)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.065)",
+  },
+
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  headerBackButton: {
+    width: 41,
+    height: 41,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.065)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.075)",
+  },
+
+  headerTitleContainer: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  headerTitle: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+
+  headerSubtitle: {
+    color: "rgba(255,255,255,0.32)",
+    fontSize: 9.5,
+    marginTop: 3,
+    lineHeight: 14,
+  },
+
+  officialBadge: {
+    minWidth: 38,
+    minHeight: 34,
+    paddingHorizontal: 7,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    borderWidth: 1,
+  },
+
+  officialBadgeText: {
+    fontSize: 7,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  scroll: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+
+  hero: {
+    overflow: "hidden",
+    borderRadius: 27,
+    marginBottom: 12,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.075)",
+  },
+
+  heroGlow: {
+    position: "absolute",
+    width: 230,
+    height: 230,
+    borderRadius: 115,
+    right: -100,
+    top: -105,
+  },
+
+  heroContent: {
+    padding: 20,
+  },
+
+  heroIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginBottom: 15,
+  },
+
+  heroEyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginBottom: 7,
+  },
+
+  heroEyebrow: {
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+  },
+
+  heroDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.20)",
+  },
+
+  heroVersion: {
+    color: "rgba(255,255,255,0.30)",
+    fontSize: 8.5,
+    fontWeight: "600",
+  },
+
+  heroTitle: {
+    color: "#FFFFFF",
+    fontSize: 25,
+    lineHeight: 31,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+  },
+
+  heroDescription: {
+    color: "rgba(255,255,255,0.43)",
+    fontSize: 11.5,
+    lineHeight: 18,
+    marginTop: 10,
+  },
+
+  heroStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 17,
+  },
+
+  heroStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  heroStatText: {
+    color: "rgba(255,255,255,0.52)",
+    fontSize: 8.5,
+    fontWeight: "700",
+  },
+
+  principles: {
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 12,
+  },
+
+  principleCard: {
+    flex: 1,
+    minHeight: 57,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRadius: 15,
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  principleIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 5,
+  },
+
+  principleText: {
+    color: "rgba(255,255,255,0.46)",
+    fontSize: 8.5,
+    fontWeight: "700",
+  },
+
+  searchActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 7,
+  },
+
+  searchBox: {
+    flex: 1,
+    minHeight: 45,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    gap: 8,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+  },
+
+  searchInput: {
+    flex: 1,
+    minHeight: 43,
+    color: "#FFFFFF",
+    fontSize: 11,
+    paddingVertical: 0,
+  },
+
+  clearSearch: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  clearSearchText: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 20,
+    lineHeight: 21,
+    fontWeight: "300",
+  },
+
+  expandButton: {
+    minHeight: 45,
+    paddingHorizontal: 11,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  expandButtonText: {
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  resultCount: {
+    color: "rgba(255,255,255,0.28)",
+    fontSize: 8.5,
+    marginBottom: 8,
+    marginLeft: 3,
+  },
+
+  accordion: {
+    overflow: "hidden",
+    borderRadius: 25,
+    marginBottom: 12,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  accordionItem: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.055)",
+  },
+
+  accordionItemFirst: {
+    borderTopWidth: 0,
+  },
+
+  accordionHeader: {
+    minHeight: 74,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    gap: 10,
+  },
+
+  accordionHeaderPressed: {
+    backgroundColor: "rgba(255,255,255,0.025)",
+  },
+
+  sectionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  sectionHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  sectionTitle: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: "800",
+  },
+
+  sectionSummary: {
+    color: "rgba(255,255,255,0.27)",
+    fontSize: 8.5,
+    lineHeight: 13,
+    marginTop: 2,
+  },
+
+  animatedContent: {
+    overflow: "hidden",
+  },
+
+  contentInner: {
+    paddingHorizontal: 13,
+    paddingBottom: 13,
+    paddingLeft: 63,
+  },
+
+  contentCard: {
+    padding: 13,
+    borderRadius: 15,
+    borderWidth: 1,
+  },
+
+  contentText: {
+    color: "rgba(255,255,255,0.57)",
+    fontSize: 11,
+    lineHeight: 19,
+  },
+
+  searchEmpty: {
+    minHeight: 250,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+
+  searchEmptyIcon: {
+    width: 53,
+    height: 53,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  searchEmptyTitle: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 12,
+  },
+
+  searchEmptyText: {
+    color: "rgba(255,255,255,0.28)",
+    fontSize: 10,
+    textAlign: "center",
+    lineHeight: 15,
+    marginTop: 5,
+  },
+
+  resetButton: {
+    minHeight: 39,
+    paddingHorizontal: 13,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginTop: 12,
+  },
+
+  resetButtonText: {
+    fontSize: 9.5,
+    fontWeight: "800",
+  },
+
+  contactCard: {
+    flexDirection: "row",
+    gap: 11,
+    padding: 15,
+    borderRadius: 24,
+    marginBottom: 12,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  contactIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  contactContent: {
+    flex: 1,
+  },
+
+  contactTitle: {
+    color: "#FFFFFF",
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+
+  contactDescription: {
+    color: "rgba(255,255,255,0.32)",
+    fontSize: 9.5,
+    lineHeight: 15,
+    marginTop: 4,
+  },
+
+  emailButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 9,
+    paddingVertical: 3,
+  },
+
+  emailText: {
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  footer: {
+    alignItems: "center",
+    paddingTop: 8,
+    paddingBottom: 5,
+  },
+
+  footerLogo: {
+    width: 27,
+    height: 27,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+
+  footerBrand: {
+    color: "rgba(255,255,255,0.42)",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  footerText: {
+    color: "rgba(255,255,255,0.18)",
+    fontSize: 8.5,
+    lineHeight: 14,
+    textAlign: "center",
+    marginTop: 4,
+  },
+
+  buttonPressed: {
+    opacity: 0.72,
+    transform: [
+      {
+        scale: 0.97,
+      },
+    ],
+  },
+
+  disabledButton: {
+    opacity: 0.4,
+  },
+
+  bottomSpace: {
+    height: 45,
+  },
+});

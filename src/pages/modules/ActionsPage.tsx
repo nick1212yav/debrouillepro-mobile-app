@@ -1,22 +1,7 @@
 // src/pages/modules/ActionsPage.tsx
 "use no memo";
 
-import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  ScrollView,
-  StyleSheet,
-  Platform,
-  Animated,
-  Easing,
-  useWindowDimensions,
-  type GestureResponderEvent,
-} from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
+import React, {
   useCallback,
   useEffect,
   useMemo,
@@ -25,7 +10,27 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
+
 import {
+  Animated,
+  Easing,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+  type GestureResponderEvent,
+} from "react-native";
+
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import {
+  Activity,
+  AlertTriangle,
   ArrowLeft,
   ArrowUpRight,
   Award,
@@ -36,15 +41,16 @@ import {
   CalendarDays,
   Camera,
   Car,
+  Check,
   ChevronRight,
-  Clock,
-  Coffee,
+  Clock3,
   Compass,
   CreditCard,
   Flame,
   FileText,
   Film,
   Globe,
+  GraduationCap,
   HandHeart,
   Heart,
   Home,
@@ -57,9 +63,9 @@ import {
   Megaphone,
   MessageSquare,
   Network,
+  Newspaper,
   Package,
   Phone,
-  Plus,
   Radio,
   Scale,
   Search,
@@ -79,12 +85,8 @@ import {
   Wrench,
   X,
   Zap,
-  Activity,
-  AlertTriangle,
-  GraduationCap,
-  Newspaper,
-  TreePine,
 } from "lucide-react-native";
+
 import { toast } from "sonner";
 
 /* ============================================================================
@@ -94,8 +96,12 @@ import { toast } from "sonner";
 type LucideIcon = ComponentType<{
   size?: number;
   color?: string;
+  strokeWidth?: number;
   style?: object;
+  fill?: string;
 }>;
+
+type ActionStatus = "available" | "coming_soon";
 
 interface Action {
   id: string;
@@ -105,10 +111,22 @@ interface Action {
   page?: string;
   color: string;
   category: string;
+  status: ActionStatus;
+  keywords: string[];
+}
+
+interface ActionsPageProps {
+  onBack: () => void;
+  onNavigate: (page: string) => void;
 }
 
 /* ============================================================================
- * DATA — 60+ actions
+ * ACTION CATALOG
+ *
+ * IMPORTANT:
+ * - "available" means the action has a navigation destination in this screen.
+ * - "coming_soon" never pretends that a backend operation exists.
+ * - No popularity score is fabricated.
  * ========================================================================== */
 
 const ALL_ACTIONS: Action[] = [
@@ -116,700 +134,758 @@ const ALL_ACTIONS: Action[] = [
     id: "payer",
     icon: CreditCard,
     label: "Payer",
-    desc: "Mobile Money, carte",
+    desc: "Ouvrir les paiements",
     page: "paiement",
     color: "#10B981",
-    category: "Finance & Paiements",
+    category: "Finance",
+    status: "available",
+    keywords: ["payer", "paiement", "money", "mobile", "carte"],
   },
   {
-    id: "transferer",
-    icon: Send,
-    label: "Transférer",
-    desc: "Peer-to-peer instantané",
+    id: "wallet",
+    icon: Wallet,
+    label: "Mon Wallet",
+    desc: "Consulter votre portefeuille",
     page: "wallet",
-    color: "#10B981",
-    category: "Finance & Paiements",
+    color: "#22C55E",
+    category: "Finance",
+    status: "available",
+    keywords: ["wallet", "argent", "solde", "portefeuille"],
   },
   {
     id: "facturer",
     icon: FileText,
     label: "Facturer",
-    desc: "Créer une facture",
+    desc: "Accéder à la facturation",
     page: "paiement",
-    color: "#10B981",
-    category: "Finance & Paiements",
+    color: "#14B8A6",
+    category: "Finance",
+    status: "available",
+    keywords: ["facture", "facturation", "business"],
   },
   {
-    id: "epargner",
+    id: "finances",
     icon: TrendingUp,
-    label: "Épargner",
-    desc: "Micro-crédit & plans",
-    page: "wallet",
-    color: "#10B981",
-    category: "Finance & Paiements",
-  },
-  {
-    id: "investir",
-    icon: BarChart2,
-    label: "Investir",
-    desc: "Placements & portefeuille",
+    label: "Finances",
+    desc: "Suivre votre activité financière",
     page: "finances",
-    color: "#10B981",
-    category: "Finance & Paiements",
-  },
-  {
-    id: "marche",
-    icon: ShoppingBag,
-    label: "Marché",
-    desc: "Acheter & vendre",
-    page: "marketplace",
-    color: "#F97316",
-    category: "Finance & Paiements",
+    color: "#06B6D4",
+    category: "Finance",
+    status: "available",
+    keywords: ["finance", "budget", "argent", "dépenses"],
   },
 
   {
     id: "vtc",
     icon: Car,
     label: "VTC / Taxi",
-    desc: "Réserver un trajet",
+    desc: "Accéder à la mobilité",
     page: "transport",
     color: "#3B82F6",
-    category: "Mobilité & Livraison",
+    category: "Mobilité",
+    status: "available",
+    keywords: ["taxi", "vtc", "transport", "trajet", "voiture"],
   },
   {
     id: "moto",
     icon: Truck,
     label: "Moto-taxi",
-    desc: "Rapide et pratique",
+    desc: "Accéder au transport moto",
     page: "transport",
-    color: "#3B82F6",
-    category: "Mobilité & Livraison",
+    color: "#2563EB",
+    category: "Mobilité",
+    status: "available",
+    keywords: ["moto", "taxi", "transport"],
   },
   {
     id: "colis",
     icon: Package,
     label: "Colis",
-    desc: "Envoyer / recevoir",
+    desc: "Accéder aux livraisons",
     page: "livraison",
-    color: "#3B82F6",
-    category: "Mobilité & Livraison",
+    color: "#0EA5E9",
+    category: "Mobilité",
+    status: "available",
+    keywords: ["colis", "livraison", "envoyer", "recevoir"],
   },
   {
     id: "repas",
     icon: UtensilsCrossed,
     label: "Repas",
-    desc: "Commander",
+    desc: "Accéder à la restauration",
     page: "restauration",
     color: "#F97316",
-    category: "Mobilité & Livraison",
+    category: "Mobilité",
+    status: "available",
+    keywords: ["repas", "restaurant", "manger", "livraison"],
   },
   {
     id: "voyager",
     icon: Compass,
     label: "Voyager",
-    desc: "Bus, avion, ferry",
+    desc: "Explorer les voyages",
     page: "voyages",
-    color: "#0EA5E9",
-    category: "Mobilité & Livraison",
+    color: "#38BDF8",
+    category: "Mobilité",
+    status: "available",
+    keywords: ["voyage", "bus", "avion", "ferry", "transport"],
   },
   {
     id: "heberger",
     icon: BedDouble,
     label: "Hébergement",
-    desc: "Trouver un logement",
+    desc: "Trouver un hébergement",
     page: "hebergement",
     color: "#10B981",
-    category: "Mobilité & Livraison",
+    category: "Mobilité",
+    status: "available",
+    keywords: ["hôtel", "logement", "hébergement", "chambre"],
   },
 
   {
     id: "louer",
     icon: Home,
     label: "Louer",
-    desc: "Appartements & studios",
+    desc: "Explorer les biens à louer",
     page: "immo",
     color: "#8B5CF6",
-    category: "Immobilier & Emploi",
+    category: "Emploi & Immobilier",
+    status: "available",
+    keywords: ["louer", "location", "appartement", "studio", "maison"],
   },
   {
     id: "vendre-immo",
     icon: Home,
-    label: "Vendre immo",
-    desc: "Mettre un bien en vente",
+    label: "Vendre un bien",
+    desc: "Accéder à l'immobilier",
     page: "immo",
-    color: "#8B5CF6",
-    category: "Immobilier & Emploi",
+    color: "#A855F7",
+    category: "Emploi & Immobilier",
+    status: "available",
+    keywords: ["vendre", "maison", "terrain", "immobilier", "bien"],
   },
   {
     id: "emploi",
     icon: Briefcase,
-    label: "Chercher emploi",
-    desc: "Offres & candidatures",
+    label: "Chercher un emploi",
+    desc: "Explorer les opportunités",
     page: "jobs",
-    color: "#8B5CF6",
-    category: "Immobilier & Emploi",
+    color: "#6366F1",
+    category: "Emploi & Immobilier",
+    status: "available",
+    keywords: ["emploi", "travail", "job", "recrutement", "carrière"],
   },
   {
     id: "recruter",
     icon: Users,
     label: "Recruter",
-    desc: "Poster une offre",
+    desc: "Accéder au recrutement",
     page: "jobs",
-    color: "#8B5CF6",
-    category: "Immobilier & Emploi",
+    color: "#7C3AED",
+    category: "Emploi & Immobilier",
+    status: "available",
+    keywords: ["recruter", "emploi", "candidat", "entreprise"],
   },
   {
     id: "freelance",
     icon: Landmark,
     label: "Freelance",
-    desc: "Missions & contrats",
+    desc: "Explorer les missions",
     page: "jobs",
     color: "#8B5CF6",
-    category: "Immobilier & Emploi",
+    category: "Emploi & Immobilier",
+    status: "available",
+    keywords: ["freelance", "mission", "contrat", "travail"],
   },
   {
     id: "business",
     icon: BarChart2,
     label: "Business",
-    desc: "Gérer son entreprise",
+    desc: "Accéder à votre espace entreprise",
     page: "business",
-    color: "#8B5CF6",
-    category: "Immobilier & Emploi",
+    color: "#A78BFA",
+    category: "Emploi & Immobilier",
+    status: "available",
+    keywords: ["business", "entreprise", "commerce", "gestion"],
   },
 
   {
     id: "plomberie",
     icon: Wrench,
     label: "Plomberie",
-    desc: "Intervention rapide",
+    desc: "Trouver des services",
     page: "services",
     color: "#F97316",
-    category: "Services à domicile",
+    category: "Services",
+    status: "available",
+    keywords: ["plomberie", "plombier", "réparation"],
   },
   {
     id: "electricite",
     icon: Zap,
     label: "Électricité",
-    desc: "Dépannage",
+    desc: "Trouver des services",
     page: "energie",
     color: "#FBBF24",
-    category: "Services à domicile",
+    category: "Services",
+    status: "available",
+    keywords: ["électricité", "électricien", "panne", "courant"],
   },
   {
     id: "menage",
     icon: Activity,
     label: "Ménage",
-    desc: "Professionnels vérifiés",
+    desc: "Explorer les services",
     page: "services",
-    color: "#F97316",
-    category: "Services à domicile",
+    color: "#FB923C",
+    category: "Services",
+    status: "available",
+    keywords: ["ménage", "nettoyage", "maison"],
   },
   {
     id: "cours-domicile",
     icon: GraduationCap,
     label: "Cours privés",
-    desc: "À domicile",
+    desc: "Explorer les services éducatifs",
     page: "apprendre",
     color: "#F59E0B",
-    category: "Services à domicile",
+    category: "Services",
+    status: "available",
+    keywords: ["cours", "professeur", "éducation", "domicile"],
   },
   {
     id: "livraison-dom",
     icon: Package,
     label: "Livraison",
-    desc: "Courses & colis",
+    desc: "Accéder aux livraisons",
     page: "livraison",
     color: "#F97316",
-    category: "Services à domicile",
+    category: "Services",
+    status: "available",
+    keywords: ["livraison", "course", "colis"],
   },
   {
     id: "restaurant-call",
     icon: UtensilsCrossed,
     label: "Restauration",
-    desc: "Menu & livraison",
+    desc: "Explorer les restaurants",
     page: "restauration",
-    color: "#F97316",
-    category: "Services à domicile",
+    color: "#EA580C",
+    category: "Services",
+    status: "available",
+    keywords: ["restaurant", "menu", "repas", "food"],
   },
 
   {
     id: "rdv",
     icon: CalendarDays,
-    label: "Prendre RDV",
-    desc: "Médecin, spécialiste",
+    label: "Prendre rendez-vous",
+    desc: "Accéder à la santé",
     page: "sante",
     color: "#EF4444",
-    category: "Santé & Bien-être",
+    category: "Santé",
+    status: "available",
+    keywords: ["médecin", "rdv", "rendez-vous", "docteur", "santé"],
   },
   {
     id: "teleconsult",
     icon: Phone,
-    label: "Téléconsult.",
-    desc: "Consultation en ligne",
+    label: "Téléconsultation",
+    desc: "Accéder aux services de santé",
     page: "sante",
-    color: "#EF4444",
-    category: "Santé & Bien-être",
+    color: "#F43F5E",
+    category: "Santé",
+    status: "available",
+    keywords: ["médecin", "appel", "consultation", "téléconsultation"],
   },
   {
     id: "pharmacie",
     icon: Stethoscope,
     label: "Pharmacie",
-    desc: "Commande & livraison",
+    desc: "Accéder aux services de santé",
     page: "sante",
-    color: "#EF4444",
-    category: "Santé & Bien-être",
+    color: "#E11D48",
+    category: "Santé",
+    status: "available",
+    keywords: ["pharmacie", "médicament", "santé"],
   },
   {
     id: "entrainer",
     icon: Flame,
     label: "S'entraîner",
-    desc: "Workouts",
+    desc: "Explorer le fitness",
     page: "fitness",
-    color: "#EF4444",
-    category: "Santé & Bien-être",
+    color: "#F43F5E",
+    category: "Santé",
+    status: "available",
+    keywords: ["sport", "fitness", "entraînement", "workout"],
   },
   {
     id: "nutrition-log",
-    icon: Coffee,
+    icon: UtensilsCrossed,
     label: "Nutrition",
-    desc: "Journal alimentaire",
+    desc: "Explorer la nutrition",
     page: "nutrition",
     color: "#F59E0B",
-    category: "Santé & Bien-être",
+    category: "Santé",
+    status: "available",
+    keywords: ["nutrition", "aliment", "repas", "santé"],
   },
   {
     id: "mediter",
     icon: Activity,
     label: "Méditer",
-    desc: "Respiration guidée",
+    desc: "Explorer le bien-être",
     page: "meditation",
     color: "#8B5CF6",
-    category: "Santé & Bien-être",
+    category: "Santé",
+    status: "available",
+    keywords: ["méditation", "respiration", "bien-être"],
   },
   {
     id: "sport-club",
     icon: Trophy,
     label: "Sport",
-    desc: "Clubs · Tournois",
+    desc: "Explorer les activités sportives",
     page: "sport",
     color: "#6366F1",
-    category: "Santé & Bien-être",
+    category: "Santé",
+    status: "available",
+    keywords: ["sport", "club", "tournoi"],
   },
 
   {
     id: "cours",
     icon: BookOpen,
     label: "Cours",
-    desc: "MOOC · Apprentissage",
+    desc: "Explorer les formations",
     page: "cours",
     color: "#F59E0B",
-    category: "Éducation & Formation",
+    category: "Éducation",
+    status: "available",
+    keywords: ["cours", "formation", "apprendre", "mooc"],
   },
   {
     id: "quiz",
     icon: Target,
     label: "Quiz",
-    desc: "Tests & évaluations",
+    desc: "Explorer les évaluations",
     page: "quiz",
     color: "#A78BFA",
-    category: "Éducation & Formation",
+    category: "Éducation",
+    status: "available",
+    keywords: ["quiz", "test", "évaluation"],
   },
   {
     id: "certifier",
     icon: Award,
-    label: "Certifier",
-    desc: "Obtenir un certificat",
+    label: "Certifications",
+    desc: "Explorer les certifications",
     page: "certifications",
-    color: "#A78BFA",
-    category: "Éducation & Formation",
+    color: "#8B5CF6",
+    category: "Éducation",
+    status: "available",
+    keywords: ["certificat", "certification", "diplôme"],
   },
   {
     id: "mentorat",
     icon: Users,
     label: "Mentorat",
-    desc: "Trouver un mentor",
+    desc: "Explorer le mentorat",
     page: "mentorat",
-    color: "#A78BFA",
-    category: "Éducation & Formation",
+    color: "#7C3AED",
+    category: "Éducation",
+    status: "available",
+    keywords: ["mentor", "mentorat", "conseil"],
   },
   {
     id: "ecole",
     icon: GraduationCap,
     label: "École",
-    desc: "Scolarité · Inscription",
+    desc: "Accéder à la scolarité",
     page: "ecole",
     color: "#F59E0B",
-    category: "Éducation & Formation",
+    category: "Éducation",
+    status: "available",
+    keywords: ["école", "scolarité", "élève"],
   },
   {
     id: "apprendre",
     icon: BookOpen,
     label: "Apprendre",
-    desc: "Catalogue complet",
+    desc: "Explorer les ressources",
     page: "apprendre",
-    color: "#F59E0B",
-    category: "Éducation & Formation",
+    color: "#F97316",
+    category: "Éducation",
+    status: "available",
+    keywords: ["apprendre", "formation", "éducation"],
   },
 
   {
     id: "groupes",
     icon: Users,
     label: "Groupes",
-    desc: "Rejoindre des discussions",
+    desc: "Explorer la communauté",
     page: "community",
     color: "#EC4899",
-    category: "Social & Communauté",
+    category: "Communauté",
+    status: "available",
+    keywords: ["groupe", "communauté", "discussion"],
   },
   {
     id: "evenement",
     icon: CalendarDays,
     label: "Événements",
-    desc: "Découvrir et créer",
+    desc: "Découvrir les événements",
     page: "evenements",
-    color: "#EC4899",
-    category: "Social & Communauté",
+    color: "#DB2777",
+    category: "Communauté",
+    status: "available",
+    keywords: ["événement", "event", "agenda"],
   },
   {
     id: "parrainer",
     icon: HandHeart,
-    label: "Parrainer",
-    desc: "Inviter & gagner",
+    label: "Parrainage",
+    desc: "Explorer le parrainage",
     page: "parrainage",
     color: "#EC4899",
-    category: "Social & Communauté",
+    category: "Communauté",
+    status: "available",
+    keywords: ["parrainage", "inviter", "ami"],
   },
   {
     id: "reseau",
     icon: Network,
     label: "Réseau",
-    desc: "Connexions professionnelles",
+    desc: "Développer votre réseau",
     page: "network",
     color: "#3B82F6",
-    category: "Social & Communauté",
+    category: "Communauté",
+    status: "available",
+    keywords: ["réseau", "professionnel", "connexion"],
   },
   {
     id: "messages",
     icon: MessageSquare,
     label: "Messages",
-    desc: "Tchatter · Groupes",
+    desc: "Accéder à la messagerie",
     page: "messages",
-    color: "#3B82F6",
-    category: "Social & Communauté",
+    color: "#2563EB",
+    category: "Communauté",
+    status: "available",
+    keywords: ["message", "chat", "conversation"],
   },
 
   {
     id: "lire-news",
     icon: Newspaper,
     label: "Actualités",
-    desc: "News & podcasts",
+    desc: "Explorer les contenus",
     page: "media",
     color: "#06B6D4",
-    category: "Médias & Création",
+    category: "Création & Média",
+    status: "available",
+    keywords: ["actualité", "news", "information", "podcast"],
   },
   {
     id: "streamer",
     icon: Radio,
-    label: "Streamer",
-    desc: "Lancer un live",
+    label: "Live",
+    desc: "Accéder au direct",
     page: "live-streaming",
     color: "#EF4444",
-    category: "Médias & Création",
+    category: "Création & Média",
+    status: "available",
+    keywords: ["live", "direct", "stream", "streaming"],
   },
   {
     id: "creer-contenu",
     icon: Camera,
-    label: "Créer contenu",
-    desc: "Stories · Vidéos",
+    label: "Créer",
+    desc: "Créer du contenu",
     page: "editeur",
     color: "#8B5CF6",
-    category: "Médias & Création",
+    category: "Création & Média",
+    status: "available",
+    keywords: ["créer", "contenu", "vidéo", "photo"],
   },
   {
     id: "publier-story",
     icon: Film,
-    label: "Story Creator",
-    desc: "Créer une story",
+    label: "Story",
+    desc: "Accéder à la création de stories",
     page: "stories-creator",
     color: "#EC4899",
-    category: "Médias & Création",
+    category: "Création & Média",
+    status: "available",
+    keywords: ["story", "stories", "vidéo"],
   },
   {
     id: "lancer-pub",
     icon: Megaphone,
     label: "Publicité",
-    desc: "Créer une campagne",
+    desc: "Accéder aux campagnes",
     page: "pub",
     color: "#F59E0B",
-    category: "Médias & Création",
+    category: "Création & Média",
+    status: "available",
+    keywords: ["pub", "publicité", "campagne", "marketing"],
   },
   {
     id: "cocreation",
     icon: Lightbulb,
     label: "Co-créer",
-    desc: "Projet collaboratif",
+    desc: "Explorer la collaboration",
     page: "cocreation",
     color: "#A78BFA",
-    category: "Médias & Création",
+    category: "Création & Média",
+    status: "available",
+    keywords: ["collaboration", "projet", "créer"],
   },
 
   {
     id: "planter",
     icon: Leaf,
-    label: "Planter",
-    desc: "Calendrier & conseils",
+    label: "Agriculture",
+    desc: "Accéder aux outils agricoles",
     page: "agri",
     color: "#22C55E",
-    category: "Agriculture & Environnement",
+    category: "Agriculture",
+    status: "available",
+    keywords: ["agriculture", "agri", "ferme", "planter"],
   },
   {
     id: "vendre-agri",
     icon: ShoppingBag,
-    label: "Vendre Agri",
-    desc: "Marché agricole",
+    label: "Marché agricole",
+    desc: "Explorer le marché agricole",
     page: "agri",
-    color: "#22C55E",
-    category: "Agriculture & Environnement",
+    color: "#16A34A",
+    category: "Agriculture",
+    status: "available",
+    keywords: ["agriculture", "vente", "marché", "produits"],
   },
   {
     id: "environnement",
-    icon: TreePine,
-    label: "Écologie",
-    desc: "Recyclage · Green",
+    icon: Globe,
+    label: "Environnement",
+    desc: "Explorer les initiatives vertes",
     page: "environnement",
     color: "#22C55E",
-    category: "Agriculture & Environnement",
+    category: "Agriculture",
+    status: "available",
+    keywords: ["écologie", "environnement", "recyclage", "green"],
   },
   {
     id: "energie",
     icon: Zap,
     label: "Énergie",
-    desc: "Solaire · Réseau",
+    desc: "Accéder aux services énergie",
     page: "energie",
     color: "#FBBF24",
-    category: "Agriculture & Environnement",
+    category: "Agriculture",
+    status: "available",
+    keywords: ["énergie", "solaire", "électricité", "réseau"],
   },
 
   {
     id: "sos",
     icon: AlertTriangle,
     label: "SOS",
-    desc: "Alerte urgence",
+    desc: "Accéder aux urgences",
     page: "sos",
     color: "#EF4444",
-    category: "Gouvernance & Sécurité",
+    category: "Sécurité & Citoyen",
+    status: "available",
+    keywords: ["sos", "urgence", "aide"],
   },
   {
     id: "securite",
     icon: Shield,
     label: "Sécurité",
-    desc: "Signalement incident",
+    desc: "Accéder aux signalements",
     page: "securite",
-    color: "#EF4444",
-    category: "Gouvernance & Sécurité",
+    color: "#DC2626",
+    category: "Sécurité & Citoyen",
+    status: "available",
+    keywords: ["sécurité", "incident", "signalement"],
   },
   {
     id: "juridique",
     icon: Scale,
     label: "Juridique",
-    desc: "Conseil légal",
+    desc: "Accéder aux services juridiques",
     page: "juridique",
-    color: "#9CA3AF",
-    category: "Gouvernance & Sécurité",
+    color: "#94A3B8",
+    category: "Sécurité & Citoyen",
+    status: "available",
+    keywords: ["juridique", "loi", "avocat", "droit"],
   },
   {
     id: "justice",
     icon: Scale,
     label: "Justice",
-    desc: "Signaler · Défendre",
+    desc: "Accéder aux services de justice",
     page: "justice",
-    color: "#9CA3AF",
-    category: "Gouvernance & Sécurité",
+    color: "#CBD5E1",
+    category: "Sécurité & Citoyen",
+    status: "available",
+    keywords: ["justice", "droit", "plainte"],
   },
   {
     id: "data-pub",
     icon: BarChart2,
-    label: "Data Publique",
-    desc: "Open data officiel",
+    label: "Data publique",
+    desc: "Explorer les données publiques",
     page: "data-publique",
     color: "#06B6D4",
-    category: "Gouvernance & Sécurité",
+    category: "Sécurité & Citoyen",
+    status: "available",
+    keywords: ["data", "données", "publique", "open data"],
   },
 
   {
     id: "dons",
     icon: HandHeart,
     label: "Faire un don",
-    desc: "Soutenir une cause",
+    desc: "Explorer la solidarité",
     page: "ong",
     color: "#10B981",
-    category: "ONG & Solidarité",
+    category: "Solidarité",
+    status: "available",
+    keywords: ["don", "solidarité", "ong", "cause"],
   },
   {
     id: "benevolat",
     icon: Globe,
     label: "Bénévolat",
-    desc: "S'engager bénévolement",
+    desc: "Explorer les missions",
     page: "ong",
-    color: "#10B981",
-    category: "ONG & Solidarité",
+    color: "#059669",
+    category: "Solidarité",
+    status: "available",
+    keywords: ["bénévolat", "volontariat", "ong"],
   },
   {
     id: "campagne",
     icon: Megaphone,
     label: "Campagne",
-    desc: "Lancer une collecte",
+    desc: "Accéder aux campagnes",
     page: "ong",
     color: "#10B981",
-    category: "ONG & Solidarité",
+    category: "Solidarité",
+    status: "available",
+    keywords: ["campagne", "collecte", "association"],
   },
 
   {
     id: "carte",
     icon: MapPin,
     label: "Carte",
-    desc: "Explorer autour de moi",
+    desc: "Explorer autour de vous",
     page: "carte",
     color: "#6366F1",
-    category: "Carte & Tech",
+    category: "Explorer",
+    status: "available",
+    keywords: ["carte", "map", "proche", "autour"],
   },
   {
     id: "map3d",
     icon: Map,
     label: "Map 3D",
-    desc: "Cartographie avancée",
+    desc: "Explorer la cartographie",
     page: "map3d",
-    color: "#6366F1",
-    category: "Carte & Tech",
+    color: "#818CF8",
+    category: "Explorer",
+    status: "available",
+    keywords: ["map", "3d", "carte"],
   },
   {
-    id: "login",
+    id: "profile",
     icon: LogIn,
     label: "Mon compte",
-    desc: "Profil · Paramètres",
+    desc: "Profil et paramètres",
     page: "profile",
     color: "#8B5CF6",
-    category: "Carte & Tech",
+    category: "Explorer",
+    status: "available",
+    keywords: ["profil", "compte", "paramètres"],
   },
 ];
 
 /* ============================================================================
- * STORAGE HELPERS (safe on RN + web)
+ * CONSTANTS
  * ========================================================================== */
 
-const RECENT_KEY = "debrouille_recent_actions";
-const FAV_KEY = "debrouille_fav_actions";
-const MAX_RECENT = 6;
-
-function getStorage(): Storage | null {
-  try {
-    if (typeof globalThis === "undefined") return null;
-    const s = (globalThis as { localStorage?: Storage }).localStorage;
-    if (!s || typeof s.getItem !== "function") return null;
-    return s;
-  } catch {
-    return null;
-  }
-}
-
-function readStorage(key: string): string[] {
-  const storage = getStorage();
-  if (!storage) return [];
-  try {
-    const value = storage.getItem(key);
-    return value ? (JSON.parse(value) as string[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStorage(key: string, value: string[]) {
-  const storage = getStorage();
-  if (!storage) return;
-  try {
-    storage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* noop */
-  }
-}
-
-const CATEGORIES: string[] = [
+const CATEGORIES = [
   "Tous",
-  ...Array.from(new Set(ALL_ACTIONS.map((a) => a.category))),
+  ...Array.from(new Set(ALL_ACTIONS.map((action) => action.category))),
 ];
 
-const PREFERRED_IDS = [
-  "payer",
-  "transferer",
-  "vtc",
-  "emploi",
-  "louer",
-  "rdv",
-  "marche",
-  "voyager",
-];
+const QUICK_IDS = ["wallet", "payer", "emploi", "louer", "vtc", "marche"];
+
+const MAX_RECENT = 6;
+const MAX_FAVORITES = 12;
 
 /* ============================================================================
- * AMBIENT BACKGROUND — orbes flottants natifs
+ * HELPERS
+ * ========================================================================== */
+
+function findAction(id: string): Action | undefined {
+  return ALL_ACTIONS.find((action) => action.id === id);
+}
+
+function normalize(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/* ============================================================================
+ * AMBIENT BACKGROUND
  * ========================================================================== */
 
 function AmbientBackground() {
-  const { width: W, height: H } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+
   const orbA = useRef(new Animated.Value(0)).current;
   const orbB = useRef(new Animated.Value(0)).current;
   const orbC = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const loopA = Animated.loop(
-      Animated.sequence([
-        Animated.timing(orbA, {
-          toValue: -40,
-          duration: 9000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(orbA, {
-          toValue: 0,
-          duration: 9000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    const loopB = Animated.loop(
-      Animated.sequence([
-        Animated.timing(orbB, {
-          toValue: 50,
-          duration: 11000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(orbB, {
-          toValue: 0,
-          duration: 11000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    const loopC = Animated.loop(
-      Animated.sequence([
-        Animated.timing(orbC, {
-          toValue: -30,
-          duration: 10000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(orbC, {
-          toValue: 0,
-          duration: 10000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
+    const createLoop = (
+      value: Animated.Value,
+      distance: number,
+      duration: number,
+    ) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(value, {
+            toValue: distance,
+            duration,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(value, {
+            toValue: 0,
+            duration,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+
+    const loopA = createLoop(orbA, -35, 8500);
+    const loopB = createLoop(orbB, 45, 10500);
+    const loopC = createLoop(orbC, -28, 11500);
+
     loopA.start();
     loopB.start();
     loopC.start();
+
     return () => {
       loopA.stop();
       loopB.stop();
@@ -820,47 +896,50 @@ function AmbientBackground() {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <LinearGradient
-        colors={["#05030E", "#0C0724", "#08041A", "#10062A"]}
-        locations={[0, 0.35, 0.7, 1]}
+        colors={["#03020A", "#08051A", "#0B0820", "#02030A"]}
+        locations={[0, 0.36, 0.72, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+
       <Animated.View
         style={[
           styles.orb,
           {
-            width: Math.max(360, W * 0.9),
-            height: Math.max(360, W * 0.9),
-            top: -180,
-            left: -140,
-            backgroundColor: "rgba(139,92,246,0.28)",
+            width: Math.max(420, width * 0.95),
+            height: Math.max(420, width * 0.95),
+            top: -220,
+            left: -180,
+            backgroundColor: "rgba(124,58,237,0.22)",
             transform: [{ translateY: orbA }],
           },
         ]}
       />
+
       <Animated.View
         style={[
           styles.orb,
           {
-            width: 320,
-            height: 320,
-            top: H * 0.4,
-            right: -140,
-            backgroundColor: "rgba(99,102,241,0.22)",
+            width: 360,
+            height: 360,
+            top: height * 0.36,
+            right: -190,
+            backgroundColor: "rgba(37,99,235,0.18)",
             transform: [{ translateY: orbB }],
           },
         ]}
       />
+
       <Animated.View
         style={[
           styles.orb,
           {
-            width: 280,
-            height: 280,
-            bottom: -120,
-            left: -60,
-            backgroundColor: "rgba(249,115,22,0.16)",
+            width: 300,
+            height: 300,
+            bottom: -150,
+            left: -90,
+            backgroundColor: "rgba(236,72,153,0.10)",
             transform: [{ translateY: orbC }],
           },
         ]}
@@ -870,43 +949,45 @@ function AmbientBackground() {
 }
 
 /* ============================================================================
- * REVEAL — entrance animée native
+ * REVEAL
  * ========================================================================== */
 
 function Reveal({
-  delay = 0,
-  distance = 14,
   children,
+  delay = 0,
+  distance = 18,
   style,
 }: {
+  children: ReactNode;
   delay?: number;
   distance?: number;
-  children: ReactNode;
   style?: object;
 }) {
-  const anim = useRef(new Animated.Value(0)).current;
+  const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animation = Animated.timing(anim, {
+    const animation = Animated.timing(progress, {
       toValue: 1,
-      duration: 480,
+      duration: 500,
       delay,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     });
+
     animation.start();
+
     return () => animation.stop();
-  }, [anim, delay]);
+  }, [delay, progress]);
 
   return (
     <Animated.View
       style={[
         style,
         {
-          opacity: anim,
+          opacity: progress,
           transform: [
             {
-              translateY: anim.interpolate({
+              translateY: progress.interpolate({
                 inputRange: [0, 1],
                 outputRange: [distance, 0],
               }),
@@ -921,51 +1002,54 @@ function Reveal({
 }
 
 /* ============================================================================
- * PRESS SCALE WRAPPER — feedback natif
+ * PRESSABLE SCALE
  * ========================================================================== */
 
 function PressScale({
+  children,
   onPress,
   onLongPress,
-  children,
-  style,
+  disabled = false,
   scaleTo = 0.96,
+  style,
   accessibilityLabel,
-  disabled,
 }: {
+  children: ReactNode;
   onPress?: () => void;
   onLongPress?: () => void;
-  children: ReactNode;
-  style?: object;
-  scaleTo?: number;
-  accessibilityLabel?: string;
   disabled?: boolean;
+  scaleTo?: number;
+  style?: object;
+  accessibilityLabel?: string;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
 
-  const pressIn = () => {
+  const pressIn = useCallback(() => {
     Animated.spring(scale, {
       toValue: scaleTo,
-      useNativeDriver: true,
       speed: 40,
+      bounciness: 4,
+      useNativeDriver: true,
     }).start();
-  };
-  const pressOut = () => {
+  }, [scale, scaleTo]);
+
+  const pressOut = useCallback(() => {
     Animated.spring(scale, {
       toValue: 1,
+      speed: 35,
+      bounciness: 5,
       useNativeDriver: true,
-      speed: 40,
     }).start();
-  };
+  }, [scale]);
 
   return (
     <Animated.View style={[style, { transform: [{ scale }] }]}>
       <Pressable
+        disabled={disabled}
         onPress={onPress}
         onLongPress={onLongPress}
         onPressIn={pressIn}
         onPressOut={pressOut}
-        disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
       >
@@ -976,176 +1060,115 @@ function PressScale({
 }
 
 /* ============================================================================
- * ACTION TILE — grande tuile bento (2 colonnes)
+ * ACTION ICON
  * ========================================================================== */
 
-function ActionTile({
-  action,
-  isFav,
-  onTap,
-  onToggleFav,
-}: {
-  action: Action;
-  isFav: boolean;
-  onTap: () => void;
-  onToggleFav: (event: GestureResponderEvent) => void;
-}) {
+function ActionIcon({ action, size = 46 }: { action: Action; size?: number }) {
   const Icon = action.icon;
 
   return (
-    <PressScale onPress={onTap} style={styles.tileWrap} scaleTo={0.97}>
-      <View style={[styles.tile, { borderColor: `${action.color}33` }]}>
-        {/* Gradient de fond */}
-        <LinearGradient
-          colors={[`${action.color}22`, `${action.color}08`, "rgba(0,0,0,0)"]}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-
-        {/* Halo supérieur */}
-        <View
-          pointerEvents="none"
-          style={[styles.tileHalo, { backgroundColor: action.color }]}
-        />
-
-        {/* Fav */}
-        <Pressable
-          onPress={onToggleFav}
-          accessibilityLabel={
-            isFav
-              ? `Retirer ${action.label} des favoris`
-              : `Ajouter ${action.label} aux favoris`
-          }
-          style={styles.tileFavBtn}
-          hitSlop={6}
-        >
-          <Star
-            size={11}
-            color={isFav ? "#FACC15" : "rgba(255,255,255,0.35)"}
-            fill={isFav ? "#FACC15" : "transparent"}
-          />
-        </Pressable>
-
-        {/* Icone */}
-        <View
-          style={[
-            styles.tileIconBox,
-            {
-              backgroundColor: `${action.color}26`,
-              borderColor: `${action.color}40`,
-            },
-          ]}
-        >
-          <Icon size={20} color={action.color} />
-        </View>
-
-        {/* Texte */}
-        <View style={styles.tileTextBlock}>
-          <Text style={styles.tileLabel} numberOfLines={1}>
-            {action.label}
-          </Text>
-          <Text style={styles.tileDesc} numberOfLines={2}>
-            {action.desc}
-          </Text>
-        </View>
-
-        {/* Chevron discret en bas à droite */}
-        <View style={styles.tileChevron}>
-          <ChevronRight size={12} color="rgba(255,255,255,0.22)" />
-        </View>
-      </View>
-    </PressScale>
+    <View
+      style={[
+        styles.actionIcon,
+        {
+          width: size,
+          height: size,
+          borderRadius: size * 0.32,
+          backgroundColor: `${action.color}20`,
+          borderColor: `${action.color}40`,
+        },
+      ]}
+    >
+      <Icon size={size * 0.42} color={action.color} strokeWidth={2.2} />
+    </View>
   );
 }
 
 /* ============================================================================
- * FEATURED CARD — grande carte carrousel horizontal
+ * FEATURED ACTION
  * ========================================================================== */
 
-function FeaturedCard({
+function FeaturedAction({
   action,
-  isFav,
-  onTap,
-  onToggleFav,
+  favorite,
+  onPress,
+  onFavorite,
 }: {
   action: Action;
-  isFav: boolean;
-  onTap: () => void;
-  onToggleFav: (event: GestureResponderEvent) => void;
+  favorite: boolean;
+  onPress: () => void;
+  onFavorite: (event: GestureResponderEvent) => void;
 }) {
-  const Icon = action.icon;
-
   return (
-    <PressScale onPress={onTap} style={styles.featuredWrap} scaleTo={0.97}>
+    <PressScale onPress={onPress} style={styles.featuredWrap}>
       <LinearGradient
-        colors={[`${action.color}30`, `${action.color}12`, "rgba(10,6,24,0.6)"]}
-        locations={[0, 0.5, 1]}
+        colors={[`${action.color}32`, `${action.color}12`, "rgba(7,5,18,0.82)"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.featuredCard, { borderColor: `${action.color}44` }]}
+        style={[
+          styles.featuredCard,
+          {
+            borderColor: `${action.color}48`,
+          },
+        ]}
       >
-        {/* Halo */}
         <View
           pointerEvents="none"
-          style={[styles.featuredHalo, { backgroundColor: action.color }]}
+          style={[
+            styles.featuredGlow,
+            {
+              backgroundColor: action.color,
+            },
+          ]}
         />
 
-        {/* Fav */}
         <Pressable
-          onPress={onToggleFav}
+          onPress={onFavorite}
+          hitSlop={8}
+          style={styles.featuredFavorite}
+          accessibilityRole="button"
           accessibilityLabel={
-            isFav ? "Retirer des favoris" : "Ajouter aux favoris"
+            favorite
+              ? `Retirer ${action.label} des favoris`
+              : `Ajouter ${action.label} aux favoris`
           }
-          style={styles.featuredFavBtn}
-          hitSlop={6}
         >
           <Star
-            size={12}
-            color={isFav ? "#FACC15" : "rgba(255,255,255,0.4)"}
-            fill={isFav ? "#FACC15" : "transparent"}
+            size={14}
+            color={favorite ? "#FACC15" : "rgba(255,255,255,0.45)"}
+            fill={favorite ? "#FACC15" : "transparent"}
           />
         </Pressable>
 
-        {/* Icone */}
-        <View
-          style={[
-            styles.featuredIconBox,
-            {
-              backgroundColor: `${action.color}2A`,
-              borderColor: `${action.color}55`,
-              shadowColor: action.color,
-            },
-          ]}
-        >
-          <Icon size={22} color={action.color} />
-        </View>
+        <ActionIcon action={action} size={52} />
 
-        {/* Texte */}
-        <View style={{ flex: 1, justifyContent: "flex-end" }}>
-          <Text style={styles.featuredLabel} numberOfLines={1}>
-            {action.label}
-          </Text>
-          <Text style={styles.featuredDesc} numberOfLines={1}>
+        <View style={styles.featuredContent}>
+          <View style={styles.featuredTitleRow}>
+            <Text style={styles.featuredTitle} numberOfLines={1}>
+              {action.label}
+            </Text>
+
+            <ArrowUpRight size={15} color="rgba(255,255,255,0.45)" />
+          </View>
+
+          <Text style={styles.featuredDescription} numberOfLines={2}>
             {action.desc}
           </Text>
 
-          <View style={styles.featuredBottomRow}>
+          <View style={styles.featuredMeta}>
             <View
               style={[
-                styles.featuredBadge,
+                styles.statusDot,
                 {
-                  backgroundColor: `${action.color}22`,
-                  borderColor: `${action.color}55`,
+                  backgroundColor:
+                    action.status === "available" ? "#34D399" : "#FBBF24",
                 },
               ]}
-            >
-              <Text style={[styles.featuredBadgeText, { color: action.color }]}>
-                {action.category.split(" ")[0]}
-              </Text>
-            </View>
-            <ArrowUpRight size={14} color="rgba(255,255,255,0.45)" />
+            />
+
+            <Text style={styles.featuredMetaText}>
+              {action.status === "available" ? "Accéder" : "Bientôt disponible"}
+            </Text>
           </View>
         </View>
       </LinearGradient>
@@ -1154,33 +1177,172 @@ function FeaturedCard({
 }
 
 /* ============================================================================
- * RECENT CHIP — petite pastille horizontale
+ * ACTION TILE
  * ========================================================================== */
 
-function RecentChip({ action, onTap }: { action: Action; onTap: () => void }) {
-  const Icon = action.icon;
-
+function ActionTile({
+  action,
+  favorite,
+  onPress,
+  onFavorite,
+}: {
+  action: Action;
+  favorite: boolean;
+  onPress: () => void;
+  onFavorite: (event: GestureResponderEvent) => void;
+}) {
   return (
-    <PressScale onPress={onTap} scaleTo={0.94}>
-      <LinearGradient
-        colors={[`${action.color}1E`, `${action.color}08`]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.recentChip, { borderColor: `${action.color}33` }]}
+    <PressScale
+      onPress={onPress}
+      disabled={action.status === "coming_soon"}
+      style={styles.tileWrap}
+      scaleTo={0.965}
+    >
+      <View
+        style={[
+          styles.tile,
+          {
+            borderColor:
+              action.status === "coming_soon"
+                ? "rgba(255,255,255,0.06)"
+                : `${action.color}30`,
+            opacity: action.status === "coming_soon" ? 0.62 : 1,
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={[`${action.color}18`, `${action.color}06`, "rgba(0,0,0,0)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+
+        <View
+          pointerEvents="none"
+          style={[
+            styles.tileAccent,
+            {
+              backgroundColor: action.color,
+            },
+          ]}
+        />
+
+        <Pressable
+          onPress={onFavorite}
+          hitSlop={8}
+          style={styles.tileFavorite}
+          accessibilityRole="button"
+          accessibilityLabel={
+            favorite
+              ? `Retirer ${action.label} des favoris`
+              : `Ajouter ${action.label} aux favoris`
+          }
+        >
+          <Star
+            size={12}
+            color={favorite ? "#FACC15" : "rgba(255,255,255,0.28)"}
+            fill={favorite ? "#FACC15" : "transparent"}
+          />
+        </Pressable>
+
+        <ActionIcon action={action} size={44} />
+
+        <View style={styles.tileText}>
+          <Text style={styles.tileTitle} numberOfLines={1}>
+            {action.label}
+          </Text>
+
+          <Text style={styles.tileDescription} numberOfLines={2}>
+            {action.desc}
+          </Text>
+
+          {action.status === "coming_soon" ? (
+            <View style={styles.comingSoonBadge}>
+              <Clock3 size={9} color="#FBBF24" />
+              <Text style={styles.comingSoonText}>Bientôt</Text>
+            </View>
+          ) : (
+            <View style={styles.tileArrow}>
+              <ChevronRight size={13} color="rgba(255,255,255,0.25)" />
+            </View>
+          )}
+        </View>
+      </View>
+    </PressScale>
+  );
+}
+
+/* ============================================================================
+ * RECENT / FAVORITE CHIP
+ * ========================================================================== */
+
+function CompactAction({
+  action,
+  onPress,
+}: {
+  action: Action;
+  onPress: () => void;
+}) {
+  return (
+    <PressScale onPress={onPress} scaleTo={0.95}>
+      <View
+        style={[
+          styles.compactAction,
+          {
+            borderColor: `${action.color}30`,
+          },
+        ]}
       >
         <View
           style={[
-            styles.recentIconBox,
-            { backgroundColor: `${action.color}26` },
+            styles.compactIcon,
+            {
+              backgroundColor: `${action.color}18`,
+            },
           ]}
         >
-          <Icon size={15} color={action.color} />
+          <action.icon size={15} color={action.color} />
         </View>
-        <Text style={styles.recentLabel} numberOfLines={1}>
+
+        <Text style={styles.compactLabel} numberOfLines={1}>
           {action.label}
         </Text>
-      </LinearGradient>
+      </View>
     </PressScale>
+  );
+}
+
+/* ============================================================================
+ * CATEGORY CHIP
+ * ========================================================================== */
+
+function CategoryChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.categoryChip, active && styles.categoryChipActive]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      {active && <Sparkles size={11} color="#C4B5FD" />}
+
+      <Text
+        style={[
+          styles.categoryChipText,
+          active && styles.categoryChipTextActive,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -1188,34 +1350,106 @@ function RecentChip({ action, onTap }: { action: Action; onTap: () => void }) {
  * MAIN PAGE
  * ========================================================================== */
 
-interface ActionsPageProps {
-  onBack: () => void;
-  onNavigate: (page: string) => void;
-}
-
 export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
   const insets = useSafeAreaInsets();
+
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("Tous");
-  const [recentIds, setRecentIds] = useState<string[]>(() =>
-    readStorage(RECENT_KEY),
+
+  /*
+   * Intentionally session-local.
+   *
+   * We do not pretend this is persistent storage.
+   * If persistent cross-session favorites are required, connect them later
+   * to the real user-preferences backend / native persistence layer.
+   */
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+
+  const [showAllCategories, setShowAllCategories] = useState(false);
+
+  const normalizedSearch = normalize(search);
+
+  /* ------------------------------------------------------------------------
+   * Derived actions
+   * ---------------------------------------------------------------------- */
+
+  const recentActions = useMemo(
+    () =>
+      recentIds
+        .map(findAction)
+        .filter((action): action is Action => Boolean(action)),
+    [recentIds],
   );
-  const [favIds, setFavIds] = useState<string[]>(() => readStorage(FAV_KEY));
 
-  useEffect(() => {
-    writeStorage(RECENT_KEY, recentIds);
-  }, [recentIds]);
+  const favoriteActions = useMemo(
+    () =>
+      favoriteIds
+        .map(findAction)
+        .filter((action): action is Action => Boolean(action)),
+    [favoriteIds],
+  );
 
-  useEffect(() => {
-    writeStorage(FAV_KEY, favIds);
-  }, [favIds]);
+  const quickActions = useMemo(
+    () =>
+      QUICK_IDS.map(findAction).filter((action): action is Action =>
+        Boolean(action),
+      ),
+    [],
+  );
 
-  /* ─────────── Handlers ─────────── */
+  const filteredActions = useMemo(() => {
+    return ALL_ACTIONS.filter((action) => {
+      const matchesCategory =
+        activeCategory === "Tous" || action.category === activeCategory;
 
-  const handleTap = useCallback(
+      if (!normalizedSearch) {
+        return matchesCategory;
+      }
+
+      const haystack = normalize(
+        [action.label, action.desc, action.category, ...action.keywords].join(
+          " ",
+        ),
+      );
+
+      return matchesCategory && haystack.includes(normalizedSearch);
+    });
+  }, [activeCategory, normalizedSearch]);
+
+  const suggestedActions = useMemo(() => {
+    if (!normalizedSearch) return [];
+
+    return filteredActions
+      .filter((action) => action.status === "available")
+      .slice(0, 5);
+  }, [filteredActions, normalizedSearch]);
+
+  const visibleCategories = showAllCategories
+    ? CATEGORIES
+    : CATEGORIES.slice(0, 6);
+
+  const isSearching = normalizedSearch.length > 0;
+  const isFiltering = isSearching || activeCategory !== "Tous";
+
+  /* ------------------------------------------------------------------------
+   * Interaction
+   * ---------------------------------------------------------------------- */
+
+  const handleOpenAction = useCallback(
     (action: Action) => {
-      setRecentIds((previous) =>
-        [action.id, ...previous.filter((id) => id !== action.id)].slice(
+      if (action.status === "coming_soon") {
+        toast("Cette fonctionnalité arrive bientôt", {
+          description:
+            "Nous préférons vous montrer clairement ce qui est disponible.",
+          duration: 2200,
+        });
+
+        return;
+      }
+
+      setRecentIds((current) =>
+        [action.id, ...current.filter((id) => id !== action.id)].slice(
           0,
           MAX_RECENT,
         ),
@@ -1228,237 +1462,291 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
 
       toast(action.label, {
         description: action.desc,
-        duration: 2000,
+        duration: 1800,
       });
     },
     [onNavigate],
   );
 
-  const handleToggleFav = useCallback(
+  const handleToggleFavorite = useCallback(
     (event: GestureResponderEvent, action: Action) => {
       event.stopPropagation();
 
-      setFavIds((previous) => {
-        const exists = previous.includes(action.id);
+      setFavoriteIds((current) => {
+        const exists = current.includes(action.id);
 
         if (exists) {
-          toast("Retiré des favoris", { duration: 1400 });
-          return previous.filter((id) => id !== action.id);
+          toast("Retiré de vos favoris", {
+            description: action.label,
+            duration: 1300,
+          });
+
+          return current.filter((id) => id !== action.id);
         }
 
-        toast(`${action.label} ajouté aux favoris`, { duration: 1400 });
-        return [action.id, ...previous];
+        if (current.length >= MAX_FAVORITES) {
+          toast("Vos favoris sont pleins", {
+            description: "Retirez une action avant d'en ajouter une nouvelle.",
+            duration: 1800,
+          });
+
+          return current;
+        }
+
+        toast("Ajouté à vos favoris", {
+          description: action.label,
+          duration: 1300,
+        });
+
+        return [action.id, ...current];
       });
     },
     [],
   );
 
-  /* ─────────── Derived data ─────────── */
+  const clearSearch = useCallback(() => {
+    setSearch("");
+  }, []);
 
-  const recentActions = useMemo(
-    () =>
-      recentIds
-        .map((id) => ALL_ACTIONS.find((a) => a.id === id))
-        .filter((a): a is Action => Boolean(a)),
-    [recentIds],
-  );
+  const resetFilters = useCallback(() => {
+    setSearch("");
+    setActiveCategory("Tous");
+  }, []);
 
-  const favActions = useMemo(
-    () =>
-      favIds
-        .map((id) => ALL_ACTIONS.find((a) => a.id === id))
-        .filter((a): a is Action => Boolean(a)),
-    [favIds],
-  );
-
-  const filteredActions = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return ALL_ACTIONS.filter((action) => {
-      const matchesSearch =
-        !query ||
-        action.label.toLowerCase().includes(query) ||
-        action.desc.toLowerCase().includes(query) ||
-        action.category.toLowerCase().includes(query);
-
-      const matchesCategory =
-        activeCategory === "Tous" || action.category === activeCategory;
-
-      return matchesSearch && matchesCategory;
-    });
-  }, [search, activeCategory]);
-
-  const isFiltering = search.trim().length > 0 || activeCategory !== "Tous";
-
-  const popularActions = useMemo(
-    () =>
-      PREFERRED_IDS.map((id) => ALL_ACTIONS.find((a) => a.id === id)).filter(
-        (a): a is Action => Boolean(a),
-      ),
-    [],
-  );
-
-  /* ─────────── Render ─────────── */
+  /* ------------------------------------------------------------------------
+   * Render
+   * ---------------------------------------------------------------------- */
 
   return (
     <View style={styles.root}>
       <AmbientBackground />
 
-      {/* ═════════════ HEADER ═════════════ */}
+      {/* ==================================================================
+       * HEADER
+       * ================================================================== */}
+
       <View
-        style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 8 }]}
+        style={[
+          styles.header,
+          {
+            paddingTop: Math.max(insets.top, 12) + 8,
+          },
+        ]}
       >
-        {/* Row 1 */}
-        <View style={styles.headerRow}>
+        <View style={styles.headerTopRow}>
           <Pressable
             onPress={onBack}
-            accessibilityLabel="Retour"
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
             style={({ pressed }) => [
-              styles.backBtn,
-              pressed && { opacity: 0.75, transform: [{ scale: 0.94 }] },
+              styles.backButton,
+              pressed && styles.pressed,
             ]}
           >
-            <ArrowLeft size={17} color="rgba(255,255,255,0.9)" />
+            <ArrowLeft size={18} color="rgba(255,255,255,0.92)" />
           </Pressable>
 
-          <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              Actions rapides
-            </Text>
-            <Text style={styles.headerSub} numberOfLines={1}>
-              {ALL_ACTIONS.length} services · {CATEGORIES.length - 1} catégories
-            </Text>
+          <View style={styles.headerIdentity}>
+            <View style={styles.headerEyebrowRow}>
+              <View style={styles.liveDot} />
+              <Text style={styles.headerEyebrow}>DÉBROUILLEPRO</Text>
+            </View>
+
+            <Text style={styles.headerTitle}>Actions</Text>
           </View>
 
-          <LinearGradient
-            colors={["#8B5CF6", "#6366F1"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.headerIcon}
-          >
-            <Zap size={17} color="#fff" />
-          </LinearGradient>
+          <View style={styles.headerBadge}>
+            <LinearGradient
+              colors={["#8B5CF6", "#4F46E5"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+
+            <Zap size={17} color="#fff" strokeWidth={2.4} />
+          </View>
         </View>
 
-        {/* Row 2 — Search */}
-        <View style={styles.searchWrap}>
-          <Search size={15} color="rgba(255,255,255,0.4)" />
+        {/* ================================================================
+         * SMART SEARCH
+         * ================================================================ */}
+
+        <View style={styles.searchContainer}>
+          <Search size={17} color="rgba(255,255,255,0.42)" />
+
           <TextInput
             value={search}
             onChangeText={setSearch}
             placeholder="Que voulez-vous faire ?"
-            placeholderTextColor="rgba(255,255,255,0.3)"
+            placeholderTextColor="rgba(255,255,255,0.30)"
             style={styles.searchInput}
-            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect={false}
             returnKeyType="search"
+            accessibilityLabel="Rechercher une action"
           />
+
           {search.length > 0 && (
             <Pressable
-              onPress={() => setSearch("")}
+              onPress={clearSearch}
+              hitSlop={8}
               style={styles.searchClear}
-              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Effacer la recherche"
             >
-              <X size={12} color="rgba(255,255,255,0.6)" />
+              <X size={13} color="rgba(255,255,255,0.65)" />
             </Pressable>
           )}
         </View>
 
-        {/* Row 3 — Chips */}
+        {/* ================================================================
+         * CATEGORIES
+         * ================================================================ */}
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsRow}
+          contentContainerStyle={styles.categoryRow}
         >
-          {CATEGORIES.map((category) => {
-            const active = activeCategory === category;
-            const label =
-              category === "Tous"
-                ? `Tous · ${ALL_ACTIONS.length}`
-                : category.split(" ")[0];
+          {visibleCategories.map((category) => (
+            <CategoryChip
+              key={category}
+              label={category}
+              active={activeCategory === category}
+              onPress={() => setActiveCategory(category)}
+            />
+          ))}
 
-            return (
-              <Pressable
-                key={category}
-                onPress={() => setActiveCategory(category)}
-                style={[
-                  styles.chip,
-                  active ? styles.chipActive : styles.chipIdle,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    { color: active ? "#FDBA74" : "rgba(255,255,255,0.6)" },
-                  ]}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {!showAllCategories && CATEGORIES.length > 6 && (
+            <Pressable
+              onPress={() => setShowAllCategories(true)}
+              style={styles.moreCategories}
+              accessibilityRole="button"
+              accessibilityLabel="Afficher toutes les catégories"
+            >
+              <Text style={styles.moreCategoriesText}>
+                +{CATEGORIES.length - 6}
+              </Text>
+            </Pressable>
+          )}
         </ScrollView>
       </View>
 
-      {/* ═════════════ BODY ═════════════ */}
+      {/* ==================================================================
+       * BODY
+       * ================================================================== */}
+
       <ScrollView
         style={styles.body}
         contentContainerStyle={[
           styles.bodyContent,
-          { paddingBottom: insets.bottom + 40 },
+          {
+            paddingBottom: Math.max(insets.bottom, 20) + 48,
+          },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {isFiltering ? (
           <>
-            {/* Result header */}
-            <Reveal>
-              <View style={styles.resultHeader}>
+            {/* ============================================================
+             * SEARCH RESULT
+             * ============================================================ */}
+
+            <Reveal delay={40}>
+              <View style={styles.searchResultHeader}>
                 <View>
-                  <Text style={styles.resultEyebrow}>RÉSULTATS</Text>
-                  <Text style={styles.resultTitle}>
-                    {filteredActions.length} action
-                    {filteredActions.length !== 1 ? "s" : ""}
+                  <Text style={styles.sectionEyebrow}>RECHERCHE</Text>
+
+                  <Text style={styles.searchResultTitle}>
+                    {filteredActions.length} résultat
+                    {filteredActions.length === 1 ? "" : "s"}
                   </Text>
                 </View>
-                <Pressable
-                  onPress={() => {
-                    setSearch("");
-                    setActiveCategory("Tous");
-                  }}
-                  hitSlop={6}
-                >
-                  <Text style={styles.resetLink}>Réinitialiser</Text>
+
+                <Pressable onPress={resetFilters} hitSlop={8}>
+                  <Text style={styles.resetText}>Réinitialiser</Text>
                 </Pressable>
               </View>
             </Reveal>
 
-            {filteredActions.length === 0 ? (
-              <Reveal>
-                <View style={styles.emptyWrap}>
-                  <View style={styles.emptyIcon}>
-                    <Search size={24} color="rgba(255,255,255,0.2)" />
+            {/* ============================================================
+             * SMART SUGGESTION
+             * ============================================================ */}
+
+            {suggestedActions.length > 0 && (
+              <Reveal delay={90}>
+                <View style={styles.smartSuggestion}>
+                  <LinearGradient
+                    colors={["rgba(139,92,246,0.22)", "rgba(59,130,246,0.08)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+
+                  <View style={styles.smartSuggestionIcon}>
+                    <Sparkles size={17} color="#C4B5FD" />
                   </View>
-                  <Text style={styles.emptyTitle}>Aucune action trouvée</Text>
-                  <Text style={styles.emptySub}>
-                    Essayez un autre mot ou une autre catégorie.
+
+                  <View style={styles.smartSuggestionText}>
+                    <Text style={styles.smartSuggestionTitle}>
+                      Trouvé pour vous
+                    </Text>
+
+                    <Text style={styles.smartSuggestionDescription}>
+                      Voici les actions qui correspondent le mieux à votre
+                      recherche.
+                    </Text>
+                  </View>
+                </View>
+              </Reveal>
+            )}
+
+            {/* ============================================================
+             * EMPTY SEARCH
+             * ============================================================ */}
+
+            {filteredActions.length === 0 ? (
+              <Reveal delay={80}>
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyIcon}>
+                    <Search size={25} color="rgba(255,255,255,0.28)" />
+                  </View>
+
+                  <Text style={styles.emptyTitle}>
+                    Rien trouvé pour le moment
                   </Text>
+
+                  <Text style={styles.emptyDescription}>
+                    Essayez un autre mot comme « emploi », « argent », «
+                    logement », « transport » ou « santé ».
+                  </Text>
+
+                  <Pressable onPress={resetFilters} style={styles.emptyButton}>
+                    <Text style={styles.emptyButtonText}>
+                      Voir toutes les actions
+                    </Text>
+
+                    <ArrowUpRight size={15} color="#fff" />
+                  </Pressable>
                 </View>
               </Reveal>
             ) : (
               <View style={styles.grid}>
-                {filteredActions.map((action, i) => (
+                {filteredActions.map((action, index) => (
                   <Reveal
                     key={action.id}
-                    delay={Math.min(i * 25, 300)}
+                    delay={Math.min(100 + index * 22, 360)}
                     style={styles.gridItem}
                   >
                     <ActionTile
                       action={action}
-                      isFav={favIds.includes(action.id)}
-                      onTap={() => handleTap(action)}
-                      onToggleFav={(event) => handleToggleFav(event, action)}
+                      favorite={favoriteIds.includes(action.id)}
+                      onPress={() => handleOpenAction(action)}
+                      onFavorite={(event) =>
+                        handleToggleFavorite(event, action)
+                      }
                     />
                   </Reveal>
                 ))}
@@ -1467,81 +1755,86 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
           </>
         ) : (
           <>
-            {/* ─── HERO COMPACT ─── */}
+            {/* ============================================================
+             * HERO
+             * ============================================================ */}
+
             <Reveal delay={20}>
               <View style={styles.hero}>
                 <LinearGradient
                   colors={[
-                    "rgba(139,92,246,0.22)",
-                    "rgba(99,102,241,0.10)",
-                    "rgba(10,6,24,0.4)",
+                    "rgba(124,58,237,0.30)",
+                    "rgba(79,70,229,0.15)",
+                    "rgba(7,5,18,0.76)",
                   ]}
-                  locations={[0, 0.5, 1]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <View pointerEvents="none" style={styles.heroOrbA} />
-                <View pointerEvents="none" style={styles.heroOrbB} />
 
-                <View style={styles.heroTopRow}>
+                <View pointerEvents="none" style={styles.heroGlowA} />
+
+                <View pointerEvents="none" style={styles.heroGlowB} />
+
+                <View style={styles.heroTop}>
                   <LinearGradient
-                    colors={["#8B5CF6", "#6366F1"]}
+                    colors={["#8B5CF6", "#4F46E5"]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.heroIconBox}
+                    style={styles.heroIcon}
                   >
-                    <Sparkles size={20} color="#fff" />
+                    <Sparkles size={22} color="#fff" strokeWidth={2} />
                   </LinearGradient>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.heroEyebrow}>CENTRE DE COMMANDES</Text>
-                    <Text style={styles.heroTitle}>
-                      Faites plus, en moins de temps.
+
+                  <View style={styles.heroText}>
+                    <Text style={styles.heroEyebrow}>CENTRE DE COMMANDE</Text>
+
+                    <Text style={styles.heroTitle}>Tout commence ici.</Text>
+
+                    <Text style={styles.heroDescription}>
+                      Retrouvez rapidement ce dont vous avez besoin, explorez de
+                      nouveaux services et construisez votre propre espace
+                      d'accès.
                     </Text>
                   </View>
                 </View>
 
-                <View style={styles.heroStatsRow}>
-                  <View style={styles.heroStat}>
-                    <Text style={styles.heroStatValue}>
-                      {ALL_ACTIONS.length}
+                <View style={styles.heroTrust}>
+                  <View style={styles.heroTrustItem}>
+                    <Check size={12} color="#34D399" />
+
+                    <Text style={styles.heroTrustText}>
+                      Actions clairement identifiées
                     </Text>
-                    <Text style={styles.heroStatLabel}>ACTIONS</Text>
                   </View>
-                  <View style={styles.heroStatDivider} />
-                  <View style={styles.heroStat}>
-                    <Text style={[styles.heroStatValue, { color: "#FACC15" }]}>
-                      {favActions.length}
+
+                  <View style={styles.heroTrustItem}>
+                    <Shield size={12} color="#A78BFA" />
+
+                    <Text style={styles.heroTrustText}>
+                      Pas de fausse promesse
                     </Text>
-                    <Text style={styles.heroStatLabel}>FAVORIS</Text>
-                  </View>
-                  <View style={styles.heroStatDivider} />
-                  <View style={styles.heroStat}>
-                    <Text style={[styles.heroStatValue, { color: "#34D399" }]}>
-                      {recentActions.length}
-                    </Text>
-                    <Text style={styles.heroStatLabel}>RÉCENTS</Text>
                   </View>
                 </View>
               </View>
             </Reveal>
 
-            {/* ─── POPULAR — carrousel horizontal ─── */}
+            {/* ============================================================
+             * QUICK ACCESS
+             * ============================================================ */}
+
             <Reveal delay={100}>
-              <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionHeader}>
                 <View>
                   <View style={styles.sectionEyebrowRow}>
                     <Flame size={11} color="#FB923C" />
+
                     <Text style={[styles.sectionEyebrow, { color: "#FDBA74" }]}>
-                      ACCÈS INSTANTANÉ
+                      ACCÈS RAPIDE
                     </Text>
                   </View>
-                  <Text style={styles.sectionTitle}>Les plus utiles</Text>
-                </View>
-                <View style={styles.sectionCountBadge}>
-                  <Text style={styles.sectionCountText}>
-                    {popularActions.length}
-                  </Text>
+
+                  <Text style={styles.sectionTitle}>Commencer maintenant</Text>
                 </View>
               </View>
 
@@ -1550,151 +1843,225 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.featuredRow}
               >
-                {popularActions.map((action) => (
-                  <FeaturedCard
+                {quickActions.map((action) => (
+                  <FeaturedAction
                     key={action.id}
                     action={action}
-                    isFav={favIds.includes(action.id)}
-                    onTap={() => handleTap(action)}
-                    onToggleFav={(event) => handleToggleFav(event, action)}
+                    favorite={favoriteIds.includes(action.id)}
+                    onPress={() => handleOpenAction(action)}
+                    onFavorite={(event) => handleToggleFavorite(event, action)}
                   />
                 ))}
               </ScrollView>
             </Reveal>
 
-            {/* ─── FAVORITES ─── */}
-            {favActions.length > 0 && (
+            {/* ============================================================
+             * FAVORITES
+             * ============================================================ */}
+
+            {favoriteActions.length > 0 && (
               <Reveal delay={160}>
-                <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionHeader}>
                   <View>
                     <View style={styles.sectionEyebrowRow}>
                       <Heart size={11} color="#FB7185" fill="#FB7185" />
+
                       <Text
                         style={[styles.sectionEyebrow, { color: "#FDA4AF" }]}
                       >
-                        MES FAVORIS
+                        VOTRE ESPACE
                       </Text>
                     </View>
-                    <Text style={styles.sectionTitle}>Vos préférés</Text>
+
+                    <Text style={styles.sectionTitle}>Vos favoris</Text>
+                  </View>
+
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countBadgeText}>
+                      {favoriteActions.length}
+                    </Text>
                   </View>
                 </View>
 
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.recentRow}
+                  contentContainerStyle={styles.compactRow}
                 >
-                  {favActions.map((action) => (
-                    <RecentChip
+                  {favoriteActions.map((action) => (
+                    <CompactAction
                       key={action.id}
                       action={action}
-                      onTap={() => handleTap(action)}
+                      onPress={() => handleOpenAction(action)}
                     />
                   ))}
                 </ScrollView>
               </Reveal>
             )}
 
-            {/* ─── RECENT ─── */}
+            {/* ============================================================
+             * RECENT
+             * ============================================================ */}
+
             {recentActions.length > 0 && (
-              <Reveal delay={220}>
-                <View style={styles.sectionHeaderRow}>
+              <Reveal delay={200}>
+                <View style={styles.sectionHeader}>
                   <View>
                     <View style={styles.sectionEyebrowRow}>
-                      <Clock size={11} color="rgba(255,255,255,0.55)" />
+                      <Clock3 size={11} color="rgba(255,255,255,0.55)" />
+
                       <Text
                         style={[
                           styles.sectionEyebrow,
-                          { color: "rgba(255,255,255,0.5)" },
+                          {
+                            color: "rgba(255,255,255,0.52)",
+                          },
                         ]}
                       >
-                        RÉCENTS
+                        REPRENDRE
                       </Text>
                     </View>
-                    <Text style={styles.sectionTitle}>
-                      Reprendre là où vous étiez
-                    </Text>
+
+                    <Text style={styles.sectionTitle}>Là où vous étiez</Text>
                   </View>
-                  <Pressable onPress={() => setRecentIds([])} hitSlop={6}>
-                    <Text style={styles.clearLink}>Effacer</Text>
+
+                  <Pressable onPress={() => setRecentIds([])} hitSlop={8}>
+                    <Text style={styles.clearText}>Effacer</Text>
                   </Pressable>
                 </View>
 
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.recentRow}
+                  contentContainerStyle={styles.compactRow}
                 >
                   {recentActions.map((action) => (
-                    <RecentChip
+                    <CompactAction
                       key={action.id}
                       action={action}
-                      onTap={() => handleTap(action)}
+                      onPress={() => handleOpenAction(action)}
                     />
                   ))}
                 </ScrollView>
               </Reveal>
             )}
 
-            {/* ─── TOUTES LES ACTIONS ─── */}
-            <Reveal delay={280}>
-              <View style={[styles.sectionHeaderRow, { marginTop: 8 }]}>
+            {/* ============================================================
+             * DISCOVERY
+             * ============================================================ */}
+
+            <Reveal delay={250}>
+              <View style={[styles.sectionHeader, { marginTop: 8 }]}>
                 <View>
                   <View style={styles.sectionEyebrowRow}>
-                    <Sparkles size={11} color="#A78BFA" />
+                    <Compass size={11} color="#A78BFA" />
+
                     <Text style={[styles.sectionEyebrow, { color: "#C4B5FD" }]}>
-                      EXPLORER
+                      DÉCOUVRIR
                     </Text>
                   </View>
-                  <Text style={styles.sectionTitle}>Toutes les actions</Text>
+
+                  <Text style={styles.sectionTitle}>
+                    Explorer DébrouillePro
+                  </Text>
                 </View>
               </View>
             </Reveal>
 
-            <View style={styles.grid}>
-              {ALL_ACTIONS.map((action, i) => (
-                <Reveal
-                  key={action.id}
-                  delay={Math.min(320 + i * 15, 700)}
-                  style={styles.gridItem}
-                >
-                  <ActionTile
-                    action={action}
-                    isFav={favIds.includes(action.id)}
-                    onTap={() => handleTap(action)}
-                    onToggleFav={(event) => handleToggleFav(event, action)}
-                  />
-                </Reveal>
-              ))}
-            </View>
+            {/* ============================================================
+             * CATEGORY GROUPS
+             * ============================================================ */}
 
-            {/* ─── FOOTER ─── */}
-            <Reveal delay={700}>
-              <View style={styles.footer}>
+            {CATEGORIES.filter((category) => category !== "Tous").map(
+              (category, categoryIndex) => {
+                const categoryActions = ALL_ACTIONS.filter(
+                  (action) => action.category === category,
+                );
+
+                if (categoryActions.length === 0) {
+                  return null;
+                }
+
+                return (
+                  <Reveal
+                    key={category}
+                    delay={280 + Math.min(categoryIndex * 20, 180)}
+                  >
+                    <View style={styles.categorySection}>
+                      <View style={styles.categorySectionHeader}>
+                        <View>
+                          <Text style={styles.categorySectionTitle}>
+                            {category}
+                          </Text>
+
+                          <Text style={styles.categorySectionSubtitle}>
+                            {categoryActions.length} action
+                            {categoryActions.length === 1 ? "" : "s"} à explorer
+                          </Text>
+                        </View>
+
+                        <Pressable
+                          onPress={() => {
+                            setActiveCategory(category);
+                            setSearch("");
+                          }}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Voir toutes les actions de ${category}`}
+                        >
+                          <ArrowUpRight
+                            size={17}
+                            color="rgba(255,255,255,0.40)"
+                          />
+                        </Pressable>
+                      </View>
+
+                      <View style={styles.grid}>
+                        {categoryActions.map((action) => (
+                          <ActionTile
+                            key={action.id}
+                            action={action}
+                            favorite={favoriteIds.includes(action.id)}
+                            onPress={() => handleOpenAction(action)}
+                            onFavorite={(event) =>
+                              handleToggleFavorite(event, action)
+                            }
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  </Reveal>
+                );
+              },
+            )}
+
+            {/* ============================================================
+             * TRUST FOOTER
+             * ============================================================ */}
+
+            <Reveal delay={500}>
+              <View style={styles.trustFooter}>
                 <LinearGradient
-                  colors={["rgba(167,139,250,0.14)", "rgba(99,102,241,0.05)"]}
+                  colors={["rgba(139,92,246,0.16)", "rgba(59,130,246,0.06)"]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <View style={styles.footerRow}>
-                  <View style={styles.footerIconBox}>
-                    <Sparkles size={15} color="#A78BFA" />
-                  </View>
-                  <Text style={styles.footerText}>
-                    DébrouillePro rassemble vos services essentiels dans un seul
-                    espace.{" "}
-                    <Text style={styles.footerHighlight}>
-                      Ajoutez vos actions préférées pour les retrouver encore
-                      plus vite.
-                    </Text>
-                  </Text>
+
+                <View style={styles.trustFooterIcon}>
+                  <Shield size={17} color="#A78BFA" />
                 </View>
 
-                <View style={styles.footerStatusRow}>
-                  <View style={styles.footerDot} />
-                  <Text style={styles.footerStatusText}>
-                    CENTRE DE COMMANDES ACTIF
+                <View style={styles.trustFooterText}>
+                  <Text style={styles.trustFooterTitle}>
+                    Une expérience claire par conception
+                  </Text>
+
+                  <Text style={styles.trustFooterDescription}>
+                    Une action doit vous conduire vers quelque chose de
+                    compréhensible. Lorsqu'une fonctionnalité n'est pas encore
+                    prête, DébrouillePro préfère vous le dire plutôt que de
+                    simuler un résultat.
                   </Text>
                 </View>
               </View>
@@ -1713,583 +2080,827 @@ export default function ActionsPage({ onBack, onNavigate }: ActionsPageProps) {
 const TILE_SHADOW = Platform.select({
   ios: {
     shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.32,
+    shadowRadius: 18,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
   },
-  android: { elevation: 4 },
+  android: {
+    elevation: 5,
+  },
   default: {},
 });
 
 const styles = StyleSheet.create({
-  /* ── Root ─────────────────────────── */
   root: {
     flex: 1,
-    backgroundColor: "#05030E",
+    backgroundColor: "#03020A",
   },
+
   orb: {
     position: "absolute",
     borderRadius: 9999,
   },
 
-  /* ── Header ───────────────────────── */
+  /* ------------------------------------------------------------------------
+   * HEADER
+   * ---------------------------------------------------------------------- */
+
   header: {
     paddingHorizontal: 16,
-    paddingBottom: 14,
-    backgroundColor: "rgba(5,3,14,0.92)",
+    paddingBottom: 13,
+    backgroundColor: "rgba(3,2,10,0.94)",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
-    zIndex: 10,
+    borderBottomColor: "rgba(255,255,255,0.065)",
+    zIndex: 20,
   },
-  headerRow: {
+
+  headerTopRow: {
+    minHeight: 46,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
   },
-  backBtn: {
+
+  backButton: {
     width: 42,
     height: 42,
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.055)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
-  headerTitleWrap: {
+
+  pressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.94 }],
+  },
+
+  headerIdentity: {
     flex: 1,
     minWidth: 0,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#fff",
-    letterSpacing: -0.4,
-  },
-  headerSub: {
-    marginTop: 3,
-    fontSize: 10.5,
-    color: "rgba(255,255,255,0.42)",
-    fontWeight: "600",
-  },
-  headerIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#8B5CF6",
-        shadowOpacity: 0.55,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 6 },
-      },
-      android: { elevation: 8 },
-      default: {},
-    }),
+    marginLeft: 12,
   },
 
-  /* ── Search ───────────────────────── */
-  searchWrap: {
-    marginTop: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
-  },
-  searchInput: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 14,
-    padding: 0,
-  },
-  searchClear: {
-    width: 26,
-    height: 26,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-
-  /* ── Chips ────────────────────────── */
-  chipsRow: {
-    gap: 8,
-    paddingTop: 14,
-    paddingRight: 8,
-  },
-  chip: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  chipActive: {
-    borderColor: "rgba(249,115,22,0.55)",
-    backgroundColor: "rgba(249,115,22,0.14)",
-  },
-  chipIdle: {
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-  },
-  chipText: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.1,
-  },
-
-  /* ── Body ─────────────────────────── */
-  body: {
-    flex: 1,
-  },
-  bodyContent: {
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    gap: 24,
-  },
-
-  /* ── Result header ────────────────── */
-  resultHeader: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  resultEyebrow: {
-    fontSize: 9.5,
-    fontWeight: "900",
-    color: "rgba(255,255,255,0.35)",
-    letterSpacing: 2,
-  },
-  resultTitle: {
-    marginTop: 4,
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#fff",
-    letterSpacing: -0.4,
-  },
-  resetLink: {
-    fontSize: 11.5,
-    fontWeight: "800",
-    color: "#C4B5FD",
-  },
-
-  /* ── Sections ─────────────────────── */
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    marginBottom: 12,
-    paddingHorizontal: 2,
-  },
-  sectionEyebrowRow: {
+  headerEyebrowRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 4,
-  },
-  sectionEyebrow: {
-    fontSize: 9.5,
-    fontWeight: "900",
-    letterSpacing: 2,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "900",
-    color: "#fff",
-    letterSpacing: -0.4,
-  },
-  sectionCountBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-  },
-  sectionCountText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.5)",
-  },
-  clearLink: {
-    fontSize: 10.5,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.4)",
   },
 
-  /* ── Hero compact ─────────────────── */
-  hero: {
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.28)",
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#34D399",
+  },
+
+  headerEyebrow: {
+    fontSize: 8.5,
+    lineHeight: 11,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    color: "rgba(255,255,255,0.38)",
+  },
+
+  headerTitle: {
+    marginTop: 2,
+    fontSize: 20,
+    lineHeight: 23,
+    fontWeight: "900",
+    letterSpacing: -0.55,
+    color: "#FFFFFF",
+  },
+
+  headerBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
     overflow: "hidden",
-  },
-  heroOrbA: {
-    position: "absolute",
-    top: -60,
-    right: -60,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: "rgba(139,92,246,0.20)",
-  },
-  heroOrbB: {
-    position: "absolute",
-    bottom: -50,
-    left: -40,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "rgba(99,102,241,0.14)",
-  },
-  heroTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  heroIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
     ...Platform.select({
       ios: {
-        shadowColor: "#6366F1",
-        shadowOpacity: 0.55,
-        shadowRadius: 16,
-        shadowOffset: { width: 0, height: 8 },
+        shadowColor: "#7C3AED",
+        shadowOpacity: 0.4,
+        shadowRadius: 14,
+        shadowOffset: {
+          width: 0,
+          height: 6,
+        },
       },
-      android: { elevation: 8 },
+      android: {
+        elevation: 7,
+      },
       default: {},
     }),
   },
-  heroEyebrow: {
-    fontSize: 9,
-    fontWeight: "900",
-    color: "rgba(196,181,253,0.9)",
-    letterSpacing: 2,
-  },
-  heroTitle: {
-    marginTop: 4,
-    fontSize: 17,
-    fontWeight: "900",
-    color: "#fff",
-    letterSpacing: -0.4,
-  },
-  heroStatsRow: {
-    marginTop: 18,
+
+  searchContainer: {
+    marginTop: 14,
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
-  },
-  heroStat: {
-    flex: 1,
-    alignItems: "center",
-  },
-  heroStatValue: {
-    fontSize: 20,
-    fontWeight: "900",
-    color: "#C4B5FD",
-    letterSpacing: -0.5,
-  },
-  heroStatLabel: {
-    marginTop: 3,
-    fontSize: 8.5,
-    fontWeight: "900",
-    color: "rgba(255,255,255,0.35)",
-    letterSpacing: 1.4,
-  },
-  heroStatDivider: {
-    width: 1,
-    height: 26,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 14,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.095)",
   },
 
-  /* ── Featured carousel ────────────── */
-  featuredRow: {
-    gap: 12,
-    paddingRight: 8,
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 10,
+    paddingVertical: 0,
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
   },
-  featuredWrap: {
-    width: 190,
-  },
-  featuredCard: {
-    width: 190,
-    height: 170,
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 14,
-    overflow: "hidden",
-    ...TILE_SHADOW,
-  },
-  featuredHalo: {
-    position: "absolute",
-    top: -40,
-    right: -40,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    opacity: 0.25,
-  },
-  featuredFavBtn: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    zIndex: 2,
-    width: 26,
-    height: 26,
+
+  searchClear: {
+    width: 28,
+    height: 28,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(255,255,255,0.075)",
+  },
+
+  categoryRow: {
+    paddingTop: 11,
+    gap: 7,
+    paddingRight: 8,
+  },
+
+  categoryChip: {
+    minHeight: 31,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  categoryChipActive: {
+    backgroundColor: "rgba(139,92,246,0.16)",
+    borderColor: "rgba(167,139,250,0.34)",
+  },
+
+  categoryChipText: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.53)",
+  },
+
+  categoryChipTextActive: {
+    color: "#C4B5FD",
+  },
+
+  moreCategories: {
+    minWidth: 36,
+    height: 31,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.055)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
-  featuredIconBox: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
+
+  moreCategoriesText: {
+    color: "rgba(255,255,255,0.68)",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  /* ------------------------------------------------------------------------
+   * BODY
+   * ---------------------------------------------------------------------- */
+
+  body: {
+    flex: 1,
+  },
+
+  bodyContent: {
+    paddingHorizontal: 16,
+    paddingTop: 17,
+  },
+
+  /* ------------------------------------------------------------------------
+   * HERO
+   * ---------------------------------------------------------------------- */
+
+  hero: {
+    minHeight: 194,
+    overflow: "hidden",
+    borderRadius: 27,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.20)",
+    ...TILE_SHADOW,
+  },
+
+  heroGlowA: {
+    position: "absolute",
+    width: 190,
+    height: 190,
+    borderRadius: 999,
+    top: -100,
+    right: -55,
+    backgroundColor: "rgba(139,92,246,0.20)",
+  },
+
+  heroGlowB: {
+    position: "absolute",
+    width: 130,
+    height: 130,
+    borderRadius: 999,
+    bottom: -75,
+    left: -35,
+    backgroundColor: "rgba(59,130,246,0.13)",
+  },
+
+  heroTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+
+  heroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    ...Platform.select({
-      ios: {
-        shadowOpacity: 0.55,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 6 },
-      },
-      android: { elevation: 4 },
-      default: {},
-    }),
+    borderColor: "rgba(255,255,255,0.14)",
   },
-  featuredLabel: {
-    fontSize: 14,
+
+  heroText: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 13,
+  },
+
+  heroEyebrow: {
+    fontSize: 8.5,
     fontWeight: "900",
-    color: "#fff",
-    letterSpacing: -0.3,
+    letterSpacing: 1.5,
+    color: "#C4B5FD",
   },
-  featuredDesc: {
+
+  heroTitle: {
+    marginTop: 4,
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: "900",
+    letterSpacing: -0.8,
+    color: "#FFFFFF",
+  },
+
+  heroDescription: {
+    marginTop: 6,
+    maxWidth: 500,
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.56)",
+  },
+
+  heroTrust: {
+    marginTop: 20,
+    paddingTop: 13,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.075)",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 13,
+  },
+
+  heroTrustItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  heroTrustText: {
+    fontSize: 9.5,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.50)",
+  },
+
+  /* ------------------------------------------------------------------------
+   * SECTION
+   * ---------------------------------------------------------------------- */
+
+  sectionHeader: {
+    marginTop: 25,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+  },
+
+  sectionEyebrowRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  sectionEyebrow: {
+    fontSize: 8.5,
+    lineHeight: 11,
+    fontWeight: "900",
+    letterSpacing: 1.35,
+    color: "#A78BFA",
+  },
+
+  sectionTitle: {
     marginTop: 3,
-    fontSize: 11,
-    color: "rgba(255,255,255,0.55)",
-    fontWeight: "600",
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: "900",
+    letterSpacing: -0.45,
+    color: "#FFFFFF",
   },
-  featuredBottomRow: {
-    marginTop: 10,
+
+  countBadge: {
+    minWidth: 28,
+    height: 25,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.22)",
+  },
+
+  countBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#C4B5FD",
+  },
+
+  clearText: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.40)",
+  },
+
+  /* ------------------------------------------------------------------------
+   * FEATURED
+   * ---------------------------------------------------------------------- */
+
+  featuredRow: {
+    gap: 10,
+    paddingRight: 10,
+  },
+
+  featuredWrap: {
+    width: 245,
+  },
+
+  featuredCard: {
+    minHeight: 174,
+    overflow: "hidden",
+    borderRadius: 23,
+    padding: 15,
+    borderWidth: 1,
+    ...TILE_SHADOW,
+  },
+
+  featuredGlow: {
+    position: "absolute",
+    width: 100,
+    height: 100,
+    borderRadius: 999,
+    top: -55,
+    right: -35,
+    opacity: 0.14,
+  },
+
+  featuredFavorite: {
+    position: "absolute",
+    top: 13,
+    right: 13,
+    zIndex: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  featuredContent: {
+    flex: 1,
+    justifyContent: "flex-end",
+    marginTop: 15,
+  },
+
+  featuredTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  featuredTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: -0.25,
+    color: "#FFFFFF",
+  },
+
+  featuredDescription: {
+    marginTop: 5,
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.48)",
+  },
+
+  featuredMeta: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+  },
+
+  featuredMetaText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.55)",
+  },
+
+  /* ------------------------------------------------------------------------
+   * COMPACT
+   * ---------------------------------------------------------------------- */
+
+  compactRow: {
+    gap: 8,
+    paddingRight: 10,
+  },
+
+  compactAction: {
+    minHeight: 43,
+    maxWidth: 170,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+  },
+
+  compactIcon: {
+    width: 29,
+    height: 29,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  compactLabel: {
+    maxWidth: 110,
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.72)",
+  },
+
+  /* ------------------------------------------------------------------------
+   * CATEGORY SECTION
+   * ---------------------------------------------------------------------- */
+
+  categorySection: {
+    marginTop: 18,
+  },
+
+  categorySectionHeader: {
+    marginBottom: 10,
+    paddingHorizontal: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  featuredBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  featuredBadgeText: {
-    fontSize: 9,
+
+  categorySectionTitle: {
+    fontSize: 14,
     fontWeight: "900",
-    letterSpacing: 0.3,
+    color: "#FFFFFF",
   },
 
-  /* ── Recent chips ─────────────────── */
-  recentRow: {
-    gap: 10,
-    paddingRight: 8,
-  },
-  recentChip: {
-    minWidth: 120,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: "center",
-    gap: 8,
-  },
-  recentIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recentLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.85)",
+  categorySectionSubtitle: {
+    marginTop: 2,
+    fontSize: 9.5,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.36)",
   },
 
-  /* ── Grid 2-col ───────────────────── */
+  /* ------------------------------------------------------------------------
+   * GRID
+   * ---------------------------------------------------------------------- */
+
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    rowGap: 10,
-  },
-  gridItem: {
-    width: "48.5%",
+    rowGap: 9,
   },
 
-  /* ── Action Tile ──────────────────── */
+  gridItem: {
+    width: "100%",
+  },
+
   tileWrap: {
     width: "100%",
   },
+
   tile: {
-    minHeight: 132,
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 12,
-    backgroundColor: "rgba(255,255,255,0.03)",
+    minHeight: 102,
+    position: "relative",
     overflow: "hidden",
-    ...TILE_SHADOW,
+    borderRadius: 19,
+    padding: 12,
+    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    flexDirection: "row",
+    alignItems: "center",
   },
-  tileHalo: {
+
+  tileAccent: {
     position: "absolute",
-    top: -30,
-    right: -30,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    opacity: 0.22,
+    width: 5,
+    height: 42,
+    left: 0,
+    top: 30,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    opacity: 0.72,
   },
-  tileFavBtn: {
+
+  tileFavorite: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    zIndex: 2,
-    width: 24,
-    height: 24,
+    right: 10,
+    top: 9,
+    width: 27,
+    height: 27,
     borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.35)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(0,0,0,0.10)",
   },
-  tileIconBox: {
+
+  actionIcon: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  tileText: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 12,
+    paddingRight: 27,
+  },
+
+  tileTitle: {
+    fontSize: 13.5,
+    lineHeight: 17,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  tileDescription: {
+    marginTop: 4,
+    fontSize: 9.8,
+    lineHeight: 14,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.42)",
+  },
+
+  tileArrow: {
+    position: "absolute",
+    right: 10,
+    bottom: 9,
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  comingSoonBadge: {
+    marginTop: 7,
+    alignSelf: "flex-start",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(251,191,36,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.15)",
+  },
+
+  comingSoonText: {
+    fontSize: 7.5,
+    fontWeight: "900",
+    color: "#FBBF24",
+    letterSpacing: 0.4,
+  },
+
+  /* ------------------------------------------------------------------------
+   * SEARCH
+   * ---------------------------------------------------------------------- */
+
+  searchResultHeader: {
+    marginTop: 4,
+    marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+  },
+
+  searchResultTitle: {
+    marginTop: 3,
+    fontSize: 21,
+    lineHeight: 25,
+    fontWeight: "900",
+    letterSpacing: -0.6,
+    color: "#FFFFFF",
+  },
+
+  resetText: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    color: "#A78BFA",
+  },
+
+  smartSuggestion: {
+    minHeight: 70,
+    overflow: "hidden",
+    marginBottom: 15,
+    padding: 13,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.20)",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  smartSuggestionIcon: {
     width: 40,
     height: 40,
-    borderRadius: 13,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.15)",
     borderWidth: 1,
-  },
-  tileTextBlock: {
-    marginTop: 10,
-    minWidth: 0,
-  },
-  tileLabel: {
-    fontSize: 12.5,
-    fontWeight: "900",
-    color: "#fff",
-    letterSpacing: -0.1,
-  },
-  tileDesc: {
-    marginTop: 3,
-    fontSize: 10,
-    lineHeight: 13,
-    color: "rgba(255,255,255,0.42)",
-    fontWeight: "600",
-  },
-  tileChevron: {
-    position: "absolute",
-    bottom: 10,
-    right: 10,
+    borderColor: "rgba(167,139,250,0.20)",
   },
 
-  /* ── Empty ────────────────────────── */
-  emptyWrap: {
-    minHeight: 260,
-    paddingVertical: 60,
+  smartSuggestionText: {
+    flex: 1,
+    marginLeft: 11,
+  },
+
+  smartSuggestionTitle: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#DDD6FE",
+  },
+
+  smartSuggestionDescription: {
+    marginTop: 3,
+    fontSize: 9.5,
+    lineHeight: 14,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.43)",
+  },
+
+  /* ------------------------------------------------------------------------
+   * EMPTY
+   * ---------------------------------------------------------------------- */
+
+  emptyState: {
+    minHeight: 320,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    backgroundColor: "rgba(255,255,255,0.02)",
+    paddingHorizontal: 25,
   },
+
   emptyIcon: {
-    width: 62,
-    height: 62,
-    borderRadius: 22,
+    width: 66,
+    height: 66,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
+
   emptyTitle: {
     marginTop: 16,
-    fontSize: 14,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.55)",
-  },
-  emptySub: {
-    marginTop: 4,
-    fontSize: 11,
-    color: "rgba(255,255,255,0.3)",
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    textAlign: "center",
   },
 
-  /* ── Footer ───────────────────────── */
-  footer: {
-    marginTop: 6,
-    padding: 16,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.2)",
-    overflow: "hidden",
+  emptyDescription: {
+    marginTop: 7,
+    maxWidth: 310,
+    fontSize: 10.5,
+    lineHeight: 16,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.40)",
+    textAlign: "center",
   },
-  footerRow: {
+
+  emptyButton: {
+    marginTop: 18,
+    minHeight: 42,
+    paddingHorizontal: 15,
+    borderRadius: 14,
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#5B21B6",
+    borderWidth: 1,
+    borderColor: "rgba(196,181,253,0.22)",
   },
-  footerIconBox: {
+
+  emptyButtonText: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+
+  /* ------------------------------------------------------------------------
+   * FOOTER
+   * ---------------------------------------------------------------------- */
+
+  trustFooter: {
+    overflow: "hidden",
+    marginTop: 25,
+    padding: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.15)",
+    flexDirection: "row",
+  },
+
+  trustFooterIcon: {
     width: 38,
     height: 38,
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(167,139,250,0.15)",
+    backgroundColor: "rgba(139,92,246,0.12)",
     borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.25)",
+    borderColor: "rgba(167,139,250,0.18)",
   },
-  footerText: {
+
+  trustFooterText: {
     flex: 1,
+    marginLeft: 11,
+  },
+
+  trustFooterTitle: {
     fontSize: 11.5,
-    lineHeight: 17,
-    color: "rgba(255,255,255,0.5)",
-    fontWeight: "600",
-  },
-  footerHighlight: {
-    color: "rgba(255,255,255,0.85)",
-  },
-  footerStatusRow: {
-    marginTop: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  footerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#34D399",
-  },
-  footerStatusText: {
-    fontSize: 9,
     fontWeight: "900",
-    color: "rgba(255,255,255,0.3)",
-    letterSpacing: 1.8,
+    color: "#DDD6FE",
+  },
+
+  trustFooterDescription: {
+    marginTop: 4,
+    fontSize: 9.5,
+    lineHeight: 15,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.39)",
   },
 });

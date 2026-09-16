@@ -6,40 +6,55 @@ import type { QueryCtx, MutationCtx } from "./_generated/server";
 
 async function requireUser(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity)
+
+  if (!identity) {
     throw new ConvexError({
       code: "UNAUTHENTICATED",
       message: "Connexion requise",
     });
+  }
+
   const user = await ctx.db
     .query("users")
     .withIndex("by_token", (q) =>
       q.eq("tokenIdentifier", identity.tokenIdentifier),
     )
     .unique();
-  if (!user)
+
+  if (!user) {
     throw new ConvexError({
       code: "NOT_FOUND",
       message: "Utilisateur introuvable",
     });
+  }
+
   return user;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LEGAL CASES (Juridique / Justice)
 // ─────────────────────────────────────────────────────────────────────────────
+
 export const getMyCases = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+
+    if (!identity) {
+      return [];
+    }
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (!user) return [];
+
+    if (!user) {
+      return [];
+    }
+
     return ctx.db
       .query("legalCases")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -62,8 +77,10 @@ export const createLegalCase = mutation({
     ),
     documents: v.array(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     return ctx.db.insert("legalCases", {
       ...args,
       userId: user._id,
@@ -84,12 +101,20 @@ export const updateLegalCaseStatus = mutation({
     ),
     resolvedAt: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const legalCase = await ctx.db.get(args.id);
-    if (!legalCase || legalCase.userId !== user._id)
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
+
+    if (!legalCase || legalCase.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Non autorisé",
+      });
+    }
+
     const { id, ...updates } = args;
+
     await ctx.db.patch(id, updates);
   },
 });
@@ -97,6 +122,7 @@ export const updateLegalCaseStatus = mutation({
 // ─────────────────────────────────────────────────────────────────────────────
 // EMERGENCY ALERTS (SOS)
 // ─────────────────────────────────────────────────────────────────────────────
+
 export const createEmergencyAlert = mutation({
   args: {
     type: v.union(
@@ -112,11 +138,33 @@ export const createEmergencyAlert = mutation({
     longitude: v.optional(v.number()),
     address: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
+    const now = Date.now();
+
+    // Le schéma impose une date d'expiration.
+    // La durée de vie du SOS est de 15 minutes.
+    const expiresAt = now + 15 * 60 * 1000;
+
     return ctx.db.insert("emergencyAlerts", {
-      ...args,
       userId: user._id,
+
+      // Le schéma canonique utilise "message" et ne possède
+      // pas de champs séparés "type", "description" ou "address".
+      // On conserve donc l'information fonctionnelle dans le message.
+      message: `[${args.type}] ${args.description}${
+        args.address ? ` — ${args.address}` : ""
+      }`,
+
+      latitude: args.latitude,
+      longitude: args.longitude,
+
+      createdAt: now,
+      updatedAt: now,
+      expiresAt,
+
       status: "active",
     });
   },
@@ -124,38 +172,82 @@ export const createEmergencyAlert = mutation({
 
 export const getActiveAlerts = query({
   args: {},
+
   handler: async (ctx) => {
+    const now = Date.now();
+
     return ctx.db
       .query("emergencyAlerts")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .withIndex("by_status_expiresAt", (q) =>
+        q.eq("status", "active").gt("expiresAt", now),
+      )
       .order("desc")
       .take(50);
   },
 });
 
 export const resolveAlert = mutation({
-  args: { id: v.id("emergencyAlerts") },
+  args: {
+    id: v.id("emergencyAlerts"),
+  },
+
   handler: async (ctx, args) => {
-    await requireUser(ctx);
+    const user = await requireUser(ctx);
+
+    const alert = await ctx.db.get(args.id);
+
+    if (!alert) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Alerte introuvable",
+      });
+    }
+
+    if (alert.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Vous ne pouvez pas résoudre cette alerte",
+      });
+    }
+
+    if (alert.status !== "active") {
+      throw new ConvexError({
+        code: "INVALID_STATE",
+        message: "Cette alerte n'est plus active",
+      });
+    }
+
+    const now = Date.now();
+
     await ctx.db.patch(args.id, {
       status: "resolved",
-      resolvedAt: new Date().toISOString(),
+      resolvedAt: now,
+      updatedAt: now,
     });
   },
 });
 
 export const getMyAlerts = query({
   args: {},
+
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+
+    if (!identity) {
+      return [];
+    }
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (!user) return [];
+
+    if (!user) {
+      return [];
+    }
+
     return ctx.db
       .query("emergencyAlerts")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -167,11 +259,13 @@ export const getMyAlerts = query({
 // ─────────────────────────────────────────────────────────────────────────────
 // URBAN PROJECTS (Urbanisme / Aménagement)
 // ─────────────────────────────────────────────────────────────────────────────
+
 export const listUrbanProjects = query({
   args: {
     city: v.optional(v.string()),
     paginationOpts: paginationOptsValidator,
   },
+
   handler: async (ctx, args) => {
     if (args.city) {
       return ctx.db
@@ -179,6 +273,7 @@ export const listUrbanProjects = query({
         .withIndex("by_city", (q) => q.eq("city", args.city!))
         .paginate(args.paginationOpts);
     }
+
     return ctx.db
       .query("urbanProjects")
       .order("desc")
@@ -209,8 +304,10 @@ export const createUrbanProject = mutation({
     endDate: v.optional(v.string()),
     images: v.array(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     return ctx.db.insert("urbanProjects", {
       ...args,
       authorId: user._id,
@@ -222,30 +319,50 @@ export const createUrbanProject = mutation({
 });
 
 export const voteUrbanProject = mutation({
-  args: { id: v.id("urbanProjects") },
+  args: {
+    id: v.id("urbanProjects"),
+  },
+
   handler: async (ctx, args) => {
     await requireUser(ctx);
+
     const project = await ctx.db.get(args.id);
-    if (project)
-      await ctx.db.patch(args.id, { likeCount: project.likeCount + 1 });
+
+    if (project) {
+      await ctx.db.patch(args.id, {
+        likeCount: project.likeCount + 1,
+      });
+    }
   },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WALLET & TRANSACTIONS
 // ─────────────────────────────────────────────────────────────────────────────
+
 export const getMyTransactions = query({
-  args: { limit: v.optional(v.number()) },
+  args: {
+    limit: v.optional(v.number()),
+  },
+
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+
+    if (!identity) {
+      return [];
+    }
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (!user) return [];
+
+    if (!user) {
+      return [];
+    }
+
     return ctx.db
       .query("walletTransactions")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -270,8 +387,10 @@ export const createTransaction = mutation({
     referenceId: v.optional(v.string()),
     counterpartId: v.optional(v.id("users")),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     return ctx.db.insert("walletTransactions", {
       ...args,
       userId: user._id,
@@ -283,27 +402,46 @@ export const createTransaction = mutation({
 
 export const getWalletSummary = query({
   args: {},
+
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+
+    if (!identity) {
+      return null;
+    }
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (!user) return null;
+
+    if (!user) {
+      return null;
+    }
+
     const txns = await ctx.db
       .query("walletTransactions")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
-    const completed = txns.filter((t) => t.status === "completed");
+
+    const completed = txns.filter(
+      (transaction) => transaction.status === "completed",
+    );
+
     const income = completed
-      .filter((t) => ["deposit", "refund", "reward"].includes(t.type))
-      .reduce((s, t) => s + t.amount, 0);
+      .filter((transaction) =>
+        ["deposit", "refund", "reward"].includes(transaction.type),
+      )
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
+
     const expenses = completed
-      .filter((t) => ["withdrawal", "payment", "transfer"].includes(t.type))
-      .reduce((s, t) => s + t.amount, 0);
+      .filter((transaction) =>
+        ["withdrawal", "payment", "transfer"].includes(transaction.type),
+      )
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
+
     return {
       income,
       expenses,
@@ -316,18 +454,28 @@ export const getWalletSummary = query({
 // ─────────────────────────────────────────────────────────────────────────────
 // BUDGETS & EXPENSES
 // ─────────────────────────────────────────────────────────────────────────────
+
 export const getMyBudgets = query({
   args: {},
+
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+
+    if (!identity) {
+      return [];
+    }
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (!user) return [];
+
+    if (!user) {
+      return [];
+    }
+
     return ctx.db
       .query("budgets")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -355,9 +503,14 @@ export const createBudget = mutation({
     currency: v.string(),
     totalAllocated: v.number(),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    return ctx.db.insert("budgets", { ...args, userId: user._id });
+
+    return ctx.db.insert("budgets", {
+      ...args,
+      userId: user._id,
+    });
   },
 });
 
@@ -372,22 +525,59 @@ export const addExpense = mutation({
     receiptUrl: v.optional(v.string()),
     tags: v.array(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
+    if (args.amount <= 0) {
+      throw new ConvexError({
+        code: "INVALID_AMOUNT",
+        message: "Le montant doit être supérieur à zéro",
+      });
+    }
+
+    if (args.budgetId) {
+      const budget = await ctx.db.get(args.budgetId);
+
+      if (!budget) {
+        throw new ConvexError({
+          code: "NOT_FOUND",
+          message: "Budget introuvable",
+        });
+      }
+
+      if (budget.userId !== user._id) {
+        throw new ConvexError({
+          code: "FORBIDDEN",
+          message: "Budget non autorisé",
+        });
+      }
+    }
+
     const expenseId = await ctx.db.insert("expenses", {
       ...args,
       userId: user._id,
     });
-    // Update budget category spent amount
+
     if (args.budgetId) {
       const budget = await ctx.db.get(args.budgetId);
+
       if (budget) {
-        const updatedCategories = budget.categories.map((c) =>
-          c.name === args.category ? { ...c, spent: c.spent + args.amount } : c,
+        const updatedCategories = budget.categories.map((category) =>
+          category.name === args.category
+            ? {
+                ...category,
+                spent: category.spent + args.amount,
+              }
+            : category,
         );
-        await ctx.db.patch(args.budgetId, { categories: updatedCategories });
+
+        await ctx.db.patch(args.budgetId, {
+          categories: updatedCategories,
+        });
       }
     }
+
     return expenseId;
   },
 });
@@ -397,46 +587,79 @@ export const getMyExpenses = query({
     budgetId: v.optional(v.id("budgets")),
     limit: v.optional(v.number()),
   },
+
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+
+    if (!identity) {
+      return [];
+    }
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (!user) return [];
+
+    if (!user) {
+      return [];
+    }
+
+    const limit = Math.min(Math.max(args.limit ?? 50, 1), 100);
+
     if (args.budgetId) {
+      const budget = await ctx.db.get(args.budgetId);
+
+      if (!budget || budget.userId !== user._id) {
+        throw new ConvexError({
+          code: "FORBIDDEN",
+          message: "Budget non autorisé",
+        });
+      }
+
       return ctx.db
         .query("expenses")
         .withIndex("by_budget", (q) => q.eq("budgetId", args.budgetId))
         .order("desc")
-        .take(args.limit ?? 50);
+        .take(limit);
     }
+
     return ctx.db
       .query("expenses")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
-      .take(args.limit ?? 50);
+      .take(limit);
   },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // USER DOCUMENTS
 // ─────────────────────────────────────────────────────────────────────────────
+
 export const getMyDocuments = query({
-  args: { category: v.optional(v.string()) },
+  args: {
+    category: v.optional(v.string()),
+  },
+
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+
+    if (!identity) {
+      return [];
+    }
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (!user) return [];
+
+    if (!user) {
+      return [];
+    }
+
     if (args.category) {
       return ctx.db
         .query("userDocuments")
@@ -456,6 +679,7 @@ export const getMyDocuments = query({
         .filter((q) => q.eq(q.field("userId"), user._id))
         .collect();
     }
+
     return ctx.db
       .query("userDocuments")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -482,19 +706,33 @@ export const addDocument = mutation({
     isPrivate: v.boolean(),
     expiresAt: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    return ctx.db.insert("userDocuments", { ...args, userId: user._id });
+
+    return ctx.db.insert("userDocuments", {
+      ...args,
+      userId: user._id,
+    });
   },
 });
 
 export const deleteDocument = mutation({
-  args: { id: v.id("userDocuments") },
+  args: {
+    id: v.id("userDocuments"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const doc = await ctx.db.get(args.id);
-    if (!doc || doc.userId !== user._id)
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
+
+    if (!doc || doc.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Non autorisé",
+      });
+    }
+
     await ctx.db.delete(args.id);
   },
 });

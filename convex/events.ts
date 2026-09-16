@@ -1,66 +1,201 @@
 // convex/events.ts
+
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel.d.ts";
+import type { Id } from "./_generated/dataModel";
 
-// ── Auth helper ────────────────────────────────────────────────────────────────
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type EventStatus = "upcoming" | "ongoing" | "past" | "cancelled";
+
+type EventCategory =
+  | "culturel"
+  | "sportif"
+  | "religieux"
+  | "professionnel"
+  | "communautaire"
+  | "formation"
+  | "festival"
+  | "autre";
+
+type RSVPStatus = "attending" | "interested" | "not_going";
+
+type EventCommentView = {
+  _id: Id<"eventComments">;
+  _creationTime: number;
+  eventId: Id<"events">;
+  authorId: Id<"users">;
+  text: string;
+  parentId?: Id<"eventComments">;
+  likeCount: number;
+  authorName: string;
+  authorAvatar?: string;
+  likedByMe: boolean;
+  isMine: boolean;
+  replies: EventCommentView[];
+};
+
+// ============================================================================
+// AUTH
+// ============================================================================
 
 async function requireUser(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity)
+
+  if (!identity) {
     throw new ConvexError({
       message: "Non authentifié",
       code: "UNAUTHENTICATED",
     });
+  }
+
   const user = await ctx.db
     .query("users")
     .withIndex("by_token", (q) =>
       q.eq("tokenIdentifier", identity.tokenIdentifier),
     )
     .unique();
-  if (!user)
+
+  if (!user) {
     throw new ConvexError({
       message: "Utilisateur introuvable",
       code: "NOT_FOUND",
     });
+  }
+
   return user;
 }
 
 async function getCurrentUser(ctx: QueryCtx) {
-  try {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier),
-      )
-      .unique();
-    return user;
-  } catch {
+  const identity = await ctx.auth.getUserIdentity();
+
+  if (!identity) {
     return null;
+  }
+
+  return await ctx.db
+    .query("users")
+    .withIndex("by_token", (q) =>
+      q.eq("tokenIdentifier", identity.tokenIdentifier),
+    )
+    .unique();
+}
+
+// ============================================================================
+// VALIDATION
+// ============================================================================
+
+function assertNonEmpty(value: string, field: string): string {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    throw new ConvexError({
+      message: `${field} est obligatoire`,
+      code: "INVALID_ARGUMENT",
+    });
+  }
+
+  return normalized;
+}
+
+function validateDates(startDate: string, endDate?: string) {
+  const start = new Date(startDate);
+
+  if (Number.isNaN(start.getTime())) {
+    throw new ConvexError({
+      message: "Date de début invalide",
+      code: "INVALID_ARGUMENT",
+    });
+  }
+
+  if (endDate !== undefined) {
+    const end = new Date(endDate);
+
+    if (Number.isNaN(end.getTime())) {
+      throw new ConvexError({
+        message: "Date de fin invalide",
+        code: "INVALID_ARGUMENT",
+      });
+    }
+
+    if (end.getTime() < start.getTime()) {
+      throw new ConvexError({
+        message: "La date de fin doit être postérieure à la date de début",
+        code: "INVALID_ARGUMENT",
+      });
+    }
   }
 }
 
-// ── Helpers de résolution d'images ────────────────────────────────────────────
+function computeEventStatus(startDate: string, endDate?: string): EventStatus {
+  const now = Date.now();
+  const start = new Date(startDate).getTime();
+  const end = endDate ? new Date(endDate).getTime() : start;
 
-async function resolveImage(
+  if (Number.isNaN(start)) {
+    return "upcoming";
+  }
+
+  if (now < start) {
+    return "upcoming";
+  }
+
+  if (now <= end) {
+    return "ongoing";
+  }
+
+  return "past";
+}
+
+// ============================================================================
+// STORAGE / IMAGES
+// ============================================================================
+
+async function resolveStorageAsset(
   ctx: QueryCtx,
-  file: string | null | undefined,
-): Promise<string | null> {
-  if (!file) return null;
-  if (file.startsWith("http://") || file.startsWith("https://")) return file;
-  if (file.startsWith("data:image")) return file;
+  value: string | undefined,
+): Promise<string | undefined> {
+  if (!value) {
+    return undefined;
+  }
+
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:image")
+  ) {
+    return value;
+  }
+
   try {
-    return await ctx.storage.getUrl(file as Id<"_storage">);
+    return (await ctx.storage.getUrl(value as Id<"_storage">)) ?? undefined;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
-// ── LIST events (paginated, filterable) ─────────────────────────────────────
+async function resolveAssetList(
+  ctx: QueryCtx,
+  values: string[] | undefined,
+): Promise<string[]> {
+  if (!values || values.length === 0) {
+    return [];
+  }
+
+  const resolved = await Promise.all(
+    values.map((value) => resolveStorageAsset(ctx, value)),
+  );
+
+  return resolved.filter((value): value is string => value !== undefined);
+}
+
+// ============================================================================
+// LIST EVENTS
+// ============================================================================
 
 export const list = query({
   args: {
@@ -75,53 +210,50 @@ export const list = query({
     category: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<
-    Array<{
-      _id: Id<"events">;
-      title: string;
-      description: string;
-      category: string;
-      startDate: string;
-      endDate?: string;
-      location: string;
-      coverImage?: string;
-      isFree: boolean;
-      price?: string;
-      tags: string[];
-      status: string;
-      authorName: string;
-      authorAvatar?: string;
-      attendingCount: number;
-      interestedCount: number;
-    }>
-  > => {
-    const limit = args.limit ?? 50;
-    let rows = await ctx.db
+
+  handler: async (ctx, args) => {
+    const requestedLimit = args.limit ?? 50;
+    const limit = Math.min(Math.max(requestedLimit, 1), 100);
+
+    let events = await ctx.db
       .query("events")
       .withIndex("by_startDate")
       .order("asc")
-      .take(200);
+      .take(100);
 
-    if (args.status) rows = rows.filter((e) => e.status === args.status);
-    if (args.category) rows = rows.filter((e) => e.category === args.category);
+    if (args.status) {
+      events = events.filter((event) => event.status === args.status);
+    }
 
-    rows = rows.slice(0, limit);
+    if (args.category) {
+      events = events.filter((event) => event.category === args.category);
+    }
 
-    const resolvedRows = await Promise.all(
-      rows.map(async (event) => {
+    events = events.slice(0, limit);
+
+    return await Promise.all(
+      events.map(async (event) => {
         const author = await ctx.db.get(event.authorId);
+
         const rsvps = await ctx.db
           .query("eventRsvps")
           .withIndex("by_event", (q) => q.eq("eventId", event._id))
-          .collect();
+          .take(500);
 
-        let coverImage = event.coverImage;
-        if (coverImage) {
-          coverImage = (await resolveImage(ctx, coverImage)) ?? coverImage;
-        }
+        const coverImage = await resolveStorageAsset(ctx, event.coverImage);
+
+        const attendingCount = rsvps.filter(
+          (rsvp) => rsvp.status === "attending",
+        ).length;
+
+        const interestedCount = rsvps.filter(
+          (rsvp) => rsvp.status === "interested",
+        ).length;
+
+        const likes = await ctx.db
+          .query("eventLikes")
+          .withIndex("by_event", (q) => q.eq("eventId", event._id))
+          .take(500);
 
         return {
           _id: event._id,
@@ -131,6 +263,7 @@ export const list = query({
           startDate: event.startDate,
           endDate: event.endDate,
           location: event.location,
+          address: event.address,
           coverImage,
           isFree: event.isFree,
           price: event.price,
@@ -138,24 +271,33 @@ export const list = query({
           status: event.status,
           authorName: author?.name ?? "Anonyme",
           authorAvatar: author?.avatar,
-          attendingCount: rsvps.filter((r) => r.status === "attending").length,
-          interestedCount: rsvps.filter((r) => r.status === "interested")
-            .length,
+          attendingCount,
+          interestedCount,
+          likeCount: likes.length,
+          viewCount: event.viewCount ?? 0,
+          commentCount: event.commentCount ?? 0,
+          shareCount: event.shareCount ?? 0,
         };
       }),
     );
-
-    return resolvedRows;
   },
 });
 
-// ── GET single event (enriched) ──────────────────────────────────────────────
+// ============================================================================
+// GET EVENT
+// ============================================================================
 
 export const get = query({
-  args: { eventId: v.id("events") },
+  args: {
+    eventId: v.id("events"),
+  },
+
   handler: async (ctx, args) => {
     const event = await ctx.db.get(args.eventId);
-    if (!event) return null;
+
+    if (!event) {
+      return null;
+    }
 
     const currentUser = await getCurrentUser(ctx);
     const author = await ctx.db.get(event.authorId);
@@ -163,41 +305,42 @@ export const get = query({
     const rsvps = await ctx.db
       .query("eventRsvps")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
+      .take(500);
 
-    // Get current user's RSVP status
-    let isAttending = false;
-    let isInterested = false;
-    let myRsvp: "attending" | "interested" | "not_going" | null = null;
+    let myRsvp: RSVPStatus | null = null;
+
     if (currentUser) {
-      const myRsvpDoc = rsvps.find((r) => r.userId === currentUser._id);
-      if (myRsvpDoc) {
-        myRsvp = myRsvpDoc.status as any;
-        isAttending = myRsvp === "attending";
-        isInterested = myRsvp === "interested";
-      }
+      const existingRsvp = await ctx.db
+        .query("eventRsvps")
+        .withIndex("by_event_and_user", (q) =>
+          q.eq("eventId", args.eventId).eq("userId", currentUser._id),
+        )
+        .unique();
+
+      myRsvp = existingRsvp?.status ?? null;
     }
 
-    // Get attendees (max 20)
     const attendingRsvps = rsvps
-      .filter((r) => r.status === "attending")
+      .filter((rsvp) => rsvp.status === "attending")
       .slice(0, 20);
+
     const attendees = await Promise.all(
-      attendingRsvps.map(async (r) => {
-        const u = await ctx.db.get(r.userId);
+      attendingRsvps.map(async (rsvp) => {
+        const user = await ctx.db.get(rsvp.userId);
+
         return {
-          userId: u?._id,
-          name: u?.name ?? "Anonyme",
-          avatar: u?.avatar,
-          status: r.status,
-          joinedAt: r._creationTime,
+          userId: user?._id,
+          name: user?.name ?? "Anonyme",
+          avatar: user?.avatar,
+          status: rsvp.status,
+          joinedAt: rsvp._creationTime,
         };
       }),
     );
 
-    // Like / bookmark status
     let likedByMe = false;
     let bookmarkedByMe = false;
+
     if (currentUser) {
       const like = await ctx.db
         .query("eventLikes")
@@ -205,6 +348,7 @@ export const get = query({
           q.eq("userId", currentUser._id).eq("eventId", args.eventId),
         )
         .unique();
+
       likedByMe = like !== null;
 
       const bookmark = await ctx.db
@@ -213,139 +357,181 @@ export const get = query({
           q.eq("userId", currentUser._id).eq("eventId", args.eventId),
         )
         .unique();
+
       bookmarkedByMe = bookmark !== null;
     }
 
-    // Counts
-    const attendingCount = rsvps.filter((r) => r.status === "attending").length;
-    const interestedCount = rsvps.filter(
-      (r) => r.status === "interested",
-    ).length;
-    const notGoingCount = rsvps.filter((r) => r.status === "not_going").length;
+    const likes = await ctx.db
+      .query("eventLikes")
+      .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
+      .take(500);
 
-    // Comments count
     const comments = await ctx.db
       .query("eventComments")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
-    const commentCount = comments.length;
+      .take(500);
 
-    // ✅ RÉSOLUTION DES IMAGES ET VIDÉOS
-    // Résoudre coverImage
-    let coverImage = event.coverImage;
-    if (coverImage) {
-      coverImage = (await resolveImage(ctx, coverImage)) ?? coverImage;
-    }
+    const coverImage = await resolveStorageAsset(ctx, event.coverImage);
 
-    // Résoudre toutes les images de la galerie
-    const gallery = await Promise.all(
-      (event.gallery ?? []).map(async (img: string) => {
-        const resolved = await resolveImage(ctx, img);
-        return resolved ?? img;
-      }),
-    );
+    const gallery = await resolveAssetList(ctx, event.gallery);
 
-    // Résoudre toutes les vidéos
-    const videos = await Promise.all(
-      (event.videos ?? []).map(async (video: string) => {
-        const resolved = await resolveImage(ctx, video);
-        return resolved ?? video;
-      }),
-    );
+    const videos = await resolveAssetList(ctx, event.videos);
+
+    const attendingCount = rsvps.filter(
+      (rsvp) => rsvp.status === "attending",
+    ).length;
+
+    const interestedCount = rsvps.filter(
+      (rsvp) => rsvp.status === "interested",
+    ).length;
+
+    const notGoingCount = rsvps.filter(
+      (rsvp) => rsvp.status === "not_going",
+    ).length;
 
     return {
       ...event,
+
       coverImage,
       gallery,
       videos,
+
       authorName: author?.name ?? "Anonyme",
       authorAvatar: author?.avatar,
+
       attendingCount,
       interestedCount,
       notGoingCount,
-      commentCount,
-      isAttending,
-      isInterested,
+
+      likeCount: likes.length,
+      commentCount: comments.length,
+
+      isAttending: myRsvp === "attending",
+      isInterested: myRsvp === "interested",
+
       isMine: currentUser?._id === event.authorId,
+
       likedByMe,
       bookmarkedByMe,
+
       attendees,
       myRsvp,
     };
   },
 });
 
-// ── GET my RSVP for an event ──────────────────────────────────────────────────
+// ============================================================================
+// MY RSVP
+// ============================================================================
 
 export const getMyRsvp = query({
-  args: { eventId: v.id("events") },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<"attending" | "interested" | "not_going" | null> => {
+  args: {
+    eventId: v.id("events"),
+  },
+
+  handler: async (ctx, args): Promise<RSVPStatus | null> => {
     const user = await getCurrentUser(ctx);
-    if (!user) return null;
+
+    if (!user) {
+      return null;
+    }
+
     const rsvp = await ctx.db
       .query("eventRsvps")
       .withIndex("by_event_and_user", (q) =>
         q.eq("eventId", args.eventId).eq("userId", user._id),
       )
       .unique();
+
     return rsvp?.status ?? null;
   },
 });
 
-// ── LIST my created events ────────────────────────────────────────────────────
+// ============================================================================
+// MY EVENTS
+// ============================================================================
 
 export const listMine = query({
   args: {},
+
   handler: async (ctx) => {
     const user = await requireUser(ctx);
+
     const events = await ctx.db
       .query("events")
       .withIndex("by_author", (q) => q.eq("authorId", user._id))
-      .collect();
-    // Enrichir avec les compteurs
-    return Promise.all(
-      events.map(async (e) => {
+      .order("desc")
+      .take(100);
+
+    return await Promise.all(
+      events.map(async (event) => {
         const rsvps = await ctx.db
           .query("eventRsvps")
-          .withIndex("by_event", (q) => q.eq("eventId", e._id))
-          .collect();
+          .withIndex("by_event", (q) => q.eq("eventId", event._id))
+          .take(500);
+
+        const likes = await ctx.db
+          .query("eventLikes")
+          .withIndex("by_event", (q) => q.eq("eventId", event._id))
+          .take(500);
+
         return {
-          ...e,
-          attendingCount: rsvps.filter((r) => r.status === "attending").length,
-          interestedCount: rsvps.filter((r) => r.status === "interested")
+          ...event,
+          attendingCount: rsvps.filter((rsvp) => rsvp.status === "attending")
             .length,
+          interestedCount: rsvps.filter((rsvp) => rsvp.status === "interested")
+            .length,
+          likeCount: likes.length,
+          commentCount: event.commentCount ?? 0,
+          viewCount: event.viewCount ?? 0,
         };
       }),
     );
   },
 });
 
-// ── LIST events I'm attending / interested in ───────────────────────────────
+// ============================================================================
+// EVENTS USER IS ATTENDING / INTERESTED IN
+// ============================================================================
 
 export const listAttending = query({
   args: {},
+
   handler: async (ctx) => {
     const user = await getCurrentUser(ctx);
-    if (!user) return [];
+
+    if (!user) {
+      return [];
+    }
+
     const rsvps = await ctx.db
       .query("eventRsvps")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .collect();
-    const eventIds = rsvps.map((r) => r.eventId);
-    const events = await Promise.all(eventIds.map((id) => ctx.db.get(id)));
-    return events.filter((e): e is NonNullable<typeof e> => e !== null);
+      .take(200);
+
+    const relevantRsvps = rsvps.filter(
+      (rsvp) => rsvp.status === "attending" || rsvp.status === "interested",
+    );
+
+    const events = await Promise.all(
+      relevantRsvps.map((rsvp) => ctx.db.get(rsvp.eventId)),
+    );
+
+    return events.filter(
+      (event): event is NonNullable<typeof event> => event !== null,
+    );
   },
 });
 
-// ── CREATE event ──────────────────────────────────────────────────────────────
+// ============================================================================
+// CREATE EVENT
+// ============================================================================
 
 export const create = mutation({
   args: {
     title: v.string(),
     description: v.string(),
+
     category: v.union(
       v.literal("culturel"),
       v.literal("sportif"),
@@ -356,67 +542,93 @@ export const create = mutation({
       v.literal("festival"),
       v.literal("autre"),
     ),
+
     startDate: v.string(),
     endDate: v.optional(v.string()),
+
     location: v.string(),
     address: v.optional(v.string()),
+
     coverImage: v.optional(v.string()),
     maxAttendees: v.optional(v.number()),
+
     isFree: v.boolean(),
     price: v.optional(v.string()),
+
     tags: v.array(v.string()),
+
     gallery: v.optional(v.array(v.string())),
     videos: v.optional(v.array(v.string())),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const now = new Date().toISOString();
-    const status = args.startDate > now ? "upcoming" : "ongoing";
 
-    // 1. Créer l'événement dans la table events
+    const title = assertNonEmpty(args.title, "Le titre");
+    const description = assertNonEmpty(args.description, "La description");
+    const location = assertNonEmpty(args.location, "Le lieu");
+
+    validateDates(args.startDate, args.endDate);
+
+    if (args.maxAttendees !== undefined) {
+      if (!Number.isInteger(args.maxAttendees) || args.maxAttendees <= 0) {
+        throw new ConvexError({
+          message:
+            "Le nombre maximal de participants doit être supérieur à zéro",
+          code: "INVALID_ARGUMENT",
+        });
+      }
+    }
+
+    if (!args.isFree && !args.price?.trim()) {
+      throw new ConvexError({
+        message: "Un prix est obligatoire pour un événement payant",
+        code: "INVALID_ARGUMENT",
+      });
+    }
+
+    const status = computeEventStatus(args.startDate, args.endDate);
+
     const eventId = await ctx.db.insert("events", {
       authorId: user._id,
-      title: args.title,
-      description: args.description,
+
+      title,
+      description,
       category: args.category,
+
       startDate: args.startDate,
       endDate: args.endDate,
-      location: args.location,
+
+      location,
       address: args.address,
+
       coverImage: args.coverImage,
       maxAttendees: args.maxAttendees,
+
       isFree: args.isFree,
       price: args.price,
+
       tags: args.tags,
+
       status,
+
+      viewCount: 0,
+      commentCount: 0,
+      shareCount: 0,
+
       gallery: args.gallery ?? [],
       videos: args.videos ?? [],
     });
 
-    // 2. Créer une publication associée dans publications
-    const meta = {
-      postType: "evenement",
-      eventId,
-      category: args.category,
-      startDate: args.startDate,
-      endDate: args.endDate,
-      location: args.location,
-      address: args.address,
-      coverImage: args.coverImage,
-      gallery: args.gallery ?? [],
-      videos: args.videos ?? [],
-      isFree: args.isFree,
-      price: args.price,
-      maxAttendees: args.maxAttendees,
-    };
-
+    // Publication dans le feed.
+    // L'événement reste la source de vérité métier.
     await ctx.db.insert("publications", {
       authorId: user._id,
       type: "evenement",
-      title: args.title,
-      description: args.description,
+      title,
+      description,
       price: args.price,
-      location: args.location,
+      location,
       category: args.category,
       images: args.coverImage ? [args.coverImage] : (args.gallery ?? []),
       tags: args.tags,
@@ -424,20 +636,39 @@ export const create = mutation({
       viewCount: 0,
       commentCount: 0,
       status: "active",
-      meta: JSON.stringify(meta),
+
+      meta: JSON.stringify({
+        postType: "evenement",
+        eventId,
+        category: args.category,
+        startDate: args.startDate,
+        endDate: args.endDate,
+        location,
+        address: args.address,
+        coverImage: args.coverImage,
+        gallery: args.gallery ?? [],
+        videos: args.videos ?? [],
+        isFree: args.isFree,
+        price: args.price,
+        maxAttendees: args.maxAttendees,
+      }),
     });
 
     return eventId;
   },
 });
 
-// ── UPDATE event ──────────────────────────────────────────────────────────────
+// ============================================================================
+// UPDATE EVENT
+// ============================================================================
 
 export const update = mutation({
   args: {
     eventId: v.id("events"),
+
     title: v.optional(v.string()),
     description: v.optional(v.string()),
+
     category: v.optional(
       v.union(
         v.literal("culturel"),
@@ -450,17 +681,23 @@ export const update = mutation({
         v.literal("autre"),
       ),
     ),
+
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
+
     location: v.optional(v.string()),
     address: v.optional(v.string()),
+
     coverImage: v.optional(v.string()),
     maxAttendees: v.optional(v.number()),
+
     isFree: v.optional(v.boolean()),
     price: v.optional(v.string()),
+
     tags: v.optional(v.array(v.string())),
     gallery: v.optional(v.array(v.string())),
     videos: v.optional(v.array(v.string())),
+
     status: v.optional(
       v.union(
         v.literal("upcoming"),
@@ -470,133 +707,290 @@ export const update = mutation({
       ),
     ),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const event = await ctx.db.get(args.eventId);
-    if (!event)
+
+    if (!event) {
       throw new ConvexError({
         message: "Événement introuvable",
         code: "NOT_FOUND",
       });
-    if (event.authorId !== user._id)
-      throw new ConvexError({ message: "Non autorisé", code: "FORBIDDEN" });
+    }
 
-    const patch: any = {};
-    if (args.title !== undefined) patch.title = args.title;
-    if (args.description !== undefined) patch.description = args.description;
-    if (args.category !== undefined) patch.category = args.category;
-    if (args.startDate !== undefined) patch.startDate = args.startDate;
-    if (args.endDate !== undefined) patch.endDate = args.endDate;
-    if (args.location !== undefined) patch.location = args.location;
-    if (args.address !== undefined) patch.address = args.address;
-    if (args.coverImage !== undefined) patch.coverImage = args.coverImage;
-    if (args.maxAttendees !== undefined) patch.maxAttendees = args.maxAttendees;
-    if (args.isFree !== undefined) patch.isFree = args.isFree;
-    if (args.price !== undefined) patch.price = args.price;
-    if (args.tags !== undefined) patch.tags = args.tags;
-    if (args.gallery !== undefined) patch.gallery = args.gallery;
-    if (args.videos !== undefined) patch.videos = args.videos;
-    if (args.status !== undefined) patch.status = args.status;
+    if (event.authorId !== user._id) {
+      throw new ConvexError({
+        message: "Non autorisé",
+        code: "FORBIDDEN",
+      });
+    }
+
+    if (args.title !== undefined && !args.title.trim()) {
+      throw new ConvexError({
+        message: "Le titre ne peut pas être vide",
+        code: "INVALID_ARGUMENT",
+      });
+    }
+
+    if (args.description !== undefined && !args.description.trim()) {
+      throw new ConvexError({
+        message: "La description ne peut pas être vide",
+        code: "INVALID_ARGUMENT",
+      });
+    }
+
+    if (args.location !== undefined && !args.location.trim()) {
+      throw new ConvexError({
+        message: "Le lieu ne peut pas être vide",
+        code: "INVALID_ARGUMENT",
+      });
+    }
+
+    const effectiveStartDate = args.startDate ?? event.startDate;
+
+    const effectiveEndDate =
+      args.endDate !== undefined ? args.endDate : event.endDate;
+
+    validateDates(effectiveStartDate, effectiveEndDate);
+
+    const effectiveIsFree = args.isFree ?? event.isFree;
+
+    const effectivePrice = args.price !== undefined ? args.price : event.price;
+
+    if (!effectiveIsFree && !effectivePrice?.trim()) {
+      throw new ConvexError({
+        message: "Un prix est obligatoire pour un événement payant",
+        code: "INVALID_ARGUMENT",
+      });
+    }
+
+    if (args.maxAttendees !== undefined) {
+      if (!Number.isInteger(args.maxAttendees) || args.maxAttendees <= 0) {
+        throw new ConvexError({
+          message:
+            "Le nombre maximal de participants doit être supérieur à zéro",
+          code: "INVALID_ARGUMENT",
+        });
+      }
+    }
+
+    const patch: {
+      title?: string;
+      description?: string;
+      category?: EventCategory;
+      startDate?: string;
+      endDate?: string;
+      location?: string;
+      address?: string;
+      coverImage?: string;
+      maxAttendees?: number;
+      isFree?: boolean;
+      price?: string;
+      tags?: string[];
+      gallery?: string[];
+      videos?: string[];
+      status?: EventStatus;
+    } = {};
+
+    if (args.title !== undefined) {
+      patch.title = args.title.trim();
+    }
+
+    if (args.description !== undefined) {
+      patch.description = args.description.trim();
+    }
+
+    if (args.category !== undefined) {
+      patch.category = args.category;
+    }
+
+    if (args.startDate !== undefined) {
+      patch.startDate = args.startDate;
+    }
+
+    if (args.endDate !== undefined) {
+      patch.endDate = args.endDate;
+    }
+
+    if (args.location !== undefined) {
+      patch.location = args.location.trim();
+    }
+
+    if (args.address !== undefined) {
+      patch.address = args.address;
+    }
+
+    if (args.coverImage !== undefined) {
+      patch.coverImage = args.coverImage;
+    }
+
+    if (args.maxAttendees !== undefined) {
+      patch.maxAttendees = args.maxAttendees;
+    }
+
+    if (args.isFree !== undefined) {
+      patch.isFree = args.isFree;
+    }
+
+    if (args.price !== undefined) {
+      patch.price = args.price;
+    }
+
+    if (args.tags !== undefined) {
+      patch.tags = args.tags;
+    }
+
+    if (args.gallery !== undefined) {
+      patch.gallery = args.gallery;
+    }
+
+    if (args.videos !== undefined) {
+      patch.videos = args.videos;
+    }
+
+    patch.status =
+      args.status ?? computeEventStatus(effectiveStartDate, effectiveEndDate);
 
     await ctx.db.patch(args.eventId, patch);
 
-    // Optionnel : mettre à jour la publication associée si besoin
-    // On pourrait chercher la publication liée via meta.eventId, mais on laisse pour l'instant.
-
-    return { success: true };
+    return {
+      success: true,
+      eventId: args.eventId,
+    };
   },
 });
 
-// ── DELETE event ──────────────────────────────────────────────────────────────
+// ============================================================================
+// DELETE EVENT
+// ============================================================================
 
 export const remove = mutation({
-  args: { eventId: v.id("events") },
+  args: {
+    eventId: v.id("events"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const event = await ctx.db.get(args.eventId);
-    if (!event)
+
+    if (!event) {
       throw new ConvexError({
         message: "Événement introuvable",
         code: "NOT_FOUND",
       });
-    if (event.authorId !== user._id)
-      throw new ConvexError({ message: "Non autorisé", code: "FORBIDDEN" });
+    }
 
-    // Supprimer les RSVP
+    if (event.authorId !== user._id) {
+      throw new ConvexError({
+        message: "Non autorisé",
+        code: "FORBIDDEN",
+      });
+    }
+
     const rsvps = await ctx.db
       .query("eventRsvps")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
-    for (const r of rsvps) await ctx.db.delete(r._id);
+      .take(1000);
 
-    // Supprimer les commentaires
+    for (const rsvp of rsvps) {
+      await ctx.db.delete(rsvp._id);
+    }
+
     const comments = await ctx.db
       .query("eventComments")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
-    for (const c of comments) await ctx.db.delete(c._id);
+      .take(1000);
 
-    // Supprimer les billets
-    const tickets = await ctx.db
-      .query("eventTickets")
-      .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
-    for (const t of tickets) await ctx.db.delete(t._id);
+    for (const comment of comments) {
+      const commentLikes = await ctx.db
+        .query("eventCommentLikes")
+        .withIndex("by_comment", (q) => q.eq("commentId", comment._id))
+        .take(1000);
 
-    // Supprimer les likes
-    const likes = await ctx.db
+      for (const like of commentLikes) {
+        await ctx.db.delete(like._id);
+      }
+
+      await ctx.db.delete(comment._id);
+    }
+
+    const eventLikes = await ctx.db
       .query("eventLikes")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
-    for (const l of likes) await ctx.db.delete(l._id);
+      .take(1000);
 
-    // Supprimer les bookmarks
+    for (const like of eventLikes) {
+      await ctx.db.delete(like._id);
+    }
+
     const bookmarks = await ctx.db
       .query("eventBookmarks")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
-    for (const b of bookmarks) await ctx.db.delete(b._id);
+      .take(1000);
 
-    // Supprimer la publication associée si elle existe
-    const publications = await ctx.db
-      .query("publications")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("type"), "evenement"),
-          q.eq(q.field("meta"), JSON.stringify({ eventId: args.eventId })),
-        ),
-      )
-      .collect();
-    // Comme le meta est un JSON string, on ne peut pas filtrer facilement.
-    // On va plutôt supprimer toutes les publications qui ont un meta contenant eventId.
-    // Pour simplifier, on cherche via une requête brute (moins efficace).
-    // Alternative : on stocke eventId dans un champ dédié ? On peut ajouter un champ eventId dans publications plus tard.
-    // Pour l'instant, on ne supprime pas automatiquement la publication, car il faudrait une recherche par meta.
-    // L'utilisateur pourra supprimer manuellement la publication si nécessaire.
+    for (const bookmark of bookmarks) {
+      await ctx.db.delete(bookmark._id);
+    }
+
+    const tickets = await ctx.db
+      .query("eventTickets")
+      .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
+      .take(1000);
+
+    for (const ticket of tickets) {
+      await ctx.db.delete(ticket._id);
+    }
+
+    // Les publications utilisent actuellement meta comme JSON.
+    // On ne supprime donc pas une publication par une correspondance
+    // approximative qui pourrait supprimer le mauvais contenu.
+    // La publication reste traçable dans le feed.
 
     await ctx.db.delete(args.eventId);
+
+    return {
+      success: true,
+      eventId: args.eventId,
+    };
   },
 });
 
-// ── RSVP ──────────────────────────────────────────────────────────────────────
+// ============================================================================
+// RSVP
+// ============================================================================
 
 export const rsvp = mutation({
   args: {
     eventId: v.id("events"),
+
     status: v.union(
       v.literal("attending"),
       v.literal("interested"),
       v.literal("not_going"),
     ),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const event = await ctx.db.get(args.eventId);
-    if (!event)
+
+    if (!event) {
       throw new ConvexError({
         message: "Événement introuvable",
         code: "NOT_FOUND",
       });
+    }
+
+    if (event.status === "cancelled") {
+      throw new ConvexError({
+        message: "Impossible de participer à un événement annulé",
+        code: "EVENT_CANCELLED",
+      });
+    }
 
     const existing = await ctx.db
       .query("eventRsvps")
@@ -606,47 +1000,119 @@ export const rsvp = mutation({
       .unique();
 
     if (existing) {
-      // Si même statut, on peut le retirer (toggle)
       if (existing.status === args.status) {
         await ctx.db.delete(existing._id);
-        return { status: null };
-      } else {
-        await ctx.db.patch(existing._id, { status: args.status });
+
+        return {
+          status: null,
+        };
       }
-    } else {
-      await ctx.db.insert("eventRsvps", {
-        eventId: args.eventId,
-        userId: user._id,
+
+      if (args.status === "attending" && event.maxAttendees !== undefined) {
+        const attending = await ctx.db
+          .query("eventRsvps")
+          .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
+          .take(1000);
+
+        const attendingCount = attending.filter(
+          (rsvp) => rsvp.status === "attending",
+        ).length;
+
+        if (attendingCount >= event.maxAttendees) {
+          throw new ConvexError({
+            message: "Plus de places disponibles",
+            code: "FULL",
+          });
+        }
+      }
+
+      await ctx.db.patch(existing._id, {
         status: args.status,
       });
+
+      return {
+        status: args.status,
+      };
     }
-    return { status: args.status };
+
+    if (args.status === "attending" && event.maxAttendees !== undefined) {
+      const attending = await ctx.db
+        .query("eventRsvps")
+        .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
+        .take(1000);
+
+      const attendingCount = attending.filter(
+        (rsvp) => rsvp.status === "attending",
+      ).length;
+
+      if (attendingCount >= event.maxAttendees) {
+        throw new ConvexError({
+          message: "Plus de places disponibles",
+          code: "FULL",
+        });
+      }
+    }
+
+    await ctx.db.insert("eventRsvps", {
+      eventId: args.eventId,
+      userId: user._id,
+      status: args.status,
+    });
+
+    return {
+      status: args.status,
+    };
   },
 });
 
-// ── TRACK VIEW ────────────────────────────────────────────────────────────────
+// ============================================================================
+// TRACK VIEW
+// ============================================================================
 
 export const trackView = mutation({
-  args: { eventId: v.id("events") },
+  args: {
+    eventId: v.id("events"),
+  },
+
   handler: async (ctx, args) => {
     const event = await ctx.db.get(args.eventId);
-    if (!event) return;
-    await ctx.db.patch(args.eventId, { viewCount: (event.viewCount || 0) + 1 });
+
+    if (!event) {
+      return {
+        success: false,
+      };
+    }
+
+    await ctx.db.patch(args.eventId, {
+      viewCount: (event.viewCount ?? 0) + 1,
+    });
+
+    return {
+      success: true,
+    };
   },
 });
 
-// ── LIKE / UNLIKE event ──────────────────────────────────────────────────────
+// ============================================================================
+// LIKE / UNLIKE EVENT
+// ============================================================================
 
 export const like = mutation({
-  args: { eventId: v.id("events") },
+  args: {
+    eventId: v.id("events"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const event = await ctx.db.get(args.eventId);
-    if (!event)
+
+    if (!event) {
       throw new ConvexError({
         message: "Événement introuvable",
         code: "NOT_FOUND",
       });
+    }
 
     const existing = await ctx.db
       .query("eventLikes")
@@ -657,29 +1123,43 @@ export const like = mutation({
 
     if (existing) {
       await ctx.db.delete(existing._id);
-      return { liked: false };
-    } else {
-      await ctx.db.insert("eventLikes", {
-        userId: user._id,
-        eventId: args.eventId,
-      });
-      return { liked: true };
+
+      return {
+        liked: false,
+      };
     }
+
+    await ctx.db.insert("eventLikes", {
+      userId: user._id,
+      eventId: args.eventId,
+    });
+
+    return {
+      liked: true,
+    };
   },
 });
 
-// ── BOOKMARK / UNBOOKMARK event ──────────────────────────────────────────────
+// ============================================================================
+// BOOKMARK / UNBOOKMARK EVENT
+// ============================================================================
 
 export const bookmark = mutation({
-  args: { eventId: v.id("events") },
+  args: {
+    eventId: v.id("events"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const event = await ctx.db.get(args.eventId);
-    if (!event)
+
+    if (!event) {
       throw new ConvexError({
         message: "Événement introuvable",
         code: "NOT_FOUND",
       });
+    }
 
     const existing = await ctx.db
       .query("eventBookmarks")
@@ -690,98 +1170,160 @@ export const bookmark = mutation({
 
     if (existing) {
       await ctx.db.delete(existing._id);
-      return { bookmarked: false };
-    } else {
-      await ctx.db.insert("eventBookmarks", {
-        userId: user._id,
-        eventId: args.eventId,
-      });
-      return { bookmarked: true };
+
+      return {
+        bookmarked: false,
+      };
     }
+
+    await ctx.db.insert("eventBookmarks", {
+      userId: user._id,
+      eventId: args.eventId,
+    });
+
+    return {
+      bookmarked: true,
+    };
   },
 });
 
-// ── COMMENTS ──────────────────────────────────────────────────────────────────
+// ============================================================================
+// COMMENTS
+// ============================================================================
 
 export const listComments = query({
-  args: { eventId: v.id("events") },
-  handler: async (ctx, args) => {
+  args: {
+    eventId: v.id("events"),
+  },
+
+  handler: async (ctx, args): Promise<EventCommentView[]> => {
     const currentUser = await getCurrentUser(ctx);
+
     const comments = await ctx.db
       .query("eventComments")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
       .order("asc")
-      .collect();
+      .take(500);
 
-    const enriched = await Promise.all(
-      comments.map(async (c) => {
-        const author = await ctx.db.get(c.authorId);
+    const enriched: EventCommentView[] = await Promise.all(
+      comments.map(async (comment) => {
+        const author = await ctx.db.get(comment.authorId);
+
         let likedByMe = false;
+
         if (currentUser) {
           const like = await ctx.db
             .query("eventCommentLikes")
             .withIndex("by_user_and_comment", (q) =>
-              q.eq("userId", currentUser._id).eq("commentId", c._id),
+              q.eq("userId", currentUser._id).eq("commentId", comment._id),
             )
             .unique();
+
           likedByMe = like !== null;
         }
+
         return {
-          ...c,
+          _id: comment._id,
+          _creationTime: comment._creationTime,
+          eventId: comment.eventId,
+          authorId: comment.authorId,
+          text: comment.text,
+          parentId: comment.parentId,
+          likeCount: comment.likeCount,
+
           authorName: author?.name ?? "Anonyme",
           authorAvatar: author?.avatar,
+
           likedByMe,
-          isMine: currentUser?._id === c.authorId,
+          isMine: currentUser?._id === comment.authorId,
+
           replies: [],
         };
       }),
     );
 
-    // Construire l'arbre (top-level uniquement)
-    const commentMap = new Map<string, any>();
-    const topLevel: any[] = [];
-    for (const c of enriched) {
-      commentMap.set(c._id, c);
+    const commentMap = new Map<Id<"eventComments">, EventCommentView>();
+
+    for (const comment of enriched) {
+      commentMap.set(comment._id, comment);
     }
-    for (const c of enriched) {
-      if (c.parentId) {
-        const parent = commentMap.get(c.parentId);
+
+    const topLevel: EventCommentView[] = [];
+
+    for (const comment of enriched) {
+      if (comment.parentId) {
+        const parent = commentMap.get(comment.parentId);
+
         if (parent) {
-          parent.replies = parent.replies || [];
-          parent.replies.push(c);
+          parent.replies.push(comment);
+        } else {
+          topLevel.push(comment);
         }
       } else {
-        topLevel.push(c);
+        topLevel.push(comment);
       }
     }
+
     return topLevel;
   },
 });
 
+// ============================================================================
+// ADD COMMENT
+// ============================================================================
+
 export const addComment = mutation({
-  args: { eventId: v.id("events"), text: v.string() },
+  args: {
+    eventId: v.id("events"),
+    text: v.string(),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const event = await ctx.db.get(args.eventId);
-    if (!event)
+
+    if (!event) {
       throw new ConvexError({
         message: "Événement introuvable",
         code: "NOT_FOUND",
       });
+    }
+
+    const text = args.text.trim();
+
+    if (!text) {
+      throw new ConvexError({
+        message: "Le commentaire ne peut pas être vide",
+        code: "INVALID_ARGUMENT",
+      });
+    }
+
+    if (text.length > 5000) {
+      throw new ConvexError({
+        message: "Le commentaire ne peut pas dépasser 5000 caractères",
+        code: "INVALID_ARGUMENT",
+      });
+    }
 
     const commentId = await ctx.db.insert("eventComments", {
       eventId: args.eventId,
       authorId: user._id,
-      text: args.text,
+      text,
       likeCount: 0,
     });
-    // Mettre à jour le compteur de commentaires sur l'événement
+
     await ctx.db.patch(args.eventId, {
-      commentCount: (event.commentCount || 0) + 1,
+      commentCount: (event.commentCount ?? 0) + 1,
     });
+
     return await ctx.db.get(commentId);
   },
 });
+
+// ============================================================================
+// ADD REPLY
+// ============================================================================
 
 export const addReply = mutation({
   args: {
@@ -789,43 +1331,87 @@ export const addReply = mutation({
     parentId: v.id("eventComments"),
     text: v.string(),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
+    const event = await ctx.db.get(args.eventId);
+
+    if (!event) {
+      throw new ConvexError({
+        message: "Événement introuvable",
+        code: "NOT_FOUND",
+      });
+    }
+
     const parent = await ctx.db.get(args.parentId);
-    if (!parent)
+
+    if (!parent) {
       throw new ConvexError({
         message: "Commentaire parent introuvable",
         code: "NOT_FOUND",
       });
+    }
+
+    if (parent.eventId !== args.eventId) {
+      throw new ConvexError({
+        message: "Le commentaire parent appartient à un autre événement",
+        code: "INVALID_ARGUMENT",
+      });
+    }
+
+    const text = args.text.trim();
+
+    if (!text) {
+      throw new ConvexError({
+        message: "La réponse ne peut pas être vide",
+        code: "INVALID_ARGUMENT",
+      });
+    }
+
+    if (text.length > 5000) {
+      throw new ConvexError({
+        message: "La réponse ne peut pas dépasser 5000 caractères",
+        code: "INVALID_ARGUMENT",
+      });
+    }
 
     const commentId = await ctx.db.insert("eventComments", {
       eventId: args.eventId,
       authorId: user._id,
       parentId: args.parentId,
-      text: args.text,
+      text,
       likeCount: 0,
     });
-    // Incrémenter le compteur de l'événement
-    const event = await ctx.db.get(args.eventId);
-    if (event) {
-      await ctx.db.patch(args.eventId, {
-        commentCount: (event.commentCount || 0) + 1,
-      });
-    }
+
+    await ctx.db.patch(args.eventId, {
+      commentCount: (event.commentCount ?? 0) + 1,
+    });
+
     return await ctx.db.get(commentId);
   },
 });
 
+// ============================================================================
+// LIKE / UNLIKE COMMENT
+// ============================================================================
+
 export const likeComment = mutation({
-  args: { commentId: v.id("eventComments") },
+  args: {
+    commentId: v.id("eventComments"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const comment = await ctx.db.get(args.commentId);
-    if (!comment)
+
+    if (!comment) {
       throw new ConvexError({
         message: "Commentaire introuvable",
         code: "NOT_FOUND",
       });
+    }
 
     const existing = await ctx.db
       .query("eventCommentLikes")
@@ -836,58 +1422,124 @@ export const likeComment = mutation({
 
     if (existing) {
       await ctx.db.delete(existing._id);
+
       await ctx.db.patch(args.commentId, {
-        likeCount: Math.max(0, (comment.likeCount || 0) - 1),
+        likeCount: Math.max(0, comment.likeCount - 1),
       });
-      return { liked: false };
-    } else {
-      await ctx.db.insert("eventCommentLikes", {
-        userId: user._id,
-        commentId: args.commentId,
-      });
-      await ctx.db.patch(args.commentId, {
-        likeCount: (comment.likeCount || 0) + 1,
-      });
-      return { liked: true };
+
+      return {
+        liked: false,
+      };
     }
+
+    await ctx.db.insert("eventCommentLikes", {
+      userId: user._id,
+      commentId: args.commentId,
+    });
+
+    await ctx.db.patch(args.commentId, {
+      likeCount: comment.likeCount + 1,
+    });
+
+    return {
+      liked: true,
+    };
   },
 });
 
-// ── TICKETS ────────────────────────────────────────────────────────────────────
+// ============================================================================
+// TICKETS — USER TICKETS
+// ============================================================================
 
 export const listTickets = query({
-  args: { eventId: v.id("events") },
+  args: {
+    eventId: v.id("events"),
+  },
+
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
-    if (!user) return [];
-    const tickets = await ctx.db
+
+    if (!user) {
+      return [];
+    }
+
+    return await ctx.db
       .query("eventTickets")
       .withIndex("by_user_and_event", (q) =>
         q.eq("userId", user._id).eq("eventId", args.eventId),
       )
-      .collect();
-    return tickets;
+      .take(20);
   },
 });
 
+// ============================================================================
+// TICKET PURCHASE
+// ============================================================================
+
 export const purchaseTicket = mutation({
-  args: { eventId: v.id("events") },
+  args: {
+    eventId: v.id("events"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const event = await ctx.db.get(args.eventId);
-    if (!event)
+
+    if (!event) {
       throw new ConvexError({
         message: "Événement introuvable",
         code: "NOT_FOUND",
       });
+    }
 
-    // Vérifier la capacité si définie
-    if (event.maxAttendees) {
-      const existingTickets = await ctx.db
-        .query("eventTickets")
+    if (event.status === "cancelled") {
+      throw new ConvexError({
+        message: "Impossible d'acheter un billet pour un événement annulé",
+        code: "EVENT_CANCELLED",
+      });
+    }
+
+    /*
+     * IMPORTANT :
+     * Aucun paiement réel n'est implémenté ici.
+     *
+     * Pour un événement payant, on refuse donc l'émission
+     * du billet au lieu de prétendre qu'un paiement a réussi.
+     */
+    if (!event.isFree) {
+      throw new ConvexError({
+        message:
+          "Le paiement des billets n'est pas encore connecté au système de paiement.",
+        code: "PAYMENT_REQUIRED",
+      });
+    }
+
+    const existing = await ctx.db
+      .query("eventTickets")
+      .withIndex("by_user_and_event", (q) =>
+        q.eq("userId", user._id).eq("eventId", args.eventId),
+      )
+      .unique();
+
+    if (existing) {
+      throw new ConvexError({
+        message: "Vous avez déjà un billet pour cet événement",
+        code: "ALREADY_PURCHASED",
+      });
+    }
+
+    if (event.maxAttendees !== undefined) {
+      const attendingRsvps = await ctx.db
+        .query("eventRsvps")
         .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-        .collect();
-      if (existingTickets.length >= event.maxAttendees) {
+        .take(1000);
+
+      const attendingCount = attendingRsvps.filter(
+        (rsvp) => rsvp.status === "attending",
+      ).length;
+
+      if (attendingCount >= event.maxAttendees) {
         throw new ConvexError({
           message: "Plus de places disponibles",
           code: "FULL",
@@ -895,22 +1547,11 @@ export const purchaseTicket = mutation({
       }
     }
 
-    // Vérifier que l'utilisateur n'a pas déjà un billet
-    const existing = await ctx.db
-      .query("eventTickets")
-      .withIndex("by_user_and_event", (q) =>
-        q.eq("userId", user._id).eq("eventId", args.eventId),
-      )
-      .unique();
-    if (existing) {
-      throw new ConvexError({
-        message: "Vous avez déjà un billet",
-        code: "ALREADY_PURCHASED",
-      });
-    }
+    const now = Date.now();
 
-    const ticketNumber = `TICKET-${args.eventId.slice(0, 6)}-${Date.now().toString().slice(-6)}`;
-    const qrCode = `QR-${ticketNumber}`;
+    const ticketNumber = `TICKET-${args.eventId}-${user._id}-${now}`;
+
+    const qrCode = ticketNumber;
 
     const ticketId = await ctx.db.insert("eventTickets", {
       eventId: args.eventId,
@@ -918,16 +1559,16 @@ export const purchaseTicket = mutation({
       ticketNumber,
       qrCode,
       status: "valid",
-      purchasedAt: Date.now(),
+      purchasedAt: now,
     });
 
-    // Auto-RSVP en "attending"
     const existingRsvp = await ctx.db
       .query("eventRsvps")
       .withIndex("by_event_and_user", (q) =>
         q.eq("eventId", args.eventId).eq("userId", user._id),
       )
       .unique();
+
     if (!existingRsvp) {
       await ctx.db.insert("eventRsvps", {
         eventId: args.eventId,
@@ -935,35 +1576,51 @@ export const purchaseTicket = mutation({
         status: "attending",
       });
     } else if (existingRsvp.status !== "attending") {
-      await ctx.db.patch(existingRsvp._id, { status: "attending" });
+      await ctx.db.patch(existingRsvp._id, {
+        status: "attending",
+      });
     }
 
     return await ctx.db.get(ticketId);
   },
 });
 
+// ============================================================================
+// VALIDATE TICKET
+// ============================================================================
+
 export const validateTicket = mutation({
-  args: { ticketId: v.id("eventTickets") },
+  args: {
+    ticketId: v.id("eventTickets"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const ticket = await ctx.db.get(args.ticketId);
-    if (!ticket)
+
+    if (!ticket) {
       throw new ConvexError({
         message: "Billet introuvable",
         code: "NOT_FOUND",
       });
+    }
 
     const event = await ctx.db.get(ticket.eventId);
-    if (!event)
+
+    if (!event) {
       throw new ConvexError({
         message: "Événement introuvable",
         code: "NOT_FOUND",
       });
-    if (event.authorId !== user._id)
+    }
+
+    if (event.authorId !== user._id) {
       throw new ConvexError({
         message: "Seul l'organisateur peut valider les billets",
         code: "FORBIDDEN",
       });
+    }
 
     if (ticket.status !== "valid") {
       throw new ConvexError({
@@ -972,42 +1629,90 @@ export const validateTicket = mutation({
       });
     }
 
-    await ctx.db.patch(args.ticketId, { status: "used", usedAt: Date.now() });
-    return { success: true };
+    await ctx.db.patch(args.ticketId, {
+      status: "used",
+      usedAt: Date.now(),
+    });
+
+    return {
+      success: true,
+    };
   },
 });
 
-// ── ANALYTICS (pour l'organisateur) ─────────────────────────────────────────
+// ============================================================================
+// ANALYTICS
+// ============================================================================
 
 export const getAnalytics = query({
-  args: { eventId: v.id("events") },
+  args: {
+    eventId: v.id("events"),
+  },
+
   handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
     const event = await ctx.db.get(args.eventId);
-    if (!event) return null;
+
+    if (!event) {
+      return null;
+    }
+
+    if (event.authorId !== user._id) {
+      throw new ConvexError({
+        message: "Seul l'organisateur peut consulter les statistiques",
+        code: "FORBIDDEN",
+      });
+    }
 
     const rsvps = await ctx.db
       .query("eventRsvps")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
+      .take(1000);
 
     const comments = await ctx.db
       .query("eventComments")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
+      .take(1000);
 
     const tickets = await ctx.db
       .query("eventTickets")
       .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
-      .collect();
+      .take(1000);
 
-    const totalViews = event.viewCount || 0;
-    const totalAttending = rsvps.filter((r) => r.status === "attending").length;
-    const totalInterested = rsvps.filter(
-      (r) => r.status === "interested",
+    const likes = await ctx.db
+      .query("eventLikes")
+      .withIndex("by_event", (q) => q.eq("eventId", args.eventId))
+      .take(1000);
+
+    const totalViews = event.viewCount ?? 0;
+
+    const totalAttending = rsvps.filter(
+      (rsvp) => rsvp.status === "attending",
     ).length;
-    const totalNotGoing = rsvps.filter((r) => r.status === "not_going").length;
+
+    const totalInterested = rsvps.filter(
+      (rsvp) => rsvp.status === "interested",
+    ).length;
+
+    const totalNotGoing = rsvps.filter(
+      (rsvp) => rsvp.status === "not_going",
+    ).length;
+
     const totalComments = comments.length;
+
     const totalTickets = tickets.length;
+
+    const totalLikes = likes.length;
+
+    const conversionRate =
+      totalViews > 0 ? (totalAttending / totalViews) * 100 : 0;
+
+    const startTime = new Date(event.startDate).getTime();
+
+    const daysUntilStart = Number.isNaN(startTime)
+      ? null
+      : Math.max(0, Math.ceil((startTime - Date.now()) / 86_400_000));
 
     return {
       totalViews,
@@ -1016,152 +1721,9 @@ export const getAnalytics = query({
       totalNotGoing,
       totalComments,
       totalTickets,
-      // Taux de conversion (vues → participants)
-      conversionRate: totalViews > 0 ? (totalAttending / totalViews) * 100 : 0,
-      // Jours restants
-      daysUntilStart: Math.max(
-        0,
-        Math.ceil(
-          (new Date(event.startDate).getTime() - Date.now()) / 86400000,
-        ),
-      ),
+      totalLikes,
+      conversionRate,
+      daysUntilStart,
     };
-  },
-});
-
-// ── SEED ───────────────────────────────────────────────────────────────────────
-
-export const seedEvents = mutation({
-  args: {},
-  handler: async (ctx): Promise<boolean> => {
-    const user = await requireUser(ctx);
-    const existing = await ctx.db.query("events").take(1);
-    if (existing.length > 0) return false;
-
-    const demoEvents: Array<{
-      title: string;
-      description: string;
-      category:
-        | "culturel"
-        | "sportif"
-        | "religieux"
-        | "professionnel"
-        | "communautaire"
-        | "formation"
-        | "festival"
-        | "autre";
-      startDate: string;
-      endDate?: string;
-      location: string;
-      coverImage: string;
-      maxAttendees: number;
-      isFree: boolean;
-      price?: string;
-      tags: string[];
-      status: "upcoming" | "ongoing";
-      gallery?: string[];
-      videos?: string[];
-    }> = [
-      {
-        title: "Afro Nation Kinshasa 2025",
-        description:
-          "Le plus grand festival de musique africaine revient à Kinshasa pour une nuit inoubliable. 4 scènes, 20 artistes, 80 000 festivaliers attendus dans le mythique Stade des Martyrs.",
-        category: "festival",
-        startDate: "2025-07-14T18:00:00Z",
-        location: "Stade des Martyrs, Kinshasa",
-        coverImage:
-          "https://images.unsplash.com/photo-1506157786151-b8491531f063?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800",
-        maxAttendees: 80000,
-        isFree: false,
-        price: "15 000 FCFA",
-        tags: ["Afrobeat", "Rumba", "Ndombolo", "Festival"],
-        status: "upcoming",
-      },
-      {
-        title: "CAN 2025 — Phase de Groupes",
-        description:
-          "Le choc des lions ! Sénégal vs Côte d'Ivoire en phase de groupes de la Coupe d'Afrique des Nations. Un match au sommet entre deux nations favorites du tournoi.",
-        category: "sportif",
-        startDate: "2025-07-15T20:00:00Z",
-        location: "Stade Léopold Sédar Senghor, Dakar",
-        coverImage:
-          "https://images.unsplash.com/photo-1556816214-6d16c62fbbf6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800",
-        maxAttendees: 60000,
-        isFree: false,
-        price: "5 000 FCFA",
-        tags: ["Football", "CAN 2025", "Dakar"],
-        status: "upcoming",
-      },
-      {
-        title: "Nuit Jazz & Soul Abidjan",
-        description:
-          "Une soirée jazz et soul exceptionnelle avec les plus grandes voix du continent. Ambiance feutrée et élégante dans le cadre magnifique du Palais de la Culture d'Abidjan.",
-        category: "culturel",
-        startDate: "2025-07-20T21:00:00Z",
-        location: "Palais de la Culture, Abidjan",
-        coverImage:
-          "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800",
-        maxAttendees: 2000,
-        isFree: false,
-        price: "8 000 FCFA",
-        tags: ["Jazz", "Soul", "Live Music"],
-        status: "upcoming",
-      },
-      {
-        title: "TED × Dakar — Innovation Africaine",
-        description:
-          "12 conférenciers africains visionnaires partageront leurs idées qui méritent d'être diffusées. Technologie, entrepreneuriat, santé, agriculture — la renaissance africaine en marche.",
-        category: "professionnel",
-        startDate: "2025-07-21T09:00:00Z",
-        location: "Hôtel King Fahd Palace, Dakar",
-        coverImage:
-          "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800",
-        maxAttendees: 500,
-        isFree: false,
-        price: "12 000 FCFA",
-        tags: ["Tech", "Innovation", "Business"],
-        status: "upcoming",
-      },
-      {
-        title: "Soirée Rooftop — Sunset Kinshasa",
-        description:
-          "La soirée rooftop la plus exclusive de Kinshasa. Vue panoramique sur le fleuve Congo, cocktails premium, DJ sets international. Tenue de soirée exigée.",
-        category: "communautaire",
-        startDate: "2025-07-27T19:00:00Z",
-        location: "Pullman Hotel Rooftop, Kinshasa",
-        coverImage:
-          "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800",
-        maxAttendees: 300,
-        isFree: false,
-        price: "20 000 FCFA",
-        tags: ["DJ", "Rooftop", "Exclusif"],
-        status: "upcoming",
-      },
-      {
-        title: "Festival Panafricain des Arts",
-        description:
-          "3 jours de célébration des arts visuels, de la musique et de la danse africaine. Entrée gratuite pour tous. Expositions, performances live, ateliers pour enfants.",
-        category: "festival",
-        startDate: "2025-07-21T10:00:00Z",
-        endDate: "2025-07-23T22:00:00Z",
-        location: "Parc de la Victoire, Abidjan",
-        coverImage:
-          "https://images.unsplash.com/photo-1556340346-5e30da977c4d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=800",
-        maxAttendees: 50000,
-        isFree: true,
-        tags: ["Arts", "Culture", "Gratuit"],
-        status: "upcoming",
-      },
-    ];
-
-    for (const event of demoEvents) {
-      await ctx.db.insert("events", {
-        authorId: user._id,
-        ...event,
-        gallery: event.gallery ?? [],
-        videos: event.videos ?? [],
-      });
-    }
-    return true;
   },
 });

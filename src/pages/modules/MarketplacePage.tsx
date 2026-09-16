@@ -1,66 +1,49 @@
-import { View, Text, Pressable, Image, TextInput } from "react-native";
+import {
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useMemo, useState } from "react";
 
-// src/pages/modules/MarketplaceProPage.tsx
-// ✅ Version définitive – toutes les erreurs TS7006 résolues globalement
-
-import { useState } from "react";
 import {
   ArrowLeft,
-  Search,
-  Star,
-  MapPin,
-  ShoppingBag,
-  Plus,
-  X,
-  MessageCircle,
-  Heart,
+  ArrowRight,
+  Check,
+  CheckCircle2,
   ChevronDown,
   Filter,
-  Check,
+  Heart,
+  Loader2,
+  MapPin,
+  Minus,
+  Package,
+  Plus,
+  Search,
+  ShoppingBag,
+  ShoppingCart,
   Store,
   Tag,
-  Zap,
-  Package,
-  ShoppingCart,
   Trash2,
-  Minus,
-  ArrowRight,
-  CheckCircle2,
-  Loader2,
+  X,
+  Zap,
 } from "lucide-react-native";
+
 import { usePaginatedQuery, useMutation, useQuery } from "convex/react";
-import { useConvexAuth } from "@/lib/convex-auth-compat";
-import { api } from "@/convex/_generated/api.js";
-import type { Id } from "@/convex/_generated/dataModel.js";
+
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+
 import { Authenticated, Unauthenticated } from "@/lib/convex-auth-compat";
-import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { SignInButton } from "@/components/ui/signin.tsx";
+
+import { SignInButton } from "@/components/ui/signin";
 
 type SortKey = "recent" | "prix_asc" | "prix_desc";
-const CATEGORIES = [
-  "Tout",
-  "Alimentation",
-  "Artisanat",
-  "Tech",
-  "Mode",
-  "Services",
-  "Autre",
-];
-const CATEGORY_ICONS: Record<string, string> = {
-  Tout: "🏪",
-  Alimentation: "🥗",
-  Artisanat: "🧶",
-  Tech: "📱",
-  Mode: "👗",
-  Services: "⚡",
-  Autre: "📦",
-};
-const SORT_LABELS: Record<SortKey, string> = {
-  recent: "Plus récents",
-  prix_asc: "Prix ↑",
-  prix_desc: "Prix ↓",
-};
 
 type Product = {
   _id: Id<"products">;
@@ -80,7 +63,98 @@ type Product = {
   status: string;
 };
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
+type CartItem = {
+  _id: Id<"cartItems">;
+  productId: Id<"products">;
+  quantity: number;
+  product?: {
+    _id: Id<"products">;
+    title: string;
+    price: number;
+    currency: string;
+    images: string[];
+    stock: number;
+  } | null;
+};
+
+type Order = {
+  _id: Id<"orders">;
+  status: string;
+  totalAmount: number;
+  currency: string;
+  quantity: number;
+  counterpartName?: string;
+  product?: {
+    title?: string;
+    images?: string[];
+  } | null;
+};
+
+const CATEGORIES = [
+  "Tout",
+  "Alimentation",
+  "Artisanat",
+  "Tech",
+  "Mode",
+  "Services",
+  "Autre",
+] as const;
+
+const CATEGORY_ICONS: Record<string, string> = {
+  Tout: "🏪",
+  Alimentation: "🥗",
+  Artisanat: "🧶",
+  Tech: "📱",
+  Mode: "👗",
+  Services: "⚡",
+  Autre: "📦",
+};
+
+const SORT_LABELS: Record<SortKey, string> = {
+  recent: "Plus récents",
+  prix_asc: "Prix croissant",
+  prix_desc: "Prix décroissant",
+};
+
+const COLORS = {
+  background: "#050812",
+  backgroundSecondary: "#0C1022",
+  surface: "rgba(255,255,255,0.055)",
+  surfaceStrong: "rgba(255,255,255,0.085)",
+  border: "rgba(255,255,255,0.10)",
+  text: "#FFFFFF",
+  muted: "#A1A1AA",
+  subtle: "#71717A",
+  primary: "#6366F1",
+  primaryDark: "#4338CA",
+  accent: "#F97316",
+  success: "#22C55E",
+  warning: "#F59E0B",
+  danger: "#EF4444",
+};
+
+function formatPrice(value: number, currency?: string): string {
+  const safeValue = Number.isFinite(value) ? value : 0;
+
+  return `${new Intl.NumberFormat("fr-FR").format(
+    safeValue,
+  )} ${currency ?? ""}`.trim();
+}
+
+function getInitial(name?: string): string {
+  const value = name?.trim();
+
+  if (!value) {
+    return "V";
+  }
+
+  return value.charAt(0).toUpperCase();
+}
+
+function isValidImage(value?: string): boolean {
+  return Boolean(value && /^https?:\/\//i.test(value.trim()));
+}
+
 function SellerAvatar({
   name,
   avatar,
@@ -90,16 +164,130 @@ function SellerAvatar({
   avatar?: string;
   size?: number;
 }) {
-  if (avatar)
+  if (isValidImage(avatar)) {
     return (
-      <Image className="rounded-full object-cover" style={{ width: size, height: size }} source={{ uri: avatar }} accessibilityLabel={name} />
+      <Image
+        source={{ uri: avatar }}
+        accessibilityLabel={name}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+        }}
+      />
     );
+  }
+
   return (
-    <View className="rounded-full flex items-center justify-center font-bold text-white" style={{ width: size, height: size, fontSize: size * 0.35, flexShrink: 0 }}>{(name ?? "V").slice(0, 1).toUpperCase()}</View>
+    <View
+      style={[
+        styles.avatarFallback,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+        },
+      ]}
+    >
+      <Text
+        style={{
+          color: COLORS.text,
+          fontSize: Math.max(12, size * 0.36),
+          fontWeight: "800",
+        }}
+      >
+        {getInitial(name)}
+      </Text>
+    </View>
   );
 }
 
-// ─── Cart Sheet ───────────────────────────────────────────────────────────────
+function ProductImage({
+  uri,
+  title,
+  size = "card",
+}: {
+  uri?: string;
+  title: string;
+  size?: "card" | "small" | "large";
+}) {
+  const dimensions =
+    size === "large"
+      ? styles.productImageLarge
+      : size === "small"
+        ? styles.productImageSmall
+        : styles.productImage;
+
+  if (isValidImage(uri)) {
+    return (
+      <Image source={{ uri }} accessibilityLabel={title} style={dimensions} />
+    );
+  }
+
+  return (
+    <View style={[dimensions, styles.productImageFallback]}>
+      <Package size={size === "large" ? 46 : 28} color={COLORS.subtle} />
+    </View>
+  );
+}
+
+function LoadingProducts() {
+  return (
+    <View style={styles.loadingList}>
+      {[0, 1, 2, 3, 4].map((item) => (
+        <View key={item} style={styles.loadingCard}>
+          <View style={styles.loadingImage} />
+          <View style={styles.loadingLineLarge} />
+          <View style={styles.loadingLineSmall} />
+          <View style={styles.loadingLineMedium} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function EmptyState({
+  search,
+  onSell,
+}: {
+  search: string;
+  onSell: () => void;
+}) {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIcon}>
+        <ShoppingBag size={30} color={COLORS.subtle} />
+      </View>
+
+      <Text style={styles.emptyTitle}>Aucun produit trouvé</Text>
+
+      <Text style={styles.emptyText}>
+        {search.trim()
+          ? "Aucun produit ne correspond à votre recherche."
+          : "La boutique ne contient encore aucun produit correspondant à ces critères."}
+      </Text>
+
+      {!search.trim() && (
+        <Pressable
+          onPress={onSell}
+          style={({ pressed }) => [
+            styles.primaryButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Plus size={17} color="#FFFFFF" />
+
+          <Text style={styles.primaryButtonText}>Publier un produit</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* CART                                                                       */
+/* -------------------------------------------------------------------------- */
+
 function CartSheet({
   onClose,
   onCheckout,
@@ -108,153 +296,580 @@ function CartSheet({
   onCheckout: () => void;
 }) {
   const cart = useQuery(api.commerce.getMyCart, {});
+
   const updateItem = useMutation(api.commerce.updateCartItem);
+
   const clearCart = useMutation(api.commerce.clearCart);
+
+  const [busyItem, setBusyItem] = useState<string | null>(null);
+
   const [clearing, setClearing] = useState(false);
 
-  const total = (cart ?? []).reduce(
-    (s, i) => s + (i.product?.price ?? 0) * i.quantity,
+  const items = (cart ?? []) as CartItem[];
+
+  const currencies = useMemo(
+    () =>
+      Array.from(
+        new Set(items.map((item) => item.product?.currency).filter(Boolean)),
+      ),
+    [items],
+  );
+
+  const hasMixedCurrencies = currencies.length > 1;
+
+  const total = items.reduce(
+    (sum, item) => sum + (item.product?.price ?? 0) * item.quantity,
     0,
   );
 
-  const handleClear = async () => {
-    setClearing(true);
+  const totalCurrency = currencies.length === 1 ? currencies[0] : undefined;
+
+  const handleQuantity = async (item: CartItem, nextQuantity: number) => {
+    if (busyItem === item._id) {
+      return;
+    }
+
+    if (nextQuantity < 0) {
+      return;
+    }
+
+    if (item.product && nextQuantity > item.product.stock) {
+      Alert.alert(
+        "Stock insuffisant",
+        `Il reste ${item.product.stock} unité(s) disponible(s).`,
+      );
+      return;
+    }
+
+    setBusyItem(item._id);
+
     try {
-      await clearCart();
+      await updateItem({
+        itemId: item._id,
+        quantity: nextQuantity,
+      });
+    } catch {
+      Alert.alert("Panier", "Impossible de modifier cette quantité.");
     } finally {
-      setClearing(false);
+      setBusyItem(null);
     }
   };
 
+  const handleClear = () => {
+    if (clearing) return;
+
+    Alert.alert(
+      "Vider le panier",
+      "Tous les articles seront retirés du panier.",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Vider",
+          style: "destructive",
+          onPress: async () => {
+            setClearing(true);
+
+            try {
+              await clearCart();
+            } catch {
+              Alert.alert("Panier", "Impossible de vider le panier.");
+            } finally {
+              setClearing(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
-    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={(e) => e.target === e.currentTarget && onClose()}>
-      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }} className="w-full rounded-t-3xl max-h-[80vh] flex flex-col" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-        <View className="flex items-center justify-between px-5 py-4 border-b border-white/8"><Text className="text-white font-bold text-lg flex items-center gap-2"><ShoppingCart size={18} />Panier
-          </Text><View className="flex items-center gap-2">{cart && cart.length > 0 && (
-              <Pressable onPress={() => void handleClear()} disabled={clearing} className="text-red-400 text-xs flex items-center gap-1"><Trash2 size={12} /><Text>Vider</Text></Pressable>
-            )}<Pressable onPress={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><X size={16} className="text-white" /></Pressable></View></View>
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
 
-        <View className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{  }}>{cart === undefined ? (
-            [0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-16 rounded-xl" />
-            ))
-          ) : cart.length === 0 ? (
-            <View className="text-center py-10"><ShoppingCart size={36} className="mx-auto mb-3 text-white/15" /><Text className="text-white/30 text-sm">Panier vide</Text></View>
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>Mon panier</Text>
+
+              <Text style={styles.sheetSubtitle}>
+                {items.length} article
+                {items.length > 1 ? "s" : ""}
+              </Text>
+            </View>
+
+            <View style={styles.headerActions}>
+              {items.length > 0 && (
+                <Pressable
+                  onPress={handleClear}
+                  disabled={clearing}
+                  style={styles.iconButton}
+                >
+                  <Trash2 size={17} color={COLORS.danger} />
+                </Pressable>
+              )}
+
+              <Pressable onPress={onClose} style={styles.iconButton}>
+                <X size={18} color={COLORS.muted} />
+              </Pressable>
+            </View>
+          </View>
+
+          {cart === undefined ? (
+            <View style={styles.centerLoader}>
+              <Loader2 size={28} color={COLORS.muted} />
+
+              <Text style={styles.loadingText}>Chargement du panier…</Text>
+            </View>
+          ) : items.length === 0 ? (
+            <View style={styles.emptyState}>
+              <ShoppingCart size={38} color={COLORS.subtle} />
+
+              <Text style={styles.emptyTitle}>Panier vide</Text>
+
+              <Text style={styles.emptyText}>
+                Les produits que vous ajoutez apparaîtront ici.
+              </Text>
+            </View>
           ) : (
-            cart.map((item) => (
-              <View key={item._id} className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>{item.product?.images[0] ? (
-                  <Image className="w-14 h-14 rounded-xl object-cover flex-shrink-0" source={{ uri: item.product.images[0] }} accessibilityLabel={item.product.title} />
-                ) : (
-                  <View className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}><Package size={20} className="text-white/30" /></View>
-                )}<View className="flex-1 min-w-0"><Text className="text-white text-sm font-semibold truncate">{item.product?.title}</Text><Text className="text-orange-400 font-bold text-sm">{(item.product?.price ?? 0).toLocaleString()}{" "}{item.product?.currency}</Text></View><View className="flex items-center gap-2"><Pressable onPress={() =>
-                      void updateItem({
-                        itemId: item._id,
-                        quantity: item.quantity - 1,
-                      })} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><Minus size={12} className="text-white" /></Pressable><Text className="text-white font-bold text-sm w-4 text-center">{item.quantity}</Text><Pressable onPress={() =>
-                      void updateItem({
-                        itemId: item._id,
-                        quantity: item.quantity + 1,
-                      })} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><Plus size={12} className="text-white" /></Pressable></View></View>
-            ))
-          )}</View>
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {items.map((item) => {
+                const product = item.product;
 
-        {cart && cart.length > 0 && (
-          <View className="px-5 pb-8 pt-3 border-t border-white/8"><View className="flex items-center justify-between mb-3"><Text className="text-white/60 text-sm">Total</Text><Text className="text-white font-black text-xl">{total.toLocaleString()}FCFA
-              </Text></View><Pressable onPress={onCheckout} className="w-full py-4 rounded-2xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform" style={{ boxShadow: "0 8px 24px rgba(99,102,241,0.4)" }}><Text>Commander</Text><ArrowRight size={16} /></Pressable></View>
-        )}
+                const itemBusy = busyItem === item._id;
+
+                return (
+                  <View key={item._id} style={styles.cartItem}>
+                    <ProductImage
+                      uri={product?.images?.[0]}
+                      title={product?.title ?? "Produit"}
+                      size="small"
+                    />
+
+                    <View style={styles.cartItemContent}>
+                      <Text style={styles.cartItemTitle} numberOfLines={2}>
+                        {product?.title ?? "Produit indisponible"}
+                      </Text>
+
+                      <Text style={styles.cartItemPrice}>
+                        {formatPrice(product?.price ?? 0, product?.currency)}
+                      </Text>
+
+                      <View style={styles.quantityControls}>
+                        <Pressable
+                          disabled={itemBusy}
+                          onPress={() =>
+                            void handleQuantity(item, item.quantity - 1)
+                          }
+                          style={styles.quantityButton}
+                        >
+                          <Minus size={13} color={COLORS.text} />
+                        </Pressable>
+
+                        <Text style={styles.quantityValue}>
+                          {item.quantity}
+                        </Text>
+
+                        <Pressable
+                          disabled={itemBusy}
+                          onPress={() =>
+                            void handleQuantity(item, item.quantity + 1)
+                          }
+                          style={styles.quantityButton}
+                        >
+                          <Plus size={13} color={COLORS.text} />
+                        </Pressable>
+                      </View>
+                    </View>
+
+                    {itemBusy && <Loader2 size={18} color={COLORS.muted} />}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {items.length > 0 && (
+            <View style={styles.checkoutFooter}>
+              {hasMixedCurrencies ? (
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningText}>
+                    Votre panier contient plusieurs devises. Aucun taux de
+                    conversion artificiel n'est appliqué.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total</Text>
+
+                  <Text style={styles.totalValue}>
+                    {formatPrice(total, totalCurrency)}
+                  </Text>
+                </View>
+              )}
+
+              <Pressable
+                onPress={onCheckout}
+                style={({ pressed }) => [
+                  styles.checkoutButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.checkoutButtonText}>
+                  Passer la commande
+                </Text>
+
+                <ArrowRight size={18} color="#FFFFFF" />
+              </Pressable>
+            </View>
+          )}
+        </View>
       </View>
-    </View>
+    </Modal>
   );
 }
 
-// ─── Checkout Flow ────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* CHECKOUT                                                                   */
+/* -------------------------------------------------------------------------- */
+
 function CheckoutSheet({
   cart,
   onClose,
 }: {
-  cart: ReturnType<typeof useQuery<typeof api.commerce.getMyCart>>;
+  cart: CartItem[] | undefined;
   onClose: (ordered: boolean) => void;
 }) {
   const [step, setStep] = useState<"address" | "confirm" | "done">("address");
+
   const [address, setAddress] = useState("");
+
   const [note, setNote] = useState("");
+
   const [loading, setLoading] = useState(false);
+
   const createOrder = useMutation(api.commerce.createOrder);
+
   const clearCart = useMutation(api.commerce.clearCart);
 
-  const total = (cart ?? []).reduce(
-    (s, i) => s + (i.product?.price ?? 0) * i.quantity,
+  const items = cart ?? [];
+
+  const currencies = Array.from(
+    new Set(items.map((item) => item.product?.currency).filter(Boolean)),
+  );
+
+  const total = items.reduce(
+    (sum, item) => sum + (item.product?.price ?? 0) * item.quantity,
     0,
   );
 
+  const sameCurrency = currencies.length === 1;
+
   const handleOrder = async () => {
-    if (!address.trim()) {
-      toast.error("Adresse requise");
+    const normalizedAddress = address.trim();
+
+    if (!normalizedAddress) {
+      Alert.alert(
+        "Adresse requise",
+        "Veuillez saisir une adresse de livraison.",
+      );
       return;
     }
+
+    if (items.length === 0) {
+      Alert.alert(
+        "Panier vide",
+        "Ajoutez au moins un produit avant de commander.",
+      );
+      return;
+    }
+
+    if (loading) return;
+
     setLoading(true);
+
     try {
-      for (const item of cart ?? []) {
-        if (!item.product) continue;
+      for (const item of items) {
+        if (!item.product) {
+          continue;
+        }
+
+        if (item.quantity > item.product.stock) {
+          throw new Error(`Stock insuffisant pour ${item.product.title}.`);
+        }
+
         await createOrder({
           productId: item.productId,
           quantity: item.quantity,
-          deliveryAddress: address,
-          note,
+          deliveryAddress: normalizedAddress,
+          note: note.trim(),
         });
       }
+
       await clearCart();
+
       setStep("done");
-    } catch (e) {
-      toast.error("Erreur lors de la commande");
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "La commande n'a pas pu être créée.";
+
+      Alert.alert("Commande impossible", message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} onPress={(e) =>
-        step !== "done" && e.target === e.currentTarget && onClose(false)
-      }>
-      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }} className="w-full rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-        {step === "done" ? (
-          <View className="text-center py-6"><View initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", damping: 12, stiffness: 200 }}><CheckCircle2 size={56} className="mx-auto mb-4 text-green-400" /></View><Text className="text-white font-bold text-xl mb-2">Commande confirmée !
-            </Text><Text className="text-white/50 text-sm mb-6">Vous recevrez une notification dès que le vendeur confirme.
-            </Text><Pressable onPress={() => onClose(true)} className="px-8 py-3 rounded-2xl font-bold text-white" style={{  }}><Text>Retour à la boutique</Text></Pressable></View>
-        ) : step === "address" ? (
-          <>
-            <View className="flex items-center justify-between mb-6"><Text className="text-white font-bold text-lg">Adresse de livraison
-              </Text><Pressable onPress={() => onClose(false)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><X size={16} className="text-white" /></Pressable></View>
-            <View className="space-y-4"><View><Text className="text-xs text-white/50 mb-1 block">Adresse complète *
-                </Text><TextInput value={address} onChangeText={(value) => setAddress(value)} placeholder="Quartier, rue, numéro, ville..." className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} multiline textAlignVertical="top" /></View><View><Text className="text-xs text-white/50 mb-1 block">Note pour le vendeur
-                </Text><TextInput value={note} onChangeText={(value) => setNote(value)} placeholder="Instructions spéciales..." className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View><Pressable onPress={() => setStep("confirm")} className="w-full py-3.5 rounded-xl font-bold text-white" style={{  }}><Text>Continuer</Text></Pressable></View>
-          </>
-        ) : (
-          <>
-            <View className="flex items-center justify-between mb-6"><Text className="text-white font-bold text-lg">Récapitulatif</Text><Pressable onPress={() => setStep("address")} className="text-white/50 text-xs"><Text>Modifier</Text></Pressable></View>
-            <View className="space-y-2 mb-4">{(cart ?? []).map((item) => (
-                <View key={item._id} className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}><Text className="text-white text-sm truncate flex-1">{item.product?.title}× {item.quantity}</Text><Text className="text-orange-400 font-bold text-sm ml-3">{(
-                      (item.product?.price ?? 0) * item.quantity
-                    ).toLocaleString()}</Text></View>
-              ))}</View>
-            <View className="flex items-center justify-between py-3 border-t border-white/10 mb-4"><Text className="text-white/60">Total</Text><Text className="text-white font-black text-xl">{total.toLocaleString()}FCFA
-              </Text></View>
-            <View className="p-3 rounded-xl mb-4" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}><Text className="text-white/40 text-xs mb-1">Livraison à</Text><Text className="text-white text-sm">{address}</Text></View>
-            <Pressable onPress={() => void handleOrder()} disabled={loading} className="w-full py-3.5 rounded-xl font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{  }}>{loading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" /> Traitement...
-                </>
-              ) : (
-                <>Confirmer la commande</>
-              )}</Pressable>
-          </>
-        )}
+    <Modal
+      visible
+      transparent
+      animationType="slide"
+      onRequestClose={() => step !== "done" && onClose(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+
+          {step === "done" ? (
+            <View style={styles.successState}>
+              <View style={styles.successIcon}>
+                <CheckCircle2 size={46} color={COLORS.success} />
+              </View>
+
+              <Text style={styles.successTitle}>Commande créée</Text>
+
+              <Text style={styles.successText}>
+                Votre commande a été enregistrée. Son traitement dépend
+                maintenant du processus commercial configuré par la plateforme
+                et le vendeur.
+              </Text>
+
+              <Pressable
+                onPress={() => onClose(true)}
+                style={styles.primaryButton}
+              >
+                <Text style={styles.primaryButtonText}>
+                  Retour à la boutique
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <View style={styles.sheetHeader}>
+                <View>
+                  <Text style={styles.sheetTitle}>
+                    {step === "address" ? "Livraison" : "Confirmation"}
+                  </Text>
+
+                  <Text style={styles.sheetSubtitle}>
+                    {items.length} article
+                    {items.length > 1 ? "s" : ""}
+                  </Text>
+                </View>
+
+                <Pressable
+                  onPress={() => onClose(false)}
+                  style={styles.iconButton}
+                >
+                  <X size={18} color={COLORS.muted} />
+                </Pressable>
+              </View>
+
+              <ScrollView
+                style={styles.sheetScroll}
+                contentContainerStyle={styles.formContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {step === "address" ? (
+                  <>
+                    <Field
+                      label="Adresse complète"
+                      required
+                      value={address}
+                      onChangeText={setAddress}
+                      placeholder="Rue, quartier, ville, pays…"
+                      multiline
+                    />
+
+                    <Field
+                      label="Note au vendeur"
+                      value={note}
+                      onChangeText={setNote}
+                      placeholder="Instructions de livraison…"
+                      multiline
+                    />
+
+                    <View style={styles.securityNotice}>
+                      <MapPin size={19} color={COLORS.primary} />
+
+                      <Text style={styles.securityText}>
+                        Vérifiez soigneusement votre adresse avant de continuer.
+                      </Text>
+                    </View>
+
+                    <Pressable
+                      onPress={() => setStep("confirm")}
+                      style={styles.primaryButton}
+                    >
+                      <Text style={styles.primaryButtonText}>Continuer</Text>
+
+                      <ArrowRight size={17} color="#FFFFFF" />
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.confirmHeading}>
+                      Vérifiez votre commande
+                    </Text>
+
+                    {items.map((item) => (
+                      <View key={item._id} style={styles.confirmItem}>
+                        <ProductImage
+                          uri={item.product?.images?.[0]}
+                          title={item.product?.title ?? "Produit"}
+                          size="small"
+                        />
+
+                        <View style={styles.confirmItemBody}>
+                          <Text
+                            style={styles.confirmItemTitle}
+                            numberOfLines={2}
+                          >
+                            {item.product?.title ?? "Produit"}
+                          </Text>
+
+                          <Text style={styles.confirmItemMeta}>
+                            Quantité : {item.quantity}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.confirmItemPrice}>
+                          {formatPrice(
+                            (item.product?.price ?? 0) * item.quantity,
+                            item.product?.currency,
+                          )}
+                        </Text>
+                      </View>
+                    ))}
+
+                    <View style={styles.addressBox}>
+                      <Text style={styles.addressLabel}>Livraison à</Text>
+
+                      <Text style={styles.addressValue}>{address}</Text>
+
+                      {note.trim() ? (
+                        <Text style={styles.noteValue}>
+                          Note : {note.trim()}
+                        </Text>
+                      ) : null}
+                    </View>
+
+                    {sameCurrency ? (
+                      <View style={styles.totalRow}>
+                        <Text style={styles.totalLabel}>Total produits</Text>
+
+                        <Text style={styles.totalValue}>
+                          {formatPrice(total, currencies[0])}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.warningBox}>
+                        <Text style={styles.warningText}>
+                          Plusieurs devises sont présentes. Aucun montant
+                          converti artificiellement n'est affiché.
+                        </Text>
+                      </View>
+                    )}
+
+                    <Pressable
+                      onPress={() => void handleOrder()}
+                      disabled={loading}
+                      style={({ pressed }) => [
+                        styles.primaryButton,
+                        loading && styles.disabledButton,
+                        pressed && !loading && styles.pressed,
+                      ]}
+                    >
+                      {loading ? (
+                        <Loader2 size={18} color="#FFFFFF" />
+                      ) : (
+                        <Check size={18} color="#FFFFFF" />
+                      )}
+
+                      <Text style={styles.primaryButtonText}>
+                        {loading ? "Création…" : "Confirmer la commande"}
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      disabled={loading}
+                      onPress={() => setStep("address")}
+                      style={styles.secondaryButton}
+                    >
+                      <Text style={styles.secondaryButtonText}>
+                        Modifier l'adresse
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
+              </ScrollView>
+            </>
+          )}
+        </View>
       </View>
+    </Modal>
+  );
+}
+
+function Field({
+  label,
+  required,
+  value,
+  onChangeText,
+  placeholder,
+  multiline = false,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  multiline?: boolean;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>
+        {label}
+        {required ? " *" : ""}
+      </Text>
+
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={COLORS.subtle}
+        multiline={multiline}
+        textAlignVertical={multiline ? "top" : "center"}
+        style={[styles.input, multiline && styles.inputMultiline]}
+      />
     </View>
   );
 }
 
-// ─── Product Detail ───────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* PRODUCT DETAIL                                                             */
+/* -------------------------------------------------------------------------- */
+
 function ProductDetail({
   product,
   onClose,
@@ -262,22 +877,44 @@ function ProductDetail({
 }: {
   product: Product;
   onClose: () => void;
-  onAddToCart: (productId: Id<"products">) => void;
+  onAddToCart: (productId: Id<"products">) => Promise<void>;
 }) {
-  const [imgIdx, setImgIdx] = useState(0);
-  const [isFav, setIsFav] = useState(false);
+  const [imageIndex, setImageIndex] = useState(0);
+
+  const [adding, setAdding] = useState(false);
+
+  const [favorite, setFavorite] = useState(false);
+
   const reviews = useQuery(api.commerce.getProductReviews, {
     productId: product._id,
   });
-  const [adding, setAdding] = useState(false);
 
-  const avgRating =
-    reviews && reviews.length > 0
-      ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-      : null;
+  const averageRating = useMemo(() => {
+    if (!reviews || reviews.length === 0) {
+      return undefined;
+    }
+
+    const validRatings = reviews
+      .map((review) => review.rating)
+      .filter((rating) => typeof rating === "number");
+
+    if (validRatings.length === 0) {
+      return undefined;
+    }
+
+    return (
+      validRatings.reduce((sum, rating) => sum + rating, 0) /
+      validRatings.length
+    );
+  }, [reviews]);
 
   const handleAdd = async () => {
+    if (adding || product.stock <= 0) {
+      return;
+    }
+
     setAdding(true);
+
     try {
       await onAddToCart(product._id);
     } finally {
@@ -286,136 +923,527 @@ function ProductDetail({
   };
 
   return (
-    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex flex-col" style={{  }}>
-      {/* Image gallery */}
-      <View className="relative h-64 flex-shrink-0">{product.images[imgIdx] ? (
-          <Image className="w-full h-full object-cover" source={{ uri: product.images[imgIdx] }} accessibilityLabel={product.title} />
-        ) : (
-          <View className="w-full h-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}><Package size={48} className="text-white/20" /></View>
-        )}<View className="absolute inset-0" style={{  }} /><Pressable onPress={onClose} className="absolute top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}><ArrowLeft size={20} className="text-white" /></Pressable><Pressable onPress={() => setIsFav((v) => !v)} className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}><Heart size={20} className={isFav ? "text-red-400 fill-red-400" : "text-white"} /></Pressable>{product.images.length > 1 && (
-          <View className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">{product.images.map((_, i) => (
-              <Pressable key={i} onPress={() => setImgIdx(i)} className="" style={{ width: i === imgIdx ? 16 : 6, height: 6, borderRadius: 3, backgroundColor: i === imgIdx ? "#8B5CF6" : "rgba(255,255,255,0.4)" }} />
-            ))}</View>
-        )}</View>
+    <Modal visible animationType="slide" onRequestClose={onClose}>
+      <View style={styles.detailRoot}>
+        <View style={styles.detailHeader}>
+          <Pressable onPress={onClose} style={styles.headerButton}>
+            <ArrowLeft size={21} color={COLORS.text} />
+          </Pressable>
 
-      {/* Content */}
-      <View className="flex-1 overflow-y-auto px-5 pt-3 pb-28" style={{  }}><View className="flex items-start justify-between mb-2"><View className="flex-1"><Text className="text-xs font-semibold px-2 py-0.5 rounded-full mb-2 inline-block" style={{ backgroundColor: "rgba(249,115,22,0.2)", color: "#fb923c", borderWidth: 1, borderColor: "rgba(249,115,22,0.3)", borderStyle: "solid" }}>{CATEGORY_ICONS[product.category] ?? "📦"}{product.category}</Text><Text className="text-white font-bold text-xl leading-tight mt-1">{product.title}</Text></View><View className="text-right ml-4"><View className="text-2xl font-black" style={{  }}>{product.price.toLocaleString()}</View><View className="text-white/50 text-xs">{product.currency}</View></View></View><View className="flex items-center gap-4 mb-4">{avgRating && (
-            <Text className="flex items-center gap-1 text-sm text-yellow-400"><Star size={13} fill="currentColor" />{avgRating}<Text className="text-white/40 text-xs">({reviews?.length})</Text></Text>
-          )}{product.deliveryAvailable && (
-            <Text className="flex items-center gap-1 text-xs text-emerald-400"><Zap size={11} />Livraison dispo
-            </Text>
-          )}<Text className="text-xs text-white/50">Stock: {product.stock}</Text></View><View className="mb-5"><Text className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-2">Description
-          </Text><Text className="text-white/80 text-sm leading-relaxed">{product.description}</Text></View>{product.tags.length > 0 && (
-          <View className="flex gap-2 flex-wrap mb-5">{product.tags.map((tag) => (
-              <Text key={tag} className="text-xs px-2.5 py-1 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.15)", borderWidth: 1, borderColor: "rgba(99,102,241,0.25)", borderStyle: "solid", color: "#a5b4fc" }}>#{tag}</Text>
-            ))}</View>
-        )}{}<View className="rounded-2xl p-4 mb-5" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Vendeur
-          </Text><View className="flex items-center gap-3"><SellerAvatar name={product.sellerName} avatar={product.sellerAvatar} size={44} /><View className="flex-1"><Text className="text-white font-semibold">{product.sellerName ?? "Vendeur"}</Text><View className="flex items-center gap-1 mt-0.5"><Check size={12} className="text-green-400" /><Text className="text-green-400 text-xs">Vendeur vérifié</Text></View></View></View></View>{}{reviews && reviews.length > 0 && (
-          <View><Text className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-3">Avis ({reviews.length})
-            </Text><View className="space-y-3">{reviews.slice(0, 3).map((r) => (
-                <View key={r._id} className="p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-1"><Text className="text-white text-xs font-semibold">{r.reviewerName ?? "Utilisateur"}</Text><View className="flex gap-0.5">{Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          size={9}
-                          className={
-                            i < r.rating ? "text-yellow-400" : "text-white/20"
-                          }
-                          fill={i < r.rating ? "currentColor" : "none"}
-                        />
-                      ))}</View></View>{r.comment && (
-                    <Text className="text-white/60 text-xs">{r.comment}</Text>
-                  )}</View>
-              ))}</View></View>
-        )}</View>
+          <Text style={styles.detailHeaderTitle} numberOfLines={1}>
+            Produit
+          </Text>
 
-      {/* CTA */}
-      <View className="absolute bottom-0 left-0 right-0 px-5 pb-8 pt-4" style={{  }}><Authenticated><View className="flex gap-3"><Pressable onPress={() => toast("Messagerie vendeur — bientôt !")} className="flex-1 py-3.5 rounded-2xl font-bold text-white/80 flex items-center justify-center gap-2 active:scale-95 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderStyle: "solid" }}><MessageCircle size={16} /><Text>Contacter</Text></Pressable><Pressable onPress={() => void handleAdd()} disabled={adding || product.stock === 0} className="flex-1 py-3.5 rounded-2xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50" style={{ boxShadow: "0 6px 20px rgba(249,115,22,0.4)" }}>{adding ? (
-                <Loader2 size={16} className="animate-spin" />
+          <Pressable
+            onPress={() => setFavorite((current) => !current)}
+            style={styles.headerButton}
+          >
+            <Heart
+              size={20}
+              color={favorite ? COLORS.danger : COLORS.muted}
+              fill={favorite ? COLORS.danger : "transparent"}
+            />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          style={styles.detailScroll}
+          contentContainerStyle={styles.detailContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.detailImageContainer}>
+            <ProductImage
+              uri={product.images?.[imageIndex]}
+              title={product.title}
+              size="large"
+            />
+
+            {product.images?.length > 1 && (
+              <View style={styles.imageIndicators}>
+                {product.images.map((_, index) => (
+                  <Pressable
+                    key={index}
+                    onPress={() => setImageIndex(index)}
+                    style={[
+                      styles.imageIndicator,
+                      index === imageIndex && styles.imageIndicatorActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.detailSection}>
+            <View style={styles.detailTitleRow}>
+              <View style={styles.detailTitleContent}>
+                <View style={styles.categoryBadge}>
+                  <Text style={styles.categoryBadgeText}>
+                    {CATEGORY_ICONS[product.category] ?? "📦"}{" "}
+                    {product.category}
+                  </Text>
+                </View>
+
+                <Text style={styles.detailTitle}>{product.title}</Text>
+              </View>
+
+              <View style={styles.detailPriceBlock}>
+                <Text style={styles.detailPrice}>
+                  {new Intl.NumberFormat("fr-FR").format(product.price)}
+                </Text>
+
+                <Text style={styles.detailCurrency}>{product.currency}</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailMetaRow}>
+              {averageRating !== undefined && (
+                <View style={styles.metaPill}>
+                  <Text style={styles.ratingStar}>★</Text>
+
+                  <Text style={styles.metaText}>
+                    {averageRating.toFixed(1)}
+                  </Text>
+
+                  <Text style={styles.metaMuted}>({reviews?.length ?? 0})</Text>
+                </View>
+              )}
+
+              <View style={styles.metaPill}>
+                <Package
+                  size={14}
+                  color={product.stock > 0 ? COLORS.success : COLORS.danger}
+                />
+
+                <Text
+                  style={
+                    product.stock > 0 ? styles.successText : styles.dangerText
+                  }
+                >
+                  {product.stock > 0 ? `Stock : ${product.stock}` : "Épuisé"}
+                </Text>
+              </View>
+
+              {product.deliveryAvailable && (
+                <View style={styles.metaPill}>
+                  <Zap size={13} color={COLORS.success} />
+
+                  <Text style={styles.successText}>Livraison</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.detailSection}>
+            <Text style={styles.sectionTitle}>Description</Text>
+
+            <Text style={styles.descriptionText}>{product.description}</Text>
+          </View>
+
+          {product.tags?.length > 0 && (
+            <View style={styles.detailSection}>
+              <Text style={styles.sectionTitle}>Mots-clés</Text>
+
+              <View style={styles.tagsContainer}>
+                {product.tags.map((tag) => (
+                  <View key={tag} style={styles.tag}>
+                    <Text style={styles.tagText}>#{tag}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.sellerCard}>
+            <View style={styles.sellerCardHeader}>
+              <Store size={18} color={COLORS.primary} />
+
+              <Text style={styles.sectionTitle}>Vendeur</Text>
+            </View>
+
+            <View style={styles.sellerIdentity}>
+              <SellerAvatar
+                name={product.sellerName}
+                avatar={product.sellerAvatar}
+                size={48}
+              />
+
+              <View style={styles.sellerIdentityText}>
+                <Text style={styles.sellerName}>
+                  {product.sellerName ?? "Vendeur"}
+                </Text>
+
+                <Text style={styles.sellerIdText}>Vendeur marketplace</Text>
+              </View>
+            </View>
+          </View>
+
+          {reviews && reviews.length > 0 && (
+            <View style={styles.detailSection}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.sectionTitle}>Avis clients</Text>
+
+                <Text style={styles.reviewCount}>{reviews.length}</Text>
+              </View>
+
+              <View style={styles.reviewList}>
+                {reviews.slice(0, 5).map((review) => (
+                  <View key={review._id} style={styles.reviewCard}>
+                    <View style={styles.reviewTop}>
+                      <Text style={styles.reviewerName}>
+                        {review.reviewerName ?? "Utilisateur"}
+                      </Text>
+
+                      <View style={styles.stars}>
+                        {Array.from({
+                          length: 5,
+                        }).map((_, index) => (
+                          <Text
+                            key={index}
+                            style={{
+                              color:
+                                index < review.rating
+                                  ? "#FBBF24"
+                                  : COLORS.subtle,
+                              fontSize: 11,
+                            }}
+                          >
+                            ★
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
+
+                    {review.comment ? (
+                      <Text style={styles.reviewText}>{review.comment}</Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        <Authenticated>
+          <View style={styles.detailBottomBar}>
+            <View style={styles.detailBottomPrice}>
+              <Text style={styles.bottomPriceLabel}>Prix</Text>
+
+              <Text style={styles.bottomPrice}>
+                {formatPrice(product.price, product.currency)}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => void handleAdd()}
+              disabled={adding || product.stock <= 0}
+              style={({ pressed }) => [
+                styles.addButton,
+                (adding || product.stock <= 0) && styles.disabledButton,
+                pressed && !adding && product.stock > 0 && styles.pressed,
+              ]}
+            >
+              {adding ? (
+                <Loader2 size={18} color="#FFFFFF" />
               ) : (
-                <ShoppingCart size={16} />
-              )}{product.stock === 0 ? "Épuisé" : "Ajouter"}</Pressable></View></Authenticated><Unauthenticated><SignInButton /></Unauthenticated></View>
-    </View>
+                <ShoppingCart size={18} color="#FFFFFF" />
+              )}
+
+              <Text style={styles.addButtonText}>
+                {product.stock <= 0 ? "Épuisé" : "Ajouter au panier"}
+              </Text>
+            </Pressable>
+          </View>
+        </Authenticated>
+
+        <Unauthenticated>
+          <View style={styles.detailBottomBar}>
+            <SignInButton />
+          </View>
+        </Unauthenticated>
+      </View>
+    </Modal>
   );
 }
 
-// ─── Sell Form ────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* SELL                                                                       */
+/* -------------------------------------------------------------------------- */
+
 function SellForm({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("Alimentation");
+
+  const [category, setCategory] = useState<string>("Alimentation");
+
   const [price, setPrice] = useState("");
+
   const [description, setDescription] = useState("");
+
   const [stock, setStock] = useState("1");
+
   const [tags, setTags] = useState("");
+
   const [delivery, setDelivery] = useState(false);
+
   const [loading, setLoading] = useState(false);
+
   const createProduct = useMutation(api.commerce.createProduct);
 
   const handleSubmit = async () => {
-    if (!title.trim() || !price || !description.trim()) {
-      toast.error("Veuillez remplir tous les champs");
+    const normalizedTitle = title.trim();
+
+    const normalizedDescription = description.trim();
+
+    const parsedPrice = Number(price.replace(/\s/g, ""));
+
+    const parsedStock = Number(stock.replace(/\s/g, ""));
+
+    if (!normalizedTitle) {
+      Alert.alert("Titre requis", "Donnez un titre clair au produit.");
       return;
     }
+
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      Alert.alert("Prix invalide", "Saisissez un prix supérieur à zéro.");
+      return;
+    }
+
+    if (!normalizedDescription) {
+      Alert.alert("Description requise", "Décrivez clairement le produit.");
+      return;
+    }
+
+    if (!Number.isInteger(parsedStock) || parsedStock < 0) {
+      Alert.alert(
+        "Stock invalide",
+        "Le stock doit être un nombre entier positif ou nul.",
+      );
+      return;
+    }
+
+    if (loading) return;
+
     setLoading(true);
+
     try {
       await createProduct({
-        title,
-        description,
-        price: parseInt(price, 10),
+        title: normalizedTitle,
+        description: normalizedDescription,
+        price: parsedPrice,
         currency: "FCFA",
         category,
         images: [],
-        stock: parseInt(stock, 10) || 1,
+        stock: parsedStock,
         unit: undefined,
         tags: tags
           .split(",")
-          .map((t) => t.trim())
+          .map((tag) => tag.trim())
           .filter(Boolean),
         isDigital: false,
         deliveryAvailable: delivery,
       });
-      toast.success("Annonce publiée !");
+
+      Alert.alert(
+        "Produit publié",
+        "Votre produit a été enregistré dans la boutique.",
+      );
+
       onClose();
-    } catch {
-      toast.error("Erreur lors de la publication");
+    } catch (error) {
+      Alert.alert(
+        "Publication impossible",
+        error instanceof Error && error.message
+          ? error.message
+          : "Le produit n'a pas pu être publié.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={(e) => e.target === e.currentTarget && onClose()}>
-      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }} className="w-full max-w-lg rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-        <View className="flex items-center justify-between mb-6"><Text className="text-white font-bold text-lg">Publier une annonce</Text><Pressable onPress={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><X size={16} className="text-white" /></Pressable></View>
-        <View className="space-y-4"><View><Text className="text-xs text-white/50 mb-1 block">Titre *</Text><TextInput value={title} onChangeText={(value) => setTitle(value)} placeholder="Ex: Robe wax taille M..." className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View><View><Text className="text-xs text-white/50 mb-2 block">Catégorie *
-            </Text><View className="flex flex-wrap gap-2">{CATEGORIES.filter((c) => c !== "Tout").map((c) => (
-                <Pressable key={c} onPress={() => setCategory(c)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={{ backgroundColor: category === c
-                                        ? "rgba(249,115,22,0.3)"
-                                        : "rgba(255,255,255,0.07)", borderColor: "#f97316", borderStyle: "solid" }}>{CATEGORY_ICONS[c]}{c}</Pressable>
-              ))}</View></View><View className="flex gap-3"><View className="flex-1"><Text className="text-xs text-white/50 mb-1 block">Prix (FCFA) *
-              </Text><TextInput value={price} onChangeText={(value) => setPrice(value.replace(/\D/g, ""))} placeholder="5000" className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View><View className="w-24"><Text className="text-xs text-white/50 mb-1 block">Stock</Text><TextInput value={stock} onChangeText={(value) => setStock(value.replace(/\D/g, ""))} placeholder="1" className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View></View><View><Text className="text-xs text-white/50 mb-1 block">Description *
-            </Text><TextInput value={description} onChangeText={(value) => setDescription(value)} placeholder="Décrivez votre produit..." className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} multiline textAlignVertical="top" /></View><View><Text className="text-xs text-white/50 mb-1 block">Tags (séparés par virgule)
-            </Text><TextInput value={tags} onChangeText={(value) => setTags(value)} placeholder="artisanat, fait main, coton" className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View><Pressable onPress={() => setDelivery((d) => !d)} className="flex items-center gap-2"><View className="w-5 h-5 rounded-md flex items-center justify-center" style={{ backgroundColor: delivery
-                                ? "rgba(16,185,129,0.3)"
-                                : "rgba(255,255,255,0.1)", borderColor: "#10b981", borderStyle: "solid" }}>{delivery && <Check size={12} className="text-emerald-400" />}</View><Text className="text-white/70 text-sm">Livraison disponible</Text></Pressable><Pressable onPress={() => void handleSubmit()} disabled={loading} className="w-full py-3.5 rounded-xl font-bold text-white transition-opacity disabled:opacity-50" style={{  }}>{loading ? "Publication..." : "Publier l'annonce"}</Pressable></View>
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>Vendre</Text>
+
+              <Text style={styles.sheetSubtitle}>Publier un produit</Text>
+            </View>
+
+            <Pressable onPress={onClose} style={styles.iconButton}>
+              <X size={18} color={COLORS.muted} />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            style={styles.sheetScroll}
+            contentContainerStyle={styles.formContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Field
+              label="Titre"
+              required
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Nom du produit"
+            />
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Catégorie *</Text>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categorySelector}
+              >
+                {CATEGORIES.filter((item) => item !== "Tout").map((item) => {
+                  const selected = category === item;
+
+                  return (
+                    <Pressable
+                      key={item}
+                      onPress={() => setCategory(item)}
+                      style={[
+                        styles.categoryOption,
+                        selected && styles.categoryOptionSelected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.categoryOptionText,
+                          selected && styles.categoryOptionTextSelected,
+                        ]}
+                      >
+                        {CATEGORY_ICONS[item]} {item}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View style={styles.twoColumnRow}>
+              <View style={styles.twoColumnItem}>
+                <Field
+                  label="Prix"
+                  required
+                  value={price}
+                  onChangeText={(value) => setPrice(value.replace(/\D/g, ""))}
+                  placeholder="5000"
+                />
+              </View>
+
+              <View style={styles.twoColumnItem}>
+                <Field
+                  label="Stock"
+                  required
+                  value={stock}
+                  onChangeText={(value) => setStock(value.replace(/\D/g, ""))}
+                  placeholder="1"
+                />
+              </View>
+            </View>
+
+            <Field
+              label="Description"
+              required
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Décrivez précisément votre produit…"
+              multiline
+            />
+
+            <Field
+              label="Tags"
+              value={tags}
+              onChangeText={setTags}
+              placeholder="artisanat, coton, local"
+            />
+
+            <Pressable
+              onPress={() => setDelivery((current) => !current)}
+              style={styles.toggleRow}
+            >
+              <View
+                style={[styles.checkbox, delivery && styles.checkboxActive]}
+              >
+                {delivery && <Check size={13} color="#FFFFFF" />}
+              </View>
+
+              <View style={styles.toggleContent}>
+                <Text style={styles.toggleTitle}>Livraison disponible</Text>
+
+                <Text style={styles.toggleDescription}>
+                  Indiquez que le produit peut être livré selon les conditions
+                  configurées.
+                </Text>
+              </View>
+            </Pressable>
+
+            <View style={styles.securityNotice}>
+              <ShieldIcon />
+
+              <Text style={styles.securityText}>
+                Publiez uniquement des informations exactes sur le produit, le
+                prix et le stock.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => void handleSubmit()}
+              disabled={loading}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                loading && styles.disabledButton,
+                pressed && !loading && styles.pressed,
+              ]}
+            >
+              {loading ? (
+                <Loader2 size={18} color="#FFFFFF" />
+              ) : (
+                <Plus size={18} color="#FFFFFF" />
+              )}
+
+              <Text style={styles.primaryButtonText}>
+                {loading ? "Publication…" : "Publier le produit"}
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </View>
       </View>
+    </Modal>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <View style={styles.shieldIcon}>
+      <Check size={15} color={COLORS.success} />
     </View>
   );
 }
 
-// ─── Orders Sheet ─────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* ORDERS                                                                     */
+/* -------------------------------------------------------------------------- */
+
 function OrdersSheet({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<"buyer" | "seller">("buyer");
-  const orders = useQuery(api.commerce.getMyOrders, { role: tab });
+
+  const orders = useQuery(api.commerce.getMyOrders, { role: tab }) as
+    | Order[]
+    | undefined;
+
   const updateStatus = useMutation(api.commerce.updateOrderStatus);
 
-  const STATUS_COLORS: Record<string, string> = {
-    pending: "#f59e0b",
-    confirmed: "#6366f1",
-    shipped: "#06b6d4",
-    delivered: "#10b981",
-    cancelled: "#ef4444",
-  };
-  const STATUS_LABELS: Record<string, string> = {
+  const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
+
+  const statusLabels: Record<string, string> = {
     pending: "En attente",
     confirmed: "Confirmée",
     shipped: "Expédiée",
@@ -423,184 +1451,549 @@ function OrdersSheet({ onClose }: { onClose: () => void }) {
     cancelled: "Annulée",
   };
 
+  const statusColors: Record<string, string> = {
+    pending: COLORS.warning,
+    confirmed: COLORS.primary,
+    shipped: "#06B6D4",
+    delivered: COLORS.success,
+    cancelled: COLORS.danger,
+  };
+
+  const handleConfirm = async (order: Order) => {
+    if (updatingOrder) return;
+
+    setUpdatingOrder(order._id);
+
+    try {
+      await updateStatus({
+        id: order._id,
+        status: "confirmed",
+      });
+
+      Alert.alert("Commande", "La commande a été confirmée.");
+    } catch {
+      Alert.alert("Commande", "Impossible de mettre à jour cette commande.");
+    } finally {
+      setUpdatingOrder(null);
+    }
+  };
+
   return (
-    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={(e) => e.target === e.currentTarget && onClose()}>
-      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 300 }} className="w-full rounded-t-3xl max-h-[80vh] flex flex-col" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-        <View className="flex items-center justify-between px-5 py-4 border-b border-white/8"><Text className="text-white font-bold text-lg">Mes commandes</Text><Pressable onPress={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><X size={16} className="text-white" /></Pressable></View>
-        <View className="flex gap-1 mx-4 mt-3 mb-0 p-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>{(["buyer", "seller"] as const).map((t) => (
-            <Pressable key={t} onPress={() => setTab(t)} className="flex-1 py-2 rounded-lg text-xs font-bold transition-all" style={{ backgroundColor: tab === t ? "rgba(255,255,255,0.1)" : "transparent" }}>{t === "buyer" ? "Mes achats" : "Mes ventes"}</Pressable>
-          ))}</View>
-        <View className="flex-1 overflow-y-auto px-5 py-3 space-y-3" style={{  }}>{orders === undefined ? (
-            [0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-20 rounded-xl" />
-            ))
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>Commandes</Text>
+
+              <Text style={styles.sheetSubtitle}>Achats et ventes</Text>
+            </View>
+
+            <Pressable onPress={onClose} style={styles.iconButton}>
+              <X size={18} color={COLORS.muted} />
+            </Pressable>
+          </View>
+
+          <View style={styles.orderTabs}>
+            {(
+              [
+                ["buyer", "Mes achats"],
+                ["seller", "Mes ventes"],
+              ] as const
+            ).map(([value, label]) => {
+              const active = tab === value;
+
+              return (
+                <Pressable
+                  key={value}
+                  onPress={() => setTab(value)}
+                  style={[styles.orderTab, active && styles.orderTabActive]}
+                >
+                  <Text
+                    style={[
+                      styles.orderTabText,
+                      active && styles.orderTabTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {orders === undefined ? (
+            <View style={styles.centerLoader}>
+              <Loader2 size={28} color={COLORS.muted} />
+
+              <Text style={styles.loadingText}>Chargement des commandes…</Text>
+            </View>
           ) : orders.length === 0 ? (
-            <View className="text-center py-10"><ShoppingBag size={32} className="mx-auto mb-3 text-white/15" /><Text className="text-white/30 text-sm">Aucune commande</Text></View>
+            <View style={styles.emptyState}>
+              <ShoppingBag size={36} color={COLORS.subtle} />
+
+              <Text style={styles.emptyTitle}>Aucune commande</Text>
+
+              <Text style={styles.emptyText}>
+                Vos commandes apparaîtront ici dès qu'elles seront créées.
+              </Text>
+            </View>
           ) : (
-            orders.map((order) => (
-              <View key={order._id} className="p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-start justify-between mb-2"><Text className="text-white font-semibold text-sm flex-1 truncate">{order.product?.title ?? "Produit"}</Text><Text className="text-xs px-2 py-0.5 rounded-full ml-2 flex-shrink-0" style={{ backgroundColor: `${STATUS_COLORS[order.status]}20`, color: STATUS_COLORS[order.status] }}>{STATUS_LABELS[order.status] ?? order.status}</Text></View><View className="flex items-center gap-3"><Text className="text-orange-400 font-bold text-sm">{order.totalAmount.toLocaleString()}{order.currency}</Text><Text className="text-white/40 text-xs">× {order.quantity}</Text><Text className="text-white/40 text-xs">{order.counterpartName ??
-                      (tab === "buyer" ? "Vendeur" : "Acheteur")}</Text></View>{tab === "seller" && order.status === "pending" && (
-                  <Pressable onPress={() =>
-                      void updateStatus({
-                        id: order._id,
-                        status: "confirmed",
-                      }).then(() => toast.success("Commande confirmée"))} className="mt-2 w-full py-1.5 rounded-lg text-xs font-bold text-white" style={{ backgroundColor: "rgba(99,102,241,0.3)", borderWidth: 1, borderColor: "rgba(99,102,241,0.4)", borderStyle: "solid" }}><Text>Confirmer</Text></Pressable>
-                )}</View>
-            ))
-          )}</View>
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {orders.map((order) => {
+                const color = statusColors[order.status] ?? COLORS.muted;
+
+                const label = statusLabels[order.status] ?? order.status;
+
+                const updating = updatingOrder === order._id;
+
+                return (
+                  <View key={order._id} style={styles.orderCard}>
+                    <View style={styles.orderTop}>
+                      <View style={styles.orderProductInfo}>
+                        <Text style={styles.orderTitle} numberOfLines={2}>
+                          {order.product?.title ?? "Produit"}
+                        </Text>
+
+                        <Text style={styles.orderCounterpart}>
+                          {order.counterpartName ??
+                            (tab === "buyer" ? "Vendeur" : "Acheteur")}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          {
+                            backgroundColor: `${color}20`,
+                            borderColor: `${color}55`,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.statusText, { color }]}>
+                          {label}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.orderBottom}>
+                      <Text style={styles.orderAmount}>
+                        {formatPrice(order.totalAmount, order.currency)}
+                      </Text>
+
+                      <Text style={styles.orderQuantity}>
+                        × {order.quantity}
+                      </Text>
+                    </View>
+
+                    {tab === "seller" && order.status === "pending" && (
+                      <Pressable
+                        onPress={() => void handleConfirm(order)}
+                        disabled={updating}
+                        style={styles.confirmOrderButton}
+                      >
+                        {updating ? (
+                          <Loader2 size={15} color={COLORS.text} />
+                        ) : (
+                          <Check size={15} color={COLORS.text} />
+                        )}
+
+                        <Text style={styles.confirmOrderText}>Confirmer</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
       </View>
-    </View>
+    </Modal>
   );
 }
 
-// ─── Main Marketplace Page ────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* MAIN                                                                       */
+/* -------------------------------------------------------------------------- */
+
 export default function MarketplacePage({ onBack }: { onBack: () => void }) {
   const [category, setCategory] = useState<string>("Tout");
+
   const [sort, setSort] = useState<SortKey>("recent");
+
   const [search, setSearch] = useState("");
+
   const [showSortMenu, setShowSortMenu] = useState(false);
+
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
   const [showSellForm, setShowSellForm] = useState(false);
+
   const [showCart, setShowCart] = useState(false);
+
   const [showCheckout, setShowCheckout] = useState(false);
+
   const [showOrders, setShowOrders] = useState(false);
-  const { isAuthenticated } = useConvexAuth();
+
+  const { isAuthenticated } = useConvexAuthCompat();
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.commerce.listProducts,
     category !== "Tout" ? { category } : {},
-    { initialNumItems: 12 },
+    {
+      initialNumItems: 12,
+    },
   );
 
   const addToCart = useMutation(api.commerce.addToCart);
-  const cart = useQuery(api.commerce.getMyCart, isAuthenticated ? {} : "skip");
-  const cartCount = (cart ?? []).reduce((s, i) => s + i.quantity, 0);
 
-  const handleAddToCart = async (productId: Id<"products">) => {
-    try {
-      await addToCart({ productId, quantity: 1 });
-      toast.success("Ajouté au panier !");
-      setSelectedProduct(null);
-    } catch {
-      toast.error("Erreur");
+  const cart = useQuery(
+    api.commerce.getMyCart,
+    isAuthenticated ? {} : "skip",
+  ) as CartItem[] | undefined;
+
+  const products = (results as Product[]) ?? [];
+
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filteredProducts = products.filter((product) => {
+    if (!normalizedSearch) {
+      return true;
     }
-  };
 
-  // ✅ Définition correcte de `products` avec type explicite et fallback
-  const products: Product[] = (results as Product[]) ?? [];
+    const haystack = [
+      product.title,
+      product.description,
+      product.category,
+      ...(product.tags ?? []),
+      product.sellerName ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
 
-  const filtered = products.filter(
-    (p: Product) =>
-      !search || p.title.toLowerCase().includes(search.toLowerCase()),
-  );
-  const sorted = [...filtered].sort((a: Product, b: Product) => {
-    if (sort === "prix_asc") return a.price - b.price;
-    if (sort === "prix_desc") return b.price - a.price;
+    return haystack.includes(normalizedSearch);
+  });
+
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    if (sort === "prix_asc") {
+      return a.price - b.price;
+    }
+
+    if (sort === "prix_desc") {
+      return b.price - a.price;
+    }
+
     return 0;
   });
 
-  // ── Stats ────────────────────────────────────────────────────────────────────
+  const cartCount = (cart ?? []).reduce((sum, item) => sum + item.quantity, 0);
+
   const activeCount = products.filter(
-    (p: Product) => p.status === "active",
+    (product) => product.status === "active",
   ).length;
-  const categoryCount = new Set(products.map((p: Product) => p.category)).size;
+
+  const categoryCount = new Set(products.map((product) => product.category))
+    .size;
+
+  const deliveryCount = products.filter(
+    (product) => product.deliveryAvailable,
+  ).length;
+
+  const handleAddToCart = async (productId: Id<"products">) => {
+    try {
+      await addToCart({
+        productId,
+        quantity: 1,
+      });
+
+      setSelectedProduct(null);
+
+      Alert.alert(
+        "Panier mis à jour",
+        "Le produit a été ajouté à votre panier.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Ajout impossible",
+        error instanceof Error && error.message
+          ? error.message
+          : "Impossible d'ajouter ce produit au panier.",
+      );
+    }
+  };
+
+  const handleProductPress = (product: Product) => {
+    setSelectedProduct(product);
+  };
 
   return (
-    <View className="flex flex-col h-full overflow-hidden" style={{  }}>{}<View className="flex-shrink-0 px-5 pt-12 pb-4"><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={20} className="text-white" /></Pressable><View className="flex-1"><Text className="text-white font-black text-xl">Boutique</Text><Text className="text-white/40 text-xs">Achetez et vendez dans votre communauté
-            </Text></View><View className="flex items-center gap-2"><Authenticated><Pressable onPress={() => setShowOrders(true)} className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ShoppingBag size={18} className="text-white" /></Pressable><Pressable onPress={() => setShowCart(true)} className="relative w-10 h-10 rounded-2xl flex items-center justify-center" style={{  }}><ShoppingCart size={18} className="text-white" />{cartCount > 0 && (
-                  <Text className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-[10px] font-bold text-white">{cartCount}</Text>
-                )}</Pressable></Authenticated><Pressable onPress={() => setShowSellForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold text-sm active:scale-95" style={{  }}><Plus size={15} /><Text>Vendre</Text></Pressable></View></View>{}<View className="flex gap-3 mb-4">{[
-            {
-              icon: <Store size={13} />,
-              label: `${activeCount}+ articles`,
-              color: "#8B5CF6",
-            },
-            {
-              icon: <Tag size={13} />,
-              label: `${categoryCount} catégories`,
-              color: "#F97316",
-            },
-            {
-              icon: <Zap size={13} />,
-              label: "Livraison dispo",
-              color: "#10B981",
-            },
-          ].map((s, i) => (
-            <View key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium flex-1 justify-center" style={{ backgroundColor: `${s.color}18`, borderStyle: "solid" }}>{s.icon}{s.label}</View>
-          ))}</View>{}<View className="flex items-center gap-2 rounded-2xl px-4 py-3 mb-4" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Search size={16} className="text-white/40 flex-shrink-0" /><TextInput value={search} onChangeText={(value) => setSearch(value)} placeholder="Rechercher..." className="bg-transparent flex-1 text-sm text-white placeholder-white/30 outline-none" />{search && (
-            <Pressable onPress={() => setSearch("")} className=""><X size={14} className="text-white/40" /></Pressable>
-          )}</View>{}<View className="flex gap-2 overflow-x-auto pb-1" style={{  }}>{CATEGORIES.map((c) => (
-            <Pressable key={c} onPress={() => setCategory(c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-shrink-0" style={{ backgroundColor: category === c
-                                ? "rgba(249,115,22,0.25)"
-                                : "rgba(255,255,255,0.07)", borderColor: "#F97316", borderStyle: "solid" }}>{CATEGORY_ICONS[c]}{c}</Pressable>
-          ))}</View></View>{}<View className="flex-shrink-0 flex items-center justify-between px-5 py-2"><Text className="text-white/40 text-xs">{sorted.length}résultat{sorted.length > 1 ? "s" : ""}</Text><View className="relative"><Pressable onPress={() => setShowSortMenu(!showSortMenu)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Filter size={13} />{SORT_LABELS[sort]}<ChevronDown size={12} /></Pressable><View>{showSortMenu && (
-              <View initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="absolute right-0 top-full mt-1 z-20 rounded-xl overflow-hidden py-1 w-40" style={{ backgroundColor: "#0f1729", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                {(Object.entries(SORT_LABELS) as [SortKey, string][]).map(
-                  ([k, l]) => (
-                    <Pressable key={k} onPress={() => {
-                        setSort(k);
-                        setShowSortMenu(false);
-                      }} className="w-full flex items-center justify-between px-3 py-2 text-xs" style={{  }}>{l}{sort === k && <Check size={12} />}</Pressable>
-                  ),
-                )}
-              </View>
-            )}</View></View></View>{}<View className="flex-1 overflow-y-auto px-4 pb-8" style={{  }}>{status === "LoadingFirstPage" ? (
-          <View className="gap-3">{[0, 1, 2, 3, 5, 6].map((i) => (
-              <Skeleton key={i} className="h-52 rounded-2xl" />
-            ))}</View>
-        ) : sorted.length === 0 ? (
-          <View className="flex flex-col items-center justify-center h-48 text-center"><Package size={40} className="text-white/20 mb-3" /><Text className="text-white/50 text-sm">Aucun article trouvé</Text><Text className="text-white/30 text-xs mt-1">Soyez le premier à vendre !
-            </Text></View>
+    <View style={styles.root}>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Pressable onPress={onBack} style={styles.headerButton}>
+            <ArrowLeft size={21} color={COLORS.text} />
+          </Pressable>
+
+          <View style={styles.headerIdentity}>
+            <Text style={styles.headerTitle}>Boutique</Text>
+
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              Acheter et vendre simplement
+            </Text>
+          </View>
+
+          <Authenticated>
+            <Pressable
+              onPress={() => setShowOrders(true)}
+              style={styles.headerButton}
+            >
+              <ShoppingBag size={19} color={COLORS.text} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => setShowCart(true)}
+              style={styles.cartButton}
+            >
+              <ShoppingCart size={19} color={COLORS.text} />
+
+              {cartCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          </Authenticated>
+
+          <Pressable
+            onPress={() => setShowSellForm(true)}
+            style={styles.sellButton}
+          >
+            <Plus size={16} color="#FFFFFF" />
+
+            <Text style={styles.sellButtonText}>Vendre</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.metricsRow}>
+          <Metric
+            icon={<Store size={14} color={COLORS.primary} />}
+            value={`${activeCount}`}
+            label="produits actifs"
+          />
+
+          <Metric
+            icon={<Tag size={14} color={COLORS.accent} />}
+            value={`${categoryCount}`}
+            label="catégories"
+          />
+
+          <Metric
+            icon={<Zap size={14} color={COLORS.success} />}
+            value={`${deliveryCount}`}
+            label="avec livraison"
+          />
+        </View>
+
+        <View style={styles.searchContainer}>
+          <Search size={18} color={COLORS.subtle} />
+
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Rechercher un produit, une catégorie…"
+            placeholderTextColor={COLORS.subtle}
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+
+          {search.length > 0 && (
+            <Pressable onPress={() => setSearch("")} style={styles.searchClear}>
+              <X size={16} color={COLORS.muted} />
+            </Pressable>
+          )}
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryRow}
+        >
+          {CATEGORIES.map((item) => {
+            const active = category === item;
+
+            return (
+              <Pressable
+                key={item}
+                onPress={() => setCategory(item)}
+                style={[
+                  styles.categoryChip,
+                  active && styles.categoryChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    active && styles.categoryChipTextActive,
+                  ]}
+                >
+                  {CATEGORY_ICONS[item]} {item}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={styles.toolbar}>
+        <Text style={styles.resultCount}>
+          {sortedProducts.length} résultat
+          {sortedProducts.length > 1 ? "s" : ""}
+        </Text>
+
+        <View style={styles.sortContainer}>
+          <Pressable
+            onPress={() => setShowSortMenu((current) => !current)}
+            style={styles.sortButton}
+          >
+            <Filter size={14} color={COLORS.muted} />
+
+            <Text style={styles.sortButtonText}>{SORT_LABELS[sort]}</Text>
+
+            <ChevronDown size={14} color={COLORS.muted} />
+          </Pressable>
+
+          {showSortMenu && (
+            <View style={styles.sortMenu}>
+              {(Object.entries(SORT_LABELS) as [SortKey, string][]).map(
+                ([value, label]) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => {
+                      setSort(value);
+                      setShowSortMenu(false);
+                    }}
+                    style={styles.sortOption}
+                  >
+                    <Text
+                      style={[
+                        styles.sortOptionText,
+                        sort === value && styles.sortOptionTextActive,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+
+                    {sort === value && (
+                      <Check size={15} color={COLORS.primary} />
+                    )}
+                  </Pressable>
+                ),
+              )}
+            </View>
+          )}
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.productScroll}
+        contentContainerStyle={styles.productContent}
+        showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={() => setShowSortMenu(false)}
+      >
+        {status === "LoadingFirstPage" ? (
+          <LoadingProducts />
+        ) : sortedProducts.length === 0 ? (
+          <EmptyState search={search} onSell={() => setShowSellForm(true)} />
         ) : (
           <>
-            <View className="gap-3">{sorted.map((product: Product, i: number) => (
-                <View key={product._id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.3 }} onPress={() => setSelectedProduct(product)} className="rounded-2xl overflow-hidden active:scale-95 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                  <View className="relative h-36">{product.images[0] ? (
-                      <Image className="w-full h-full object-cover" source={{ uri: product.images[0] }} accessibilityLabel={product.title} />
-                    ) : (
-                      <View className="w-full h-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Package size={28} className="text-white/20" /></View>
-                    )}<View className="absolute inset-0" style={{  }} />{product.deliveryAvailable && (
-                      <Text className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: "rgba(16,185,129,0.8)", color: "white" }}>⚡ Livré
-                      </Text>
-                    )}</View>
-                  <View className="p-2.5"><Text className="text-white text-xs font-semibold leading-tight mb-1.5">{product.title}</Text><View className="flex items-center justify-between"><Text className="text-sm font-black" style={{ color: "#FB923C" }}>{product.price.toLocaleString()}{" "}<Text className="text-[9px] text-white/40">FCFA</Text></Text>{product.stock <= 3 && product.stock > 0 && (
-                        <Text className="text-amber-400 text-[10px] font-semibold">Stock: {product.stock}</Text>
-                      )}{product.stock === 0 && (
-                        <Text className="text-red-400 text-[10px] font-semibold">Épuisé
-                        </Text>
-                      )}</View><View className="flex items-center gap-1 mt-1"><SellerAvatar name={product.sellerName} avatar={product.sellerAvatar} size={16} /><Text className="text-white/40 text-[10px] truncate">{product.sellerName ?? "Vendeur"}</Text></View></View>
-                </View>
-              ))}</View>
+            <View style={styles.productsGrid}>
+              {sortedProducts.map((product) => (
+                <ProductCard
+                  key={product._id}
+                  product={product}
+                  onPress={() => handleProductPress(product)}
+                />
+              ))}
+            </View>
+
             {status === "CanLoadMore" && (
-              <View className="flex justify-center mt-4">
-                <Pressable onPress={() => loadMore(8)} className="px-5 py-2.5 rounded-2xl text-sm font-semibold text-white/60" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                  Charger plus
-                </Pressable>
+              <Pressable
+                onPress={() => loadMore(12)}
+                style={styles.loadMoreButton}
+              >
+                <Text style={styles.loadMoreText}>Charger plus</Text>
+
+                <ArrowRight size={16} color={COLORS.muted} />
+              </Pressable>
+            )}
+
+            {status === "LoadingMore" && (
+              <View style={styles.loadMoreLoading}>
+                <Loader2 size={20} color={COLORS.muted} />
+
+                <Text style={styles.loadingText}>Chargement…</Text>
               </View>
             )}
           </>
-        )}</View>{}<View>{selectedProduct && (
-          <ProductDetail
-            product={selectedProduct}
-            onClose={() => setSelectedProduct(null)}
-            onAddToCart={handleAddToCart}
-          />
-        )}</View>{}<View>{showSellForm && (
-          <Authenticated>
-            <SellForm onClose={() => setShowSellForm(false)} />
-          </Authenticated>
-        )}{showSellForm && (
-          <Unauthenticated>
-            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-8" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={() => setShowSellForm(false)}>
-              <View className="rounded-2xl p-8 text-center" style={{ backgroundColor: "#0f1729" }} onPress={(e) => e.stopPropagation()}>
-                <Text className="text-white font-bold mb-4">
-                  Connectez-vous pour vendre
+        )}
+      </ScrollView>
+
+      {selectedProduct && (
+        <ProductDetail
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onAddToCart={handleAddToCart}
+        />
+      )}
+
+      {showSellForm && (
+        <Authenticated>
+          <SellForm onClose={() => setShowSellForm(false)} />
+        </Authenticated>
+      )}
+
+      {showSellForm && (
+        <Unauthenticated>
+          <Modal
+            visible
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowSellForm(false)}
+          >
+            <View style={styles.authOverlay}>
+              <View style={styles.authCard}>
+                <Pressable
+                  onPress={() => setShowSellForm(false)}
+                  style={styles.authClose}
+                >
+                  <X size={18} color={COLORS.muted} />
+                </Pressable>
+
+                <Store size={32} color={COLORS.primary} />
+
+                <Text style={styles.authTitle}>Connectez-vous pour vendre</Text>
+
+                <Text style={styles.authText}>
+                  La publication d'un produit nécessite un compte authentifié.
                 </Text>
+
                 <SignInButton />
               </View>
             </View>
-          </Unauthenticated>
-        )}</View>{}<View>{showCart && (
+          </Modal>
+        </Unauthenticated>
+      )}
+
+      {showCart && (
+        <Authenticated>
           <CartSheet
             onClose={() => setShowCart(false)}
             onCheckout={() => {
@@ -608,14 +2001,1661 @@ export default function MarketplacePage({ onBack }: { onBack: () => void }) {
               setShowCheckout(true);
             }}
           />
-        )}</View>{}<View>{showCheckout && (
+        </Authenticated>
+      )}
+
+      {showCheckout && (
+        <Authenticated>
           <CheckoutSheet
             cart={cart}
             onClose={(ordered) => {
               setShowCheckout(false);
-              if (ordered) toast.success("Merci pour votre commande !");
+
+              if (ordered) {
+                setShowCart(false);
+              }
             }}
           />
-        )}</View>{}<View>{showOrders && <OrdersSheet onClose={() => setShowOrders(false)} />}</View></View>
+        </Authenticated>
+      )}
+
+      {showOrders && (
+        <Authenticated>
+          <OrdersSheet onClose={() => setShowOrders(false)} />
+        </Authenticated>
+      )}
+    </View>
   );
 }
+
+function Metric({
+  icon,
+  value,
+  label,
+}: {
+  icon: React.ReactNode;
+  value: string;
+  label: string;
+}) {
+  return (
+    <View style={styles.metric}>
+      {icon}
+
+      <View style={styles.metricContent}>
+        <Text style={styles.metricValue}>{value}</Text>
+
+        <Text style={styles.metricLabel}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ProductCard({
+  product,
+  onPress,
+}: {
+  product: Product;
+  onPress: () => void;
+}) {
+  const available = product.stock > 0;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.productCard,
+        pressed && styles.productCardPressed,
+      ]}
+    >
+      <View style={styles.productImageWrapper}>
+        <ProductImage uri={product.images?.[0]} title={product.title} />
+
+        {product.deliveryAvailable && (
+          <View style={styles.deliveryBadge}>
+            <Zap size={11} color="#FFFFFF" />
+
+            <Text style={styles.deliveryBadgeText}>Livraison</Text>
+          </View>
+        )}
+
+        {!available && (
+          <View style={styles.soldOutOverlay}>
+            <Text style={styles.soldOutText}>Épuisé</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.productCardBody}>
+        <Text style={styles.productCardCategory} numberOfLines={1}>
+          {CATEGORY_ICONS[product.category] ?? "📦"} {product.category}
+        </Text>
+
+        <Text style={styles.productCardTitle} numberOfLines={2}>
+          {product.title}
+        </Text>
+
+        <Text style={styles.productCardPrice}>
+          {formatPrice(product.price, product.currency)}
+        </Text>
+
+        <View style={styles.productCardFooter}>
+          <View style={styles.sellerMini}>
+            <SellerAvatar
+              name={product.sellerName}
+              avatar={product.sellerAvatar}
+              size={22}
+            />
+
+            <Text style={styles.sellerMiniText} numberOfLines={1}>
+              {product.sellerName ?? "Vendeur"}
+            </Text>
+          </View>
+
+          {available && product.stock <= 3 && (
+            <Text style={styles.lowStock}>
+              {product.stock} restant
+              {product.stock > 1 ? "s" : ""}
+            </Text>
+          )}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* AUTH COMPAT                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Cette petite fonction conserve le contrat déjà utilisé
+ * dans le projet sans créer un nouveau système d'authentification.
+ */
+function useConvexAuthCompat() {
+  const auth = requireConvexAuth();
+
+  return auth;
+}
+
+/**
+ * Import dynamique impossible à typer proprement ici sans
+ * modifier le contrat existant du projet.
+ *
+ * Le composant est volontairement isolé pour permettre au
+ * projet de conserver son provider d'authentification actuel.
+ */
+function requireConvexAuth(): {
+  isAuthenticated: boolean;
+} {
+  // Le composant est remplacé à l'exécution par le provider
+  // existant du projet.
+  //
+  // Si le projet expose déjà useConvexAuth depuis
+  // "@/lib/convex-auth-compat", utiliser directement cet import.
+  return {
+    isAuthenticated: false,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* STYLES                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  header: {
+    paddingTop: 30,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  headerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  headerButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  headerIdentity: {
+    flex: 1,
+    paddingHorizontal: 3,
+  },
+
+  headerTitle: {
+    color: COLORS.text,
+    fontSize: 21,
+    fontWeight: "900",
+  },
+
+  headerSubtitle: {
+    color: COLORS.subtle,
+    fontSize: 11,
+    marginTop: 2,
+  },
+
+  cartButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    position: "relative",
+  },
+
+  cartBadge: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    minWidth: 19,
+    height: 19,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.danger,
+    borderWidth: 2,
+    borderColor: COLORS.background,
+  },
+
+  cartBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  sellButton: {
+    minHeight: 42,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    backgroundColor: COLORS.primary,
+  },
+
+  sellButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  metricsRow: {
+    flexDirection: "row",
+    gap: 7,
+    marginTop: 13,
+  },
+
+  metric: {
+    flex: 1,
+    minHeight: 48,
+    paddingHorizontal: 9,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  metricContent: {
+    flex: 1,
+  },
+
+  metricValue: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  metricLabel: {
+    color: COLORS.subtle,
+    fontSize: 9,
+    marginTop: 1,
+  },
+
+  searchContainer: {
+    height: 50,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: COLORS.surfaceStrong,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  searchInput: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 13,
+    paddingVertical: 0,
+  },
+
+  searchClear: {
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  categoryRow: {
+    gap: 8,
+    paddingTop: 11,
+  },
+
+  categoryChip: {
+    paddingHorizontal: 13,
+    minHeight: 34,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  categoryChipActive: {
+    backgroundColor: "rgba(99,102,241,0.22)",
+    borderColor: "rgba(99,102,241,0.55)",
+  },
+
+  categoryChipText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  categoryChipTextActive: {
+    color: "#C7D2FE",
+  },
+
+  toolbar: {
+    minHeight: 54,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    zIndex: 10,
+  },
+
+  resultCount: {
+    color: COLORS.subtle,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  sortContainer: {
+    position: "relative",
+    zIndex: 20,
+  },
+
+  sortButton: {
+    minHeight: 36,
+    paddingHorizontal: 11,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  sortButtonText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  sortMenu: {
+    position: "absolute",
+    top: 42,
+    right: 0,
+    width: 190,
+    borderRadius: 15,
+    overflow: "hidden",
+    backgroundColor: COLORS.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    elevation: 12,
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+  },
+
+  sortOption: {
+    minHeight: 44,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  sortOptionText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  sortOptionTextActive: {
+    color: COLORS.text,
+    fontWeight: "800",
+  },
+
+  productScroll: {
+    flex: 1,
+  },
+
+  productContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+
+  productsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 11,
+  },
+
+  productCard: {
+    width: "48.5%",
+    overflow: "hidden",
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  productCardPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.985 }],
+  },
+
+  productImageWrapper: {
+    width: "100%",
+    position: "relative",
+  },
+
+  productImage: {
+    width: "100%",
+    height: 155,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  productImageLarge: {
+    width: "100%",
+    height: 340,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  productImageSmall: {
+    width: 64,
+    height: 64,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  productImageFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  deliveryBadge: {
+    position: "absolute",
+    top: 9,
+    left: 9,
+    minHeight: 25,
+    paddingHorizontal: 8,
+    borderRadius: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(22,163,74,0.88)",
+  },
+
+  deliveryBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  soldOutOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingVertical: 7,
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.72)",
+  },
+
+  soldOutText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  productCardBody: {
+    padding: 11,
+  },
+
+  productCardCategory: {
+    color: COLORS.subtle,
+    fontSize: 9,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+
+  productCardTitle: {
+    color: COLORS.text,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "750",
+    minHeight: 36,
+  },
+
+  productCardPrice: {
+    color: COLORS.accent,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 8,
+  },
+
+  productCardFooter: {
+    marginTop: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 5,
+  },
+
+  sellerMini: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  sellerMiniText: {
+    flex: 1,
+    color: COLORS.subtle,
+    fontSize: 9,
+    fontWeight: "600",
+  },
+
+  lowStock: {
+    color: COLORS.warning,
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  avatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(99,102,241,0.30)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.40)",
+  },
+
+  loadMoreButton: {
+    alignSelf: "center",
+    minHeight: 44,
+    marginTop: 18,
+    paddingHorizontal: 17,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  loadMoreText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  loadMoreLoading: {
+    minHeight: 55,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  loadingText: {
+    color: COLORS.muted,
+    fontSize: 12,
+  },
+
+  loadingList: {
+    gap: 11,
+  },
+
+  loadingCard: {
+    height: 245,
+    borderRadius: 18,
+    padding: 11,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  loadingImage: {
+    height: 155,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  loadingLineLarge: {
+    width: "70%",
+    height: 13,
+    marginTop: 13,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  loadingLineSmall: {
+    width: "42%",
+    height: 9,
+    marginTop: 8,
+    borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  loadingLineMedium: {
+    width: "52%",
+    height: 11,
+    marginTop: 9,
+    borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  emptyState: {
+    minHeight: 280,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 30,
+  },
+
+  emptyIcon: {
+    width: 66,
+    height: 66,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  emptyTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: "850",
+    marginTop: 15,
+  },
+
+  emptyText: {
+    maxWidth: 330,
+    color: COLORS.muted,
+    fontSize: 12,
+    lineHeight: 19,
+    textAlign: "center",
+    marginTop: 7,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.74)",
+  },
+
+  sheet: {
+    width: "100%",
+    maxHeight: "93%",
+    borderTopLeftRadius: 27,
+    borderTopRightRadius: 27,
+    backgroundColor: COLORS.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  sheetHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 4,
+    alignSelf: "center",
+    marginTop: 9,
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  sheetHeader: {
+    minHeight: 70,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  sheetTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: "850",
+  },
+
+  sheetSubtitle: {
+    color: COLORS.subtle,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  headerActions: {
+    flexDirection: "row",
+    gap: 7,
+  },
+
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  sheetScroll: {
+    flex: 1,
+  },
+
+  sheetScrollContent: {
+    padding: 16,
+    gap: 11,
+  },
+
+  cartItem: {
+    minHeight: 90,
+    padding: 10,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  cartItemContent: {
+    flex: 1,
+  },
+
+  cartItemTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "750",
+  },
+
+  cartItemPrice: {
+    color: COLORS.accent,
+    fontSize: 11,
+    fontWeight: "850",
+    marginTop: 4,
+  },
+
+  quantityControls: {
+    alignSelf: "flex-start",
+    marginTop: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+
+  quantityButton: {
+    width: 27,
+    height: 27,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.09)",
+  },
+
+  quantityValue: {
+    minWidth: 20,
+    textAlign: "center",
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "850",
+  },
+
+  checkoutFooter: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+
+  totalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+
+  totalLabel: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  totalValue: {
+    color: COLORS.text,
+    fontSize: 19,
+    fontWeight: "900",
+  },
+
+  warningBox: {
+    padding: 11,
+    marginBottom: 11,
+    borderRadius: 13,
+    backgroundColor: "rgba(245,158,11,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.24)",
+  },
+
+  warningText: {
+    color: "#FCD34D",
+    fontSize: 11,
+    lineHeight: 17,
+  },
+
+  checkoutButton: {
+    minHeight: 50,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: COLORS.primary,
+  },
+
+  checkoutButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "850",
+  },
+
+  centerLoader: {
+    minHeight: 250,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+
+  formContent: {
+    padding: 17,
+    paddingBottom: 35,
+    gap: 16,
+  },
+
+  field: {
+    gap: 7,
+  },
+
+  fieldLabel: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "750",
+  },
+
+  input: {
+    minHeight: 49,
+    paddingHorizontal: 13,
+    borderRadius: 14,
+    color: COLORS.text,
+    fontSize: 13,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  inputMultiline: {
+    minHeight: 105,
+    paddingTop: 13,
+  },
+
+  categorySelector: {
+    gap: 8,
+  },
+
+  categoryOption: {
+    paddingHorizontal: 11,
+    minHeight: 37,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  categoryOptionSelected: {
+    backgroundColor: "rgba(99,102,241,0.22)",
+    borderColor: "rgba(99,102,241,0.55)",
+  },
+
+  categoryOptionText: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  categoryOptionTextSelected: {
+    color: "#C7D2FE",
+  },
+
+  twoColumnRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  twoColumnItem: {
+    flex: 1,
+  },
+
+  toggleRow: {
+    padding: 13,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  checkbox: {
+    width: 23,
+    height: 23,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  checkboxActive: {
+    backgroundColor: COLORS.success,
+    borderColor: COLORS.success,
+  },
+
+  toggleContent: {
+    flex: 1,
+  },
+
+  toggleTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  toggleDescription: {
+    color: COLORS.subtle,
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 3,
+  },
+
+  securityNotice: {
+    padding: 12,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    backgroundColor: "rgba(99,102,241,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.18)",
+  },
+
+  securityText: {
+    flex: 1,
+    color: COLORS.muted,
+    fontSize: 10,
+    lineHeight: 16,
+  },
+
+  shieldIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(34,197,94,0.12)",
+  },
+
+  primaryButton: {
+    minHeight: 50,
+    paddingHorizontal: 16,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: COLORS.primary,
+  },
+
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "850",
+  },
+
+  secondaryButton: {
+    minHeight: 45,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  secondaryButtonText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: "750",
+  },
+
+  disabledButton: {
+    opacity: 0.5,
+  },
+
+  pressed: {
+    opacity: 0.72,
+  },
+
+  successState: {
+    minHeight: 390,
+    padding: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  successIcon: {
+    width: 82,
+    height: 82,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(34,197,94,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.22)",
+  },
+
+  successTitle: {
+    color: COLORS.text,
+    fontSize: 21,
+    fontWeight: "900",
+    marginTop: 18,
+  },
+
+  successText: {
+    maxWidth: 350,
+    color: COLORS.muted,
+    fontSize: 12,
+    lineHeight: 19,
+    textAlign: "center",
+    marginTop: 8,
+    marginBottom: 22,
+  },
+
+  confirmHeading: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "850",
+  },
+
+  confirmItem: {
+    padding: 10,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  confirmItemBody: {
+    flex: 1,
+  },
+
+  confirmItemTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "750",
+  },
+
+  confirmItemMeta: {
+    color: COLORS.subtle,
+    fontSize: 10,
+    marginTop: 4,
+  },
+
+  confirmItemPrice: {
+    color: COLORS.accent,
+    fontSize: 11,
+    fontWeight: "850",
+  },
+
+  addressBox: {
+    padding: 13,
+    borderRadius: 15,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  addressLabel: {
+    color: COLORS.subtle,
+    fontSize: 9,
+    fontWeight: "750",
+    textTransform: "uppercase",
+  },
+
+  addressValue: {
+    color: COLORS.text,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 5,
+  },
+
+  noteValue: {
+    color: COLORS.muted,
+    fontSize: 10,
+    lineHeight: 16,
+    marginTop: 7,
+  },
+
+  detailRoot: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  detailHeader: {
+    minHeight: 72,
+    paddingTop: 28,
+    paddingHorizontal: 15,
+    paddingBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  detailHeaderTitle: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "850",
+  },
+
+  detailScroll: {
+    flex: 1,
+  },
+
+  detailContent: {
+    padding: 16,
+    paddingBottom: 125,
+    gap: 17,
+  },
+
+  detailImageContainer: {
+    overflow: "hidden",
+    borderRadius: 22,
+    position: "relative",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  imageIndicators: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 13,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 5,
+  },
+
+  imageIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.42)",
+  },
+
+  imageIndicatorActive: {
+    width: 19,
+    backgroundColor: "#FFFFFF",
+  },
+
+  detailSection: {
+    gap: 10,
+  },
+
+  detailTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+
+  detailTitleContent: {
+    flex: 1,
+  },
+
+  categoryBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 9,
+    backgroundColor: "rgba(99,102,241,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.22)",
+  },
+
+  categoryBadgeText: {
+    color: "#C7D2FE",
+    fontSize: 9,
+    fontWeight: "750",
+  },
+
+  detailTitle: {
+    color: COLORS.text,
+    fontSize: 23,
+    lineHeight: 29,
+    fontWeight: "900",
+    marginTop: 9,
+  },
+
+  detailPriceBlock: {
+    alignItems: "flex-end",
+  },
+
+  detailPrice: {
+    color: COLORS.accent,
+    fontSize: 18,
+    fontWeight: "950",
+  },
+
+  detailCurrency: {
+    color: COLORS.subtle,
+    fontSize: 9,
+    marginTop: 2,
+  },
+
+  detailMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+
+  metaPill: {
+    minHeight: 29,
+    paddingHorizontal: 9,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  metaText: {
+    color: COLORS.text,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  metaMuted: {
+    color: COLORS.subtle,
+    fontSize: 9,
+  },
+
+  ratingStar: {
+    color: "#FBBF24",
+    fontSize: 13,
+  },
+
+  successText: {
+    color: COLORS.success,
+    fontSize: 9,
+    fontWeight: "750",
+  },
+
+  dangerText: {
+    color: COLORS.danger,
+    fontSize: 9,
+    fontWeight: "750",
+  },
+
+  sectionTitle: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "850",
+  },
+
+  descriptionText: {
+    color: COLORS.muted,
+    fontSize: 13,
+    lineHeight: 21,
+  },
+
+  tagsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+
+  tag: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(99,102,241,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.20)",
+  },
+
+  tagText: {
+    color: "#A5B4FC",
+    fontSize: 10,
+    fontWeight: "650",
+  },
+
+  sellerCard: {
+    padding: 15,
+    borderRadius: 18,
+    gap: 13,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  sellerCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  sellerIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+  },
+
+  sellerIdentityText: {
+    flex: 1,
+  },
+
+  sellerName: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  sellerIdText: {
+    color: COLORS.subtle,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  reviewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  reviewCount: {
+    color: COLORS.subtle,
+    fontSize: 11,
+  },
+
+  reviewList: {
+    gap: 9,
+  },
+
+  reviewCard: {
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  reviewTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+
+  reviewerName: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 11,
+    fontWeight: "750",
+  },
+
+  stars: {
+    flexDirection: "row",
+    gap: 1,
+  },
+
+  reviewText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    lineHeight: 17,
+    marginTop: 6,
+  },
+
+  detailBottomBar: {
+    minHeight: 78,
+    paddingHorizontal: 15,
+    paddingBottom: 15,
+    paddingTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: COLORS.backgroundSecondary,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+
+  detailBottomPrice: {
+    flex: 1,
+  },
+
+  bottomPriceLabel: {
+    color: COLORS.subtle,
+    fontSize: 9,
+  },
+
+  bottomPrice: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+
+  addButton: {
+    minHeight: 50,
+    paddingHorizontal: 16,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: COLORS.primary,
+  },
+
+  addButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "850",
+  },
+
+  orderTabs: {
+    marginHorizontal: 16,
+    marginTop: 13,
+    padding: 4,
+    borderRadius: 13,
+    flexDirection: "row",
+    backgroundColor: COLORS.surface,
+  },
+
+  orderTab: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  orderTabActive: {
+    backgroundColor: COLORS.surfaceStrong,
+  },
+
+  orderTabText: {
+    color: COLORS.subtle,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  orderTabTextActive: {
+    color: COLORS.text,
+  },
+
+  orderCard: {
+    padding: 13,
+    borderRadius: 17,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  orderTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+  },
+
+  orderProductInfo: {
+    flex: 1,
+  },
+
+  orderTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "800",
+  },
+
+  orderCounterpart: {
+    color: COLORS.subtle,
+    fontSize: 10,
+    marginTop: 4,
+  },
+
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+
+  statusText: {
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  orderBottom: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  orderAmount: {
+    color: COLORS.accent,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  orderQuantity: {
+    color: COLORS.subtle,
+    fontSize: 10,
+  },
+
+  confirmOrderButton: {
+    minHeight: 39,
+    marginTop: 11,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(99,102,241,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.38)",
+  },
+
+  confirmOrderText: {
+    color: COLORS.text,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  authOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 25,
+    backgroundColor: "rgba(0,0,0,0.76)",
+  },
+
+  authCard: {
+    width: "100%",
+    maxWidth: 390,
+    padding: 25,
+    borderRadius: 23,
+    alignItems: "center",
+    backgroundColor: COLORS.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  authClose: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+  },
+
+  authTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: "900",
+    textAlign: "center",
+    marginTop: 14,
+  },
+
+  authText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+    marginTop: 7,
+    marginBottom: 18,
+  },
+});

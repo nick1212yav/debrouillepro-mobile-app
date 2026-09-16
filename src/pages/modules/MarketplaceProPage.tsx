@@ -1,42 +1,59 @@
-import { Picker } from "@react-native-picker/picker";
-import { View, Text, Pressable, TextInput, Image } from "react-native";
-
 // src/pages/modules/MarketplaceProPage.tsx
-// ✅ Version corrigée – toutes les erreurs TS7006 résolues
 
-import { useState, useMemo } from "react";
-import { useQuery, useMutation, usePaginatedQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { usePaginatedQuery, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
-import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { SignInButton } from "@/components/ui/signin.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import {
   ArrowLeft,
-  TrendingUp,
-  ShoppingBag,
-  Package,
-  Star,
-  DollarSign,
-  BarChart2,
+  BarChart3,
+  Check,
   ChevronRight,
-  Zap,
-  Flame,
-  CheckCircle,
-  Clock,
-  X,
-  Download,
+  Clock3,
+  Edit3,
   Eye,
-  Tag,
-  Megaphone,
+  Flame,
+  Image as ImageIcon,
+  Package,
   Plus,
+  RefreshCw,
   Search,
-  Edit,
+  ShoppingBag,
+  Tag,
+  TrendingUp,
+  Truck,
+  X,
 } from "lucide-react-native";
+
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
-// ── Type Product ─────────────────────────────────────────────────────────────
+type TabId = "dashboard" | "produits" | "commandes";
+
+type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+  | "refunded";
+
+type ProductStatus = "active" | "out_of_stock" | "archived";
+
 type Product = {
   _id: Id<"products">;
   title: string;
@@ -46,24 +63,30 @@ type Product = {
   category: string;
   images: string[];
   stock: number;
+  unit?: string;
   tags: string[];
   isDigital: boolean;
   deliveryAvailable: boolean;
+  location?: string;
   sellerId: Id<"users">;
-  status: string;
+  status: ProductStatus;
 };
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-type OrderStatusDisplay =
-  | "pending"
-  | "confirmed"
-  | "shipped"
-  | "delivered"
-  | "cancelled"
-  | "refunded";
-type TabId = "dashboard" | "produits" | "commandes" | "boosts";
+type SellerOrder = {
+  _id: Id<"orders">;
+  productId: Id<"products">;
+  quantity: number;
+  totalAmount: number;
+  currency: string;
+  status: OrderStatus;
+  deliveryAddress?: string;
+  note?: string;
+  product?: Product | null;
+  counterpartName?: string;
+  _creationTime: number;
+};
 
-interface NewProductForm {
+type NewProductForm = {
   title: string;
   description: string;
   price: string;
@@ -76,40 +99,220 @@ interface NewProductForm {
   isDigital: boolean;
   deliveryAvailable: boolean;
   location: string;
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function fmt(n: number) {
-  return Math.abs(n).toLocaleString("fr-FR");
-}
-
-const ORDER_STATUS_CFG: Record<
-  OrderStatusDisplay,
-  { color: string; bg: string; label: string }
-> = {
-  pending: { color: "#F59E0B", bg: "#F59E0B20", label: "En attente" },
-  confirmed: { color: "#3B82F6", bg: "#3B82F620", label: "Confirmé" },
-  shipped: { color: "#6366F1", bg: "#6366F120", label: "Expédié" },
-  delivered: { color: "#10B981", bg: "#10B98120", label: "Livré" },
-  cancelled: { color: "#EF4444", bg: "#EF444420", label: "Annulé" },
-  refunded: { color: "#9CA3AF", bg: "#9CA3AF20", label: "Remboursé" },
 };
 
-// ── Create Product Sheet ──────────────────────────────────────────────────────
-function CreateProductSheet({
+type EditProductForm = {
+  title: string;
+  description: string;
+  price: string;
+  stock: string;
+  status: ProductStatus;
+  images: string;
+};
+
+const COLORS = {
+  background: "#050812",
+  surface: "#0c1022",
+  card: "rgba(255,255,255,0.055)",
+  cardStrong: "rgba(255,255,255,0.08)",
+  border: "rgba(255,255,255,0.10)",
+  borderSoft: "rgba(255,255,255,0.07)",
+  text: "#FFFFFF",
+  muted: "#94A3B8",
+  dim: "#64748B",
+  primary: "#2563EB",
+  indigo: "#4F46E5",
+  green: "#10B981",
+  orange: "#F59E0B",
+  red: "#EF4444",
+  purple: "#8B5CF6",
+};
+
+const ORDER_STATUS: Record<OrderStatus, { label: string; color: string }> = {
+  pending: {
+    label: "En attente",
+    color: COLORS.orange,
+  },
+  confirmed: {
+    label: "Confirmée",
+    color: COLORS.primary,
+  },
+  shipped: {
+    label: "Expédiée",
+    color: COLORS.indigo,
+  },
+  delivered: {
+    label: "Livrée",
+    color: COLORS.green,
+  },
+  cancelled: {
+    label: "Annulée",
+    color: COLORS.red,
+  },
+  refunded: {
+    label: "Remboursée",
+    color: COLORS.dim,
+  },
+};
+
+function formatAmount(value: number, currency: string) {
+  return `${Math.abs(value).toLocaleString("fr-FR")} ${currency}`;
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof ConvexError) {
+    const data = error.data as { message?: string } | string | undefined;
+
+    if (typeof data === "string" && data.trim()) {
+      return data;
+    }
+
+    if (
+      data &&
+      typeof data === "object" &&
+      typeof data.message === "string" &&
+      data.message.trim()
+    ) {
+      return data.message;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function Field({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  multiline = false,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder?: string;
+  keyboardType?: "default" | "numeric" | "decimal-pad";
+  multiline?: boolean;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#64748B"
+        keyboardType={keyboardType}
+        multiline={multiline}
+        textAlignVertical={multiline ? "top" : "center"}
+        style={[styles.input, multiline && styles.multilineInput]}
+      />
+    </View>
+  );
+}
+
+function Toggle({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => onChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      style={styles.toggleRow}
+    >
+      <View style={[styles.checkbox, value && styles.checkboxActive]}>
+        {value ? <Check size={13} color="#FFFFFF" strokeWidth={3} /> : null}
+      </View>
+
+      <Text style={styles.toggleLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function ModalShell({
+  visible,
+  title,
+  subtitle,
+  onClose,
+  children,
+}: {
+  visible: boolean;
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          style={styles.modalKeyboard}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleBlock}>
+                <Text style={styles.modalTitle}>{title}</Text>
+
+                {subtitle ? (
+                  <Text style={styles.modalSubtitle}>{subtitle}</Text>
+                ) : null}
+              </View>
+
+              <Pressable
+                onPress={onClose}
+                style={styles.closeButton}
+                accessibilityLabel="Fermer"
+              >
+                <X size={18} color="#FFFFFF" />
+              </Pressable>
+            </View>
+
+            {children}
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+function ProductFormModal({
+  visible,
   onClose,
   onCreated,
 }: {
+  visible: boolean;
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const createMutation = useMutation(api.commerce.createProduct);
+  const createProduct = useMutation(api.commerce.createProduct);
+
+  const [submitting, setSubmitting] = useState(false);
+
   const [form, setForm] = useState<NewProductForm>({
     title: "",
     description: "",
     price: "",
     currency: "XAF",
-    category: "Mode",
+    category: "",
     images: "",
     stock: "",
     unit: "pièce",
@@ -118,478 +321,1495 @@ function CreateProductSheet({
     deliveryAvailable: true,
     location: "",
   });
-  const [submitting, setSubmitting] = useState(false);
 
-  const update = (k: keyof NewProductForm, v: string | boolean) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const update = <K extends keyof NewProductForm>(
+    key: K,
+    value: NewProductForm[K],
+  ) => {
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
 
-  const handleSubmit = async () => {
-    if (!form.title || !form.price || !form.stock) {
-      toast.error("Titre, prix et stock sont requis");
+  const submit = async () => {
+    const title = form.title.trim();
+    const description = form.description.trim();
+    const category = form.category.trim();
+    const price = Number(form.price.replace(",", "."));
+    const stock = Number(form.stock);
+    const images = form.images
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const tags = form.tags
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!title) {
+      Alert.alert("Produit", "Le titre est obligatoire.");
       return;
     }
+
+    if (!Number.isFinite(price) || price < 0) {
+      Alert.alert("Produit", "Le prix doit être valide.");
+      return;
+    }
+
+    if (!Number.isInteger(stock) || stock < 0) {
+      Alert.alert(
+        "Produit",
+        "Le stock doit être un nombre entier positif ou nul.",
+      );
+      return;
+    }
+
+    if (!category) {
+      Alert.alert("Produit", "La catégorie est obligatoire.");
+      return;
+    }
+
     setSubmitting(true);
+
     try {
-      await createMutation({
-        title: form.title,
-        description: form.description || "Aucune description",
-        price: parseFloat(form.price),
-        currency: form.currency,
-        category: form.category,
-        images: form.images
-          ? form.images
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-          : [],
-        stock: parseInt(form.stock),
-        unit: form.unit || undefined,
-        tags: form.tags
-          ? form.tags
-              .split(",")
-              .map((t) => t.trim())
-              .filter(Boolean)
-          : [],
+      await createProduct({
+        title,
+        description,
+        price,
+        currency: form.currency.trim() || "XAF",
+        category,
+        images,
+        stock,
+        unit: form.unit.trim() || undefined,
+        tags,
         isDigital: form.isDigital,
         deliveryAvailable: form.deliveryAvailable,
-        location: form.location || undefined,
+        location: form.location.trim() || undefined,
       });
-      toast.success("Produit créé !");
+
+      Alert.alert(
+        "Produit créé",
+        "Votre produit a été enregistré dans le Marketplace.",
+      );
+
+      setForm({
+        title: "",
+        description: "",
+        price: "",
+        currency: "XAF",
+        category: "",
+        images: "",
+        stock: "",
+        unit: "pièce",
+        tags: "",
+        isDigital: false,
+        deliveryAvailable: true,
+        location: "",
+      });
+
       onCreated();
       onClose();
-    } catch (err) {
-      if (err instanceof ConvexError) {
-        const data = err.data as { message: string };
-        toast.error(data.message);
-      } else {
-        toast.error("Erreur lors de la création");
-      }
+    } catch (error) {
+      Alert.alert(
+        "Création impossible",
+        errorMessage(error, "Une erreur est survenue."),
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <>
-      <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={onClose} className="absolute inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} />
-      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl p-5 max-h-[85%] overflow-y-auto" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-        <View className="w-12 h-1 rounded-full bg-white/20 mx-auto mb-4" />
-        <View className="flex items-center justify-between mb-4"><Text className="text-white font-black text-lg">Nouveau produit</Text><Pressable onPress={onClose} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><X size={15} className="text-white" /></Pressable></View>
+    <ModalShell
+      visible={visible}
+      title="Nouveau produit"
+      subtitle="Publiez uniquement des informations réelles."
+      onClose={onClose}
+    >
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.modalScroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Field
+          label="Titre *"
+          value={form.title}
+          onChangeText={(value) => update("title", value)}
+          placeholder="Nom du produit"
+        />
 
-        <View className="space-y-3">{[
-            {
-              label: "Titre *",
-              key: "title" as const,
-              placeholder: "Nom du produit",
-            },
-            {
-              label: "Description",
-              key: "description" as const,
-              placeholder: "Décrivez votre produit",
-            },
-            {
-              label: "Prix *",
-              key: "price" as const,
-              placeholder: "Ex: 15000",
-            },
-            { label: "Stock *", key: "stock" as const, placeholder: "Ex: 50" },
-            {
-              label: "Catégorie",
-              key: "category" as const,
-              placeholder: "Ex: Mode, Beauté, Alimentation",
-            },
-            {
-              label: "Images (URLs séparées par des virgules)",
-              key: "images" as const,
-              placeholder: "https://...",
-            },
-            {
-              label: "Tags (séparés par virgules)",
-              key: "tags" as const,
-              placeholder: "handmade, premium",
-            },
-            {
-              label: "Localisation",
-              key: "location" as const,
-              placeholder: "Kinshasa, RDC",
-            },
-          ].map(({ label, key, placeholder }) => (
-            <View key={key}><Text className="text-white/50 text-xs mb-1">{label}</Text><TextInput value={form[key] as string} onChangeText={(value) => update(key, value)} placeholder={placeholder} className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none placeholder:text-white/25" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View>
-          ))}<View className="flex gap-3"><View className="flex-1"><Text className="text-white/50 text-xs mb-1">Devise</Text><Picker onValueChange={(value) => update("currency", value)} className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} selectedValue={form.currency}><Picker.Item label="FCFA (XAF)" value="XAF" /><Picker.Item label="USD" value="USD" /><Picker.Item label="EUR" value="EUR" /></Picker></View><View className="flex-1"><Text className="text-white/50 text-xs mb-1">Unité</Text><Picker onValueChange={(value) => update("unit", value)} className="w-full px-3 py-2.5 rounded-xl text-white text-sm outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} selectedValue={form.unit}><Picker.Item label="Pièce" value="pièce" /><Picker.Item label="Kg" value="kg" /><Picker.Item label="Lot" value="lot" /></Picker></View></View><View className="flex gap-4"><Text className="flex items-center gap-2"><Pressable onPress={(e) => update("deliveryAvailable", e.target.checked)} className="rounded" accessibilityRole="checkbox" accessibilityState={{ checked: form.deliveryAvailable }} /><Text className="text-white/60 text-xs">Livraison</Text></Text><Text className="flex items-center gap-2"><Pressable onPress={(e) => update("isDigital", e.target.checked)} className="rounded" accessibilityRole="checkbox" accessibilityState={{ checked: form.isDigital }} /><Text className="text-white/60 text-xs">Digital</Text></Text></View></View>
+        <Field
+          label="Description"
+          value={form.description}
+          onChangeText={(value) => update("description", value)}
+          placeholder="Décrivez précisément le produit"
+          multiline
+        />
 
-        <Pressable onPress={handleSubmit} disabled={submitting} className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40 mt-4" style={{ boxShadow: "0 4px 20px rgba(249,115,22,0.35)" }}><Plus size={16} className="text-white" /><Text className="text-white font-black">{submitting ? "Création..." : "Créer le produit"}</Text></Pressable>
-      </View>
-    </>
+        <View style={styles.twoColumns}>
+          <View style={styles.column}>
+            <Field
+              label="Prix *"
+              value={form.price}
+              onChangeText={(value) => update("price", value)}
+              placeholder="15000"
+              keyboardType="decimal-pad"
+            />
+          </View>
+
+          <View style={styles.column}>
+            <Field
+              label="Devise"
+              value={form.currency}
+              onChangeText={(value) => update("currency", value)}
+              placeholder="XAF / USD / EUR..."
+            />
+          </View>
+        </View>
+
+        <View style={styles.twoColumns}>
+          <View style={styles.column}>
+            <Field
+              label="Stock *"
+              value={form.stock}
+              onChangeText={(value) => update("stock", value)}
+              placeholder="50"
+              keyboardType="numeric"
+            />
+          </View>
+
+          <View style={styles.column}>
+            <Field
+              label="Unité"
+              value={form.unit}
+              onChangeText={(value) => update("unit", value)}
+              placeholder="pièce"
+            />
+          </View>
+        </View>
+
+        <Field
+          label="Catégorie *"
+          value={form.category}
+          onChangeText={(value) => update("category", value)}
+          placeholder="Mode, Tech, Alimentation..."
+        />
+
+        <Field
+          label="Images"
+          value={form.images}
+          onChangeText={(value) => update("images", value)}
+          placeholder="URL 1, URL 2, URL 3..."
+          multiline
+        />
+
+        <Field
+          label="Tags"
+          value={form.tags}
+          onChangeText={(value) => update("tags", value)}
+          placeholder="premium, local, handmade..."
+        />
+
+        <Field
+          label="Localisation"
+          value={form.location}
+          onChangeText={(value) => update("location", value)}
+          placeholder="Ville / région / pays"
+        />
+
+        <View style={styles.toggleGroup}>
+          <Toggle
+            label="Livraison disponible"
+            value={form.deliveryAvailable}
+            onChange={(value) => update("deliveryAvailable", value)}
+          />
+
+          <Toggle
+            label="Produit numérique"
+            value={form.isDigital}
+            onChange={(value) => update("isDigital", value)}
+          />
+        </View>
+
+        <Pressable
+          onPress={submit}
+          disabled={submitting}
+          style={[styles.primaryButton, submitting && styles.buttonDisabled]}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Plus size={18} color="#FFFFFF" />
+          )}
+
+          <Text style={styles.primaryButtonText}>
+            {submitting ? "Création..." : "Créer le produit"}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </ModalShell>
   );
 }
 
-// ── Inner (authenticated) ─────────────────────────────────────────────────────
+function ProductEditModal({
+  product,
+  visible,
+  onClose,
+}: {
+  product: Product | null;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const updateProduct = useMutation(api.commerce.updateProduct);
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const [form, setForm] = useState<EditProductForm>({
+    title: product?.title ?? "",
+    description: product?.description ?? "",
+    price: product ? String(product.price) : "",
+    stock: product ? String(product.stock) : "",
+    status: product?.status ?? "active",
+    images: product?.images.join(", ") ?? "",
+  });
+
+  const syncFromProduct = () => {
+    if (!product) return;
+
+    setForm({
+      title: product.title,
+      description: product.description,
+      price: String(product.price),
+      stock: String(product.stock),
+      status: product.status,
+      images: product.images.join(", "),
+    });
+  };
+
+  const submit = async () => {
+    if (!product) return;
+
+    const title = form.title.trim();
+    const description = form.description.trim();
+    const price = Number(form.price.replace(",", "."));
+    const stock = Number(form.stock);
+
+    if (!title) {
+      Alert.alert("Produit", "Le titre est obligatoire.");
+      return;
+    }
+
+    if (!Number.isFinite(price) || price < 0) {
+      Alert.alert("Produit", "Prix invalide.");
+      return;
+    }
+
+    if (!Number.isInteger(stock) || stock < 0) {
+      Alert.alert("Produit", "Stock invalide.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await updateProduct({
+        id: product._id,
+        title,
+        description,
+        price,
+        stock,
+        status: form.status,
+        images: form.images
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      });
+
+      Alert.alert(
+        "Produit mis à jour",
+        "Les modifications ont été enregistrées.",
+      );
+
+      onClose();
+    } catch (error) {
+      Alert.alert(
+        "Modification impossible",
+        errorMessage(error, "Une erreur est survenue."),
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell
+      visible={visible}
+      title="Modifier le produit"
+      subtitle={product?.title ? product.title : "Modification"}
+      onClose={onClose}
+    >
+      <ScrollView
+        contentContainerStyle={styles.modalScroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <Field
+          label="Titre"
+          value={form.title}
+          onChangeText={(value) =>
+            setForm((current) => ({
+              ...current,
+              title: value,
+            }))
+          }
+        />
+
+        <Field
+          label="Description"
+          value={form.description}
+          onChangeText={(value) =>
+            setForm((current) => ({
+              ...current,
+              description: value,
+            }))
+          }
+          multiline
+        />
+
+        <View style={styles.twoColumns}>
+          <View style={styles.column}>
+            <Field
+              label="Prix"
+              value={form.price}
+              onChangeText={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  price: value,
+                }))
+              }
+              keyboardType="decimal-pad"
+            />
+          </View>
+
+          <View style={styles.column}>
+            <Field
+              label="Stock"
+              value={form.stock}
+              onChangeText={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  stock: value,
+                }))
+              }
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+
+        <Field
+          label="Images"
+          value={form.images}
+          onChangeText={(value) =>
+            setForm((current) => ({
+              ...current,
+              images: value,
+            }))
+          }
+          multiline
+        />
+
+        <Text style={styles.fieldLabel}>Statut</Text>
+
+        <View style={styles.statusSelector}>
+          {(
+            [
+              ["active", "Actif"],
+              ["out_of_stock", "Rupture"],
+              ["archived", "Archivé"],
+            ] as const
+          ).map(([value, label]) => {
+            const selected = form.status === value;
+
+            return (
+              <Pressable
+                key={value}
+                onPress={() =>
+                  setForm((current) => ({
+                    ...current,
+                    status: value,
+                  }))
+                }
+                style={[
+                  styles.statusOption,
+                  selected && styles.statusOptionActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusOptionText,
+                    selected && styles.statusOptionTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={styles.editActions}>
+          <Pressable
+            onPress={() => {
+              syncFromProduct();
+              onClose();
+            }}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>Annuler</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={submit}
+            disabled={submitting}
+            style={[
+              styles.primaryButton,
+              styles.flexButton,
+              submitting && styles.buttonDisabled,
+            ]}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Check size={17} color="#FFFFFF" />
+            )}
+
+            <Text style={styles.primaryButtonText}>Enregistrer</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </ModalShell>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <View style={styles.statCard}>
+      <View style={[styles.statIcon, { backgroundColor: `${color}20` }]}>
+        {icon}
+      </View>
+
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function ProductCard({
+  product,
+  onEdit,
+  onArchive,
+  onReactivate,
+}: {
+  product: Product;
+  onEdit: () => void;
+  onArchive: () => void;
+  onReactivate: () => void;
+}) {
+  const image = product.images[0];
+
+  const statusColor =
+    product.status === "active"
+      ? COLORS.green
+      : product.status === "out_of_stock"
+        ? COLORS.red
+        : COLORS.dim;
+
+  const statusLabel =
+    product.status === "active"
+      ? "Actif"
+      : product.status === "out_of_stock"
+        ? "Rupture"
+        : "Archivé";
+
+  return (
+    <View style={styles.productCard}>
+      <View style={styles.productTop}>
+        <View style={styles.productImage}>
+          {image ? (
+            <Image
+              source={{ uri: image }}
+              style={styles.productImageFill}
+              resizeMode="cover"
+              accessibilityLabel={product.title}
+            />
+          ) : (
+            <ImageIcon size={24} color={COLORS.dim} />
+          )}
+        </View>
+
+        <View style={styles.productIdentity}>
+          <Text style={styles.productTitle} numberOfLines={2}>
+            {product.title}
+          </Text>
+
+          <Text style={styles.productCategory}>{product.category}</Text>
+
+          <Text style={styles.productPrice}>
+            {formatAmount(product.price, product.currency)}
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.statusBadge,
+            {
+              backgroundColor: `${statusColor}20`,
+            },
+          ]}
+        >
+          <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+            {statusLabel}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.productMetrics}>
+        <View style={styles.metric}>
+          <Package size={14} color={COLORS.green} />
+          <Text style={styles.metricValue}>{product.stock}</Text>
+          <Text style={styles.metricLabel}>stock</Text>
+        </View>
+
+        <View style={styles.metric}>
+          <Tag size={14} color={COLORS.purple} />
+          <Text style={styles.metricValue} numberOfLines={1}>
+            {product.category}
+          </Text>
+          <Text style={styles.metricLabel}>catégorie</Text>
+        </View>
+
+        <View style={styles.metric}>
+          <Truck size={14} color={COLORS.primary} />
+          <Text style={styles.metricValue}>
+            {product.deliveryAvailable ? "Oui" : "Non"}
+          </Text>
+          <Text style={styles.metricLabel}>livraison</Text>
+        </View>
+      </View>
+
+      <View style={styles.productActions}>
+        <Pressable onPress={onEdit} style={styles.actionButton}>
+          <Edit3 size={15} color="#CBD5E1" />
+          <Text style={styles.actionText}>Modifier</Text>
+        </Pressable>
+
+        {product.status === "active" ? (
+          <Pressable onPress={onArchive} style={styles.actionButton}>
+            <Text style={styles.actionText}>Archiver</Text>
+          </Pressable>
+        ) : product.status === "archived" ? (
+          <Pressable
+            onPress={onReactivate}
+            style={[styles.actionButton, styles.reactivateButton]}
+          >
+            <RefreshCw size={14} color={COLORS.green} />
+            <Text style={[styles.actionText, { color: COLORS.green }]}>
+              Réactiver
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function OrderCard({
+  order,
+  onUpdateStatus,
+}: {
+  order: SellerOrder;
+  onUpdateStatus: (
+    status: "confirmed" | "shipped" | "delivered" | "cancelled",
+  ) => void;
+}) {
+  const config = ORDER_STATUS[order.status] ?? ORDER_STATUS.pending;
+
+  return (
+    <View style={styles.orderCard}>
+      <View style={styles.orderHeader}>
+        <View style={styles.orderIdentity}>
+          <Text style={styles.orderProduct} numberOfLines={2}>
+            {order.product?.title ?? "Produit indisponible"}
+          </Text>
+
+          <Text style={styles.orderBuyer}>
+            {order.counterpartName ?? "Acheteur"}
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.orderStatus,
+            {
+              backgroundColor: `${config.color}20`,
+            },
+          ]}
+        >
+          <Text style={[styles.orderStatusText, { color: config.color }]}>
+            {config.label}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.orderGrid}>
+        <View style={styles.orderInfo}>
+          <Text style={styles.orderInfoLabel}>Montant</Text>
+
+          <Text style={styles.orderInfoValue}>
+            {formatAmount(order.totalAmount, order.currency)}
+          </Text>
+        </View>
+
+        <View style={styles.orderInfo}>
+          <Text style={styles.orderInfoLabel}>Quantité</Text>
+
+          <Text style={styles.orderInfoValue}>
+            {order.quantity} {order.product?.unit ?? "unité(s)"}
+          </Text>
+        </View>
+      </View>
+
+      {order.deliveryAddress ? (
+        <View style={styles.addressBox}>
+          <Truck size={15} color={COLORS.primary} />
+
+          <Text style={styles.addressText}>{order.deliveryAddress}</Text>
+        </View>
+      ) : null}
+
+      {order.note ? (
+        <Text style={styles.orderNote}>Note : {order.note}</Text>
+      ) : null}
+
+      {order.status === "pending" ? (
+        <View style={styles.orderActions}>
+          <Pressable
+            onPress={() => onUpdateStatus("confirmed")}
+            style={styles.primarySmallButton}
+          >
+            <Check size={15} color="#FFFFFF" />
+            <Text style={styles.smallButtonText}>Confirmer</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => onUpdateStatus("cancelled")}
+            style={styles.dangerSmallButton}
+          >
+            <Text style={[styles.smallButtonText, { color: COLORS.red }]}>
+              Annuler
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {order.status === "confirmed" ? (
+        <Pressable
+          onPress={() => onUpdateStatus("shipped")}
+          style={styles.primaryFullButton}
+        >
+          <Truck size={16} color="#FFFFFF" />
+          <Text style={styles.smallButtonText}>Marquer comme expédiée</Text>
+        </Pressable>
+      ) : null}
+
+      {order.status === "shipped" ? (
+        <Pressable
+          onPress={() => onUpdateStatus("delivered")}
+          style={styles.primaryFullButton}
+        >
+          <Check size={16} color="#FFFFFF" />
+          <Text style={styles.smallButtonText}>Marquer comme livrée</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function EmptyState({
+  icon,
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIcon}>{icon}</View>
+
+      <Text style={styles.emptyTitle}>{title}</Text>
+
+      <Text style={styles.emptyDescription}>{description}</Text>
+
+      {actionLabel && onAction ? (
+        <Pressable onPress={onAction} style={styles.emptyAction}>
+          <Plus size={16} color="#FFFFFF" />
+          <Text style={styles.emptyActionText}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 function MarketplaceProInner({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<TabId>("dashboard");
-  const [orderFilter, setOrderFilter] = useState<"tous" | OrderStatusDisplay>(
-    "tous",
-  );
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showCreateSheet, setShowCreateSheet] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Id<"products"> | null>(
-    null,
-  );
 
-  // ✅ Récupérer l'email Firebase
-  const { user } = useFirebaseAuth();
-  const email = user?.email;
+  const [showCreate, setShowCreate] = useState(false);
 
-  // ✅ Utiliser l'email pour récupérer l'utilisateur Convex
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  const [productSearch, setProductSearch] = useState("");
+
+  const [orderSearch, setOrderSearch] = useState("");
+
+  const [orderFilter, setOrderFilter] = useState<"all" | OrderStatus>("all");
+
+  const [mutationId, setMutationId] = useState<string | null>(null);
+
   const currentUser = useQuery(api.users.getCurrentUser, {});
 
-  // Fetch my products (filtered by seller)
-  const productsResult = useQuery(
+  const productsQuery = usePaginatedQuery(
     api.commerce.listProducts,
     currentUser?._id
       ? {
           sellerId: currentUser._id,
-          paginationOpts: { numItems: 50, cursor: null },
         }
       : "skip",
+    {
+      initialNumItems: 50,
+    },
   );
-  // ✅ Correction : typer explicitement `products` comme un tableau de `Product`
-  const products: Product[] = (productsResult?.page ?? []) as Product[];
-  const productsStatus =
-    productsResult === undefined ? "LoadingFirstPage" : "Exhausted";
-  const loadMore = () => {
-    /* noop */
-  };
 
-  // Fetch my orders as seller
-  const orders = useQuery(api.commerce.getMyOrders, { role: "seller" });
+  const orders = useQuery(api.commerce.getMyOrders, {
+    role: "seller",
+  }) as SellerOrder[] | undefined;
 
-  // Mutations
-  const updateProductMutation = useMutation(api.commerce.updateProduct);
-  const updateOrderStatusMutation = useMutation(api.commerce.updateOrderStatus);
+  const updateProduct = useMutation(api.commerce.updateProduct);
 
-  // ── Derived data ──────────────────────────────────────────────────────────
-  const totalCA = useMemo(() => {
-    if (!orders) return 0;
-    return orders
-      .filter((o) => o.status === "delivered")
-      .reduce((a, o) => a + o.totalAmount, 0);
-  }, [orders]);
+  const updateOrderStatus = useMutation(api.commerce.updateOrderStatus);
 
-  const totalOrders =
-    orders?.filter((o) => o.status === "delivered").length ?? 0;
-  const pendingOrders =
-    orders?.filter(
-      (o) =>
-        o.status === "pending" ||
-        o.status === "confirmed" ||
-        o.status === "shipped",
-    ).length ?? 0;
+  const products = (productsQuery.results ?? []) as Product[];
+
+  const isProductsLoading = productsQuery.isLoading;
+
+  const filteredProducts = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+
+    if (!query) return products;
+
+    return products.filter((product) => {
+      return (
+        product.title.toLowerCase().includes(query) ||
+        product.category.toLowerCase().includes(query) ||
+        product.tags.some((tag) => tag.toLowerCase().includes(query))
+      );
+    });
+  }, [products, productSearch]);
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
-    const byStatus =
-      orderFilter === "tous"
-        ? orders
-        : orders.filter((o) => o.status === orderFilter);
-    if (!searchQuery) return byStatus;
-    return byStatus.filter(
-      (o) =>
-        (o.product?.title ?? "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        (o.counterpartName ?? "")
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()),
-    );
-  }, [orders, orderFilter, searchQuery]);
 
-  const handleUpdateOrderStatus = async (
+    const query = orderSearch.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const statusMatch = orderFilter === "all" || order.status === orderFilter;
+
+      const searchMatch =
+        !query ||
+        (order.product?.title ?? "").toLowerCase().includes(query) ||
+        (order.counterpartName ?? "").toLowerCase().includes(query);
+
+      return statusMatch && searchMatch;
+    });
+  }, [orders, orderFilter, orderSearch]);
+
+  const deliveredOrders =
+    orders?.filter((order) => order.status === "delivered") ?? [];
+
+  const pendingOrders =
+    orders?.filter(
+      (order) =>
+        order.status === "pending" ||
+        order.status === "confirmed" ||
+        order.status === "shipped",
+    ) ?? [];
+
+  const activeProducts = products.filter(
+    (product) => product.status === "active",
+  );
+
+  const totalRevenueByCurrency = useMemo(() => {
+    const map = new Map<string, number>();
+
+    for (const order of deliveredOrders) {
+      map.set(
+        order.currency,
+        (map.get(order.currency) ?? 0) + order.totalAmount,
+      );
+    }
+
+    return Array.from(map.entries()).map(([currency, amount]) => ({
+      currency,
+      amount,
+    }));
+  }, [deliveredOrders]);
+
+  const primaryRevenue = totalRevenueByCurrency[0];
+
+  const updateOrder = async (
     orderId: Id<"orders">,
     status: "confirmed" | "shipped" | "delivered" | "cancelled",
   ) => {
+    const operationId = `order:${String(orderId)}`;
+
+    setMutationId(operationId);
+
     try {
-      await updateOrderStatusMutation({ id: orderId, status });
-      toast.success(`Commande mise à jour: ${ORDER_STATUS_CFG[status].label}`);
-    } catch (err) {
-      if (err instanceof ConvexError) {
-        const data = err.data as { message: string };
-        toast.error(data.message);
-      } else {
-        toast.error("Erreur de mise à jour");
-      }
+      await updateOrderStatus({
+        id: orderId,
+        status,
+      });
+    } catch (error) {
+      Alert.alert(
+        "Commande",
+        errorMessage(error, "Impossible de mettre à jour la commande."),
+      );
+    } finally {
+      setMutationId(null);
     }
   };
 
-  const handleArchiveProduct = async (productId: Id<"products">) => {
+  const archiveProduct = (product: Product) => {
+    Alert.alert(
+      "Archiver le produit",
+      `Voulez-vous archiver « ${product.title} » ?`,
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
+        {
+          text: "Archiver",
+          style: "destructive",
+          onPress: async () => {
+            const operationId = `product:${String(product._id)}`;
+
+            setMutationId(operationId);
+
+            try {
+              await updateProduct({
+                id: product._id,
+                status: "archived",
+              });
+            } catch (error) {
+              Alert.alert(
+                "Produit",
+                errorMessage(error, "Impossible d'archiver le produit."),
+              );
+            } finally {
+              setMutationId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const reactivateProduct = async (product: Product) => {
+    const operationId = `product:${String(product._id)}`;
+
+    setMutationId(operationId);
+
     try {
-      await updateProductMutation({ id: productId, status: "archived" });
-      toast.success("Produit archivé");
-    } catch (err) {
-      if (err instanceof ConvexError) {
-        const data = err.data as { message: string };
-        toast.error(data.message);
-      } else {
-        toast.error("Erreur");
-      }
+      await updateProduct({
+        id: product._id,
+        status: "active",
+      });
+    } catch (error) {
+      Alert.alert(
+        "Produit",
+        errorMessage(error, "Impossible de réactiver le produit."),
+      );
+    } finally {
+      setMutationId(null);
     }
   };
 
-  // Sparkline data (synthetic based on real order count)
-  const sparkData = [
-    30,
-    45,
-    55,
-    40,
-    65,
-    75,
-    Math.min(100, totalOrders * 10 + 20),
-  ];
-  const sparkMax = Math.max(...sparkData, 1);
+  const renderDashboard = () => {
+    return (
+      <ScrollView
+        contentContainerStyle={styles.pageContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.heroCard}>
+          <View style={styles.heroAccent} />
+
+          <View style={styles.heroContent}>
+            <Text style={styles.eyebrow}>PERFORMANCE VENDEUR</Text>
+
+            <Text style={styles.heroTitle}>
+              Votre boutique,
+              {"\n"}
+              vos performances.
+            </Text>
+
+            <Text style={styles.heroDescription}>
+              Les chiffres affichés ici proviennent directement des produits et
+              commandes associés à votre compte.
+            </Text>
+
+            <View style={styles.heroMetrics}>
+              <View>
+                <Text style={styles.heroMetricLabel}>Commandes livrées</Text>
+
+                <Text style={styles.heroMetricValue}>
+                  {deliveredOrders.length}
+                </Text>
+              </View>
+
+              <View>
+                <Text style={styles.heroMetricLabel}>Commandes en cours</Text>
+
+                <Text style={styles.heroMetricValue}>
+                  {pendingOrders.length}
+                </Text>
+              </View>
+            </View>
+
+            {primaryRevenue ? (
+              <View style={styles.revenueBlock}>
+                <Text style={styles.heroMetricLabel}>
+                  Chiffre d'affaires livré
+                </Text>
+
+                <Text style={styles.revenueValue}>
+                  {formatAmount(primaryRevenue.amount, primaryRevenue.currency)}
+                </Text>
+
+                {totalRevenueByCurrency.length > 1 ? (
+                  <Text style={styles.multiCurrencyNotice}>
+                    Plusieurs devises sont présentes dans vos commandes. Elles
+                    ne sont pas converties artificiellement.
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <Text style={styles.noRevenue}>
+                Aucun chiffre d'affaires livré enregistré pour le moment.
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.statsGrid}>
+          <StatCard
+            icon={<Package size={18} color={COLORS.primary} />}
+            label="Produits"
+            value={String(products.length)}
+            color={COLORS.primary}
+          />
+
+          <StatCard
+            icon={<Check size={18} color={COLORS.green} />}
+            label="Produits actifs"
+            value={String(activeProducts.length)}
+            color={COLORS.green}
+          />
+
+          <StatCard
+            icon={<ShoppingBag size={18} color={COLORS.purple} />}
+            label="Commandes"
+            value={String(orders?.length ?? 0)}
+            color={COLORS.purple}
+          />
+
+          <StatCard
+            icon={<Clock3 size={18} color={COLORS.orange} />}
+            label="À traiter"
+            value={String(pendingOrders.length)}
+            color={COLORS.orange}
+          />
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Activité récente</Text>
+
+            <Text style={styles.sectionSubtitle}>
+              Vos dernières commandes vendeur
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={() => setTab("commandes")}
+            style={styles.linkButton}
+          >
+            <Text style={styles.linkText}>Voir tout</Text>
+
+            <ChevronRight size={15} color={COLORS.primary} />
+          </Pressable>
+        </View>
+
+        {orders === undefined ? (
+          <View style={styles.loadingCard}>
+            <ActivityIndicator color={COLORS.primary} />
+            <Text style={styles.loadingText}>Chargement des commandes...</Text>
+          </View>
+        ) : orders.length === 0 ? (
+          <EmptyState
+            icon={<ShoppingBag size={26} color={COLORS.dim} />}
+            title="Aucune commande"
+            description="Les commandes de vos clients apparaîtront ici."
+          />
+        ) : (
+          <View style={styles.recentOrders}>
+            {orders.slice(0, 4).map((order) => {
+              const config = ORDER_STATUS[order.status];
+
+              return (
+                <View key={String(order._id)} style={styles.recentOrderRow}>
+                  <View style={styles.recentOrderIcon}>
+                    <ShoppingBag size={15} color={COLORS.primary} />
+                  </View>
+
+                  <View style={styles.recentOrderIdentity}>
+                    <Text style={styles.recentOrderTitle} numberOfLines={1}>
+                      {order.product?.title ?? "Produit indisponible"}
+                    </Text>
+
+                    <Text style={styles.recentOrderSubtitle}>
+                      {order.counterpartName ?? "Acheteur"}
+                    </Text>
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.recentOrderStatus,
+                      {
+                        color: config.color,
+                      },
+                    ]}
+                  >
+                    {config.label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <View style={styles.trustCard}>
+          <TrendingUp size={18} color={COLORS.green} />
+
+          <View style={styles.trustTextBlock}>
+            <Text style={styles.trustTitle}>Données réelles</Text>
+
+            <Text style={styles.trustDescription}>
+              Aucun graphique synthétique ni pourcentage inventé n'est utilisé
+              dans ce tableau de bord.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderProducts = () => {
+    return (
+      <ScrollView
+        contentContainerStyle={styles.pageContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Mes produits</Text>
+
+            <Text style={styles.sectionSubtitle}>
+              Catalogue vendeur connecté à Convex
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={() => setShowCreate(true)}
+            style={styles.roundPrimaryButton}
+          >
+            <Plus size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        <View style={styles.searchBox}>
+          <Search size={17} color={COLORS.dim} />
+
+          <TextInput
+            value={productSearch}
+            onChangeText={setProductSearch}
+            placeholder="Rechercher un produit..."
+            placeholderTextColor="#64748B"
+            style={styles.searchInput}
+          />
+        </View>
+
+        {isProductsLoading ? (
+          <View style={styles.loadingCard}>
+            <ActivityIndicator color={COLORS.primary} />
+            <Text style={styles.loadingText}>Chargement des produits...</Text>
+          </View>
+        ) : filteredProducts.length === 0 ? (
+          <EmptyState
+            icon={<Package size={28} color={COLORS.dim} />}
+            title={productSearch ? "Aucun résultat" : "Aucun produit"}
+            description={
+              productSearch
+                ? "Aucun produit ne correspond à votre recherche."
+                : "Créez votre premier produit pour commencer à vendre."
+            }
+            actionLabel={productSearch ? undefined : "Créer un produit"}
+            onAction={productSearch ? undefined : () => setShowCreate(true)}
+          />
+        ) : (
+          <>
+            {filteredProducts.map((product) => {
+              const busy = mutationId === `product:${String(product._id)}`;
+
+              return (
+                <View
+                  key={String(product._id)}
+                  style={busy ? styles.busyProduct : undefined}
+                >
+                  <ProductCard
+                    product={product}
+                    onEdit={() => setEditingProduct(product)}
+                    onArchive={() => archiveProduct(product)}
+                    onReactivate={() => reactivateProduct(product)}
+                  />
+
+                  {busy ? (
+                    <View style={styles.busyOverlay}>
+                      <ActivityIndicator color="#FFFFFF" />
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+
+            {productsQuery.status === "CanLoadMore" ? (
+              <Pressable
+                onPress={() => productsQuery.loadMore(50)}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>Charger plus</Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+      </ScrollView>
+    );
+  };
+
+  const renderOrders = () => {
+    const filters: Array<"all" | OrderStatus> = [
+      "all",
+      "pending",
+      "confirmed",
+      "shipped",
+      "delivered",
+      "cancelled",
+      "refunded",
+    ];
+
+    return (
+      <ScrollView
+        contentContainerStyle={styles.pageContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Commandes</Text>
+
+            <Text style={styles.sectionSubtitle}>
+              Gérez les commandes reçues
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {filters.map((filter) => {
+            const selected = orderFilter === filter;
+
+            const count =
+              filter === "all"
+                ? (orders?.length ?? 0)
+                : (orders?.filter((order) => order.status === filter).length ??
+                  0);
+
+            return (
+              <Pressable
+                key={filter}
+                onPress={() => setOrderFilter(filter)}
+                style={[styles.filterChip, selected && styles.filterChipActive]}
+              >
+                <Text
+                  style={[
+                    styles.filterText,
+                    selected && styles.filterTextActive,
+                  ]}
+                >
+                  {filter === "all" ? "Toutes" : ORDER_STATUS[filter].label}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.filterCount,
+                    selected && styles.filterCountActive,
+                  ]}
+                >
+                  {count}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.searchBox}>
+          <Search size={17} color={COLORS.dim} />
+
+          <TextInput
+            value={orderSearch}
+            onChangeText={setOrderSearch}
+            placeholder="Rechercher une commande..."
+            placeholderTextColor="#64748B"
+            style={styles.searchInput}
+          />
+        </View>
+
+        {orders === undefined ? (
+          <View style={styles.loadingCard}>
+            <ActivityIndicator color={COLORS.primary} />
+            <Text style={styles.loadingText}>Chargement des commandes...</Text>
+          </View>
+        ) : filteredOrders.length === 0 ? (
+          <EmptyState
+            icon={<ShoppingBag size={28} color={COLORS.dim} />}
+            title="Aucune commande trouvée"
+            description="Aucune commande ne correspond aux critères sélectionnés."
+          />
+        ) : (
+          filteredOrders.map((order) => {
+            const busy = mutationId === `order:${String(order._id)}`;
+
+            return (
+              <View
+                key={String(order._id)}
+                style={busy ? styles.busyProduct : undefined}
+              >
+                <OrderCard
+                  order={order}
+                  onUpdateStatus={(status) => updateOrder(order._id, status)}
+                />
+
+                {busy ? (
+                  <View style={styles.busyOverlay}>
+                    <ActivityIndicator color="#FFFFFF" />
+                  </View>
+                ) : null}
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+    );
+  };
 
   return (
-    <View className="h-full flex flex-col relative" style={{  }}>{}<View className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-48 pointer-events-none" style={{  }} /><View className="absolute bottom-32 right-0 w-48 h-48 pointer-events-none" style={{  }} />{}<View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" }}><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-white font-black text-lg">Marketplace Pro</Text><Text className="text-white/40 text-xs">Dashboard vendeur</Text></View><Pressable onPress={() => setShowCreateSheet(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl active:scale-95 transition-all" style={{  }}><Plus size={13} className="text-white" /><Text className="text-white font-semibold text-xs">Produit</Text></Pressable></View>{}<View className="flex-shrink-0 flex gap-1 px-4 py-3">{[
-          { id: "dashboard" as TabId, label: "Dashboard", icon: BarChart2 },
-          { id: "produits" as TabId, label: "Produits", icon: Package },
-          { id: "commandes" as TabId, label: "Commandes", icon: ShoppingBag },
-          { id: "boosts" as TabId, label: "Boosts", icon: Megaphone },
-        ].map(({ id, label, icon: Icon }) => (
-          <Pressable key={id} onPress={() => setTab(id)} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold transition-all" style={tab === id
-                ? {  }
-                : { backgroundColor: "rgba(255,255,255,0.06)" }}><Icon size={11} />{label}</Pressable>
-        ))}</View><View className="flex-1 overflow-y-auto" style={{  }}>{}{tab === "dashboard" && (
-          <View className="px-4 pb-8">{}<View initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl overflow-hidden mb-5"><View className="h-1.5" style={{  }} /><View className="p-5" style={{ borderWidth: 1, borderColor: "rgba(249,115,22,0.2)", borderStyle: "solid", borderTopWidth: 0 }}><Text className="text-white/50 text-sm mb-1">Chiffre d'affaires (livrés)
-                </Text><Text className="text-white font-black text-4xl mb-0.5">{fmt(totalCA)}<Text className="text-white/40 text-lg font-normal">{" "}FCFA
-                  </Text></Text><Text className="text-green-400 text-xs font-semibold flex items-center gap-1 mb-4"><TrendingUp size={11} />{totalOrders}commande
-                  {totalOrders > 1 ? "s" : ""}livrée
-                  {totalOrders > 1 ? "s" : ""}</Text>{}<View className="flex items-end gap-1 h-14">{sparkData.map((v, i) => (
-                    <View key={i} initial={{ height: 0 }} animate={{ height: `${(v / sparkMax) * 100}%` }} transition={{
-                        delay: i * 0.05,
-                        duration: 0.45,
-                        ease: "easeOut",
-                      }} className="flex-1 rounded-sm" style={{  }} />
-                  ))}</View></View></View>{}<View className="gap-3 mb-5">{[
-                {
-                  icon: DollarSign,
-                  label: "Revenu total",
-                  value: `${fmt(totalCA)} FCFA`,
-                  color: "#10B981",
-                },
-                {
-                  icon: ShoppingBag,
-                  label: "Commandes livrées",
-                  value: `${totalOrders}`,
-                  color: "#8B5CF6",
-                },
-                {
-                  icon: Package,
-                  label: "Produits actifs",
-                  // ✅ Correction : ajout du type explicite pour `p`
-                  value: `${products.filter((p: Product) => p.status === "active").length ?? 0}`,
-                  color: "#3B82F6",
-                },
-                {
-                  icon: Clock,
-                  label: "En attente",
-                  value: `${pendingOrders}`,
-                  color: "#F59E0B",
-                },
-              ].map(({ icon: Icon, label, value, color }) => (
-                <View key={label} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-                  <View className="w-9 h-9 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: `${color}22` }}><Icon size={16} style={{ color }} /></View>
-                  <Text className="text-white font-black text-lg">{value}</Text>
-                  <Text className="text-white/50 text-xs">{label}</Text>
-                </View>
-              ))}</View>{}{orders && orders.length > 0 && (
-              <View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Text className="text-white font-bold text-sm mb-3">Dernières commandes
-                </Text>{orders.slice(0, 3).map((o) => {
-                  const cfg =
-                    ORDER_STATUS_CFG[o.status as OrderStatusDisplay] ??
-                    ORDER_STATUS_CFG.pending;
-                  return (
-                    <View key={o._id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0"><View className="flex-1 min-w-0"><Text className="text-white/80 text-xs font-semibold">{o.product?.title ?? "Produit"}</Text><Text className="text-white/40 text-[10px]">{o.counterpartName ?? "Acheteur"}</Text></View><Text className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ color: cfg.color, backgroundColor: cfg.bg }}>{cfg.label}</Text></View>
-                  );
-                })}</View>
-            )}</View>
-        )}{}{tab === "produits" && (
-          <View className="px-4 pb-8"><View className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={14} className="text-white/40" /><TextInput value={searchQuery} onChangeText={(value) => setSearchQuery(value)} placeholder="Rechercher un produit…" className="flex-1 bg-transparent text-white text-sm placeholder-white/30 outline-none" /></View>{!products ? (
-              <View className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-32 w-full rounded-2xl" />
-                ))}</View>
-            ) : products.length === 0 ? (
-              <View className="text-center py-16"><Package size={40} className="text-white/20 mx-auto mb-3" /><Text className="text-white/40 text-sm">Aucun produit</Text><Text className="text-white/25 text-xs mt-1">Créez votre premier produit pour commencer à vendre
-                </Text><Pressable onPress={() => setShowCreateSheet(true)} className="mt-4 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{  }}><Plus size={14} className="inline mr-1" /><Text>Créer un produit</Text></Pressable></View>
-            ) : (
-              <>
-                {products
-                  // ✅ Correction : type explicite pour `p`
-                  .filter(
-                    (p: Product) =>
-                      !searchQuery ||
-                      p.title.toLowerCase().includes(searchQuery.toLowerCase()),
-                  )
-                  // ✅ Correction : types explicites pour `p` et `idx`
-                  .map((p: Product, idx: number) => {
-                    const statusColor =
-                      p.status === "active"
-                        ? "#10B981"
-                        : p.status === "out_of_stock"
-                          ? "#EF4444"
-                          : "#9CA3AF";
-                    const statusLabel =
-                      p.status === "active"
-                        ? "Actif"
-                        : p.status === "out_of_stock"
-                          ? "Rupture"
-                          : "Archivé";
-                    return (
-                      <View key={p._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="rounded-2xl overflow-hidden mb-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                        <View className="p-4"><View className="flex items-start gap-3 mb-3"><View className="w-12 h-12 rounded-xl flex items-center justify-center text-lg flex-shrink-0 overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>{p.images.length > 0 ? (
-                                <Image className="w-full h-full object-cover rounded-xl" source={{ uri: p.images[0] }} accessibilityLabel={p.title} />
-                              ) : (
-                                <Package size={20} className="text-white/30" />
-                              )}</View><View className="flex-1 min-w-0"><Text className="text-white font-bold text-sm leading-tight">{p.title}</Text><Text className="text-white/40 text-xs">{p.category}· {p.currency}</Text></View><View className="flex flex-col items-end flex-shrink-0 gap-1"><Text className="text-white font-bold text-sm">{fmt(p.price)}{p.currency}</Text><Text className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ color: statusColor, backgroundColor: `${statusColor}20` }}>{statusLabel}</Text></View></View><View className="gap-2 mb-3">{[
-                              {
-                                icon: Package,
-                                val: p.stock,
-                                label: "stock",
-                                color: "#10B981",
-                              },
-                              {
-                                icon: Tag,
-                                val: p.category,
-                                label: "catégorie",
-                                color: "#8B5CF6",
-                              },
-                              {
-                                icon: Zap,
-                                val: p.deliveryAvailable ? "Oui" : "Non",
-                                label: "livraison",
-                                color: "#3B82F6",
-                              },
-                            ].map(({ icon: Icon, val, label, color }) => (
-                              <View key={label} className="flex flex-col items-center gap-0.5 p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Icon size={11} style={{ color }} /><Text className="text-white font-bold text-xs">{val}</Text><Text className="text-white/30 text-[9px]">{label}</Text></View>
-                            ))}</View><View className="flex items-center gap-2">{p.status === "active" && (
-                              <Pressable onPress={() => handleArchiveProduct(p._id)} className="flex-1 py-2 rounded-xl text-xs font-semibold text-white/60" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><Text>Archiver</Text></Pressable>
-                            )}{p.status === "archived" && (
-                              <Pressable onPress={async () => {
-                                  await updateProductMutation({
-                                    id: p._id,
-                                    status: "active",
-                                  });
-                                  toast.success("Produit réactivé");
-                                }} className="flex-1 py-2 rounded-xl text-xs font-semibold text-green-400" style={{ backgroundColor: "rgba(16,185,129,0.1)" }}><Text>Réactiver</Text></Pressable>
-                            )}</View></View>
-                      </View>
-                    );
-                  })}
-                {productsStatus === "Exhausted" && products.length >= 50 && (
-                  <Pressable onPress={() => loadMore()} className="w-full py-2.5 rounded-xl text-xs font-semibold text-white/50" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><Text>Charger plus</Text></Pressable>
-                )}
-              </>
-            )}</View>
-        )}{}{tab === "commandes" && (
-          <View className="px-4 pb-8">{}<View className="flex gap-2 overflow-x-auto pb-1 mb-3" style={{  }}>{(
-                [
-                  "tous",
-                  "pending",
-                  "confirmed",
-                  "shipped",
-                  "delivered",
-                  "cancelled",
-                  "refunded",
-                ] as const
-              ).map((f) => {
-                const count =
-                  f === "tous"
-                    ? (orders?.length ?? 0)
-                    : (orders?.filter((o) => o.status === f).length ?? 0);
-                return (
-                  <Pressable key={f} onPress={() => setOrderFilter(f)} className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all" style={orderFilter === f
-                        ? {  }
-                        : { backgroundColor: "rgba(255,255,255,0.06)" }}>{f === "tous" ? "Tous" : ORDER_STATUS_CFG[f].label}<Text>(</Text>{count}<Text>)</Text></Pressable>
-                );
-              })}</View>{}<View className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-4" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={14} className="text-white/40" /><TextInput value={searchQuery} onChangeText={(value) => setSearchQuery(value)} placeholder="Rechercher une commande…" className="flex-1 bg-transparent text-white text-sm placeholder-white/30 outline-none" /></View>{!orders ? (
-              <View className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-28 w-full rounded-2xl" />
-                ))}</View>
-            ) : filteredOrders.length === 0 ? (
-              <View className="text-center py-10 text-white/30 text-sm"><Text>Aucune commande trouvée</Text></View>
-            ) : (
-              <View className="flex flex-col gap-2">{filteredOrders.map((o, idx) => {
-                  const cfg =
-                    ORDER_STATUS_CFG[o.status as OrderStatusDisplay] ??
-                    ORDER_STATUS_CFG.pending;
-                  return (
-                    <View key={o._id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.04 }} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-                      <View className="flex items-start justify-between mb-2"><View className="flex-1 min-w-0 pr-2"><Text className="text-white font-semibold text-sm">{o.product?.title ?? "Produit supprimé"}</Text><Text className="text-white/40 text-xs">{o.counterpartName ?? "Acheteur"}· {o.quantity}x
-                          </Text></View><Text className="px-2.5 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0" style={{ color: cfg.color, backgroundColor: cfg.bg }}>{cfg.label}</Text></View>
-                      <View className="gap-2 mb-3"><View className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Text className="text-white/30 text-[10px]">Montant</Text><Text className="font-bold text-xs text-white">{fmt(o.totalAmount)}{o.currency}</Text></View><View className="p-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Text className="text-white/30 text-[10px]">Quantité</Text><Text className="font-bold text-xs text-white">{o.quantity}{o.product?.unit ?? "pcs"}</Text></View></View>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Pressable
+          onPress={onBack}
+          style={styles.backButton}
+          accessibilityLabel="Retour"
+        >
+          <ArrowLeft size={19} color="#FFFFFF" />
+        </Pressable>
 
-                      {/* Actions */}
-                      {o.status === "pending" && (
-                        <View className="flex gap-2"><Pressable onPress={() =>
-                              handleUpdateOrderStatus(o._id, "confirmed")} className="flex-1 py-2 rounded-xl text-xs font-bold text-white" style={{  }}><Text>Confirmer</Text></Pressable><Pressable onPress={() =>
-                              handleUpdateOrderStatus(o._id, "cancelled")} className="py-2 px-3 rounded-xl text-xs font-bold text-red-400" style={{ backgroundColor: "rgba(239,68,68,0.1)" }}><Text>Annuler</Text></Pressable></View>
-                      )}
-                      {o.status === "confirmed" && (
-                        <Pressable onPress={() =>
-                            handleUpdateOrderStatus(o._id, "shipped")} className="w-full py-2 rounded-xl text-xs font-bold text-white" style={{  }}><Text>Marquer expédié</Text></Pressable>
-                      )}
-                      {o.status === "shipped" && (
-                        <Pressable onPress={() =>
-                            handleUpdateOrderStatus(o._id, "delivered")} className="w-full py-2 rounded-xl text-xs font-bold text-white" style={{  }}><Text>Marquer livré</Text></Pressable>
-                      )}
-                    </View>
-                  );
-                })}</View>
-            )}</View>
-        )}{}{tab === "boosts" && (
-          <View className="px-4 pb-8">{}<View className="rounded-xl p-3 mb-4 flex items-start gap-2" style={{ backgroundColor: "rgba(249,115,22,0.08)", borderWidth: 1, borderColor: "rgba(249,115,22,0.15)", borderStyle: "solid" }}><Megaphone size={14} className="text-orange-400 mt-0.5 flex-shrink-0" /><Text className="text-orange-300/80 text-xs leading-relaxed">Le système de boost sera bientôt disponible. Boostez vos
-                produits pour les afficher en tête des résultats et augmenter
-                votre visibilité x3.
-              </Text></View><View className="text-center py-12"><Flame size={40} className="text-white/15 mx-auto mb-3" /><Text className="text-white/40 text-sm font-semibold">Fonctionnalité à venir
-              </Text><Text className="text-white/25 text-xs mt-1">Les boosts seront disponibles prochainement
-              </Text></View></View>
-        )}</View>{}<View>{showCreateSheet && (
-          <CreateProductSheet
-            onClose={() => setShowCreateSheet(false)}
-            onCreated={() => {
-              /* products auto-refresh via reactive query */
-            }}
-          />
-        )}</View></View>
+        <View style={styles.headerIdentity}>
+          <Text style={styles.headerTitle}>Marketplace Pro</Text>
+
+          <Text style={styles.headerSubtitle}>Espace vendeur</Text>
+        </View>
+
+        <Pressable
+          onPress={() => setShowCreate(true)}
+          style={styles.headerProductButton}
+        >
+          <Plus size={15} color="#FFFFFF" />
+
+          <Text style={styles.headerProductText}>Produit</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.tabs}>
+        <TabButton
+          active={tab === "dashboard"}
+          icon={
+            <BarChart3
+              size={16}
+              color={tab === "dashboard" ? "#FFFFFF" : COLORS.muted}
+            />
+          }
+          label="Dashboard"
+          onPress={() => setTab("dashboard")}
+        />
+
+        <TabButton
+          active={tab === "produits"}
+          icon={
+            <Package
+              size={16}
+              color={tab === "produits" ? "#FFFFFF" : COLORS.muted}
+            />
+          }
+          label="Produits"
+          onPress={() => setTab("produits")}
+        />
+
+        <TabButton
+          active={tab === "commandes"}
+          icon={
+            <ShoppingBag
+              size={16}
+              color={tab === "commandes" ? "#FFFFFF" : COLORS.muted}
+            />
+          }
+          label="Commandes"
+          onPress={() => setTab("commandes")}
+        />
+      </View>
+
+      <View style={styles.content}>
+        {tab === "dashboard"
+          ? renderDashboard()
+          : tab === "produits"
+            ? renderProducts()
+            : renderOrders()}
+      </View>
+
+      <ProductFormModal
+        visible={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={() => {
+          setTab("produits");
+        }}
+      />
+
+      <ProductEditModal
+        visible={editingProduct !== null}
+        product={editingProduct}
+        onClose={() => setEditingProduct(null)}
+      />
+    </View>
   );
 }
 
-// ── Main page with auth ───────────────────────────────────────────────────────
-interface MarketplaceProPageProps {
-  onBack: () => void;
+function TabButton({
+  active,
+  icon,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.tabButton, active && styles.tabButtonActive]}
+    >
+      {icon}
+
+      <Text
+        style={[styles.tabButtonText, active && styles.tabButtonTextActive]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
 }
 
-export default function MarketplaceProPage({
-  onBack,
-}: MarketplaceProPageProps) {
+export default function MarketplaceProPage({ onBack }: { onBack: () => void }) {
   const { isAuthenticated, loading } = useFirebaseAuth();
 
   if (loading) {
     return (
-      <View className="h-full w-full flex flex-col items-center justify-center gap-3 px-4" style={{  }}><Skeleton className="h-8 w-48" /><Skeleton className="h-4 w-32" /><View className="space-y-3 w-full mt-6">{Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
-          ))}</View></View>
+      <View style={styles.authState}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+
+        <Text style={styles.authStateTitle}>Chargement de votre boutique</Text>
+
+        <Text style={styles.authStateDescription}>
+          Vérification de votre session...
+        </Text>
+      </View>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <View className="h-full w-full flex flex-col items-center justify-center gap-4 px-6 text-center" style={{  }}>
-        <ShoppingBag size={48} className="text-white/20" />
-        <Text className="text-white font-bold text-lg">Espace Vendeur</Text>
-        <Text className="text-white/50 text-sm">
-          Connectez-vous pour gérer votre boutique
+      <View style={styles.authState}>
+        <View style={styles.authIcon}>
+          <ShoppingBag size={34} color={COLORS.primary} />
+        </View>
+
+        <Text style={styles.authStateTitle}>Espace vendeur</Text>
+
+        <Text style={styles.authStateDescription}>
+          Connectez-vous pour accéder à votre catalogue et gérer vos commandes.
         </Text>
-        <SignInButton />
-        <Pressable onPress={onBack} className="text-white/40 text-xs mt-4">
-          ← Retour
+
+        <Pressable
+          onPress={() => {
+            Alert.alert(
+              "Connexion requise",
+              "Veuillez utiliser le parcours de connexion de votre application pour accéder à l'espace vendeur.",
+            );
+          }}
+          style={styles.primaryButton}
+        >
+          <Text style={styles.primaryButtonText}>Se connecter</Text>
+        </Pressable>
+
+        <Pressable onPress={onBack} style={styles.backTextButton}>
+          <Text style={styles.backText}>Retour</Text>
         </Pressable>
       </View>
     );
@@ -597,3 +1817,1001 @@ export default function MarketplaceProPage({
 
   return <MarketplaceProInner onBack={onBack} />;
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderSoft,
+  },
+
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  headerIdentity: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  headerTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  headerSubtitle: {
+    color: COLORS.dim,
+    fontSize: 11,
+    marginTop: 2,
+  },
+
+  headerProductButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+  },
+
+  headerProductText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  tabs: {
+    flexDirection: "row",
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderSoft,
+  },
+
+  tabButton: {
+    flex: 1,
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  tabButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+
+  tabButtonText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  tabButtonTextActive: {
+    color: "#FFFFFF",
+  },
+
+  content: {
+    flex: 1,
+  },
+
+  pageContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+
+  heroCard: {
+    overflow: "hidden",
+    borderRadius: 24,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: "rgba(37,99,235,0.25)",
+    marginBottom: 14,
+  },
+
+  heroAccent: {
+    height: 4,
+    backgroundColor: COLORS.primary,
+  },
+
+  heroContent: {
+    padding: 20,
+  },
+
+  eyebrow: {
+    color: "#60A5FA",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+    marginBottom: 9,
+  },
+
+  heroTitle: {
+    color: "#FFFFFF",
+    fontSize: 28,
+    lineHeight: 33,
+    fontWeight: "900",
+  },
+
+  heroDescription: {
+    color: COLORS.muted,
+    fontSize: 12,
+    lineHeight: 19,
+    marginTop: 10,
+  },
+
+  heroMetrics: {
+    flexDirection: "row",
+    gap: 40,
+    marginTop: 22,
+  },
+
+  heroMetricLabel: {
+    color: COLORS.dim,
+    fontSize: 10,
+    marginBottom: 4,
+  },
+
+  heroMetricValue: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "900",
+  },
+
+  revenueBlock: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderSoft,
+  },
+
+  revenueValue: {
+    color: "#FFFFFF",
+    fontSize: 25,
+    fontWeight: "900",
+  },
+
+  multiCurrencyNotice: {
+    color: COLORS.orange,
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 6,
+  },
+
+  noRevenue: {
+    color: COLORS.dim,
+    fontSize: 11,
+    marginTop: 18,
+  },
+
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 24,
+  },
+
+  statCard: {
+    width: "48%",
+    flexGrow: 1,
+    minWidth: 145,
+    padding: 14,
+    borderRadius: 17,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  statIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 9,
+  },
+
+  statValue: {
+    color: "#FFFFFF",
+    fontSize: 19,
+    fontWeight: "900",
+  },
+
+  statLabel: {
+    color: COLORS.dim,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+
+  sectionTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  sectionSubtitle: {
+    color: COLORS.dim,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  linkButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+
+  linkText: {
+    color: "#60A5FA",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  recentOrders: {
+    borderRadius: 18,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+    overflow: "hidden",
+  },
+
+  recentOrderRow: {
+    minHeight: 66,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderSoft,
+  },
+
+  recentOrderIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(37,99,235,0.13)",
+  },
+
+  recentOrderIdentity: {
+    flex: 1,
+    marginHorizontal: 10,
+  },
+
+  recentOrderTitle: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  recentOrderSubtitle: {
+    color: COLORS.dim,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  recentOrderStatus: {
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  trustCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 14,
+    marginTop: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(16,185,129,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.14)",
+  },
+
+  trustTextBlock: {
+    flex: 1,
+  },
+
+  trustTitle: {
+    color: "#D1FAE5",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  trustDescription: {
+    color: "#94A3B8",
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 3,
+  },
+
+  searchBox: {
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingHorizontal: 13,
+    marginBottom: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  searchInput: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 12,
+    minHeight: 42,
+  },
+
+  productCard: {
+    padding: 14,
+    marginBottom: 12,
+    borderRadius: 19,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  productTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+
+  productImage: {
+    width: 62,
+    height: 62,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  productImageFill: {
+    width: "100%",
+    height: "100%",
+  },
+
+  productIdentity: {
+    flex: 1,
+    marginLeft: 11,
+    paddingRight: 8,
+  },
+
+  productTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    lineHeight: 18,
+  },
+
+  productCategory: {
+    color: COLORS.dim,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  productPrice: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    marginTop: 7,
+  },
+
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+
+  statusBadgeText: {
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  productMetrics: {
+    flexDirection: "row",
+    gap: 7,
+    marginTop: 13,
+  },
+
+  metric: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  metricValue: {
+    maxWidth: "95%",
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+
+  metricLabel: {
+    color: COLORS.dim,
+    fontSize: 8,
+    marginTop: 2,
+  },
+
+  productActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+
+  actionButton: {
+    flex: 1,
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.055)",
+  },
+
+  actionText: {
+    color: "#CBD5E1",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  reactivateButton: {
+    backgroundColor: "rgba(16,185,129,0.08)",
+  },
+
+  busyProduct: {
+    position: "relative",
+  },
+
+  busyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 19,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+
+  filterRow: {
+    gap: 7,
+    paddingBottom: 11,
+  },
+
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  filterChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+
+  filterText: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  filterTextActive: {
+    color: "#FFFFFF",
+  },
+
+  filterCount: {
+    color: COLORS.dim,
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  filterCountActive: {
+    color: "#DBEAFE",
+  },
+
+  orderCard: {
+    padding: 14,
+    marginBottom: 11,
+    borderRadius: 18,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  orderHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+
+  orderIdentity: {
+    flex: 1,
+    paddingRight: 10,
+  },
+
+  orderProduct: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    lineHeight: 18,
+  },
+
+  orderBuyer: {
+    color: COLORS.dim,
+    fontSize: 10,
+    marginTop: 4,
+  },
+
+  orderStatus: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+
+  orderStatusText: {
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  orderGrid: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 13,
+  },
+
+  orderInfo: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  orderInfoLabel: {
+    color: COLORS.dim,
+    fontSize: 9,
+  },
+
+  orderInfoValue: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+
+  addressBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(37,99,235,0.06)",
+  },
+
+  addressText: {
+    flex: 1,
+    color: COLORS.muted,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  orderNote: {
+    color: COLORS.dim,
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 9,
+  },
+
+  orderActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+
+  primarySmallButton: {
+    flex: 1,
+    minHeight: 39,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 11,
+    backgroundColor: COLORS.primary,
+  },
+
+  dangerSmallButton: {
+    minHeight: 39,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: "rgba(239,68,68,0.08)",
+  },
+
+  primaryFullButton: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    marginTop: 12,
+    borderRadius: 11,
+    backgroundColor: COLORS.primary,
+  },
+
+  smallButtonText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  emptyState: {
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 45,
+    borderRadius: 18,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  emptyIcon: {
+    width: 58,
+    height: 58,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    marginBottom: 13,
+  },
+
+  emptyTitle: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  emptyDescription: {
+    color: COLORS.dim,
+    fontSize: 11,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 5,
+  },
+
+  emptyAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 16,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 11,
+    backgroundColor: COLORS.primary,
+  },
+
+  emptyActionText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  loadingCard: {
+    minHeight: 150,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: 18,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  loadingText: {
+    color: COLORS.dim,
+    fontSize: 11,
+  },
+
+  roundPrimaryButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 13,
+    backgroundColor: COLORS.primary,
+  },
+
+  primaryButton: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+  },
+
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  secondaryButton: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    marginTop: 4,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  secondaryButtonText: {
+    color: "#CBD5E1",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  flexButton: {
+    flex: 1,
+    marginTop: 0,
+  },
+
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.78)",
+  },
+
+  modalKeyboard: {
+    width: "100%",
+    maxHeight: "92%",
+  },
+
+  modalCard: {
+    maxHeight: "100%",
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    backgroundColor: "#090D1C",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingTop: 17,
+    paddingBottom: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderSoft,
+  },
+
+  modalTitleBlock: {
+    flex: 1,
+  },
+
+  modalTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  modalSubtitle: {
+    color: COLORS.dim,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  closeButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  modalScroll: {
+    padding: 18,
+    paddingBottom: 34,
+  },
+
+  field: {
+    marginBottom: 13,
+  },
+
+  fieldLabel: {
+    color: "#CBD5E1",
+    fontSize: 10,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+
+  input: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    color: "#FFFFFF",
+    fontSize: 12,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  multilineInput: {
+    minHeight: 90,
+    paddingTop: 11,
+  },
+
+  twoColumns: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  column: {
+    flex: 1,
+  },
+
+  toggleGroup: {
+    gap: 10,
+    marginBottom: 18,
+  },
+
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  checkbox: {
+    width: 23,
+    height: 23,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  checkboxActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+
+  toggleLabel: {
+    color: "#CBD5E1",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  statusSelector: {
+    flexDirection: "row",
+    gap: 7,
+    marginTop: 7,
+    marginBottom: 20,
+  },
+
+  statusOption: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  statusOptionActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+
+  statusOptionText: {
+    color: COLORS.muted,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  statusOptionTextActive: {
+    color: "#FFFFFF",
+  },
+
+  editActions: {
+    flexDirection: "row",
+    gap: 9,
+    marginTop: 4,
+  },
+
+  authState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    backgroundColor: COLORS.background,
+  },
+
+  authIcon: {
+    width: 72,
+    height: 72,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+    backgroundColor: "rgba(37,99,235,0.10)",
+    marginBottom: 18,
+  },
+
+  authStateTitle: {
+    color: "#FFFFFF",
+    fontSize: 19,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  authStateDescription: {
+    color: COLORS.dim,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+    marginTop: 7,
+    marginBottom: 18,
+  },
+
+  backTextButton: {
+    padding: 12,
+    marginTop: 8,
+  },
+
+  backText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+});

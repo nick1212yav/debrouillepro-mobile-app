@@ -1,431 +1,623 @@
-import { View, Pressable, Text } from "react-native";
+import React, { useMemo, useState } from "react";
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import {
   ArrowLeft,
-  Shield,
-  Lock,
-  Eye,
-  Database,
-  Trash2,
-  Download,
-  Bell,
-  UserX,
-  Globe,
-  CheckCircle2,
+  ChevronDown,
   ChevronRight,
-  Sparkles,
-  MapPin,
-  BarChart3,
+  Cookie,
+  Database,
+  Globe2,
+  Lock,
   Mail,
-  AlertTriangle,
-  X,
+  ShieldCheck,
+  UserCheck,
 } from "lucide-react-native";
-import { useAppearance, ACCENT_PALETTES } from "@/hooks/use-appearance.ts";
-import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { toast } from "sonner";
+import { useRouter } from "expo-router";
 
-interface PrivacyPageProps {
-  onBack: () => void;
-}
-
-type PrivacySettings = {
-  profilePublic: boolean;
-  showEmail: boolean;
-  shareActivity: boolean;
-  analyticsConsent: boolean;
-  locationServices: boolean;
-  thirdPartyAds: boolean;
+type Section = {
+  id: string;
+  title: string;
+  icon: React.ComponentType<{
+    size?: number;
+    color?: string;
+    strokeWidth?: number;
+  }>;
+  content: string[];
 };
 
-function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View className="mb-6"><View className="px-1 mb-2"><Text className="text-[10px] font-black text-white/30 uppercase tracking-[0.18em]">{title}</Text>{subtitle && (
-          <Text className="text-[10px] text-white/20 mt-1">{subtitle}</Text>
-        )}</View><View className="rounded-[1.75rem] overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid", boxShadow: "0 18px 50px rgba(0,0,0,0.12)" }}>{children}</View></View>
-  );
-}
+const SECTIONS: Section[] = [
+  {
+    id: "scope",
+    title: "1. Champ d’application",
+    icon: Globe2,
+    content: [
+      "La présente Politique de confidentialité explique comment DébrouillePro traite les informations relatives à ses utilisateurs, visiteurs, partenaires et autres personnes utilisant ses services.",
+      "DébrouillePro est conçu comme une plateforme internationale. Les règles applicables peuvent donc varier selon le pays, le territoire ou le cadre juridique dont relève l’utilisateur.",
+      "Cette politique s’applique aux services numériques de DébrouillePro, notamment aux fonctionnalités sociales, professionnelles, commerciales, éducatives, financières, de santé, de communication et aux autres services effectivement disponibles dans l’application.",
+    ],
+  },
+  {
+    id: "data",
+    title: "2. Données que nous pouvons traiter",
+    icon: Database,
+    content: [
+      "Selon les fonctionnalités utilisées, DébrouillePro peut traiter des informations nécessaires à la création et à la gestion du compte, telles que le nom, les coordonnées, les identifiants techniques, les informations de profil et les préférences.",
+      "Certaines fonctionnalités peuvent nécessiter des informations supplémentaires. Par exemple, les services de localisation peuvent utiliser des données de position lorsque l’utilisateur accorde l’autorisation correspondante.",
+      "Les services de santé, financiers ou autres services sensibles peuvent nécessiter un traitement spécifique et des garanties supplémentaires. Ces données ne doivent être collectées ou utilisées que lorsqu’elles sont nécessaires à la fonctionnalité concernée et conformément au droit applicable.",
+      "Les informations de paiement peuvent être traitées par DébrouillePro ou par des prestataires de paiement selon le service utilisé. Les données qui ne sont pas nécessaires à DébrouillePro ne doivent pas être collectées simplement parce qu’elles sont techniquement disponibles.",
+    ],
+  },
+  {
+    id: "purpose",
+    title: "3. Pourquoi nous utilisons les données",
+    icon: ShieldCheck,
+    content: [
+      "Fournir, maintenir et sécuriser les services demandés par l’utilisateur.",
+      "Créer et gérer les comptes et les profils.",
+      "Permettre les communications, publications, transactions, commandes, rendez-vous et autres opérations initiées par l’utilisateur.",
+      "Personnaliser certaines fonctionnalités lorsque cela est nécessaire et autorisé.",
+      "Détecter, prévenir et traiter les abus, fraudes, accès non autorisés et incidents de sécurité.",
+      "Respecter les obligations légales et réglementaires applicables.",
+      "Améliorer la fiabilité, les performances et l’expérience des services, dans les limites prévues par le droit applicable.",
+    ],
+  },
+  {
+    id: "legal-bases",
+    title: "4. Fondements juridiques",
+    icon: Lock,
+    content: [
+      "Selon le pays concerné, le traitement des données peut notamment reposer sur l’exécution d’un contrat, le consentement de la personne, le respect d’une obligation légale, la protection d’intérêts vitaux ou un intérêt légitime lorsque celui-ci est reconnu par le droit applicable.",
+      "Lorsqu’un traitement repose sur le consentement, celui-ci peut être retiré dans les conditions prévues par la réglementation applicable. Le retrait du consentement n’affecte pas nécessairement la licéité des traitements effectués avant ce retrait.",
+      "Les bases juridiques et les droits disponibles peuvent différer selon la juridiction de l’utilisateur.",
+    ],
+  },
+  {
+    id: "sharing",
+    title: "5. Partage des informations",
+    icon: UserCheck,
+    content: [
+      "DébrouillePro ne doit pas vendre les données personnelles des utilisateurs comme un produit.",
+      "Certaines informations peuvent être communiquées à des prestataires techniques, partenaires ou autorités lorsque cela est nécessaire pour fournir un service, assurer la sécurité, traiter une opération ou respecter une obligation légale.",
+      "Lorsqu’un utilisateur publie volontairement une information dans une fonctionnalité publique ou communautaire, cette information peut être visible par les personnes autorisées à accéder à cette fonctionnalité.",
+      "Les informations peuvent également être partagées lorsque l’utilisateur demande explicitement une opération impliquant un tiers.",
+    ],
+  },
+  {
+    id: "international",
+    title: "6. Traitements internationaux",
+    icon: Globe2,
+    content: [
+      "DébrouillePro étant une plateforme internationale, certaines données peuvent être traitées ou hébergées dans un pays différent de celui où se trouve l’utilisateur.",
+      "Lorsque la réglementation applicable impose des garanties pour les transferts internationaux de données, DébrouillePro doit mettre en œuvre les mécanismes appropriés prévus par cette réglementation.",
+      "Les garanties applicables peuvent dépendre du pays de résidence, du lieu du traitement et de la nature des données concernées.",
+    ],
+  },
+  {
+    id: "security",
+    title: "7. Sécurité",
+    icon: Lock,
+    content: [
+      "DébrouillePro met en œuvre des mesures techniques et organisationnelles destinées à protéger les informations contre les accès non autorisés, la perte, la modification, la divulgation ou la destruction.",
+      "Les mesures de sécurité peuvent inclure le contrôle des accès, l’authentification, la protection des communications, la surveillance des événements de sécurité et des mesures de sauvegarde adaptées.",
+      "Aucun système informatique ne peut garantir une sécurité absolue. Les utilisateurs doivent également protéger leurs identifiants et signaler rapidement toute activité suspecte.",
+    ],
+  },
+  {
+    id: "retention",
+    title: "8. Conservation",
+    icon: Database,
+    content: [
+      "Les données sont conservées pendant une durée compatible avec leur finalité, les besoins opérationnels légitimes et les obligations légales applicables.",
+      "La durée de conservation peut varier selon le type de données et le service concerné.",
+      "Lorsque les données ne sont plus nécessaires et qu’aucune obligation ne justifie leur conservation, elles doivent être supprimées, anonymisées ou traitées conformément aux exigences applicables.",
+    ],
+  },
+  {
+    id: "rights",
+    title: "9. Vos droits",
+    icon: UserCheck,
+    content: [
+      "Selon votre juridiction, vous pouvez disposer de droits concernant vos données personnelles, notamment le droit d’accès, de rectification, de suppression, de limitation du traitement, d’opposition, de portabilité ou de retrait du consentement.",
+      "Certains droits peuvent être soumis à des conditions ou exceptions prévues par la loi.",
+      "Les utilisateurs doivent pouvoir exercer leurs droits par les moyens de contact officiellement proposés par DébrouillePro.",
+    ],
+  },
+  {
+    id: "children",
+    title: "10. Protection des mineurs",
+    icon: ShieldCheck,
+    content: [
+      "Les services destinés aux adultes ou soumis à des restrictions d’âge doivent respecter les conditions d’âge applicables dans la juridiction concernée.",
+      "DébrouillePro ne doit pas demander à un mineur des informations personnelles au-delà de ce qui est autorisé ou nécessaire pour un service légalement accessible à son âge.",
+      "Lorsque la réglementation exige l’intervention ou le consentement d’un parent ou représentant légal, les mécanismes appropriés doivent être utilisés.",
+    ],
+  },
+  {
+    id: "cookies",
+    title: "11. Cookies et technologies similaires",
+    icon: Cookie,
+    content: [
+      "Les services numériques peuvent utiliser des technologies nécessaires à leur fonctionnement, à la sécurité, à la mémorisation des préférences ou à d’autres finalités autorisées.",
+      "Lorsque la loi exige un consentement pour certaines technologies non essentielles, celui-ci doit être obtenu avant leur utilisation.",
+      "Les possibilités de gestion des cookies et technologies similaires peuvent varier selon la plateforme, le navigateur et la juridiction.",
+    ],
+  },
+  {
+    id: "third-party",
+    title: "12. Services tiers",
+    icon: Globe2,
+    content: [
+      "Certaines fonctionnalités peuvent dépendre de services tiers, notamment des services d’authentification, d’hébergement, de stockage, de communication, de cartographie, de paiement ou d’autres infrastructures techniques.",
+      "Lorsque des prestataires traitent des données pour le compte de DébrouillePro, leurs accès doivent être limités aux besoins du service et encadrés par les accords appropriés.",
+      "Les services tiers utilisés directement par l’utilisateur peuvent également être soumis à leurs propres politiques de confidentialité.",
+    ],
+  },
+  {
+    id: "account",
+    title: "13. Compte et contrôle utilisateur",
+    icon: UserCheck,
+    content: [
+      "L’utilisateur doit pouvoir accéder aux informations de son compte disponibles dans l’application et, lorsque la fonctionnalité existe, modifier les informations qu’il a fournies.",
+      "La suppression d’un compte peut entraîner la suppression de certaines données, sous réserve des données qui doivent légalement ou techniquement être conservées.",
+      "La suppression d’un compte ne signifie pas nécessairement la suppression immédiate de toutes les informations lorsque leur conservation est légalement requise ou nécessaire à la résolution d’un litige, à la sécurité ou à la prévention de la fraude.",
+    ],
+  },
+  {
+    id: "changes",
+    title: "14. Modifications de cette politique",
+    icon: ShieldCheck,
+    content: [
+      "Cette politique peut évoluer afin de tenir compte des changements du service, des technologies ou des exigences légales.",
+      "Lorsqu’une modification importante nécessite une information ou un consentement particulier, les mesures appropriées doivent être mises en œuvre.",
+      "La date de dernière mise à jour doit être affichée clairement dans l’application.",
+    ],
+  },
+  {
+    id: "contact",
+    title: "15. Contact et réclamations",
+    icon: Mail,
+    content: [
+      "Pour toute question concernant la confidentialité ou l’exercice de vos droits, utilisez le canal officiel de contact de DébrouillePro affiché dans l’application ou sur son site officiel.",
+      "Lorsque la réglementation applicable le prévoit, vous pouvez également disposer du droit d’introduire une réclamation auprès de l’autorité de protection des données compétente dans votre juridiction.",
+    ],
+  },
+];
 
-function Row({
-  icon: Icon,
-  color,
-  label,
-  desc,
-  action,
-  danger = false,
-  disabled = false,
+function SectionCard({
+  section,
+  expanded,
+  onPress,
 }: {
-  icon: React.ElementType;
-  color: string;
-  label: string;
-  desc?: string;
-  action?: React.ReactNode;
-  danger?: boolean;
-  disabled?: boolean;
+  section: Section;
+  expanded: boolean;
+  onPress: () => void;
 }) {
-  return (
-    <View className={`flex items-center gap-3 px-4 py-3.5 border-b last:border-0 ${
-        disabled ? "opacity-45" : ""
-      }`} style={{
-        borderColor: "rgba(255,255,255,0.045)",
-      }}><View className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}16`, borderStyle: "solid" }}><Icon size={17} style={{ color }} /></View><View className="flex-1 min-w-0"><Text className="text-sm font-bold" style={{
-            color: danger ? "#F87171" : "rgba(255,255,255,0.87)",
-          }}>{label}</Text>{desc && (
-          <Text className="text-[11px] text-white/30 mt-1 leading-relaxed">{desc}</Text>
-        )}</View>{action}</View>
-  );
-}
+  const Icon = section.icon;
 
-function Toggle({
-  on,
-  onChange,
-  color,
-  label,
-  disabled = false,
-}: {
-  on: boolean;
-  onChange: (value: boolean) => void;
-  color: string;
-  label: string;
-  disabled?: boolean;
-}) {
   return (
-    <Pressable accessibilityRole="switch" accessibilityLabel={label} disabled={disabled} onPress={() => onChange(!on)} className={`relative w-12 h-7 rounded-full shrink-0 transition-all active:scale-95 ${
-        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-      }`} style={{ backgroundColor: on ? color : "rgba(255,255,255,0.11)", boxShadow: on ? `0 4px 18px ${color}35` : "none" }} accessibilityState={{ checked: on }}><View animate={{ x: on ? 22 : 3 }} transition={{
-          type: "spring",
-          stiffness: 450,
-          damping: 28,
-        }} className="absolute top-1 w-5 h-5 rounded-full bg-white shadow-lg" />{on && (
-        <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute left-1.5 top-1.5">
-          <CheckCircle2 size={10} className="text-white/70" />
+    <View style={styles.card}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        style={({ pressed }) => [styles.cardHeader, pressed && styles.pressed]}
+      >
+        <View style={styles.iconBox}>
+          <Icon size={20} color="#8ab4ff" strokeWidth={2} />
         </View>
-      )}</Pressable>
+
+        <Text style={styles.cardTitle}>{section.title}</Text>
+
+        {expanded ? (
+          <ChevronDown size={20} color="#94a3b8" />
+        ) : (
+          <ChevronRight size={20} color="#94a3b8" />
+        )}
+      </Pressable>
+
+      {expanded && (
+        <View style={styles.cardContent}>
+          {section.content.map((paragraph, index) => (
+            <Text key={`${section.id}-${index}`} style={styles.paragraph}>
+              {paragraph}
+            </Text>
+          ))}
+        </View>
+      )}
+    </View>
   );
 }
 
-function ActionRow({
-  icon: Icon,
-  iconColor,
-  title,
-  description,
-  onClick,
-  danger = false,
-}: {
-  icon: React.ElementType;
-  iconColor: string;
-  title: string;
-  description: string;
-  onClick: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <Pressable whileTap={{ scale: 0.985 }} onPress={onClick} className="w-full flex items-center gap-3 px-4 py-4 text-left border-b last:border-0 transition-colors" style={{
-        borderColor: "rgba(255,255,255,0.045)",
-      }}>
-      <View className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${iconColor}16`, borderStyle: "solid" }}><Icon size={17} style={{  }} /></View>
+function PrivacyContent() {
+  const router = useRouter();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-      <View className="flex-1 min-w-0"><Text className="text-sm font-bold" style={{
-            color: danger ? "#F87171" : "rgba(255,255,255,0.86)",
-          }}>{title}</Text><Text className="text-[11px] text-white/30 mt-1 leading-relaxed">{description}</Text></View>
-
-      <ChevronRight size={16} className="text-white/20 shrink-0" />
-    </Pressable>
-  );
-}
-
-export default function PrivacyPage({ onBack }: PrivacyPageProps) {
-  const { prefs } = useAppearance();
-
-  const { hex, gradFrom, gradTo, glow } = ACCENT_PALETTES[prefs.accent];
-
-  const privacySettings = useQuery(api.privacy.getPrivacySettings);
-  const updatePrivacySetting = useMutation(api.privacy.updatePrivacySetting);
-  const requestDataExport = useMutation(api.privacy.requestDataExport);
-  const requestAccountDeletion = useMutation(
-    api.privacy.requestAccountDeletion,
-  );
-
-  const [settings, setSettings] = useState<PrivacySettings>({
-    profilePublic: true,
-    showEmail: false,
-    shareActivity: true,
-    analyticsConsent: true,
-    locationServices: true,
-    thirdPartyAds: false,
-  });
-
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [updatingKey, setUpdatingKey] = useState<keyof PrivacySettings | null>(
-    null,
-  );
-
-  useEffect(() => {
-    if (!privacySettings) return;
-
-    setSettings({
-      profilePublic: privacySettings.profilePublic,
-      showEmail: privacySettings.showEmail,
-      shareActivity: privacySettings.shareActivity,
-      analyticsConsent: privacySettings.analyticsConsent,
-      locationServices: privacySettings.locationServices,
-      thirdPartyAds: privacySettings.thirdPartyAds,
+  const updatedLabel = useMemo(() => {
+    const date = new Date();
+    return date.toLocaleDateString("fr-FR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
-  }, [privacySettings]);
+  }, []);
 
-  const toggle = async (key: keyof PrivacySettings, value: boolean) => {
-    if (updatingKey) return;
-
-    const previousValue = settings[key];
-
-    setSettings((previous) => ({
-      ...previous,
-      [key]: value,
-    }));
-    setUpdatingKey(key);
-
-    try {
-      await updatePrivacySetting({ key, value });
-      toast.success("Préférence de confidentialité mise à jour");
-    } catch (error) {
-      setSettings((previous) => ({
-        ...previous,
-        [key]: previousValue,
-      }));
-
-      console.error("updatePrivacySetting:", error);
-      toast.error("Impossible d'enregistrer cette préférence");
-    } finally {
-      setUpdatingKey(null);
-    }
+  const openContact = async () => {
+    // Aucun e-mail fictif n'est injecté ici.
+    // Branchez le canal officiel de support lorsqu'il est défini.
+    await Linking.openURL("mailto:");
   };
-
-  const handleExport = async () => {
-    if (exporting) return;
-
-    setExporting(true);
-
-    try {
-      const result = await requestDataExport({});
-
-      if (result.alreadyRequested) {
-        toast.info("Une demande d'export est déjà en cours.");
-      } else {
-        toast.success("Demande d'export enregistrée");
-      }
-    } catch (error) {
-      console.error("requestDataExport:", error);
-      toast.error("Impossible de demander l'export de tes données");
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (deleting) return;
-
-    setDeleting(true);
-
-    try {
-      const result = await requestAccountDeletion({
-        confirmation: "DELETE_ACCOUNT",
-      });
-
-      setShowDeleteDialog(false);
-
-      if (result.alreadyRequested) {
-        toast.info("Une demande de suppression est déjà en cours.");
-      } else {
-        toast.error("Demande de suppression enregistrée");
-      }
-    } catch (error) {
-      console.error("requestAccountDeletion:", error);
-      toast.error("Impossible d'enregistrer la demande de suppression");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const enabledCount = Object.values(settings).filter(Boolean).length;
 
   return (
-    <View className="flex flex-col h-full min-h-0 overflow-hidden text-white" style={{  }}>{}<View initial={{
-          opacity: 0,
-          y: -18,
-        }} animate={{
-          opacity: 1,
-          y: 0,
-        }} className="flex items-center gap-3 px-5 pt-12 pb-4 shrink-0 border-b backdrop-blur-xl" style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(2,6,23,0.72)" }}><Pressable onPress={onBack} accessibilityLabel="Retour" className="w-10 h-10 rounded-2xl flex items-center justify-center active:scale-90 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><ArrowLeft size={18} accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" /></Pressable><View className="flex-1 min-w-0"><Text className="text-lg font-black flex items-center gap-2"><Shield size={18} style={{  }} />Confidentialité & Sécurité
-          </Text><Text className="text-xs text-white/35 mt-0.5">Contrôle de tes données et de ta vie privée
-          </Text></View><View className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black" style={{ backgroundColor: `${hex}12`, borderStyle: "solid" }}><Lock size={11} /><Text>PRIVÉ</Text></View></View>{}<View className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-5"><View className="max-w-3xl mx-auto pb-10">{}<View initial={{
-              opacity: 0,
-              y: 18,
-            }} animate={{
-              opacity: 1,
-              y: 0,
-            }} transition={{
-              duration: 0.45,
-            }} className="rounded-[2rem] p-5 sm:p-7 mb-6 relative overflow-hidden" style={{ borderStyle: "solid", boxShadow: `0 24px 80px ${glow}18` }}><View className="absolute -right-24 -top-28 w-72 h-72 rounded-full pointer-events-none" style={{  }} /><View className="absolute -left-24 -bottom-32 w-64 h-64 rounded-full pointer-events-none" style={{  }} /><View className="relative z-10"><View className="flex items-start justify-between gap-4"><View className="w-16 h-16 rounded-[1.35rem] flex items-center justify-center shrink-0" style={{ boxShadow: `0 12px 36px ${glow}` }}><Shield size={29} /></View><View className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Lock size={12} style={{  }} /><Text className="text-[9px] font-black text-white/55">TES DONNÉES
-                  </Text></View></View><Text className="text-[10px] font-black uppercase tracking-[0.22em] mt-7" style={{ color: hex }}>CONFIDENTIALITÉ
-              </Text><Text className="text-2xl sm:text-3xl font-black tracking-tight mt-1.5">Tes données.
-                <br /><Text style={{ WebkitBackgroundClip: "text", color: "transparent" }}>Tes choix.
-                </Text></Text><Text className="text-sm text-white/45 leading-relaxed mt-3 max-w-2xl">Tu gardes le contrôle sur la visibilité de ton profil, les
-                services utilisés, les données de personnalisation et les
-                demandes liées à ton compte.
-              </Text><View className="gap-2.5 mt-6"><View className="rounded-2xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Lock size={16} style={{  }} /><Text className="text-[10px] font-bold text-white/50 mt-2">Sécurité
-                  </Text></View><View className="rounded-2xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Eye size={16} style={{  }} /><Text className="text-[10px] font-bold text-white/50 mt-2">Transparence
-                  </Text></View><View className="rounded-2xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><UserX size={16} style={{  }} /><Text className="text-[10px] font-bold text-white/50 mt-2">Contrôle
-                  </Text></View></View></View></View>{}<View initial={{
-              opacity: 0,
-              y: 12,
-            }} animate={{
-              opacity: 1,
-              y: 0,
-            }} transition={{
-              delay: 0.08,
-            }} className="rounded-[1.75rem] p-4 mb-6" style={{ backgroundColor: "rgba(255,255,255,0.035)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="flex items-center gap-3"><View className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${hex}14` }}><BarChart3 size={17} style={{  }} /></View><View className="flex-1"><View className="flex justify-between gap-3"><Text className="text-xs font-bold text-white/70">Contrôle de confidentialité
-                  </Text><Text className="text-xs font-black" style={{ color: hex }}>{enabledCount}/6
-                  </Text></View><View className="h-1.5 rounded-full mt-2 overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><View initial={{ width: 0 }} animate={{
-                      width: `${(enabledCount / 6) * 100}%`,
-                    }} transition={{
-                      duration: 0.7,
-                      ease: "easeOut",
-                    }} className="h-full rounded-full" style={{  }} /></View></View></View></View>{}<Section title="Visibilité du profil" subtitle="Décide de ce que les autres peuvent voir"><Row icon={Globe} color="#3B82F6" label="Profil public" desc="Ton profil et tes publications peuvent être découverts." action={
-                <Toggle
-                  on={settings.profilePublic}
-                  onValueChange={(v) => toggle("profilePublic", v)}
-                  color={hex}
-                  label="Profil public"
-                  disabled={updatingKey !== null}
-                />
-              } /><Row icon={Eye} color="#8B5CF6" label="Afficher l'email" desc="Ton adresse devient visible selon tes connexions." action={
-                <Toggle
-                  on={settings.showEmail}
-                  onValueChange={(v) => toggle("showEmail", v)}
-                  color={hex}
-                  label="Afficher l'email"
-                  disabled={updatingKey !== null}
-                />
-              } /><Row icon={Bell} color="#F97316" label="Partager mon activité" desc="Tes abonnés peuvent voir tes activités récentes." action={
-                <Toggle
-                  on={settings.shareActivity}
-                  onValueChange={(v) => toggle("shareActivity", v)}
-                  color={hex}
-                  label="Partager mon activité"
-                  disabled={updatingKey !== null}
-                />
-              } /></Section>{}<Section title="Données & personnalisation" subtitle="Choisis comment Débrouille Pro peut améliorer ton expérience"><Row icon={Database} color="#10B981" label="Améliorer Débrouille Pro" desc="Partager des données d'utilisation anonymisées pour améliorer l'application." action={
-                <Toggle
-                  on={settings.analyticsConsent}
-                  onValueChange={(v) => toggle("analyticsConsent", v)}
-                  color={hex}
-                  label="Améliorer Débrouille Pro"
-                  disabled={updatingKey !== null}
-                />
-              } /><Row icon={MapPin} color="#06B6D4" label="Services de localisation" desc="Utilisés pour la carte, les recherches proches et les alertes locales." action={
-                <Toggle
-                  on={settings.locationServices}
-                  onValueChange={(v) => toggle("locationServices", v)}
-                  color={hex}
-                  label="Services de localisation"
-                  disabled={updatingKey !== null}
-                />
-              } /><Row icon={Globe} color="#9CA3AF" label="Publicités personnalisées" desc="Permet d'adapter les contenus promotionnels à ton activité." action={
-                <Toggle
-                  on={settings.thirdPartyAds}
-                  onValueChange={(v) => toggle("thirdPartyAds", v)}
-                  color={hex}
-                  label="Publicités personnalisées"
-                  disabled={updatingKey !== null}
-                />
-              } /></Section>{}<Section title="Tes données" subtitle="Exerce tes droits et gère tes informations"><ActionRow icon={Download} iconColor="#3B82F6" title={
-                exporting
-                  ? "Enregistrement de ta demande…"
-                  : "Exporter mes données"
-              } description="Demande une copie de tes informations et contenus." onPress={handleExport} /><ActionRow icon={Mail} iconColor="#8B5CF6" title="Demander une assistance" description="Une question concernant tes données ? Notre équipe peut t'aider." onPress={() => toast.info("Contacte privacy@debrouille.pro")} /><ActionRow icon={Trash2} iconColor="#EF4444" title="Supprimer mon compte" description="Demande définitive de suppression de ton compte et de tes données." danger onPress={() => setShowDeleteDialog(true)} /></Section>{}<Section title="Sécurité sociale" subtitle="Gère les personnes que tu ne souhaites plus voir interagir avec toi"><ActionRow icon={UserX} iconColor="#F97316" title="Utilisateurs bloqués" description="Aucun utilisateur bloqué pour l'instant." onPress={() =>
-                toast.info("La gestion des blocages sera disponible ici.")
-              } /></Section>{}<View initial={{
-              opacity: 0,
-              y: 8,
-            }} whileInView={{
-              opacity: 1,
-              y: 0,
-            }} viewport={{
-              once: true,
-            }} className="rounded-[1.5rem] p-4 mb-5" style={{ backgroundColor: `${hex}0c`, borderStyle: "solid" }}><View className="flex gap-3"><Sparkles size={17} style={{  }} className="shrink-0 mt-0.5" /><View><Text className="text-xs font-bold text-white/65">Ta confidentialité compte.
-                </Text><Text className="text-[11px] text-white/30 leading-relaxed mt-1">Les préférences affichées ici contrôlent l'expérience côté
-                  application. Les demandes liées à tes données peuvent
-                  nécessiter une vérification avant traitement.
-                </Text></View></View></View><Text className="text-center text-[10px] text-white/20 leading-relaxed px-4">Politique de confidentialité mise à jour le 1er juin 2025.
-            <br />Débrouille Pro · Kolwezi, RDC
-          </Text></View></View>{}<View>{showDeleteDialog && (
-          <View initial={{
-              opacity: 0,
-            }} animate={{
-              opacity: 1,
-            }} exit={{
-              opacity: 0,
-            }} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.68)" }} onPress={() => setShowDeleteDialog(false)}>
-            <View initial={{
-                opacity: 0,
-                y: 30,
-                scale: 0.97,
-              }} animate={{
-                opacity: 1,
-                y: 0,
-                scale: 1,
-              }} exit={{
-                opacity: 0,
-                y: 20,
-                scale: 0.98,
-              }} transition={{
-                type: "spring",
-                stiffness: 380,
-                damping: 30,
-              }} onPress={(event) => event.stopPropagation()} className="w-full max-w-md rounded-[2rem] p-5" style={{ borderWidth: 1, borderColor: "rgba(248,113,113,.22)", borderStyle: "solid", boxShadow: "0 30px 100px rgba(0,0,0,.5)" }}>
-              <View className="flex items-start justify-between gap-4"><View className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,.12)" }}><AlertTriangle size={22} className="text-red-400" /></View><Pressable onPress={() => setShowDeleteDialog(false)} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,.05)" }}><X size={16} className="text-white/40" /></Pressable></View>
+    <View style={styles.screen}>
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [
+            styles.backButton,
+            pressed && styles.pressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
+          <ArrowLeft size={22} color="#ffffff" />
+        </Pressable>
 
-              <Text className="text-xl font-black mt-5">Supprimer ton compte ?
-              </Text>
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>Confidentialité</Text>
+          <Text style={styles.headerSubtitle}>
+            Protection mondiale des données
+          </Text>
+        </View>
+      </View>
 
-              <Text className="text-sm text-white/40 leading-relaxed mt-2">
-                Cette demande peut entraîner la suppression de ton profil, de
-                tes contenus et des données associées selon les règles
-                applicables.
-              </Text>
-
-              <View className="rounded-2xl p-3 mt-4" style={{ backgroundColor: "rgba(239,68,68,.07)", borderWidth: 1, borderColor: "rgba(239,68,68,.13)", borderStyle: "solid" }}>
-                <Text className="text-[11px] text-red-300/65 leading-relaxed">
-                  Cette action est sensible. Vérifie que tu souhaites réellement
-                  supprimer ton compte avant de confirmer.
-                </Text>
-              </View>
-
-              <View className="gap-2.5 mt-5">
-                <Pressable onPress={() => setShowDeleteDialog(false)} className="h-11 rounded-2xl text-sm font-bold" style={{ backgroundColor: "rgba(255,255,255,.06)", borderWidth: 1, borderColor: "rgba(255,255,255,.08)", borderStyle: "solid" }}>
-                  Annuler
-                </Pressable>
-
-                <Pressable onPress={handleDelete} disabled={deleting} className={`h-11 rounded-2xl text-sm font-black text-white ${
-                    deleting
-                      ? "opacity-60 cursor-not-allowed"
-                      : "cursor-pointer"
-                  }`} style={{ boxShadow: "0 10px 28px rgba(239,68,68,.2)" }}>
-                  Confirmer
-                </Pressable>
-              </View>
-            </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.hero}>
+          <View style={styles.heroIcon}>
+            <ShieldCheck size={34} color="#8ab4ff" strokeWidth={1.8} />
           </View>
-        )}</View></View>
+
+          <Text style={styles.heroTitle}>
+            Votre vie privée est une priorité
+          </Text>
+
+          <Text style={styles.heroText}>
+            Cette politique présente les principes appliqués au traitement des
+            données personnelles dans les services DébrouillePro.
+          </Text>
+
+          <View style={styles.metaRow}>
+            <View style={styles.statusDot} />
+            <Text style={styles.metaText}>
+              Dernière mise à jour : {updatedLabel}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.notice}>
+          <Lock size={18} color="#8ab4ff" />
+          <View style={styles.noticeBody}>
+            <Text style={styles.noticeTitle}>Principe essentiel</Text>
+            <Text style={styles.noticeText}>
+              Les données doivent être collectées et utilisées uniquement pour
+              des finalités légitimes, nécessaires et compatibles avec les
+              droits des personnes.
+            </Text>
+          </View>
+        </View>
+
+        {SECTIONS.map((section) => (
+          <SectionCard
+            key={section.id}
+            section={section}
+            expanded={expandedId === section.id}
+            onPress={() =>
+              setExpandedId((current) =>
+                current === section.id ? null : section.id,
+              )
+            }
+          />
+        ))}
+
+        <View style={styles.contactCard}>
+          <View style={styles.contactIcon}>
+            <Mail size={22} color="#8ab4ff" />
+          </View>
+
+          <Text style={styles.contactTitle}>
+            Une question sur vos données ?
+          </Text>
+
+          <Text style={styles.contactText}>
+            Utilisez le canal officiel de confidentialité indiqué par
+            DébrouillePro lorsque celui-ci est configuré.
+          </Text>
+
+          <Pressable
+            onPress={openContact}
+            style={({ pressed }) => [
+              styles.contactButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Mail size={18} color="#ffffff" />
+            <Text style={styles.contactButtonText}>Contacter</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.footer}>
+          DébrouillePro — Politique de confidentialité internationale
+        </Text>
+      </ScrollView>
+    </View>
   );
 }
+
+export default function PrivacyPage() {
+  return <PrivacyContent />;
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#050812",
+  },
+
+  header: {
+    minHeight: 72,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(5,8,18,0.96)",
+  },
+
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  headerText: {
+    flex: 1,
+    marginLeft: 13,
+  },
+
+  headerTitle: {
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "800",
+  },
+
+  headerSubtitle: {
+    color: "#94a3b8",
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  scroll: {
+    flex: 1,
+  },
+
+  content: {
+    padding: 16,
+    paddingBottom: 42,
+  },
+
+  hero: {
+    padding: 22,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    marginBottom: 14,
+  },
+
+  heroIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(59,130,246,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.2)",
+    marginBottom: 18,
+  },
+
+  heroTitle: {
+    color: "#ffffff",
+    fontSize: 27,
+    lineHeight: 33,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+
+  heroText: {
+    color: "#b7c1d1",
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 10,
+  },
+
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 18,
+  },
+
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#60a5fa",
+    marginRight: 8,
+  },
+
+  metaText: {
+    color: "#7f8ca3",
+    fontSize: 12,
+  },
+
+  notice: {
+    flexDirection: "row",
+    padding: 16,
+    borderRadius: 18,
+    marginBottom: 14,
+    backgroundColor: "rgba(59,130,246,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.16)",
+  },
+
+  noticeBody: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  noticeTitle: {
+    color: "#dbeafe",
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 5,
+  },
+
+  noticeText: {
+    color: "#aebbd0",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+
+  card: {
+    marginBottom: 10,
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  cardHeader: {
+    minHeight: 68,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.055)",
+    marginRight: 12,
+  },
+
+  cardTitle: {
+    flex: 1,
+    color: "#f8fafc",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "750",
+    paddingRight: 8,
+  },
+
+  cardContent: {
+    paddingHorizontal: 16,
+    paddingTop: 2,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+  },
+
+  paragraph: {
+    color: "#b6c0d0",
+    fontSize: 13,
+    lineHeight: 21,
+    marginTop: 12,
+  },
+
+  contactCard: {
+    marginTop: 10,
+    padding: 20,
+    alignItems: "center",
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+  },
+
+  contactIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(59,130,246,0.12)",
+    marginBottom: 12,
+  },
+
+  contactTitle: {
+    color: "#ffffff",
+    fontSize: 17,
+    fontWeight: "850",
+  },
+
+  contactText: {
+    color: "#94a3b8",
+    textAlign: "center",
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 7,
+  },
+
+  contactButton: {
+    marginTop: 16,
+    minHeight: 46,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#2563eb",
+  },
+
+  contactButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  footer: {
+    color: "#64748b",
+    textAlign: "center",
+    fontSize: 11,
+    lineHeight: 18,
+    marginTop: 24,
+    paddingHorizontal: 20,
+  },
+
+  pressed: {
+    opacity: 0.72,
+  },
+});

@@ -1,92 +1,74 @@
-import { Pressable, View, Text, TextInput } from "react-native";
+import React, {
+  useMemo,
+  useState,
+  type ElementType,
+  type ReactNode,
+} from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-// src/pages/modules/GroupesPage.tsx
-// Page temporairement simplifiée : les fonctionnalités de posts dans les groupes sont désactivées
-// car les mutations correspondantes n'existent pas encore dans le backend.
+import { useMutation, useQuery } from "convex/react";
 
-import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "convex/react";
+import {
+  ArrowLeft,
+  Bell,
+  CheckCircle,
+  ChevronRight,
+  Crown,
+  Globe,
+  Lock,
+  MapPin,
+  Plus,
+  Search,
+  Shield,
+  Users,
+  X,
+  Zap,
+} from "lucide-react-native";
+
+import { api } from "@/convex/_generated/api.js";
+import type { Id } from "@/convex/_generated/dataModel.js";
 import {
   Authenticated,
   Unauthenticated,
   AuthLoading,
 } from "@/lib/convex-auth-compat";
-import { api } from "@/convex/_generated/api.js";
-import type { Id } from "@/convex/_generated/dataModel.js";
-import { toast } from "sonner";
-import {
-  ArrowLeft,
-  Users,
-  Search,
-  Plus,
-  Bell,
-  Lock,
-  Globe,
-  Crown,
-  Shield,
-  CheckCircle,
-  MessageCircle,
-  ChevronRight,
-  X,
-  Star,
-  Zap,
-  Flame,
-  TrendingUp,
-  MapPin,
-} from "lucide-react-native";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Theme
+// ─────────────────────────────────────────────────────────────────────────────
+
+const COLORS = {
+  background: "#050812",
+  backgroundSecondary: "#0C1022",
+  card: "rgba(255,255,255,0.045)",
+  cardStrong: "rgba(255,255,255,0.065)",
+  border: "rgba(255,255,255,0.09)",
+  borderSoft: "rgba(255,255,255,0.065)",
+  text: "#FFFFFF",
+  textSecondary: "rgba(255,255,255,0.68)",
+  textMuted: "rgba(255,255,255,0.42)",
+  textFaint: "rgba(255,255,255,0.28)",
+  primary: "#6366F1",
+  primaryStrong: "#4F46E5",
+  danger: "#EF4444",
+  success: "#10B981",
+  warning: "#F59E0B",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
 type Role = "admin" | "moderator" | "member";
-
-const ROLE_COLORS: Record<Role, string> = {
-  admin: "#F59E0B",
-  moderator: "#8B5CF6",
-  member: "#6B7280",
-};
-const ROLE_LABELS: Record<Role, string> = {
-  admin: "Admin",
-  moderator: "Modér.",
-  member: "Membre",
-};
-const ROLE_ICONS: Record<Role, React.ElementType> = {
-  admin: Crown,
-  moderator: Shield,
-  member: CheckCircle,
-};
-
-const EMOJI_MAP: Record<string, string> = {
-  Métier: "💼",
-  Quartier: "🏘️",
-  Intérêt: "💻",
-  Famille: "👨‍👩‍👧‍👦",
-  Agriculture: "🌾",
-  Business: "💼",
-};
-const COLOR_MAP: Record<string, string> = {
-  Métier: "#8B5CF6",
-  Quartier: "#10B981",
-  Intérêt: "#6366F1",
-  Famille: "#F97316",
-  Agriculture: "#22C55E",
-  Business: "#3B82F6",
-};
-const CATEGORIES = [
-  "Tous",
-  "Mes groupes",
-  "Quartier",
-  "Métier",
-  "Intérêt",
-  "Famille",
-];
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-function RoleBadge({ role }: { role: Role }) {
-  const Icon = ROLE_ICONS[role];
-  return (
-    <Text className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: `${ROLE_COLORS[role]}22`, color: ROLE_COLORS[role] }}><Icon size={8} />{ROLE_LABELS[role]}</Text>
-  );
-}
 
 type GroupData = {
   _id: string;
@@ -101,29 +83,250 @@ type GroupData = {
   role?: string;
 };
 
+type GroupCategory =
+  | "Tous"
+  | "Mes groupes"
+  | "Quartier"
+  | "Métier"
+  | "Intérêt"
+  | "Famille";
+
+type IconComponent = ElementType<{
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CATEGORIES: GroupCategory[] = [
+  "Tous",
+  "Mes groupes",
+  "Quartier",
+  "Métier",
+  "Intérêt",
+  "Famille",
+];
+
+const CREATE_CATEGORIES = ["Quartier", "Métier", "Intérêt", "Famille"] as const;
+
+const ROLE_COLORS: Record<Role, string> = {
+  admin: "#F59E0B",
+  moderator: "#8B5CF6",
+  member: "#6B7280",
+};
+
+const ROLE_LABELS: Record<Role, string> = {
+  admin: "Admin",
+  moderator: "Modérateur",
+  member: "Membre",
+};
+
+const ROLE_ICONS: Record<Role, IconComponent> = {
+  admin: Crown,
+  moderator: Shield,
+  member: CheckCircle,
+};
+
+const EMOJI_MAP: Record<string, string> = {
+  Métier: "💼",
+  Quartier: "🏘️",
+  Intérêt: "💻",
+  Famille: "👨‍👩‍👧‍👦",
+  Agriculture: "🌾",
+  Business: "💼",
+};
+
+const COLOR_MAP: Record<string, string> = {
+  Métier: "#8B5CF6",
+  Quartier: "#10B981",
+  Intérêt: "#6366F1",
+  Famille: "#F97316",
+  Agriculture: "#22C55E",
+  Business: "#3B82F6",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getRole(role?: string): Role | null {
+  if (role === "admin" || role === "moderator" || role === "member") {
+    return role;
+  }
+
+  return null;
+}
+
+function getGroupColor(category: string): string {
+  return COLOR_MAP[category] ?? COLORS.primary;
+}
+
+function getGroupEmoji(category: string): string {
+  return EMOJI_MAP[category] ?? "👥";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skeleton
+// ─────────────────────────────────────────────────────────────────────────────
+
+function GroupSkeleton() {
+  return (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonAvatar} />
+
+      <View style={styles.skeletonContent}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonDescription} />
+        <View style={styles.skeletonMeta} />
+      </View>
+
+      <View style={styles.skeletonArrow} />
+    </View>
+  );
+}
+
+function PageSkeleton() {
+  return (
+    <View style={styles.page}>
+      <ScrollView
+        contentContainerStyle={styles.loadingContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.skeletonHeader}>
+          <View style={styles.skeletonBack} />
+          <View style={styles.skeletonHeaderText}>
+            <View style={styles.skeletonHeaderTitle} />
+            <View style={styles.skeletonHeaderSubtitle} />
+          </View>
+        </View>
+
+        {Array.from({ length: 5 }).map((_, index) => (
+          <GroupSkeleton key={index} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Role Badge
+// ─────────────────────────────────────────────────────────────────────────────
+
+function RoleBadge({ role }: { role: Role }) {
+  const Icon = ROLE_ICONS[role];
+  const color = ROLE_COLORS[role];
+
+  return (
+    <View
+      style={[
+        styles.roleBadge,
+        {
+          backgroundColor: `${color}20`,
+          borderColor: `${color}40`,
+        },
+      ]}
+    >
+      <Icon size={9} color={color} strokeWidth={2.5} />
+
+      <Text style={[styles.roleBadgeText, { color }]}>{ROLE_LABELS[role]}</Text>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group Card
+// ─────────────────────────────────────────────────────────────────────────────
+
 function GroupeCard({
   groupe,
-  onClick,
+  onPress,
 }: {
   groupe: GroupData;
-  onClick: () => void;
+  onPress: () => void;
 }) {
-  const color = COLOR_MAP[groupe.category] ?? "#8B5CF6";
-  const emoji = EMOJI_MAP[groupe.category] ?? "👥";
+  const color = getGroupColor(groupe.category);
+  const emoji = getGroupEmoji(groupe.category);
+  const role = getRole(groupe.role);
+
   return (
-    <Pressable whileTap={{ scale: 0.97 }} onPress={onClick} className="w-full text-left rounded-2xl p-4 flex items-center gap-3" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-      <View className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{ backgroundColor: `${color}18`, borderStyle: "solid" }}>{emoji}</View>
-      <View className="flex-1 min-w-0"><View className="flex items-center gap-2 flex-wrap"><Text className="text-sm font-bold text-white truncate">{groupe.name}</Text>{groupe.isPrivate && (
-            <Lock size={10} className="text-white/40 flex-shrink-0" />
-          )}{groupe.role && <RoleBadge accessibilityRole={groupe.role as Role} />}</View><Text className="text-[11px] text-white/50 mt-0.5">{groupe.description}</Text><View className="flex items-center gap-3 mt-1.5"><Text className="flex items-center gap-1 text-[10px] text-white/40"><Users size={9} />{groupe.memberCount.toLocaleString()}</Text>{groupe.city && (
-            <Text className="flex items-center gap-1 text-[10px] text-white/30"><MapPin size={9} />{groupe.city}</Text>
-          )}</View></View>
-      <ChevronRight size={14} className="text-white/30 flex-shrink-0" />
+    <Pressable
+      onPress={onPress}
+      android_ripple={{ color: "rgba(255,255,255,0.06)" }}
+      style={({ pressed }) => [
+        styles.groupCard,
+        pressed && styles.groupCardPressed,
+      ]}
+    >
+      <View
+        style={[
+          styles.groupIcon,
+          {
+            backgroundColor: `${color}16`,
+            borderColor: `${color}30`,
+          },
+        ]}
+      >
+        <Text style={styles.groupEmoji}>{emoji}</Text>
+      </View>
+
+      <View style={styles.groupMain}>
+        <View style={styles.groupTitleRow}>
+          <Text numberOfLines={1} ellipsizeMode="tail" style={styles.groupName}>
+            {groupe.name}
+          </Text>
+
+          {groupe.isPrivate ? (
+            <Lock size={12} color={COLORS.textFaint} strokeWidth={2.2} />
+          ) : null}
+
+          {role ? <RoleBadge role={role} /> : null}
+        </View>
+
+        <Text
+          numberOfLines={2}
+          ellipsizeMode="tail"
+          style={styles.groupDescription}
+        >
+          {groupe.description}
+        </Text>
+
+        <View style={styles.groupMeta}>
+          <View style={styles.metaItem}>
+            <Users size={11} color={COLORS.textMuted} strokeWidth={2} />
+
+            <Text style={styles.metaText}>
+              {groupe.memberCount.toLocaleString()}
+            </Text>
+          </View>
+
+          {groupe.city ? (
+            <View style={styles.metaItem}>
+              <MapPin size={11} color={COLORS.textFaint} strokeWidth={2} />
+
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={styles.metaTextFaint}
+              >
+                {groupe.city}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      <ChevronRight size={17} color={COLORS.textFaint} strokeWidth={2} />
     </Pressable>
   );
 }
 
-// ── Group Detail (simplifié, posts désactivés) ──────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Group Detail
+// ─────────────────────────────────────────────────────────────────────────────
+
 function GroupeDetail({
   groupe,
   onBack,
@@ -132,223 +335,1815 @@ function GroupeDetail({
   onBack: () => void;
 }) {
   const [showCreate, setShowCreate] = useState(false);
-  const [postText, setPostText] = useState("");
+  const [joinPending, setJoinPending] = useState(false);
+
   const joinGroup = useMutation(api.community.joinGroup);
 
-  const color = COLOR_MAP[groupe.category] ?? "#8B5CF6";
-  const emoji = EMOJI_MAP[groupe.category] ?? "👥";
+  const color = getGroupColor(groupe.category);
+  const emoji = getGroupEmoji(groupe.category);
+  const role = getRole(groupe.role);
 
   const handleJoin = async () => {
+    if (joinPending) {
+      return;
+    }
+
+    setJoinPending(true);
+
     try {
-      const result = await joinGroup({ groupId: groupe._id as Id<"groups"> });
-      toast.success(result.joined ? "Groupe rejoint !" : "Groupe quitté");
+      await joinGroup({
+        groupId: groupe._id as Id<"groups">,
+      });
+
+      // The list query is reactive. The UI will receive the backend truth.
     } catch {
-      toast.error("Erreur lors de l'action");
+      // Keep the current state unchanged.
+      // No fake success is shown.
+    } finally {
+      setJoinPending(false);
     }
   };
 
-  const handlePost = async () => {
-    // Fonction désactivée car `createGroupPost` n'existe pas encore.
-    toast.info("Publication dans les groupes : fonctionnalité à venir");
-    setShowCreate(false);
-    setPostText("");
-  };
-
   return (
-    <View className="relative h-full w-full flex flex-col" style={{  }}><View className="absolute top-0 right-0 w-56 h-56 rounded-full pointer-events-none" style={{  }} /><View className="flex-shrink-0 px-5 pt-6 pb-4"><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ backgroundColor: `${color}20` }}>{emoji}</View><View className="flex-1 min-w-0"><View className="flex items-center gap-1.5"><Text className="text-base font-black text-white truncate">{groupe.name}</Text>{groupe.isPrivate && <Lock size={11} className="text-white/40" />}</View><Text className="text-[11px] text-white/40">{groupe.memberCount.toLocaleString()}membres
-            </Text></View><Pressable className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><Bell size={16} className="text-white/60" /></Pressable></View><Text className="text-xs text-white/50 leading-relaxed mb-3">{groupe.description}</Text><View className="flex flex-wrap gap-1.5 mb-4">{groupe.tags.map((t) => (
-            <Text key={t} className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ backgroundColor: `${color}15`, color }}>#{t}</Text>
-          ))}</View><View className="flex gap-2"><Authenticated>{groupe.isMember ? (
-              <>
-                {groupe.role && <RoleBadge accessibilityRole={groupe.role as Role} />}
-                <Pressable onPress={() => setShowCreate(true)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white" style={{  }}><Plus size={13} /><Text>Publier</Text></Pressable>
-                <Pressable onPress={handleJoin} className="px-3 py-2.5 rounded-xl text-xs font-semibold" style={{ backgroundColor: "rgba(239,68,68,0.12)" }}><Text>Quitter</Text></Pressable>
-              </>
+    <View style={styles.page}>
+      <ScrollView
+        contentContainerStyle={styles.detailScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.detailHeader}>
+          <Pressable
+            onPress={onBack}
+            style={({ pressed }) => [
+              styles.iconButton,
+              pressed && styles.iconButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+          >
+            <ArrowLeft size={19} color={COLORS.text} strokeWidth={2.2} />
+          </Pressable>
+
+          <View
+            style={[
+              styles.detailAvatar,
+              {
+                backgroundColor: `${color}18`,
+                borderColor: `${color}35`,
+              },
+            ]}
+          >
+            <Text style={styles.detailEmoji}>{emoji}</Text>
+          </View>
+
+          <View style={styles.detailTitleContainer}>
+            <View style={styles.detailTitleRow}>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={styles.detailTitle}
+              >
+                {groupe.name}
+              </Text>
+
+              {groupe.isPrivate ? (
+                <Lock size={12} color={COLORS.textFaint} strokeWidth={2.2} />
+              ) : null}
+            </View>
+
+            <Text style={styles.detailMemberCount}>
+              {groupe.memberCount.toLocaleString()} membres
+            </Text>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.iconButton,
+              pressed && styles.iconButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications du groupe"
+          >
+            <Bell size={17} color={COLORS.textSecondary} strokeWidth={2} />
+          </Pressable>
+        </View>
+
+        {/* Description */}
+        <View style={styles.detailDescriptionCard}>
+          <Text style={styles.detailDescription}>{groupe.description}</Text>
+
+          {groupe.tags.length > 0 ? (
+            <View style={styles.tagsContainer}>
+              {groupe.tags.map((tag) => (
+                <View
+                  key={tag}
+                  style={[
+                    styles.tag,
+                    {
+                      backgroundColor: `${color}14`,
+                      borderColor: `${color}30`,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tagText, { color }]}>#{tag}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+
+        {/* Membership */}
+        <View style={styles.membershipCard}>
+          <View style={styles.membershipHeader}>
+            <View>
+              <Text style={styles.membershipTitle}>Votre participation</Text>
+
+              <Text style={styles.membershipSubtitle}>
+                {groupe.isMember
+                  ? "Vous êtes membre de ce groupe."
+                  : "Vous ne faites pas encore partie de ce groupe."}
+              </Text>
+            </View>
+
+            {role ? <RoleBadge role={role} /> : null}
+          </View>
+
+          <View style={styles.membershipActions}>
+            {groupe.isMember ? (
+              <Authenticated>
+                <Pressable
+                  onPress={handleJoin}
+                  disabled={joinPending}
+                  style={({ pressed }) => [
+                    styles.secondaryAction,
+                    pressed && styles.actionPressed,
+                    joinPending && styles.actionDisabled,
+                  ]}
+                >
+                  {joinPending ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={COLORS.textSecondary}
+                    />
+                  ) : (
+                    <Text style={styles.secondaryActionText}>
+                      Quitter le groupe
+                    </Text>
+                  )}
+                </Pressable>
+              </Authenticated>
             ) : (
-              <Pressable onPress={handleJoin} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-bold text-white" style={{  }}><Plus size={15} /><Text>Rejoindre le groupe</Text></Pressable>
-            )}</Authenticated><Unauthenticated><Pressable onPress={() =>
-                toast.info("Connectez-vous pour rejoindre le groupe")} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-sm font-bold text-white" style={{  }}><Plus size={15} /><Text>Rejoindre le groupe</Text></Pressable></Unauthenticated></View></View><View className="flex-1 overflow-y-auto px-5 pb-8 flex flex-col gap-3" style={{  }}>{}<View className="flex flex-col items-center justify-center py-16 gap-3"><View className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl" style={{ backgroundColor: `${color}15` }}>{emoji}</View><Text className="text-sm text-white/40 text-center">Les publications dans les groupes sont temporairement désactivées.
-            <br />Cette fonctionnalité sera bientôt disponible.
-          </Text></View></View>{}<View>{showCreate && (
-          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.7)" }}>
-            <View initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }} className="w-full rounded-t-3xl p-5" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-              <View className="flex items-center justify-between mb-4"><Text className="text-base font-bold text-white">Nouveau post
-                </Text><Pressable onPress={() => setShowCreate(false)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><X size={16} className="text-white/60" /></Pressable></View>
-              <TextInput value={postText} onChangeText={(value) => setPostText(value)} placeholder="Quoi de neuf dans le groupe ?" className="w-full rounded-2xl px-4 py-3 text-sm text-white/90 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.09)", borderStyle: "solid" }} multiline textAlignVertical="top" />
-              <Pressable onPress={handlePost} disabled={!postText.trim()} className="w-full mt-3 py-3 rounded-2xl text-sm font-bold text-white disabled:opacity-40" style={{  }}><Text>Publier (désactivé)</Text></Pressable>
+              <>
+                <Authenticated>
+                  <Pressable
+                    onPress={handleJoin}
+                    disabled={joinPending}
+                    style={({ pressed }) => [
+                      styles.primaryAction,
+                      pressed && styles.actionPressed,
+                      joinPending && styles.actionDisabled,
+                    ]}
+                  >
+                    {joinPending ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Plus size={16} color="#FFFFFF" strokeWidth={2.4} />
+
+                        <Text style={styles.primaryActionText}>
+                          Rejoindre le groupe
+                        </Text>
+                      </>
+                    )}
+                  </Pressable>
+                </Authenticated>
+
+                <Unauthenticated>
+                  <View style={styles.authHint}>
+                    <Text style={styles.authHintText}>
+                      Connectez-vous pour rejoindre ce groupe.
+                    </Text>
+                  </View>
+                </Unauthenticated>
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* Group content */}
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Publications</Text>
+
+            <Text style={styles.sectionSubtitle}>Espace communautaire</Text>
+          </View>
+        </View>
+
+        <View style={styles.emptyState}>
+          <View
+            style={[
+              styles.emptyIcon,
+              {
+                backgroundColor: `${color}14`,
+                borderColor: `${color}28`,
+              },
+            ]}
+          >
+            <Text style={styles.emptyEmoji}>{emoji}</Text>
+          </View>
+
+          <Text style={styles.emptyTitle}>Publications non disponibles</Text>
+
+          <Text style={styles.emptyDescription}>
+            Les publications dans les groupes ne sont pas encore disponibles
+            dans le backend actuel.
+          </Text>
+
+          <Text style={styles.emptyFootnote}>
+            Aucune publication fictive n’est affichée.
+          </Text>
+        </View>
+      </ScrollView>
+
+      {/* Create-post UI intentionally not exposed because the backend
+          mutation does not exist in the provided source. */}
+      {showCreate ? (
+        <Modal
+          visible={showCreate}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowCreate(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Publication</Text>
+
+                <Pressable
+                  onPress={() => setShowCreate(false)}
+                  style={styles.modalClose}
+                >
+                  <X size={17} color={COLORS.textSecondary} />
+                </Pressable>
+              </View>
+
+              <Text style={styles.modalInfo}>
+                La création de publications de groupe n’est pas encore reliée à
+                une mutation backend disponible.
+              </Text>
             </View>
           </View>
-        )}</View></View>
-  );
-}
-
-// ── Create Group Modal ─────────────────────────────────────────────────────────
-function CreateGroupModal({
-  onClose,
-  onCreate,
-}: {
-  onClose: () => void;
-  onCreate: () => void;
-}) {
-  const [nom, setNom] = useState("");
-  const [desc, setDesc] = useState("");
-  const [categorie, setCategorie] = useState("Intérêt");
-  const [prive, setPrive] = useState(false);
-  const createGroup = useMutation(api.community.createGroup);
-  const CATS = ["Quartier", "Métier", "Intérêt", "Famille"];
-
-  const handleCreate = async () => {
-    if (!nom.trim()) return;
-    try {
-      await createGroup({
-        name: nom.trim(),
-        description: desc.trim() || "Groupe créé sur Débrouille Pro.",
-        category: categorie,
-        isPrivate: prive,
-        tags: [categorie],
-      });
-      toast.success("Groupe créé !");
-      onCreate();
-      onClose();
-    } catch {
-      toast.error("Erreur lors de la création");
-    }
-  };
-
-  return (
-    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.75)" }}>
-      <View initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }} className="w-full rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-        <View className="flex items-center justify-between mb-5"><Text className="text-base font-bold text-white">Créer un groupe
-          </Text><Pressable onPress={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><X size={16} className="text-white/60" /></Pressable></View>
-        <TextInput value={nom} onChangeText={(value) => setNom(value)} placeholder="Nom du groupe*" className="w-full rounded-2xl px-4 py-3 text-sm text-white outline-none mb-3" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.09)", borderStyle: "solid" }} />
-        <TextInput value={desc} onChangeText={(value) => setDesc(value)} placeholder="Description (optionnel)" className="w-full rounded-2xl px-4 py-3 text-sm text-white/80 outline-none mb-3" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.09)", borderStyle: "solid" }} multiline textAlignVertical="top" />
-        <View className="mb-4"><Text className="text-xs text-white/50 mb-2">Catégorie</Text><View className="flex flex-wrap gap-2">{CATS.map((c) => (
-              <Pressable key={c} onPress={() => setCategorie(c)} className="px-3 py-1.5 rounded-xl text-xs font-semibold" style={{ backgroundColor: categorie === c
-                                    ? "rgba(139,92,246,0.25)"
-                                    : "rgba(255,255,255,0.06)", borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}>{c}</Pressable>
-            ))}</View></View>
-        <Pressable onPress={() => setPrive(!prive)} className="w-full flex items-center justify-between px-4 py-3 rounded-2xl mb-5" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2">{prive ? (
-              <Lock size={14} className="text-yellow-400" />
-            ) : (
-              <Globe size={14} className="text-green-400" />
-            )}<Text className="text-sm text-white/80">{prive ? "Groupe privé" : "Groupe public"}</Text></View><View className="w-10 h-5 rounded-full relative" style={{ backgroundColor: prive ? "#8B5CF6" : "rgba(255,255,255,0.15)" }}><View animate={{ x: prive ? 18 : 2 }} className="absolute top-0.5 w-4 h-4 rounded-full bg-white" /></View></Pressable>
-        <Pressable onPress={handleCreate} disabled={!nom.trim()} className="w-full py-3.5 rounded-2xl text-sm font-bold text-white disabled:opacity-40" style={{  }}><Text>Créer le groupe ✨</Text></Pressable>
-      </View>
+        </Modal>
+      ) : null}
     </View>
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Create Group Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CreateGroupModal({
+  visible,
+  onClose,
+  onCreated,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] =
+    useState<(typeof CREATE_CATEGORIES)[number]>("Intérêt");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const createGroup = useMutation(api.community.createGroup);
+
+  const resetForm = () => {
+    setName("");
+    setDescription("");
+    setCategory("Intérêt");
+    setIsPrivate(false);
+    setError(null);
+  };
+
+  const handleClose = () => {
+    if (pending) {
+      return;
+    }
+
+    resetForm();
+    onClose();
+  };
+
+  const handleCreate = async () => {
+    const trimmedName = name.trim();
+    const trimmedDescription = description.trim();
+
+    if (!trimmedName) {
+      setError("Le nom du groupe est obligatoire.");
+      return;
+    }
+
+    if (pending) {
+      return;
+    }
+
+    setPending(true);
+    setError(null);
+
+    try {
+      await createGroup({
+        name: trimmedName,
+        description: trimmedDescription || "Groupe créé sur Débrouille Pro.",
+        category,
+        isPrivate,
+        tags: [category],
+      });
+
+      resetForm();
+      onCreated();
+      onClose();
+    } catch {
+      setError(
+        "Impossible de créer le groupe. Vérifiez votre connexion puis réessayez.",
+      );
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.createModalCard}>
+          <View style={styles.modalHeader}>
+            <View>
+              <Text style={styles.modalTitle}>Créer un groupe</Text>
+
+              <Text style={styles.modalSubtitle}>
+                Créez un espace pour votre communauté.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={handleClose}
+              disabled={pending}
+              style={({ pressed }) => [
+                styles.modalClose,
+                pressed && styles.iconButtonPressed,
+              ]}
+            >
+              <X size={17} color={COLORS.textSecondary} />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.createScrollContent}
+          >
+            {/* Name */}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Nom du groupe</Text>
+
+              <TextInput
+                value={name}
+                onChangeText={(value) => {
+                  setName(value);
+                  if (error) {
+                    setError(null);
+                  }
+                }}
+                placeholder="Ex. Entrepreneurs de Kolwezi"
+                placeholderTextColor={COLORS.textFaint}
+                editable={!pending}
+                maxLength={100}
+                returnKeyType="next"
+                style={styles.input}
+              />
+
+              <Text style={styles.fieldCounter}>{name.length}/100</Text>
+            </View>
+
+            {/* Description */}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Description</Text>
+
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Décrivez l'objectif du groupe..."
+                placeholderTextColor={COLORS.textFaint}
+                editable={!pending}
+                maxLength={500}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                style={[styles.input, styles.textArea]}
+              />
+
+              <Text style={styles.fieldCounter}>{description.length}/500</Text>
+            </View>
+
+            {/* Category */}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Catégorie</Text>
+
+              <View style={styles.categoryGrid}>
+                {CREATE_CATEGORIES.map((item) => {
+                  const active = category === item;
+                  const color = getGroupColor(item);
+
+                  return (
+                    <Pressable
+                      key={item}
+                      onPress={() => setCategory(item)}
+                      disabled={pending}
+                      style={({ pressed }) => [
+                        styles.categoryOption,
+                        {
+                          backgroundColor: active ? `${color}20` : COLORS.card,
+                          borderColor: active
+                            ? `${color}60`
+                            : COLORS.borderSoft,
+                        },
+                        pressed && styles.optionPressed,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.categoryEmoji,
+                          { opacity: active ? 1 : 0.65 },
+                        ]}
+                      >
+                        {getGroupEmoji(item)}
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.categoryText,
+                          active && {
+                            color,
+                            fontWeight: "700",
+                          },
+                        ]}
+                      >
+                        {item}
+                      </Text>
+
+                      {active ? (
+                        <CheckCircle
+                          size={13}
+                          color={color}
+                          strokeWidth={2.5}
+                        />
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Privacy */}
+            <Pressable
+              onPress={() => setIsPrivate((value) => !value)}
+              disabled={pending}
+              style={({ pressed }) => [
+                styles.privacyCard,
+                pressed && styles.optionPressed,
+              ]}
+            >
+              <View style={styles.privacyLeft}>
+                <View
+                  style={[
+                    styles.privacyIcon,
+                    {
+                      backgroundColor: isPrivate
+                        ? "rgba(245,158,11,0.12)"
+                        : "rgba(16,185,129,0.12)",
+                    },
+                  ]}
+                >
+                  {isPrivate ? (
+                    <Lock size={16} color={COLORS.warning} strokeWidth={2} />
+                  ) : (
+                    <Globe size={16} color={COLORS.success} strokeWidth={2} />
+                  )}
+                </View>
+
+                <View style={styles.privacyTextContainer}>
+                  <Text style={styles.privacyTitle}>
+                    {isPrivate ? "Groupe privé" : "Groupe public"}
+                  </Text>
+
+                  <Text style={styles.privacyDescription}>
+                    {isPrivate
+                      ? "L'accès au groupe est réservé aux membres."
+                      : "Le groupe peut être découvert par les utilisateurs."}
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={[
+                  styles.switchTrack,
+                  {
+                    backgroundColor: isPrivate
+                      ? COLORS.primary
+                      : "rgba(255,255,255,0.13)",
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.switchThumb,
+                    {
+                      alignSelf: isPrivate ? "flex-end" : "flex-start",
+                    },
+                  ]}
+                />
+              </View>
+            </Pressable>
+
+            {error ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
+            {/* Submit */}
+            <Pressable
+              onPress={handleCreate}
+              disabled={pending || !name.trim()}
+              style={({ pressed }) => [
+                styles.createButton,
+                (pending || !name.trim()) && styles.createButtonDisabled,
+                pressed && !pending && !!name.trim() && styles.actionPressed,
+              ]}
+            >
+              {pending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Plus size={17} color="#FFFFFF" strokeWidth={2.5} />
+
+                  <Text style={styles.createButtonText}>Créer le groupe</Text>
+                </>
+              )}
+            </Pressable>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Empty State
+// ─────────────────────────────────────────────────────────────────────────────
+
+function EmptyGroups({
+  authenticated,
+  onCreate,
+}: {
+  authenticated: boolean;
+  onCreate: () => void;
+}) {
+  return (
+    <View style={styles.emptyList}>
+      <View style={styles.emptyListIcon}>
+        <Users size={28} color={COLORS.primary} strokeWidth={1.8} />
+      </View>
+
+      <Text style={styles.emptyListTitle}>Aucun groupe trouvé</Text>
+
+      <Text style={styles.emptyListDescription}>
+        Aucun groupe ne correspond actuellement à votre recherche ou à ce
+        filtre.
+      </Text>
+
+      {authenticated ? (
+        <Pressable
+          onPress={onCreate}
+          style={({ pressed }) => [
+            styles.emptyCreateButton,
+            pressed && styles.actionPressed,
+          ]}
+        >
+          <Plus size={15} color="#FFFFFF" strokeWidth={2.4} />
+
+          <Text style={styles.emptyCreateButtonText}>Créer un groupe</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface GroupesPageProps {
   onBack: () => void;
 }
 
 function GroupesPageInner({ onBack }: GroupesPageProps) {
-  const [categorie, setCategorie] = useState("Tous");
+  const [category, setCategory] = useState<GroupCategory>("Tous");
   const [search, setSearch] = useState("");
-  const [selectedGroupe, setSelectedGroupe] = useState<GroupData | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<GroupData | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   const groupsData = useQuery(api.community.listGroups, {
     category:
-      categorie !== "Tous" && categorie !== "Mes groupes"
-        ? categorie
-        : undefined,
+      category !== "Tous" && category !== "Mes groupes" ? category : undefined,
     search: search.trim() || undefined,
   });
 
-  const groups = groupsData ?? [];
+  const groups = (groupsData ?? []) as GroupData[];
 
-  const filtered = useMemo(() => {
-    if (categorie === "Mes groupes") return groups.filter((g) => g.isMember);
+  const filteredGroups = useMemo(() => {
+    if (category === "Mes groupes") {
+      return groups.filter((group) => group.isMember);
+    }
+
     return groups;
-  }, [groups, categorie]);
+  }, [groups, category]);
 
-  if (selectedGroupe) {
+  const myGroupsCount = useMemo(
+    () => groups.filter((group) => group.isMember).length,
+    [groups],
+  );
+
+  const availableGroupsCount = useMemo(
+    () => groups.filter((group) => !group.isMember).length,
+    [groups],
+  );
+
+  if (selectedGroup) {
     return (
       <GroupeDetail
-        groupe={selectedGroupe}
-        onBack={() => setSelectedGroupe(null)}
+        groupe={selectedGroup}
+        onBack={() => setSelectedGroup(null)}
       />
     );
   }
 
-  const mesGroupes = groups.filter((g) => g.isMember);
-
   return (
-    <View className="relative h-full w-full flex flex-col overflow-hidden" style={{  }}><View className="absolute top-0 right-0 w-64 h-64 rounded-full pointer-events-none" style={{  }} /><View className="flex-shrink-0 px-5 pt-6 pb-0"><View className="flex items-center gap-3 mb-5"><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View><Text className="text-lg font-black text-white">Groupes & Communautés
-            </Text><Text className="text-[11px] text-white/40">{mesGroupes.length}groupes rejoints
-            </Text></View><Authenticated><Pressable whileTap={{ scale: 0.92 }} onPress={() => setShowCreate(true)} className="ml-auto w-9 h-9 rounded-xl flex items-center justify-center" style={{  }}><Plus size={18} className="text-white" /></Pressable></Authenticated></View><View className="gap-2 mb-4">{[
-            {
-              label: "Mes groupes",
-              value: mesGroupes.length,
-              icon: Users,
-              color: "#8B5CF6",
-            },
-            {
-              label: "Total groupes",
-              value: groups.length,
-              icon: Flame,
-              color: "#F97316",
-            },
-            {
-              label: "Disponibles",
-              value: groups.filter((g) => !g.isMember).length,
-              icon: Zap,
-              color: "#10B981",
-            },
-          ].map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <View key={stat.label} className="rounded-2xl p-3 flex flex-col items-center gap-1" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><Icon size={16} style={{  }} /><Text className="text-base font-black text-white">{stat.value}</Text><Text className="text-[9px] text-white/40 text-center leading-tight">{stat.label}</Text></View>
-            );
-          })}</View><View className="flex items-center gap-2 px-4 py-2.5 rounded-2xl mb-4" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={14} className="text-white/40 flex-shrink-0" /><TextInput value={search} onChangeText={(value) => setSearch(value)} placeholder="Rechercher un groupe..." className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-white/30" /></View><View className="flex gap-2 overflow-x-auto pb-3" style={{  }}>{CATEGORIES.map((c) => (
-            <Pressable key={c} onPress={() => setCategorie(c)} className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all" style={{  }}>{c}</Pressable>
-          ))}</View></View><View className="flex-1 overflow-y-auto px-5 pb-8 flex flex-col gap-2.5" style={{  }}>{groupsData === undefined ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-20 w-full rounded-2xl" />
-          ))
-        ) : filtered.length === 0 ? (
-          <View className="flex flex-col items-center py-16 gap-3">
-            <View className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(139,92,246,0.12)" }}><Users size={28} className="text-purple-400" /></View>
-            <Text className="text-sm text-white/40 text-center">Aucun groupe trouvé.
-              <br />Créez le vôtre !
+    <View style={styles.page}>
+      {/* Decorative glow */}
+      <View style={styles.decorativeGlow} />
+
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.pageContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable
+            onPress={onBack}
+            style={({ pressed }) => [
+              styles.iconButton,
+              pressed && styles.iconButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+          >
+            <ArrowLeft size={19} color={COLORS.text} strokeWidth={2.2} />
+          </Pressable>
+
+          <View style={styles.headerText}>
+            <Text style={styles.pageTitle}>Groupes & Communautés</Text>
+
+            <Text style={styles.pageSubtitle}>
+              {myGroupsCount} groupe
+              {myGroupsCount !== 1 ? "s" : ""} rejoint
+              {myGroupsCount !== 1 ? "s" : ""}
             </Text>
-            <Authenticated>
-              <Pressable onPress={() => setShowCreate(true)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{  }}><Plus size={13} className="inline mr-1" /><Text>Créer un groupe</Text></Pressable>
-            </Authenticated>
           </View>
-        ) : (
-          filtered.map((g, i) => (
-            <View key={g._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-              <GroupeCard groupe={g} onPress={() => setSelectedGroupe(g)} />
-            </View>
-          ))
-        )}</View><View>{showCreate && (
+
           <Authenticated>
-            <CreateGroupModal
-              onClose={() => setShowCreate(false)}
-              onCreate={() => {}}
-            />
+            <Pressable
+              onPress={() => setShowCreate(true)}
+              style={({ pressed }) => [
+                styles.createIconButton,
+                pressed && styles.iconButtonPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Créer un groupe"
+            >
+              <Plus size={19} color="#FFFFFF" strokeWidth={2.4} />
+            </Pressable>
           </Authenticated>
-        )}</View></View>
+        </View>
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <StatCard
+            icon={Users}
+            label="Mes groupes"
+            value={myGroupsCount}
+            iconColor={COLORS.primary}
+          />
+
+          <StatCard
+            icon={Users}
+            label="Total"
+            value={groups.length}
+            iconColor={COLORS.warning}
+          />
+
+          <StatCard
+            icon={Zap}
+            label="Disponibles"
+            value={availableGroupsCount}
+            iconColor={COLORS.success}
+          />
+        </View>
+
+        {/* Search */}
+        <View style={styles.searchContainer}>
+          <Search size={17} color={COLORS.textMuted} strokeWidth={2} />
+
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Rechercher un groupe..."
+            placeholderTextColor={COLORS.textFaint}
+            returnKeyType="search"
+            clearButtonMode="never"
+            style={styles.searchInput}
+          />
+
+          {search.length > 0 ? (
+            <Pressable
+              onPress={() => setSearch("")}
+              style={styles.clearSearchButton}
+              accessibilityRole="button"
+              accessibilityLabel="Effacer la recherche"
+            >
+              <X size={15} color={COLORS.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Categories */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesContent}
+          style={styles.categoriesScroll}
+        >
+          {CATEGORIES.map((item) => {
+            const active = category === item;
+
+            return (
+              <Pressable
+                key={item}
+                onPress={() => setCategory(item)}
+                style={({ pressed }) => [
+                  styles.categoryChip,
+                  active && styles.categoryChipActive,
+                  pressed && styles.optionPressed,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    active && styles.categoryChipTextActive,
+                  ]}
+                >
+                  {item}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* List */}
+        <View style={styles.listSection}>
+          {groupsData === undefined ? (
+            <>
+              <GroupSkeleton />
+              <GroupSkeleton />
+              <GroupSkeleton />
+              <GroupSkeleton />
+            </>
+          ) : filteredGroups.length === 0 ? (
+            <EmptyGroups
+              authenticated={false}
+              onCreate={() => setShowCreate(true)}
+            />
+          ) : (
+            filteredGroups.map((group) => (
+              <GroupeCard
+                key={group._id}
+                groupe={group}
+                onPress={() => setSelectedGroup(group)}
+              />
+            ))
+          )}
+        </View>
+      </ScrollView>
+
+      <Authenticated>
+        <CreateGroupModal
+          visible={showCreate}
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
+            // Convex listGroups is reactive; no manual refresh required.
+          }}
+        />
+      </Authenticated>
+    </View>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stat Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  iconColor,
+}: {
+  icon: IconComponent;
+  label: string;
+  value: number;
+  iconColor: string;
+}) {
+  return (
+    <View style={styles.statCard}>
+      <View style={[styles.statIcon, { backgroundColor: `${iconColor}14` }]}>
+        <Icon size={16} color={iconColor} strokeWidth={2.2} />
+      </View>
+
+      <Text style={styles.statValue}>{value.toLocaleString()}</Text>
+
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Export
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function GroupesPage({ onBack }: GroupesPageProps) {
   return (
     <>
       <AuthLoading>
-        <View className="h-full flex items-center justify-center" style={{  }}><View className="flex flex-col gap-3 px-5 w-full">{Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-2xl" />
-            ))}</View></View>
+        <PageSkeleton />
       </AuthLoading>
+
       <Authenticated>
         <GroupesPageInner onBack={onBack} />
       </Authenticated>
+
       <Unauthenticated>
         <GroupesPageInner onBack={onBack} />
       </Unauthenticated>
     </>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+
+  page: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  pageContent: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 40,
+  },
+
+  loadingContent: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 40,
+    gap: 12,
+  },
+
+  decorativeGlow: {
+    position: "absolute",
+    top: -120,
+    right: -100,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "rgba(99,102,241,0.07)",
+  },
+
+  // Header
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 20,
+  },
+
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  pageTitle: {
+    color: COLORS.text,
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: "900",
+    letterSpacing: -0.35,
+  },
+
+  pageSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.065)",
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  createIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primaryStrong,
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.45)",
+  },
+
+  iconButtonPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.96 }],
+  },
+
+  // Stats
+  statsRow: {
+    flexDirection: "row",
+    gap: 9,
+    marginBottom: 16,
+  },
+
+  statCard: {
+    flex: 1,
+    minHeight: 104,
+    borderRadius: 18,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  statIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 7,
+  },
+
+  statValue: {
+    color: COLORS.text,
+    fontSize: 17,
+    lineHeight: 21,
+    fontWeight: "900",
+  },
+
+  statLabel: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: "600",
+    marginTop: 2,
+    textAlign: "center",
+  },
+
+  // Search
+  searchContainer: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 12,
+  },
+
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    color: COLORS.text,
+    fontSize: 14,
+    paddingVertical: 10,
+  },
+
+  clearSearchButton: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  // Categories
+  categoriesScroll: {
+    marginHorizontal: -20,
+    marginBottom: 16,
+  },
+
+  categoriesContent: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+
+  categoryChip: {
+    paddingHorizontal: 14,
+    minHeight: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  categoryChipActive: {
+    backgroundColor: "rgba(99,102,241,0.18)",
+    borderColor: "rgba(99,102,241,0.45)",
+  },
+
+  categoryChipText: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  categoryChipTextActive: {
+    color: "#A5B4FC",
+  },
+
+  // List
+  listSection: {
+    gap: 10,
+  },
+
+  groupCard: {
+    minHeight: 92,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  groupCardPressed: {
+    backgroundColor: COLORS.cardStrong,
+    transform: [{ scale: 0.992 }],
+  },
+
+  groupIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  groupEmoji: {
+    fontSize: 25,
+  },
+
+  groupMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  groupTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 20,
+  },
+
+  groupName: {
+    flexShrink: 1,
+    color: COLORS.text,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "800",
+  },
+
+  groupDescription: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+
+  groupMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginTop: 7,
+  },
+
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minWidth: 0,
+  },
+
+  metaText: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  metaTextFaint: {
+    flexShrink: 1,
+    color: COLORS.textFaint,
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  // Role
+  roleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+
+  roleBadgeText: {
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: "800",
+  },
+
+  // Skeleton
+  skeletonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 8,
+  },
+
+  skeletonBack: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  skeletonHeaderText: {
+    flex: 1,
+    gap: 6,
+  },
+
+  skeletonHeaderTitle: {
+    width: "62%",
+    height: 17,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  skeletonHeaderSubtitle: {
+    width: "38%",
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  skeletonCard: {
+    minHeight: 92,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  skeletonAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.065)",
+  },
+
+  skeletonContent: {
+    flex: 1,
+    gap: 7,
+  },
+
+  skeletonTitle: {
+    width: "65%",
+    height: 13,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.075)",
+  },
+
+  skeletonDescription: {
+    width: "90%",
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  skeletonMeta: {
+    width: "38%",
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+
+  skeletonArrow: {
+    width: 16,
+    height: 16,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  // Empty
+  emptyList: {
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 58,
+    paddingBottom: 48,
+  },
+
+  emptyListIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(99,102,241,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.24)",
+    marginBottom: 15,
+  },
+
+  emptyListTitle: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "800",
+    marginBottom: 7,
+  },
+
+  emptyListDescription: {
+    maxWidth: 300,
+    color: COLORS.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+
+  emptyCreateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginTop: 18,
+    paddingHorizontal: 17,
+    minHeight: 42,
+    borderRadius: 13,
+    backgroundColor: COLORS.primaryStrong,
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.4)",
+  },
+
+  emptyCreateButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  // Detail
+  detailScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 48,
+  },
+
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    marginBottom: 18,
+  },
+
+  detailAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  detailEmoji: {
+    fontSize: 21,
+  },
+
+  detailTitleContainer: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  detailTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  detailTitle: {
+    flexShrink: 1,
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+
+  detailMemberCount: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+
+  detailDescriptionCard: {
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+    marginBottom: 12,
+  },
+
+  detailDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+
+  tagsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 14,
+  },
+
+  tag: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+
+  tagText: {
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  membershipCard: {
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: "rgba(99,102,241,0.075)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.18)",
+    marginBottom: 24,
+  },
+
+  membershipHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  membershipTitle: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  membershipSubtitle: {
+    maxWidth: 260,
+    color: COLORS.textMuted,
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 3,
+  },
+
+  membershipActions: {
+    marginTop: 14,
+  },
+
+  primaryAction: {
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 13,
+    backgroundColor: COLORS.primaryStrong,
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.4)",
+  },
+
+  primaryActionText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  secondaryAction: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 13,
+    backgroundColor: "rgba(239,68,68,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.20)",
+  },
+
+  secondaryActionText: {
+    color: "#FCA5A5",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  authHint: {
+    paddingVertical: 12,
+    paddingHorizontal: 13,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  authHintText: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+  },
+
+  sectionHeader: {
+    marginBottom: 11,
+  },
+
+  sectionTitle: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  sectionSubtitle: {
+    color: COLORS.textFaint,
+    fontSize: 10,
+    marginTop: 2,
+  },
+
+  emptyState: {
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 42,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  emptyIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+
+  emptyEmoji: {
+    fontSize: 29,
+  },
+
+  emptyTitle: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+
+  emptyDescription: {
+    maxWidth: 310,
+    color: COLORS.textMuted,
+    fontSize: 11,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 7,
+  },
+
+  emptyFootnote: {
+    color: COLORS.textFaint,
+    fontSize: 9,
+    textAlign: "center",
+    marginTop: 12,
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.72)",
+  },
+
+  modalCard: {
+    width: "100%",
+    padding: 20,
+    paddingBottom: 28,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    backgroundColor: "#0B1020",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  createModalCard: {
+    width: "100%",
+    maxHeight: "91%",
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    backgroundColor: "#0B1020",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 18,
+  },
+
+  modalTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  modalSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 3,
+  },
+
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.065)",
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+  },
+
+  modalInfo: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 19,
+  },
+
+  createScrollContent: {
+    paddingBottom: 12,
+  },
+
+  // Form
+  field: {
+    marginBottom: 17,
+  },
+
+  fieldLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: "700",
+    marginBottom: 7,
+  },
+
+  input: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    color: COLORS.text,
+    fontSize: 13,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  textArea: {
+    minHeight: 104,
+  },
+
+  fieldCounter: {
+    color: COLORS.textFaint,
+    fontSize: 9,
+    textAlign: "right",
+    marginTop: 4,
+  },
+
+  categoryGrid: {
+    gap: 8,
+  },
+
+  categoryOption: {
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingHorizontal: 12,
+    borderRadius: 13,
+    borderWidth: 1,
+  },
+
+  categoryEmoji: {
+    fontSize: 18,
+  },
+
+  categoryText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  privacyCard: {
+    minHeight: 70,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 13,
+    borderRadius: 16,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+    marginBottom: 14,
+  },
+
+  privacyLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  privacyIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  privacyTextContainer: {
+    flex: 1,
+  },
+
+  privacyTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  privacyDescription: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    lineHeight: 14,
+    marginTop: 2,
+  },
+
+  switchTrack: {
+    width: 42,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+
+  switchThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#FFFFFF",
+  },
+
+  errorBox: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(239,68,68,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.22)",
+    marginBottom: 12,
+  },
+
+  errorText: {
+    color: "#FCA5A5",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+
+  createButton: {
+    minHeight: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 15,
+    backgroundColor: COLORS.primaryStrong,
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.42)",
+  },
+
+  createButtonDisabled: {
+    opacity: 0.42,
+  },
+
+  createButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  // Press states
+  actionPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.985 }],
+  },
+
+  actionDisabled: {
+    opacity: 0.55,
+  },
+
+  optionPressed: {
+    opacity: 0.78,
+  },
+});

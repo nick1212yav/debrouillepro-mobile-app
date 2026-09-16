@@ -1,22 +1,53 @@
-import { View, Image, Text, Pressable, TextInput } from "react-native";
-import { useState } from "react";
-import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
-import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
+import React, { useMemo, useState } from "react";
+import {
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
+import {
+  Authenticated,
+  Unauthenticated,
+  AuthLoading,
+} from "@/lib/convex-auth-compat";
 import { api } from "@/convex/_generated/api.js";
 import type { Doc, Id } from "@/convex/_generated/dataModel.d.ts";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
-import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
-  ArrowLeft, Search, SlidersHorizontal, Briefcase, MapPin,
-  Clock, DollarSign, Star, Heart, X, CheckCircle, Send,
-  Plus, Download, Eye, TrendingUp, Users,
-  Building2, Zap, FileText, Edit3, BarChart2
+  ArrowLeft,
+  BarChart2,
+  Briefcase,
+  Building2,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  Edit3,
+  Eye,
+  FileText,
+  MapPin,
+  Plus,
+  Search,
+  Send,
+  SlidersHorizontal,
+  X,
+  Zap,
 } from "lucide-react-native";
 
-// ── Types ──────────────────────────────────────────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* Types                                                                      */
+/* -------------------------------------------------------------------------- */
+
 type TabId = "offres" | "freelance" | "candidatures" | "cv";
+
 type ContractType = Doc<"jobListings">["contractType"];
 type ApplicationStatus = Doc<"jobApplications">["status"];
 
@@ -28,11 +59,40 @@ interface CVData {
   city: string;
   summary: string;
   skills: string[];
-  experiences: { role: string; company: string; period: string; desc: string }[];
-  education: { degree: string; school: string; year: string }[];
+  experiences: {
+    role: string;
+    company: string;
+    period: string;
+    desc: string;
+  }[];
+  education: {
+    degree: string;
+    school: string;
+    year: string;
+  }[];
 }
 
-// ── Config ─────────────────────────────────────────────────────────────────
+type ApplicationWithJob = Doc<"jobApplications"> & {
+  jobTitle?: string;
+  jobCompany?: string;
+};
+
+/* -------------------------------------------------------------------------- */
+/* Configuration                                                              */
+/* -------------------------------------------------------------------------- */
+
+const EMPTY_CV: CVData = {
+  name: "",
+  title: "",
+  email: "",
+  phone: "",
+  city: "",
+  summary: "",
+  skills: [],
+  experiences: [],
+  education: [],
+};
+
 const CONTRACT_LABELS: Record<ContractType, string> = {
   cdi: "CDI",
   cdd: "CDD",
@@ -42,46 +102,81 @@ const CONTRACT_LABELS: Record<ContractType, string> = {
   benevole: "Bénévole",
 };
 
-const STATUS_CONFIG: Record<ApplicationStatus, { label: string; color: string; bg: string }> = {
-  submitted:   { label: "Envoyée",     color: "#6366F1", bg: "rgba(99,102,241,0.15)" },
-  viewed:      { label: "Vue",         color: "#F59E0B", bg: "rgba(245,158,11,0.15)" },
-  shortlisted: { label: "Entretien",   color: "#3B82F6", bg: "rgba(59,130,246,0.15)" },
-  hired:       { label: "Acceptée",    color: "#10B981", bg: "rgba(16,185,129,0.15)" },
-  rejected:    { label: "Refusée",     color: "#EF4444", bg: "rgba(239,68,68,0.15)"  },
-};
-
-const DEFAULT_CV: CVData = {
-  name: "Jean-Paul Mulamba",
-  title: "Développeur Web & Mobile",
-  email: "jp.mulamba@email.com",
-  phone: "+243 81 234 5678",
-  city: "Kinshasa",
-  summary: "Développeur passionné avec 3 ans d'expérience dans la création d'applications web et mobiles innovantes pour le marché africain.",
-  skills: ["React", "Node.js", "TypeScript", "MongoDB", "Figma"],
-  experiences: [
-    { role: "Développeur Frontend", company: "TechAfrique", period: "2022–Présent", desc: "Développement d'interfaces React pour 5+ clients entreprises." },
-    { role: "Stagiaire Dev Mobile", company: "StartupHub RDC", period: "2021–2022", desc: "Création d'une app de livraison React Native." },
-  ],
-  education: [
-    { degree: "Licence Informatique", school: "Université de Kinshasa", year: "2021" },
-    { degree: "Bac Scientifique", school: "Lycée Bosangani", year: "2017" },
-  ],
-};
-
-// Color for company initials based on name hash
-function getCompanyColor(name: string): string {
-  const colors = ["#6366F1", "#F97316", "#EC4899", "#22C55E", "#0EA5E9", "#8B5CF6", "#EF4444", "#14B8A6"];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+const STATUS_CONFIG: Record<
+  ApplicationStatus,
+  {
+    label: string;
+    color: string;
+    bg: string;
   }
+> = {
+  submitted: {
+    label: "Envoyée",
+    color: "#6366F1",
+    bg: "rgba(99,102,241,0.15)",
+  },
+  viewed: {
+    label: "Vue",
+    color: "#F59E0B",
+    bg: "rgba(245,158,11,0.15)",
+  },
+  shortlisted: {
+    label: "Entretien",
+    color: "#3B82F6",
+    bg: "rgba(59,130,246,0.15)",
+  },
+  hired: {
+    label: "Acceptée",
+    color: "#10B981",
+    bg: "rgba(16,185,129,0.15)",
+  },
+  rejected: {
+    label: "Refusée",
+    color: "#EF4444",
+    bg: "rgba(239,68,68,0.15)",
+  },
+};
+
+const TYPE_FILTERS = [
+  { label: "Tout", value: null },
+  { label: "CDI", value: "cdi" as ContractType },
+  { label: "CDD", value: "cdd" as ContractType },
+  { label: "Stage", value: "stage" as ContractType },
+  { label: "Freelance", value: "freelance" as ContractType },
+  { label: "Alternance", value: "alternance" as ContractType },
+];
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function getCompanyColor(name: string): string {
+  const colors = [
+    "#6366F1",
+    "#F97316",
+    "#EC4899",
+    "#22C55E",
+    "#0EA5E9",
+    "#8B5CF6",
+    "#EF4444",
+    "#14B8A6",
+  ];
+
+  let hash = 0;
+
+  for (let index = 0; index < name.length; index += 1) {
+    hash = name.charCodeAt(index) + ((hash << 5) - hash);
+  }
+
   return colors[Math.abs(hash) % colors.length];
 }
 
 function getInitials(name: string): string {
   return name
-    .split(" ")
-    .map((w) => w[0])
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
@@ -89,377 +184,2565 @@ function getInitials(name: string): string {
 
 function formatSalary(min?: number, max?: number, currency?: string): string {
   const cur = currency ?? "USD";
-  if (min && max) return `${min.toLocaleString()}–${max.toLocaleString()} ${cur}`;
-  if (min) return `${min.toLocaleString()}+ ${cur}`;
-  if (max) return `≤${max.toLocaleString()} ${cur}`;
+
+  if (min != null && max != null) {
+    return `${min.toLocaleString()}–${max.toLocaleString()} ${cur}`;
+  }
+
+  if (min != null) {
+    return `${min.toLocaleString()}+ ${cur}`;
+  }
+
+  if (max != null) {
+    return `≤${max.toLocaleString()} ${cur}`;
+  }
+
   return "Non précisé";
 }
 
-function formatRelativeDate(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
+function formatRelativeDate(timestamp: number): string {
+  const diff = Math.max(0, Date.now() - timestamp);
+
   const hours = Math.floor(diff / (1000 * 60 * 60));
-  if (hours < 1) return "À l'instant";
-  if (hours < 24) return `Il y a ${hours}h`;
+
+  if (hours < 1) {
+    return "À l'instant";
+  }
+
+  if (hours < 24) {
+    return `Il y a ${hours}h`;
+  }
+
   const days = Math.floor(hours / 24);
-  if (days < 7) return `Il y a ${days}j`;
-  return `Il y a ${Math.floor(days / 7)} sem.`;
+
+  if (days < 7) {
+    return `Il y a ${days}j`;
+  }
+
+  const weeks = Math.floor(days / 7);
+
+  return `Il y a ${weeks} sem.`;
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────
-function JobCard({ job, onSelect, onApply, hasApplied }: {
+/* -------------------------------------------------------------------------- */
+/* Company Logo                                                               */
+/* -------------------------------------------------------------------------- */
+
+function CompanyLogo({
+  company,
+  logo,
+  size = 48,
+}: {
+  company: string;
+  logo?: string;
+  size?: number;
+}) {
+  const color = getCompanyColor(company);
+  const initials = getInitials(company);
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.28,
+        backgroundColor: `${color}33`,
+        borderWidth: 1,
+        borderColor: `${color}55`,
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+    >
+      {logo ? (
+        <Image
+          source={{ uri: logo }}
+          style={{
+            width: "100%",
+            height: "100%",
+          }}
+          resizeMode="cover"
+          accessibilityLabel={company}
+        />
+      ) : (
+        <Text
+          style={{
+            color: "#FFFFFF",
+            fontSize: size * 0.3,
+            fontWeight: "900",
+          }}
+        >
+          {initials}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Job Card                                                                   */
+/* -------------------------------------------------------------------------- */
+
+function JobCard({
+  job,
+  onSelect,
+  onApply,
+  hasApplied,
+}: {
   job: Doc<"jobListings">;
   onSelect: () => void;
   onApply: () => void;
   hasApplied: boolean;
 }) {
-  const color = getCompanyColor(job.company);
-  const initials = getInitials(job.company);
-
   return (
-    <View initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl p-4 mb-3" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={onSelect}>
-      <View className="flex items-start gap-3 mb-3"><View className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0" style={{ backgroundColor: `${color}33`, borderStyle: "solid" }}>{job.companyLogo ? (
-            <Image className="w-full h-full rounded-2xl object-cover" source={{ uri: job.companyLogo }} accessibilityLabel={job.company} />
-          ) : initials}</View><View className="flex-1 min-w-0"><View className="flex items-start justify-between gap-2"><Text className="text-sm font-bold text-white leading-tight">{job.title}</Text></View><View className="flex items-center gap-1.5 mt-0.5"><Building2 size={11} className="text-white/40" /><Text className="text-xs text-white/50">{job.company}</Text>{job.remote && <Text className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#10B981" }}>Remote</Text>}</View></View></View>
+    <Pressable
+      onPress={onSelect}
+      style={({ pressed }) => ({
+        opacity: pressed ? 0.92 : 1,
+        backgroundColor: "rgba(255,255,255,0.055)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.09)",
+        borderRadius: 24,
+        padding: 16,
+        marginBottom: 12,
+      })}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
+      >
+        <CompanyLogo company={job.company} logo={job.companyLogo} />
 
-      <View className="flex flex-wrap gap-2 mb-3"><View className="flex items-center gap-1 text-xs text-white/50"><MapPin size={11} />{job.city}</View><View className="flex items-center gap-1 text-xs text-white/50"><Clock size={11} />{formatRelativeDate(job._creationTime ? new Date(job._creationTime).toISOString() : new Date().toISOString())}</View><View className="flex items-center gap-1 text-xs text-white/50"><Briefcase size={11} />{CONTRACT_LABELS[job.contractType]}</View></View>
+        <View style={{ flex: 1 }}>
+          <Text
+            numberOfLines={2}
+            style={{
+              color: "#FFFFFF",
+              fontSize: 15,
+              fontWeight: "800",
+              lineHeight: 20,
+            }}
+          >
+            {job.title}
+          </Text>
 
-      <View className="flex flex-wrap gap-1.5 mb-3">{job.skills.slice(0, 3).map((s) => (
-          <Text key={s} className="px-2 py-1 rounded-lg text-[11px] text-white/60" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>{s}</Text>
-        ))}{job.skills.length > 3 && <Text className="px-2 py-1 rounded-lg text-[11px] text-white/40" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>+{job.skills.length - 3}</Text>}</View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 6,
+              marginTop: 5,
+            }}
+          >
+            <Building2 size={12} color="rgba(255,255,255,0.4)" />
 
-      <View className="flex items-center justify-between"><Text className="text-base font-black text-emerald-400">{formatSalary(job.salaryMin, job.salaryMax, job.currency)}</Text><Pressable onPress={(e) => { onApply(); }} className="px-4 py-2 rounded-xl text-xs font-bold text-white" style={hasApplied
-            ? { backgroundColor: "rgba(16,185,129,0.2)", borderWidth: 1, borderColor: "rgba(16,185,129,0.3)", borderStyle: "solid" }
-            : {  }}>{hasApplied ? <><CheckCircle size={12} className="inline mr-1" />Candidaté</> : <><Send size={12} className="inline mr-1" />Postuler</>}</Pressable></View>
-    </View>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: "rgba(255,255,255,0.52)",
+                fontSize: 12,
+                flexShrink: 1,
+              }}
+            >
+              {job.company}
+            </Text>
+
+            {job.remote ? (
+              <View
+                style={{
+                  paddingHorizontal: 7,
+                  paddingVertical: 3,
+                  borderRadius: 7,
+                  backgroundColor: "rgba(16,185,129,0.15)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#10B981",
+                    fontSize: 9,
+                    fontWeight: "800",
+                  }}
+                >
+                  REMOTE
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
+
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 10,
+          marginTop: 14,
+          marginBottom: 13,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+          }}
+        >
+          <MapPin size={12} color="rgba(255,255,255,0.4)" />
+
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.5)",
+              fontSize: 11,
+            }}
+          >
+            {job.city}
+          </Text>
+        </View>
+
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+          }}
+        >
+          <Clock size={12} color="rgba(255,255,255,0.4)" />
+
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.5)",
+              fontSize: 11,
+            }}
+          >
+            {formatRelativeDate(job._creationTime)}
+          </Text>
+        </View>
+
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+          }}
+        >
+          <Briefcase size={12} color="rgba(255,255,255,0.4)" />
+
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.5)",
+              fontSize: 11,
+            }}
+          >
+            {CONTRACT_LABELS[job.contractType]}
+          </Text>
+        </View>
+      </View>
+
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 6,
+          marginBottom: 14,
+        }}
+      >
+        {job.skills.slice(0, 4).map((skill) => (
+          <View
+            key={skill}
+            style={{
+              paddingHorizontal: 9,
+              paddingVertical: 5,
+              borderRadius: 9,
+              backgroundColor: "rgba(255,255,255,0.055)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.08)",
+            }}
+          >
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.62)",
+                fontSize: 10,
+                fontWeight: "600",
+              }}
+            >
+              {skill}
+            </Text>
+          </View>
+        ))}
+
+        {job.skills.length > 4 ? (
+          <View
+            style={{
+              paddingHorizontal: 9,
+              paddingVertical: 5,
+              borderRadius: 9,
+              backgroundColor: "rgba(255,255,255,0.04)",
+            }}
+          >
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.4)",
+                fontSize: 10,
+              }}
+            >
+              +{job.skills.length - 4}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <Text
+          style={{
+            color: "#34D399",
+            fontSize: 14,
+            fontWeight: "900",
+            flex: 1,
+          }}
+        >
+          {formatSalary(job.salaryMin, job.salaryMax, job.currency)}
+        </Text>
+
+        <Pressable
+          onPress={(event) => {
+            event.stopPropagation();
+            onApply();
+          }}
+          disabled={hasApplied}
+          style={{
+            minHeight: 38,
+            paddingHorizontal: 13,
+            borderRadius: 12,
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "row",
+            gap: 6,
+            backgroundColor: hasApplied
+              ? "rgba(16,185,129,0.16)"
+              : "rgba(99,102,241,0.18)",
+            borderWidth: 1,
+            borderColor: hasApplied
+              ? "rgba(16,185,129,0.3)"
+              : "rgba(99,102,241,0.3)",
+          }}
+        >
+          {hasApplied ? (
+            <>
+              <CheckCircle size={13} color="#34D399" />
+              <Text
+                style={{
+                  color: "#34D399",
+                  fontSize: 11,
+                  fontWeight: "800",
+                }}
+              >
+                Candidaté
+              </Text>
+            </>
+          ) : (
+            <>
+              <Send size={13} color="#A78BFA" />
+              <Text
+                style={{
+                  color: "#A78BFA",
+                  fontSize: 11,
+                  fontWeight: "800",
+                }}
+              >
+                Postuler
+              </Text>
+            </>
+          )}
+        </Pressable>
+      </View>
+    </Pressable>
   );
 }
 
-function JobDetail({ job, onClose, onApply, hasApplied }: {
-  job: Doc<"jobListings">; onClose: () => void;
-  onApply: () => void; hasApplied: boolean;
+/* -------------------------------------------------------------------------- */
+/* Job Detail                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function JobDetail({
+  job,
+  onClose,
+  onApply,
+  hasApplied,
+}: {
+  job: Doc<"jobListings">;
+  onClose: () => void;
+  onApply: () => void;
+  hasApplied: boolean;
 }) {
-  const [applied, setApplied] = useState(hasApplied);
-  const handleApply = () => { setApplied(true); onApply(); };
-  const color = getCompanyColor(job.company);
-  const initials = getInitials(job.company);
-
   return (
-    <View initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 280 }} className="absolute inset-0 z-50 flex flex-col overflow-y-auto" style={{  }}>
-      {/* Header */}
-      <View className="flex-shrink-0 px-4 pt-12 pb-4" style={{  }}><View className="flex items-center gap-3 mb-5"><Pressable onPress={onClose} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ArrowLeft size={18} className="text-white" /></Pressable><Text className="text-sm text-white/50 flex-1">Détail de l{"'"}offre</Text></View><View className="flex items-start gap-4"><View className="w-14 h-14 rounded-3xl flex items-center justify-center font-black text-lg text-white flex-shrink-0" style={{ backgroundColor: `${color}33`, borderStyle: "solid" }}>{job.companyLogo ? (
-              <Image className="w-full h-full rounded-3xl object-cover" source={{ uri: job.companyLogo }} accessibilityLabel={job.company} />
-            ) : initials}</View><View><Text className="text-xl font-black text-white leading-tight">{job.title}</Text><Text className="text-sm text-white/60 mt-0.5">{job.company}· {job.city}</Text><View className="flex flex-wrap gap-2 mt-2"><Text className="px-2.5 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: "rgba(99,102,241,0.25)" }}>{CONTRACT_LABELS[job.contractType]}</Text>{job.remote && <Text className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#10B981" }}>Remote</Text>}</View></View></View></View>
+    <Modal
+      visible
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#050812",
+        }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingBottom: 40,
+          }}
+        >
+          <View
+            style={{
+              paddingHorizontal: 18,
+              paddingTop: Platform.OS === "ios" ? 22 : 18,
+              paddingBottom: 20,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 22,
+              }}
+            >
+              <Pressable
+                onPress={onClose}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 14,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "rgba(255,255,255,0.08)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.1)",
+                }}
+              >
+                <ArrowLeft size={19} color="#FFFFFF" />
+              </Pressable>
 
-      {/* Body */}
-      <View className="flex-1 px-4 pb-6 space-y-4">{}<View className="gap-2">{[
-            { icon: DollarSign, label: "Salaire", value: formatSalary(job.salaryMin, job.salaryMax, job.currency), color: "#10B981" },
-            { icon: MapPin, label: "Lieu", value: job.city, color: "#6366F1" },
-          ].map(({ icon: Icon, label, value, color: c }) => (
-            <View key={label} className="rounded-2xl p-3 text-center" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Icon size={16} style={{  }} className="mx-auto mb-1" /><Text className="text-xs font-bold text-white">{value}</Text><Text className="text-[10px] text-white/40">{label}</Text></View>
-          ))}</View>{}<View><Text className="text-xs text-white/40 font-semibold uppercase tracking-wider mb-2">Description</Text><Text className="text-sm text-white/70 leading-relaxed">{job.description}</Text></View>{}<View><Text className="text-xs text-white/40 font-semibold uppercase tracking-wider mb-2">Compétences requises</Text><View className="flex flex-wrap gap-2">{job.skills.map((s) => (
-              <Text key={s} className="px-3 py-1.5 rounded-xl text-xs text-white/80 font-medium" style={{ backgroundColor: "rgba(139,92,246,0.15)", borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}>{s}</Text>
-            ))}</View></View>{}<View className="space-y-2">{[
-            { icon: Clock, label: "Publié", value: formatRelativeDate(new Date(job._creationTime).toISOString()) },
-            { icon: MapPin, label: "Lieu", value: job.city },
-            { icon: Briefcase, label: "Contrat", value: CONTRACT_LABELS[job.contractType] },
-          ].map(({ icon: Icon, label, value }) => (
-            <View key={label} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Icon size={14} className="text-white/40" /><Text className="text-xs text-white/50">{label}</Text><Text className="text-xs text-white/80 ml-auto">{value}</Text></View>
-          ))}</View>{}<Pressable onPress={handleApply} disabled={applied} className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-base font-black text-white" style={applied
-            ? {  }
-            : { boxShadow: "0 8px 32px rgba(139,92,246,0.4)" }}>{applied ? <><CheckCircle size={18} />Candidature envoyée !</> : <><Send size={18} />Postuler maintenant</>}</Pressable></View>
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.5)",
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
+              >
+                Détail de l'offre
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 14,
+              }}
+            >
+              <CompanyLogo
+                company={job.company}
+                logo={job.companyLogo}
+                size={62}
+              />
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    color: "#FFFFFF",
+                    fontSize: 22,
+                    fontWeight: "900",
+                    lineHeight: 28,
+                  }}
+                >
+                  {job.title}
+                </Text>
+
+                <Text
+                  style={{
+                    color: "rgba(255,255,255,0.58)",
+                    fontSize: 13,
+                    marginTop: 5,
+                  }}
+                >
+                  {job.company} · {job.city}
+                </Text>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 7,
+                    marginTop: 10,
+                  }}
+                >
+                  <View
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                      backgroundColor: "rgba(99,102,241,0.2)",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#A78BFA",
+                        fontSize: 10,
+                        fontWeight: "800",
+                      }}
+                    >
+                      {CONTRACT_LABELS[job.contractType]}
+                    </Text>
+                  </View>
+
+                  {job.remote ? (
+                    <View
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 999,
+                        backgroundColor: "rgba(16,185,129,0.15)",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#34D399",
+                          fontSize: 10,
+                          fontWeight: "800",
+                        }}
+                      >
+                        REMOTE
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 10,
+                marginTop: 22,
+              }}
+            >
+              <DetailMetric
+                icon={<DollarSign size={17} color="#34D399" />}
+                label="Salaire"
+                value={formatSalary(job.salaryMin, job.salaryMax, job.currency)}
+              />
+
+              <DetailMetric
+                icon={<MapPin size={17} color="#818CF8" />}
+                label="Lieu"
+                value={job.city}
+              />
+            </View>
+
+            <DetailSection title="Description">
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.7)",
+                  fontSize: 14,
+                  lineHeight: 22,
+                }}
+              >
+                {job.description}
+              </Text>
+            </DetailSection>
+
+            <DetailSection title="Compétences requises">
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                {job.skills.map((skill) => (
+                  <View
+                    key={skill}
+                    style={{
+                      paddingHorizontal: 11,
+                      paddingVertical: 7,
+                      borderRadius: 11,
+                      backgroundColor: "rgba(139,92,246,0.14)",
+                      borderWidth: 1,
+                      borderColor: "rgba(139,92,246,0.24)",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#C4B5FD",
+                        fontSize: 11,
+                        fontWeight: "600",
+                      }}
+                    >
+                      {skill}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </DetailSection>
+
+            <DetailSection title="Informations">
+              <InfoRow
+                icon={<Clock size={15} color="rgba(255,255,255,0.4)" />}
+                label="Publié"
+                value={formatRelativeDate(job._creationTime)}
+              />
+
+              <InfoRow
+                icon={<MapPin size={15} color="rgba(255,255,255,0.4)" />}
+                label="Lieu"
+                value={job.city}
+              />
+
+              <InfoRow
+                icon={<Briefcase size={15} color="rgba(255,255,255,0.4)" />}
+                label="Contrat"
+                value={CONTRACT_LABELS[job.contractType]}
+              />
+            </DetailSection>
+
+            <Pressable
+              onPress={onApply}
+              disabled={hasApplied}
+              style={{
+                minHeight: 54,
+                borderRadius: 17,
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "row",
+                gap: 9,
+                backgroundColor: hasApplied
+                  ? "rgba(16,185,129,0.18)"
+                  : "rgba(99,102,241,0.95)",
+                borderWidth: 1,
+                borderColor: hasApplied
+                  ? "rgba(16,185,129,0.35)"
+                  : "rgba(129,140,248,0.4)",
+                marginTop: 26,
+              }}
+            >
+              {hasApplied ? (
+                <>
+                  <CheckCircle size={19} color="#34D399" />
+                  <Text
+                    style={{
+                      color: "#34D399",
+                      fontSize: 14,
+                      fontWeight: "900",
+                    }}
+                  >
+                    Candidature envoyée
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Send size={19} color="#FFFFFF" />
+                  <Text
+                    style={{
+                      color: "#FFFFFF",
+                      fontSize: 14,
+                      fontWeight: "900",
+                    }}
+                  >
+                    Postuler maintenant
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function DetailMetric({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        padding: 13,
+        borderRadius: 16,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+      }}
+    >
+      <View style={{ marginBottom: 7 }}>{icon}</View>
+
+      <Text
+        numberOfLines={2}
+        style={{
+          color: "#FFFFFF",
+          fontSize: 12,
+          fontWeight: "800",
+        }}
+      >
+        {value}
+      </Text>
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.4)",
+          fontSize: 10,
+          marginTop: 3,
+        }}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
 
-// ── Freelance Mission Card ───────────────────────────────────────────────
+function DetailSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{ marginTop: 25 }}>
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.42)",
+          fontSize: 11,
+          fontWeight: "800",
+          textTransform: "uppercase",
+          letterSpacing: 1,
+          marginBottom: 10,
+        }}
+      >
+        {title}
+      </Text>
+
+      {children}
+    </View>
+  );
+}
+
+function InfoRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View
+      style={{
+        minHeight: 44,
+        borderRadius: 13,
+        paddingHorizontal: 12,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 9,
+        backgroundColor: "rgba(255,255,255,0.035)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.055)",
+        marginBottom: 7,
+      }}
+    >
+      {icon}
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.48)",
+          fontSize: 11,
+        }}
+      >
+        {label}
+      </Text>
+
+      <Text
+        numberOfLines={1}
+        style={{
+          color: "rgba(255,255,255,0.8)",
+          fontSize: 11,
+          fontWeight: "700",
+          marginLeft: "auto",
+          maxWidth: "55%",
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Freelance                                                                  */
+/* -------------------------------------------------------------------------- */
+
 function MissionCard({ mission }: { mission: Doc<"freelanceMissions"> }) {
   return (
-    <View initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl p-4 mb-3" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-      <View className="flex items-start gap-3 mb-3"><View className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0" style={{ backgroundColor: "rgba(249,115,22,0.2)", borderWidth: 1, borderColor: "rgba(249,115,22,0.3)", borderStyle: "solid" }}><Zap size={16} className="text-orange-400" /></View><View className="flex-1 min-w-0"><Text className="text-sm font-bold text-white leading-tight">{mission.title}</Text><View className="flex items-center gap-1.5 mt-0.5">{mission.remote && <Text className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#10B981" }}>Remote</Text>}{mission.duration && <Text className="text-xs text-white/50">{mission.duration}</Text>}</View></View></View>
+    <View
+      style={{
+        backgroundColor: "rgba(255,255,255,0.055)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.09)",
+        borderRadius: 24,
+        padding: 16,
+        marginBottom: 12,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
+      >
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 16,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(249,115,22,0.16)",
+            borderWidth: 1,
+            borderColor: "rgba(249,115,22,0.3)",
+          }}
+        >
+          <Zap size={18} color="#FB923C" />
+        </View>
 
-      <Text className="text-xs text-white/50 mb-3">{mission.description}</Text>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              color: "#FFFFFF",
+              fontSize: 15,
+              fontWeight: "800",
+              lineHeight: 20,
+            }}
+          >
+            {mission.title}
+          </Text>
 
-      <View className="flex flex-wrap gap-1.5 mb-3">{mission.skills.slice(0, 3).map((s) => (
-          <Text key={s} className="px-2 py-1 rounded-lg text-[11px] text-white/60" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>{s}</Text>
-        ))}{mission.skills.length > 3 && <Text className="px-2 py-1 rounded-lg text-[11px] text-white/40" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>+{mission.skills.length - 3}</Text>}</View>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 7,
+              marginTop: 5,
+            }}
+          >
+            {mission.remote ? (
+              <Text
+                style={{
+                  color: "#34D399",
+                  fontSize: 10,
+                  fontWeight: "800",
+                }}
+              >
+                REMOTE
+              </Text>
+            ) : null}
 
-      <View className="flex items-center justify-between"><Text className="text-base font-black text-purple-400">{mission.budget ? `${mission.budget.toLocaleString()} ${mission.currency ?? "USD"}` : "Budget ouvert"}</Text></View>
+            {mission.duration ? (
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.42)",
+                  fontSize: 11,
+                }}
+              >
+                {mission.duration}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </View>
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.55)",
+          fontSize: 12,
+          lineHeight: 19,
+          marginTop: 14,
+          marginBottom: 13,
+        }}
+      >
+        {mission.description}
+      </Text>
+
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 6,
+          marginBottom: 13,
+        }}
+      >
+        {mission.skills.slice(0, 4).map((skill) => (
+          <View
+            key={skill}
+            style={{
+              paddingHorizontal: 9,
+              paddingVertical: 5,
+              borderRadius: 9,
+              backgroundColor: "rgba(255,255,255,0.055)",
+            }}
+          >
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.6)",
+                fontSize: 10,
+              }}
+            >
+              {skill}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <Text
+        style={{
+          color: "#C4B5FD",
+          fontSize: 14,
+          fontWeight: "900",
+        }}
+      >
+        {mission.budget != null
+          ? `${mission.budget.toLocaleString()} ${mission.currency ?? "USD"}`
+          : "Budget ouvert"}
+      </Text>
     </View>
   );
 }
 
-// ── CV Builder ────────────────────────────────────────────────────────────
-function CVBuilder({ cv, onChange }: { cv: CVData; onChange: (cv: CVData) => void }) {
+/* -------------------------------------------------------------------------- */
+/* Applications                                                               */
+/* -------------------------------------------------------------------------- */
+
+function ApplicationsTab({
+  applications,
+}: {
+  applications: ApplicationWithJob[];
+}) {
+  if (applications.length === 0) {
+    return (
+      <View
+        style={{
+          alignItems: "center",
+          paddingVertical: 70,
+          paddingHorizontal: 25,
+        }}
+      >
+        <Send size={42} color="rgba(255,255,255,0.18)" />
+
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.45)",
+            fontSize: 14,
+            fontWeight: "700",
+            marginTop: 14,
+          }}
+        >
+          Aucune candidature
+        </Text>
+
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.25)",
+            fontSize: 12,
+            textAlign: "center",
+            marginTop: 5,
+          }}
+        >
+          Tes candidatures apparaîtront ici dès que tu postules à une offre.
+        </Text>
+      </View>
+    );
+  }
+
+  const counts = {
+    total: applications.length,
+    interviews: applications.filter(
+      (application) => application.status === "shortlisted",
+    ).length,
+    accepted: applications.filter(
+      (application) => application.status === "hired",
+    ).length,
+  };
+
+  return (
+    <View>
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 8,
+          marginBottom: 16,
+        }}
+      >
+        <ApplicationMetric label="Total" value={counts.total} color="#818CF8" />
+
+        <ApplicationMetric
+          label="Entretiens"
+          value={counts.interviews}
+          color="#60A5FA"
+        />
+
+        <ApplicationMetric
+          label="Acceptées"
+          value={counts.accepted}
+          color="#34D399"
+        />
+      </View>
+
+      {applications.map((application) => {
+        const config = STATUS_CONFIG[application.status];
+
+        return (
+          <View
+            key={application._id}
+            style={{
+              borderRadius: 18,
+              padding: 14,
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.08)",
+              marginBottom: 9,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    color: "#FFFFFF",
+                    fontSize: 13,
+                    fontWeight: "800",
+                  }}
+                >
+                  {application.jobTitle ?? "Offre"}
+                </Text>
+
+                <Text
+                  style={{
+                    color: "rgba(255,255,255,0.45)",
+                    fontSize: 11,
+                    marginTop: 4,
+                  }}
+                >
+                  {application.jobCompany ?? "Entreprise"} ·{" "}
+                  {formatRelativeDate(
+                    new Date(application.appliedAt).getTime(),
+                  )}
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  paddingHorizontal: 9,
+                  paddingVertical: 5,
+                  borderRadius: 999,
+                  backgroundColor: config.bg,
+                }}
+              >
+                <Text
+                  style={{
+                    color: config.color,
+                    fontSize: 9,
+                    fontWeight: "900",
+                  }}
+                >
+                  {config.label}
+                </Text>
+              </View>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function ApplicationMetric({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: "center",
+        paddingVertical: 13,
+        borderRadius: 16,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+      }}
+    >
+      <Text
+        style={{
+          color,
+          fontSize: 22,
+          fontWeight: "900",
+        }}
+      >
+        {value}
+      </Text>
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.4)",
+          fontSize: 10,
+          marginTop: 2,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* CV                                                                         */
+/* -------------------------------------------------------------------------- */
+
+function CVBuilder({
+  cv,
+  onChange,
+}: {
+  cv: CVData;
+  onChange: (cv: CVData) => void;
+}) {
   const [preview, setPreview] = useState(false);
   const [newSkill, setNewSkill] = useState("");
 
   const addSkill = () => {
-    if (newSkill.trim()) {
-      onChange({ ...cv, skills: [...cv.skills, newSkill.trim()] });
-      setNewSkill("");
+    const value = newSkill.trim();
+
+    if (!value) {
+      return;
     }
+
+    if (
+      cv.skills.some((skill) => skill.toLowerCase() === value.toLowerCase())
+    ) {
+      setNewSkill("");
+      return;
+    }
+
+    onChange({
+      ...cv,
+      skills: [...cv.skills, value],
+    });
+
+    setNewSkill("");
   };
 
-  const removeSkill = (i: number) =>
-    onChange({ ...cv, skills: cv.skills.filter((_, idx) => idx !== i) });
+  const removeSkill = (index: number) => {
+    onChange({
+      ...cv,
+      skills: cv.skills.filter((_, itemIndex) => itemIndex !== index),
+    });
+  };
 
   if (preview) {
     return (
-      <View className="space-y-4"><View className="flex items-center justify-between mb-2"><Text className="text-sm font-bold text-white">Aperçu CV</Text><Pressable onPress={() => setPreview(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-white/70" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><Edit3 size={12} /><Text>Modifier</Text></Pressable></View><View className="rounded-3xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.97)" }}><View className="px-5 py-4" style={{  }}><Text className="text-xl font-black text-white">{cv.name}</Text><Text className="text-sm text-white/80">{cv.title}</Text><View className="flex flex-wrap gap-2 mt-2 text-xs text-white/70"><Text>{cv.email}</Text><Text>·</Text><Text>{cv.phone}</Text><Text>·</Text><Text>{cv.city}</Text></View></View><View className="px-5 py-4 space-y-4"><View><Text className="text-xs font-black uppercase text-purple-700 mb-1">Profil</Text><Text className="text-xs text-gray-600">{cv.summary}</Text></View><View><Text className="text-xs font-black uppercase text-purple-700 mb-1">Compétences</Text><View className="flex flex-wrap gap-1.5">{cv.skills.map((s) => <Text key={s} className="px-2 py-0.5 rounded-full text-[11px] font-medium text-purple-700" style={{ backgroundColor: "#EDE9FE" }}>{s}</Text>)}</View></View><View><Text className="text-xs font-black uppercase text-purple-700 mb-2">Expériences</Text>{cv.experiences.map((e, i) => (
-                <View key={i} className="mb-2"><Text className="text-xs font-bold text-gray-800">{e.role}· {e.company}</Text><Text className="text-[10px] text-gray-500">{e.period}</Text><Text className="text-[11px] text-gray-600 mt-0.5">{e.desc}</Text></View>
-              ))}</View><View><Text className="text-xs font-black uppercase text-purple-700 mb-2">Formation</Text>{cv.education.map((e, i) => (
-                <View key={i} className="mb-1.5"><Text className="text-xs font-bold text-gray-800">{e.degree}</Text><Text className="text-[10px] text-gray-500">{e.school}· {e.year}</Text></View>
-              ))}</View></View></View><Pressable className="w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-white" style={{  }}><Download size={16} /><Text>Télécharger PDF</Text></Pressable></View>
-    );
-  }
+      <View>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 12,
+          }}
+        >
+          <Text
+            style={{
+              color: "#FFFFFF",
+              fontSize: 15,
+              fontWeight: "800",
+            }}
+          >
+            Aperçu du CV
+          </Text>
 
-  return (
-    <View className="space-y-4"><View className="flex items-center justify-between"><Text className="text-sm font-bold text-white">Mon CV</Text><Pressable onPress={() => setPreview(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-purple-400" style={{ backgroundColor: "rgba(139,92,246,0.15)", borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}><Eye size={12} /><Text>Aperçu</Text></Pressable></View>{}<View className="rounded-2xl p-4 space-y-3" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-xs text-white/40 font-semibold uppercase">Informations personnelles</Text>{(["name", "title", "email", "phone", "city"] as const).map((field) => (
-          <View key={field}><Text className="text-[11px] text-white/40 mb-1 capitalize">{field === "name" ? "Nom complet" : field === "title" ? "Poste visé" : field === "email" ? "Email" : field === "phone" ? "Téléphone" : "Ville"}</Text><TextInput value={cv[field]} onChangeText={(value) => onChange({ ...cv, [field]: value })} className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View>
-        ))}</View>{}<View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-xs text-white/40 font-semibold uppercase mb-2">Résumé professionnel</Text><TextInput value={cv.summary} onChangeText={(value) => onChange({ ...cv, summary: value })} className="w-full px-3 py-2 rounded-xl text-sm text-white outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} multiline textAlignVertical="top" /></View>{}<View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-xs text-white/40 font-semibold uppercase mb-2">Compétences</Text><View className="flex flex-wrap gap-1.5 mb-2">{cv.skills.map((s, i) => (
-            <View key={i} className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs text-white/70" style={{ backgroundColor: "rgba(139,92,246,0.15)", borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}>{s}<Pressable onPress={() => removeSkill(i)} className=""><X size={10} className="text-white/40" /></Pressable></View>
-          ))}</View><View className="flex gap-2"><TextInput value={newSkill} onChangeText={(value) => setNewSkill(value)} onKeyPress={(e) => e.nativeEvent.key === "Enter" && addSkill()} placeholder="Ajouter compétence..." className="flex-1 px-3 py-1.5 rounded-xl text-xs text-white outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /><Pressable onPress={addSkill} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(139,92,246,0.2)" }}><Plus size={14} className="text-purple-400" /></Pressable></View></View><Pressable onPress={() => setPreview(true)} className="w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-white" style={{  }}><Eye size={16} /><Text>Voir l</Text>{"'"}<Text>aperçu</Text></Pressable></View>
-  );
-}
+          <Pressable
+            onPress={() => setPreview(false)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              paddingHorizontal: 11,
+              paddingVertical: 8,
+              borderRadius: 11,
+              backgroundColor: "rgba(255,255,255,0.07)",
+            }}
+          >
+            <Edit3 size={13} color="#A78BFA" />
 
-// ── Applications tab ─────────────────────────────────────────────────────
-type ApplicationWithJob = Doc<"jobApplications"> & { jobTitle?: string; jobCompany?: string };
+            <Text
+              style={{
+                color: "#C4B5FD",
+                fontSize: 11,
+                fontWeight: "700",
+              }}
+            >
+              Modifier
+            </Text>
+          </Pressable>
+        </View>
 
-function ApplicationsTab({ applications }: { applications: ApplicationWithJob[] }) {
-  if (applications.length === 0) {
-    return (
-      <View className="text-center py-16"><Send size={40} className="text-white/20 mx-auto mb-3" /><Text className="text-white/40 text-sm">Aucune candidature</Text><Text className="text-white/25 text-xs mt-1">Postulez à des offres pour les suivre ici</Text></View>
-    );
-  }
+        <View
+          style={{
+            borderRadius: 22,
+            overflow: "hidden",
+            backgroundColor: "#F8FAFC",
+          }}
+        >
+          <View
+            style={{
+              padding: 20,
+              backgroundColor: "#111827",
+            }}
+          >
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 22,
+                fontWeight: "900",
+              }}
+            >
+              {cv.name || "Nom complet"}
+            </Text>
 
-  const counts: Record<string, number> = {};
-  for (const key of Object.keys(STATUS_CONFIG)) {
-    counts[key] = applications.filter((a) => a.status === key).length;
-  }
+            <Text
+              style={{
+                color: "#C4B5FD",
+                fontSize: 13,
+                marginTop: 4,
+              }}
+            >
+              {cv.title || "Poste recherché"}
+            </Text>
 
-  return (
-    <View className="space-y-4">{}<View className="gap-2">{[
-          { label: "Total", value: applications.length, color: "#6366F1" },
-          { label: "Entretiens", value: counts.shortlisted ?? 0, color: "#3B82F6" },
-          { label: "Acceptées", value: counts.hired ?? 0, color: "#10B981" },
-        ].map(({ label, value, color }) => (
-          <View key={label} className="rounded-2xl p-3 text-center" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-2xl font-black" style={{ color }}>{value}</Text><Text className="text-xs text-white/40">{label}</Text></View>
-        ))}</View>{}{applications.map((app, i) => {
-        const cfg = STATUS_CONFIG[app.status];
-        return (
-          <View key={app._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="rounded-2xl p-3" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-            <View className="flex items-start justify-between gap-2"><View><Text className="text-sm font-bold text-white">{app.jobTitle ?? "Offre"}</Text><Text className="text-xs text-white/50">{app.jobCompany ?? ""}· {formatRelativeDate(app.appliedAt)}</Text></View><Text className="px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0" style={{ backgroundColor: cfg.bg, color: cfg.color }}>{cfg.label}</Text></View>
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.65)",
+                fontSize: 10,
+                marginTop: 9,
+              }}
+            >
+              {[cv.email, cv.phone, cv.city].filter(Boolean).join(" · ")}
+            </Text>
           </View>
-        );
-      })}</View>
+
+          <View style={{ padding: 20 }}>
+            {cv.summary ? (
+              <CVPreviewSection title="Profil">
+                <Text
+                  style={{
+                    color: "#475569",
+                    fontSize: 11,
+                    lineHeight: 18,
+                  }}
+                >
+                  {cv.summary}
+                </Text>
+              </CVPreviewSection>
+            ) : null}
+
+            {cv.skills.length > 0 ? (
+              <CVPreviewSection title="Compétences">
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 6,
+                  }}
+                >
+                  {cv.skills.map((skill) => (
+                    <View
+                      key={skill}
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 999,
+                        backgroundColor: "#EDE9FE",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#6D28D9",
+                          fontSize: 10,
+                          fontWeight: "600",
+                        }}
+                      >
+                        {skill}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </CVPreviewSection>
+            ) : null}
+
+            {cv.experiences.length > 0 ? (
+              <CVPreviewSection title="Expériences">
+                {cv.experiences.map((experience, index) => (
+                  <View
+                    key={`${experience.role}-${index}`}
+                    style={{ marginBottom: 10 }}
+                  >
+                    <Text
+                      style={{
+                        color: "#1E293B",
+                        fontSize: 11,
+                        fontWeight: "800",
+                      }}
+                    >
+                      {experience.role} · {experience.company}
+                    </Text>
+
+                    <Text
+                      style={{
+                        color: "#64748B",
+                        fontSize: 9,
+                        marginTop: 2,
+                      }}
+                    >
+                      {experience.period}
+                    </Text>
+
+                    {experience.desc ? (
+                      <Text
+                        style={{
+                          color: "#475569",
+                          fontSize: 10,
+                          lineHeight: 16,
+                          marginTop: 3,
+                        }}
+                      >
+                        {experience.desc}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </CVPreviewSection>
+            ) : null}
+
+            {cv.education.length > 0 ? (
+              <CVPreviewSection title="Formation">
+                {cv.education.map((education, index) => (
+                  <View
+                    key={`${education.degree}-${index}`}
+                    style={{ marginBottom: 8 }}
+                  >
+                    <Text
+                      style={{
+                        color: "#1E293B",
+                        fontSize: 11,
+                        fontWeight: "800",
+                      }}
+                    >
+                      {education.degree}
+                    </Text>
+
+                    <Text
+                      style={{
+                        color: "#64748B",
+                        fontSize: 9,
+                        marginTop: 2,
+                      }}
+                    >
+                      {education.school}
+                      {education.year ? ` · ${education.year}` : ""}
+                    </Text>
+                  </View>
+                ))}
+              </CVPreviewSection>
+            ) : null}
+          </View>
+        </View>
+
+        <View
+          style={{
+            marginTop: 12,
+            padding: 13,
+            borderRadius: 15,
+            backgroundColor: "rgba(255,255,255,0.04)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.07)",
+          }}
+        >
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 11,
+              lineHeight: 17,
+            }}
+          >
+            L'export PDF nécessite un service de génération de document
+            connecté. Aucun faux téléchargement n'est déclenché ici.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <View>
+          <Text
+            style={{
+              color: "#FFFFFF",
+              fontSize: 15,
+              fontWeight: "800",
+            }}
+          >
+            Mon CV
+          </Text>
+
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.38)",
+              fontSize: 11,
+              marginTop: 3,
+            }}
+          >
+            Crée ton profil professionnel
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={() => setPreview(true)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            paddingHorizontal: 11,
+            paddingVertical: 8,
+            borderRadius: 11,
+            backgroundColor: "rgba(139,92,246,0.15)",
+            borderWidth: 1,
+            borderColor: "rgba(139,92,246,0.25)",
+          }}
+        >
+          <Eye size={13} color="#A78BFA" />
+
+          <Text
+            style={{
+              color: "#C4B5FD",
+              fontSize: 11,
+              fontWeight: "700",
+            }}
+          >
+            Aperçu
+          </Text>
+        </Pressable>
+      </View>
+
+      <CVField
+        label="Nom complet"
+        value={cv.name}
+        placeholder="Votre nom"
+        onChangeText={(value) => onChange({ ...cv, name: value })}
+      />
+
+      <CVField
+        label="Poste recherché"
+        value={cv.title}
+        placeholder="Ex. Technicien maintenance"
+        onChangeText={(value) => onChange({ ...cv, title: value })}
+      />
+
+      <CVField
+        label="Email"
+        value={cv.email}
+        placeholder="Votre email"
+        keyboardType="email-address"
+        onChangeText={(value) => onChange({ ...cv, email: value })}
+      />
+
+      <CVField
+        label="Téléphone"
+        value={cv.phone}
+        placeholder="Votre téléphone"
+        keyboardType="phone-pad"
+        onChangeText={(value) => onChange({ ...cv, phone: value })}
+      />
+
+      <CVField
+        label="Ville"
+        value={cv.city}
+        placeholder="Votre ville"
+        onChangeText={(value) => onChange({ ...cv, city: value })}
+      />
+
+      <CVField
+        label="Résumé professionnel"
+        value={cv.summary}
+        placeholder="Présentez votre profil, votre expérience et votre valeur..."
+        multiline
+        onChangeText={(value) => onChange({ ...cv, summary: value })}
+      />
+
+      <View
+        style={{
+          marginTop: 4,
+          padding: 15,
+          borderRadius: 18,
+          backgroundColor: "rgba(255,255,255,0.05)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.08)",
+        }}
+      >
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.42)",
+            fontSize: 10,
+            fontWeight: "800",
+            textTransform: "uppercase",
+            letterSpacing: 1,
+            marginBottom: 10,
+          }}
+        >
+          Compétences
+        </Text>
+
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 7,
+            marginBottom: 10,
+          }}
+        >
+          {cv.skills.map((skill, index) => (
+            <View
+              key={`${skill}-${index}`}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingHorizontal: 9,
+                paddingVertical: 6,
+                borderRadius: 10,
+                backgroundColor: "rgba(139,92,246,0.15)",
+                borderWidth: 1,
+                borderColor: "rgba(139,92,246,0.24)",
+              }}
+            >
+              <Text
+                style={{
+                  color: "#C4B5FD",
+                  fontSize: 10,
+                  fontWeight: "600",
+                }}
+              >
+                {skill}
+              </Text>
+
+              <Pressable onPress={() => removeSkill(index)}>
+                <X size={11} color="rgba(255,255,255,0.45)" />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 8,
+          }}
+        >
+          <TextInput
+            value={newSkill}
+            onChangeText={setNewSkill}
+            onSubmitEditing={addSkill}
+            placeholder="Ajouter une compétence..."
+            placeholderTextColor="rgba(255,255,255,0.28)"
+            style={{
+              flex: 1,
+              minHeight: 40,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              color: "#FFFFFF",
+              backgroundColor: "rgba(255,255,255,0.05)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.09)",
+              fontSize: 12,
+            }}
+            returnKeyType="done"
+          />
+
+          <Pressable
+            onPress={addSkill}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(139,92,246,0.2)",
+            }}
+          >
+            <Plus size={16} color="#A78BFA" />
+          </Pressable>
+        </View>
+      </View>
+    </View>
   );
 }
 
-// ── Loading skeletons ────────────────────────────────────────────────────
+function CVField({
+  label,
+  value,
+  placeholder,
+  multiline,
+  keyboardType,
+  onChangeText,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  multiline?: boolean;
+  keyboardType?: "default" | "email-address" | "phone-pad";
+  onChangeText: (value: string) => void;
+}) {
+  return (
+    <View style={{ marginBottom: 11 }}>
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.42)",
+          fontSize: 10,
+          fontWeight: "700",
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </Text>
+
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="rgba(255,255,255,0.25)"
+        keyboardType={keyboardType}
+        multiline={multiline}
+        textAlignVertical={multiline ? "top" : "center"}
+        style={{
+          minHeight: multiline ? 105 : 44,
+          borderRadius: 13,
+          paddingHorizontal: 12,
+          paddingVertical: multiline ? 11 : 0,
+          color: "#FFFFFF",
+          backgroundColor: "rgba(255,255,255,0.05)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.09)",
+          fontSize: 12,
+        }}
+      />
+    </View>
+  );
+}
+
+function CVPreviewSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{ marginBottom: 17 }}>
+      <Text
+        style={{
+          color: "#6D28D9",
+          fontSize: 10,
+          fontWeight: "900",
+          textTransform: "uppercase",
+          marginBottom: 7,
+        }}
+      >
+        {title}
+      </Text>
+
+      {children}
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Skeleton                                                                    */
+/* -------------------------------------------------------------------------- */
+
 function JobListSkeleton() {
   return (
-    <View className="space-y-3">{Array.from({ length: 4 }).map((_, i) => (
-        <View key={i} className="rounded-3xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-start gap-3 mb-3"><Skeleton className="w-11 h-11 rounded-2xl" /><View className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></View></View><View className="flex gap-2 mb-3"><Skeleton className="h-3 w-20" /><Skeleton className="h-3 w-16" /></View><View className="flex gap-1.5 mb-3"><Skeleton className="h-6 w-16 rounded-lg" /><Skeleton className="h-6 w-14 rounded-lg" /><Skeleton className="h-6 w-18 rounded-lg" /></View><View className="flex justify-between"><Skeleton className="h-5 w-28" /><Skeleton className="h-8 w-24 rounded-xl" /></View></View>
-      ))}</View>
+    <View>
+      {[0, 1, 2, 3].map((index) => (
+        <View
+          key={index}
+          style={{
+            borderRadius: 24,
+            padding: 16,
+            marginBottom: 12,
+            backgroundColor: "rgba(255,255,255,0.05)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.08)",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 12,
+            }}
+          >
+            <Skeleton className="w-12 h-12 rounded-2xl" />
+
+            <View style={{ flex: 1, gap: 8 }}>
+              <Skeleton className="h-4 w-3/4 rounded-lg" />
+              <Skeleton className="h-3 w-1/2 rounded-lg" />
+            </View>
+          </View>
+
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 8,
+              marginTop: 16,
+            }}
+          >
+            <Skeleton className="h-3 w-20 rounded-lg" />
+            <Skeleton className="h-3 w-16 rounded-lg" />
+            <Skeleton className="h-3 w-16 rounded-lg" />
+          </View>
+
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 7,
+              marginTop: 14,
+            }}
+          >
+            <Skeleton className="h-6 w-16 rounded-lg" />
+            <Skeleton className="h-6 w-20 rounded-lg" />
+            <Skeleton className="h-6 w-14 rounded-lg" />
+          </View>
+        </View>
+      ))}
+    </View>
   );
 }
 
-// ── Inner content (requires auth for applications) ───────────────────────
+/* -------------------------------------------------------------------------- */
+/* Main authenticated content                                                 */
+/* -------------------------------------------------------------------------- */
+
 function EmploiContent({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<TabId>("offres");
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [typeFilter, setTypeFilter] = useState("Tout");
-  const [selectedJob, setSelectedJob] = useState<Doc<"jobListings"> | null>(null);
-  const [cv, setCv] = useState<CVData>(() => {
-    try {
-      const stored = localStorage.getItem("emploi_cv");
-      return stored ? JSON.parse(stored) as CVData : DEFAULT_CV;
-    } catch { return DEFAULT_CV; }
-  });
+  const [typeFilter, setTypeFilter] = useState<ContractType | null>(null);
+  const [selectedJob, setSelectedJob] = useState<Doc<"jobListings"> | null>(
+    null,
+  );
 
-  // Save CV locally
-  const updateCv = (newCv: CVData) => {
-    setCv(newCv);
-    localStorage.setItem("emploi_cv", JSON.stringify(newCv));
-  };
+  const [cv, setCv] = useState<CVData>(EMPTY_CV);
 
-  // Convex queries
   const {
     results: jobs,
     status: jobsStatus,
     loadMore: loadMoreJobs,
-  } = usePaginatedQuery(api.employment.listJobs, {}, { initialNumItems: 20 });
+  } = usePaginatedQuery(
+    api.employment.listJobs,
+    {},
+    {
+      initialNumItems: 20,
+    },
+  );
 
   const {
     results: missions,
     status: missionsStatus,
     loadMore: loadMoreMissions,
-  } = usePaginatedQuery(api.employment.listMissions, {}, { initialNumItems: 20 });
+  } = usePaginatedQuery(
+    api.employment.listMissions,
+    {},
+    {
+      initialNumItems: 20,
+    },
+  );
 
   const myApplications = useQuery(api.employment.getMyApplications, {});
+
   const applyToJobMutation = useMutation(api.employment.applyToJob);
 
-  // Applied job IDs for quick lookup
-  const appliedJobIds = new Set(
-    (myApplications ?? []).map((a) => a.jobId)
+  const appliedJobIds = useMemo(
+    () =>
+      new Set((myApplications ?? []).map((application) => application.jobId)),
+    [myApplications],
   );
 
   const handleApply = async (jobId: Id<"jobListings">) => {
     try {
       await applyToJobMutation({ jobId });
-      toast.success("Candidature envoyée !");
+
+      Alert.alert(
+        "Candidature envoyée",
+        "Ta candidature a bien été enregistrée.",
+      );
     } catch (error) {
       if (error instanceof ConvexError) {
-        const data = error.data as { message: string; code: string };
-        if (data.code === "CONFLICT") {
-          toast.info("Candidature déjà envoyée");
-        } else {
-          toast.error(data.message);
+        const data = error.data as
+          | {
+              message?: string;
+              code?: string;
+            }
+          | undefined;
+
+        if (data?.code === "CONFLICT") {
+          Alert.alert(
+            "Déjà candidaté",
+            "Une candidature existe déjà pour cette offre.",
+          );
+          return;
         }
-      } else {
-        toast.error("Erreur lors de l'envoi");
+
+        Alert.alert(
+          "Impossible de postuler",
+          data?.message ?? "Une erreur est survenue.",
+        );
+        return;
       }
+
+      Alert.alert(
+        "Impossible de postuler",
+        "Une erreur est survenue. Réessaie.",
+      );
     }
   };
 
-  // Filter jobs client-side by search and type
-  const filteredJobs = (jobs ?? []).filter((j) => {
-    if (search && !j.title.toLowerCase().includes(search.toLowerCase()) && !j.company.toLowerCase().includes(search.toLowerCase())) return false;
-    if (typeFilter !== "Tout") {
-      const filterMap: Record<string, ContractType> = {
-        CDI: "cdi", CDD: "cdd", Stage: "stage", Freelance: "freelance", Alternance: "alternance",
-      };
-      if (filterMap[typeFilter] && j.contractType !== filterMap[typeFilter]) return false;
-    }
-    return true;
-  });
+  const normalizedSearch = search.trim().toLowerCase();
 
-  // Filter freelance jobs vs regular (we show missions for freelance tab)
-  const filteredMissions = (missions ?? []).filter((m) => {
-    if (search && !m.title.toLowerCase().includes(search.toLowerCase()) && !m.description.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const filteredJobs = useMemo(() => {
+    return (jobs ?? []).filter((job) => {
+      if (
+        normalizedSearch &&
+        !job.title.toLowerCase().includes(normalizedSearch) &&
+        !job.company.toLowerCase().includes(normalizedSearch) &&
+        !job.city.toLowerCase().includes(normalizedSearch) &&
+        !job.skills.some((skill) =>
+          skill.toLowerCase().includes(normalizedSearch),
+        )
+      ) {
+        return false;
+      }
+
+      if (typeFilter && job.contractType !== typeFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [jobs, normalizedSearch, typeFilter]);
+
+  const filteredMissions = useMemo(() => {
+    return (missions ?? []).filter((mission) => {
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return (
+        mission.title.toLowerCase().includes(normalizedSearch) ||
+        mission.description.toLowerCase().includes(normalizedSearch) ||
+        mission.skills.some((skill) =>
+          skill.toLowerCase().includes(normalizedSearch),
+        )
+      );
+    });
+  }, [missions, normalizedSearch]);
 
   const totalCount = (jobs?.length ?? 0) + (missions?.length ?? 0);
 
-  const TABS = [
-    { id: "offres" as TabId, label: "Emplois", icon: Briefcase, color: "#8B5CF6" },
-    { id: "freelance" as TabId, label: "Freelance", icon: Zap, color: "#F97316" },
-    { id: "candidatures" as TabId, label: "Mes candidatures", icon: BarChart2, color: "#3B82F6" },
-    { id: "cv" as TabId, label: "Mon CV", icon: FileText, color: "#10B981" },
+  const tabs: {
+    id: TabId;
+    label: string;
+    icon: typeof Briefcase;
+    color: string;
+  }[] = [
+    {
+      id: "offres",
+      label: "Emplois",
+      icon: Briefcase,
+      color: "#8B5CF6",
+    },
+    {
+      id: "freelance",
+      label: "Freelance",
+      icon: Zap,
+      color: "#F97316",
+    },
+    {
+      id: "candidatures",
+      label: "Candidatures",
+      icon: BarChart2,
+      color: "#3B82F6",
+    },
+    {
+      id: "cv",
+      label: "Mon CV",
+      icon: FileText,
+      color: "#10B981",
+    },
   ];
 
-  const TYPE_FILTERS = ["Tout", "CDI", "CDD", "Stage", "Freelance", "Alternance"];
-
   return (
-    <View className="relative h-full w-full overflow-hidden flex flex-col" style={{  }}>{}<View className="absolute top-0 left-0 w-72 h-72 rounded-full pointer-events-none" style={{  }} /><View className="absolute bottom-20 right-0 w-48 h-48 rounded-full pointer-events-none" style={{  }} />{}<View className="flex-shrink-0 px-4 pt-12 pb-3"><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-xl font-black text-white">Emploi & Freelance</Text><Text className="text-xs text-white/40">Trouvez votre prochaine opportunité</Text></View><View className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl" style={{ backgroundColor: "rgba(139,92,246,0.15)", borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}><TrendingUp size={13} className="text-purple-400" /><Text className="text-xs font-bold text-purple-400">{totalCount}offres</Text></View></View>{}{(tab === "offres" || tab === "freelance") && (
-          <>
-            <View className="flex gap-2 mb-3"><View className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Search size={14} className="text-white/40" /><TextInput value={search} onChangeText={(value) => setSearch(value)} placeholder="Titre, entreprise, compétence..." className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/30" />{search && <Pressable onPress={() => setSearch("")} className=""><X size={13} className="text-white/40" /></Pressable>}</View><Pressable onPress={() => setShowFilters((v) => !v)} className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: showFilters ? "rgba(139,92,246,0.2)" : "rgba(255,255,255,0.07)", borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}><SlidersHorizontal size={16} className={showFilters ? "text-purple-400" : "text-white/60"} /></Pressable></View>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: "#050812",
+      }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          width: 260,
+          height: 260,
+          borderRadius: 130,
+          top: -150,
+          right: -100,
+          backgroundColor: "rgba(99,102,241,0.08)",
+        }}
+      />
 
-<View>
-              {showFilters && (
-                <View initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mb-3 overflow-hidden">
-                  <View className="flex gap-1.5 overflow-x-auto pb-1" style={{  }}>{TYPE_FILTERS.map((f) => (
-                      <Pressable key={f} onPress={() => setTypeFilter(f)} className="px-3 py-1.5 rounded-xl text-xs font-semibold" style={typeFilter === f
-                          ? {  }
-                          : { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>{f}</Pressable>
-                    ))}</View>
-                </View>
-              )}
+      <View
+        style={{
+          position: "absolute",
+          width: 220,
+          height: 220,
+          borderRadius: 110,
+          bottom: -120,
+          left: -100,
+          backgroundColor: "rgba(139,92,246,0.06)",
+        }}
+      />
+
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: Platform.OS === "ios" ? 18 : 14,
+          paddingBottom: 10,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 11,
+            marginBottom: 15,
+          }}
+        >
+          <Pressable
+            onPress={onBack}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 14,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(255,255,255,0.08)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.1)",
+            }}
+          >
+            <ArrowLeft size={19} color="#FFFFFF" />
+          </Pressable>
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 21,
+                fontWeight: "900",
+              }}
+            >
+              Emploi & Freelance
+            </Text>
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.4)",
+                fontSize: 11,
+                marginTop: 2,
+              }}
+            >
+              Opportunités disponibles sur la plateforme
+            </Text>
+          </View>
+
+          <View
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              borderRadius: 12,
+              backgroundColor: "rgba(139,92,246,0.14)",
+              borderWidth: 1,
+              borderColor: "rgba(139,92,246,0.23)",
+            }}
+          >
+            <Text
+              style={{
+                color: "#C4B5FD",
+                fontSize: 10,
+                fontWeight: "900",
+              }}
+            >
+              {totalCount} disponibles
+            </Text>
+          </View>
+        </View>
+
+        {(tab === "offres" || tab === "freelance") && (
+          <>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  minHeight: 44,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: 14,
+                  backgroundColor: "rgba(255,255,255,0.06)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.09)",
+                }}
+              >
+                <Search size={15} color="rgba(255,255,255,0.4)" />
+
+                <TextInput
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Titre, entreprise, ville, compétence..."
+                  placeholderTextColor="rgba(255,255,255,0.28)"
+                  style={{
+                    flex: 1,
+                    color: "#FFFFFF",
+                    fontSize: 12,
+                  }}
+                  returnKeyType="search"
+                />
+
+                {search ? (
+                  <Pressable onPress={() => setSearch("")}>
+                    <X size={14} color="rgba(255,255,255,0.4)" />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              <Pressable
+                onPress={() => setShowFilters((value) => !value)}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: showFilters
+                    ? "rgba(139,92,246,0.2)"
+                    : "rgba(255,255,255,0.06)",
+                  borderWidth: 1,
+                  borderColor: showFilters
+                    ? "rgba(139,92,246,0.35)"
+                    : "rgba(255,255,255,0.09)",
+                }}
+              >
+                <SlidersHorizontal
+                  size={16}
+                  color={showFilters ? "#A78BFA" : "rgba(255,255,255,0.6)"}
+                />
+              </Pressable>
             </View>
+
+            {showFilters ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  gap: 7,
+                  paddingBottom: 10,
+                }}
+              >
+                {TYPE_FILTERS.map((filter) => {
+                  const active = typeFilter === filter.value;
+
+                  return (
+                    <Pressable
+                      key={filter.label}
+                      onPress={() => setTypeFilter(filter.value)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 11,
+                        backgroundColor: active
+                          ? "rgba(139,92,246,0.2)"
+                          : "rgba(255,255,255,0.05)",
+                        borderWidth: 1,
+                        borderColor: active
+                          ? "rgba(139,92,246,0.35)"
+                          : "rgba(255,255,255,0.08)",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: active ? "#C4B5FD" : "rgba(255,255,255,0.55)",
+                          fontSize: 10,
+                          fontWeight: "800",
+                        }}
+                      >
+                        {filter.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
           </>
-        )}{}<View className="flex gap-1.5">{TABS.map(({ id, label, icon: Icon, color }) => (
-            <Pressable key={id} onPress={() => setTab(id)} className="flex-1 py-2 rounded-2xl flex flex-col items-center gap-0.5" style={tab === id
-                ? { backgroundColor: `${color}22`, borderStyle: "solid" }
-                : { backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Icon size={14} style={{  }} /><Text className="text-[10px] font-semibold leading-tight text-center px-0.5" style={{ color: tab === id ? color : "rgba(255,255,255,0.35)" }}>{label}</Text></Pressable>
-          ))}</View></View>{}<View className="flex-1 overflow-y-auto px-4 pb-6" style={{  }}><View>{tab === "offres" && (
-            <View key="offres" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <View className="flex items-center justify-between py-2 mb-1"><Text className="text-xs text-white/40">{filteredJobs.length}résultat{filteredJobs.length > 1 ? "s" : ""}</Text></View>
-              {jobsStatus === "LoadingFirstPage" ? (
-                <JobListSkeleton />
-              ) : filteredJobs.length === 0 ? (
-                <View className="text-center py-16"><Briefcase size={40} className="text-white/20 mx-auto mb-3" /><Text className="text-white/40 text-sm">Aucune offre trouvée</Text></View>
-              ) : (
-                <>
-                  {filteredJobs.map((job) => (
-                    <JobCard
-                      key={job._id}
-                      job={job}
-                      onSelect={() => setSelectedJob(job)}
-                      onApply={() => handleApply(job._id)}
-                      hasApplied={appliedJobIds.has(job._id)}
-                    />
-                  ))}
-                  {jobsStatus === "CanLoadMore" && (
-                    <Pressable onPress={() => loadMoreJobs(20)} className="w-full py-3 rounded-2xl text-sm font-semibold text-purple-400 mb-4" style={{ backgroundColor: "rgba(139,92,246,0.1)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}><Text>Charger plus</Text></Pressable>
-                  )}
-                  {jobsStatus === "LoadingMore" && (
-                    <View className="flex justify-center py-4"><Skeleton className="h-8 w-32 rounded-xl" /></View>
-                  )}
-                </>
-              )}
-            </View>
-          )}{tab === "freelance" && (
-            <View key="freelance" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <View className="flex items-center justify-between py-2 mb-1"><Text className="text-xs text-white/40">{filteredMissions.length}mission{filteredMissions.length > 1 ? "s" : ""}</Text></View>
-              {missionsStatus === "LoadingFirstPage" ? (
-                <JobListSkeleton />
-              ) : filteredMissions.length === 0 ? (
-                <View className="text-center py-16"><Zap size={40} className="text-white/20 mx-auto mb-3" /><Text className="text-white/40 text-sm">Aucune mission disponible</Text></View>
-              ) : (
-                <>
-                  {filteredMissions.map((mission) => (
-                    <MissionCard key={mission._id} mission={mission} />
-                  ))}
-                  {missionsStatus === "CanLoadMore" && (
-                    <Pressable onPress={() => loadMoreMissions(20)} className="w-full py-3 rounded-2xl text-sm font-semibold text-orange-400 mb-4" style={{ backgroundColor: "rgba(249,115,22,0.1)", borderWidth: 1, borderColor: "rgba(249,115,22,0.2)", borderStyle: "solid" }}><Text>Charger plus</Text></Pressable>
-                  )}
-                  {missionsStatus === "LoadingMore" && (
-                    <View className="flex justify-center py-4"><Skeleton className="h-8 w-32 rounded-xl" /></View>
-                  )}
-                </>
-              )}
-            </View>
-          )}{tab === "candidatures" && (
-            <View key="candidatures" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-2">
-              {myApplications === undefined ? (
-                <View className="space-y-3">{Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-                  ))}</View>
-              ) : (
-                <ApplicationsTab applications={myApplications as ApplicationWithJob[]} />
-              )}
-            </View>
-          )}{tab === "cv" && (
-            <View key="cv" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-2">
-              <CVBuilder cv={cv} onChange={updateCv} />
-            </View>
-          )}</View></View>{}<View>{selectedJob && (
-          <JobDetail
-            job={selectedJob}
-            onClose={() => setSelectedJob(null)}
-            onApply={() => handleApply(selectedJob._id)}
-            hasApplied={appliedJobIds.has(selectedJob._id)}
-          />
-        )}</View></View>
+        )}
+
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 5,
+          }}
+        >
+          {tabs.map(({ id, label, icon: Icon, color }) => {
+            const active = tab === id;
+
+            return (
+              <Pressable
+                key={id}
+                onPress={() => setTab(id)}
+                style={{
+                  flex: 1,
+                  minHeight: 54,
+                  borderRadius: 15,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  backgroundColor: active
+                    ? `${color}20`
+                    : "rgba(255,255,255,0.035)",
+                  borderWidth: 1,
+                  borderColor: active ? `${color}45` : "rgba(255,255,255,0.06)",
+                }}
+              >
+                <Icon
+                  size={15}
+                  color={active ? color : "rgba(255,255,255,0.35)"}
+                />
+
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: active ? color : "rgba(255,255,255,0.38)",
+                    fontSize: 9,
+                    fontWeight: "800",
+                  }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: 35,
+        }}
+      >
+        {tab === "offres" ? (
+          <View style={{ paddingTop: 4 }}>
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.4)",
+                fontSize: 11,
+                marginBottom: 10,
+              }}
+            >
+              {filteredJobs.length}{" "}
+              {filteredJobs.length === 1 ? "résultat" : "résultats"}
+            </Text>
+
+            {jobsStatus === "LoadingFirstPage" ? (
+              <JobListSkeleton />
+            ) : filteredJobs.length === 0 ? (
+              <EmptyState
+                icon={<Briefcase size={42} color="rgba(255,255,255,0.18)" />}
+                title="Aucune offre trouvée"
+                description="Aucune offre correspondant aux données et filtres actuels."
+              />
+            ) : (
+              <>
+                {filteredJobs.map((job) => (
+                  <JobCard
+                    key={job._id}
+                    job={job}
+                    onSelect={() => setSelectedJob(job)}
+                    onApply={() => handleApply(job._id)}
+                    hasApplied={appliedJobIds.has(job._id)}
+                  />
+                ))}
+
+                {jobsStatus === "CanLoadMore" ? (
+                  <LoadMoreButton
+                    label="Charger plus d'offres"
+                    onPress={() => loadMoreJobs(20)}
+                  />
+                ) : null}
+
+                {jobsStatus === "LoadingMore" ? (
+                  <View style={{ paddingVertical: 12 }}>
+                    <Skeleton className="h-9 w-36 rounded-xl" />
+                  </View>
+                ) : null}
+              </>
+            )}
+          </View>
+        ) : null}
+
+        {tab === "freelance" ? (
+          <View style={{ paddingTop: 4 }}>
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.4)",
+                fontSize: 11,
+                marginBottom: 10,
+              }}
+            >
+              {filteredMissions.length}{" "}
+              {filteredMissions.length === 1 ? "mission" : "missions"}
+            </Text>
+
+            {missionsStatus === "LoadingFirstPage" ? (
+              <JobListSkeleton />
+            ) : filteredMissions.length === 0 ? (
+              <EmptyState
+                icon={<Zap size={42} color="rgba(255,255,255,0.18)" />}
+                title="Aucune mission disponible"
+                description="Aucune mission correspondant à la recherche actuelle."
+              />
+            ) : (
+              <>
+                {filteredMissions.map((mission) => (
+                  <MissionCard key={mission._id} mission={mission} />
+                ))}
+
+                {missionsStatus === "CanLoadMore" ? (
+                  <LoadMoreButton
+                    label="Charger plus de missions"
+                    onPress={() => loadMoreMissions(20)}
+                  />
+                ) : null}
+
+                {missionsStatus === "LoadingMore" ? (
+                  <View style={{ paddingVertical: 12 }}>
+                    <Skeleton className="h-9 w-36 rounded-xl" />
+                  </View>
+                ) : null}
+              </>
+            )}
+          </View>
+        ) : null}
+
+        {tab === "candidatures" ? (
+          <View style={{ paddingTop: 6 }}>
+            {myApplications === undefined ? (
+              <View style={{ gap: 9 }}>
+                <Skeleton className="h-20 w-full rounded-2xl" />
+                <Skeleton className="h-20 w-full rounded-2xl" />
+                <Skeleton className="h-20 w-full rounded-2xl" />
+              </View>
+            ) : (
+              <ApplicationsTab
+                applications={myApplications as ApplicationWithJob[]}
+              />
+            )}
+          </View>
+        ) : null}
+
+        {tab === "cv" ? (
+          <View style={{ paddingTop: 6 }}>
+            <CVBuilder cv={cv} onChange={setCv} />
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {selectedJob ? (
+        <JobDetail
+          job={selectedJob}
+          onClose={() => setSelectedJob(null)}
+          onApply={() => handleApply(selectedJob._id)}
+          hasApplied={appliedJobIds.has(selectedJob._id)}
+        />
+      ) : null}
+    </View>
   );
 }
 
-// ── Main page with auth handling ─────────────────────────────────────────
-interface EmploiPageProps { onBack: () => void; }
+/* -------------------------------------------------------------------------- */
+/* Generic UI                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <View
+      style={{
+        alignItems: "center",
+        paddingVertical: 70,
+        paddingHorizontal: 25,
+      }}
+    >
+      {icon}
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.46)",
+          fontSize: 14,
+          fontWeight: "700",
+          textAlign: "center",
+          marginTop: 14,
+        }}
+      >
+        {title}
+      </Text>
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.25)",
+          fontSize: 11,
+          textAlign: "center",
+          lineHeight: 17,
+          marginTop: 5,
+        }}
+      >
+        {description}
+      </Text>
+    </View>
+  );
+}
+
+function LoadMoreButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        minHeight: 44,
+        borderRadius: 14,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(139,92,246,0.1)",
+        borderWidth: 1,
+        borderColor: "rgba(139,92,246,0.22)",
+        marginBottom: 10,
+      }}
+    >
+      <Text
+        style={{
+          color: "#C4B5FD",
+          fontSize: 11,
+          fontWeight: "800",
+        }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page                                                                       */
+/* -------------------------------------------------------------------------- */
+
+interface EmploiPageProps {
+  onBack: () => void;
+}
 
 export default function EmploiPage({ onBack }: EmploiPageProps) {
   return (
     <>
       <AuthLoading>
-        <View className="relative h-full w-full overflow-hidden flex flex-col items-center justify-center" style={{  }}><View className="space-y-4 w-full max-w-sm px-6"><Skeleton className="h-8 w-48 mx-auto" /><Skeleton className="h-4 w-32 mx-auto" /><View className="space-y-3 mt-8">{Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-28 w-full rounded-3xl" />
-              ))}</View></View></View>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#050812",
+            paddingHorizontal: 20,
+            paddingTop: 45,
+          }}
+        >
+          <Skeleton className="h-9 w-52 rounded-xl" />
+
+          <View style={{ marginTop: 25, gap: 12 }}>
+            <Skeleton className="h-28 w-full rounded-3xl" />
+            <Skeleton className="h-28 w-full rounded-3xl" />
+            <Skeleton className="h-28 w-full rounded-3xl" />
+          </View>
+        </View>
       </AuthLoading>
+
       <Unauthenticated>
-        <View className="relative h-full w-full overflow-hidden flex flex-col" style={{  }}><View className="flex-shrink-0 px-4 pt-12 pb-3"><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-xl font-black text-white">Emploi & Freelance</Text><Text className="text-xs text-white/40">Trouvez votre prochaine opportunité</Text></View></View></View><View className="flex-1 flex flex-col items-center justify-center px-6 gap-4"><Briefcase size={48} className="text-white/20" /><Text className="text-white/60 text-center text-sm">Connectez-vous pour accéder aux offres d{"'"}emploi et postuler</Text><SignInButton /></View></View>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#050812",
+          }}
+        >
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: Platform.OS === "ios" ? 18 : 14,
+              paddingBottom: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 11,
+            }}
+          >
+            <Pressable
+              onPress={onBack}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 14,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "rgba(255,255,255,0.08)",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.1)",
+              }}
+            >
+              <ArrowLeft size={19} color="#FFFFFF" />
+            </Pressable>
+
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: "#FFFFFF",
+                  fontSize: 21,
+                  fontWeight: "900",
+                }}
+              >
+                Emploi & Freelance
+              </Text>
+
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.4)",
+                  fontSize: 11,
+                  marginTop: 2,
+                }}
+              >
+                Opportunités professionnelles
+              </Text>
+            </View>
+          </View>
+
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: 30,
+            }}
+          >
+            <Briefcase size={50} color="rgba(255,255,255,0.17)" />
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.65)",
+                fontSize: 14,
+                fontWeight: "700",
+                textAlign: "center",
+                lineHeight: 21,
+                marginTop: 17,
+              }}
+            >
+              Connecte-toi pour accéder aux opportunités et envoyer tes
+              candidatures.
+            </Text>
+
+            <View style={{ marginTop: 20 }}>
+              <SignInButton />
+            </View>
+          </View>
+        </View>
       </Unauthenticated>
+
       <Authenticated>
         <EmploiContent onBack={onBack} />
       </Authenticated>

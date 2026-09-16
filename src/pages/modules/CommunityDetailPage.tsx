@@ -1,143 +1,592 @@
-import { View, Pressable, Text } from "react-native";
-
 // src/pages/modules/CommunityDetailPage.tsx
-import { useState, useEffect, Component } from "react";
-import type { ErrorInfo, ReactNode } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+  Image as RNImage,
+} from "react-native";
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 import {
   ArrowLeft,
-  MoreVertical,
-  Calendar,
-  MapPin,
-  Heart,
-  MessageCircle,
-  Share2,
   Bookmark,
-  Pencil,
-  Trash2,
-  Link,
-  Flag,
+  Calendar,
+  Check,
+  Copy,
   EyeOff,
+  Flag,
+  Heart,
+  Link as LinkIcon,
+  MapPin,
+  MessageCircle,
+  MoreVertical,
+  Pencil,
+  Send,
+  Share2,
+  Sparkles,
+  Trash2,
+  TrendingUp,
   X,
 } from "lucide-react-native";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import { toast } from "sonner";
+import { Clipboard } from "@react-native-clipboard/clipboard";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
+
 import {
-  CommunityHeader,
-  CommunityGallery,
+  CommunityActions,
   CommunityComments,
-  CommunityPoll,
-  CommunityQuestion,
+  CommunityGallery,
   CommunityHashtags,
+  CommunityHeader,
   CommunityLocation,
   CommunityMap,
-  CommunityStatistics,
-  CommunityActions,
+  CommunityPoll,
+  CommunityQuestion,
   CommunityShare,
-  CommunityBoost,
+  CommunityStatistics,
 } from "@/features/community/components";
 import {
-  useCommunityComments,
-  useCommunityBookmarks,
-  useCommunityNotifications,
   useCommunityAI,
+  useCommunityBookmarks,
+  useCommunityComments,
+  useCommunityNotifications,
 } from "@/features/community/hooks";
 import { adaptCommunityPost } from "@/features/community/adapter";
 import type { CommunityPost } from "@/features/community/types";
-import type { Id } from "@/convex/_generated/dataModel";
-import { Clipboard } from "@react-native-clipboard/clipboard";
 
-// ── ErrorBoundary ──────────────────────────────────────────────────────────
-class ErrorBoundary extends Component<{
-  children: ReactNode;
-  fallback: ReactNode;
-}> {
+/* ════════════════════════════════════════════════════════════════════════════
+   TYPES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+interface CommunityDetailPageProps {
+  id?: string;
+  onBack: () => void;
+  onOpenProfile?: (userId: string) => void;
+  onEdit?: (postId: string) => void;
+}
+
+type ReportReason =
+  | "Spam"
+  | "Contenu inapproprié"
+  | "Harcèlement"
+  | "Fausse information"
+  | "Autre";
+
+type CommunityMeta = {
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  pollOptions?: { _id: string; text: string; votes?: number }[];
+  eventDate?: string;
+  eventLocation?: string;
+  audience?: string;
+  mood?: string;
+  videos?: string[];
+  audio?: string[];
+  mentions?: string[];
+  images?: string[];
+  postType?: string;
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const T = {
+  bg: "#07070C",
+  sheet: "#0E0E14",
+  card: "rgba(255,255,255,0.045)",
+  cardUp: "rgba(255,255,255,0.075)",
+  border: "rgba(255,255,255,0.08)",
+  borderUp: "rgba(255,255,255,0.14)",
+  text: "#FFFFFF",
+  dim: "rgba(255,255,255,0.58)",
+  faint: "rgba(255,255,255,0.32)",
+  ghost: "rgba(255,255,255,0.18)",
+  primary: "#8B5CF6",
+  primarySoft: "#C4B5FD",
+  danger: "#EF4444",
+  success: "#10B981",
+  amber: "#F59E0B",
+  amberSoft: "#FCD34D",
+  rose: "#FB7185",
+} as const;
+
+const SHARE_BASE_URL = "https://debrouille.pro";
+const SCREEN_W = Dimensions.get("window").width;
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function alpha(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function buildShareUrl(postId: string): string {
+  return `${SHARE_BASE_URL}/community/${postId}`;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ERROR BOUNDARY (native)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+class ErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode; label?: string },
+  { hasError: boolean }
+> {
   state = { hasError: false };
+
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("❌ ErrorBoundary capturé :", error, errorInfo);
-  }
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn(`❌ ${this.props.label ?? "Section"} crashed:`, error, info);
     }
+  }
+
+  render() {
+    if (this.state.hasError) return this.props.fallback;
     return this.props.children;
   }
 }
 
-// ── Composants désactivés (placeholders) ──────────────────────────────────
-const CommunityMedia = () => null;
-const CommunityVideo = () => null;
-const CommunityVoice = () => null;
-const CommunityAudio = () => null;
-const CommunityFiles = () => null;
-const CommunityDocuments = () => null;
-const CommunityStories = () => null;
-const CommunityShorts = () => null;
-const CommunityLive = () => null;
-const CommunityLiveChat = () => null;
-const CommunityReplay = () => null;
-const CommunityReplies = () => null;
-const CommunityReactions = () => null;
-const CommunityLikes = () => null;
-const CommunityBookmarks = () => null;
-const CommunityQuiz = () => null;
-const CommunityMentions = () => null;
-const CommunityTags = () => null;
-const CommunityGroup = () => null;
-const CommunityGroupMembers = () => null;
-const CommunityEvents = () => null;
-const CommunityCalendar = () => null;
-const CommunityNearby = () => null;
-const CommunityCreator = () => null;
-const CommunityProfile = () => null;
-const CommunityBadge = () => null;
-const CommunityVerification = () => null;
-const CommunityAnalytics = () => null;
-const CommunityInsights = () => null;
-const CommunityRecommendations = () => null;
-const CommunityTrending = () => null;
-const CommunityAI = () => null;
-const CommunityAISummary = () => null;
-const CommunityAITranslate = () => null;
-const CommunityAIModeration = () => null;
-const CommunityModeration = () => null;
-const CommunitySecurity = () => null;
-const CommunityReports = () => null;
-const CommunityNotifications = () => null;
-const CommunityMarketplace = () => null;
-const CommunityCommerce = () => null;
-const CommunityJobs = () => null;
-const CommunityServices = () => null;
-const CommunityProperties = () => null;
-const CommunityPayments = () => null;
-const CommunityMonetization = () => null;
-const CommunitySponsors = () => null;
+function SectionFallback({ label }: { label: string }) {
+  return (
+    <View style={styles.sectionFallback}>
+      <Text style={styles.sectionFallbackText}>
+        Impossible d'afficher cette section ({label})
+      </Text>
+    </View>
+  );
+}
 
-export default function CommunityDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+/* ════════════════════════════════════════════════════════════════════════════
+   PRIMITIVES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function Skeleton({
+  style,
+}: {
+  style?: React.ComponentProps<typeof Animated.View>["style"];
+}) {
+  const opacity = useRef(new Animated.Value(0.28)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.65,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.28,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+  return (
+    <Animated.View
+      style={[
+        {
+          backgroundColor: "rgba(255,255,255,0.06)",
+          borderRadius: 18,
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+}
+
+function SheetBackdrop({ onPress }: { onPress: () => void }) {
+  return <Pressable style={StyleSheet.absoluteFill} onPress={onPress} />;
+}
+
+function SheetHandle() {
+  return <View style={styles.sheetHandle} />;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MENU MODAL
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function MenuSheet({
+  visible,
+  onClose,
+  canEdit,
+  onEdit,
+  onDelete,
+  onCopyLink,
+  onReport,
+  onHide,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  canEdit: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onCopyLink: () => void;
+  onReport: () => void;
+  onHide: () => void;
+}) {
+  const slide = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(slide, {
+      toValue: visible ? 0 : 1,
+      duration: 280,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, slide]);
+
+  const items: {
+    icon: React.ElementType;
+    label: string;
+    color: string;
+    onPress: () => void;
+    destructive?: boolean;
+  }[] = [
+    ...(canEdit
+      ? [
+          {
+            icon: Pencil,
+            label: "Modifier",
+            color: T.text,
+            onPress: onEdit,
+          },
+        ]
+      : []),
+    {
+      icon: LinkIcon,
+      label: "Copier le lien",
+      color: T.text,
+      onPress: onCopyLink,
+    },
+    {
+      icon: Flag,
+      label: "Signaler",
+      color: T.text,
+      onPress: onReport,
+    },
+    {
+      icon: EyeOff,
+      label: "Masquer",
+      color: T.text,
+      onPress: onHide,
+    },
+    ...(canEdit
+      ? [
+          {
+            icon: Trash2,
+            label: "Supprimer",
+            color: T.danger,
+            onPress: onDelete,
+            destructive: true,
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={styles.modalBackdrop}>
+        <SheetBackdrop onPress={onClose} />
+
+        <Animated.View
+          style={[
+            styles.menuSheet,
+            {
+              transform: [
+                {
+                  translateY: slide.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 400],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <SheetHandle />
+
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Options</Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              style={styles.sheetCloseBtn}
+            >
+              <X size={16} color="#fff" />
+            </Pressable>
+          </View>
+
+          <View style={{ gap: 4, paddingBottom: 12 }}>
+            {items.map(({ icon: Icon, label, color, onPress, destructive }) => (
+              <Pressable
+                key={label}
+                onPress={onPress}
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  {
+                    backgroundColor: pressed
+                      ? "rgba(255,255,255,0.06)"
+                      : "transparent",
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.menuIcon,
+                    {
+                      backgroundColor: destructive
+                        ? alpha(T.danger, 0.14)
+                        : "rgba(255,255,255,0.05)",
+                    },
+                  ]}
+                >
+                  <Icon size={15} color={color} />
+                </View>
+                <Text
+                  style={[
+                    styles.menuLabel,
+                    { color: destructive ? T.danger : T.text },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   REPORT MODAL
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const REPORT_REASONS: ReportReason[] = [
+  "Spam",
+  "Contenu inapproprié",
+  "Harcèlement",
+  "Fausse information",
+  "Autre",
+];
+
+function ReportSheet({
+  visible,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (reason: ReportReason) => void;
+}) {
+  const slide = useRef(new Animated.Value(1)).current;
+  const [selected, setSelected] = useState<ReportReason | null>(null);
+
+  useEffect(() => {
+    if (visible) setSelected(null);
+    Animated.timing(slide, {
+      toValue: visible ? 0 : 1,
+      duration: 280,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, slide]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={styles.modalBackdrop}>
+        <SheetBackdrop onPress={onClose} />
+
+        <Animated.View
+          style={[
+            styles.menuSheet,
+            {
+              transform: [
+                {
+                  translateY: slide.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 500],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <SheetHandle />
+
+          <View style={styles.sheetHeader}>
+            <View
+              style={[
+                styles.sheetHeaderIcon,
+                { backgroundColor: alpha(T.danger, 0.14) },
+              ]}
+            >
+              <Flag size={15} color={T.danger} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sheetTitle}>Signaler ce post</Text>
+              <Text style={styles.sheetSubtitle}>
+                Pourquoi signales-tu ce contenu ?
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ gap: 6, paddingTop: 4 }}>
+            {REPORT_REASONS.map((reason) => {
+              const active = selected === reason;
+              return (
+                <Pressable
+                  key={reason}
+                  onPress={() => setSelected(reason)}
+                  style={({ pressed }) => [
+                    styles.reportRow,
+                    {
+                      backgroundColor: active
+                        ? alpha(T.danger, 0.12)
+                        : pressed
+                          ? "rgba(255,255,255,0.05)"
+                          : "transparent",
+                      borderColor: active ? alpha(T.danger, 0.36) : T.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.reportRowText,
+                      { color: active ? T.danger : T.text },
+                    ]}
+                  >
+                    {reason}
+                  </Text>
+                  <View
+                    style={[
+                      styles.radioOuter,
+                      active && {
+                        borderColor: T.danger,
+                        backgroundColor: T.danger,
+                      },
+                    ]}
+                  >
+                    {active && <Check size={10} color="#fff" strokeWidth={3} />}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable
+            onPress={() => selected && onSubmit(selected)}
+            disabled={!selected}
+            style={({ pressed }) => [
+              styles.reportSubmit,
+              {
+                opacity: !selected ? 0.4 : pressed ? 0.85 : 1,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              },
+            ]}
+          >
+            <Send size={15} color="#fff" />
+            <Text style={styles.reportSubmitText}>Envoyer le signalement</Text>
+          </Pressable>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   AUTHOR HEADER FALLBACK (si CommunityHeader casse)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function AuthorSkeleton() {
+  return (
+    <View style={styles.authorSkeleton}>
+      <Skeleton style={{ width: 44, height: 44, borderRadius: 15 }} />
+      <View style={{ flex: 1, gap: 6 }}>
+        <Skeleton style={{ width: 140, height: 14, borderRadius: 7 }} />
+        <Skeleton style={{ width: 80, height: 10, borderRadius: 5 }} />
+      </View>
+    </View>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MAIN
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export default function CommunityDetailPage({
+  id,
+  onBack,
+  onOpenProfile,
+  onEdit,
+}: CommunityDetailPageProps) {
+  /* ── États ───────────────────────────────────────────────────────────── */
   const [post, setPost] = useState<CommunityPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [showComments, setShowComments] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showReport, setShowReport] = useState(false);
-  const [showBoost, setShowBoost] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
-
-  // États pour les réactions (exemple)
-  const [reactions, setReactions] = useState<Record<string, number>>({});
   const [userReaction, setUserReaction] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<Record<string, number>>({});
   const [isFollowing, setIsFollowing] = useState(false);
+
+  const entryAnim = useRef(new Animated.Value(0)).current;
+
+  /* ── Queries / mutations ─────────────────────────────────────────────── */
+  const publicationId = id as Id<"publications"> | undefined;
 
   const publication = useQuery(
     api.publications.getPublication,
-    id ? { id: id as any } : "skip",
+    publicationId ? { id: publicationId } : "skip",
   );
 
   const trackView = useMutation(api.publications.trackView);
@@ -151,533 +600,1028 @@ export default function CommunityDetailPage() {
   const { sendNotification } = useCommunityNotifications();
   const { moderateText } = useCommunityAI();
 
+  /* ── Effet : adapter la publication ─────────────────────────────────── */
   useEffect(() => {
-    console.log("🔍 publication =", publication);
     if (publication === undefined) {
       setLoading(true);
       return;
     }
-    if (publication) {
-      try {
-        const adapted = adaptCommunityPost(publication);
-        console.log("✅ adapted =", adapted);
-        console.log("POST IMAGES =", adapted.images);
-        console.log("META IMAGES =", adapted.meta?.images);
-        setPost(adapted);
-        setLoading(false);
-        trackView({ publicationId: publication._id }).catch((err) =>
-          console.warn("⚠️ trackView error:", err),
-        );
-        // Simuler des réactions (à remplacer par des données réelles)
-        setReactions({ "❤️": adapted.likeCount || 0 });
-        setUserReaction(adapted.likedByMe ? "❤️" : null);
-      } catch (err) {
-        console.error("❌ Erreur dans adaptCommunityPost :", err);
-        setPost(null);
-        setLoading(false);
-      }
-    } else {
-      console.log("⚠️ publication = null");
+
+    if (!publication) {
+      setPost(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const adapted = adaptCommunityPost(publication);
+      setPost(adapted);
+      setReactions({ "❤️": adapted.likeCount || 0 });
+      setUserReaction(adapted.likedByMe ? "❤️" : null);
+      setLoading(false);
+
+      // Tracking une seule fois
+      trackView({ publicationId: publication._id }).catch(() => {
+        /* silencieux */
+      });
+    } catch {
       setPost(null);
       setLoading(false);
     }
   }, [publication, trackView]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  /* ── Animation d'entrée ──────────────────────────────────────────────── */
+  useEffect(() => {
+    if (!loading && post) {
+      Animated.timing(entryAnim, {
+        toValue: 1,
+        duration: 380,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [loading, post, entryAnim]);
 
-  const handleLike = async () => {
+  /* ── Données dérivées ────────────────────────────────────────────────── */
+  const canEdit = useMemo(() => {
+    // à remplacer par la vraie vérification : user._id === post.authorId
+    return false;
+  }, []);
+
+  const safeMeta = useMemo<CommunityMeta>(() => {
+    const meta = (post as unknown as { meta?: CommunityMeta })?.meta ?? {};
+    return {
+      location: meta.location ?? "",
+      latitude: meta.latitude,
+      longitude: meta.longitude,
+      pollOptions: meta.pollOptions ?? [],
+      eventDate: meta.eventDate,
+      eventLocation: meta.eventLocation ?? "",
+      audience: meta.audience ?? "public",
+      mood: meta.mood,
+      videos: meta.videos ?? [],
+      audio: meta.audio ?? [],
+      mentions: meta.mentions ?? [],
+      images: meta.images ?? [],
+      postType: meta.postType ?? "text",
+    };
+  }, [post]);
+
+  const images = useMemo(() => {
+    if (!post) return [];
+    return safeMeta.images && safeMeta.images.length > 0
+      ? safeMeta.images
+      : (post.images ?? []);
+  }, [post, safeMeta.images]);
+
+  /* ── Handlers ────────────────────────────────────────────────────────── */
+
+  const handleLike = useCallback(async () => {
     if (!post) return;
     try {
       await likePost({ publicationId: post._id });
-      setPost({
-        ...post,
-        likedByMe: !post.likedByMe,
-        likeCount: post.likedByMe ? post.likeCount - 1 : post.likeCount + 1,
-      });
-    } catch (error) {
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              likedByMe: !prev.likedByMe,
+              likeCount: prev.likedByMe
+                ? prev.likeCount - 1
+                : prev.likeCount + 1,
+            }
+          : prev,
+      );
+      setReactions((r) => ({
+        ...r,
+        "❤️": Math.max(0, (r["❤️"] ?? 0) + (post.likedByMe ? -1 : 1)),
+      }));
+    } catch {
       toast.error("Erreur lors du like");
     }
-  };
+  }, [post, likePost]);
 
-  const handleBookmark = async () => {
+  const handleBookmark = useCallback(async () => {
     if (!post) return;
     try {
       await bookmarkPost({ publicationId: post._id });
-      setPost({
-        ...post,
-        bookmarkedByMe: !post.bookmarkedByMe,
-      });
-      toast.success(
-        post.bookmarkedByMe ? "Retiré des favoris" : "Ajouté aux favoris",
+      const wasBookmarked = post.bookmarkedByMe;
+      setPost((prev) =>
+        prev ? { ...prev, bookmarkedByMe: !prev.bookmarkedByMe } : prev,
       );
-    } catch (error) {
+      if (wasBookmarked) {
+        removeBookmark(post._id);
+        toast.success("Retiré des favoris");
+      } else {
+        addBookmark(post._id);
+        toast.success("Ajouté aux favoris");
+      }
+    } catch {
       toast.error("Erreur lors de l'enregistrement");
     }
-  };
+  }, [post, bookmarkPost, addBookmark, removeBookmark]);
 
-  const handleShare = () => setShowShare(true);
-  const handleReport = () => setShowReport(true);
-  const handleBoost = () => setShowBoost(true);
-
-  const handleDelete = async () => {
-    if (!post) return;
-    if (!confirm("Voulez-vous vraiment supprimer ce post ?")) return;
-    try {
-      await deletePost({ publicationId: post._id });
-      toast.success("Post supprimé");
-      navigate(-1);
-    } catch (error) {
-      toast.error("Erreur lors de la suppression");
-    }
-  };
-
-  const handleCopyLink = () => {
-    Clipboard.setString(window.location.href);
-    toast.success("Lien copié !");
+  const handleShare = useCallback(() => setShowShare(true), []);
+  const handleReport = useCallback(() => {
     setShowMenu(false);
-  };
+    setShowReport(true);
+  }, []);
 
-  const handleHide = () => {
-    toast.info("Post masqué (fonctionnalité à implémenter)");
+  const handleDelete = useCallback(() => {
+    if (!post) return;
+    Alert.alert(
+      "Supprimer ce post ?",
+      "Cette action est définitive et ne peut pas être annulée.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deletePost({ publicationId: post._id });
+              toast.success("Post supprimé");
+              onBack();
+            } catch {
+              toast.error("Erreur lors de la suppression");
+            }
+          },
+        },
+      ],
+    );
+  }, [post, deletePost, onBack]);
+
+  const handleCopyLink = useCallback(() => {
+    if (!post) return;
+    Clipboard.setString(buildShareUrl(post._id));
+    toast.success("Lien copié");
     setShowMenu(false);
-  };
+  }, [post]);
 
-  const handleEdit = () => {
-    navigate(`/community/edit/${post?._id}`);
+  const handleHide = useCallback(() => {
+    toast.info("Post masqué");
     setShowMenu(false);
-  };
+  }, []);
 
-  const handleComment = async (text: string) => {
+  const handleEdit = useCallback(() => {
+    setShowMenu(false);
     if (!post) return;
-    try {
-      await addComment(text);
-      toast.success("Commentaire ajouté");
-    } catch (error) {
-      toast.error("Erreur lors de l'ajout du commentaire");
-    }
-  };
-
-  const handleReply = async (text: string, parentId: string) => {
-    try {
-      await addReply(text, parentId as Id<"comments">);
-      toast.success("Réponse ajoutée");
-    } catch (error) {
-      toast.error("Erreur lors de l'ajout de la réponse");
-    }
-  };
-
-  const reportContent = async ({
-    postId,
-    reason,
-  }: {
-    postId: Id<"publications">;
-    reason: string;
-  }) => {
-    try {
-      await moderateText(reason);
-      toast.success("Signalement envoyé");
-    } catch (error) {
-      toast.error("Erreur lors du signalement");
-    }
-  };
-
-  const handleStatsLikes = () => toast.info("Liste des likes à venir");
-  const handleStatsComments = () => setShowComments(!showComments);
-  const handleStatsShares = () => setShowShare(true);
-  const handleStatsBookmarks = () => toast.info("Liste des favoris à venir");
-
-  const handleVote = async (optionId: string) => {
-    if (!post) return;
-    try {
-      await votePoll({ publicationId: post._id, optionId });
-      toast.success("Vote enregistré !");
-    } catch (error) {
-      toast.error("Erreur lors du vote");
-    }
-  };
-
-  const handleAnswer = async (answer: string) => {
-    toast.info("Réponse aux questions bientôt disponible");
-  };
-
-  const handleLikeComment = async (commentId: string) => {
-    toast.info("Like des commentaires bientôt disponible");
-  };
-
-  const handleAuthorClick = (authorId: string) => {
-    navigate(`/profile/${authorId}`);
-  };
-
-  // ── Handler pour les réactions multiples ──────────────────────────────
-  const handleReaction = (emoji: string) => {
-    if (!post) return;
-    if (emoji === userReaction) {
-      // Retirer la réaction
-      setUserReaction(null);
-      setReactions((prev) => {
-        const newReactions = { ...prev };
-        if (newReactions[emoji] && newReactions[emoji] > 0) {
-          newReactions[emoji] -= 1;
-          if (newReactions[emoji] === 0) delete newReactions[emoji];
-        }
-        return newReactions;
-      });
-      // Appeler le like standard pour décrémenter (ou une mutation dédiée)
-      handleLike();
+    if (onEdit) {
+      onEdit(post._id);
     } else {
-      // Ajouter ou changer la réaction
+      toast.info("Édition bientôt disponible");
+    }
+  }, [post, onEdit]);
+
+  const handleComment = useCallback(
+    async (text: string) => {
+      if (!post) return;
+      try {
+        await addComment(text);
+        toast.success("Commentaire ajouté");
+      } catch {
+        toast.error("Erreur lors de l'ajout du commentaire");
+      }
+    },
+    [post, addComment],
+  );
+
+  const handleReply = useCallback(
+    async (text: string, parentId: string) => {
+      try {
+        await addReply(text, parentId as Id<"comments">);
+        toast.success("Réponse ajoutée");
+      } catch {
+        toast.error("Erreur lors de l'ajout de la réponse");
+      }
+    },
+    [addReply],
+  );
+
+  const handleReportSubmit = useCallback(
+    async (reason: ReportReason) => {
+      if (!post) return;
+      try {
+        await moderateText(reason);
+        await sendNotification({
+          type: "report",
+          postId: post._id,
+          message: reason,
+        });
+        toast.success("Signalement envoyé");
+        setShowReport(false);
+      } catch {
+        toast.error("Erreur lors du signalement");
+      }
+    },
+    [post, moderateText, sendNotification],
+  );
+
+  const handleVote = useCallback(
+    async (optionId: string) => {
+      if (!post) return;
+      try {
+        await votePoll({ publicationId: post._id, optionId });
+        toast.success("Vote enregistré");
+      } catch {
+        toast.error("Erreur lors du vote");
+      }
+    },
+    [post, votePoll],
+  );
+
+  const handleReaction = useCallback(
+    (emoji: string) => {
+      if (!post) return;
+
+      if (emoji === userReaction) {
+        setUserReaction(null);
+        setReactions((prev) => {
+          const next = { ...prev };
+          if (next[emoji] && next[emoji] > 0) {
+            next[emoji] -= 1;
+            if (next[emoji] === 0) delete next[emoji];
+          }
+          return next;
+        });
+        void handleLike();
+        return;
+      }
+
       setUserReaction(emoji);
       setReactions((prev) => ({
         ...prev,
         [emoji]: (prev[emoji] || 0) + 1,
       }));
-      // Mettre à jour le like si pas déjà liké
-      if (!post.likedByMe) {
-        handleLike();
-      }
+      if (!post.likedByMe) void handleLike();
       toast.success(`Réaction ${emoji} ajoutée`);
-      // Ici, appeler une mutation Convex pour stocker la réaction
-    }
-  };
+    },
+    [post, userReaction, handleLike],
+  );
 
-  // ── Handler pour le suivi ──────────────────────────────────────────────
-  const handleFollow = () => {
+  const handleFollow = useCallback(() => {
     setIsFollowing(true);
-    toast.success("Vous suivez maintenant cet auteur");
-  };
+    toast.success("Tu suis maintenant cet auteur");
+  }, []);
 
-  const handleUnfollow = () => {
+  const handleUnfollow = useCallback(() => {
     setIsFollowing(false);
-    toast.info("Vous ne suivez plus cet auteur");
-  };
+    toast.info("Tu ne suis plus cet auteur");
+  }, []);
 
-  // ── États de chargement et d'erreur ─────────────────────────────────────
+  const handleAuthorClick = useCallback(
+    (authorId: string) => {
+      if (onOpenProfile) onOpenProfile(authorId);
+      else toast.info("Profil bientôt disponible");
+    },
+    [onOpenProfile],
+  );
+
+  const handleNativeShare = useCallback(async () => {
+    if (!post) return;
+    try {
+      await Share.share(
+        {
+          title: post.title ?? "Publication",
+          message: `${post.title ?? "Publication"}\n${buildShareUrl(post._id)}`,
+          url: buildShareUrl(post._id),
+        },
+        { dialogTitle: "Partager cette publication" },
+      );
+    } catch {
+      toast.info("Partage annulé");
+    }
+  }, [post]);
+
+  /* ── États de chargement ─────────────────────────────────────────────── */
+  if (!id) {
+    return (
+      <View style={styles.root}>
+        <Header onBack={onBack} onMenu={() => {}} />
+        <View style={styles.centerState}>
+          <Text style={styles.centerStateText}>
+            Identifiant de publication manquant
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
-      <View className="h-full flex flex-col" style={{
-}}><View className="px-4 pt-12 pb-3"><Skeleton className="w-10 h-10 rounded-2xl" /></View><View className="px-4 space-y-4"><Skeleton className="h-64 w-full rounded-2xl" /><Skeleton className="h-8 w-3/4 rounded-xl" /><Skeleton className="h-6 w-1/2 rounded-xl" /><Skeleton className="h-32 w-full rounded-xl" /></View></View>
+      <View style={styles.root}>
+        <Header onBack={onBack} onMenu={() => {}} />
+        <View style={styles.content}>
+          <AuthorSkeleton />
+          <Skeleton style={{ height: 260, borderRadius: 22 }} />
+          <Skeleton style={{ height: 26, width: "75%", borderRadius: 12 }} />
+          <Skeleton style={{ height: 18, width: "50%", borderRadius: 10 }} />
+          <Skeleton style={{ height: 130, borderRadius: 18 }} />
+        </View>
+      </View>
     );
   }
 
   if (!post) {
     return (
-      <View className="h-full flex flex-col items-center justify-center" style={{
-}}><Pressable onPress={() => navigate(-1)} className="self-start ml-4 mb-4"><ArrowLeft size={24} className="text-white/60" /></Pressable><Text className="text-white/40">Post introuvable</Text></View>
+      <View style={styles.root}>
+        <Header onBack={onBack} onMenu={() => {}} />
+        <View style={styles.centerState}>
+          <View style={styles.centerIcon}>
+            <EyeOff size={28} color={T.faint} />
+          </View>
+          <Text style={styles.centerTitle}>Publication introuvable</Text>
+          <Text style={styles.centerText}>
+            Elle a peut-être été supprimée ou masquée.
+          </Text>
+        </View>
+      </View>
     );
   }
 
-  // ── Mode debug ──────────────────────────────────────────────────────────
-  if (debugMode) {
-    return (
-      <View className="p-6 text-white min-h-screen bg-black"><Text className="text-xl font-bold mb-4">🔍 Données du post (debug)</Text><pre className="text-xs bg-white/10 p-4 rounded-xl overflow-auto max-h-[80vh] border border-white/10">{JSON.stringify(post, null, 2)}</pre><Pressable onPress={() => setDebugMode(false)} className="mt-6 px-4 py-2 bg-purple-500/20 rounded-xl transition-colors"><Text>Retour au rendu normal</Text></Pressable><Pressable onPress={() => navigate(-1)} className="mt-6 ml-4 px-4 py-2 bg-white/10 rounded-xl transition-colors"><Text>← Retour</Text></Pressable></View>
-    );
-  }
-
-  // ── Sécurisation de `post.meta` ──────────────────────────────────────────
-  const meta = post.meta ?? {};
-  const safeMeta = {
-    location: meta.location ?? "",
-    latitude: meta.latitude ?? undefined,
-    longitude: meta.longitude ?? undefined,
-    pollOptions: meta.pollOptions ?? [],
-    eventDate: meta.eventDate ?? undefined,
-    eventLocation: meta.eventLocation ?? "",
-    audience: meta.audience ?? "public",
-    mood: meta.mood ?? undefined,
-    videos: meta.videos ?? [],
-    audio: meta.audio ?? [],
-    mentions: meta.mentions ?? [],
-    images: meta.images ?? [],
-    postType: meta.postType ?? "text",
-  };
-  const images = safeMeta.images.length > 0 ? safeMeta.images : post.images;
-
-  // ── Rendu principal ─────────────────────────────────────────────────────
-
-  const renderContent = () => (
-    <View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-      <ErrorBoundary
-        fallback={
-          <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityHeader</Text></View>
-        }
-      >
-        <CommunityHeader
-          authorId={post.authorId}
-          authorName={post.authorName || "Anonyme"}
-          authorAvatar={post.authorAvatar}
-          createdAt={post._creationTime}
-          isVerified={false} // à remplacer par une vraie valeur
-          isFollowing={isFollowing}
-          onFollow={handleFollow}
-          onUnfollow={handleUnfollow}
-          onViewProfile={() => handleAuthorClick(post.authorId)}
-        />
-      </ErrorBoundary>
-
-      {images && images.length > 0 && (
-        <ErrorBoundary
-          fallback={
-            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityGallery</Text></View>
-          }
-        >
-          <CommunityGallery images={images} title={post.title || "Post"} />
-        </ErrorBoundary>
-      )}
-
-      {post.title && (
-        <Text className="text-xl font-bold text-white leading-tight">{post.title}</Text>
-      )}
-      <Text className="text-white/80 text-sm leading-relaxed">{post.description}</Text>
-
-      {post.tags.length > 0 && (
-        <ErrorBoundary
-          fallback={
-            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityHashtags</Text></View>
-          }
-        >
-          <CommunityHashtags tags={post.tags} />
-        </ErrorBoundary>
-      )}
-
-      {safeMeta.location && (
-        <ErrorBoundary
-          fallback={
-            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityLocation</Text></View>
-          }
-        >
-          <CommunityLocation location={safeMeta.location} />
-        </ErrorBoundary>
-      )}
-      {safeMeta.latitude && safeMeta.longitude && (
-        <ErrorBoundary
-          fallback={
-            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityMap</Text></View>
-          }
-        >
-          <CommunityMap
-            latitude={safeMeta.latitude}
-            longitude={safeMeta.longitude}
-          />
-        </ErrorBoundary>
-      )}
-
-      {post.type === "evenement" && safeMeta.eventDate && (
-        <View className="flex items-center gap-2 text-sm text-white/60 bg-white/5 rounded-xl p-3"><Calendar size={16} className="text-purple-400" /><Text>{new Date(safeMeta.eventDate).toLocaleDateString()}</Text>{safeMeta.eventLocation && (
-            <>
-              <span className="text-white/20">|</span>
-              <MapPin size={16} className="text-purple-400" />
-              <span>{safeMeta.eventLocation}</span>
-            </>
-          )}</View>
-      )}
-
-      {post.type === "poll" && safeMeta.pollOptions.length > 0 && (
-        <ErrorBoundary
-          fallback={
-            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityPoll</Text></View>
-          }
-        >
-          <CommunityPoll
-            options={safeMeta.pollOptions}
-            votedOptionId={post.votedOptionId}
-            onVote={handleVote}
-          />
-        </ErrorBoundary>
-      )}
-
-      {post.type === "question" && (
-        <ErrorBoundary
-          fallback={
-            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityQuestion</Text></View>
-          }
-        >
-          <CommunityQuestion
-            question={post.title || "Question"}
-            onAnswer={handleAnswer}
-          />
-        </ErrorBoundary>
-      )}
-
-      <ErrorBoundary
-        fallback={
-          <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityStatistics</Text></View>
-        }
-      >
-        <CommunityStatistics
-          views={post.viewCount}
-          likes={post.likeCount}
-          comments={post.commentCount}
-          shares={post.shareCount || 0}
-          bookmarks={post.bookmarkCount || 0}
-          onLikesClick={handleStatsLikes}
-          onCommentsClick={handleStatsComments}
-          onSharesClick={handleStatsShares}
-          onBookmarksClick={handleStatsBookmarks}
-        />
-      </ErrorBoundary>
-
-      <ErrorBoundary
-        fallback={
-          <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityActions</Text></View>
-        }
-      >
-        <CommunityActions
-          onLike={handleLike}
-          onComment={() => setShowComments(!showComments)}
-          onShare={handleShare}
-          onBookmark={handleBookmark}
-          onReport={handleReport}
-          onReaction={handleReaction}
-          isLiked={post.likedByMe}
-          isBookmarked={post.bookmarkedByMe}
-          likeCount={post.likeCount}
-          commentCount={post.commentCount}
-          shareCount={post.shareCount || 0}
-          reactions={reactions}
-          userReaction={userReaction || undefined}
-        />
-      </ErrorBoundary>
-
-      {showComments && (
-        <ErrorBoundary
-          fallback={
-            <View className="text-red-400 p-4"><Text>❌ Erreur dans CommunityComments</Text></View>
-          }
-        >
-          <CommunityComments
-            postId={post._id}
-            comments={comments || []}
-            onAddComment={handleComment}
-            onReply={handleReply}
-            onLikeComment={handleLikeComment}
-            onAuthorClick={handleAuthorClick}
-          />
-        </ErrorBoundary>
-      )}
-
-      <View className="flex items-center justify-between pt-4 border-t border-white/10"><Pressable onPress={handleLike} className="flex items-center gap-2 text-white/60 transition-colors"><Heart
-            size={18}
-            className={post.likedByMe ? "fill-red-500 text-red-500" : ""}
-          /><Text>{post.likeCount}</Text></Pressable><Pressable onPress={() => setShowComments(!showComments)} className="flex items-center gap-2 text-white/60 transition-colors"><MessageCircle size={18} /><Text>{post.commentCount}</Text></Pressable><Pressable onPress={handleShare} className="flex items-center gap-2 text-white/60 transition-colors"><Share2 size={18} /></Pressable><Pressable onPress={handleBookmark} className="flex items-center gap-2 text-white/60 transition-colors"><Bookmark
-            size={18}
-            className={
-              post.bookmarkedByMe ? "fill-purple-400 text-purple-400" : ""
-            }
-          /></Pressable></View>
-    </View>
-  );
-
+  /* ── Rendu principal ─────────────────────────────────────────────────── */
   return (
-    <View className="h-full flex flex-col" style={{
-}}><View className="flex-shrink-0 px-4 pt-12 pb-3 flex items-center gap-3 relative"><Pressable onPress={() => navigate(-1)} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors"><ArrowLeft size={20} className="text-white" /></Pressable><Text className="text-white font-bold text-lg flex-1 truncate">Publication
-        </Text><Pressable onPress={() => setShowMenu(!showMenu)} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 transition-colors"><MoreVertical size={20} className="text-white/60" /></Pressable><Pressable onPress={() => setDebugMode(true)} className="text-[10px] text-white/20 transition-colors px-2 py-1"><Text>debug</Text></Pressable>{showMenu && (
-          <div className="absolute right-4 top-16 z-50 w-48 rounded-xl bg-zinc-900/95 backdrop-blur-sm border border-white/10 shadow-xl overflow-hidden">
-            <div className="py-1">
-              <button
-                onPress={handleEdit}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 transition-colors"
-              >
-                <Pencil size={16} />
-                Modifier
-              </button>
-              <button
-                onPress={handleDelete}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 transition-colors"
-              >
-                <Trash2 size={16} />
-                Supprimer
-              </button>
-              <hr className="border-white/5" />
-              <button
-                onPress={handleCopyLink}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 transition-colors"
-              >
-                <Link size={16} />
-                Copier le lien
-              </button>
-              <button
-                onPress={() => {
-                  setShowMenu(false);
-                  handleReport();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 transition-colors"
-              >
-                <Flag size={16} />
-                Signaler
-              </button>
-              <button
-                onPress={handleHide}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-white/80 transition-colors"
-              >
-                <EyeOff size={16} />
-                Masquer
-              </button>
-            </div>
-            <button
-              onPress={() => setShowMenu(false)}
-              className="absolute top-2 right-2 text-white/30"
+    <View style={styles.root}>
+      <View pointerEvents="none" style={styles.glow} />
+
+      <Header onBack={onBack} onMenu={() => setShowMenu(true)} />
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Animated.View
+          style={{
+            opacity: entryAnim,
+            transform: [
+              {
+                translateY: entryAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [16, 0],
+                }),
+              },
+            ],
+            gap: 18,
+          }}
+        >
+          {/* Auteur */}
+          <ErrorBoundary label="AuthorHeader" fallback={<AuthorSkeleton />}>
+            <CommunityHeader
+              authorId={post.authorId}
+              authorName={post.authorName || "Anonyme"}
+              authorAvatar={post.authorAvatar}
+              createdAt={post._creationTime}
+              isVerified={false}
+              isFollowing={isFollowing}
+              onFollow={handleFollow}
+              onUnfollow={handleUnfollow}
+              onViewProfile={() => handleAuthorClick(post.authorId)}
+            />
+          </ErrorBoundary>
+
+          {/* Galerie */}
+          {images.length > 0 && (
+            <ErrorBoundary
+              label="Gallery"
+              fallback={<SectionFallback label="Galerie" />}
             >
-              <X size={16} />
-            </button>
-          </div>
-        )}</View><View className="flex-1 overflow-y-auto px-4 pb-8 space-y-5" style={{ }}><ErrorBoundary
-          fallback={
-            <div className="text-red-400 p-6 text-center bg-red-500/10 rounded-2xl border border-red-500/20">
-              <p className="font-bold text-lg">
-                ❌ Erreur dans l'affichage du post
-              </p>
-              <p className="text-sm text-red-300/70 mt-2">
-                Un composant a planté. Utilisez le bouton "debug" en haut à
-                droite pour voir les données brutes.
-              </p>
-            </div>
-          }
-        >{renderContent()}</ErrorBoundary></View>{showShare && (
+              <CommunityGallery images={images} title={post.title || "Post"} />
+            </ErrorBoundary>
+          )}
+
+          {/* Titre + description */}
+          <View style={{ gap: 10 }}>
+            {!!post.title && <Text style={styles.postTitle}>{post.title}</Text>}
+            {!!post.description && (
+              <Text style={styles.postDescription}>{post.description}</Text>
+            )}
+          </View>
+
+          {/* Tags */}
+          {post.tags.length > 0 && (
+            <ErrorBoundary
+              label="Hashtags"
+              fallback={<SectionFallback label="Tags" />}
+            >
+              <CommunityHashtags tags={post.tags} />
+            </ErrorBoundary>
+          )}
+
+          {/* Localisation */}
+          {!!safeMeta.location && (
+            <ErrorBoundary
+              label="Location"
+              fallback={<SectionFallback label="Localisation" />}
+            >
+              <CommunityLocation location={safeMeta.location} />
+            </ErrorBoundary>
+          )}
+
+          {/* Carte */}
+          {safeMeta.latitude !== undefined &&
+            safeMeta.longitude !== undefined && (
+              <ErrorBoundary
+                label="Map"
+                fallback={<SectionFallback label="Carte" />}
+              >
+                <CommunityMap
+                  latitude={safeMeta.latitude}
+                  longitude={safeMeta.longitude}
+                />
+              </ErrorBoundary>
+            )}
+
+          {/* Événement */}
+          {post.type === "evenement" && safeMeta.eventDate && (
+            <View style={styles.eventCard}>
+              <View style={styles.eventIcon}>
+                <Calendar size={15} color={T.primarySoft} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.eventLabel}>Événement</Text>
+                <Text style={styles.eventDate}>
+                  {new Date(safeMeta.eventDate).toLocaleDateString("fr-FR", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })}
+                </Text>
+                {!!safeMeta.eventLocation && (
+                  <View style={styles.eventLocationRow}>
+                    <MapPin size={11} color={T.faint} />
+                    <Text style={styles.eventLocationText} numberOfLines={1}>
+                      {safeMeta.eventLocation}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Sondage */}
+          {post.type === "poll" &&
+            safeMeta.pollOptions &&
+            safeMeta.pollOptions.length > 0 && (
+              <ErrorBoundary
+                label="Poll"
+                fallback={<SectionFallback label="Sondage" />}
+              >
+                <CommunityPoll
+                  options={safeMeta.pollOptions}
+                  votedOptionId={post.votedOptionId}
+                  onVote={handleVote}
+                />
+              </ErrorBoundary>
+            )}
+
+          {/* Question */}
+          {post.type === "question" && (
+            <ErrorBoundary
+              label="Question"
+              fallback={<SectionFallback label="Question" />}
+            >
+              <CommunityQuestion
+                question={post.title || "Question"}
+                onAnswer={() => toast.info("Réponse bientôt disponible")}
+              />
+            </ErrorBoundary>
+          )}
+
+          {/* Statistiques */}
+          <ErrorBoundary
+            label="Statistics"
+            fallback={<SectionFallback label="Statistiques" />}
+          >
+            <CommunityStatistics
+              views={post.viewCount}
+              likes={post.likeCount}
+              comments={post.commentCount}
+              shares={post.shareCount || 0}
+              bookmarks={post.bookmarkCount || 0}
+              onLikesClick={() => toast.info("Liste des likes à venir")}
+              onCommentsClick={() => setShowComments((v) => !v)}
+              onSharesClick={() => setShowShare(true)}
+              onBookmarksClick={() => toast.info("Liste des favoris à venir")}
+            />
+          </ErrorBoundary>
+
+          {/* Actions */}
+          <ErrorBoundary
+            label="Actions"
+            fallback={<SectionFallback label="Actions" />}
+          >
+            <CommunityActions
+              onLike={handleLike}
+              onComment={() => setShowComments((v) => !v)}
+              onShare={handleShare}
+              onBookmark={handleBookmark}
+              onReport={handleReport}
+              onReaction={handleReaction}
+              isLiked={post.likedByMe}
+              isBookmarked={post.bookmarkedByMe}
+              likeCount={post.likeCount}
+              commentCount={post.commentCount}
+              shareCount={post.shareCount || 0}
+              reactions={reactions}
+              userReaction={userReaction || undefined}
+            />
+          </ErrorBoundary>
+
+          {/* Commentaires */}
+          {showComments && (
+            <ErrorBoundary
+              label="Comments"
+              fallback={<SectionFallback label="Commentaires" />}
+            >
+              <CommunityComments
+                postId={post._id}
+                comments={comments || []}
+                onAddComment={handleComment}
+                onReply={handleReply}
+                onLikeComment={() =>
+                  toast.info("Like des commentaires bientôt disponible")
+                }
+                onAuthorClick={handleAuthorClick}
+              />
+            </ErrorBoundary>
+          )}
+        </Animated.View>
+      </ScrollView>
+
+      {/* Barre d'actions rapides en bas */}
+      <View style={styles.bottomBar}>
+        <Pressable
+          onPress={handleLike}
+          style={({ pressed }) => [
+            styles.bottomAction,
+            {
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
+        >
+          <Heart
+            size={18}
+            color={post.likedByMe ? T.rose : T.dim}
+            fill={post.likedByMe ? T.rose : "transparent"}
+          />
+          <Text
+            style={[
+              styles.bottomActionText,
+              { color: post.likedByMe ? T.rose : T.dim },
+            ]}
+          >
+            {post.likeCount}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setShowComments((v) => !v)}
+          style={({ pressed }) => [
+            styles.bottomAction,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <MessageCircle size={18} color={T.dim} />
+          <Text style={styles.bottomActionText}>{post.commentCount}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={handleShare}
+          style={({ pressed }) => [
+            styles.bottomAction,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Share2 size={18} color={T.dim} />
+        </Pressable>
+
+        <Pressable
+          onPress={handleBookmark}
+          style={({ pressed }) => [
+            styles.bottomAction,
+            { opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Bookmark
+            size={18}
+            color={post.bookmarkedByMe ? T.primarySoft : T.dim}
+            fill={post.bookmarkedByMe ? T.primarySoft : "transparent"}
+          />
+        </Pressable>
+      </View>
+
+      {/* Modales */}
+      <MenuSheet
+        visible={showMenu}
+        onClose={() => setShowMenu(false)}
+        canEdit={canEdit}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onCopyLink={handleCopyLink}
+        onReport={handleReport}
+        onHide={handleHide}
+      />
+
+      <ReportSheet
+        visible={showReport}
+        onClose={() => setShowReport(false)}
+        onSubmit={handleReportSubmit}
+      />
+
+      {showShare && (
         <CommunityShare
           title={post.title || "Post"}
           description={post.description}
-          url={window.location.href}
-          onClose={() => setShowShare(false)}
-        />
-      )}{showReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-zinc-900 rounded-2xl p-6 max-w-sm w-full border border-white/10">
-            <h3 className="text-white font-bold text-lg mb-2">
-              Signaler ce post
-            </h3>
-            <p className="text-white/60 text-sm mb-4">
-              Pourquoi signalez-vous ce contenu ?
-            </p>
-            <div className="space-y-2">
-              {[
-                "Spam",
-                "Contenu inapproprié",
-                "Harcèlement",
-                "Fausse information",
-                "Autre",
-              ].map((reason) => (
-                <Pressable key={reason} onPress={() => {
-                    reportContent({ postId: post._id, reason });
-                    setShowReport(false);
-                  }} className="w-full text-left px-4 py-2 rounded-xl text-white/80 transition-colors">
-                  {reason}
-                </Pressable>
-              ))}
-            </div>
-            <Pressable onPress={() => setShowReport(false)} className="mt-4 text-white/40 text-sm">
-              Annuler
-            </Pressable>
-          </div>
-        </div>
-      )}{showBoost && (
-        <CommunityBoost
-          onBoost={async (duration) => {
-            toast.success(`Post boosté pour ${duration} jours !`);
-            setShowBoost(false);
+          url={buildShareUrl(post._id)}
+          onClose={() => {
+            setShowShare(false);
+            void handleNativeShare();
           }}
-          onClose={() => setShowBoost(false)}
         />
-      )}</View>
+      )}
+    </View>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HEADER
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function Header({
+  onBack,
+  onMenu,
+}: {
+  onBack: () => void;
+  onMenu: () => void;
+}) {
+  return (
+    <View style={styles.header}>
+      <Pressable
+        onPress={onBack}
+        style={({ pressed }) => [
+          styles.headerBtn,
+          { transform: [{ scale: pressed ? 0.92 : 1 }] },
+        ]}
+        hitSlop={10}
+      >
+        <ArrowLeft size={19} color="#fff" />
+      </Pressable>
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.headerTitle}>Publication</Text>
+        <Text style={styles.headerSubtitle}>Détail du post</Text>
+      </View>
+
+      <Pressable
+        onPress={onMenu}
+        style={({ pressed }) => [
+          styles.headerBtn,
+          { transform: [{ scale: pressed ? 0.92 : 1 }] },
+        ]}
+        hitSlop={10}
+      >
+        <MoreVertical size={19} color="#fff" />
+      </Pressable>
+    </View>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   STYLES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: T.bg },
+
+  glow: {
+    position: "absolute",
+    top: -150,
+    left: -80,
+    right: -80,
+    height: 320,
+    borderRadius: 220,
+    backgroundColor: alpha(T.primary, 0.1),
+  },
+
+  /* Header */
+  header: {
+    paddingTop: 56,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  headerTitle: {
+    color: T.text,
+    fontSize: 17,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    color: T.faint,
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+
+  /* Content */
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 120,
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    gap: 14,
+  },
+
+  /* Post content */
+  postTitle: {
+    color: T.text,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    lineHeight: 27,
+  },
+  postDescription: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
+  },
+
+  /* Event card */
+  eventCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: alpha(T.primary, 0.07),
+    borderWidth: 1,
+    borderColor: alpha(T.primary, 0.22),
+  },
+  eventIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: alpha(T.primary, 0.16),
+  },
+  eventLabel: {
+    color: T.faint,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  eventDate: {
+    color: T.text,
+    fontSize: 13.5,
+    fontWeight: "800",
+    marginTop: 3,
+    letterSpacing: -0.2,
+  },
+  eventLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 5,
+  },
+  eventLocationText: {
+    color: T.faint,
+    fontSize: 11.5,
+    fontWeight: "600",
+    flex: 1,
+  },
+
+  /* Fallback */
+  sectionFallback: {
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: alpha(T.danger, 0.07),
+    borderWidth: 1,
+    borderColor: alpha(T.danger, 0.22),
+  },
+  sectionFallbackText: {
+    color: alpha(T.danger, 0.85),
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  /* Author skeleton */
+  authorSkeleton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 4,
+  },
+
+  /* Bottom bar */
+  bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingTop: 12,
+    paddingBottom: Platform.OS === "ios" ? 28 : 18,
+    paddingHorizontal: 20,
+    backgroundColor: "rgba(10,10,15,0.96)",
+    borderTopWidth: 1,
+    borderTopColor: T.border,
+  },
+  bottomAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  bottomActionText: {
+    color: T.dim,
+    fontSize: 12.5,
+    fontWeight: "800",
+  },
+
+  /* Modal sheets */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    justifyContent: "flex-end",
+  },
+  menuSheet: {
+    backgroundColor: T.sheet,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
+    borderColor: T.borderUp,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === "ios" ? 34 : 24,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 42,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  sheetHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetTitle: {
+    color: T.text,
+    fontSize: 17,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  sheetSubtitle: {
+    color: T.faint,
+    fontSize: 11.5,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+  sheetCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  /* Menu item */
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 12,
+    borderRadius: 14,
+  },
+  menuIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+
+  /* Report */
+  reportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  reportRowText: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    flex: 1,
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: T.borderUp,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportSubmit: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 50,
+    borderRadius: 16,
+    backgroundColor: T.danger,
+    marginTop: 16,
+    shadowColor: T.danger,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  reportSubmitText: {
+    color: "#fff",
+    fontSize: 13.5,
+    fontWeight: "900",
+    letterSpacing: -0.1,
+  },
+
+  /* Center state */
+  centerState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    gap: 14,
+  },
+  centerStateText: {
+    color: T.dim,
+    fontSize: 13.5,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  centerIcon: {
+    width: 76,
+    height: 76,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: T.border,
+    marginBottom: 6,
+  },
+  centerTitle: {
+    color: T.text,
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+    textAlign: "center",
+  },
+  centerText: {
+    color: T.dim,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    maxWidth: 300,
+  },
+});

@@ -1,48 +1,102 @@
-import { Picker } from "@react-native-picker/picker";
-import { View, Pressable, Text, TextInput } from "react-native";
-import { useState, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
-import { api } from "@/convex/_generated/api.js";
-import { ConvexError } from "convex/values";
-import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { SignInButton } from "@/components/ui/signin.tsx";
-import {
-  ArrowLeft, Search, FileText, Scale, Calculator, MessageSquare,
-  ChevronRight, Download, Copy, CheckCircle, X, Send,
-  Shield, BookOpen, Briefcase, Home, Users, Clock,
-  AlertTriangle, Info, ChevronDown, ChevronUp, Lock,
-  Bot, User as UserIcon
-} from "lucide-react-native";
-import { Clipboard } from "@react-native-clipboard/clipboard";
+import React, { useMemo, useRef, useState } from "react";
 
-/* __DEBROUILLEPRO_NATIVE_DOM_API_HELPERS_V8__ — scrollIntoView helper */
-const __debrouilleProNativeScrollIntoView = async (ref: { current?: { measure?: (cb: (x: number, y: number, w: number, h: number, px: number, py: number) => void) => void } }): Promise<void> => {
-  return new Promise((resolve) => {
-    ref.current?.measure?.((_x, _y, _w, _h, _px, py) => {
-      console.warn('__debrouilleProNativeScrollIntoView: implement scrollTo with pageY on your ScrollView ref');
-      resolve();
-    });
-  });
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+
+import { Picker } from "@react-native-picker/picker";
+import { Clipboard } from "@react-native-clipboard/clipboard";
+import { useMutation, useQuery } from "convex/react";
+
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BookOpen,
+  Briefcase,
+  Calculator,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Copy,
+  Download,
+  FileText,
+  Home,
+  Info,
+  Lock,
+  MessageSquare,
+  Plus,
+  Scale,
+  Search,
+  Send,
+  Shield,
+  User as UserIcon,
+  Users,
+  X,
+} from "lucide-react-native";
+
+import {
+  Authenticated,
+  AuthLoading,
+  Unauthenticated,
+} from "@/lib/convex-auth-compat";
+
+import { api } from "@/convex/_generated/api";
+import { SignInButton } from "@/components/ui/signin";
+import { ModuleForm } from "@/integrations/react/components/ModuleForm";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { useModuleForm } from "@/integrations/react/hooks/useModuleForm";
+
+/* ============================================================================
+ * DESIGN SYSTEM
+ * ========================================================================== */
+
+const COLORS = {
+  background: "#050812",
+  background2: "#0C1022",
+  background3: "#11172A",
+
+  white: "#FFFFFF",
+  text: "#F8FAFC",
+  secondary: "#CBD5E1",
+  muted: "#94A3B8",
+  faint: "#64748B",
+
+  border: "rgba(255,255,255,0.10)",
+  borderStrong: "rgba(255,255,255,0.16)",
+  card: "rgba(255,255,255,0.055)",
+  cardStrong: "rgba(255,255,255,0.075)",
+
+  primary: "#2563EB",
+  primary2: "#4F46E5",
+  purple: "#8B5CF6",
+  green: "#10B981",
+  yellow: "#F59E0B",
+  red: "#EF4444",
+  cyan: "#06B6D4",
+  pink: "#EC4899",
 };
 
+type IconComponent = React.ComponentType<{
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}>;
 
-// ── Types ──────────────────────────────────────────────────────────────────
 type TabId = "contrats" | "demarches" | "calculateurs" | "assistant";
 
-interface ContractTemplate {
-  id: string;
-  title: string;
-  category: string;
-  icon: React.ElementType;
-  color: string;
-  description: string;
-  tags: string[];
-  popular: boolean;
-  pages: number;
-  fields: ContractField[];
-}
+/* ============================================================================
+ * CONTRACTS
+ * ========================================================================== */
 
 interface ContractField {
   id: string;
@@ -53,11 +107,364 @@ interface ContractField {
   required: boolean;
 }
 
+interface ContractTemplate {
+  id: string;
+  title: string;
+  category: string;
+  icon: IconComponent;
+  color: string;
+  description: string;
+  tags: string[];
+  popular: boolean;
+  pages: number;
+  fields: ContractField[];
+}
+
+const CONTRACTS: ContractTemplate[] = [
+  {
+    id: "bail",
+    title: "Contrat de bail",
+    category: "Immobilier",
+    icon: Home,
+    color: "#F97316",
+    description:
+      "Modèle de contrat de location entre propriétaire et locataire.",
+    tags: ["Location", "Immobilier", "Logement"],
+    popular: true,
+    pages: 4,
+    fields: [
+      {
+        id: "bailleur",
+        label: "Nom du bailleur",
+        placeholder: "Nom complet",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "locataire",
+        label: "Nom du locataire",
+        placeholder: "Nom complet",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "adresse",
+        label: "Adresse du bien",
+        placeholder: "Adresse complète",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "loyer",
+        label: "Loyer mensuel",
+        placeholder: "Montant",
+        type: "number",
+        required: true,
+      },
+      {
+        id: "caution",
+        label: "Caution",
+        placeholder: "Montant",
+        type: "number",
+        required: false,
+      },
+      {
+        id: "debut",
+        label: "Date de début",
+        placeholder: "JJ/MM/AAAA",
+        type: "date",
+        required: true,
+      },
+      {
+        id: "duree",
+        label: "Durée",
+        placeholder: "",
+        type: "select",
+        options: ["6 mois", "1 an", "2 ans", "3 ans", "Indéterminée"],
+        required: true,
+      },
+    ],
+  },
+
+  {
+    id: "prestation",
+    title: "Contrat de prestation",
+    category: "Freelance",
+    icon: Briefcase,
+    color: "#8B5CF6",
+    description:
+      "Modèle de contrat de mission entre un prestataire et son client.",
+    tags: ["Freelance", "Service", "Mission"],
+    popular: true,
+    pages: 3,
+    fields: [
+      {
+        id: "prestataire",
+        label: "Prestataire",
+        placeholder: "Nom complet",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "client",
+        label: "Client",
+        placeholder: "Nom ou société",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "mission",
+        label: "Description de la mission",
+        placeholder: "Décrivez précisément la mission...",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "montant",
+        label: "Montant",
+        placeholder: "Montant convenu",
+        type: "number",
+        required: true,
+      },
+      {
+        id: "delai",
+        label: "Délai de livraison",
+        placeholder: "JJ/MM/AAAA",
+        type: "date",
+        required: true,
+      },
+      {
+        id: "paiement",
+        label: "Mode de paiement",
+        placeholder: "",
+        type: "select",
+        options: [
+          "À la livraison",
+          "50% avance 50% fin",
+          "Mensuel",
+          "Par étapes",
+        ],
+        required: true,
+      },
+    ],
+  },
+
+  {
+    id: "cdi",
+    title: "Contrat de travail CDI",
+    category: "Emploi",
+    icon: Users,
+    color: "#10B981",
+    description: "Modèle de contrat de travail à durée indéterminée.",
+    tags: ["CDI", "Emploi", "Travail"],
+    popular: true,
+    pages: 5,
+    fields: [
+      {
+        id: "employeur",
+        label: "Employeur",
+        placeholder: "Nom ou société",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "employe",
+        label: "Employé(e)",
+        placeholder: "Nom complet",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "poste",
+        label: "Poste",
+        placeholder: "Intitulé du poste",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "salaire",
+        label: "Salaire brut",
+        placeholder: "Montant",
+        type: "number",
+        required: true,
+      },
+      {
+        id: "debut",
+        label: "Date de début",
+        placeholder: "JJ/MM/AAAA",
+        type: "date",
+        required: true,
+      },
+      {
+        id: "essai",
+        label: "Période d'essai",
+        placeholder: "",
+        type: "select",
+        options: ["Aucune", "1 mois", "2 mois", "3 mois", "6 mois"],
+        required: false,
+      },
+    ],
+  },
+
+  {
+    id: "cession",
+    title: "Acte de cession",
+    category: "Commerce",
+    icon: Scale,
+    color: "#6366F1",
+    description:
+      "Modèle de document pour formaliser une cession entre parties.",
+    tags: ["Cession", "Vente", "Propriété"],
+    popular: false,
+    pages: 3,
+    fields: [
+      {
+        id: "vendeur",
+        label: "Vendeur / cédant",
+        placeholder: "Nom complet",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "acheteur",
+        label: "Acheteur / cessionnaire",
+        placeholder: "Nom complet",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "bien",
+        label: "Bien cédé",
+        placeholder: "Description précise du bien...",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "prix",
+        label: "Prix de cession",
+        placeholder: "Montant",
+        type: "number",
+        required: true,
+      },
+      {
+        id: "date",
+        label: "Date de cession",
+        placeholder: "JJ/MM/AAAA",
+        type: "date",
+        required: true,
+      },
+    ],
+  },
+
+  {
+    id: "pret",
+    title: "Reconnaissance de dette",
+    category: "Finance",
+    icon: FileText,
+    color: "#EC4899",
+    description:
+      "Modèle de document attestant une dette ou un prêt entre parties.",
+    tags: ["Prêt", "Dette", "Finance"],
+    popular: false,
+    pages: 2,
+    fields: [
+      {
+        id: "preteur",
+        label: "Prêteur",
+        placeholder: "Nom complet",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "emprunteur",
+        label: "Emprunteur",
+        placeholder: "Nom complet",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "montant",
+        label: "Montant prêté",
+        placeholder: "Montant",
+        type: "number",
+        required: true,
+      },
+      {
+        id: "remboursement",
+        label: "Date de remboursement",
+        placeholder: "JJ/MM/AAAA",
+        type: "date",
+        required: true,
+      },
+      {
+        id: "interet",
+        label: "Taux d'intérêt",
+        placeholder: "0",
+        type: "number",
+        required: false,
+      },
+    ],
+  },
+
+  {
+    id: "nda",
+    title: "Accord de confidentialité",
+    category: "Business",
+    icon: Lock,
+    color: "#0EA5E9",
+    description:
+      "Modèle d'accord destiné à encadrer la confidentialité d'informations.",
+    tags: ["NDA", "Confidentialité", "Business"],
+    popular: false,
+    pages: 2,
+    fields: [
+      {
+        id: "divulgant",
+        label: "Partie divulgante",
+        placeholder: "Entreprise / personne",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "recevant",
+        label: "Partie recevante",
+        placeholder: "Entreprise / personne",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "objet",
+        label: "Objet de la confidentialité",
+        placeholder: "Informations concernées...",
+        type: "text",
+        required: true,
+      },
+      {
+        id: "duree",
+        label: "Durée",
+        placeholder: "",
+        type: "select",
+        options: ["1 an", "2 ans", "3 ans", "5 ans", "Indéfinie"],
+        required: true,
+      },
+    ],
+  },
+];
+
+/* ============================================================================
+ * DEMARCHES
+ * ========================================================================== */
+
+interface DemarcheStep {
+  title: string;
+  description: string;
+}
+
 interface Demarche {
   id: string;
   title: string;
   category: string;
-  icon: React.ElementType;
+  icon: IconComponent;
   color: string;
   description: string;
   duration: string;
@@ -66,468 +473,3097 @@ interface Demarche {
   documents: string[];
 }
 
-interface DemarcheStep {
-  title: string;
-  description: string;
-  done?: boolean;
-}
-
-// ── Contract templates ─────────────────────────────────────────────────────
-const CONTRACTS: ContractTemplate[] = [
-  {
-    id: "bail", title: "Contrat de bail", category: "Immobilier",
-    icon: Home, color: "#F97316", description: "Contrat de location d'un logement entre propriétaire et locataire. Conforme à la législation congolaise.",
-    tags: ["Location", "Immobilier", "Logement"], popular: true, pages: 4,
-    fields: [
-      { id: "bailleur", label: "Nom du bailleur", placeholder: "Jean Mulamba", type: "text", required: true },
-      { id: "locataire", label: "Nom du locataire", placeholder: "Marie Kabila", type: "text", required: true },
-      { id: "adresse", label: "Adresse du bien", placeholder: "Av. des Huileries, Kinshasa", type: "text", required: true },
-      { id: "loyer", label: "Loyer mensuel ($)", placeholder: "350", type: "number", required: true },
-      { id: "caution", label: "Caution ($)", placeholder: "700", type: "number", required: false },
-      { id: "debut", label: "Date de début", placeholder: "", type: "date", required: true },
-      { id: "duree", label: "Durée", placeholder: "", type: "select", options: ["6 mois", "1 an", "2 ans", "3 ans", "Indéterminée"], required: true },
-    ],
-  },
-  {
-    id: "prestation", title: "Contrat de prestation", category: "Freelance",
-    icon: Briefcase, color: "#8B5CF6", description: "Contrat de mission freelance entre un prestataire de services et son client.",
-    tags: ["Freelance", "Service", "Mission"], popular: true, pages: 3,
-    fields: [
-      { id: "prestataire", label: "Prestataire", placeholder: "Paul Mwamba", type: "text", required: true },
-      { id: "client", label: "Client", placeholder: "Entreprise Congo SARL", type: "text", required: true },
-      { id: "mission", label: "Description de la mission", placeholder: "Développement d'un site web...", type: "text", required: true },
-      { id: "montant", label: "Montant ($)", placeholder: "800", type: "number", required: true },
-      { id: "delai", label: "Délai de livraison", placeholder: "", type: "date", required: true },
-      { id: "paiement", label: "Mode de paiement", placeholder: "", type: "select", options: ["À la livraison", "50% avance 50% fin", "Mensuel", "Par étapes"], required: true },
-    ],
-  },
-  {
-    id: "cdi", title: "Contrat de travail CDI", category: "Emploi",
-    icon: Users, color: "#10B981", description: "Contrat à durée indéterminée conforme au Code du travail de la RDC.",
-    tags: ["CDI", "Emploi", "Travail"], popular: true, pages: 5,
-    fields: [
-      { id: "employeur", label: "Employeur", placeholder: "TechAfrique SARL", type: "text", required: true },
-      { id: "employe", label: "Employé(e)", placeholder: "Alice Ngoy", type: "text", required: true },
-      { id: "poste", label: "Poste", placeholder: "Développeur Senior", type: "text", required: true },
-      { id: "salaire", label: "Salaire brut ($)", placeholder: "1200", type: "number", required: true },
-      { id: "debut", label: "Date de début", placeholder: "", type: "date", required: true },
-      { id: "essai", label: "Période d'essai", placeholder: "", type: "select", options: ["Aucune", "1 mois", "2 mois", "3 mois", "6 mois"], required: false },
-    ],
-  },
-  {
-    id: "cession", title: "Acte de cession", category: "Commerce",
-    icon: Scale, color: "#6366F1", description: "Transfert de propriété d'un bien ou d'un fonds de commerce entre deux parties.",
-    tags: ["Cession", "Vente", "Propriété"], popular: false, pages: 3,
-    fields: [
-      { id: "vendeur", label: "Vendeur", placeholder: "Nom du vendeur", type: "text", required: true },
-      { id: "acheteur", label: "Acheteur", placeholder: "Nom de l'acheteur", type: "text", required: true },
-      { id: "bien", label: "Bien cédé", placeholder: "Description du bien...", type: "text", required: true },
-      { id: "prix", label: "Prix de cession ($)", placeholder: "5000", type: "number", required: true },
-      { id: "date", label: "Date de cession", placeholder: "", type: "date", required: true },
-    ],
-  },
-  {
-    id: "pret", title: "Reconnaissance de dette", category: "Finance",
-    icon: FileText, color: "#EC4899", description: "Document attestant d'un prêt d'argent entre deux personnes physiques.",
-    tags: ["Prêt", "Dette", "Finance"], popular: false, pages: 2,
-    fields: [
-      { id: "preteur", label: "Prêteur", placeholder: "Nom du prêteur", type: "text", required: true },
-      { id: "emprunteur", label: "Emprunteur", placeholder: "Nom de l'emprunteur", type: "text", required: true },
-      { id: "montant", label: "Montant prêté ($)", placeholder: "500", type: "number", required: true },
-      { id: "remboursement", label: "Date de remboursement", placeholder: "", type: "date", required: true },
-      { id: "interet", label: "Taux d'intérêt (%)", placeholder: "0", type: "number", required: false },
-    ],
-  },
-  {
-    id: "nda", title: "Accord de confidentialité (NDA)", category: "Business",
-    icon: Lock, color: "#0EA5E9", description: "Accord de non-divulgation pour protéger les informations confidentielles.",
-    tags: ["NDA", "Confidentialité", "Business"], popular: false, pages: 2,
-    fields: [
-      { id: "divulgant", label: "Partie divulgante", placeholder: "Entreprise A", type: "text", required: true },
-      { id: "recevant", label: "Partie recevante", placeholder: "Entreprise B", type: "text", required: true },
-      { id: "objet", label: "Objet de la confidentialité", placeholder: "Données clients, plans stratégiques...", type: "text", required: true },
-      { id: "duree", label: "Durée", placeholder: "", type: "select", options: ["1 an", "2 ans", "3 ans", "5 ans", "Indéfinie"], required: true },
-    ],
-  },
-];
-
-// ── Démarches ──────────────────────────────────────────────────────────────
 const DEMARCHES: Demarche[] = [
   {
-    id: "registre", title: "Création d'entreprise (RCCM)", category: "Entreprise",
-    icon: Briefcase, color: "#8B5CF6", description: "Enregistrement au Registre du Commerce et du Crédit Mobilier pour créer une SARL ou SA.",
-    duration: "2–4 semaines", difficulty: "Moyen",
+    id: "registre",
+    title: "Création d'entreprise (RCCM)",
+    category: "Entreprise",
+    icon: Briefcase,
+    color: "#8B5CF6",
+    description:
+      "Parcours indicatif pour préparer les principales étapes liées à la création d'une entreprise.",
+    duration: "2–4 semaines",
+    difficulty: "Moyen",
     steps: [
-      { title: "Choisir la forme juridique", description: "SARL (1 associé min.), SA (3 associés min.), SURL (personne seule). La SARL est la plus courante." },
-      { title: "Rédiger les statuts", description: "Document fondateur précisant : dénomination sociale, objet, capital, associés, gérant. Notaire recommandé." },
-      { title: "Déposer le capital", description: "Ouvrir un compte bancaire bloqué et déposer le capital minimum : 200 USD pour une SARL." },
-      { title: "S'immatriculer au RCCM", description: "Déposer le dossier au greffe du Tribunal de Commerce de votre ville. Frais : ~50–100 USD." },
-      { title: "Obtenir le NIF", description: "Demander le Numéro d'Identification Fiscale à la Direction Générale des Impôts (DGI)." },
-      { title: "Inscription INSS", description: "S'inscrire à l'Institut National de Sécurité Sociale pour les cotisations employeur." },
+      {
+        title: "Choisir la forme juridique",
+        description:
+          "Déterminer la forme juridique adaptée à l'activité et aux associés.",
+      },
+      {
+        title: "Rédiger les statuts",
+        description:
+          "Préparer le document fondateur avec les informations relatives à la société.",
+      },
+      {
+        title: "Préparer le capital",
+        description:
+          "Préparer les justificatifs et opérations financières requis par la procédure applicable.",
+      },
+      {
+        title: "Déposer le dossier",
+        description:
+          "Déposer le dossier auprès de l'autorité ou du guichet compétent.",
+      },
+      {
+        title: "Obtenir les identifiants",
+        description:
+          "Effectuer les démarches fiscales et administratives applicables.",
+      },
+      {
+        title: "Effectuer les inscriptions complémentaires",
+        description:
+          "Vérifier les obligations sociales et administratives applicables à l'entreprise.",
+      },
     ],
-    documents: ["Pièce d'identité nationale", "Statuts de société", "Preuve de capital", "Photo d'identité", "Certificat de résidence"],
+    documents: [
+      "Pièce d'identité",
+      "Statuts de société",
+      "Justificatifs requis",
+      "Informations relatives aux associés",
+      "Justificatifs de siège",
+    ],
   },
+
   {
-    id: "passeport", title: "Renouvellement de passeport", category: "Documents",
-    icon: FileText, color: "#3B82F6", description: "Procédure de renouvellement du passeport congolais à la Direction Générale de Migration.",
-    duration: "3–8 semaines", difficulty: "Facile",
+    id: "passeport",
+    title: "Renouvellement de passeport",
+    category: "Documents",
+    icon: FileText,
+    color: "#3B82F6",
+    description:
+      "Parcours indicatif pour préparer un renouvellement de passeport.",
+    duration: "Variable",
+    difficulty: "Facile",
     steps: [
-      { title: "Rassembler les documents", description: "Ancien passeport, acte de naissance, carte nationale d'identité, 2 photos récentes (fond blanc)." },
-      { title: "Se rendre à la DGM", description: "Direction Générale de Migration. Arriver tôt (file d'attente). Horaires : Lun–Ven 7h30–15h30." },
-      { title: "Remplir le formulaire", description: "Formulaire de demande disponible sur place. À remplir en majuscules, sans ratures." },
-      { title: "Payer les frais", description: "Frais officiels : 100 USD (ordinaire) ou 200 USD (urgent). Paiement en caisse uniquement." },
-      { title: "Récupérer le récépissé", description: "Conserver précieusement le récépissé. Il sert de preuve en attendant le passeport." },
-      { title: "Retirer le passeport", description: "Retour à la DGM avec le récépissé à la date indiquée. Délai : 3–8 semaines selon l'affluence." },
+      {
+        title: "Rassembler les documents",
+        description:
+          "Préparer le passeport précédent et les autres pièces exigées par l'administration.",
+      },
+      {
+        title: "Vérifier l'autorité compétente",
+        description:
+          "Identifier le service officiel compétent et ses modalités actuelles.",
+      },
+      {
+        title: "Remplir la demande",
+        description:
+          "Compléter le formulaire selon les instructions officielles.",
+      },
+      {
+        title: "Payer les frais officiels",
+        description:
+          "Utiliser exclusivement les modalités de paiement communiquées par l'autorité compétente.",
+      },
+      {
+        title: "Conserver le récépissé",
+        description: "Conserver toute preuve officielle de dépôt.",
+      },
+      {
+        title: "Retirer le document",
+        description: "Suivre les instructions officielles pour le retrait.",
+      },
     ],
-    documents: ["Ancien passeport", "Acte de naissance", "Carte nationale d'identité (CNI)", "2 photos d'identité fond blanc", "Justificatif de paiement"],
+    documents: [
+      "Ancien passeport",
+      "Pièce d'identité",
+      "Acte d'état civil si requis",
+      "Photos si requises",
+      "Justificatif de paiement",
+    ],
   },
+
   {
-    id: "permis", title: "Permis de construire", category: "Immobilier",
-    icon: Home, color: "#F97316", description: "Autorisation obligatoire avant tout début de construction ou de rénovation importante.",
-    duration: "4–12 semaines", difficulty: "Complexe",
+    id: "permis",
+    title: "Permis de construire",
+    category: "Immobilier",
+    icon: Home,
+    color: "#F97316",
+    description:
+      "Parcours indicatif pour préparer une demande d'autorisation de construire.",
+    duration: "Variable",
+    difficulty: "Complexe",
     steps: [
-      { title: "Faire établir les plans", description: "Faire appel à un architecte ou bureau d'études agréé pour établir les plans du bâtiment." },
-      { title: "Constituer le dossier", description: "Plans architecturaux, titre foncier ou bail, rapport géotechnique (si bâtiment > 2 étages)." },
-      { title: "Dépôt à la Commune", description: "Déposer le dossier complet à la mairie ou commune de votre circonscription." },
-      { title: "Instruction du dossier", description: "La commune transmet à l'Urbanisme pour examen technique. Délai théorique : 30 jours ouvrables." },
-      { title: "Retrait du permis", description: "En cas d'accord, retirer le permis signé et l'afficher sur le chantier avant tout commencement." },
+      {
+        title: "Faire établir les plans",
+        description:
+          "Préparer les documents techniques requis avec les professionnels compétents.",
+      },
+      {
+        title: "Constituer le dossier",
+        description:
+          "Rassembler les documents fonciers, techniques et administratifs exigés.",
+      },
+      {
+        title: "Déposer la demande",
+        description:
+          "Déposer le dossier auprès de l'autorité compétente pour le site concerné.",
+      },
+      {
+        title: "Instruction",
+        description:
+          "Suivre l'instruction administrative et technique du dossier.",
+      },
+      {
+        title: "Décision",
+        description:
+          "Respecter la décision et les éventuelles conditions imposées.",
+      },
     ],
-    documents: ["Plans architecturaux (3 exemplaires)", "Titre foncier ou attestation de bail", "CNI du demandeur", "Rapport géotechnique", "Acte de propriété ou autorisation du propriétaire"],
+    documents: [
+      "Plans architecturaux",
+      "Justificatif de propriété ou droit d'occupation",
+      "Pièce d'identité",
+      "Documents techniques requis",
+      "Autorisations complémentaires si nécessaires",
+    ],
   },
+
   {
-    id: "cnss", title: "Inscription CNSS / INSS", category: "Social",
-    icon: Shield, color: "#10B981", description: "Inscription à la Caisse Nationale de Sécurité Sociale pour les travailleurs salariés.",
-    duration: "1–2 semaines", difficulty: "Facile",
+    id: "cnss",
+    title: "Inscription CNSS / INSS",
+    category: "Social",
+    icon: Shield,
+    color: "#10B981",
+    description:
+      "Parcours indicatif relatif aux démarches sociales d'un employeur et de ses travailleurs.",
+    duration: "Variable",
+    difficulty: "Facile",
     steps: [
-      { title: "Préparer les documents employeur", description: "RCCM, NIF, liste des employés avec salaires." },
-      { title: "Se rendre à l'INSS", description: "Direction provinciale de l'INSS. Prendre rendez-vous par téléphone si possible." },
-      { title: "Remplir le formulaire d'inscription", description: "Formulaire OE1 pour l'employeur, OT1 pour chaque travailleur." },
-      { title: "Obtenir le numéro matricule", description: "Chaque employé reçoit un numéro matricule INSS unique pour le suivi des cotisations." },
+      {
+        title: "Préparer les documents employeur",
+        description:
+          "Réunir les documents d'identification et d'immatriculation de l'employeur.",
+      },
+      {
+        title: "Identifier le service compétent",
+        description:
+          "Vérifier auprès de l'organisme concerné le circuit actuellement applicable.",
+      },
+      {
+        title: "Remplir les formulaires",
+        description:
+          "Compléter les formulaires exigés pour l'employeur et les travailleurs.",
+      },
+      {
+        title: "Obtenir les références",
+        description:
+          "Conserver les numéros et attestations remis par l'organisme.",
+      },
     ],
-    documents: ["RCCM de l'entreprise", "NIF de l'entreprise", "CNI du gérant", "Liste nominative des employés", "Contrats de travail"],
+    documents: [
+      "Documents d'immatriculation",
+      "Pièce d'identité",
+      "Liste des travailleurs",
+      "Contrats de travail",
+      "Documents exigés par l'organisme",
+    ],
   },
 ];
 
-// ── ContractDetail ─────────────────────────────────────────────────────────
-function ContractDetail({ template, onClose }: { template: ContractTemplate; onClose: () => void }) {
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function formatDate() {
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date());
+}
+
+function difficultyColor(difficulty: Demarche["difficulty"]) {
+  if (difficulty === "Facile") {
+    return COLORS.green;
+  }
+
+  if (difficulty === "Complexe") {
+    return COLORS.red;
+  }
+
+  return COLORS.yellow;
+}
+
+/* ============================================================================
+ * CONTRACT DETAIL
+ * ========================================================================== */
+
+function ContractDetail({
+  template,
+  onClose,
+}: {
+  template: ContractTemplate;
+  onClose: () => void;
+}) {
   const [values, setValues] = useState<Record<string, string>>({});
+
   const [generated, setGenerated] = useState(false);
+
   const [copied, setCopied] = useState(false);
-  const complete = template.fields.filter((f) => f.required).every((f) => values[f.id]?.trim());
 
-  const generateContract = () => setGenerated(true);
+  const complete = template.fields
+    .filter((field) => field.required)
+    .every((field) => Boolean(values[field.id]?.trim()));
 
-  const previewText = `CONTRAT – ${template.title.toUpperCase()}
+  const previewText = useMemo(() => {
+    const fields = template.fields
+      .map(
+        (field) =>
+          `${field.label} : ${values[field.id]?.trim() || "________________"}`,
+      )
+      .join("\n");
 
-Entre les soussignés :
-${template.fields.map((f) => `${f.label} : ${values[f.id] ?? "___________"}`).join("\n")}
+    return [
+      `DOCUMENT – ${template.title.toUpperCase()}`,
+      "",
+      "INFORMATIONS DES PARTIES",
+      fields,
+      "",
+      `Fait le ${formatDate()}`,
+      "",
+      "SIGNATURES",
+      "",
+      "____________________        ____________________",
+      "        Partie 1                       Partie 2",
+      "",
+      "IMPORTANT :",
+      "Ce modèle est fourni comme support de préparation.",
+      "Il ne constitue pas, à lui seul, une validation juridique.",
+      "Pour un acte important, faites vérifier le document",
+      "par un professionnel du droit compétent.",
+    ].join("\n");
+  }, [template, values]);
 
-Fait à Kinshasa, le ${new Date().toLocaleDateString("fr-FR")}
+  const copyDocument = async () => {
+    try {
+      await Clipboard.setString(previewText);
 
-Signatures :
-_________________          _________________
-       Partie 1                    Partie 2
+      setCopied(true);
 
-[Document généré par Débrouille Pro – À faire valider par un notaire ou avocat]`;
-
-  const handleCopy = () => {
-    Clipboard.setString(previewText).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      Alert.alert("Copie impossible", "Le document n'a pas pu être copié.");
+    }
   };
 
   return (
-    <View initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 280 }} className="absolute inset-0 z-50 flex flex-col overflow-y-auto" style={{  }}>
-      {/* Header */}
-      <View className="flex-shrink-0 px-4 pt-12 pb-4"><View className="flex items-center gap-3 mb-5"><Pressable onPress={onClose} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-lg font-black text-white">{template.title}</Text><Text className="text-xs text-white/40">{template.pages}pages · {template.category}</Text></View><View className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: `${template.color}22`, borderStyle: "solid" }}><template.icon size={18} style={{  }} /></View></View><Text className="text-sm text-white/60 mb-3">{template.description}</Text><View className="flex flex-wrap gap-1.5">{template.tags.map((t) => (
-            <Text key={t} className="px-2.5 py-1 rounded-full text-xs text-white/50" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>#{t}</Text>
-          ))}</View></View>
+    <Modal visible animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalScreen}>
+        <View style={styles.modalHeader}>
+          <Pressable onPress={onClose} style={styles.iconButton}>
+            <ArrowLeft size={20} color={COLORS.white} />
+          </Pressable>
 
-      <View className="flex-1 px-4 pb-6 space-y-3">{}<View className="rounded-2xl p-3 flex items-start gap-2" style={{ backgroundColor: "rgba(245,158,11,0.1)", borderWidth: 1, borderColor: "rgba(245,158,11,0.2)", borderStyle: "solid" }}><AlertTriangle size={14} className="text-yellow-400 flex-shrink-0 mt-0.5" /><Text className="text-xs text-yellow-200/70">Ce modèle est fourni à titre indicatif. Faites valider tout contrat important par un notaire ou un avocat agréé.</Text></View>{}{!generated && template.fields.map((field) => (
-          <View key={field.id} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-xs text-white/40 mb-2">{field.label}{field.required && <Text className="text-red-400 ml-1">*</Text>}</Text>{field.type === "select" ? (
-              <Picker onValueChange={(value) => setValues((v) => ({ ...v, [field.id]: value }))} className="w-full bg-transparent text-sm text-white outline-none" selectedValue={values[field.id] ?? ""}><Picker.Item label="Choisir..." value="" />{field.options?.map((o) => <Picker.Item label={o} value={o} />)}</Picker>
-            ) : (
-              <TextInput value={values[field.id] ?? ""} onChangeText={(value) => setValues((v) => ({ ...v, [field.id]: value }))} placeholder={field.placeholder} className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/25" />
-            )}</View>
-        ))}{}{generated && (
-          <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-4 space-y-3" style={{ backgroundColor: "rgba(16,185,129,0.07)", borderWidth: 1, borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}>
-            <View className="flex items-center justify-between"><Text className="text-sm font-bold text-green-400">Contrat généré !</Text><Pressable onPress={handleCopy} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs" style={{ backgroundColor: "rgba(16,185,129,0.15)" }}>{copied ? <><CheckCircle size={12} />Copié</> : <><Copy size={12} />Copier</>}</Pressable></View>
-            <pre className="text-xs text-white/60 leading-relaxed font-mono">{previewText}</pre>
+          <View style={styles.modalHeaderText}>
+            <Text style={styles.modalTitle} numberOfLines={2}>
+              {template.title}
+            </Text>
+
+            <Text style={styles.modalSubtitle}>
+              {template.category} · {template.pages} pages indicatives
+            </Text>
           </View>
-        )}{}{!generated ? (
-          <Pressable onPress={generateContract} disabled={!complete} className="w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-base font-black text-white disabled:opacity-40" style={{  }}><FileText size={18} /><Text>Générer le contrat</Text></Pressable>
-        ) : (
-          <View className="flex gap-2"><Pressable onPress={() => setGenerated(false)} className="flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><X size={15} /><Text>Modifier</Text></Pressable><Pressable className="flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-white" style={{  }}><Download size={15} /><Text>Télécharger</Text></Pressable></View>
-        )}</View>
-    </View>
-  );
-}
 
-// ── Demarche Detail ────────────────────────────────────────────────────────
-function DemarcheDetail({ demarche, onClose }: { demarche: Demarche; onClose: () => void }) {
-  const [completedSteps, setCompletedSteps] = useState<number[]>(() => {
-    try { return JSON.parse(localStorage.getItem(`demarche_${demarche.id}`) ?? "[]") as number[]; } catch { return []; }
-  });
+          <View
+            style={[
+              styles.templateIcon,
+              {
+                backgroundColor: `${template.color}18`,
+                borderColor: `${template.color}30`,
+              },
+            ]}
+          >
+            {React.createElement(template.icon, {
+              size: 19,
+              color: template.color,
+            })}
+          </View>
+        </View>
 
-  const toggleStep = (i: number) => {
-    const updated = completedSteps.includes(i) ? completedSteps.filter((s) => s !== i) : [...completedSteps, i];
-    setCompletedSteps(updated);
-    localStorage.setItem(`demarche_${demarche.id}`, JSON.stringify(updated));
-  };
+        <ScrollView
+          contentContainerStyle={styles.modalContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.institutionNotice}>
+            <AlertTriangle size={16} color={COLORS.yellow} />
 
-  const progress = Math.round((completedSteps.length / demarche.steps.length) * 100);
-  const diffColors: Record<string, string> = { Facile: "#10B981", Moyen: "#F59E0B", Complexe: "#EF4444" };
+            <Text style={styles.institutionNoticeText}>
+              Modèle de préparation. Le contenu doit être vérifié au regard du
+              droit applicable, de la situation des parties et des formalités
+              éventuellement requises.
+            </Text>
+          </View>
 
-  return (
-    <View initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 280 }} className="absolute inset-0 z-50 flex flex-col overflow-y-auto" style={{  }}>
-      <View className="flex-shrink-0 px-4 pt-12 pb-4"><View className="flex items-center gap-3 mb-5"><Pressable onPress={onClose} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-lg font-black text-white">{demarche.title}</Text><View className="flex items-center gap-2 mt-0.5"><Text className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${diffColors[demarche.difficulty]}22`, color: diffColors[demarche.difficulty] }}>{demarche.difficulty}</Text><Text className="text-xs text-white/40"><Clock size={10} className="inline mr-1" />{demarche.duration}</Text></View></View></View>{}<View className="mb-4"><View className="flex justify-between mb-1.5"><Text className="text-xs text-white/40">Progression</Text><Text className="text-xs font-bold" style={{ color: progress === 100 ? "#10B981" : "#8B5CF6" }}>{completedSteps.length}/{demarche.steps.length}étapes</Text></View><View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><View className="h-full rounded-full" animate={{ width: `${progress}%` }} style={{  }} /></View></View></View>
+          {!generated ? (
+            <>
+              <View style={styles.sectionHeading}>
+                <Text style={styles.sectionTitle}>Informations</Text>
 
-      <View className="flex-1 px-4 pb-6 space-y-3"><Text className="text-sm text-white/60">{demarche.description}</Text>{}<View><Text className="text-xs text-white/40 font-semibold uppercase tracking-wider mb-3">Étapes à suivre</Text>{demarche.steps.map((step, i) => {
-            const done = completedSteps.includes(i);
-            return (
-              <View key={i} layout onPress={() => toggleStep(i)} className="flex gap-3 mb-3 p-3 rounded-2xl transition-all" style={{ backgroundColor: done ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.04)", borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}>
-                <View className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 transition-all" style={{ backgroundColor: done ? "rgba(16,185,129,0.25)" : "rgba(255,255,255,0.08)" }}>{done ? <CheckCircle size={14} className="text-green-400" /> : <Text className="text-xs font-black text-white/50">{i + 1}</Text>}</View>
-                <View className="flex-1"><Text className="text-sm font-semibold text-white mb-0.5" style={{ textDecoration: done ? "line-through" : "none", opacity: done ? 0.6 : 1 }}>{step.title}</Text><Text className="text-xs text-white/50 leading-relaxed">{step.description}</Text></View>
+                <Text style={styles.sectionSubtitle}>
+                  Les champs marqués * sont requis.
+                </Text>
               </View>
-            );
-          })}</View>{}<View className="rounded-2xl p-4" style={{ backgroundColor: "rgba(59,130,246,0.08)", borderWidth: 1, borderColor: "rgba(59,130,246,0.2)", borderStyle: "solid" }}><Text className="text-xs text-blue-400 font-semibold uppercase tracking-wider mb-3">Documents requis</Text><View className="space-y-2">{demarche.documents.map((doc, i) => (
-              <View key={i} className="flex items-center gap-2"><FileText size={12} className="text-blue-400/70 flex-shrink-0" /><Text className="text-xs text-white/60">{doc}</Text></View>
-            ))}</View></View>{progress === 100 && (
-          <View initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="rounded-2xl p-4 text-center" style={{ borderWidth: 1, borderColor: "rgba(16,185,129,0.3)", borderStyle: "solid" }}>
-            <Text className="text-sm font-black text-green-400">Démarche complétée !</Text>
-            <Text className="text-xs text-white/50 mt-1">Toutes les étapes ont été réalisées.</Text>
+
+              {template.fields.map((field) => (
+                <View key={field.id} style={styles.formCard}>
+                  <Text style={styles.fieldLabel}>
+                    {field.label}
+                    {field.required ? (
+                      <Text
+                        style={{
+                          color: COLORS.red,
+                        }}
+                      >
+                        {" "}
+                        *
+                      </Text>
+                    ) : null}
+                  </Text>
+
+                  {field.type === "select" ? (
+                    <View style={styles.pickerWrapper}>
+                      <Picker
+                        selectedValue={values[field.id] ?? ""}
+                        onValueChange={(value) =>
+                          setValues((current) => ({
+                            ...current,
+                            [field.id]: String(value),
+                          }))
+                        }
+                        dropdownIconColor={COLORS.muted}
+                        style={styles.picker}
+                      >
+                        <Picker.Item label="Sélectionner..." value="" />
+
+                        {field.options?.map((option) => (
+                          <Picker.Item
+                            key={option}
+                            label={option}
+                            value={option}
+                          />
+                        ))}
+                      </Picker>
+                    </View>
+                  ) : (
+                    <TextInput
+                      value={values[field.id] ?? ""}
+                      onChangeText={(value) =>
+                        setValues((current) => ({
+                          ...current,
+                          [field.id]: value,
+                        }))
+                      }
+                      placeholder={field.placeholder}
+                      placeholderTextColor={COLORS.faint}
+                      keyboardType={
+                        field.type === "number" ? "numeric" : "default"
+                      }
+                      style={styles.textInput}
+                    />
+                  )}
+                </View>
+              ))}
+
+              <Pressable
+                disabled={!complete}
+                onPress={() => setGenerated(true)}
+                style={[
+                  styles.primaryButton,
+                  !complete && styles.disabledButton,
+                ]}
+              >
+                <FileText size={18} color="#FFFFFF" />
+
+                <Text style={styles.primaryButtonText}>
+                  Générer le document
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <View style={styles.generatedHeader}>
+                <View>
+                  <Text style={styles.generatedTitle}>Document préparé</Text>
+
+                  <Text style={styles.generatedSubtitle}>
+                    Vérifiez chaque élément avant toute utilisation.
+                  </Text>
+                </View>
+
+                <CheckCircle2 size={24} color={COLORS.green} />
+              </View>
+
+              <View style={styles.documentPreview}>
+                <Text style={styles.documentPreviewText}>{previewText}</Text>
+              </View>
+
+              <View style={styles.actionRow}>
+                <Pressable
+                  onPress={() => setGenerated(false)}
+                  style={styles.secondaryButton}
+                >
+                  <X size={16} color={COLORS.secondary} />
+
+                  <Text style={styles.secondaryButtonText}>Modifier</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={copyDocument}
+                  style={styles.primaryButtonSmall}
+                >
+                  {copied ? (
+                    <CheckCircle2 size={16} color="#FFFFFF" />
+                  ) : (
+                    <Copy size={16} color="#FFFFFF" />
+                  )}
+
+                  <Text style={styles.primaryButtonText}>
+                    {copied ? "Copié" : "Copier"}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.legalWarning}>
+                <Shield size={15} color={COLORS.yellow} />
+
+                <Text style={styles.legalWarningText}>
+                  Aucun document généré ici ne remplace la vérification d'un
+                  professionnel lorsque celle-ci est nécessaire.
+                </Text>
+              </View>
+            </>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+ * DEMARCHE DETAIL
+ * ========================================================================== */
+
+function DemarcheDetail({
+  demarche,
+  onClose,
+}: {
+  demarche: Demarche;
+  onClose: () => void;
+}) {
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+
+  const progress =
+    demarche.steps.length === 0
+      ? 0
+      : Math.round((completedSteps.length / demarche.steps.length) * 100);
+
+  const toggleStep = (index: number) => {
+    setCompletedSteps((current) =>
+      current.includes(index)
+        ? current.filter((value) => value !== index)
+        : [...current, index],
+    );
+  };
+
+  const diffColor = difficultyColor(demarche.difficulty);
+
+  return (
+    <Modal visible animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalScreen}>
+        <View style={styles.modalHeader}>
+          <Pressable onPress={onClose} style={styles.iconButton}>
+            <ArrowLeft size={20} color={COLORS.white} />
+          </Pressable>
+
+          <View style={styles.modalHeaderText}>
+            <Text style={styles.modalTitle} numberOfLines={2}>
+              {demarche.title}
+            </Text>
+
+            <View style={styles.inlineMeta}>
+              <View
+                style={[
+                  styles.difficultyBadge,
+                  {
+                    backgroundColor: `${diffColor}18`,
+                    borderColor: `${diffColor}30`,
+                  },
+                ]}
+              >
+                <Text style={[styles.difficultyText, { color: diffColor }]}>
+                  {demarche.difficulty}
+                </Text>
+              </View>
+
+              <Text style={styles.modalSubtitle}>{demarche.duration}</Text>
+            </View>
           </View>
-        )}</View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.modalContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.detailDescription}>{demarche.description}</Text>
+
+          <View style={styles.progressCard}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressLabel}>Progression personnelle</Text>
+
+              <Text
+                style={[
+                  styles.progressValue,
+                  {
+                    color: progress === 100 ? COLORS.green : COLORS.purple,
+                  },
+                ]}
+              >
+                {progress}%
+              </Text>
+            </View>
+
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${progress}%`,
+                  },
+                ]}
+              />
+            </View>
+
+            <Text style={styles.progressMeta}>
+              {completedSteps.length}/{demarche.steps.length} étapes cochées sur
+              cet appareil.
+            </Text>
+          </View>
+
+          <Text style={styles.sectionTitle}>Étapes à suivre</Text>
+
+          <View style={styles.stepList}>
+            {demarche.steps.map((step, index) => {
+              const done = completedSteps.includes(index);
+
+              return (
+                <Pressable
+                  key={`${demarche.id}-${index}`}
+                  onPress={() => toggleStep(index)}
+                  style={[styles.stepCard, done && styles.stepCardDone]}
+                >
+                  <View
+                    style={[styles.stepNumber, done && styles.stepNumberDone]}
+                  >
+                    {done ? (
+                      <CheckCircle2 size={16} color={COLORS.green} />
+                    ) : (
+                      <Text style={styles.stepNumberText}>{index + 1}</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.stepContent}>
+                    <Text
+                      style={[styles.stepTitle, done && styles.stepTitleDone]}
+                    >
+                      {step.title}
+                    </Text>
+
+                    <Text style={styles.stepDescription}>
+                      {step.description}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.documentsCard}>
+            <View style={styles.documentsHeader}>
+              <FileText size={17} color={COLORS.cyan} />
+
+              <Text style={styles.documentsTitle}>Documents à vérifier</Text>
+            </View>
+
+            {demarche.documents.map((document) => (
+              <View key={document} style={styles.documentRow}>
+                <View style={styles.documentBullet} />
+
+                <Text style={styles.documentText}>{document}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.officialWarning}>
+            <Info size={16} color={COLORS.cyan} />
+
+            <Text style={styles.officialWarningText}>
+              Les délais, frais, pièces et autorités compétentes peuvent
+              évoluer. Avant toute démarche, vérifiez les informations auprès du
+              service public compétent.
+            </Text>
+          </View>
+
+          {progress === 100 ? (
+            <View style={styles.completedCard}>
+              <CheckCircle2 size={20} color={COLORS.green} />
+
+              <View style={styles.completedText}>
+                <Text style={styles.completedTitle}>
+                  Parcours marqué comme terminé
+                </Text>
+
+                <Text style={styles.completedSubtitle}>
+                  Cela indique uniquement votre progression dans l'application.
+                </Text>
+              </View>
+            </View>
+          ) : null}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+ * CALCULATEURS
+ * ========================================================================== */
+
+function NumberField({
+  label,
+  value,
+  onChange,
+  suffix,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  suffix?: string;
+}) {
+  return (
+    <View style={styles.calculatorField}>
+      <Text style={styles.calculatorLabel}>{label}</Text>
+
+      <View style={styles.calculatorInputRow}>
+        <TextInput
+          value={value}
+          onChangeText={(text) => onChange(text.replace(/[^0-9.]/g, ""))}
+          keyboardType="decimal-pad"
+          placeholder="0"
+          placeholderTextColor={COLORS.faint}
+          style={styles.calculatorInput}
+        />
+
+        {suffix ? <Text style={styles.calculatorSuffix}>{suffix}</Text> : null}
+      </View>
     </View>
   );
 }
 
-// ── Calculateurs ──────────────────────────────────────────────────────────
 function Calculateurs() {
-  const [activeCalc, setActiveCalc] = useState<"conges" | "indemnite" | "charges" | null>(null);
-  const [salaire, setSalaire] = useState(1000);
-  const [anciennete, setAnciennete] = useState(3);
-  const [joursConges, setJoursConges] = useState(18);
+  const [activeCalc, setActiveCalc] = useState<
+    "conges" | "indemnite" | "charges" | null
+  >(null);
 
-  const indemnite = salaire * anciennete;
-  const chargesEmployeur = Math.round(salaire * 0.13);
-  const chargesEmploye = Math.round(salaire * 0.05);
-  const coutTotal = salaire + chargesEmployeur;
-  const coutConges = Math.round((salaire / 26) * joursConges);
+  const [salaire, setSalaire] = useState("1000");
 
-  const calcs = [
+  const [anciennete, setAnciennete] = useState("3");
+
+  const [joursConges, setJoursConges] = useState("18");
+
+  const salary = Number(salaire) || 0;
+
+  const years = Number(anciennete) || 0;
+
+  const days = Number(joursConges) || 0;
+
+  /*
+   * Ces résultats sont volontairement présentés
+   * comme des simulations mathématiques.
+   *
+   * Nous ne les présentons pas comme un calcul
+   * juridiquement certifié, car le fichier fourni
+   * ne contient pas de moteur juridique officiel
+   * permettant de vérifier les règles applicables
+   * à chaque situation.
+   */
+  const simpleIndemnite = salary * years;
+
+  const simpleEmployerCharge = salary * 0.13;
+
+  const simpleEmployeeCharge = salary * 0.05;
+
+  const simpleEmployerCost = salary + simpleEmployerCharge;
+
+  const simpleLeaveValue = days > 0 ? (salary / 26) * days : 0;
+
+  const calculations = [
     {
-      id: "conges" as const, title: "Congés payés", icon: Clock, color: "#3B82F6",
-      description: "Calculez la valeur des congés non pris en cas de départ.",
+      id: "conges" as const,
+      title: "Simulation de congés",
+      description: "Estimation mathématique à partir des paramètres saisis.",
+      icon: Clock,
+      color: COLORS.primary,
     },
     {
-      id: "indemnite" as const, title: "Indemnité de licenciement", icon: Briefcase, color: "#EF4444",
-      description: "Calculez l'indemnité due en cas de licenciement sans faute.",
+      id: "indemnite" as const,
+      title: "Simulation d'indemnité",
+      description: "Simulation simple selon salaire et ancienneté saisis.",
+      icon: Briefcase,
+      color: COLORS.red,
     },
     {
-      id: "charges" as const, title: "Charges sociales INSS", icon: Shield, color: "#10B981",
-      description: "Calculez les cotisations INSS employeur et employé.",
+      id: "charges" as const,
+      title: "Simulation de charges",
+      description:
+        "Calcul indicatif à partir des pourcentages saisis dans le modèle.",
+      icon: Shield,
+      color: COLORS.green,
     },
   ];
 
   return (
-    <View className="space-y-3">{calcs.map(({ id, title, icon: Icon, color, description }) => (
-        <View key={id}><View onPress={() => setActiveCalc(activeCalc === id ? null : id)} className="rounded-2xl p-4" style={{ backgroundColor: activeCalc === id ? `${color}11` : "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-3"><View className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}22` }}><Icon size={18} style={{ color }} /></View><View className="flex-1"><Text className="text-sm font-bold text-white">{title}</Text><Text className="text-xs text-white/50">{description}</Text></View>{activeCalc === id ? <ChevronUp size={16} className="text-white/40" /> : <ChevronDown size={16} className="text-white/40" />}</View></View><View>{activeCalc === id && (
-              <View initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                <View className="pt-2 space-y-3">{}<View className="rounded-2xl p-4 space-y-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View><View className="flex justify-between mb-1.5"><Text className="text-xs text-white/40">Salaire brut mensuel</Text><Text className="text-xs font-bold text-purple-400">${salaire}</Text></View><TextInput value={salaire} onChangeText={(value) => setSalaire(Number(value))} className="w-full accent-purple-500" /></View>{id === "indemnite" && (
-                      <View><View className="flex justify-between mb-1.5"><Text className="text-xs text-white/40">Ancienneté (années)</Text><Text className="text-xs font-bold text-red-400">{anciennete}ans</Text></View><TextInput value={anciennete} onChangeText={(value) => setAnciennete(Number(value))} className="w-full accent-red-500" /></View>
-                    )}{id === "conges" && (
-                      <View><View className="flex justify-between mb-1.5"><Text className="text-xs text-white/40">Jours de congés</Text><Text className="text-xs font-bold text-blue-400">{joursConges}jours</Text></View><TextInput value={joursConges} onChangeText={(value) => setJoursConges(Number(value))} className="w-full accent-blue-500" /></View>
-                    )}</View>{}<View className="rounded-2xl p-4" style={{ backgroundColor: `${color}0f`, borderStyle: "solid" }}><Text className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color }}>Résultat</Text>{id === "conges" && (
-                      <View className="space-y-2"><View className="flex justify-between"><Text className="text-xs text-white/50">Salaire journalier</Text><Text className="text-xs font-bold text-white">${(salaire / 26).toFixed(2)}</Text></View><View className="flex justify-between"><Text className="text-xs text-white/50">Jours à indemniser</Text><Text className="text-xs font-bold text-white">{joursConges}j.</Text></View><View className="border-t border-white/10 pt-2 flex justify-between"><Text className="text-sm text-white/70">Indemnité de congés</Text><Text className="text-xl font-black" style={{ color }}>${coutConges}</Text></View></View>
-                    )}{id === "indemnite" && (
-                      <View className="space-y-2"><View className="flex justify-between"><Text className="text-xs text-white/50">Salaire × ancienneté</Text><Text className="text-xs text-white/70">${salaire}× {anciennete}ans</Text></View><View className="border-t border-white/10 pt-2 flex justify-between"><Text className="text-sm text-white/70">Indemnité totale</Text><Text className="text-xl font-black" style={{ color }}>${indemnite.toLocaleString()}</Text></View><Text className="text-[10px] text-white/30">Base : 1 mois de salaire par année d'ancienneté (Art. 69 CT-RDC)</Text></View>
-                    )}{id === "charges" && (
-                      <View className="space-y-2"><View className="flex justify-between"><Text className="text-xs text-white/50">Part employeur (13%)</Text><Text className="text-xs font-bold text-white">${chargesEmployeur}</Text></View><View className="flex justify-between"><Text className="text-xs text-white/50">Part employé (5%)</Text><Text className="text-xs font-bold text-white">${chargesEmploye}</Text></View><View className="border-t border-white/10 pt-2 flex justify-between"><Text className="text-sm text-white/70">Coût total employeur</Text><Text className="text-xl font-black" style={{ color }}>${coutTotal}</Text></View><Text className="text-[10px] text-white/30">Taux INSS en vigueur – versement avant le 10 du mois suivant</Text></View>
-                    )}</View></View>
+    <View style={styles.calculators}>
+      <View style={styles.calculatorNotice}>
+        <Info size={16} color={COLORS.cyan} />
+
+        <Text style={styles.calculatorNoticeText}>
+          Ces outils produisent des simulations indicatives. Ils ne constituent
+          pas un calcul juridique, fiscal ou social certifié.
+        </Text>
+      </View>
+
+      {calculations.map(({ id, title, description, icon: Icon, color }) => {
+        const opened = activeCalc === id;
+
+        return (
+          <View key={id} style={styles.calculatorCard}>
+            <Pressable
+              onPress={() => setActiveCalc(opened ? null : id)}
+              style={styles.calculatorHeader}
+            >
+              <View
+                style={[
+                  styles.calculatorIcon,
+                  {
+                    backgroundColor: `${color}18`,
+                    borderColor: `${color}28`,
+                  },
+                ]}
+              >
+                <Icon size={19} color={color} />
               </View>
-            )}</View></View>
-      ))}</View>
+
+              <View style={styles.calculatorIdentity}>
+                <Text style={styles.calculatorTitle}>{title}</Text>
+
+                <Text style={styles.calculatorDescription}>{description}</Text>
+              </View>
+
+              {opened ? (
+                <ChevronUp size={17} color={COLORS.muted} />
+              ) : (
+                <ChevronDown size={17} color={COLORS.muted} />
+              )}
+            </Pressable>
+
+            {opened ? (
+              <View style={styles.calculatorBody}>
+                <NumberField
+                  label="Salaire mensuel"
+                  value={salaire}
+                  onChange={setSalaire}
+                  suffix="USD"
+                />
+
+                {id === "indemnite" ? (
+                  <NumberField
+                    label="Ancienneté"
+                    value={anciennete}
+                    onChange={setAnciennete}
+                    suffix="ans"
+                  />
+                ) : null}
+
+                {id === "conges" ? (
+                  <NumberField
+                    label="Nombre de jours"
+                    value={joursConges}
+                    onChange={setJoursConges}
+                    suffix="jours"
+                  />
+                ) : null}
+
+                <View
+                  style={[
+                    styles.resultCard,
+                    {
+                      borderColor: `${color}28`,
+                      backgroundColor: `${color}0D`,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.resultLabel, { color }]}>
+                    RÉSULTAT INDICATIF
+                  </Text>
+
+                  {id === "conges" ? (
+                    <>
+                      <Text style={styles.resultFormula}>
+                        Salaire ÷ 26 × jours
+                      </Text>
+
+                      <Text style={[styles.resultValue, { color }]}>
+                        {Math.round(simpleLeaveValue).toLocaleString("fr-FR")}{" "}
+                        USD
+                      </Text>
+                    </>
+                  ) : null}
+
+                  {id === "indemnite" ? (
+                    <>
+                      <Text style={styles.resultFormula}>
+                        Salaire × ancienneté
+                      </Text>
+
+                      <Text style={[styles.resultValue, { color }]}>
+                        {Math.round(simpleIndemnite).toLocaleString("fr-FR")}{" "}
+                        USD
+                      </Text>
+                    </>
+                  ) : null}
+
+                  {id === "charges" ? (
+                    <>
+                      <Text style={styles.resultFormula}>
+                        Paramètres du modèle : employeur 13% · employé 5%
+                      </Text>
+
+                      <View style={styles.resultLine}>
+                        <Text style={styles.resultLineLabel}>Employeur</Text>
+
+                        <Text style={styles.resultLineValue}>
+                          {Math.round(simpleEmployerCharge).toLocaleString(
+                            "fr-FR",
+                          )}{" "}
+                          USD
+                        </Text>
+                      </View>
+
+                      <View style={styles.resultLine}>
+                        <Text style={styles.resultLineLabel}>Employé</Text>
+
+                        <Text style={styles.resultLineValue}>
+                          {Math.round(simpleEmployeeCharge).toLocaleString(
+                            "fr-FR",
+                          )}{" "}
+                          USD
+                        </Text>
+                      </View>
+
+                      <View style={styles.resultLine}>
+                        <Text style={styles.resultLineLabelStrong}>
+                          Coût employeur
+                        </Text>
+
+                        <Text style={[styles.resultLineValueStrong, { color }]}>
+                          {Math.round(simpleEmployerCost).toLocaleString(
+                            "fr-FR",
+                          )}{" "}
+                          USD
+                        </Text>
+                      </View>
+                    </>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
-// ── AI Assistant (authenticated inner) ────────────────────────────────────
+/* ============================================================================
+ * AI / ASSISTANT JURIDIQUE
+ * ========================================================================== */
+
 function AIAssistantInner() {
   const requests = useQuery(api.legal.getMyRequests, {});
-  const createRequest = useMutation(api.legal.createRequest);
-  const [input, setInput] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const endRef = useRef<View>(null);
 
-  const SUGGESTIONS = [
-    "Quels sont mes droits en cas de licenciement ?",
-    "Comment calculer les congés payés ?",
-    "Cotisations INSS employeur ?",
-    "Bail : caution maximale ?",
+  const createRequest = useMutation(api.legal.createRequest);
+
+  const [input, setInput] = useState("");
+
+  const [isSending, setIsSending] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+
+  const suggestions = [
+    "Quels documents faut-il préparer pour cette démarche ?",
+    "Quels sont les points importants d'un contrat de travail ?",
+    "Comment préparer une demande administrative ?",
+    "Quels éléments vérifier avant de signer un contrat ?",
   ];
 
-  const sendMessage = async (text?: string) => {
-    const q = text ?? input.trim();
-    if (!q || isSending) return;
+  const sendMessage = async (suggestion?: string) => {
+    const question = (suggestion ?? input).trim();
+
+    if (!question || isSending) {
+      return;
+    }
+
     setInput("");
     setIsSending(true);
 
     try {
       await createRequest({
         type: "question",
-        title: q.slice(0, 100),
-        description: q,
+        title: question.slice(0, 100),
+        description: question,
       });
-      setTimeout(() => __debrouilleProNativeScrollIntoView(endRef.current), 200);
+
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollToEnd({
+          animated: true,
+        });
+      });
     } catch (error) {
-      if (error instanceof ConvexError) {
-        const data = error.data as { message: string; code: string };
-        toast.error(data.message);
-      } else {
-        toast.error("Erreur lors de l'envoi");
-      }
+      Alert.alert(
+        "Question non envoyée",
+        error instanceof Error ? error.message : "Une erreur est survenue.",
+      );
     } finally {
       setIsSending(false);
     }
   };
 
-  // Loading state
   if (requests === undefined) {
     return (
-      <View className="flex flex-col h-full space-y-3"><Skeleton className="h-14 w-full rounded-2xl" /><View className="flex gap-2">{Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 w-32 rounded-xl" />
-          ))}</View><View className="flex-1 space-y-3">{Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-          ))}</View></View>
+      <View style={styles.assistantLoading}>
+        <View style={styles.loadingBarLarge} />
+
+        <View style={styles.loadingBarSmall} />
+
+        <View style={styles.loadingConversation}>
+          <View style={styles.loadingBubble} />
+
+          <View style={[styles.loadingBubble, styles.loadingBubbleShort]} />
+
+          <View style={styles.loadingBubble} />
+        </View>
+      </View>
     );
   }
 
+  const orderedRequests = [...requests].reverse();
+
   return (
-    <View className="flex flex-col h-full space-y-3">{}<View className="rounded-2xl p-3 flex items-center gap-3" style={{ backgroundColor: "rgba(139,92,246,0.1)", borderWidth: 1, borderColor: "rgba(139,92,246,0.2)", borderStyle: "solid" }}><View className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{  }}><Scale size={16} className="text-white" /></View><View><Text className="text-sm font-bold text-white">Assistant Juridique</Text><Text className="text-xs text-white/50">Droit congolais · Code du travail · OHADA</Text></View><View className="ml-auto w-2 h-2 rounded-full bg-green-400" /></View>{}<View className="flex gap-1.5 overflow-x-auto pb-1" style={{  }}>{SUGGESTIONS.map((s) => (
-          <Pressable key={s} onPress={() => sendMessage(s)} className="px-3 py-1.5 rounded-xl text-xs text-white/60 flex-shrink-0" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>{s}</Pressable>
-        ))}</View>{}<View className="flex-1 space-y-3 overflow-y-auto" style={{  }}>{}<View className="flex gap-2"><View className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{  }}><Bot size={14} className="text-white" /></View><View className="max-w-[82%] rounded-2xl rounded-tl-sm px-3 py-2.5" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-sm text-white/85 leading-relaxed">Je suis votre assistant juridique. Posez-moi une question sur le droit congolais, les contrats, les démarches administratives ou les calculs de droits du travail.
-            </Text></View></View>{}{[...requests].reverse().map((req) => (
-          <View key={req._id} className="space-y-3">{}<View className="flex gap-2 flex-row-reverse"><View className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><UserIcon size={14} className="text-white/70" /></View><View className="max-w-[82%] rounded-2xl rounded-tr-sm px-3 py-2.5" style={{ backgroundColor: "rgba(139,92,246,0.2)", borderWidth: 1, borderColor: "rgba(139,92,246,0.3)", borderStyle: "solid" }}><Text className="text-sm text-white/85 leading-relaxed">{req.description}</Text><View className="flex items-center gap-2 mt-1"><Text className="text-[10px] text-white/30">{new Date(req.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</Text><Text className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: req.status === "pending" ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)", color: req.status === "pending" ? "#F59E0B" : "#10B981" }}>{req.status === "pending" ? "En attente" : req.status}</Text></View></View></View>{}<View className="flex gap-2"><View className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{  }}><Bot size={14} className="text-white" /></View><View className="max-w-[82%] rounded-2xl rounded-tl-sm px-3 py-2.5" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-sm text-white/85 leading-relaxed">Votre question a été enregistrée. Un conseiller juridique vous répondra sous peu.
-                </Text></View></View></View>
-        ))}{}{isSending && (
-          <View className="flex gap-2"><View className="w-7 h-7 rounded-xl flex items-center justify-center" style={{  }}><Bot size={14} className="text-white" /></View><View className="rounded-2xl rounded-tl-sm px-3 py-3" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex gap-1">{[0, 1, 2].map((i) => (
-                  <View key={i} className="w-1.5 h-1.5 rounded-full bg-white/50" animate={{ y: [0, -4, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }} />
-                ))}</View></View></View>
-        )}<View ref={endRef} /></View>{}{requests.length === 0 && (
-        <View className="rounded-2xl p-3 flex items-start gap-2" style={{ backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.15)", borderStyle: "solid" }}><Info size={13} className="text-indigo-400 flex-shrink-0 mt-0.5" /><Text className="text-xs text-white/50">Vos questions seront enregistrées ici. Posez votre première question juridique ci-dessous.</Text></View>
-      )}{}<View className="flex gap-2 pt-1"><View className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><TextInput value={input} onChangeText={(value) => setInput(value)} onKeyPress={(e) => { if (e.nativeEvent.key === "Enter") sendMessage(); }} placeholder="Posez une question juridique..." className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/30" />{input && <Pressable onPress={() => setInput("")} className=""><X size={12} className="text-white/30" /></Pressable>}</View><Pressable onPress={() => sendMessage()} disabled={isSending || !input.trim()} className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{  }}><Send size={15} className={input.trim() ? "text-white" : "text-white/30"} /></Pressable></View></View>
+    <KeyboardAvoidingView
+      style={styles.assistant}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={styles.assistantHeader}>
+        <View style={styles.assistantIcon}>
+          <Scale size={18} color="#FFFFFF" />
+        </View>
+
+        <View style={styles.assistantHeaderText}>
+          <Text style={styles.assistantTitle}>Assistant Juridique</Text>
+
+          <Text style={styles.assistantSubtitle}>
+            Questions · demandes · suivi
+          </Text>
+        </View>
+
+        <View style={styles.assistantStatus}>
+          <View style={styles.statusDot} />
+
+          <Text style={styles.statusText}>Actif</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.suggestionsScroll}
+        contentContainerStyle={styles.suggestionsContent}
+      >
+        {suggestions.map((suggestion) => (
+          <Pressable
+            key={suggestion}
+            disabled={isSending}
+            onPress={() => sendMessage(suggestion)}
+            style={styles.suggestion}
+          >
+            <Text style={styles.suggestionText}>{suggestion}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <ScrollView
+        ref={scrollRef}
+        style={styles.conversation}
+        contentContainerStyle={styles.conversationContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.messageRow}>
+          <View style={styles.botAvatar}>
+            <Scale size={14} color="#FFFFFF" />
+          </View>
+
+          <View style={styles.botBubble}>
+            <Text style={styles.messageText}>
+              Posez votre question juridique. Votre demande sera enregistrée
+              dans votre espace pour traitement selon le fonctionnement prévu
+              par le service juridique.
+            </Text>
+          </View>
+        </View>
+
+        {orderedRequests.map((request) => (
+          <View key={String(request._id)}>
+            <View style={[styles.messageRow, styles.userMessageRow]}>
+              <View style={styles.userAvatar}>
+                <UserIcon size={14} color={COLORS.secondary} />
+              </View>
+
+              <View style={styles.userBubble}>
+                <Text style={styles.messageText}>{request.description}</Text>
+
+                <Text style={styles.messageTime}>
+                  {new Date(request.createdAt).toLocaleTimeString("fr-FR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Text>
+
+                <View style={styles.requestStatus}>
+                  <Text style={styles.requestStatusText}>
+                    {request.status === "pending"
+                      ? "En attente"
+                      : request.status}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.messageRow}>
+              <View style={styles.botAvatar}>
+                <Scale size={14} color="#FFFFFF" />
+              </View>
+
+              <View style={styles.botBubble}>
+                <Text style={styles.messageText}>
+                  Votre demande a été enregistrée. La réponse juridique doit
+                  être fournie selon le processus de traitement configuré par le
+                  service.
+                </Text>
+              </View>
+            </View>
+          </View>
+        ))}
+
+        {isSending ? (
+          <View style={styles.messageRow}>
+            <View style={styles.botAvatar}>
+              <Scale size={14} color="#FFFFFF" />
+            </View>
+
+            <View style={styles.typingBubble}>
+              <Text style={styles.typingText}>
+                Enregistrement de votre demande...
+              </Text>
+            </View>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      <View style={styles.assistantInputRow}>
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          editable={!isSending}
+          placeholder="Posez une question juridique..."
+          placeholderTextColor={COLORS.faint}
+          multiline
+          maxLength={5000}
+          style={styles.assistantInput}
+        />
+
+        {input.length > 0 ? (
+          <Pressable onPress={() => setInput("")} style={styles.inputClear}>
+            <X size={14} color={COLORS.muted} />
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          disabled={isSending || !input.trim()}
+          onPress={() => sendMessage()}
+          style={[
+            styles.sendButton,
+            (!input.trim() || isSending) && styles.sendButtonDisabled,
+          ]}
+        >
+          <Send size={16} color={input.trim() ? "#FFFFFF" : COLORS.faint} />
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
-// ── AI Assistant wrapper with auth handling ───────────────────────────────
 function AIAssistantJuridique() {
   return (
-    <>
+    <View style={styles.full}>
       <AuthLoading>
-        <View className="flex flex-col h-full space-y-3"><Skeleton className="h-14 w-full rounded-2xl" /><View className="flex gap-2">{Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-8 w-32 rounded-xl" />
-            ))}</View><View className="flex-1 space-y-3">{Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-            ))}</View></View>
+        <View style={styles.authLoading} accessible>
+          <View style={styles.loadingBarLarge} />
+
+          <View style={styles.loadingBarSmall} />
+        </View>
       </AuthLoading>
 
       <Unauthenticated>
-        <View className="flex flex-col items-center justify-center h-full space-y-4"><View className="w-16 h-16 rounded-3xl flex items-center justify-center" style={{  }}><Scale size={28} className="text-white" /></View><View className="text-center"><Text className="text-base font-bold text-white">Assistant Juridique</Text><Text className="text-sm text-white/50 mt-1">Connectez-vous pour poser vos questions juridiques</Text></View><SignInButton /></View>
+        <View style={styles.unauthenticated}>
+          <View style={styles.authIcon}>
+            <Scale size={30} color="#FFFFFF" />
+          </View>
+
+          <Text style={styles.authTitle}>Assistant Juridique</Text>
+
+          <Text style={styles.authDescription}>
+            Connectez-vous pour envoyer et suivre vos demandes juridiques.
+          </Text>
+
+          <SignInButton />
+        </View>
       </Unauthenticated>
 
       <Authenticated>
         <AIAssistantInner />
       </Authenticated>
-    </>
+    </View>
   );
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────
-interface JuridiquePageProps { onBack: () => void; }
+/* ============================================================================
+ * CARD COMPONENTS
+ * ========================================================================== */
+
+function ContractCard({
+  template,
+  onPress,
+}: {
+  template: ContractTemplate;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.contentCard, pressed && styles.pressed]}
+    >
+      <View style={styles.contentCardHeader}>
+        <View
+          style={[
+            styles.contentIcon,
+            {
+              backgroundColor: `${template.color}18`,
+              borderColor: `${template.color}28`,
+            },
+          ]}
+        >
+          {React.createElement(template.icon, {
+            size: 20,
+            color: template.color,
+          })}
+        </View>
+
+        <View style={styles.contentCardIdentity}>
+          <View style={styles.titleLine}>
+            <Text style={styles.contentCardTitle} numberOfLines={2}>
+              {template.title}
+            </Text>
+
+            {template.popular ? (
+              <View style={styles.popularBadge}>
+                <Text style={styles.popularText}>Populaire</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Text style={styles.contentCardMeta}>
+            {template.category} · {template.pages} pages
+          </Text>
+
+          <Text style={styles.contentCardDescription} numberOfLines={3}>
+            {template.description}
+          </Text>
+        </View>
+
+        <ChevronRight size={18} color={COLORS.faint} />
+      </View>
+
+      <View style={styles.tagsRow}>
+        {template.tags.slice(0, 3).map((tag) => (
+          <View key={tag} style={styles.tag}>
+            <Text style={styles.tagText}>#{tag}</Text>
+          </View>
+        ))}
+      </View>
+    </Pressable>
+  );
+}
+
+function DemarcheCard({
+  demarche,
+  onPress,
+}: {
+  demarche: Demarche;
+  onPress: () => void;
+}) {
+  const color = difficultyColor(demarche.difficulty);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.contentCard, pressed && styles.pressed]}
+    >
+      <View style={styles.contentCardHeader}>
+        <View
+          style={[
+            styles.contentIcon,
+            {
+              backgroundColor: `${demarche.color}18`,
+              borderColor: `${demarche.color}28`,
+            },
+          ]}
+        >
+          {React.createElement(demarche.icon, {
+            size: 20,
+            color: demarche.color,
+          })}
+        </View>
+
+        <View style={styles.contentCardIdentity}>
+          <Text style={styles.contentCardTitle} numberOfLines={2}>
+            {demarche.title}
+          </Text>
+
+          <View style={styles.inlineMeta}>
+            <View
+              style={[
+                styles.difficultyBadge,
+                {
+                  backgroundColor: `${color}15`,
+                  borderColor: `${color}25`,
+                },
+              ]}
+            >
+              <Text style={[styles.difficultyText, { color }]}>
+                {demarche.difficulty}
+              </Text>
+            </View>
+
+            <Text style={styles.contentCardMeta}>{demarche.duration}</Text>
+          </View>
+
+          <Text style={styles.contentCardDescription} numberOfLines={3}>
+            {demarche.description}
+          </Text>
+        </View>
+
+        <ChevronRight size={18} color={COLORS.faint} />
+      </View>
+
+      <View style={styles.demarchFooter}>
+        <Text style={styles.demarchFooterText}>
+          {demarche.steps.length} étapes · {demarche.documents.length} documents
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+/* ============================================================================
+ * MAIN PAGE
+ * ========================================================================== */
+
+interface JuridiquePageProps {
+  onBack: () => void;
+}
 
 export default function JuridiquePage({ onBack }: JuridiquePageProps) {
   const [tab, setTab] = useState<TabId>("contrats");
+
   const [search, setSearch] = useState("");
+
   const [categoryFilter, setCategoryFilter] = useState("Tout");
-  const [selectedContract, setSelectedContract] = useState<ContractTemplate | null>(null);
-  const [selectedDemarche, setSelectedDemarche] = useState<Demarche | null>(null);
 
-  const contractCategories = ["Tout", "Immobilier", "Freelance", "Emploi", "Commerce", "Finance", "Business"];
-  const demarcheCategories = ["Tout", "Entreprise", "Documents", "Immobilier", "Social"];
+  const [selectedContract, setSelectedContract] =
+    useState<ContractTemplate | null>(null);
 
-  const filteredContracts = CONTRACTS.filter((c) => {
-    if (categoryFilter !== "Tout" && c.category !== categoryFilter) return false;
-    if (search && !c.title.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const [selectedDemarche, setSelectedDemarche] = useState<Demarche | null>(
+    null,
+  );
 
-  const filteredDemarches = DEMARCHES.filter((d) => {
-    if (categoryFilter !== "Tout" && d.category !== categoryFilter) return false;
-    if (search && !d.title.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-
-  const TABS = [
-    { id: "contrats" as TabId, label: "Contrats", icon: FileText, color: "#8B5CF6" },
-    { id: "demarches" as TabId, label: "Démarches", icon: BookOpen, color: "#3B82F6" },
-    { id: "calculateurs" as TabId, label: "Calculs", icon: Calculator, color: "#10B981" },
-    { id: "assistant" as TabId, label: "IA Juridique", icon: MessageSquare, color: "#EC4899" },
+  const contractCategories = [
+    "Tout",
+    "Immobilier",
+    "Freelance",
+    "Emploi",
+    "Commerce",
+    "Finance",
+    "Business",
   ];
 
-  const categories = tab === "contrats" ? contractCategories : demarcheCategories;
+  const demarcheCategories = [
+    "Tout",
+    "Entreprise",
+    "Documents",
+    "Immobilier",
+    "Social",
+  ];
+
+  const normalizedSearch = normalizeSearch(search);
+
+  const filteredContracts = useMemo(() => {
+    return CONTRACTS.filter((contract) => {
+      if (categoryFilter !== "Tout" && contract.category !== categoryFilter) {
+        return false;
+      }
+
+      if (
+        normalizedSearch &&
+        !normalizeSearch(
+          `${contract.title} ${contract.category} ${contract.description} ${contract.tags.join(
+            " ",
+          )}`,
+        ).includes(normalizedSearch)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [categoryFilter, normalizedSearch]);
+
+  const filteredDemarches = useMemo(() => {
+    return DEMARCHES.filter((demarche) => {
+      if (categoryFilter !== "Tout" && demarche.category !== categoryFilter) {
+        return false;
+      }
+
+      if (
+        normalizedSearch &&
+        !normalizeSearch(
+          `${demarche.title} ${demarche.category} ${demarche.description}`,
+        ).includes(normalizedSearch)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [categoryFilter, normalizedSearch]);
+
+  const tabs: Array<{
+    id: TabId;
+    label: string;
+    icon: IconComponent;
+    color: string;
+  }> = [
+    {
+      id: "contrats",
+      label: "Contrats",
+      icon: FileText,
+      color: COLORS.purple,
+    },
+    {
+      id: "demarches",
+      label: "Démarches",
+      icon: BookOpen,
+      color: COLORS.primary,
+    },
+    {
+      id: "calculateurs",
+      label: "Calculs",
+      icon: Calculator,
+      color: COLORS.green,
+    },
+    {
+      id: "assistant",
+      label: "Assistant",
+      icon: MessageSquare,
+      color: COLORS.pink,
+    },
+  ];
+
+  const categories =
+    tab === "contrats" ? contractCategories : demarcheCategories;
+
+  const showSearch = tab === "contrats" || tab === "demarches";
+
+  const handleTabChange = (nextTab: TabId) => {
+    setTab(nextTab);
+    setSearch("");
+    setCategoryFilter("Tout");
+  };
 
   return (
-    <View className="relative h-full w-full overflow-hidden flex flex-col" style={{  }}>{}<View className="absolute top-0 left-0 w-72 h-72 rounded-full pointer-events-none" style={{  }} /><View className="absolute bottom-20 right-0 w-56 h-56 rounded-full pointer-events-none" style={{  }} />{}<View className="flex-shrink-0 px-4 pt-12 pb-3"><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-xl font-black text-white">Juridique & Admin</Text><Text className="text-xs text-white/40">Contrats · Démarches · Droit congolais</Text></View><View className="px-2.5 py-1.5 rounded-xl flex items-center gap-1.5" style={{ backgroundColor: "rgba(139,92,246,0.15)", borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}><Scale size={13} className="text-purple-400" /><Text className="text-xs font-bold text-purple-400">OHADA</Text></View></View>{}{(tab === "contrats" || tab === "demarches") && (
-          <View className="flex items-center gap-2 px-3 py-2.5 rounded-2xl mb-3" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><Search size={14} className="text-white/40" /><TextInput value={search} onChangeText={(value) => setSearch(value)} placeholder={tab === "contrats" ? "Rechercher un contrat..." : "Rechercher une démarche..."} className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/30" />{search && <Pressable onPress={() => setSearch("")} className=""><X size={13} className="text-white/40" /></Pressable>}</View>
-        )}{}{(tab === "contrats" || tab === "demarches") && (
-          <View className="flex gap-1.5 overflow-x-auto pb-1 mb-3" style={{  }}>{categories.map((c) => (
-              <Pressable key={c} onPress={() => setCategoryFilter(c)} className="px-3 py-1.5 rounded-xl text-xs font-semibold" style={categoryFilter === c
-                  ? {  }
-                  : { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>{c}</Pressable>
-            ))}</View>
-        )}{}<View className="flex gap-1.5">{TABS.map(({ id, label, icon: Icon, color }) => (
-            <Pressable key={id} onPress={() => { setTab(id); setCategoryFilter("Tout"); setSearch(""); }} className="flex-1 py-2 rounded-2xl flex flex-col items-center gap-0.5" style={tab === id
-                ? { backgroundColor: `${color}22`, borderStyle: "solid" }
-                : { backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}><Icon size={14} style={{  }} /><Text className="text-[10px] font-semibold leading-tight text-center" style={{ color: tab === id ? color : "rgba(255,255,255,0.35)" }}>{label}</Text></Pressable>
-          ))}</View></View>{}<View className="flex-1 overflow-y-auto px-4 pb-6" style={{  }}><View>{tab === "contrats" && (
-            <View key="contrats" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Text className="text-xs text-white/40 py-2">{filteredContracts.length}modèle{filteredContracts.length > 1 ? "s" : ""}disponible{filteredContracts.length > 1 ? "s" : ""}</Text>
-              <View className="space-y-3">{filteredContracts.map((c, i) => (
-                  <View key={c.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} onPress={() => setSelectedContract(c)} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                    <View className="flex items-start gap-3"><View className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${c.color}22`, borderStyle: "solid" }}><c.icon size={20} style={{  }} /></View><View className="flex-1"><View className="flex items-start justify-between gap-2"><Text className="text-sm font-bold text-white">{c.title}</Text>{c.popular && <Text className="px-1.5 py-0.5 rounded text-[10px] font-black text-orange-400 flex-shrink-0" style={{ backgroundColor: "rgba(249,115,22,0.15)" }}>Populaire</Text>}</View><Text className="text-xs text-white/50 mt-0.5">{c.category}· {c.pages}pages</Text><Text className="text-xs text-white/40 mt-1">{c.description}</Text><View className="flex items-center justify-between mt-2"><View className="flex gap-1">{c.tags.slice(0, 2).map((t) => (
-                              <Text key={t} className="px-2 py-0.5 rounded text-[10px] text-white/40" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>#{t}</Text>
-                            ))}</View><ChevronRight size={14} className="text-white/30" /></View></View></View>
-                  </View>
-                ))}</View>
-            </View>
-          )}{tab === "demarches" && (
-            <View key="demarches" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Text className="text-xs text-white/40 py-2">{filteredDemarches.length}démarche{filteredDemarches.length > 1 ? "s" : ""}</Text>
-              <View className="space-y-3">{filteredDemarches.map((d, i) => {
-                  const diffColors: Record<string, string> = { Facile: "#10B981", Moyen: "#F59E0B", Complexe: "#EF4444" };
-                  return (
-                    <View key={d.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} onPress={() => setSelectedDemarche(d)} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                      <View className="flex items-start gap-3"><View className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${d.color}22`, borderStyle: "solid" }}><d.icon size={20} style={{  }} /></View><View className="flex-1"><Text className="text-sm font-bold text-white">{d.title}</Text><View className="flex items-center gap-2 mt-0.5"><Text className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${diffColors[d.difficulty]}18`, color: diffColors[d.difficulty] }}>{d.difficulty}</Text><Text className="text-xs text-white/40"><Clock size={10} className="inline mr-0.5" />{d.duration}</Text></View><Text className="text-xs text-white/40 mt-1">{d.description}</Text><View className="flex items-center justify-between mt-2"><Text className="text-xs text-white/30">{d.steps.length}étapes · {d.documents.length}documents</Text><ChevronRight size={14} className="text-white/30" /></View></View></View>
-                    </View>
-                  );
-                })}</View>
-            </View>
-          )}{tab === "calculateurs" && (
-            <View key="calcs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-2">
-              <View className="rounded-2xl p-3 mb-3 flex items-start gap-2" style={{ backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.18)", borderStyle: "solid" }}>
-                <Info size={13} className="text-indigo-400 flex-shrink-0 mt-0.5" />
-                <Text className="text-xs text-white/50">Calculs basés sur le Code du Travail de la RDC et les taux INSS en vigueur. À titre indicatif uniquement.</Text>
+    <View style={styles.screen}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Pressable
+            onPress={onBack}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+          >
+            <ArrowLeft size={20} color={COLORS.white} />
+          </Pressable>
+
+          <View style={styles.headerIdentity}>
+            <Text style={styles.headerTitle}>Juridique & Administration</Text>
+
+            <Text style={styles.headerSubtitle}>
+              Information · Préparation · Suivi
+            </Text>
+          </View>
+
+          <View style={styles.institutionBadge}>
+            <Scale size={14} color={COLORS.purple} />
+
+            <Text style={styles.institutionBadgeText}>RDC</Text>
+          </View>
+        </View>
+
+        {showSearch ? (
+          <View style={styles.searchBox}>
+            <Search size={17} color={COLORS.muted} />
+
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder={
+                tab === "contrats"
+                  ? "Rechercher un contrat..."
+                  : "Rechercher une démarche..."
+              }
+              placeholderTextColor={COLORS.faint}
+              style={styles.searchInput}
+              autoCorrect={false}
+            />
+
+            {search.length > 0 ? (
+              <Pressable
+                onPress={() => setSearch("")}
+                style={styles.inputClear}
+              >
+                <X size={14} color={COLORS.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {showSearch ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categories}
+          >
+            {categories.map((category) => {
+              const selected = categoryFilter === category;
+
+              return (
+                <Pressable
+                  key={category}
+                  onPress={() => setCategoryFilter(category)}
+                  style={[styles.category, selected && styles.categorySelected]}
+                >
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      selected && styles.categoryTextSelected,
+                    ]}
+                  >
+                    {category}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabs}
+        >
+          {tabs.map(({ id, label, icon: Icon, color }) => {
+            const selected = tab === id;
+
+            return (
+              <Pressable
+                key={id}
+                onPress={() => handleTabChange(id)}
+                style={[
+                  styles.tab,
+                  selected && {
+                    backgroundColor: `${color}16`,
+                    borderColor: `${color}32`,
+                  },
+                ]}
+              >
+                <Icon size={15} color={selected ? color : COLORS.faint} />
+
+                <Text
+                  style={[
+                    styles.tabText,
+                    selected && {
+                      color,
+                    },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* CONTENT */}
+      <View style={styles.content}>
+        {tab === "contrats" ? (
+          <ScrollView
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.pageIntro}>
+              <View>
+                <Text style={styles.pageTitle}>Modèles de documents</Text>
+
+                <Text style={styles.pageSubtitle}>
+                  Préparez vos documents à partir de modèles structurés.
+                </Text>
               </View>
-              <Calculateurs />
+
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>
+                  {filteredContracts.length}
+                </Text>
+              </View>
             </View>
-          )}{tab === "assistant" && (
-            <View key="assistant" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-2 flex flex-col" style={{ height: "calc(100vh - 300px)" }}>
-              <AIAssistantJuridique />
+
+            <View style={styles.securityNotice}>
+              <Shield size={16} color={COLORS.green} />
+
+              <Text style={styles.securityNoticeText}>
+                Les modèles sont des supports de préparation. Ils ne constituent
+                pas une certification ou un avis juridique individualisé.
+              </Text>
             </View>
-          )}</View></View>{}<View>{selectedContract && (
-          <ContractDetail template={selectedContract} onClose={() => setSelectedContract(null)} />
-        )}{selectedDemarche && (
-          <DemarcheDetail demarche={selectedDemarche} onClose={() => setSelectedDemarche(null)} />
-        )}</View></View>
+
+            {filteredContracts.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="Aucun modèle trouvé"
+                description="Aucun modèle ne correspond aux critères actuels."
+                onClear={() => {
+                  setSearch("");
+                  setCategoryFilter("Tout");
+                }}
+              />
+            ) : (
+              <View style={styles.cards}>
+                {filteredContracts.map((contract) => (
+                  <ContractCard
+                    key={contract.id}
+                    template={contract}
+                    onPress={() => setSelectedContract(contract)}
+                  />
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        ) : null}
+
+        {tab === "demarches" ? (
+          <ScrollView
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.pageIntro}>
+              <View>
+                <Text style={styles.pageTitle}>Démarches administratives</Text>
+
+                <Text style={styles.pageSubtitle}>
+                  Parcours de préparation et checklist personnelle.
+                </Text>
+              </View>
+
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>
+                  {filteredDemarches.length}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.securityNotice}>
+              <Info size={16} color={COLORS.cyan} />
+
+              <Text style={styles.securityNoticeText}>
+                Les procédures administratives peuvent évoluer. Vérifiez
+                toujours les conditions actuelles auprès de l'administration
+                compétente.
+              </Text>
+            </View>
+
+            {filteredDemarches.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="Aucune démarche trouvée"
+                description="Aucune démarche ne correspond aux critères actuels."
+                onClear={() => {
+                  setSearch("");
+                  setCategoryFilter("Tout");
+                }}
+              />
+            ) : (
+              <View style={styles.cards}>
+                {filteredDemarches.map((demarche) => (
+                  <DemarcheCard
+                    key={demarche.id}
+                    demarche={demarche}
+                    onPress={() => setSelectedDemarche(demarche)}
+                  />
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        ) : null}
+
+        {tab === "calculateurs" ? (
+          <ScrollView
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.pageIntro}>
+              <View>
+                <Text style={styles.pageTitle}>Calculateurs</Text>
+
+                <Text style={styles.pageSubtitle}>
+                  Outils de simulation pour préparer vos estimations.
+                </Text>
+              </View>
+            </View>
+
+            <Calculateurs />
+
+            <View style={styles.institutionNotice}>
+              <AlertTriangle size={16} color={COLORS.yellow} />
+
+              <Text style={styles.institutionNoticeText}>
+                Pour une situation réelle, les règles applicables doivent être
+                vérifiées dans les textes officiels et, si nécessaire, auprès
+                d'un professionnel compétent.
+              </Text>
+            </View>
+          </ScrollView>
+        ) : null}
+
+        {tab === "assistant" ? <AIAssistantJuridique /> : null}
+      </View>
+
+      {selectedContract ? (
+        <ContractDetail
+          template={selectedContract}
+          onClose={() => setSelectedContract(null)}
+        />
+      ) : null}
+
+      {selectedDemarche ? (
+        <DemarcheDetail
+          demarche={selectedDemarche}
+          onClose={() => setSelectedDemarche(null)}
+        />
+      ) : null}
+    </View>
   );
 }
+
+/* ============================================================================
+ * EMPTY STATE
+ * ========================================================================== */
+
+function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  onClear,
+}: {
+  icon: IconComponent;
+  title: string;
+  description: string;
+  onClear: () => void;
+}) {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIcon}>
+        <Icon size={27} color={COLORS.muted} />
+      </View>
+
+      <Text style={styles.emptyTitle}>{title}</Text>
+
+      <Text style={styles.emptyDescription}>{description}</Text>
+
+      <Pressable onPress={onClear} style={styles.secondaryButton}>
+        <X size={15} color={COLORS.secondary} />
+
+        <Text style={styles.secondaryButtonText}>Réinitialiser</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  full: {
+    flex: 1,
+  },
+
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
+    backgroundColor: "rgba(5,8,18,0.98)",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  headerTop: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  iconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  headerIdentity: {
+    flex: 1,
+  },
+
+  headerTitle: {
+    color: COLORS.text,
+    fontSize: 19,
+    fontWeight: "900",
+    letterSpacing: -0.35,
+  },
+
+  headerSubtitle: {
+    marginTop: 3,
+    color: COLORS.muted,
+    fontSize: 10.5,
+    fontWeight: "600",
+  },
+
+  institutionBadge: {
+    minHeight: 34,
+    paddingHorizontal: 9,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(139,92,246,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.25)",
+  },
+
+  institutionBadgeText: {
+    color: COLORS.purple,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  searchBox: {
+    marginTop: 11,
+    minHeight: 48,
+    paddingHorizontal: 13,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.cardStrong,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  searchInput: {
+    flex: 1,
+    minHeight: 46,
+    color: COLORS.text,
+    fontSize: 13,
+  },
+
+  inputClear: {
+    width: 29,
+    height: 29,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  categories: {
+    paddingTop: 9,
+    paddingBottom: 3,
+    gap: 6,
+  },
+
+  category: {
+    minHeight: 32,
+    paddingHorizontal: 11,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  categorySelected: {
+    backgroundColor: "rgba(139,92,246,0.16)",
+    borderColor: "rgba(139,92,246,0.32)",
+  },
+
+  categoryText: {
+    color: COLORS.muted,
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
+
+  categoryTextSelected: {
+    color: COLORS.purple,
+  },
+
+  tabs: {
+    paddingTop: 8,
+    gap: 6,
+  },
+
+  tab: {
+    minHeight: 46,
+    paddingHorizontal: 13,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  tabText: {
+    color: COLORS.faint,
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+
+  content: {
+    flex: 1,
+  },
+
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 30,
+  },
+
+  pageIntro: {
+    minHeight: 48,
+    marginBottom: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  pageTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+
+  pageSubtitle: {
+    maxWidth: 310,
+    marginTop: 4,
+    color: COLORS.muted,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+
+  countBadge: {
+    minWidth: 33,
+    height: 30,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  countBadgeText: {
+    color: COLORS.secondary,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  securityNotice: {
+    marginBottom: 12,
+    padding: 13,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    backgroundColor: "rgba(16,185,129,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.16)",
+  },
+
+  securityNoticeText: {
+    flex: 1,
+    color: COLORS.muted,
+    fontSize: 10.5,
+    lineHeight: 16,
+  },
+
+  cards: {
+    gap: 11,
+  },
+
+  contentCard: {
+    padding: 15,
+    borderRadius: 21,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  contentCardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 11,
+  },
+
+  contentIcon: {
+    width: 47,
+    height: 47,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  contentCardIdentity: {
+    flex: 1,
+  },
+
+  titleLine: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+
+  contentCardTitle: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "850",
+  },
+
+  contentCardMeta: {
+    color: COLORS.faint,
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  contentCardDescription: {
+    marginTop: 6,
+    color: COLORS.muted,
+    fontSize: 11,
+    lineHeight: 17,
+  },
+
+  popularBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 7,
+    backgroundColor: "rgba(249,115,22,0.12)",
+  },
+
+  popularText: {
+    color: "#FB923C",
+    fontSize: 8.5,
+    fontWeight: "900",
+  },
+
+  tagsRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+
+  tag: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  tagText: {
+    color: COLORS.faint,
+    fontSize: 9,
+    fontWeight: "650",
+  },
+
+  difficultyBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+
+  difficultyText: {
+    fontSize: 8.5,
+    fontWeight: "850",
+  },
+
+  inlineMeta: {
+    marginTop: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  demarchFooter: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+
+  demarchFooterText: {
+    color: COLORS.faint,
+    fontSize: 9.5,
+    fontWeight: "650",
+  },
+
+  emptyState: {
+    marginTop: 25,
+    paddingHorizontal: 24,
+    paddingVertical: 38,
+    alignItems: "center",
+    borderRadius: 22,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  emptyIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  emptyTitle: {
+    marginTop: 14,
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "850",
+    textAlign: "center",
+  },
+
+  emptyDescription: {
+    maxWidth: 320,
+    marginTop: 7,
+    color: COLORS.muted,
+    fontSize: 11.5,
+    lineHeight: 17,
+    textAlign: "center",
+  },
+
+  secondaryButton: {
+    marginTop: 17,
+    minHeight: 42,
+    paddingHorizontal: 15,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: COLORS.cardStrong,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  secondaryButtonText: {
+    color: COLORS.secondary,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  primaryButton: {
+    minHeight: 52,
+    marginTop: 8,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: COLORS.primary,
+  },
+
+  primaryButtonSmall: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: COLORS.primary,
+  },
+
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  disabledButton: {
+    opacity: 0.38,
+  },
+
+  pressed: {
+    opacity: 0.76,
+    transform: [
+      {
+        scale: 0.985,
+      },
+    ],
+  },
+
+  /* -------------------------------------------------------------------------
+   * MODALS
+   * ---------------------------------------------------------------------- */
+
+  modalScreen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  modalHeader: {
+    minHeight: 82,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: COLORS.background2,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  modalHeaderText: {
+    flex: 1,
+  },
+
+  modalTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "900",
+  },
+
+  modalSubtitle: {
+    marginTop: 3,
+    color: COLORS.muted,
+    fontSize: 10,
+  },
+
+  modalContent: {
+    padding: 16,
+    paddingBottom: 35,
+  },
+
+  templateIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  institutionNotice: {
+    marginBottom: 15,
+    padding: 13,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    backgroundColor: "rgba(245,158,11,0.075)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.18)",
+  },
+
+  institutionNoticeText: {
+    flex: 1,
+    color: "#FDE68A",
+    fontSize: 10.5,
+    lineHeight: 16,
+  },
+
+  sectionHeading: {
+    marginBottom: 10,
+  },
+
+  sectionTitle: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "850",
+  },
+
+  sectionSubtitle: {
+    marginTop: 4,
+    color: COLORS.faint,
+    fontSize: 10,
+  },
+
+  formCard: {
+    marginBottom: 10,
+    padding: 13,
+    borderRadius: 17,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  fieldLabel: {
+    marginBottom: 8,
+    color: COLORS.secondary,
+    fontSize: 11,
+    fontWeight: "750",
+  },
+
+  textInput: {
+    minHeight: 45,
+    paddingHorizontal: 12,
+    borderRadius: 13,
+    color: COLORS.text,
+    fontSize: 12,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  pickerWrapper: {
+    overflow: "hidden",
+    minHeight: 47,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  picker: {
+    color: COLORS.text,
+  },
+
+  generatedHeader: {
+    marginBottom: 12,
+    padding: 15,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(16,185,129,0.075)",
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.20)",
+  },
+
+  generatedTitle: {
+    color: COLORS.green,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  generatedSubtitle: {
+    marginTop: 4,
+    color: COLORS.muted,
+    fontSize: 10,
+  },
+
+  documentPreview: {
+    padding: 16,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  documentPreviewText: {
+    color: COLORS.secondary,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontSize: 10.5,
+    lineHeight: 17,
+  },
+
+  actionRow: {
+    marginTop: 11,
+    flexDirection: "row",
+    gap: 9,
+  },
+
+  legalWarning: {
+    marginTop: 12,
+    padding: 13,
+    borderRadius: 15,
+    flexDirection: "row",
+    gap: 9,
+    backgroundColor: "rgba(245,158,11,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.15)",
+  },
+
+  legalWarningText: {
+    flex: 1,
+    color: COLORS.muted,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  detailDescription: {
+    marginBottom: 14,
+    color: COLORS.muted,
+    fontSize: 12,
+    lineHeight: 19,
+  },
+
+  progressCard: {
+    marginBottom: 18,
+    padding: 14,
+    borderRadius: 17,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  progressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  progressLabel: {
+    color: COLORS.secondary,
+    fontSize: 11,
+    fontWeight: "750",
+  },
+
+  progressValue: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  progressTrack: {
+    height: 7,
+    marginTop: 10,
+    overflow: "hidden",
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: COLORS.purple,
+  },
+
+  progressMeta: {
+    marginTop: 7,
+    color: COLORS.faint,
+    fontSize: 9.5,
+  },
+
+  stepList: {
+    marginTop: 10,
+    gap: 9,
+  },
+
+  stepCard: {
+    padding: 13,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  stepCardDone: {
+    backgroundColor: "rgba(16,185,129,0.07)",
+    borderColor: "rgba(16,185,129,0.18)",
+  },
+
+  stepNumber: {
+    width: 31,
+    height: 31,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  stepNumberDone: {
+    backgroundColor: "rgba(16,185,129,0.16)",
+  },
+
+  stepNumberText: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  stepContent: {
+    flex: 1,
+  },
+
+  stepTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "800",
+  },
+
+  stepTitleDone: {
+    opacity: 0.6,
+  },
+
+  stepDescription: {
+    marginTop: 4,
+    color: COLORS.muted,
+    fontSize: 10.5,
+    lineHeight: 16,
+  },
+
+  documentsCard: {
+    marginTop: 18,
+    padding: 14,
+    borderRadius: 17,
+    backgroundColor: "rgba(6,182,212,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(6,182,212,0.16)",
+  },
+
+  documentsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginBottom: 10,
+  },
+
+  documentsTitle: {
+    color: COLORS.cyan,
+    fontSize: 11,
+    fontWeight: "850",
+  },
+
+  documentRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+
+  documentBullet: {
+    width: 5,
+    height: 5,
+    marginTop: 5,
+    borderRadius: 3,
+    backgroundColor: COLORS.cyan,
+  },
+
+  documentText: {
+    flex: 1,
+    color: COLORS.secondary,
+    fontSize: 10.5,
+    lineHeight: 16,
+  },
+
+  officialWarning: {
+    marginTop: 12,
+    padding: 13,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    backgroundColor: "rgba(6,182,212,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(6,182,212,0.14)",
+  },
+
+  officialWarningText: {
+    flex: 1,
+    color: COLORS.muted,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  completedCard: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(16,185,129,0.075)",
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.20)",
+  },
+
+  completedText: {
+    flex: 1,
+  },
+
+  completedTitle: {
+    color: COLORS.green,
+    fontSize: 12,
+    fontWeight: "850",
+  },
+
+  completedSubtitle: {
+    marginTop: 3,
+    color: COLORS.muted,
+    fontSize: 9.5,
+    lineHeight: 15,
+  },
+
+  /* -------------------------------------------------------------------------
+   * CALCULATORS
+   * ---------------------------------------------------------------------- */
+
+  calculators: {
+    gap: 10,
+  },
+
+  calculatorNotice: {
+    padding: 13,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    backgroundColor: "rgba(6,182,212,0.065)",
+    borderWidth: 1,
+    borderColor: "rgba(6,182,212,0.15)",
+  },
+
+  calculatorNoticeText: {
+    flex: 1,
+    color: COLORS.muted,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  calculatorCard: {
+    overflow: "hidden",
+    borderRadius: 19,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  calculatorHeader: {
+    minHeight: 72,
+    padding: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  calculatorIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  calculatorIdentity: {
+    flex: 1,
+  },
+
+  calculatorTitle: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "850",
+  },
+
+  calculatorDescription: {
+    marginTop: 3,
+    color: COLORS.muted,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  calculatorBody: {
+    padding: 13,
+    paddingTop: 0,
+    gap: 10,
+  },
+
+  calculatorField: {
+    gap: 7,
+  },
+
+  calculatorLabel: {
+    color: COLORS.secondary,
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
+
+  calculatorInputRow: {
+    minHeight: 45,
+    paddingHorizontal: 12,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  calculatorInput: {
+    flex: 1,
+    minHeight: 43,
+    padding: 0,
+    color: COLORS.text,
+    fontSize: 12,
+  },
+
+  calculatorSuffix: {
+    color: COLORS.faint,
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  resultCard: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+
+  resultLabel: {
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+
+  resultFormula: {
+    marginTop: 7,
+    color: COLORS.muted,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  resultValue: {
+    marginTop: 8,
+    fontSize: 23,
+    fontWeight: "950",
+  },
+
+  resultLine: {
+    marginTop: 10,
+    paddingTop: 9,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.07)",
+  },
+
+  resultLineLabel: {
+    color: COLORS.muted,
+    fontSize: 10.5,
+  },
+
+  resultLineValue: {
+    color: COLORS.secondary,
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+
+  resultLineLabelStrong: {
+    color: COLORS.secondary,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  resultLineValueStrong: {
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  /* -------------------------------------------------------------------------
+   * ASSISTANT
+   * ---------------------------------------------------------------------- */
+
+  assistant: {
+    flex: 1,
+  },
+
+  assistantHeader: {
+    minHeight: 65,
+    padding: 11,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: "rgba(139,92,246,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.18)",
+  },
+
+  assistantIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.purple,
+  },
+
+  assistantHeaderText: {
+    flex: 1,
+  },
+
+  assistantTitle: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: "850",
+  },
+
+  assistantSubtitle: {
+    marginTop: 2,
+    color: COLORS.muted,
+    fontSize: 9.5,
+  },
+
+  assistantStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.green,
+  },
+
+  statusText: {
+    color: COLORS.green,
+    fontSize: 9,
+    fontWeight: "750",
+  },
+
+  suggestionsScroll: {
+    flexGrow: 0,
+    marginTop: 8,
+  },
+
+  suggestionsContent: {
+    gap: 6,
+  },
+
+  suggestion: {
+    maxWidth: 270,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 11,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  suggestionText: {
+    color: COLORS.secondary,
+    fontSize: 9.5,
+    lineHeight: 14,
+  },
+
+  conversation: {
+    flex: 1,
+    marginTop: 8,
+  },
+
+  conversationContent: {
+    paddingBottom: 10,
+    gap: 10,
+  },
+
+  messageRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+  },
+
+  userMessageRow: {
+    flexDirection: "row-reverse",
+  },
+
+  botAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.70)",
+  },
+
+  userAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.09)",
+  },
+
+  botBubble: {
+    maxWidth: "82%",
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 15,
+    borderTopLeftRadius: 5,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  userBubble: {
+    maxWidth: "82%",
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 15,
+    borderTopRightRadius: 5,
+    backgroundColor: "rgba(139,92,246,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.28)",
+  },
+
+  messageText: {
+    color: COLORS.secondary,
+    fontSize: 11,
+    lineHeight: 17,
+  },
+
+  messageTime: {
+    marginTop: 5,
+    color: COLORS.faint,
+    fontSize: 8.5,
+  },
+
+  requestStatus: {
+    alignSelf: "flex-start",
+    marginTop: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(245,158,11,0.10)",
+  },
+
+  requestStatusText: {
+    color: COLORS.yellow,
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  typingBubble: {
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  typingText: {
+    color: COLORS.muted,
+    fontSize: 9.5,
+  },
+
+  assistantInputRow: {
+    minHeight: 55,
+    marginTop: 8,
+    padding: 6,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+    backgroundColor: COLORS.cardStrong,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  assistantInput: {
+    flex: 1,
+    maxHeight: 110,
+    minHeight: 40,
+    paddingHorizontal: 9,
+    paddingVertical: 9,
+    color: COLORS.text,
+    fontSize: 11.5,
+  },
+
+  sendButton: {
+    width: 39,
+    height: 39,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primary,
+  },
+
+  sendButtonDisabled: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  /* -------------------------------------------------------------------------
+   * AUTH / LOADING
+   * ---------------------------------------------------------------------- */
+
+  authLoading: {
+    flex: 1,
+    padding: 20,
+    justifyContent: "center",
+    gap: 12,
+  },
+
+  loadingBarLarge: {
+    width: "100%",
+    height: 50,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  loadingBarSmall: {
+    width: "55%",
+    height: 30,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  assistantLoading: {
+    flex: 1,
+    gap: 12,
+  },
+
+  loadingConversation: {
+    flex: 1,
+    justifyContent: "center",
+    gap: 12,
+  },
+
+  loadingBubble: {
+    width: "75%",
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  loadingBubbleShort: {
+    width: "55%",
+    alignSelf: "flex-end",
+  },
+
+  unauthenticated: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 25,
+  },
+
+  authIcon: {
+    width: 78,
+    height: 78,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.13)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.24)",
+  },
+
+  authTitle: {
+    marginTop: 18,
+    color: COLORS.text,
+    fontSize: 19,
+    fontWeight: "900",
+  },
+
+  authDescription: {
+    maxWidth: 340,
+    marginTop: 7,
+    marginBottom: 22,
+    color: COLORS.muted,
+    fontSize: 11.5,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+});

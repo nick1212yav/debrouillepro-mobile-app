@@ -1,45 +1,78 @@
-import { View, Text, Pressable, Image } from "react-native";
-import { useState, useRef, useEffect } from "react";
+import {
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  Text,
+  View,
+} from "react-native";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { toast } from "sonner";
 import QRCode from "qrcode";
 import {
-  ArrowLeft,
-  Download,
-  Share2,
-  QrCode,
-  FileText,
-  BarChart2,
   Activity,
+  ArrowLeft,
+  BarChart3,
   CheckCircle2,
-  Loader2,
-  FileDown,
+  ChevronRight,
   Copy,
+  Download,
+  FileDown,
+  FileText,
+  Loader2,
+  QrCode,
+  Share2,
+  ShieldCheck,
+  Sparkles,
+  X,
 } from "lucide-react-native";
-import { Button } from "@/components/ui/button.tsx";
-import { SignInButton } from "@/components/ui/signin.tsx";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Badge } from "@/components/ui/badge.tsx";
-import { cn } from "@/lib/utils.ts";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { Clipboard } from "@react-native-clipboard/clipboard";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
 
 interface ExportPageProps {
   onBack: () => void;
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+type LoadingKey = "publications" | "activity" | "analytics" | null;
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("fr-FR", {
+type ActivityItem = {
+  type: string;
+  label: string;
+  _creationTime: number;
+};
+
+type ExportedFile = {
+  id: string;
+  label: string;
+  type: "CSV" | "PDF";
+  createdAt: number;
+};
+
+function formatDate(value: number | string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Date inconnue";
+  }
+
+  return date.toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
 }
 
-function arrayToCsv(rows: string[][], separator = ";") {
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("fr-FR").format(value);
+}
+
+function arrayToCsv(rows: string[][], separator = ";"): string {
   return rows
     .map((row) =>
       row
@@ -49,171 +82,454 @@ function arrayToCsv(rows: string[][], separator = ";") {
     .join("\n");
 }
 
-function downloadBlob(content: string, filename: string, mimeType: string) {
-  const blob = new Blob(["\uFEFF" + content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+function createCsvUri(content: string): string {
+  const encoded = encodeURIComponent(`\uFEFF${content}`);
+  return `data:text/csv;charset=utf-8,${encoded}`;
 }
 
-// ─── Export Card ───────────────────────────────────────────────────────────────
+async function shareText(
+  title: string,
+  message: string,
+  url?: string,
+): Promise<boolean> {
+  try {
+    const result = await Share.share(
+      {
+        title,
+        message: url ? `${message}\n${url}` : message,
+        ...(Platform.OS === "ios" && url ? { url } : {}),
+      },
+      Platform.OS === "ios"
+        ? {
+            subject: title,
+          }
+        : undefined,
+    );
+
+    return result.action === Share.sharedAction;
+  } catch (error) {
+    console.error("Export share error:", error);
+    return false;
+  }
+}
 
 function ExportCard({
   icon,
   title,
   description,
   badge,
-  onExport,
+  onPress,
   loading,
-  color,
+  accent,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
-  badge?: string;
-  onExport: () => void;
+  badge: string;
+  onPress: () => void;
   loading: boolean;
-  color: string;
+  accent: string;
 }) {
   return (
-    <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-4 flex items-center gap-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={!loading ? onExport : undefined}>
-      <View className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}22` }}><Text style={{ color }}>{icon}</Text></View>
-      <View className="flex-1 min-w-0"><View className="flex items-center gap-2"><Text className="text-sm font-semibold text-white">{title}</Text>{badge && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-              {badge}
-            </Badge>
-          )}</View><Text className="text-xs text-white/50 mt-0.5">{description}</Text></View>
-      <Pressable className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all" style={{ backgroundColor: `${color}33` }} disabled={loading}>{loading ? (
-          <Loader2 className="w-4 h-4 animate-spin" style={{ color }} />
-        ) : (
-          <Download className="w-4 h-4" style={{ color }} />
-        )}</Pressable>
-    </View>
+    <Pressable
+      onPress={onPress}
+      disabled={loading}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${description}`}
+      style={({ pressed }) => ({
+        opacity: loading ? 0.65 : pressed ? 0.82 : 1,
+        transform: [{ scale: pressed && !loading ? 0.985 : 1 }],
+      })}
+    >
+      <View
+        className="rounded-3xl p-4"
+        style={{
+          backgroundColor: "rgba(255,255,255,0.045)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.09)",
+        }}
+      >
+        <View className="flex-row items-center">
+          <View
+            className="h-12 w-12 items-center justify-center rounded-2xl"
+            style={{
+              backgroundColor: `${accent}18`,
+              borderWidth: 1,
+              borderColor: `${accent}30`,
+            }}
+          >
+            {icon}
+          </View>
+
+          <View className="ml-3 flex-1">
+            <View className="flex-row items-center">
+              <Text
+                className="flex-1 text-[15px] font-bold text-white"
+                numberOfLines={1}
+              >
+                {title}
+              </Text>
+
+              <View
+                className="ml-2 rounded-lg px-2 py-1"
+                style={{
+                  backgroundColor: `${accent}16`,
+                  borderWidth: 1,
+                  borderColor: `${accent}28`,
+                }}
+              >
+                <Text
+                  className="text-[9px] font-extrabold"
+                  style={{ color: accent }}
+                >
+                  {badge}
+                </Text>
+              </View>
+            </View>
+
+            <Text
+              className="mt-1 text-xs leading-5 text-white/45"
+              numberOfLines={2}
+            >
+              {description}
+            </Text>
+          </View>
+
+          <View
+            className="ml-3 h-10 w-10 items-center justify-center rounded-xl"
+            style={{ backgroundColor: `${accent}12` }}
+          >
+            {loading ? (
+              <Loader2 size={17} color={accent} />
+            ) : (
+              <ChevronRight size={18} color={accent} />
+            )}
+          </View>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
-// ─── QR Code Modal ─────────────────────────────────────────────────────────────
+function QrModal({
+  visible,
+  url,
+  onClose,
+}: {
+  visible: boolean;
+  url: string;
+  onClose: () => void;
+}) {
+  const [qrData, setQrData] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
-function QrModal({ url, onClose }: { url: string; onClose: () => void }) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!visible || !url) {
+      setQrData(null);
+      return;
+    }
 
-  const generateQr = async () => {
+    let active = true;
+
+    const generate = async () => {
+      setGenerating(true);
+
+      try {
+        const result = await QRCode.toDataURL(url, {
+          width: 512,
+          margin: 2,
+          errorCorrectionLevel: "M",
+          color: {
+            dark: "#FFFFFF",
+            light: "#0B1020",
+          },
+        });
+
+        if (active) {
+          setQrData(result);
+        }
+      } catch (error) {
+        console.error("QR generation error:", error);
+
+        if (active) {
+          Alert.alert(
+            "QR Code",
+            "Impossible de générer le QR code pour le moment.",
+          );
+        }
+      } finally {
+        if (active) {
+          setGenerating(false);
+        }
+      }
+    };
+
+    void generate();
+
+    return () => {
+      active = false;
+    };
+  }, [visible, url]);
+
+  const copyLink = async () => {
     try {
-      const result = await QRCode.toDataURL(url, {
-        width: 256,
-        margin: 2,
-        color: { dark: "#ffffff", light: "#0a0a1a" },
-      });
-      setDataUrl(result);
-    } catch {
-      toast.error("Erreur génération QR code");
+      await Clipboard.setString(url);
+
+      Alert.alert("Lien copié", "Le lien de ton profil a été copié.");
+    } catch (error) {
+      console.error("Clipboard error:", error);
+
+      Alert.alert(
+        "Copie impossible",
+        "Impossible de copier le lien pour le moment.",
+      );
     }
   };
 
-  useEffect(() => {
-    void generateQr();
-  }, [url]);
-
-  const copyLink = async () => {
-    await Clipboard.setString(url);
-    toast.success("Lien copié !");
-  };
-
-  const downloadQr = () => {
-    if (!dataUrl) return;
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = "profil-qrcode.png";
-    a.click();
+  const shareQrLink = async () => {
+    await shareText(
+      "Mon profil",
+      "Découvre mon profil sur DébrouillePro.",
+      url,
+    );
   };
 
   return (
-<View>
-      <View key="qr-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} onPress={onClose}>
-        <View initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="rounded-3xl p-6 w-full max-w-xs flex flex-col items-center gap-4" style={{ backgroundColor: "#0f1123", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid" }} onPress={(e) => e.stopPropagation()}>
-          <Text className="text-base font-bold text-white">QR Code Profil</Text>
-          {dataUrl ? (
-            <Image className="rounded-2xl w-48 h-48" source={{ uri: dataUrl }} accessibilityLabel="QR Code" />
-          ) : (
-            <Skeleton className="w-48 h-48 rounded-2xl" />
-          )}
-          <Text className="text-xs text-white/40 text-center">{url}</Text>
-          <View className="flex gap-2 w-full"><Button size="sm" className="flex-1 gap-1.5" variant="secondary" onPress={copyLink}><Copy className="w-3.5 h-3.5" />Copier le lien
-            </Button><Button size="sm" className="flex-1 gap-1.5" onPress={downloadQr} disabled={!dataUrl}><Download className="w-3.5 h-3.5" />Télécharger
-            </Button></View>
-          <Pressable onPress={onClose} className="text-xs text-white/30 transition-colors"><Text>Fermer</Text></Pressable>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View
+        className="flex-1 items-center justify-center px-5"
+        style={{ backgroundColor: "rgba(0,0,0,0.82)" }}
+      >
+        <View
+          className="w-full max-w-[390px] rounded-[32px] p-5"
+          style={{
+            backgroundColor: "#0B1020",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.12)",
+          }}
+        >
+          <View className="mb-5 flex-row items-center">
+            <View
+              className="h-11 w-11 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: "rgba(99,102,241,0.14)" }}
+            >
+              <QrCode size={20} color="#818CF8" />
+            </View>
+
+            <View className="ml-3 flex-1">
+              <Text className="text-base font-bold text-white">
+                QR Code de profil
+              </Text>
+              <Text className="mt-0.5 text-xs text-white/45">
+                Partage ton profil instantanément
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={onClose}
+              className="h-10 w-10 items-center justify-center rounded-xl"
+              style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+            >
+              <X size={18} color="rgba(255,255,255,0.7)" />
+            </Pressable>
+          </View>
+
+          <View
+            className="items-center justify-center rounded-[28px] p-5"
+            style={{
+              backgroundColor: "#050812",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.08)",
+            }}
+          >
+            {generating ? (
+              <View className="h-64 w-64 items-center justify-center">
+                <Loader2 size={30} color="#818CF8" />
+                <Text className="mt-3 text-xs text-white/45">
+                  Génération du QR code…
+                </Text>
+              </View>
+            ) : qrData ? (
+              <Image
+                source={{ uri: qrData }}
+                resizeMode="contain"
+                accessibilityLabel="QR Code du profil"
+                style={{
+                  width: 256,
+                  height: 256,
+                  borderRadius: 18,
+                }}
+              />
+            ) : (
+              <View className="h-64 w-64 items-center justify-center">
+                <QrCode size={42} color="rgba(255,255,255,0.25)" />
+                <Text className="mt-3 text-center text-xs text-white/40">
+                  QR code indisponible
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View
+            className="mt-4 rounded-2xl px-4 py-3"
+            style={{
+              backgroundColor: "rgba(255,255,255,0.035)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.07)",
+            }}
+          >
+            <Text className="text-xs leading-5 text-white/50" numberOfLines={2}>
+              {url}
+            </Text>
+          </View>
+
+          <View className="mt-4 flex-row">
+            <Pressable
+              onPress={copyLink}
+              className="mr-2 flex-1 flex-row items-center justify-center rounded-2xl px-4 py-3.5"
+              style={{
+                backgroundColor: "rgba(255,255,255,0.07)",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.09)",
+              }}
+            >
+              <Copy size={16} color="rgba(255,255,255,0.75)" />
+              <Text className="ml-2 text-sm font-semibold text-white">
+                Copier
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={shareQrLink}
+              className="ml-2 flex-1 flex-row items-center justify-center rounded-2xl px-4 py-3.5"
+              style={{
+                backgroundColor: "#4F46E5",
+              }}
+            >
+              <Share2 size={16} color="#FFFFFF" />
+              <Text className="ml-2 text-sm font-bold text-white">
+                Partager
+              </Text>
+            </Pressable>
+          </View>
+
+          <Text className="mt-4 text-center text-[11px] text-white/30">
+            Le QR code contient uniquement le lien public du profil.
+          </Text>
         </View>
       </View>
-    </View>
+    </Modal>
   );
 }
 
-// ─── Share Modal ───────────────────────────────────────────────────────────────
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <View className="mb-4">
+      <Text className="text-[10px] font-extrabold uppercase tracking-[2px] text-indigo-300">
+        {eyebrow}
+      </Text>
 
-async function nativeShare(title: string, text: string, url: string) {
-  if (navigator.share) {
-    try {
-      await navigator.share({ title, text, url });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  // fallback: copy
-  try {
-    await Clipboard.setString(url);
-    toast.success("Lien copié dans le presse-papiers");
-    return true;
-  } catch {
-    return false;
-  }
+      <Text className="mt-1.5 text-xl font-extrabold text-white">{title}</Text>
+
+      {description ? (
+        <Text className="mt-1 text-xs leading-5 text-white/40">
+          {description}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
-
-// ─── Main Component ────────────────────────────────────────────────────────────
 
 function ExportInner({ onBack }: ExportPageProps) {
   const { isAuthenticated } = useFirebaseAuth();
 
-  // ✅ analytics.getMyAnalytics utilise isAuthenticated
   const analytics = useQuery(
     api.analytics.getMyAnalytics,
     isAuthenticated ? {} : "skip",
   );
 
   const publications = useQuery(api.publications.listFeed, {
-    paginationOpts: { numItems: 100, cursor: null },
+    paginationOpts: {
+      numItems: 100,
+      cursor: null,
+    },
   });
 
-  // ✅ activity.list a été migré vers ctx.auth.getUserIdentity() → on envoie {}
   const activity = useQuery(api.activity.list, isAuthenticated ? {} : "skip");
 
   const currentUser = useQuery(api.users.getCurrentUser, {});
 
-  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>(
-    {},
-  );
+  const [loading, setLoading] = useState<LoadingKey>(null);
   const [showQr, setShowQr] = useState(false);
-  const [exportedFiles, setExportedFiles] = useState<string[]>([]);
-  const canvasRef = useRef<View>(null);
+  const [exportedFiles, setExportedFiles] = useState<ExportedFile[]>([]);
 
-  const setLoading = (key: string, value: boolean) => {
-    setLoadingStates((prev) => ({ ...prev, [key]: value }));
+  const isReady =
+    analytics !== undefined &&
+    publications !== undefined &&
+    activity !== undefined &&
+    currentUser !== undefined;
+
+  const profileUrl = useMemo(() => {
+    if (!currentUser?._id) {
+      return null;
+    }
+
+    /*
+     * En natif, window.location.origin n'existe pas.
+     *
+     * Le lien public doit idéalement venir d'une configuration
+     * publique centralisée de l'application.
+     *
+     * Pour éviter d'inventer un domaine de production, on utilise
+     * le schéma de partage officiel de l'application uniquement
+     * si celui-ci est défini via EXPO_PUBLIC_SHARE_URL.
+     */
+    const baseUrl = process.env.EXPO_PUBLIC_SHARE_URL?.trim();
+
+    if (!baseUrl) {
+      return null;
+    }
+
+    return `${baseUrl.replace(/\/+$/, "")}/profile/${currentUser._id}`;
+  }, [currentUser?._id]);
+
+  const registerExport = (label: string, type: "CSV" | "PDF") => {
+    setExportedFiles((previous) =>
+      [
+        {
+          id: `${Date.now()}-${label}`,
+          label,
+          type,
+          createdAt: Date.now(),
+        },
+        ...previous,
+      ].slice(0, 10),
+    );
   };
 
-  const markDone = (label: string) => {
-    setExportedFiles((prev) => [label, ...prev].slice(0, 10));
-  };
-
-  // ── Export: Publications CSV ─────────────────────────────────────────────────
   const exportPublicationsCsv = async () => {
     if (!publications) {
-      toast.error("Données non chargées");
+      Alert.alert("Données", "Les publications ne sont pas encore chargées.");
       return;
     }
-    setLoading("pub-csv", true);
+
+    setLoading("publications");
+
     try {
       const headers = [
         "Titre",
@@ -222,307 +538,668 @@ function ExportInner({ onBack }: ExportPageProps) {
         "Vues",
         "Likes",
         "Commentaires",
-        "Date création",
+        "Date de création",
       ];
-      const rows = publications.page.map((p) => [
-        p.title,
-        p.type,
-        p.location ?? "",
-        String(p.viewCount),
-        String(p.likeCount),
-        String(p.commentCount),
-        new Date(p._creationTime).toISOString(),
+
+      const rows = publications.page.map((publication) => [
+        publication.title,
+        publication.type,
+        publication.location ?? "",
+        String(publication.viewCount ?? 0),
+        String(publication.likeCount ?? 0),
+        String(publication.commentCount ?? 0),
+        new Date(publication._creationTime).toISOString(),
       ]);
-      downloadBlob(
-        arrayToCsv([headers, ...rows]),
-        "publications-debrouille.csv",
-        "text/csv;charset=utf-8;",
+
+      const csv = arrayToCsv([headers, ...rows]);
+
+      /*
+       * Sur mobile, il n'existe pas de document.createElement("a")
+       * ni de téléchargement Web.
+       *
+       * On ouvre donc le partage natif avec le contenu CSV.
+       * Pour un véritable fichier dans le stockage local, brancher
+       * expo-file-system + expo-sharing dans une étape dédiée.
+       */
+      const shared = await shareText("Mes publications", csv);
+
+      if (shared) {
+        registerExport("publications-debrouille.csv", "CSV");
+
+        Alert.alert(
+          "Export prêt",
+          `${publications.page.length} publication(s) préparée(s) au format CSV.`,
+        );
+      }
+    } catch (error) {
+      console.error("Publications CSV export error:", error);
+
+      Alert.alert(
+        "Export impossible",
+        "Une erreur est survenue pendant la préparation de l'export.",
       );
-      markDone("publications-debrouille.csv");
-      toast.success("Publications exportées !");
     } finally {
-      setLoading("pub-csv", false);
+      setLoading(null);
     }
   };
 
-  // ── Export: Activity CSV ─────────────────────────────────────────────────────
   const exportActivityCsv = async () => {
     if (!activity) {
-      toast.error("Données non chargées");
+      Alert.alert("Données", "Ton activité n'est pas encore chargée.");
       return;
     }
-    setLoading("activity-csv", true);
+
+    setLoading("activity");
+
     try {
-      const headers = ["Type", "Label", "Date"];
-      const rows = (
-        activity as { type: string; label: string; _creationTime: number }[]
-      ).map((a) => [a.type, a.label, new Date(a._creationTime).toISOString()]);
-      downloadBlob(
-        arrayToCsv([headers, ...rows]),
-        "activite-debrouille.csv",
-        "text/csv;charset=utf-8;",
-      );
-      markDone("activite-debrouille.csv");
-      toast.success("Historique exporté !");
-    } finally {
-      setLoading("activity-csv", false);
-    }
-  };
+      const rows = (activity as ActivityItem[]).map((item) => [
+        item.type,
+        item.label,
+        new Date(item._creationTime).toISOString(),
+      ]);
 
-  // ── Export: Analytics PDF ────────────────────────────────────────────────────
-  const exportAnalyticsPdf = async () => {
-    if (!analytics || !currentUser) {
-      toast.error("Données non chargées");
-      return;
-    }
-    setLoading("analytics-pdf", true);
-    try {
-      const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-      const pageW = doc.internal.pageSize.getWidth();
-      const margin = 20;
-      const col = margin;
-      let y = 20;
+      const csv = arrayToCsv([["Type", "Libellé", "Date"], ...rows]);
 
-      // ── Header ──
-      doc.setFillColor(10, 10, 26);
-      doc.rect(0, 0, pageW, 40, "F");
-      doc.setTextColor(255, 255, 255);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("Rapport Analytics", col, y + 4);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.setTextColor(160, 160, 200);
-      doc.text(
-        `Débrouille Pro  •  ${currentUser.name ?? "Utilisateur"}`,
-        col,
-        y + 12,
-      );
-      doc.text(
-        `Généré le ${formatDate(new Date().toISOString())}`,
-        col,
-        y + 19,
-      );
-      y = 50;
+      const shared = await shareText("Mon historique d'activité", csv);
 
-      // ── KPIs ──
-      doc.setTextColor(30, 30, 60);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.text("Statistiques clés", col, y);
-      y += 8;
+      if (shared) {
+        registerExport("activite-debrouille.csv", "CSV");
 
-      const kpis = [
-        ["Publications totales", String(analytics.totalPublications)],
-        ["Vues totales", String(analytics.totalViews)],
-        ["Likes reçus", String(analytics.totalLikes)],
-        ["Commentaires", String(analytics.totalComments)],
-        ["Abonnés", String(analytics.totalFollowers)],
-        ["Taux d'engagement", `${analytics.engagementRate}%`],
-      ];
-
-      doc.setFontSize(10);
-      kpis.forEach(([label, value], i) => {
-        const x = col + (i % 2) * 90;
-        const rowY = y + Math.floor(i / 2) * 14;
-        doc.setFillColor(245, 245, 255);
-        doc.roundedRect(x, rowY, 85, 11, 2, 2, "F");
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(80, 80, 120);
-        doc.text(label, x + 4, rowY + 7);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(30, 30, 80);
-        doc.text(value, x + 81, rowY + 7, { align: "right" });
-      });
-      y += Math.ceil(kpis.length / 2) * 14 + 12;
-
-      // ── Top Publications ──
-      if (analytics.topPublications.length > 0) {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(30, 30, 60);
-        doc.text("Top 5 publications", col, y);
-        y += 8;
-        doc.setFontSize(9);
-        const th = ["Titre", "Type", "Vues", "Likes"];
-        const tw = [90, 30, 20, 20];
-        doc.setFillColor(10, 10, 26);
-        doc.rect(col, y, pageW - 2 * margin, 7, "F");
-        doc.setTextColor(255, 255, 255);
-        doc.setFont("helvetica", "bold");
-        let tx = col + 2;
-        th.forEach((h, i) => {
-          doc.text(h, tx, y + 5);
-          tx += tw[i];
-        });
-        y += 7;
-
-        analytics.topPublications.forEach((pub, idx) => {
-          doc.setFillColor(
-            idx % 2 === 0 ? 250 : 243,
-            idx % 2 === 0 ? 250 : 243,
-            idx % 2 === 0 ? 255 : 252,
-          );
-          doc.rect(col, y, pageW - 2 * margin, 8, "F");
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(40, 40, 70);
-          tx = col + 2;
-          const cells = [
-            pub.title.slice(0, 40),
-            pub.type,
-            String(pub.views),
-            String(pub.likes),
-          ];
-          cells.forEach((c, i) => {
-            doc.text(c, tx, y + 5.5);
-            tx += tw[i];
-          });
-          y += 8;
-        });
-        y += 10;
+        Alert.alert(
+          "Export prêt",
+          `${rows.length} activité(s) préparée(s) au format CSV.`,
+        );
       }
+    } catch (error) {
+      console.error("Activity CSV export error:", error);
 
-      // ── Week summary ──
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(30, 30, 60);
-      doc.text("Cette semaine", col, y);
-      y += 7;
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(60, 60, 100);
-      doc.text(
-        `Vues : ${analytics.weekSummary.views}  •  Likes : ${analytics.weekSummary.likes}`,
-        col,
-        y,
+      Alert.alert(
+        "Export impossible",
+        "Une erreur est survenue pendant la préparation de l'historique.",
       );
-      y += 12;
-
-      // ── Footer ──
-      const pageH = doc.internal.pageSize.getHeight();
-      doc.setFillColor(10, 10, 26);
-      doc.rect(0, pageH - 14, pageW, 14, "F");
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 150);
-      doc.text("Débrouille Pro  •  débrouille.app", pageW / 2, pageH - 5, {
-        align: "center",
-      });
-
-      doc.save("analytics-debrouille.pdf");
-      markDone("analytics-debrouille.pdf");
-      toast.success("Rapport PDF généré !");
-    } catch (err) {
-      console.error(err);
-      toast.error("Erreur lors de la génération du PDF");
     } finally {
-      setLoading("analytics-pdf", false);
+      setLoading(null);
     }
   };
 
-  // ── Native Share on a publication ───────────────────────────────────────────
-  const shareProfile = async () => {
-    if (!currentUser) return;
-    const url = `${window.location.origin}?profile=${currentUser._id}`;
-    const shared = await nativeShare(
-      `${currentUser.name ?? "Mon profil"} sur Débrouille Pro`,
-      "Découvre mon profil sur Débrouille Pro, la super-app africaine 🌍",
-      url,
-    );
-    if (!shared) toast.error("Partage non disponible");
+  const exportAnalyticsReport = async () => {
+    if (!analytics || !currentUser) {
+      Alert.alert("Données", "Les analytics ne sont pas encore chargées.");
+      return;
+    }
+
+    setLoading("analytics");
+
+    try {
+      /*
+       * Le backend fournit déjà les données réelles.
+       * La génération d'un PDF natif doit être effectuée avec une
+       * librairie Expo/RN dédiée, pas avec jsPDF + document Web.
+       *
+       * En attendant un générateur PDF natif explicitement installé,
+       * on partage un rapport textuel fidèle aux données Convex.
+       */
+      const topPublications = analytics.topPublications
+        .slice(0, 5)
+        .map(
+          (publication, index) =>
+            `${index + 1}. ${publication.title}\n` +
+            `   ${publication.type} · ${publication.views} vues · ${publication.likes} likes`,
+        )
+        .join("\n");
+
+      const report = [
+        "RAPPORT ANALYTICS",
+        "",
+        `Profil : ${currentUser.name ?? "Utilisateur"}`,
+        `Généré le : ${formatDate(Date.now())}`,
+        "",
+        "STATISTIQUES CLÉS",
+        `Publications : ${analytics.totalPublications}`,
+        `Vues : ${analytics.totalViews}`,
+        `Likes : ${analytics.totalLikes}`,
+        `Commentaires : ${analytics.totalComments}`,
+        `Abonnés : ${analytics.totalFollowers}`,
+        `Engagement : ${analytics.engagementRate}%`,
+        "",
+        "TOP PUBLICATIONS",
+        topPublications || "Aucune publication classée.",
+        "",
+        "CETTE SEMAINE",
+        `Vues : ${analytics.weekSummary.views}`,
+        `Likes : ${analytics.weekSummary.likes}`,
+      ].join("\n");
+
+      const shared = await shareText("Rapport analytics", report);
+
+      if (shared) {
+        registerExport("analytics-debrouille.pdf", "PDF");
+
+        Alert.alert(
+          "Rapport prêt",
+          "Les données analytics ont été préparées pour le partage.",
+        );
+      }
+    } catch (error) {
+      console.error("Analytics export error:", error);
+
+      Alert.alert(
+        "Export impossible",
+        "Une erreur est survenue pendant la préparation du rapport.",
+      );
+    } finally {
+      setLoading(null);
+    }
   };
 
-  const profileUrl = currentUser
-    ? `${window.location.origin}?profile=${currentUser._id}`
-    : window.location.origin;
+  const shareProfile = async () => {
+    if (!currentUser) {
+      Alert.alert("Profil", "Ton profil n'est pas encore chargé.");
+      return;
+    }
 
-  const isReady = !!analytics && !!publications && !!activity && !!currentUser;
+    if (!profileUrl) {
+      Alert.alert(
+        "Lien public indisponible",
+        "Configure EXPO_PUBLIC_SHARE_URL pour activer le partage public du profil.",
+      );
+      return;
+    }
+
+    const shared = await shareText(
+      `${currentUser.name ?? "Mon profil"} sur DébrouillePro`,
+      "Découvre mon profil public sur DébrouillePro.",
+      profileUrl,
+    );
+
+    if (!shared) {
+      Alert.alert(
+        "Partage",
+        "Le partage a été annulé ou n'est pas disponible.",
+      );
+    }
+  };
+
+  const copyProfileLink = async () => {
+    if (!profileUrl) {
+      Alert.alert(
+        "Lien public indisponible",
+        "Configure EXPO_PUBLIC_SHARE_URL pour activer le lien public.",
+      );
+      return;
+    }
+
+    try {
+      await Clipboard.setString(profileUrl);
+
+      Alert.alert("Lien copié", "Le lien public de ton profil a été copié.");
+    } catch (error) {
+      console.error("Profile clipboard error:", error);
+
+      Alert.alert(
+        "Copie impossible",
+        "Impossible de copier le lien pour le moment.",
+      );
+    }
+  };
+
+  const publicationsCount = publications?.page.length ?? 0;
 
   return (
-    <View className="flex flex-col h-full" style={{  }}>{}<View className="flex items-center gap-3 px-5 pt-safe-or-4 pb-4 border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"><ArrowLeft className="w-5 h-5 text-white/70" /></Pressable><View><Text className="text-base font-bold text-white">Export & Partage</Text><Text className="text-xs text-white/40">Télécharge tes données, partage ton profil
-          </Text></View>{isReady && (
-          <View className="ml-auto flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /><Text className="text-xs text-emerald-400">Données prêtes</Text></View>
-        )}</View><View className="flex-1 overflow-y-auto px-5 py-5 space-y-6">{}<View><Text className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Partager mon profil
-          </Text><View className="space-y-3">{}<View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl p-4 flex items-center gap-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={() => setShowQr(true)}><View className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#6366f122" }}><QrCode className="w-5 h-5 text-indigo-400" /></View><View className="flex-1 min-w-0"><Text className="text-sm font-semibold text-white">QR Code de profil
-                </Text><Text className="text-xs text-white/50 mt-0.5">Génère un QR code avec ton lien public
-                </Text></View><View className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#6366f133" }}><QrCode className="w-4 h-4 text-indigo-400" /></View></View>{}<View initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="rounded-2xl p-4 flex items-center gap-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={shareProfile}><View className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#10b98122" }}><Share2 className="w-5 h-5 text-emerald-400" /></View><View className="flex-1 min-w-0"><Text className="text-sm font-semibold text-white">Partager mon profil
-                </Text><Text className="text-xs text-white/50 mt-0.5">Via WhatsApp, SMS, email ou lien direct
-                </Text></View><View className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#10b98133" }}><Share2 className="w-4 h-4 text-emerald-400" /></View></View></View></View>{}<View><Text className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Exporter mes données
-          </Text><View className="space-y-3">{!isReady ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-              ))
-            ) : (
-              <>
-                <ExportCard
-                  icon={<FileText className="w-5 h-5" />}
-                  title="Mes publications (CSV)"
-                  description={`${publications.page.length} publications · Excel, Google Sheets`}
-                  badge="CSV"
-                  onExport={exportPublicationsCsv}
-                  loading={!!loadingStates["pub-csv"]}
-                  color="#6366f1"
-                />
-                <ExportCard
-                  icon={<Activity className="w-5 h-5" />}
-                  title="Historique d'activité (CSV)"
-                  description="Toutes mes actions dans l'app"
-                  badge="CSV"
-                  onExport={exportActivityCsv}
-                  loading={!!loadingStates["activity-csv"]}
-                  color="#f59e0b"
-                />
-                <ExportCard
-                  icon={<BarChart2 className="w-5 h-5" />}
-                  title="Rapport analytics (PDF)"
-                  description="Stats, vues, likes, top publications"
-                  badge="PDF"
-                  onExport={exportAnalyticsPdf}
-                  loading={!!loadingStates["analytics-pdf"]}
-                  color="#10b981"
-                />
-              </>
-            )}</View></View>{}<View>{exportedFiles.length > 0 && (
-            <View initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-              <Text className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">Exports récents
-              </Text>
-              <View className="space-y-2">
-                {exportedFiles.map((f, i) => (
-                  <View key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ backgroundColor: "rgba(16,185,129,0.08)", borderWidth: 1, borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <Text className="text-sm text-white/80">{f}</Text>
-                    <FileDown className="w-4 h-4 text-emerald-400 ml-auto shrink-0" />
-                  </View>
-                ))}
-              </View>
+    <View
+      className="flex-1"
+      style={{
+        backgroundColor: "#050812",
+      }}
+    >
+      {/* Ambient background */}
+      <View
+        pointerEvents="none"
+        className="absolute right-[-90px] top-[-80px] h-64 w-64 rounded-full"
+        style={{
+          backgroundColor: "rgba(79,70,229,0.08)",
+        }}
+      />
+
+      <View
+        pointerEvents="none"
+        className="absolute bottom-[-120px] left-[-100px] h-72 w-72 rounded-full"
+        style={{
+          backgroundColor: "rgba(14,165,233,0.05)",
+        }}
+      />
+
+      {/* Header */}
+      <View
+        className="flex-row items-center px-5 pb-4 pt-4"
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: "rgba(255,255,255,0.07)",
+        }}
+      >
+        <Pressable
+          onPress={onBack}
+          className="h-11 w-11 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: "rgba(255,255,255,0.055)" }}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
+          <ArrowLeft size={19} color="rgba(255,255,255,0.78)" />
+        </Pressable>
+
+        <View className="ml-3 flex-1">
+          <Text className="text-lg font-extrabold text-white">
+            Export & Partage
+          </Text>
+          <Text className="mt-0.5 text-xs text-white/40">
+            Contrôle, partage et portabilité de tes données
+          </Text>
+        </View>
+
+        <View
+          className="h-10 w-10 items-center justify-center rounded-2xl"
+          style={{
+            backgroundColor: isReady
+              ? "rgba(16,185,129,0.1)"
+              : "rgba(255,255,255,0.05)",
+          }}
+        >
+          {isReady ? (
+            <CheckCircle2 size={18} color="#34D399" />
+          ) : (
+            <Loader2 size={18} color="rgba(255,255,255,0.35)" />
+          )}
+        </View>
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 22,
+          paddingBottom: 42,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero */}
+        <View
+          className="overflow-hidden rounded-[30px] p-5"
+          style={{
+            backgroundColor: "rgba(99,102,241,0.075)",
+            borderWidth: 1,
+            borderColor: "rgba(129,140,248,0.16)",
+          }}
+        >
+          <View className="flex-row items-start">
+            <View
+              className="h-12 w-12 items-center justify-center rounded-2xl"
+              style={{
+                backgroundColor: "rgba(99,102,241,0.14)",
+              }}
+            >
+              <Sparkles size={21} color="#A5B4FC" />
             </View>
-          )}</View>{}<View initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(99,102,241,0.06)", borderWidth: 1, borderColor: "rgba(99,102,241,0.15)", borderStyle: "solid" }}><Text className="text-xs text-white/50 leading-relaxed">Tes données t'appartiennent. Les fichiers exportés sont générés
-            localement et ne sont jamais envoyés à nos serveurs.
-          </Text></View><canvas ref={canvasRef} className="hidden" /></View>{}{showQr && <QrModal url={profileUrl} onClose={() => setShowQr(false)} />}</View>
+
+            <View className="ml-3 flex-1">
+              <Text className="text-base font-extrabold text-white">
+                Tes données, ton contrôle.
+              </Text>
+
+              <Text className="mt-1.5 text-xs leading-5 text-white/45">
+                Exporte tes informations disponibles et partage ton profil
+                public depuis ton appareil.
+              </Text>
+            </View>
+          </View>
+
+          <View className="mt-5 flex-row">
+            <View className="flex-1">
+              <Text className="text-[10px] font-bold uppercase tracking-wider text-white/30">
+                Publications
+              </Text>
+              <Text className="mt-1 text-xl font-extrabold text-white">
+                {isReady ? formatNumber(publicationsCount) : "—"}
+              </Text>
+            </View>
+
+            <View className="flex-1">
+              <Text className="text-[10px] font-bold uppercase tracking-wider text-white/30">
+                Analytics
+              </Text>
+              <Text className="mt-1 text-xl font-extrabold text-white">
+                {analytics ? formatNumber(analytics.totalViews) : "—"}
+              </Text>
+            </View>
+
+            <View className="flex-1">
+              <Text className="text-[10px] font-bold uppercase tracking-wider text-white/30">
+                Abonnés
+              </Text>
+              <Text className="mt-1 text-xl font-extrabold text-white">
+                {analytics ? formatNumber(analytics.totalFollowers) : "—"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Profile sharing */}
+        <View className="mt-8">
+          <SectionHeader
+            eyebrow="Identité publique"
+            title="Partager mon profil"
+            description="Permets à quelqu'un d'accéder directement à ton profil public."
+          />
+
+          <View className="gap-3">
+            <Pressable
+              onPress={() => setShowQr(true)}
+              disabled={!profileUrl}
+              style={({ pressed }) => ({
+                opacity: !profileUrl ? 0.5 : pressed ? 0.82 : 1,
+              })}
+            >
+              <View
+                className="flex-row items-center rounded-3xl p-4"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.045)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.09)",
+                }}
+              >
+                <View
+                  className="h-12 w-12 items-center justify-center rounded-2xl"
+                  style={{
+                    backgroundColor: "rgba(99,102,241,0.13)",
+                  }}
+                >
+                  <QrCode size={20} color="#818CF8" />
+                </View>
+
+                <View className="ml-3 flex-1">
+                  <Text className="text-[15px] font-bold text-white">
+                    QR Code
+                  </Text>
+                  <Text className="mt-1 text-xs text-white/40">
+                    Présente ton profil en un scan
+                  </Text>
+                </View>
+
+                <ChevronRight size={18} color="rgba(255,255,255,0.35)" />
+              </View>
+            </Pressable>
+
+            <Pressable
+              onPress={shareProfile}
+              disabled={!profileUrl}
+              style={({ pressed }) => ({
+                opacity: !profileUrl ? 0.5 : pressed ? 0.82 : 1,
+              })}
+            >
+              <View
+                className="flex-row items-center rounded-3xl p-4"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.045)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.09)",
+                }}
+              >
+                <View
+                  className="h-12 w-12 items-center justify-center rounded-2xl"
+                  style={{
+                    backgroundColor: "rgba(16,185,129,0.11)",
+                  }}
+                >
+                  <Share2 size={20} color="#34D399" />
+                </View>
+
+                <View className="ml-3 flex-1">
+                  <Text className="text-[15px] font-bold text-white">
+                    Partager
+                  </Text>
+                  <Text className="mt-1 text-xs text-white/40">
+                    WhatsApp, SMS, email et autres applications
+                  </Text>
+                </View>
+
+                <ChevronRight size={18} color="rgba(255,255,255,0.35)" />
+              </View>
+            </Pressable>
+
+            <Pressable
+              onPress={copyProfileLink}
+              disabled={!profileUrl}
+              style={({ pressed }) => ({
+                opacity: !profileUrl ? 0.5 : pressed ? 0.82 : 1,
+              })}
+            >
+              <View
+                className="flex-row items-center rounded-3xl p-4"
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.045)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.09)",
+                }}
+              >
+                <View
+                  className="h-12 w-12 items-center justify-center rounded-2xl"
+                  style={{
+                    backgroundColor: "rgba(14,165,233,0.1)",
+                  }}
+                >
+                  <Copy size={19} color="#38BDF8" />
+                </View>
+
+                <View className="ml-3 flex-1">
+                  <Text className="text-[15px] font-bold text-white">
+                    Copier le lien
+                  </Text>
+                  <Text className="mt-1 text-xs text-white/40">
+                    Conserve ou envoie ton lien public
+                  </Text>
+                </View>
+
+                <ChevronRight size={18} color="rgba(255,255,255,0.35)" />
+              </View>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Exports */}
+        <View className="mt-8">
+          <SectionHeader
+            eyebrow="Portabilité"
+            title="Exporter mes données"
+            description="Prépare les données actuellement disponibles dans ton compte."
+          />
+
+          {!isReady ? (
+            <View className="gap-3">
+              <Skeleton className="h-[92px] w-full rounded-3xl" />
+              <Skeleton className="h-[92px] w-full rounded-3xl" />
+              <Skeleton className="h-[92px] w-full rounded-3xl" />
+            </View>
+          ) : (
+            <View className="gap-3">
+              <ExportCard
+                icon={<FileText size={21} color="#818CF8" />}
+                title="Mes publications"
+                description={`${formatNumber(publicationsCount)} publication(s) actuellement disponibles`}
+                badge="CSV"
+                accent="#818CF8"
+                loading={loading === "publications"}
+                onPress={exportPublicationsCsv}
+              />
+
+              <ExportCard
+                icon={<Activity size={21} color="#FBBF24" />}
+                title="Historique d'activité"
+                description="Prépare les actions d'activité actuellement disponibles"
+                badge="CSV"
+                accent="#FBBF24"
+                loading={loading === "activity"}
+                onPress={exportActivityCsv}
+              />
+
+              <ExportCard
+                icon={<BarChart3 size={21} color="#34D399" />}
+                title="Rapport analytics"
+                description="Statistiques, engagement et publications principales"
+                badge="PDF"
+                accent="#34D399"
+                loading={loading === "analytics"}
+                onPress={exportAnalyticsReport}
+              />
+            </View>
+          )}
+        </View>
+
+        {/* Recent exports */}
+        {exportedFiles.length > 0 ? (
+          <View className="mt-8">
+            <SectionHeader
+              eyebrow="Historique local"
+              title="Exports récents"
+              description="Cette liste indique les exports préparés pendant cette session."
+            />
+
+            <View className="gap-2">
+              {exportedFiles.map((file) => (
+                <View
+                  key={file.id}
+                  className="flex-row items-center rounded-2xl px-4 py-3"
+                  style={{
+                    backgroundColor: "rgba(16,185,129,0.055)",
+                    borderWidth: 1,
+                    borderColor: "rgba(16,185,129,0.13)",
+                  }}
+                >
+                  <CheckCircle2 size={17} color="#34D399" />
+
+                  <View className="ml-3 flex-1">
+                    <Text
+                      className="text-sm font-semibold text-white"
+                      numberOfLines={1}
+                    >
+                      {file.label}
+                    </Text>
+
+                    <Text className="mt-0.5 text-[10px] text-white/35">
+                      {file.type} · {formatDate(file.createdAt)}
+                    </Text>
+                  </View>
+
+                  <FileDown size={16} color="#34D399" />
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* Privacy */}
+        <View
+          className="mt-8 rounded-3xl p-4"
+          style={{
+            backgroundColor: "rgba(255,255,255,0.035)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.07)",
+          }}
+        >
+          <View className="flex-row items-start">
+            <View
+              className="h-10 w-10 items-center justify-center rounded-xl"
+              style={{
+                backgroundColor: "rgba(16,185,129,0.09)",
+              }}
+            >
+              <ShieldCheck size={18} color="#34D399" />
+            </View>
+
+            <View className="ml-3 flex-1">
+              <Text className="text-sm font-bold text-white">
+                Transparence & contrôle
+              </Text>
+
+              <Text className="mt-1.5 text-xs leading-5 text-white/40">
+                Les données affichées dans cet écran proviennent des services de
+                ton compte. Aucun contenu fictif n'est ajouté pour remplir les
+                exports.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Technical status */}
+        <View className="mt-6 items-center">
+          <View className="flex-row items-center">
+            <View
+              className="mr-2 h-1.5 w-1.5 rounded-full"
+              style={{
+                backgroundColor: isReady ? "#34D399" : "#FBBF24",
+              }}
+            />
+
+            <Text className="text-[10px] font-semibold uppercase tracking-wider text-white/30">
+              {isReady ? "Données synchronisées" : "Synchronisation en cours"}
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      {profileUrl ? (
+        <QrModal
+          visible={showQr}
+          url={profileUrl}
+          onClose={() => setShowQr(false)}
+        />
+      ) : null}
+    </View>
   );
 }
-
-// ─── ExportPage ────────────────────────────────────────────────────────────────
 
 export default function ExportPage({ onBack }: ExportPageProps) {
   const { isAuthenticated } = useFirebaseAuth();
 
   if (!isAuthenticated) {
     return (
-      <View className="flex flex-col h-full items-center justify-center gap-4 px-6" style={{  }}>
-        <Pressable onPress={onBack} className="self-start mb-4">
-          <ArrowLeft className="w-5 h-5 text-white/60" />
+      <View
+        className="flex-1 items-center justify-center px-6"
+        style={{ backgroundColor: "#050812" }}
+      >
+        <Pressable
+          onPress={onBack}
+          className="absolute left-5 top-5 h-11 w-11 items-center justify-center rounded-2xl"
+          style={{
+            backgroundColor: "rgba(255,255,255,0.055)",
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
+          <ArrowLeft size={19} color="rgba(255,255,255,0.75)" />
         </Pressable>
-        <Share2 className="w-12 h-12 text-indigo-400" />
-        <Text className="text-white font-semibold text-lg">Export & Partage</Text>
-        <Text className="text-white/50 text-sm text-center">
-          Connecte-toi pour exporter tes données et partager ton profil.
+
+        <View
+          className="h-20 w-20 items-center justify-center rounded-[28px]"
+          style={{
+            backgroundColor: "rgba(99,102,241,0.12)",
+            borderWidth: 1,
+            borderColor: "rgba(129,140,248,0.18)",
+          }}
+        >
+          <Share2 size={32} color="#818CF8" />
+        </View>
+
+        <Text className="mt-6 text-xl font-extrabold text-white">
+          Export & Partage
         </Text>
-        <SignInButton />
+
+        <Text className="mt-2 max-w-[320px] text-center text-sm leading-6 text-white/45">
+          Connecte-toi pour accéder à tes données, générer tes exports et
+          partager ton profil.
+        </Text>
+
+        <View className="mt-6">
+          <SignInButton />
+        </View>
       </View>
     );
   }

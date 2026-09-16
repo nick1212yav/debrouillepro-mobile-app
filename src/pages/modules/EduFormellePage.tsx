@@ -1,155 +1,59 @@
-import { View, Pressable, Text, TextInput, Image } from "react-native";
-import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
-import { api } from "@/convex/_generated/api.js";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
-import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
+import React, { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import {
   ArrowLeft,
-  GraduationCap,
-  BookOpen,
-  DollarSign,
-  MapPin,
-  Calendar,
-  Star,
-  ChevronRight,
-  Search,
   Award,
-  CheckCircle,
-  Clock,
+  BookOpen,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  GraduationCap,
+  Search,
+  Sparkles,
   Users,
+  X,
 } from "lucide-react-native";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import {
+  Authenticated,
+  Unauthenticated,
+  AuthLoading,
+} from "@/lib/convex-auth-compat";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
-// ─── Static fallback data ────────────────────────────────────────────────────
+interface EduFormellePageProps {
+  onBack: () => void;
+}
 
-const SCHOOLS_STATIC = [
+type TabKey = "cours" | "bourses" | "programmes";
+
+const TABS: Array<{
+  key: TabKey;
+  label: string;
+}> = [
   {
-    id: 1,
-    name: "Université Félix Houphouët-Boigny",
-    type: "Université publique",
-    city: "Abidjan",
-    rating: 4.2,
-    students: 80000,
-    programs: 120,
-    tuition: "Gratuit (publique)",
-    img: "https://images.unsplash.com/photo-1562774053-701939374585?w=400&h=200&fit=crop",
-    color: "#6366F1",
+    key: "cours",
+    label: "Cours",
   },
   {
-    id: 2,
-    name: "INPHB Yamoussoukro",
-    type: "Grande école",
-    city: "Yamoussoukro",
-    rating: 4.7,
-    students: 12000,
-    programs: 45,
-    tuition: "250 000 FCFA/an",
-    img: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=400&h=200&fit=crop",
-    color: "#F97316",
+    key: "bourses",
+    label: "Bourses",
   },
   {
-    id: 3,
-    name: "ESCA École de Management",
-    type: "École privée",
-    city: "Abidjan",
-    rating: 4.5,
-    students: 3000,
-    programs: 18,
-    tuition: "1 500 000 FCFA/an",
-    img: "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400&h=200&fit=crop",
-    color: "#10B981",
-  },
-  {
-    id: 4,
-    name: "IAI – Institut Africain",
-    type: "Institut tech",
-    city: "Abidjan",
-    rating: 4.6,
-    students: 5000,
-    programs: 22,
-    tuition: "800 000 FCFA/an",
-    img: "https://images.unsplash.com/photo-1606761568499-6d2451b23c66?w=400&h=200&fit=crop",
-    color: "#8B5CF6",
+    key: "programmes",
+    label: "Programmes",
   },
 ];
-
-const SCHOLARSHIPS_STATIC = [
-  {
-    name: "Bourse d'Excellence CGECI",
-    amount: "500 000 FCFA",
-    deadline: "30 Juil 2025",
-    level: "Licence",
-    field: "Toutes filières",
-    status: "Ouvert",
-  },
-  {
-    name: "Bourse BAD – Ingénierie",
-    amount: "2 000 000 FCFA",
-    deadline: "15 Août 2025",
-    level: "Master",
-    field: "Ingénierie & Tech",
-    status: "Ouvert",
-  },
-  {
-    name: "AFD Mobilité Internationale",
-    amount: "5 000 €",
-    deadline: "1 Sept 2025",
-    level: "Master/Doctorat",
-    field: "Sciences sociales",
-    status: "Bientôt",
-  },
-  {
-    name: "Bourse Gouvernement Marocain",
-    amount: "Couverture totale",
-    deadline: "31 Juil 2025",
-    level: "Licence",
-    field: "Toutes filières",
-    status: "Ouvert",
-  },
-];
-
-const PROGRAMS_STATIC = [
-  {
-    name: "Informatique & IA",
-    school: "IAI",
-    duration: "3 ans (Licence)",
-    level: "Bac+3",
-    demand: "Très élevée",
-  },
-  {
-    name: "Finance & Comptabilité",
-    school: "ESCA",
-    duration: "2 ans (Master)",
-    level: "Bac+5",
-    demand: "Élevée",
-  },
-  {
-    name: "Génie Civil",
-    school: "INPHB",
-    duration: "5 ans (Ingénieur)",
-    level: "Bac+5",
-    demand: "Élevée",
-  },
-  {
-    name: "Médecine Générale",
-    school: "UFHB",
-    duration: "7 ans",
-    level: "Bac+7",
-    demand: "Très élevée",
-  },
-  {
-    name: "Droit des Affaires",
-    school: "UFHB",
-    duration: "3 ans (Licence)",
-    level: "Bac+3",
-    demand: "Moyenne",
-  },
-];
-
-// ─── Level label mapping ─────────────────────────────────────────────────────
 
 const LEVEL_LABELS: Record<string, string> = {
   debutant: "Débutant",
@@ -157,280 +61,885 @@ const LEVEL_LABELS: Record<string, string> = {
   avance: "Avancé",
 };
 
-// ─── Inner authenticated content ─────────────────────────────────────────────
+const ACCENT = "#A78BFA";
+const SUCCESS = "#10B981";
+const WARNING = "#F59E0B";
 
-function EduFormelleContent({ onBack }: { onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState("Écoles");
-  const [searchQ, setSearchQ] = useState("");
-  const [savedSchools, setSavedSchools] = useState<Set<number>>(new Set());
-  const [appliedScholarships, setAppliedScholarships] = useState<Set<number>>(
-    new Set(),
+function Header({ onBack }: { onBack: () => void }) {
+  return (
+    <View
+      className="flex-row items-center px-5 pb-4 pt-4"
+      style={{
+        backgroundColor: "rgba(2,6,23,0.97)",
+        borderBottomWidth: 1,
+        borderBottomColor: "rgba(255,255,255,0.06)",
+      }}
+    >
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="Retour"
+        className="h-11 w-11 items-center justify-center rounded-2xl"
+        style={({ pressed }) => ({
+          backgroundColor: pressed
+            ? "rgba(255,255,255,0.11)"
+            : "rgba(255,255,255,0.055)",
+          transform: [{ scale: pressed ? 0.94 : 1 }],
+        })}
+      >
+        <ArrowLeft size={19} color="rgba(255,255,255,0.9)" strokeWidth={2.3} />
+      </Pressable>
+
+      <View className="ml-3 flex-1">
+        <Text className="text-[18px] font-black text-white">Éducation</Text>
+
+        <Text className="mt-0.5 text-[11px] text-white/35">
+          Apprendre · Progresser · Se former
+        </Text>
+      </View>
+
+      <View
+        className="h-10 w-10 items-center justify-center rounded-2xl"
+        style={{
+          backgroundColor: `${ACCENT}16`,
+          borderWidth: 1,
+          borderColor: `${ACCENT}28`,
+        }}
+      >
+        <GraduationCap size={18} color={ACCENT} strokeWidth={2.1} />
+      </View>
+    </View>
   );
-  const [enrollingId, setEnrollingId] = useState<Id<"courses"> | null>(null);
+}
 
-  // Convex queries
+function Hero() {
+  return (
+    <View className="mx-5 mt-5">
+      <View className="flex-row items-center">
+        <View
+          className="h-2 w-2 rounded-full"
+          style={{
+            backgroundColor: ACCENT,
+          }}
+        />
+
+        <Text
+          className="ml-2 text-[10px] font-black uppercase"
+          style={{
+            color: ACCENT,
+            letterSpacing: 1.8,
+          }}
+        >
+          ÉDUCATION FORMELLE
+        </Text>
+      </View>
+
+      <Text className="mt-2 text-[25px] font-black leading-8 text-white">
+        Construis ton avenir
+        {"\n"}
+        par l'apprentissage.
+      </Text>
+
+      <Text className="mt-2 text-[12px] leading-5 text-white/35">
+        Découvre les formations disponibles et gère tes inscriptions depuis un
+        seul espace.
+      </Text>
+    </View>
+  );
+}
+
+function StatCard({
+  icon,
+  value,
+  label,
+  accent,
+}: {
+  icon: React.ReactNode;
+  value: string;
+  label: string;
+  accent: string;
+}) {
+  return (
+    <View
+      className="flex-1 rounded-2xl p-3"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.035)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.065)",
+      }}
+    >
+      <View
+        className="mb-2 h-8 w-8 items-center justify-center rounded-xl"
+        style={{
+          backgroundColor: `${accent}14`,
+        }}
+      >
+        {icon}
+      </View>
+
+      <Text className="text-[17px] font-black text-white">{value}</Text>
+
+      <Text numberOfLines={1} className="mt-0.5 text-[9px] text-white/30">
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function Stats({
+  coursesCount,
+  enrolledCount,
+}: {
+  coursesCount: number;
+  enrolledCount: number;
+}) {
+  return (
+    <View className="mx-5 mt-5 flex-row gap-2">
+      <StatCard
+        icon={<BookOpen size={15} color={ACCENT} strokeWidth={2} />}
+        value={String(coursesCount)}
+        label="Cours disponibles"
+        accent={ACCENT}
+      />
+
+      <StatCard
+        icon={<CheckCircle2 size={15} color={SUCCESS} strokeWidth={2} />}
+        value={String(enrolledCount)}
+        label="Mes inscriptions"
+        accent={SUCCESS}
+      />
+
+      <StatCard
+        icon={<Sparkles size={15} color={WARNING} strokeWidth={2} />}
+        value="—"
+        label="Progression"
+        accent={WARNING}
+      />
+    </View>
+  );
+}
+
+function TabBar({
+  activeTab,
+  onChange,
+}: {
+  activeTab: TabKey;
+  onChange: (tab: TabKey) => void;
+}) {
+  return (
+    <View
+      className="mx-5 mt-5 flex-row rounded-2xl p-1"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.035)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.055)",
+      }}
+    >
+      {TABS.map((tab) => {
+        const active = tab.key === activeTab;
+
+        return (
+          <Pressable
+            key={tab.key}
+            onPress={() => onChange(tab.key)}
+            accessibilityRole="tab"
+            accessibilityState={{
+              selected: active,
+            }}
+            className="flex-1 items-center justify-center rounded-xl py-2.5"
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.72 : 1,
+              backgroundColor: active
+                ? "rgba(167,139,250,0.14)"
+                : "transparent",
+            })}
+          >
+            <Text
+              className="text-[11px] font-bold"
+              style={{
+                color: active ? "#FFFFFF" : "rgba(255,255,255,0.35)",
+              }}
+            >
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function SearchBar({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <View
+      className="mb-4 flex-row items-center rounded-2xl px-3.5"
+      style={{
+        minHeight: 46,
+        backgroundColor: "rgba(255,255,255,0.035)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.065)",
+      }}
+    >
+      <Search size={16} color="rgba(255,255,255,0.35)" strokeWidth={2} />
+
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder="Rechercher un cours ou une catégorie…"
+        placeholderTextColor="rgba(255,255,255,0.25)"
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+        className="ml-3 flex-1 text-[13px] text-white"
+      />
+
+      {value.length > 0 ? (
+        <Pressable
+          onPress={() => onChange("")}
+          accessibilityRole="button"
+          accessibilityLabel="Effacer la recherche"
+          className="h-7 w-7 items-center justify-center rounded-full"
+          style={{
+            backgroundColor: "rgba(255,255,255,0.06)",
+          }}
+        >
+          <X size={13} color="rgba(255,255,255,0.5)" />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function LoadingCourses() {
+  return (
+    <View
+      className="items-center rounded-[24px] px-6 py-12"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.06)",
+      }}
+    >
+      <ActivityIndicator size="small" color={ACCENT} />
+
+      <Text className="mt-3 text-[12px] text-white/35">
+        Chargement des formations…
+      </Text>
+    </View>
+  );
+}
+
+function EmptyCourses({ searching }: { searching: boolean }) {
+  return (
+    <View
+      className="items-center rounded-[24px] px-6 py-11"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.06)",
+      }}
+    >
+      <View
+        className="h-14 w-14 items-center justify-center rounded-2xl"
+        style={{
+          backgroundColor: `${ACCENT}12`,
+        }}
+      >
+        <BookOpen size={23} color={`${ACCENT}CC`} strokeWidth={2} />
+      </View>
+
+      <Text className="mt-4 text-center text-[15px] font-black text-white">
+        {searching ? "Aucun résultat" : "Aucun cours disponible"}
+      </Text>
+
+      <Text className="mt-2 max-w-[310px] text-center text-[12px] leading-5 text-white/30">
+        {searching
+          ? "Aucun cours publié ne correspond à votre recherche."
+          : "Aucun cours publié n'est actuellement disponible dans les données connectées."}
+      </Text>
+    </View>
+  );
+}
+
+function CourseCard({
+  course,
+  enrolled,
+  enrolling,
+  onEnroll,
+}: {
+  course: {
+    _id: Id<"courses">;
+    title: string;
+    description: string;
+    category: string;
+    level: string;
+    lessonCount: number;
+    duration?: string;
+    enrollmentCount: number;
+    rating?: number;
+    isFree: boolean;
+    price: number;
+    currency: string;
+    coverImage?: string;
+  };
+  enrolled: boolean;
+  enrolling: boolean;
+  onEnroll: () => void;
+}) {
+  return (
+    <View
+      className="overflow-hidden rounded-[24px]"
+      style={{
+        backgroundColor: "rgba(255,255,255,0.035)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.07)",
+      }}
+    >
+      {course.coverImage ? (
+        <View className="relative h-44">
+          <View
+            className="absolute inset-0"
+            style={{
+              backgroundColor: "rgba(2,4,18,0.18)",
+              zIndex: 1,
+            }}
+          />
+
+          <Image
+            source={{
+              uri: course.coverImage,
+            }}
+            className="h-full w-full"
+            resizeMode="cover"
+            accessibilityLabel={course.title}
+          />
+
+          <View
+            className="absolute left-3 top-3 rounded-full px-2.5 py-1"
+            style={{
+              backgroundColor: "rgba(2,4,18,0.78)",
+              zIndex: 2,
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.10)",
+            }}
+          >
+            <Text className="text-[9px] font-bold text-white">
+              {course.category}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View
+          className="h-36 items-center justify-center"
+          style={{
+            backgroundColor: `${ACCENT}10`,
+          }}
+        >
+          <View
+            className="h-16 w-16 items-center justify-center rounded-3xl"
+            style={{
+              backgroundColor: `${ACCENT}12`,
+              borderWidth: 1,
+              borderColor: `${ACCENT}22`,
+            }}
+          >
+            <GraduationCap size={31} color={ACCENT} strokeWidth={1.8} />
+          </View>
+
+          <View
+            className="absolute left-3 top-3 rounded-full px-2.5 py-1"
+            style={{
+              backgroundColor: "rgba(2,4,18,0.72)",
+            }}
+          >
+            <Text className="text-[9px] font-bold text-white">
+              {course.category}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      <View className="p-4">
+        <Text
+          numberOfLines={2}
+          className="text-[16px] font-black leading-5 text-white"
+        >
+          {course.title}
+        </Text>
+
+        {course.description ? (
+          <Text
+            numberOfLines={3}
+            className="mt-2 text-[11px] leading-4 text-white/35"
+          >
+            {course.description}
+          </Text>
+        ) : null}
+
+        <View
+          className="mt-4 flex-row flex-wrap items-center"
+          style={{
+            columnGap: 12,
+            rowGap: 7,
+          }}
+        >
+          <Meta
+            icon={<BookOpen size={12} color="rgba(255,255,255,0.38)" />}
+            label={`${course.lessonCount} ${
+              course.lessonCount > 1 ? "leçons" : "leçon"
+            }`}
+          />
+
+          {course.duration ? (
+            <Meta
+              icon={<Clock3 size={12} color="rgba(255,255,255,0.38)" />}
+              label={course.duration}
+            />
+          ) : null}
+
+          <Meta
+            icon={<Users size={12} color="rgba(255,255,255,0.38)" />}
+            label={String(course.enrollmentCount)}
+          />
+
+          {course.rating !== undefined ? (
+            <Meta
+              icon={<Sparkles size={12} color={WARNING} />}
+              label={course.rating.toFixed(1)}
+            />
+          ) : null}
+        </View>
+
+        <View
+          className="mt-4 flex-row items-center justify-between"
+          style={{
+            gap: 10,
+          }}
+        >
+          <View className="flex-1 flex-row flex-wrap items-center">
+            <View
+              className="rounded-full px-2.5 py-1"
+              style={{
+                backgroundColor: `${ACCENT}13`,
+              }}
+            >
+              <Text
+                className="text-[9px] font-bold"
+                style={{
+                  color: ACCENT,
+                }}
+              >
+                {LEVEL_LABELS[course.level] ?? course.level}
+              </Text>
+            </View>
+
+            <Text
+              className="ml-2 text-[11px] font-bold"
+              style={{
+                color: course.isFree ? SUCCESS : WARNING,
+              }}
+            >
+              {course.isFree
+                ? "Gratuit"
+                : `${course.price.toLocaleString()} ${course.currency}`}
+            </Text>
+          </View>
+
+          {enrolled ? (
+            <View
+              className="flex-row items-center rounded-xl px-3 py-2"
+              style={{
+                backgroundColor: "rgba(16,185,129,0.11)",
+                borderWidth: 1,
+                borderColor: "rgba(16,185,129,0.16)",
+              }}
+            >
+              <CheckCircle2 size={14} color={SUCCESS} strokeWidth={2} />
+
+              <Text className="ml-1.5 text-[10px] font-bold text-emerald-400">
+                Inscrit
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={onEnroll}
+              disabled={enrolling}
+              accessibilityRole="button"
+              accessibilityLabel={`S'inscrire à ${course.title}`}
+              className="flex-row items-center rounded-xl px-3.5 py-2.5"
+              style={({ pressed }) => ({
+                opacity: enrolling ? 0.55 : pressed ? 0.78 : 1,
+                backgroundColor: ACCENT,
+              })}
+            >
+              {enrolling ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Text className="text-[10px] font-black text-white">
+                    S'inscrire
+                  </Text>
+
+                  <ChevronRight
+                    size={13}
+                    color="#FFFFFF"
+                    strokeWidth={2.5}
+                    style={{
+                      marginLeft: 3,
+                    }}
+                  />
+                </>
+              )}
+            </Pressable>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function Meta({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <View className="flex-row items-center">
+      {icon}
+
+      <Text className="ml-1 text-[10px] text-white/35">{label}</Text>
+    </View>
+  );
+}
+
+function CoursesTab() {
   const courses = useQuery(api.education.listPublishedCourses, {});
+
   const enrollments = useQuery(api.education.getMyEnrollments, {});
+
   const enrollInCourse = useMutation(api.education.enrollInCourse);
 
-  // Determine enrolled course IDs for visual state
-  const enrolledCourseIds = new Set(
-    (enrollments ?? [])
-      .filter((e): e is NonNullable<typeof e> => e !== null)
-      .map((e) => {
-        const enrollment = e as { courseId: Id<"courses"> };
-        return enrollment.courseId;
-      }),
-  );
+  const [search, setSearch] = useState("");
+  const [enrollingId, setEnrollingId] = useState<Id<"courses"> | null>(null);
+
+  const enrolledCourseIds = useMemo(() => {
+    return new Set(
+      (enrollments ?? [])
+        .filter((item) => item !== null)
+        .map((item) => {
+          return (
+            item as {
+              courseId: Id<"courses">;
+            }
+          ).courseId;
+        }),
+    );
+  }, [enrollments]);
+
+  const filteredCourses = useMemo(() => {
+    const normalized = search.trim().toLowerCase();
+
+    if (!courses) {
+      return [];
+    }
+
+    if (!normalized) {
+      return courses;
+    }
+
+    return courses.filter((course) => {
+      return (
+        course.title.toLowerCase().includes(normalized) ||
+        course.category.toLowerCase().includes(normalized) ||
+        course.description.toLowerCase().includes(normalized)
+      );
+    });
+  }, [courses, search]);
 
   const handleEnroll = async (courseId: Id<"courses">) => {
+    if (enrollingId !== null) {
+      return;
+    }
+
     setEnrollingId(courseId);
+
     try {
-      await enrollInCourse({ courseId });
-      toast.success("Inscription réussie !");
-    } catch (error) {
-      const msg =
-        error instanceof Error ? error.message : "Erreur lors de l'inscription";
-      toast.error(msg);
+      await enrollInCourse({
+        courseId,
+      });
     } finally {
       setEnrollingId(null);
     }
   };
 
-  // Use courses from Convex if available, otherwise show static schools
-  const hasCourses = courses !== undefined && courses.length > 0;
-  const filteredSchools = SCHOOLS_STATIC.filter(
-    (s) =>
-      s.name.toLowerCase().includes(searchQ.toLowerCase()) ||
-      s.city.toLowerCase().includes(searchQ.toLowerCase()),
-  );
-  const filteredCourses = (courses ?? []).filter(
-    (c) =>
-      c.title.toLowerCase().includes(searchQ.toLowerCase()) ||
-      c.category.toLowerCase().includes(searchQ.toLowerCase()),
-  );
-
-  // Stats
-  const coursesCount = hasCourses ? courses.length : SCHOOLS_STATIC.length;
-  const scholCount = SCHOLARSHIPS_STATIC.length;
-  const enrolledCount = enrollments?.length ?? 0;
+  if (courses === undefined) {
+    return <LoadingCourses />;
+  }
 
   return (
-    <View className="h-full flex flex-col overflow-hidden" style={{  }}>{}<View className="flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={onBack} className="p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} color="white" /></Pressable><View className="flex-1"><Text className="text-white font-bold text-lg">Éducation Formelle</Text><Text className="text-gray-400 text-xs">Écoles · Bourses · Programmes</Text></View><View className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(167,139,250,0.15)" }}><GraduationCap size={16} color="#A78BFA" /></View></View>{}<View className="flex gap-2 px-4 mb-4">{[
-          {
-            icon: BookOpen,
-            label: "Cours",
-            value: String(coursesCount),
-            color: "#A78BFA",
-          },
-          {
-            icon: DollarSign,
-            label: "Bourses actives",
-            value: String(scholCount),
-            color: "#10B981",
-          },
-          {
-            icon: Users,
-            label: "Mes inscriptions",
-            value: String(enrolledCount),
-            color: "#F97316",
-          },
-        ].map(({ icon: Icon, label, value, color }) => (
-          <View key={label} className="flex-1 p-3 rounded-xl text-center" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Icon size={14} color={color} className="mx-auto mb-1" /><Text className="text-white font-bold text-sm">{value}</Text><Text className="text-gray-500 text-xs">{label}</Text></View>
-        ))}</View>{}<View className="flex gap-1 mx-4 mb-4 p-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>{["Écoles", "Bourses", "Programmes"].map((tab) => (
-          <Pressable key={tab} onPress={() => setActiveTab(tab)} className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: activeTab === tab ? "rgba(255,255,255,0.1)" : "transparent" }}>{tab}</Pressable>
-        ))}</View><View className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">{}{activeTab === "Écoles" && (
-          <>
-            <View className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={14} color="#9CA3AF" /><TextInput value={searchQ} onChangeText={(value) => setSearchQ(value)} placeholder={hasCourses
-                    ? "Rechercher un cours..."
-                    : "Rechercher une école..."} className="flex-1 bg-transparent text-white text-sm outline-none" /></View>
+    <View>
+      <SearchBar value={search} onChange={setSearch} />
 
-            {/* Loading skeleton */}
-            {courses === undefined && (
-              <View className="space-y-4">{Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-48 w-full rounded-2xl" />
-                ))}</View>
-            )}
-
-            {/* Convex courses */}
-            {hasCourses &&
-              filteredCourses.map((course, i) => {
-                const isEnrolled = enrolledCourseIds.has(course._id);
-                const colors = [
-                  "#6366F1",
-                  "#F97316",
-                  "#10B981",
-                  "#8B5CF6",
-                  "#EC4899",
-                ];
-                const cardColor = colors[i % colors.length];
-
-                return (
-                  <View key={course._id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                    {course.coverImage && (
-                      <View className="relative"><Image className="w-full h-32 object-cover" source={{ uri: course.coverImage }} accessibilityLabel={course.title} /><View className="absolute inset-0" style={{  }} /><Text className="absolute top-3 left-3 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${cardColor}CC`, color: "white" }}>{course.category}</Text></View>
-                    )}
-                    {!course.coverImage && (
-                      <View className="relative h-32 flex items-center justify-center" style={{ backgroundColor: `${cardColor}20` }}><GraduationCap size={40} color={cardColor} /><Text className="absolute top-3 left-3 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${cardColor}CC`, color: "white" }}>{course.category}</Text></View>
-                    )}
-                    <View className="p-3"><Text className="text-white font-bold text-sm">{course.title}</Text><Text className="text-gray-400 text-xs mt-0.5">{course.description}</Text><View className="flex items-center gap-3 mt-2 mb-2"><View className="flex items-center gap-1"><BookOpen size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{course.lessonCount}leçons
-                          </Text></View>{course.duration && (
-                          <View className="flex items-center gap-1"><Clock size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{course.duration}</Text></View>
-                        )}<View className="flex items-center gap-1"><Users size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{course.enrollmentCount}</Text></View>{course.rating && (
-                          <View className="flex items-center gap-1"><Star size={10} color="#F59E0B" fill="#F59E0B" /><Text className="text-white text-xs">{course.rating.toFixed(1)}</Text></View>
-                        )}</View><View className="flex items-center justify-between"><View className="flex items-center gap-2"><Text className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(167,139,250,0.15)", color: "#A78BFA" }}>{LEVEL_LABELS[course.level] ?? course.level}</Text><Text className="text-xs" style={{
-                              color: course.isFree ? "#10B981" : "#F59E0B",
-                            }}>{course.isFree
-                              ? "Gratuit"
-                              : `${course.price.toLocaleString()} ${course.currency}`}</Text></View>{isEnrolled ? (
-                          <View className="flex items-center gap-1 px-3 py-1.5 rounded-xl" style={{ backgroundColor: "rgba(16,185,129,0.15)" }}><CheckCircle size={12} color="#10B981" /><Text className="text-green-400 text-xs font-medium">Inscrit
-                            </Text></View>
-                        ) : (
-                          <Pressable onPress={() => handleEnroll(course._id)} disabled={enrollingId === course._id} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold disabled:opacity-50" style={{ backgroundColor: cardColor }}>{enrollingId === course._id ? "..." : "S'inscrire"}<ChevronRight size={10} /></Pressable>
-                        )}</View></View>
-                  </View>
-                );
-              })}
-
-            {/* Static fallback when no courses in Convex */}
-            {courses !== undefined &&
-              courses.length === 0 &&
-              filteredSchools.map((school, i) => (
-                <View key={school.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                  <View className="relative"><Image className="w-full h-32 object-cover" source={{ uri: school.img }} accessibilityLabel={school.name} /><View className="absolute inset-0" style={{  }} /><Text className="absolute top-3 left-3 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${school.color}CC`, color: "white" }}>{school.type}</Text><Pressable onPress={() =>
-                        setSavedSchools((p) => {
-                          const n = new Set(p);
-                          if (n.has(school.id)) {
-                            n.delete(school.id);
-                          } else {
-                            n.add(school.id);
-                          }
-                          return n;
-                        })} className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}><Star size={14} color={
-                          savedSchools.has(school.id) ? "#F59E0B" : "white"
-                        } fill={savedSchools.has(school.id) ? "#F59E0B" : "none"} /></Pressable></View>
-                  <View className="p-3"><Text className="text-white font-bold text-sm">{school.name}</Text><View className="flex items-center gap-3 mt-1 mb-2"><View className="flex items-center gap-1"><MapPin size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{school.city}</Text></View><View className="flex items-center gap-1"><Star size={10} color="#F59E0B" fill="#F59E0B" /><Text className="text-white text-xs">{school.rating}</Text></View><View className="flex items-center gap-1"><Users size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{school.students.toLocaleString()}</Text></View></View><View className="flex items-center justify-between"><Text className="text-xs" style={{ color: "#10B981" }}>{school.tuition}</Text><Pressable className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold" style={{ backgroundColor: school.color }}><Text>Voir détails</Text><ChevronRight size={10} /></Pressable></View></View>
-                </View>
-              ))}
-          </>
-        )}{}{activeTab === "Bourses" && (
-          <>
-            <View className="p-3 rounded-xl flex items-center gap-2" style={{ backgroundColor: "rgba(16,185,129,0.08)", borderWidth: 1, borderColor: "rgba(16,185,129,0.2)", borderStyle: "solid" }}><Award size={14} color="#10B981" /><Text className="text-green-400 text-xs">{SCHOLARSHIPS_STATIC.filter((s) => s.status === "Ouvert")
-                    .length}{" "}bourses ouvertes – Candidatez maintenant !
-              </Text></View>
-            {SCHOLARSHIPS_STATIC.map((s, i) => (
-              <View key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <View className="flex items-start justify-between gap-2 mb-2"><Text className="text-white font-semibold text-sm flex-1">{s.name}</Text><Text className="text-xs px-2 py-1 rounded-full" style={{ backgroundColor: s.status === "Ouvert"
-                                          ? "rgba(16,185,129,0.15)"
-                                          : "rgba(245,158,11,0.15)", color: s.status === "Ouvert" ? "#10B981" : "#F59E0B" }}>{s.status}</Text></View>
-                <View className="gap-1 mb-3"><View className="flex items-center gap-1"><DollarSign size={10} color="#10B981" /><Text className="text-green-400 text-xs font-medium">{s.amount}</Text></View><View className="flex items-center gap-1"><Clock size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">Avant {s.deadline}</Text></View><View className="flex items-center gap-1"><GraduationCap size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{s.level}</Text></View><View className="flex items-center gap-1"><BookOpen size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{s.field}</Text></View></View>
-                {s.status === "Ouvert" &&
-                  (appliedScholarships.has(i) ? (
-                    <View className="w-full py-2 rounded-xl flex items-center justify-center gap-2" style={{ backgroundColor: "rgba(16,185,129,0.15)" }}><CheckCircle size={14} color="#10B981" /><Text className="text-green-400 text-sm font-medium">Candidature envoyée
-                      </Text></View>
-                  ) : (
-                    <Pressable onPress={() =>
-                        setAppliedScholarships((p) => new Set([...p, i]))} className="w-full py-2 rounded-xl text-sm font-bold" style={{ backgroundColor: "#A78BFA" }}><Text>Postuler maintenant</Text></Pressable>
-                  ))}
-              </View>
-            ))}
-          </>
-        )}{}{activeTab === "Programmes" && (
-          <>
-            {PROGRAMS_STATIC.map((p, i) => (
-              <View key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="flex items-center gap-3 p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <View className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(167,139,250,0.15)" }}><GraduationCap size={18} color="#A78BFA" /></View>
-                <View className="flex-1"><Text className="text-white font-semibold text-sm">{p.name}</Text><View className="flex items-center gap-2 mt-0.5"><Text className="text-gray-400 text-xs">{p.school}</Text><Text className="text-gray-500 text-xs">·</Text><Text className="text-gray-400 text-xs">{p.duration}</Text></View></View>
-                <View className="text-right"><Text className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: p.demand === "Très élevée"
-                                          ? "rgba(239,68,68,0.15)"
-                                          : "rgba(245,158,11,0.15)", color: p.demand === "Très élevée" ? "#EF4444" : "#F59E0B" }}>{p.demand}</Text><Text className="text-gray-500 text-xs mt-1">{p.level}</Text></View>
-              </View>
-            ))}
-          </>
-        )}</View></View>
+      {filteredCourses.length === 0 ? (
+        <EmptyCourses searching={search.trim().length > 0} />
+      ) : (
+        <View className="gap-4">
+          {filteredCourses.map((course) => (
+            <CourseCard
+              key={course._id}
+              course={course}
+              enrolled={enrolledCourseIds.has(course._id)}
+              enrolling={enrollingId === course._id}
+              onEnroll={() => void handleEnroll(course._id)}
+            />
+          ))}
+        </View>
+      )}
+    </View>
   );
 }
 
-// ─── Unauthenticated fallback (static data only) ─────────────────────────────
-
-function EduFormelleStatic({ onBack }: { onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState("Écoles");
-  const [searchQ, setSearchQ] = useState("");
-  const { isAuthenticated } = useFirebaseAuth();
-  const filteredSchools = SCHOOLS_STATIC.filter(
-    (s) =>
-      s.name.toLowerCase().includes(searchQ.toLowerCase()) ||
-      s.city.toLowerCase().includes(searchQ.toLowerCase()),
-  );
+function ComingSoonTab({ type }: { type: "bourses" | "programmes" }) {
+  const isScholarship = type === "bourses";
 
   return (
-    <View className="h-full flex flex-col overflow-hidden" style={{  }}>{}<View className="flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={onBack} className="p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} color="white" /></Pressable><View className="flex-1"><Text className="text-white font-bold text-lg">Éducation Formelle</Text><Text className="text-gray-400 text-xs">Écoles · Bourses · Programmes</Text></View><View className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(167,139,250,0.15)" }}><GraduationCap size={16} color="#A78BFA" /></View></View>{}<View className="mx-4 mb-4 p-3 rounded-xl flex items-center gap-3" style={{ backgroundColor: "rgba(167,139,250,0.08)", borderWidth: 1, borderColor: "rgba(167,139,250,0.2)", borderStyle: "solid" }}><GraduationCap size={16} color="#A78BFA" /><View className="flex-1"><Text className="text-white text-xs font-medium">Connectez-vous pour vous inscrire aux cours
-          </Text></View><Pressable onPress={() => {
-            window.location.reload();
-          }} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ backgroundColor: "#A78BFA" }}><Text>Connexion</Text></Pressable></View>{}<View className="flex gap-2 px-4 mb-4">{[
-          {
-            icon: BookOpen,
-            label: "Établissements",
-            value: "400+",
-            color: "#A78BFA",
-          },
-          {
-            icon: DollarSign,
-            label: "Bourses actives",
-            value: "24",
-            color: "#10B981",
-          },
-          { icon: Users, label: "Étudiants", value: "250K+", color: "#F97316" },
-        ].map(({ icon: Icon, label, value, color }) => (
-          <View key={label} className="flex-1 p-3 rounded-xl text-center" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Icon size={14} color={color} className="mx-auto mb-1" /><Text className="text-white font-bold text-sm">{value}</Text><Text className="text-gray-500 text-xs">{label}</Text></View>
-        ))}</View>{}<View className="flex gap-1 mx-4 mb-4 p-1 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>{["Écoles", "Bourses", "Programmes"].map((tab) => (
-          <Pressable key={tab} onPress={() => setActiveTab(tab)} className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: activeTab === tab ? "rgba(255,255,255,0.1)" : "transparent" }}>{tab}</Pressable>
-        ))}</View><View className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">{activeTab === "Écoles" && (
-          <>
-            <View className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={14} color="#9CA3AF" /><TextInput value={searchQ} onChangeText={(value) => setSearchQ(value)} placeholder="Rechercher une école..." className="flex-1 bg-transparent text-white text-sm outline-none" /></View>
-            {filteredSchools.map((school, i) => (
-              <View key={school.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-                <View className="relative"><Image className="w-full h-32 object-cover" source={{ uri: school.img }} accessibilityLabel={school.name} /><View className="absolute inset-0" style={{  }} /><Text className="absolute top-3 left-3 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: `${school.color}CC`, color: "white" }}>{school.type}</Text></View>
-                <View className="p-3"><Text className="text-white font-bold text-sm">{school.name}</Text><View className="flex items-center gap-3 mt-1 mb-2"><View className="flex items-center gap-1"><MapPin size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{school.city}</Text></View><View className="flex items-center gap-1"><Star size={10} color="#F59E0B" fill="#F59E0B" /><Text className="text-white text-xs">{school.rating}</Text></View><View className="flex items-center gap-1"><Users size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{school.students.toLocaleString()}</Text></View></View><View className="flex items-center justify-between"><Text className="text-xs" style={{ color: "#10B981" }}>{school.tuition}</Text><Pressable className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold" style={{ backgroundColor: school.color }}><Text>Voir détails</Text><ChevronRight size={10} /></Pressable></View></View>
-              </View>
-            ))}
-          </>
-        )}{activeTab === "Bourses" &&
-          SCHOLARSHIPS_STATIC.map((s, i) => (
-            <View key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-              <Text className="text-white font-semibold text-sm mb-2">{s.name}</Text>
-              <View className="gap-1"><View className="flex items-center gap-1"><DollarSign size={10} color="#10B981" /><Text className="text-green-400 text-xs">{s.amount}</Text></View><View className="flex items-center gap-1"><Clock size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{s.deadline}</Text></View><View className="flex items-center gap-1"><GraduationCap size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{s.level}</Text></View><View className="flex items-center gap-1"><BookOpen size={10} color="#9CA3AF" /><Text className="text-gray-400 text-xs">{s.field}</Text></View></View>
-            </View>
-          ))}{activeTab === "Programmes" &&
-          PROGRAMS_STATIC.map((p, i) => (
-            <View key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }} className="flex items-center gap-3 p-4 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-              <View className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(167,139,250,0.15)" }}><GraduationCap size={18} color="#A78BFA" /></View>
-              <View className="flex-1"><Text className="text-white font-semibold text-sm">{p.name}</Text><Text className="text-gray-400 text-xs">{p.school}· {p.duration}</Text></View>
-              <Text className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: p.demand === "Très élevée"
-                                    ? "rgba(239,68,68,0.15)"
-                                    : "rgba(245,158,11,0.15)", color: p.demand === "Très élevée" ? "#EF4444" : "#F59E0B" }}>{p.demand}</Text>
-            </View>
-          ))}</View></View>
+    <View>
+      <View
+        className="mb-4 flex-row items-center rounded-2xl px-4 py-3.5"
+        style={{
+          backgroundColor: `${ACCENT}09`,
+          borderWidth: 1,
+          borderColor: `${ACCENT}18`,
+        }}
+      >
+        {isScholarship ? (
+          <Award size={17} color={ACCENT} strokeWidth={2} />
+        ) : (
+          <GraduationCap size={17} color={ACCENT} strokeWidth={2} />
+        )}
+
+        <Text className="ml-3 flex-1 text-[11px] leading-4 text-white/40">
+          Cette section est prête pour être connectée à ses véritables données
+          backend.
+        </Text>
+      </View>
+
+      <View
+        className="items-center rounded-[24px] px-6 py-12"
+        style={{
+          backgroundColor: "rgba(255,255,255,0.03)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.06)",
+        }}
+      >
+        <View
+          className="h-14 w-14 items-center justify-center rounded-2xl"
+          style={{
+            backgroundColor: `${ACCENT}12`,
+          }}
+        >
+          {isScholarship ? (
+            <Award size={23} color={`${ACCENT}CC`} strokeWidth={2} />
+          ) : (
+            <GraduationCap size={23} color={`${ACCENT}CC`} strokeWidth={2} />
+          )}
+        </View>
+
+        <Text className="mt-4 text-center text-[15px] font-black text-white">
+          {isScholarship
+            ? "Bourses non connectées"
+            : "Programmes non connectés"}
+        </Text>
+
+        <Text className="mt-2 max-w-[310px] text-center text-[12px] leading-5 text-white/30">
+          Aucune donnée réelle de cette catégorie n'est actuellement disponible
+          dans les sources utilisées par cette page.
+        </Text>
+      </View>
+    </View>
   );
 }
 
-// ─── Main export with auth handling ──────────────────────────────────────────
+function AuthLoadingScreen({ onBack }: EduFormellePageProps) {
+  return (
+    <View
+      className="flex-1"
+      style={{
+        backgroundColor: "#020412",
+      }}
+    >
+      <Header onBack={onBack} />
 
-export default function EduFormellePage({ onBack }: { onBack: () => void }) {
+      <View className="flex-1 items-center justify-center px-6">
+        <View
+          className="h-16 w-16 items-center justify-center rounded-3xl"
+          style={{
+            backgroundColor: `${ACCENT}12`,
+          }}
+        >
+          <ActivityIndicator size="small" color={ACCENT} />
+        </View>
+
+        <Text className="mt-4 text-[14px] font-bold text-white">
+          Préparation de votre espace
+        </Text>
+
+        <Text className="mt-1 text-center text-[11px] text-white/30">
+          Vérification de votre session…
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function UnauthenticatedScreen({ onBack }: EduFormellePageProps) {
+  return (
+    <View
+      className="flex-1"
+      style={{
+        backgroundColor: "#020412",
+      }}
+    >
+      <Header onBack={onBack} />
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: "center",
+          padding: 20,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          className="items-center rounded-[30px] px-6 py-10"
+          style={{
+            backgroundColor: "rgba(255,255,255,0.035)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.07)",
+          }}
+        >
+          <View
+            className="h-20 w-20 items-center justify-center rounded-[28px]"
+            style={{
+              backgroundColor: `${ACCENT}12`,
+              borderWidth: 1,
+              borderColor: `${ACCENT}20`,
+            }}
+          >
+            <GraduationCap size={35} color={ACCENT} strokeWidth={1.8} />
+          </View>
+
+          <Text className="mt-5 text-center text-[21px] font-black text-white">
+            Votre espace éducatif
+          </Text>
+
+          <Text className="mt-2 max-w-[330px] text-center text-[12px] leading-5 text-white/35">
+            Connectez-vous pour accéder à vos formations et gérer vos
+            inscriptions.
+          </Text>
+
+          <View
+            className="mt-5 flex-row items-center rounded-2xl px-4 py-3"
+            style={{
+              backgroundColor: "rgba(255,255,255,0.035)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.06)",
+            }}
+          >
+            <Check size={14} color={SUCCESS} strokeWidth={2.5} />
+
+            <Text className="ml-2 flex-1 text-[10px] leading-4 text-white/35">
+              Vos données éducatives restent liées à votre compte.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function AuthenticatedContent({ onBack }: EduFormellePageProps) {
+  const [activeTab, setActiveTab] = useState<TabKey>("cours");
+
+  const courses = useQuery(api.education.listPublishedCourses, {});
+
+  const enrollments = useQuery(api.education.getMyEnrollments, {});
+
+  const { width } = useWindowDimensions();
+
+  const maxWidth = Math.min(width - 32, 920);
+
+  return (
+    <View
+      className="flex-1"
+      style={{
+        backgroundColor: "#020412",
+      }}
+    >
+      <Header onBack={onBack} />
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{
+          width: maxWidth,
+          alignSelf: "center",
+          paddingBottom: 45,
+        }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Hero />
+
+        <Stats
+          coursesCount={courses?.length ?? 0}
+          enrolledCount={enrollments?.length ?? 0}
+        />
+
+        <TabBar activeTab={activeTab} onChange={setActiveTab} />
+
+        <View className="mt-5 px-5">
+          {activeTab === "cours" ? <CoursesTab /> : null}
+
+          {activeTab === "bourses" ? <ComingSoonTab type="bourses" /> : null}
+
+          {activeTab === "programmes" ? (
+            <ComingSoonTab type="programmes" />
+          ) : null}
+        </View>
+
+        <View className="mx-5 mt-7 flex-row items-center justify-center">
+          <View
+            className="h-1.5 w-1.5 rounded-full"
+            style={{
+              backgroundColor: SUCCESS,
+            }}
+          />
+
+          <Text className="ml-2 text-[9px] text-white/20">
+            Données affichées depuis les sources connectées
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+export default function EduFormellePage({ onBack }: EduFormellePageProps) {
   return (
     <>
       <AuthLoading>
-        <View className="h-full flex flex-col overflow-hidden" style={{  }}><View className="flex items-center gap-3 px-4 pt-12 pb-4"><Pressable onPress={onBack} className="p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} color="white" /></Pressable><Skeleton className="h-6 w-48" /></View><View className="flex gap-2 px-4 mb-4">{Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="flex-1 h-20 rounded-xl" />
-            ))}</View><View className="px-4 space-y-4">{Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 w-full rounded-2xl" />
-            ))}</View></View>
+        <AuthLoadingScreen onBack={onBack} />
       </AuthLoading>
+
       <Authenticated>
-        <EduFormelleContent onBack={onBack} />
+        <AuthenticatedContent onBack={onBack} />
       </Authenticated>
+
       <Unauthenticated>
-        <EduFormelleStatic onBack={onBack} />
+        <UnauthenticatedScreen onBack={onBack} />
       </Unauthenticated>
     </>
   );

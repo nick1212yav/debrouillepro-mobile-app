@@ -1,123 +1,954 @@
-import { View, Text, Pressable } from "react-native";
-import {
-  ArrowLeft, Leaf, Wind, Droplets, Sun, AlertTriangle,
-  TreePine, Recycle, Zap, BarChart2, MapPin, TrendingUp, TrendingDown,
-  Thermometer, CloudRain, CheckCircle, Info
-} from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
+import React, { useState } from "react";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Authenticated, Unauthenticated } from "@/lib/convex-auth-compat";
-import { useState } from "react";
-import { toast } from "sonner";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle,
+  CloudRain,
+  Droplets,
+  Info,
+  Leaf,
+  MapPin,
+  Recycle,
+  RefreshCw,
+  Sun,
+  Thermometer,
+  TreePine,
+  Wind,
+  Zap,
+} from "lucide-react-native";
 
-const AIR_INDEX = 72;
-const AIR_LEVEL = AIR_INDEX < 50 ? "Bon" : AIR_INDEX < 100 ? "Modéré" : "Mauvais";
-const AIR_COLOR = AIR_INDEX < 50 ? "#10B981" : AIR_INDEX < 100 ? "#F59E0B" : "#EF4444";
+/* -------------------------------------------------------------------------- */
+/* Types                                                                      */
+/* -------------------------------------------------------------------------- */
 
-const ALERTS = [
-  { id: 1, type: "warning", title: "Épisode de pollution atmosphérique", location: "Plateau, Abidjan", date: "Aujourd'hui", icon: Wind, color: "#F59E0B" },
-  { id: 2, type: "danger", title: "Dépôt sauvage signalé", location: "Yopougon, km7", date: "Hier", icon: AlertTriangle, color: "#EF4444" },
-  { id: 3, type: "info", title: "Collecte spéciale déchets électroniques", location: "Tout Abidjan", date: "Sam 20 jan", icon: Recycle, color: "#6366F1" },
+type EnvironmentTab = "bilan" | "actions" | "recyclage";
+
+/* -------------------------------------------------------------------------- */
+/* UI constants                                                               */
+/* -------------------------------------------------------------------------- */
+
+const TABS: {
+  id: EnvironmentTab;
+  label: string;
+}[] = [
+  {
+    id: "bilan",
+    label: "Bilan",
+  },
+  {
+    id: "actions",
+    label: "Éco-gestes",
+  },
+  {
+    id: "recyclage",
+    label: "Recyclage",
+  },
 ];
 
-const ECO_ACTIONS_DEF = [
-  { id: "eco-1", title: "Tri des déchets", desc: "Triez vos déchets plastique, verre et papier", points: 50, icon: Recycle, color: "#10B981" },
-  { id: "eco-2", title: "Économiser l'eau", desc: "Réduisez votre consommation de 20% ce mois", points: 100, icon: Droplets, color: "#3B82F6" },
-  { id: "eco-3", title: "Transport vert", desc: "Utilisez un vélo ou la marche 3 fois cette semaine", points: 75, icon: Leaf, color: "#22C55E" },
-  { id: "eco-4", title: "Énergie solaire", desc: "Renseignez-vous sur les panneaux solaires", points: 30, icon: Sun, color: "#F59E0B" },
-  { id: "eco-5", title: "Planter un arbre", desc: "Participez à une journée de reboisement", points: 200, icon: TreePine, color: "#16A34A" },
-];
+/* -------------------------------------------------------------------------- */
+/* Generic components                                                         */
+/* -------------------------------------------------------------------------- */
 
-const INDICATORS = [
-  { label: "Température", value: "31°C", trend: "up", icon: Thermometer, color: "#F59E0B" },
-  { label: "Humidité", value: "78%", trend: "stable", icon: Droplets, color: "#3B82F6" },
-  { label: "Précipitations", value: "12mm", trend: "down", icon: CloudRain, color: "#6366F1" },
-  { label: "UV Index", value: "8/11", trend: "up", icon: Sun, color: "#EF4444" },
-];
-
-const RECYCLING_POINTS = [
-  { name: "Centre de tri Cocody", address: "Bd de la Paix, Cocody", dist: "1.2 km", accepts: ["Plastique", "Verre", "Papier"] },
-  { name: "Point vert Plateau", address: "Av Botreau Roussel, Plateau", dist: "2.8 km", accepts: ["Plastique", "Métal", "Électronique"] },
-  { name: "Collecte organique Marcory", address: "Rue 12, Marcory", dist: "3.5 km", accepts: ["Organique", "Compost"] },
-];
-
-function EnvironnementContent({ tab }: { tab: "bilan" | "actions" | "recyclage" }) {
-  const progress = useQuery(api.urban.getEcoProgress);
-  const toggleEcoAction = useMutation(api.urban.toggleEcoAction);
-
-  const getActionDone = (id: string) => progress?.find((p) => p.actionId === id)?.done ?? false;
-  const totalPoints = ECO_ACTIONS_DEF.reduce((sum, a) => getActionDone(a.id) ? sum + a.points : sum, 0);
-
-  const handleToggle = async (id: string, points: number) => {
-    const current = getActionDone(id);
-    try {
-      await toggleEcoAction({ actionId: id, points, done: !current });
-    } catch {
-      toast.error("Erreur lors de la mise à jour");
-    }
-  };
-
-  if (tab === "bilan") {
-    return (
-      <View className="space-y-4"><View initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-2xl" style={{ borderStyle: "solid" }}><View className="flex items-center justify-between mb-3"><View><Text className="text-white/60 text-xs mb-1">{"Qualité de l'air — Abidjan"}</Text><View className="flex items-baseline gap-2"><Text className="text-white text-4xl font-bold">{AIR_INDEX}</Text><Text className="text-white/60 text-sm">AQI</Text></View><Text className="font-semibold text-sm" style={{ color: AIR_COLOR }}>{AIR_LEVEL}</Text></View><View className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: `${AIR_COLOR}20`, borderStyle: "solid" }}><Wind size={28} style={{  }} /></View></View><Text className="text-white/50 text-xs">Qualité modérée : les personnes sensibles peuvent ressentir des effets.</Text></View><View className="gap-3">{INDICATORS.map(({ label, value, trend, icon: Icon, color }, i) => (
-            <View key={label} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.06 }} className="p-3 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-              <View className="flex items-start justify-between mb-2"><Icon size={18} style={{ color }} />{trend === "up" && <TrendingUp size={14} className="text-red-400" />}{trend === "down" && <TrendingDown size={14} className="text-green-400" />}{trend === "stable" && <Text className="text-white/30 text-xs">—</Text>}</View>
-              <Text className="text-white font-bold text-xl">{value}</Text>
-              <Text className="text-white/50 text-xs">{label}</Text>
-            </View>
-          ))}</View><View><Text className="text-white font-semibold text-sm mb-3">{"Alertes & Événements"}</Text><View className="space-y-3">{ALERTS.map((alert, i) => {
-              const Icon = alert.icon;
-              return (
-                <View key={alert.id} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }} className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: `${alert.color}10`, borderStyle: "solid" }}>
-                  <View className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${alert.color}20` }}><Icon size={16} style={{  }} /></View>
-                  <View className="flex-1"><Text className="text-white text-sm font-medium">{alert.title}</Text><View className="flex items-center gap-2 mt-0.5"><MapPin size={11} className="text-white/40" /><Text className="text-white/50 text-xs">{alert.location}</Text><Text className="text-white/30 text-xs ml-auto">{alert.date}</Text></View></View>
-                </View>
-              );
-            })}</View></View></View>
-    );
-  }
-
-  if (tab === "actions") {
-    return (
-      <View className="space-y-4"><View initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-2xl flex items-center gap-4" style={{ borderWidth: 1, borderColor: "rgba(34,197,94,0.3)", borderStyle: "solid" }}><View className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(34,197,94,0.2)" }}><Leaf size={28} className="text-green-400" /></View><View><Text className="text-white/60 text-xs">Vos points éco</Text><Text className="text-green-400 text-3xl font-bold">{totalPoints}</Text><Text className="text-white/50 text-xs">Continuez vos efforts !</Text></View><View className="ml-auto"><Text className="text-white/40 text-xs text-right">Niveau</Text><Text className="text-green-300 font-semibold text-sm">Éco-Actif</Text></View></View><Text className="text-white font-semibold text-sm">Défis de la semaine</Text><View className="space-y-3">{ECO_ACTIONS_DEF.map((action, i) => {
-            const Icon = action.icon;
-            const done = getActionDone(action.id);
-            return (
-              <View key={action.id} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }} className="flex items-center gap-3 p-4 rounded-xl" style={{ backgroundColor: done ? `${action.color}12` : "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }} onPress={() => { void handleToggle(action.id, action.points); }}>
-                <View className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${action.color}20` }}><Icon size={20} style={{  }} /></View>
-                <View className="flex-1"><Text className={`font-medium text-sm ${done ? "line-through text-white/50" : "text-white"}`}>{action.title}</Text><Text className="text-white/40 text-xs mt-0.5">{action.desc}</Text></View>
-                <View className="flex flex-col items-end gap-1"><Text className="text-xs font-semibold" style={{ color: action.color }}>+{action.points}pts</Text>{done && <CheckCircle size={16} style={{  }} />}</View>
-              </View>
-            );
-          })}</View><View className="p-4 rounded-xl flex items-center gap-3" style={{ backgroundColor: "rgba(99,102,241,0.1)", borderWidth: 1, borderColor: "rgba(99,102,241,0.2)", borderStyle: "solid" }}><Info size={18} className="text-indigo-400 flex-shrink-0" /><Text className="text-white/60 text-xs">Accumulez des points éco pour débloquer des récompenses : réductions partenaires, arbres plantés, et badges exclusifs.</Text></View></View>
-    );
-  }
-
+function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <View className="space-y-4"><View className="gap-3">{[
-          { icon: Recycle, label: "Plastique", color: "#3B82F6", tip: "Bouteilles, emballages" },
-          { icon: Zap, label: "Électronique", color: "#F59E0B", tip: "Téléphones, piles" },
-          { icon: TreePine, label: "Organique", color: "#22C55E", tip: "Déchets alimentaires" },
-        ].map(({ icon: Icon, label, color, tip }) => (
-          <View key={label} className="p-3 rounded-xl flex flex-col items-center gap-2" style={{ backgroundColor: `${color}12`, borderStyle: "solid" }}><Icon size={24} style={{ color }} /><Text className="text-white font-medium text-xs text-center">{label}</Text><Text className="text-white/40 text-xs text-center">{tip}</Text></View>
-        ))}</View><Text className="text-white font-semibold text-sm">Points de collecte proches</Text><View className="space-y-3">{RECYCLING_POINTS.map((point, i) => (
-          <View key={point.name} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className="p-4 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-            <View className="flex items-start justify-between mb-2"><Text className="text-white font-medium text-sm">{point.name}</Text><Text className="text-green-400 text-xs font-semibold">{point.dist}</Text></View>
-            <View className="flex items-center gap-1 mb-2"><MapPin size={11} className="text-white/40" /><Text className="text-white/50 text-xs">{point.address}</Text></View>
-            <View className="flex flex-wrap gap-1.5">{point.accepts.map(a => (
-                <Text key={a} className="px-2 py-0.5 rounded text-xs text-green-300" style={{ backgroundColor: "rgba(34,197,94,0.1)" }}>{a}</Text>
-              ))}</View>
-          </View>
-        ))}</View></View>
+    <Text
+      style={{
+        color: "#FFFFFF",
+        fontSize: 15,
+        fontWeight: "800",
+        marginBottom: 11,
+      }}
+    >
+      {children}
+    </Text>
   );
 }
 
-export default function EnvironnementPage({ onBack }: { onBack: () => void }) {
-  const [tab, setTab] = useState<"bilan" | "actions" | "recyclage">("bilan");
+function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <View
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 24,
+        paddingVertical: 52,
+      }}
+    >
+      {icon}
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.58)",
+          fontSize: 14,
+          fontWeight: "700",
+          textAlign: "center",
+          marginTop: 14,
+        }}
+      >
+        {title}
+      </Text>
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.32)",
+          fontSize: 11,
+          lineHeight: 17,
+          textAlign: "center",
+          marginTop: 6,
+        }}
+      >
+        {description}
+      </Text>
+    </View>
+  );
+}
+
+function SourceBadge({ label }: { label: string }) {
+  return (
+    <View
+      style={{
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 999,
+        backgroundColor: "rgba(255,255,255,0.055)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.09)",
+      }}
+    >
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.45)",
+          fontSize: 8,
+          fontWeight: "800",
+          letterSpacing: 0.5,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Bilan                                                                      */
+/* -------------------------------------------------------------------------- */
+
+function BilanTab() {
+  /*
+   * Aucun indicateur environnemental n'est inventé.
+   *
+   * Les anciennes constantes AIR_INDEX / INDICATORS / ALERTS
+   * ont volontairement été supprimées.
+   *
+   * Une donnée institutionnelle doit être rattachée à une
+   * source vérifiable avant d'être présentée à l'utilisateur.
+   */
 
   return (
-    <View className="h-full flex flex-col" style={{  }}><View className="flex-shrink-0 px-4 pt-12 pb-3"><View className="flex items-center gap-3 mb-4"><Pressable onPress={onBack} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={20} className="text-white" /></Pressable><View className="flex-1"><Text className="text-xl font-bold text-white">Environnement</Text><Text className="text-xs text-white/50">{"Qualité de l'air, éco-gestes & recyclage"}</Text></View><View className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(34,197,94,0.2)" }}><Leaf size={18} className="text-green-400" /></View></View><View className="flex gap-1 p-1 rounded-xl mb-4" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>{(["bilan", "actions", "recyclage"] as const).map(t => (
-            <Pressable key={t} onPress={() => setTab(t)} className="flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all" style={{ backgroundColor: tab === t ? "rgba(34,197,94,0.4)" : "transparent" }}>{t === "bilan" ? "Bilan" : t === "actions" ? "Éco-gestes" : "Recyclage"}</Pressable>
-          ))}</View></View><View className="flex-1 overflow-y-auto px-4 pb-6"><Authenticated><EnvironnementContent tab={tab} /></Authenticated><Unauthenticated><EnvironnementContent tab={tab} /></Unauthenticated></View></View>
+    <View>
+      <View
+        style={{
+          padding: 17,
+          borderRadius: 22,
+          backgroundColor: "rgba(255,255,255,0.045)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.08)",
+          marginBottom: 18,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 11,
+          }}
+        >
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 15,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(34,197,94,0.12)",
+            }}
+          >
+            <Leaf size={20} color="#4ADE80" />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 14,
+                fontWeight: "800",
+              }}
+            >
+              Observatoire environnemental
+            </Text>
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.38)",
+                fontSize: 10,
+                marginTop: 3,
+              }}
+            >
+              Données vérifiées et traçables
+            </Text>
+          </View>
+
+          <SourceBadge label="EN ATTENTE DE SOURCE" />
+        </View>
+
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.45)",
+            fontSize: 11,
+            lineHeight: 18,
+            marginTop: 14,
+          }}
+        >
+          Aucun indicateur environnemental temps réel n'est actuellement
+          disponible via une source connectée à cette interface.
+        </Text>
+      </View>
+
+      <SectionTitle>Indicateurs environnementaux</SectionTitle>
+
+      <View
+        style={{
+          gap: 9,
+        }}
+      >
+        <IndicatorCard
+          icon={<Wind size={17} color="#60A5FA" />}
+          label="Qualité de l'air"
+        />
+
+        <IndicatorCard
+          icon={<Thermometer size={17} color="#FBBF24" />}
+          label="Température"
+        />
+
+        <IndicatorCard
+          icon={<Droplets size={17} color="#38BDF8" />}
+          label="Humidité"
+        />
+
+        <IndicatorCard
+          icon={<CloudRain size={17} color="#818CF8" />}
+          label="Précipitations"
+        />
+      </View>
+
+      <View style={{ marginTop: 20 }}>
+        <SectionTitle>Alertes environnementales</SectionTitle>
+
+        <EmptyState
+          icon={<AlertTriangle size={40} color="rgba(255,255,255,0.15)" />}
+          title="Aucune alerte vérifiée disponible"
+          description="Les alertes doivent provenir d'une source environnementale ou d'une autorité habilitée."
+        />
+      </View>
+
+      <View
+        style={{
+          padding: 14,
+          borderRadius: 16,
+          backgroundColor: "rgba(99,102,241,0.07)",
+          borderWidth: 1,
+          borderColor: "rgba(99,102,241,0.15)",
+          flexDirection: "row",
+          gap: 9,
+        }}
+      >
+        <Info size={15} color="#818CF8" />
+
+        <Text
+          style={{
+            flex: 1,
+            color: "rgba(255,255,255,0.43)",
+            fontSize: 10,
+            lineHeight: 16,
+          }}
+        >
+          Chaque indicateur institutionnel devra conserver sa source, son
+          horodatage et son statut de validation.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function IndicatorCard({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <View
+      style={{
+        minHeight: 65,
+        paddingHorizontal: 14,
+        borderRadius: 17,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 11,
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.07)",
+      }}
+    >
+      {icon}
+
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            color: "#FFFFFF",
+            fontSize: 12,
+            fontWeight: "700",
+          }}
+        >
+          {label}
+        </Text>
+
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.3)",
+            fontSize: 9,
+            marginTop: 3,
+          }}
+        >
+          Aucune mesure disponible
+        </Text>
+      </View>
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.22)",
+          fontSize: 14,
+          fontWeight: "800",
+        }}
+      >
+        —
+      </Text>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Eco actions                                                                */
+/* -------------------------------------------------------------------------- */
+
+function ActionsTab() {
+  const progress = useQuery(api.urban.getEcoProgress);
+
+  const toggleEcoAction = useMutation(api.urban.toggleEcoAction);
+
+  /*
+   * Les actions existantes du backend restent utilisées,
+   * mais aucun nouveau catalogue fictif n'est introduit.
+   *
+   * Si le backend ne retourne pas de catalogue d'actions,
+   * nous ne fabriquons pas de défis.
+   */
+
+  const completedPoints =
+    progress?.reduce(
+      (total, item) => (item.done ? total + (item.points ?? 0) : total),
+      0,
+    ) ?? 0;
+
+  const handleToggle = async (
+    actionId: string,
+    points: number,
+    done: boolean,
+  ) => {
+    try {
+      await toggleEcoAction({
+        actionId,
+        points,
+        done: !done,
+      });
+    } catch {
+      // Aucun toast Web :
+      // l'état Convex reste la source de vérité.
+    }
+  };
+
+  if (progress === undefined) {
+    return (
+      <EmptyState
+        icon={<RefreshCw size={38} color="rgba(255,255,255,0.18)" />}
+        title="Chargement des actions"
+        description="Récupération de votre progression environnementale."
+      />
+    );
+  }
+
+  if (progress.length === 0) {
+    return (
+      <View>
+        <View
+          style={{
+            padding: 17,
+            borderRadius: 22,
+            backgroundColor: "rgba(34,197,94,0.06)",
+            borderWidth: 1,
+            borderColor: "rgba(34,197,94,0.15)",
+            marginBottom: 18,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 11,
+            }}
+          >
+            <Leaf size={21} color="#4ADE80" />
+
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: "#FFFFFF",
+                  fontSize: 14,
+                  fontWeight: "800",
+                }}
+              >
+                Votre engagement
+              </Text>
+
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.38)",
+                  fontSize: 10,
+                  marginTop: 3,
+                }}
+              >
+                Progression enregistrée
+              </Text>
+            </View>
+
+            <Text
+              style={{
+                color: "#4ADE80",
+                fontSize: 20,
+                fontWeight: "900",
+              }}
+            >
+              {completedPoints}
+            </Text>
+          </View>
+        </View>
+
+        <EmptyState
+          icon={<CheckCircle size={40} color="rgba(255,255,255,0.15)" />}
+          title="Aucune action enregistrée"
+          description="Les actions environnementales apparaîtront ici lorsqu'elles seront définies et disponibles dans le backend."
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <View
+        style={{
+          padding: 17,
+          borderRadius: 22,
+          backgroundColor: "rgba(34,197,94,0.06)",
+          borderWidth: 1,
+          borderColor: "rgba(34,197,94,0.16)",
+          marginBottom: 17,
+        }}
+      >
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.42)",
+            fontSize: 10,
+          }}
+        >
+          Points enregistrés
+        </Text>
+
+        <Text
+          style={{
+            color: "#4ADE80",
+            fontSize: 31,
+            fontWeight: "900",
+            marginTop: 3,
+          }}
+        >
+          {completedPoints}
+        </Text>
+      </View>
+
+      <SectionTitle>Vos actions enregistrées</SectionTitle>
+
+      {progress.map((item) => {
+        const done = item.done;
+        const points = item.points ?? 0;
+
+        return (
+          <Pressable
+            key={item.actionId}
+            onPress={() => void handleToggle(item.actionId, points, done)}
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.88 : 1,
+              minHeight: 68,
+              padding: 13,
+              borderRadius: 17,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 11,
+              backgroundColor: done
+                ? "rgba(34,197,94,0.08)"
+                : "rgba(255,255,255,0.04)",
+              borderWidth: 1,
+              borderColor: done
+                ? "rgba(34,197,94,0.18)"
+                : "rgba(255,255,255,0.07)",
+              marginBottom: 8,
+            })}
+          >
+            <View
+              style={{
+                width: 39,
+                height: 39,
+                borderRadius: 13,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: done
+                  ? "rgba(34,197,94,0.16)"
+                  : "rgba(255,255,255,0.06)",
+              }}
+            >
+              {done ? (
+                <CheckCircle size={18} color="#4ADE80" />
+              ) : (
+                <Leaf size={18} color="rgba(255,255,255,0.35)" />
+              )}
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: done ? "rgba(255,255,255,0.5)" : "#FFFFFF",
+                  fontSize: 12,
+                  fontWeight: "700",
+                }}
+              >
+                {item.actionId}
+              </Text>
+
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.3)",
+                  fontSize: 9,
+                  marginTop: 3,
+                }}
+              >
+                Action enregistrée dans votre progression
+              </Text>
+            </View>
+
+            <Text
+              style={{
+                color: "#4ADE80",
+                fontSize: 10,
+                fontWeight: "800",
+              }}
+            >
+              +{points}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Recyclage                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function RecyclageTab() {
+  return (
+    <View>
+      <View
+        style={{
+          padding: 17,
+          borderRadius: 22,
+          backgroundColor: "rgba(255,255,255,0.045)",
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.08)",
+          marginBottom: 18,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 11,
+          }}
+        >
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 15,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(34,197,94,0.12)",
+            }}
+          >
+            <Recycle size={20} color="#4ADE80" />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 14,
+                fontWeight: "800",
+              }}
+            >
+              Réseau de recyclage
+            </Text>
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.38)",
+                fontSize: 10,
+                marginTop: 3,
+              }}
+            >
+              Points de collecte vérifiés
+            </Text>
+          </View>
+        </View>
+
+        <Text
+          style={{
+            color: "rgba(255,255,255,0.42)",
+            fontSize: 11,
+            lineHeight: 17,
+            marginTop: 13,
+          }}
+        >
+          Aucun point de collecte n'est affiché sans enregistrement provenant
+          d'une source vérifiée.
+        </Text>
+      </View>
+
+      <SectionTitle>Catégories prises en charge</SectionTitle>
+
+      <View
+        style={{
+          gap: 8,
+        }}
+      >
+        <CategoryCard
+          icon={<Recycle size={18} color="#60A5FA" />}
+          label="Plastiques"
+        />
+
+        <CategoryCard
+          icon={<Zap size={18} color="#FBBF24" />}
+          label="Équipements électroniques"
+        />
+
+        <CategoryCard
+          icon={<TreePine size={18} color="#4ADE80" />}
+          label="Déchets organiques"
+        />
+      </View>
+
+      <View style={{ marginTop: 20 }}>
+        <SectionTitle>Points de collecte</SectionTitle>
+
+        <EmptyState
+          icon={<MapPin size={40} color="rgba(255,255,255,0.15)" />}
+          title="Aucun point vérifié disponible"
+          description="Les emplacements devront provenir du registre ou du service backend correspondant."
+        />
+      </View>
+    </View>
+  );
+}
+
+function CategoryCard({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <View
+      style={{
+        minHeight: 57,
+        paddingHorizontal: 14,
+        borderRadius: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.07)",
+      }}
+    >
+      {icon}
+
+      <Text
+        style={{
+          color: "rgba(255,255,255,0.72)",
+          fontSize: 12,
+          fontWeight: "600",
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Main                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export default function EnvironnementPage({ onBack }: { onBack: () => void }) {
+  const [tab, setTab] = useState<EnvironmentTab>("bilan");
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: "#050812",
+      }}
+    >
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          width: 280,
+          height: 280,
+          borderRadius: 140,
+          top: -170,
+          right: -110,
+          backgroundColor: "rgba(34,197,94,0.055)",
+        }}
+      />
+
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          width: 230,
+          height: 230,
+          borderRadius: 115,
+          bottom: -130,
+          left: -100,
+          backgroundColor: "rgba(16,185,129,0.035)",
+        }}
+      />
+
+      {/* Header */}
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingTop: Platform.OS === "ios" ? 18 : 14,
+          paddingBottom: 11,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 11,
+            marginBottom: 14,
+          }}
+        >
+          <Pressable
+            onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+            style={({ pressed }) => ({
+              width: 41,
+              height: 41,
+              borderRadius: 14,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: pressed
+                ? "rgba(255,255,255,0.13)"
+                : "rgba(255,255,255,0.08)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.1)",
+            })}
+          >
+            <ArrowLeft size={19} color="#FFFFFF" />
+          </Pressable>
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 20,
+                fontWeight: "900",
+              }}
+            >
+              Environnement
+            </Text>
+
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.4)",
+                fontSize: 10,
+                marginTop: 2,
+              }}
+            >
+              Données · signalements · actions · recyclage
+            </Text>
+          </View>
+
+          <View
+            style={{
+              width: 41,
+              height: 41,
+              borderRadius: 14,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(34,197,94,0.12)",
+              borderWidth: 1,
+              borderColor: "rgba(34,197,94,0.2)",
+            }}
+          >
+            <Leaf size={18} color="#4ADE80" />
+          </View>
+        </View>
+
+        {/* Navigation */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            gap: 6,
+          }}
+        >
+          {TABS.map((item) => {
+            const active = tab === item.id;
+
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => setTab(item.id)}
+                style={{
+                  minHeight: 38,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: active
+                    ? "rgba(34,197,94,0.16)"
+                    : "rgba(255,255,255,0.045)",
+                  borderWidth: 1,
+                  borderColor: active
+                    ? "rgba(34,197,94,0.3)"
+                    : "rgba(255,255,255,0.07)",
+                }}
+              >
+                <Text
+                  style={{
+                    color: active ? "#4ADE80" : "rgba(255,255,255,0.42)",
+                    fontSize: 10,
+                    fontWeight: "800",
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: 35,
+        }}
+      >
+        {tab === "bilan" ? <BilanTab /> : null}
+
+        {tab === "actions" ? (
+          <Authenticated>
+            <ActionsTab />
+          </Authenticated>
+        ) : null}
+
+        {tab === "actions" ? (
+          <Unauthenticated>
+            <EmptyState
+              icon={<Leaf size={40} color="rgba(255,255,255,0.15)" />}
+              title="Connexion requise"
+              description="Connecte-toi pour accéder à ta progression environnementale."
+            />
+          </Unauthenticated>
+        ) : null}
+
+        {tab === "recyclage" ? <RecyclageTab /> : null}
+
+        <View
+          style={{
+            marginTop: 22,
+            padding: 13,
+            borderRadius: 15,
+            backgroundColor: "rgba(255,255,255,0.025)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.05)",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 8,
+              alignItems: "flex-start",
+            }}
+          >
+            <Info size={13} color="rgba(255,255,255,0.28)" />
+
+            <Text
+              style={{
+                flex: 1,
+                color: "rgba(255,255,255,0.28)",
+                fontSize: 9,
+                lineHeight: 14,
+              }}
+            >
+              Les données environnementales doivent être rattachées à une source
+              identifiable et à leur date de collecte. Les informations
+              indisponibles sont volontairement laissées vides.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

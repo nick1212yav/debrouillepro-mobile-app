@@ -1,228 +1,1896 @@
-import { View, Text, Pressable, TextInput } from "react-native";
+import React, { useMemo, useState } from "react";
+
 import {
-  ArrowLeft, Send, ArrowDownLeft, QrCode, Clock,
-  Plus, X, Check, Eye, EyeOff, TrendingUp,
-  TrendingDown, Shield, Copy, Phone, Search, Star, Wallet
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+
+import {
+  ArrowDownLeft,
+  ArrowLeft,
+  ArrowUpRight,
+  Banknote,
+  Check,
+  ChevronRight,
+  Clock,
+  Copy,
+  Eye,
+  EyeOff,
+  Globe,
+  Heart,
+  Info,
+  QrCode,
+  RefreshCw,
+  Search,
+  Send,
+  Shield,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+  X,
 } from "lucide-react-native";
-import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { toast } from "sonner";
-import { CheckCircle2, XCircle, AlertCircle, RefreshCw } from "lucide-react-native";
+
+import { useQuery } from "convex/react";
+
 import { Clipboard } from "@react-native-clipboard/clipboard";
 
-// ─── Operators ───────────────────────────────────────────────────────────────
-const OPERATORS = [
-  { id: "orange", name: "Orange Money", shortName: "Orange", color: "#FF6200", bg: "rgba(255,98,0,0.15)", logo: "🟠" },
-  { id: "mtn",    name: "MTN MoMo",     shortName: "MTN",    color: "#FFCC00", bg: "rgba(255,204,0,0.15)", logo: "🟡" },
-  { id: "airtel", name: "Airtel Money", shortName: "Airtel", color: "#EF4444", bg: "rgba(239,68,68,0.15)", logo: "🔴" },
-  { id: "wave",   name: "Wave",         shortName: "Wave",   color: "#3B82F6", bg: "rgba(59,130,246,0.15)", logo: "🔵" },
-];
+import {
+  Authenticated,
+  AuthLoading,
+  Unauthenticated,
+} from "@/lib/convex-auth-compat";
 
-type TxType = "envoi" | "reception" | "recharge" | "paiement";
+import { api } from "@/convex/_generated/api.js";
 
-const FILTER_LABELS: { key: TxType | "all"; label: string }[] = [
-  { key: "all", label: "Tout" },
-  { key: "reception", label: "Reçus" },
-  { key: "envoi", label: "Envois" },
-  { key: "recharge", label: "Recharges" },
-  { key: "paiement", label: "Paiements" },
-];
+import { Skeleton } from "@/components/ui/skeleton.tsx";
 
-function formatFCFA(n: number): string {
-  const abs = Math.abs(n);
-  if (abs >= 1000000) return `${(abs / 1000000).toFixed(1)}M FCFA`;
-  if (abs >= 1000) return `${(abs / 1000).toFixed(0)}k FCFA`;
-  return `${abs.toLocaleString()} FCFA`;
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
+
+type TransactionFilter =
+  | "all"
+  | "incoming"
+  | "outgoing"
+  | "recharge"
+  | "payment";
+
+type TransactionRecord = {
+  _id: string;
+  type?: string;
+  amount: number;
+  currency?: string;
+  description?: string;
+  completedAt?: number;
+  createdAt?: number;
+};
+
+type WalletSnapshot = {
+  balance?: number;
+  monthIn?: number;
+  monthOut?: number;
+  currency?: string;
+};
+
+/* ============================================================================
+ * DESIGN
+ * ========================================================================== */
+
+const COLORS = {
+  background: "#050812",
+  surface: "rgba(255,255,255,0.045)",
+  surfaceStrong: "rgba(255,255,255,0.065)",
+  border: "rgba(255,255,255,0.075)",
+  borderStrong: "rgba(255,255,255,0.11)",
+
+  white: "#FFFFFF",
+  text: "#E4E4E7",
+  muted: "#71717A",
+  muted2: "#52525B",
+
+  green: "#10B981",
+  blue: "#3B82F6",
+  purple: "#8B5CF6",
+  orange: "#F97316",
+  red: "#EF4444",
+};
+
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
+
+function getCurrency(currency?: string): string {
+  const value = typeof currency === "string" ? currency.trim() : "";
+
+  return value || "—";
 }
 
-// ─── Mini Sparkline ───────────────────────────────────────────────────────────
-function Sparkline({ data }: { data: number[] }) {
-  const w = 200, h = 40;
-  if (data.length < 2) return <svg width="100%" viewBox={`0 0 ${w} ${h}`} />;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * h;
-    return `${x},${y}`;
-  }).join(" ");
+function formatMoney(amount: number, currency?: string): string {
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+
+  const safeCurrency = getCurrency(currency);
+
+  return `${Math.abs(safeAmount).toLocaleString("fr-FR")} ${safeCurrency}`;
+}
+
+function formatCompactMoney(amount: number, currency?: string): string {
+  const safeAmount = Math.abs(Number.isFinite(amount) ? amount : 0);
+
+  const code = getCurrency(currency);
+
+  if (safeAmount >= 1_000_000) {
+    return `${(safeAmount / 1_000_000).toFixed(1)} M ${code}`;
+  }
+
+  if (safeAmount >= 1_000) {
+    return `${(safeAmount / 1_000).toFixed(1)} k ${code}`;
+  }
+
+  return formatMoney(safeAmount, code);
+}
+
+function formatDate(value?: number): string {
+  if (!value || !Number.isFinite(value)) {
+    return "Date indisponible";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Date indisponible";
+  }
+
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function normalizeTransactionType(type?: string): TransactionFilter {
+  switch (type) {
+    case "deposit":
+    case "reward":
+    case "refund":
+      return "incoming";
+
+    case "withdrawal":
+    case "transfer":
+      return "outgoing";
+
+    case "payment":
+      return "payment";
+
+    default:
+      return "outgoing";
+  }
+}
+
+function isIncoming(type?: string): boolean {
+  return type === "deposit" || type === "reward" || type === "refund";
+}
+
+/* ============================================================================
+ * FILTERS
+ * ========================================================================== */
+
+const FILTERS: Array<{
+  key: TransactionFilter;
+  label: string;
+}> = [
+  {
+    key: "all",
+    label: "Tout",
+  },
+  {
+    key: "incoming",
+    label: "Reçus",
+  },
+  {
+    key: "outgoing",
+    label: "Envois",
+  },
+  {
+    key: "recharge",
+    label: "Recharges",
+  },
+  {
+    key: "payment",
+    label: "Paiements",
+  },
+];
+
+/* ============================================================================
+ * TRANSACTION ICON
+ * ========================================================================== */
+
+function TransactionIcon({ type }: { type?: string }) {
+  const incoming = isIncoming(type);
+
+  let icon = <Send size={16} color={COLORS.blue} />;
+
+  if (type === "deposit") {
+    icon = <ArrowDownLeft size={16} color={COLORS.green} />;
+  }
+
+  if (type === "withdrawal") {
+    icon = <ArrowUpRight size={16} color={COLORS.red} />;
+  }
+
+  if (type === "payment") {
+    icon = <Banknote size={16} color={COLORS.purple} />;
+  }
+
+  if (type === "reward") {
+    icon = <Heart size={16} color={COLORS.orange} />;
+  }
+
+  if (type === "refund") {
+    icon = <RefreshCw size={16} color={COLORS.green} />;
+  }
+
   return (
-    <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="opacity-60">
-      <polyline fill="none" stroke="#10B981" strokeWidth="1.5" points={pts} />
-    </svg>
+    <View
+      style={[
+        styles.transactionIcon,
+        {
+          backgroundColor: incoming
+            ? "rgba(16,185,129,0.09)"
+            : "rgba(59,130,246,0.09)",
+        },
+      ]}
+    >
+      {icon}
+    </View>
   );
 }
 
-// ─── Receive Modal ────────────────────────────────────────────────────────────
-function ReceiveModal({ onClose }: { onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-  const phone = "+225 07 88 21 34";
-  const copy = () => {
-    Clipboard.setString(phone).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+/* ============================================================================
+ * ACTION CARD
+ * ========================================================================== */
+
+function WalletAction({
+  icon,
+  title,
+  subtitle,
+  color,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  color: string;
+  onPress: () => void;
+}) {
   return (
-    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="w-full max-w-sm rounded-t-3xl p-5" style={{ backgroundColor: "#0d1117", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-        <View className="flex items-center justify-between mb-5"><Text className="text-base font-bold text-white">Recevoir un paiement</Text><Pressable onPress={onClose} className=""><X size={18} className="text-white/60" /></Pressable></View>
-        <View className="flex justify-center mb-4"><View className="p-4 rounded-2xl" style={{ backgroundColor: "white" }}><View className="w-40 h-40 gap-0.5">{Array.from({ length: 100 }).map((_, i) => {
-                const isCorner = [0,1,10,11,8,9,18,19,80,81,90,91,88,89,98,99].includes(i);
-                const isFill = (i % 7 === 0 || i % 11 === 3 || (i > 30 && i < 70 && i % 5 === 2));
-                return <View key={i} className="rounded-sm" style={{ backgroundColor: isCorner || isFill ? "#000" : "transparent", aspectRatio: "1" }} />;
-              })}</View></View></View>
-        <View className="flex items-center justify-center gap-2 mb-5"><Phone size={14} className="text-green-400" /><Text className="text-base font-bold text-white">{phone}</Text><Pressable onPress={copy} className="">{copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-white/40" />}</Pressable></View>
-        <View className="flex gap-2">{OPERATORS.map(op => (
-            <View key={op.id} className="flex-1 py-2 rounded-xl text-[10px] font-semibold text-center" style={{ backgroundColor: op.bg }}>{op.logo}{op.shortName}</View>
-          ))}</View>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.walletAction, pressed && styles.pressed]}
+    >
+      <View
+        style={[
+          styles.walletActionIcon,
+          {
+            backgroundColor: `${color}12`,
+          },
+        ]}
+      >
+        {icon}
+      </View>
+
+      <Text numberOfLines={1} style={styles.walletActionTitle}>
+        {title}
+      </Text>
+
+      <Text numberOfLines={1} style={styles.walletActionSubtitle}>
+        {subtitle}
+      </Text>
+    </Pressable>
+  );
+}
+
+/* ============================================================================
+ * WALLET HEADER
+ * ========================================================================== */
+
+function WalletHeader({
+  onBack,
+  balanceVisible,
+  onToggleBalance,
+  onReceive,
+}: {
+  onBack: () => void;
+  balanceVisible: boolean;
+  onToggleBalance: () => void;
+  onReceive: () => void;
+}) {
+  return (
+    <View style={styles.header}>
+      <Pressable
+        onPress={onBack}
+        style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+      >
+        <ArrowLeft size={19} color="#FFFFFF" />
+      </Pressable>
+
+      <View style={styles.headerIdentity}>
+        <View style={styles.walletLogo}>
+          <Wallet size={18} color={COLORS.green} strokeWidth={2.2} />
+        </View>
+
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle}>DébrouillePay</Text>
+
+          <Text style={styles.headerSubtitle}>
+            Paiements · Wallet · Finance
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.headerActions}>
+        <Pressable onPress={onToggleBalance} style={styles.headerAction}>
+          {balanceVisible ? (
+            <Eye size={16} color="#A1A1AA" />
+          ) : (
+            <EyeOff size={16} color="#A1A1AA" />
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={onReceive}
+          style={[styles.headerAction, styles.receiveHeaderAction]}
+        >
+          <QrCode size={16} color="#60A5FA" />
+        </Pressable>
       </View>
     </View>
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-function PaiementInner({ onBack }: { onBack: () => void }) {
-  const [filter, setFilter] = useState<TxType | "all">("all");
-  const [showReceive, setShowReceive] = useState(false);
-  const [showSend, setShowSend] = useState(false);
-  const [showTopup, setShowTopup] = useState(false);
-  const [balanceVisible, setBalanceVisible] = useState(true);
-  const [sendAmt, setSendAmt] = useState("");
-  const [sendDesc, setSendDesc] = useState("");
-  const [selectedOp, setSelectedOp] = useState("orange");
+/* ============================================================================
+ * BALANCE CARD
+ * ========================================================================== */
 
-  const walletData = useQuery(api.finances.getWalletBalance, {});
-  const transactions = useQuery(api.finances.getWalletTransactions, { limit: 30 }) ?? [];
-  const addTx = useMutation(api.finances.addWalletTransaction);
+function BalanceCard({
+  wallet,
+  transactions,
+  balanceVisible,
+  onSend,
+  onReceive,
+  onTopup,
+}: {
+  wallet: WalletSnapshot | null | undefined;
 
-  const balance = walletData?.balance ?? 0;
-  const monthIn = walletData?.monthIn ?? 0;
-  const monthOut = walletData?.monthOut ?? 0;
+  transactions: TransactionRecord[] | undefined;
 
-  // Map wallet transactions to mobile money style
-  const enrichedTxs = transactions.map(tx => ({
-    ...tx,
-    txType: (tx.type === "deposit" || tx.type === "reward" || tx.type === "refund" ? "reception" : tx.type === "withdrawal" ? "retrait" : tx.type === "payment" ? "paiement" : "envoi") as TxType,
-    isIn: tx.type === "deposit" || tx.type === "reward" || tx.type === "refund",
-  }));
+  balanceVisible: boolean;
 
-  const filtered = filter === "all" ? enrichedTxs : enrichedTxs.filter(tx => tx.txType === filter);
-  const sparkData = transactions.slice(0, 30).map(tx => tx.amount).reverse();
+  onSend: () => void;
+  onReceive: () => void;
+  onTopup: () => void;
+}) {
+  const balance = Number(wallet?.balance ?? 0);
 
-  async function handleSend() {
-    if (!sendAmt || parseFloat(sendAmt) <= 0) return;
-    try {
-      await addTx({ type: "transfer", amount: parseFloat(sendAmt), currency: "XAF", description: sendDesc || `Envoi ${OPERATORS.find(o => o.id === selectedOp)?.name}` });
-      setShowSend(false);
-      setSendAmt("");
-      setSendDesc("");
-      toast.success("Transfert envoyé !");
-    } catch {
-      toast.error("Erreur lors du transfert");
-    }
-  }
+  const monthIn = Number(wallet?.monthIn ?? 0);
 
-  async function handleTopup(opId: string) {
-    const op = OPERATORS.find(o => o.id === opId);
-    try {
-      await addTx({ type: "deposit", amount: 10000, currency: "XAF", description: `Recharge ${op?.name}` });
-      setShowTopup(false);
-      toast.success("Compte rechargé !");
-    } catch {
-      toast.error("Erreur");
-    }
-  }
+  const monthOut = Number(wallet?.monthOut ?? 0);
+
+  const currency =
+    wallet?.currency ||
+    transactions?.find((tx) => Boolean(tx.currency))?.currency ||
+    undefined;
 
   return (
-    <View className="h-full flex flex-col" style={{  }}><View initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="px-5 pt-5 pb-4 flex-shrink-0"><View className="flex items-center gap-3 mb-5"><Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View><Text className="text-xl font-bold text-white">Mobile Money Pro</Text><Text className="text-xs" style={{ color: "#10B981" }}>Orange · MTN · Airtel · Wave</Text></View><View className="ml-auto flex gap-2"><Pressable onPress={() => setBalanceVisible(v => !v)} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}>{balanceVisible ? <Eye size={14} className="text-white/60" /> : <EyeOff size={14} className="text-white/60" />}</Pressable><Pressable onPress={() => setShowReceive(true)} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,0.15)", borderWidth: 1, borderColor: "rgba(16,185,129,0.3)", borderStyle: "solid" }}><QrCode size={14} style={{  }} /></Pressable></View></View>{}<View initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }} className="rounded-3xl p-5 mb-3 overflow-hidden relative" style={{ borderWidth: 1, borderColor: "rgba(16,185,129,0.25)", borderStyle: "solid" }}><View className="flex items-start justify-between mb-1"><View><Text className="text-xs text-green-300/60 mb-1">Solde Débrouille Pay</Text><Text key={balanceVisible ? "show" : "hide"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-4xl font-black text-white">{balanceVisible ? <>{formatFCFA(balance)}</> : <Text className="tracking-widest">••••••</Text>}</Text></View><View className="text-right"><Text className="text-[10px] text-white/40 mb-1">Activité</Text><View className="h-8 w-20"><Sparkline data={sparkData.length > 0 ? sparkData : [0, 0]} /></View></View></View><View className="flex gap-2 mt-3 pt-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.07)" }}><View className="flex-1 flex items-center gap-1.5"><View className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(16,185,129,0.2)" }}><TrendingUp size={12} style={{  }} /></View><View><Text className="text-[9px] text-white/40">Reçu</Text><Text className="text-xs font-bold text-green-400">{formatFCFA(monthIn)}</Text></View></View><View className="w-px" style={{ backgroundColor: "rgba(255,255,255,0.08)" }} /><View className="flex-1 flex items-center gap-1.5"><View className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(239,68,68,0.2)" }}><TrendingDown size={12} style={{  }} /></View><View><Text className="text-[9px] text-white/40">Dépensé</Text><Text className="text-xs font-bold text-red-400">{formatFCFA(monthOut)}</Text></View></View></View><View className="flex gap-2 mt-3">{[
-              { icon: Send, label: "Envoyer", action: () => setShowSend(true), color: "#10B981" },
-              { icon: ArrowDownLeft, label: "Recevoir", action: () => setShowReceive(true), color: "#3B82F6" },
-              { icon: RefreshCw, label: "Recharger", action: () => setShowTopup(true), color: "#8B5CF6" },
-            ].map(({ icon: Icon, label, action, color }) => (
-              <Pressable key={label} onPress={action} className="flex-1 flex flex-col items-center gap-1.5 py-2.5 rounded-2xl active:scale-95 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><Icon size={16} style={{ color }} /><Text className="text-[10px] text-white/70 font-medium">{label}</Text></Pressable>
-            ))}</View></View>{}<View className="flex gap-2">{OPERATORS.map((op, i) => (
-            <Pressable key={op.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 + i * 0.05 }} className="flex-1 py-2 rounded-xl text-[10px] font-semibold active:scale-95 transition-transform" style={{ backgroundColor: op.bg, borderStyle: "solid" }}>
-              {op.logo} {op.shortName}
-            </Pressable>
-          ))}</View></View>{}<View className="flex-1 overflow-y-auto px-5 pb-6" style={{  }}><View className="flex gap-2 mb-4 overflow-x-auto pb-1" style={{  }}>{FILTER_LABELS.map(({ key, label }) => (
-            <Pressable key={key} onPress={() => setFilter(key)} className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all" style={{ backgroundColor: filter === key ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.06)", borderColor: "rgba(16,185,129,0.4)", borderStyle: "solid" }}>{label}</Pressable>
-          ))}</View><View className="flex items-center justify-between mb-3"><Text className="text-xs font-semibold text-white/40 uppercase tracking-wider">{filtered.length}transaction{filtered.length > 1 ? "s" : ""}</Text><View className="flex items-center gap-1"><Shield size={10} className="text-green-400" /><Text className="text-[10px] text-green-400">Sécurisé</Text></View></View>{filtered.length === 0 && (
-          <View className="flex flex-col items-center justify-center py-12 gap-3"><Wallet size={40} color="#6B7280" /><Text className="text-gray-400 text-sm">Aucune transaction</Text></View>
-        )}<View className="flex flex-col gap-2"><View>{filtered.map((tx, i) => {
-              const op = OPERATORS[i % OPERATORS.length];
-              return (
-                <View key={tx._id} initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: i * 0.04 }} className="flex items-center gap-3 p-3.5 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}>
-                  <View className="relative"><View className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ backgroundColor: op.bg }}>{op.logo}</View></View>
-                  <View className="flex-1 min-w-0"><Text className="text-sm font-semibold text-white truncate">{tx.description}</Text><View className="flex items-center gap-1.5 mt-0.5"><Text className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.4)" }}>{tx.type}</Text><Clock size={9} className="text-white/25" /><Text className="text-[10px] text-white/35 truncate">{tx.completedAt ? new Date(tx.completedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "—"}</Text></View></View>
-                  <View className="text-right flex-shrink-0"><Text className="text-sm font-black" style={{ color: tx.isIn ? "#10B981" : "#EF4444" }}>{tx.isIn ? "+" : "-"}{formatFCFA(tx.amount)}</Text></View>
-                </View>
-              );
-            })}</View></View></View>{}<View>{showSend && (
-          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="w-full max-w-sm rounded-t-3xl p-5" style={{ backgroundColor: "#0d1117", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-              <View className="flex items-center justify-between mb-5"><Text className="text-base font-bold text-white">Envoyer de l'argent</Text><Pressable onPress={() => setShowSend(false)} className=""><X size={18} className="text-white/60" /></Pressable></View>
-              <View className="space-y-3 mb-4"><View className="text-center mb-4"><TextInput value={sendAmt} onChangeText={value => setSendAmt(value)} placeholder="0" className="bg-transparent text-5xl font-black text-white text-center w-40 outline-none" inputMode="numeric" keyboardType="numeric" /><Text className="text-white/40 text-sm">FCFA</Text></View><View className="flex gap-2 flex-wrap mb-3">{[1000, 2000, 5000, 10000].map(v => (
-                    <Pressable key={v} onPress={() => setSendAmt(String(v))} className="flex-1 py-1.5 rounded-xl text-xs font-semibold" style={{ backgroundColor: sendAmt === String(v) ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.07)", borderColor: "rgba(16,185,129,0.4)", borderStyle: "solid" }}>{formatFCFA(v)}</Pressable>
-                  ))}</View><TextInput value={sendDesc} onChangeText={value => setSendDesc(value)} placeholder="Description (optionnel)…" className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder:text-white/30" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", outline: "none" }} /><Text className="text-xs text-white/40">Opérateur</Text><View className="flex gap-2">{OPERATORS.map(op => (
-                    <Pressable key={op.id} onPress={() => setSelectedOp(op.id)} className="flex-1 py-2 rounded-xl text-[10px] font-semibold" style={{ backgroundColor: selectedOp === op.id ? op.bg : "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}>
-                      {op.logo} {op.shortName}
-                    </Pressable>
-                  ))}</View></View>
-              <Pressable onPress={handleSend} disabled={!sendAmt || parseFloat(sendAmt) <= 0} className="w-full py-3.5 rounded-2xl font-bold text-sm disabled:opacity-40" style={{ backgroundColor: "#10B981" }}>
-                Envoyer
-              </Pressable>
+    <View style={styles.balanceCard}>
+      <View style={styles.balanceGlow} />
+
+      <View style={styles.balanceTop}>
+        <View>
+          <View style={styles.balanceLabelRow}>
+            <Text style={styles.balanceLabel}>Solde disponible</Text>
+
+            <View style={styles.secureBadge}>
+              <Shield size={10} color={COLORS.green} />
+
+              <Text style={styles.secureBadgeText}>Ledger</Text>
             </View>
           </View>
-        )}{showReceive && <ReceiveModal onClose={() => setShowReceive(false)} />}{showTopup && (
-          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="w-full max-w-sm rounded-t-3xl p-5" style={{ backgroundColor: "#0d1117", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-              <View className="flex items-center justify-between mb-5">
-                <Text className="text-base font-bold text-white">Recharger le solde</Text>
-                <Pressable onPress={() => setShowTopup(false)} className=""><X size={18} className="text-white/60" /></Pressable>
-              </View>
-              <View className="flex flex-col gap-2">
-                {OPERATORS.map(op => (
-                  <Pressable key={op.id} onPress={() => handleTopup(op.id)} className="flex items-center gap-3 p-3.5 rounded-2xl active:scale-[0.98] transition-transform" style={{ backgroundColor: op.bg, borderStyle: "solid" }}>
-                    <Text className="text-2xl">{op.logo}</Text>
-                    <View className="flex-1 text-left">
-                      <Text className="text-sm font-bold" style={{ color: op.color }}>{op.name}</Text>
-                      <Text className="text-xs text-white/40">Recharge instantanée (+10,000 FCFA)</Text>
-                    </View>
-                    <Star size={14} style={{  }} />
-                  </Pressable>
-                ))}
-              </View>
-            </View>
+
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            style={styles.balanceValue}
+          >
+            {balanceVisible ? formatMoney(balance, currency) : "••••••••"}
+          </Text>
+        </View>
+
+        <View style={styles.currencyBadge}>
+          <Globe size={12} color="#60A5FA" />
+
+          <Text style={styles.currencyBadgeText}>{getCurrency(currency)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.balanceDivider} />
+
+      <View style={styles.monthStats}>
+        <View style={styles.monthStat}>
+          <View
+            style={[
+              styles.monthStatIcon,
+              {
+                backgroundColor: "rgba(16,185,129,0.11)",
+              },
+            ]}
+          >
+            <TrendingUp size={12} color={COLORS.green} />
           </View>
-        )}</View></View>
+
+          <View>
+            <Text style={styles.monthStatLabel}>Entrées</Text>
+
+            <Text style={styles.monthStatValue}>
+              {formatCompactMoney(monthIn, currency)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.monthSeparator} />
+
+        <View style={styles.monthStat}>
+          <View
+            style={[
+              styles.monthStatIcon,
+              {
+                backgroundColor: "rgba(239,68,68,0.10)",
+              },
+            ]}
+          >
+            <TrendingDown size={12} color={COLORS.red} />
+          </View>
+
+          <View>
+            <Text style={styles.monthStatLabel}>Sorties</Text>
+
+            <Text style={styles.monthStatValue}>
+              {formatCompactMoney(monthOut, currency)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.actionGrid}>
+        <WalletAction
+          icon={<Send size={16} color={COLORS.green} />}
+          title="Envoyer"
+          subtitle="Transfert"
+          color={COLORS.green}
+          onPress={onSend}
+        />
+
+        <WalletAction
+          icon={<ArrowDownLeft size={17} color={COLORS.blue} />}
+          title="Recevoir"
+          subtitle="Identifiant"
+          color={COLORS.blue}
+          onPress={onReceive}
+        />
+
+        <WalletAction
+          icon={<RefreshCw size={16} color={COLORS.purple} />}
+          title="Recharger"
+          subtitle="Mobile Money"
+          color={COLORS.purple}
+          onPress={onTopup}
+        />
+      </View>
+    </View>
   );
 }
 
-export default function PaiementPage({ onBack }: { onBack: () => void }) {
+/* ============================================================================
+ * TRANSACTION ITEM
+ * ========================================================================== */
+
+function TransactionItem({ transaction }: { transaction: TransactionRecord }) {
+  const incoming = isIncoming(transaction.type);
+
+  const amount = Number(transaction.amount ?? 0);
+
+  const currency = transaction.currency;
+
+  return (
+    <View style={styles.transactionItem}>
+      <TransactionIcon type={transaction.type} />
+
+      <View style={styles.transactionMiddle}>
+        <Text numberOfLines={1} style={styles.transactionTitle}>
+          {transaction.description || transaction.type || "Transaction"}
+        </Text>
+
+        <View style={styles.transactionMeta}>
+          <View style={styles.typeBadge}>
+            <Text style={styles.typeBadgeText}>
+              {transaction.type || "transaction"}
+            </Text>
+          </View>
+
+          <Clock size={10} color="#3F3F46" />
+
+          <Text numberOfLines={1} style={styles.transactionDate}>
+            {formatDate(transaction.completedAt ?? transaction.createdAt)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.transactionAmountWrap}>
+        <Text
+          style={[
+            styles.transactionAmount,
+            {
+              color: incoming ? COLORS.green : COLORS.red,
+            },
+          ]}
+        >
+          {incoming ? "+" : "-"}
+          {formatMoney(amount, currency)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * RECEIVE MODAL
+ * ========================================================================== */
+
+function ReceiveModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  /*
+   * Aucun identifiant de wallet n'est actuellement retourné par
+   * getWalletBalance dans le contrat fourni.
+   *
+   * On ne fabrique donc ni téléphone, ni adresse, ni QR code.
+   */
+  const copyUnavailable = () => {
+    Clipboard.setString("").catch(() => {});
+
+    setCopied(true);
+
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdrop} onPress={onClose} />
+
+        <View style={styles.modalSheet}>
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>Recevoir un paiement</Text>
+
+              <Text style={styles.sheetSubtitle}>Identité de paiement</Text>
+            </View>
+
+            <Pressable onPress={onClose} style={styles.closeButton}>
+              <X size={17} color="#A1A1AA" />
+            </Pressable>
+          </View>
+
+          <View style={styles.unavailablePanel}>
+            <View style={styles.unavailableIcon}>
+              <QrCode size={27} color="#60A5FA" />
+            </View>
+
+            <Text style={styles.unavailableTitle}>
+              Identifiant de réception non exposé par le backend
+            </Text>
+
+            <Text style={styles.unavailableText}>
+              Le contrat actuellement fourni à l'application retourne le solde
+              et les transactions, mais pas encore d'adresse de wallet, de
+              numéro de réception ou de payload QR.
+            </Text>
+
+            <View style={styles.integrityPanel}>
+              <Shield size={15} color={COLORS.green} />
+
+              <Text style={styles.integrityPanelText}>
+                Aucun QR code fictif, numéro téléphonique ou identifiant
+                financier n'est généré.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={copyUnavailable}
+              style={styles.disabledLikeButton}
+            >
+              {copied ? (
+                <Check size={15} color={COLORS.green} />
+              ) : (
+                <Copy size={15} color="#71717A" />
+              )}
+
+              <Text style={styles.disabledLikeText}>
+                {copied
+                  ? "Aucun identifiant à copier"
+                  : "Identifiant non disponible"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+ * PAYMENT ACTION MODAL
+ * ========================================================================== */
+
+function BackendActionModal({
+  visible,
+  onClose,
+  mode,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  mode: "send" | "topup";
+}) {
+  const isSend = mode === "send";
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdrop} onPress={onClose} />
+
+        <View style={styles.modalSheet}>
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>
+                {isSend ? "Envoyer de l'argent" : "Recharger le wallet"}
+              </Text>
+
+              <Text style={styles.sheetSubtitle}>DébrouillePay</Text>
+            </View>
+
+            <Pressable onPress={onClose} style={styles.closeButton}>
+              <X size={17} color="#A1A1AA" />
+            </Pressable>
+          </View>
+
+          <View style={styles.actionUnavailable}>
+            <View
+              style={[
+                styles.actionUnavailableIcon,
+                {
+                  backgroundColor: isSend
+                    ? "rgba(16,185,129,0.08)"
+                    : "rgba(139,92,246,0.08)",
+                },
+              ]}
+            >
+              {isSend ? (
+                <Send size={24} color={COLORS.green} />
+              ) : (
+                <RefreshCw size={24} color={COLORS.purple} />
+              )}
+            </View>
+
+            <Text style={styles.actionUnavailableTitle}>
+              Opération financière en attente d'un contrat de paiement réel
+            </Text>
+
+            <Text style={styles.actionUnavailableText}>
+              Le backend actuellement exposé à cette page possède une mutation
+              de journalisation de wallet, mais ne fournit pas ici de contrat
+              complet permettant de réaliser un transfert externe ou une
+              recharge Mobile Money.
+            </Text>
+
+            <View style={styles.securityNotice}>
+              <Shield size={15} color={COLORS.green} />
+
+              <Text style={styles.securityNoticeText}>
+                Pour éviter une fausse transaction, cette version ne modifie pas
+                le solde lorsqu'un paiement réel n'a pas été confirmé par le
+                prestataire.
+              </Text>
+            </View>
+
+            <Pressable onPress={onClose} style={styles.closePrimaryButton}>
+              <Text style={styles.closePrimaryButtonText}>Compris</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+ * SEARCH / FILTER BAR
+ * ========================================================================== */
+
+function TransactionToolbar({
+  filter,
+  onFilterChange,
+  search,
+  onSearchChange,
+}: {
+  filter: TransactionFilter;
+  onFilterChange: (value: TransactionFilter) => void;
+  search: string;
+  onSearchChange: (value: string) => void;
+}) {
   return (
     <>
-      <AuthLoading>
-        <View className="h-full flex flex-col p-5 gap-4" style={{  }}>
-          <Skeleton className="h-12 w-full rounded-xl" />
-          <Skeleton className="h-44 w-full rounded-3xl" />
-        </View>
-      </AuthLoading>
-      <Unauthenticated>
-        <View className="h-full flex flex-col items-center justify-center gap-4 relative" style={{  }}>
-          <Pressable onPress={onBack} className="absolute top-14 left-5 p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-            <ArrowLeft size={18} color="white" />
+      <View style={styles.searchBox}>
+        <Search size={15} color="#52525B" />
+
+        <TextInput
+          value={search}
+          onChangeText={onSearchChange}
+          placeholder="Rechercher une transaction…"
+          placeholderTextColor="#52525B"
+          style={styles.searchInput}
+        />
+
+        {search.length > 0 ? (
+          <Pressable onPress={() => onSearchChange("")}>
+            <X size={14} color="#71717A" />
           </Pressable>
-          <Wallet size={48} color="#6B7280" />
-          <Text className="text-gray-400">Connectez-vous pour accéder aux paiements</Text>
-        </View>
-      </Unauthenticated>
-      <Authenticated>
-        <PaiementInner onBack={onBack} />
-      </Authenticated>
+        ) : null}
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+      >
+        {FILTERS.map(({ key, label }) => {
+          const active = filter === key;
+
+          return (
+            <Pressable
+              key={key}
+              onPress={() => onFilterChange(key)}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+            >
+              <Text
+                style={[styles.filterText, active && styles.filterTextActive]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </>
   );
 }
+
+/* ============================================================================
+ * MAIN AUTHENTICATED
+ * ========================================================================== */
+
+function PaiementInner({ onBack }: { onBack: () => void }) {
+  const [filter, setFilter] = useState<TransactionFilter>("all");
+
+  const [search, setSearch] = useState("");
+
+  const [balanceVisible, setBalanceVisible] = useState(true);
+
+  const [showReceive, setShowReceive] = useState(false);
+
+  const [actionMode, setActionMode] = useState<"send" | "topup" | null>(null);
+
+  const walletQuery = useQuery(api.finances.getWalletBalance, {});
+
+  const transactionsQuery = useQuery(api.finances.getWalletTransactions, {
+    limit: 30,
+  });
+
+  const transactions = (transactionsQuery ?? []) as TransactionRecord[];
+
+  const wallet = walletQuery as WalletSnapshot | null | undefined;
+
+  const filteredTransactions = useMemo(() => {
+    const normalized = search.trim().toLowerCase();
+
+    return transactions.filter((tx) => {
+      const transactionFilter = normalizeTransactionType(tx.type);
+
+      const matchesFilter = filter === "all" || transactionFilter === filter;
+
+      if (!matchesFilter) {
+        return false;
+      }
+
+      if (normalized.length === 0) {
+        return true;
+      }
+
+      const haystack = [tx.description, tx.type, tx.currency]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalized);
+    });
+  }, [transactions, filter, search]);
+
+  const currency =
+    wallet?.currency ||
+    transactions.find((tx) => Boolean(tx.currency))?.currency;
+
+  return (
+    <View style={styles.screen}>
+      <WalletHeader
+        onBack={onBack}
+        balanceVisible={balanceVisible}
+        onToggleBalance={() => setBalanceVisible((value) => !value)}
+        onReceive={() => setShowReceive(true)}
+      />
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <BalanceCard
+          wallet={wallet}
+          transactions={transactions}
+          balanceVisible={balanceVisible}
+          onSend={() => setActionMode("send")}
+          onReceive={() => setShowReceive(true)}
+          onTopup={() => setActionMode("topup")}
+        />
+
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Activité financière</Text>
+
+            <Text style={styles.sectionSubtitle}>
+              Les opérations retournées par votre wallet.
+            </Text>
+          </View>
+
+          <View style={styles.secureLabel}>
+            <Shield size={11} color={COLORS.green} />
+
+            <Text style={styles.secureLabelText}>Sécurisé</Text>
+          </View>
+        </View>
+
+        <TransactionToolbar
+          filter={filter}
+          onFilterChange={setFilter}
+          search={search}
+          onSearchChange={setSearch}
+        />
+
+        <View style={styles.transactionCountRow}>
+          <Text style={styles.transactionCount}>
+            {filteredTransactions.length} transaction
+            {filteredTransactions.length !== 1 ? "s" : ""}
+          </Text>
+
+          {currency ? (
+            <View style={styles.currencySmallBadge}>
+              <Globe size={10} color="#71717A" />
+
+              <Text style={styles.currencySmallBadgeText}>{currency}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {transactionsQuery === undefined ? (
+          <View style={styles.loadingTransactions}>
+            <ActivityIndicator size="small" color={COLORS.green} />
+
+            <Text style={styles.loadingText}>Chargement du wallet…</Text>
+          </View>
+        ) : filteredTransactions.length === 0 ? (
+          <View style={styles.emptyTransactions}>
+            <View style={styles.emptyIcon}>
+              <Wallet size={26} color="#3F3F46" />
+            </View>
+
+            <Text style={styles.emptyTitle}>Aucune transaction</Text>
+
+            <Text style={styles.emptyText}>
+              {search.trim()
+                ? "Aucune opération ne correspond à votre recherche."
+                : "Aucune transaction n'est retournée par votre wallet."}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.transactionList}>
+            {filteredTransactions.map((transaction) => (
+              <TransactionItem
+                key={transaction._id}
+                transaction={transaction}
+              />
+            ))}
+          </View>
+        )}
+
+        <View style={styles.financialIntegrity}>
+          <View style={styles.financialIntegrityIcon}>
+            <Shield size={15} color={COLORS.green} />
+          </View>
+
+          <View style={styles.financialIntegrityBody}>
+            <Text style={styles.financialIntegrityTitle}>
+              Intégrité financière
+            </Text>
+
+            <Text style={styles.financialIntegrityText}>
+              Le solde et l'historique affichés sont issus des fonctions Convex
+              actuellement connectées. Cette interface ne simule pas de
+              paiement, de recharge ou de transfert.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.globalArchitecture}>
+          <Globe size={16} color="#60A5FA" />
+
+          <View style={styles.globalArchitectureBody}>
+            <Text style={styles.globalArchitectureTitle}>
+              DébrouillePay — architecture mondiale
+            </Text>
+
+            <Text style={styles.globalArchitectureText}>
+              Les paiements internationaux doivent être traités avec des
+              devises, opérateurs, rails de paiement, contrôles de conformité et
+              statuts de transaction fournis par le backend. Aucun pays n'est
+              imposé dans cette interface.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      <ReceiveModal
+        visible={showReceive}
+        onClose={() => setShowReceive(false)}
+      />
+
+      {actionMode ? (
+        <BackendActionModal
+          visible
+          mode={actionMode}
+          onClose={() => setActionMode(null)}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * ROOT
+ * ========================================================================== */
+
+export default function PaiementPage({ onBack }: { onBack: () => void }) {
+  return (
+    <View style={styles.screen}>
+      <AuthLoading>
+        <View style={styles.authLoading}>
+          <Skeleton className="h-12 w-full rounded-xl" />
+
+          <Skeleton className="h-48 w-full rounded-3xl" />
+
+          <Skeleton className="h-20 w-full rounded-2xl" />
+        </View>
+      </AuthLoading>
+
+      <Unauthenticated>
+        <View style={styles.unauthenticated}>
+          <Pressable onPress={onBack} style={styles.unauthenticatedBack}>
+            <ArrowLeft size={18} color="#FFFFFF" />
+          </Pressable>
+
+          <View style={styles.unauthenticatedIcon}>
+            <Wallet size={35} color="#71717A" />
+          </View>
+
+          <Text style={styles.unauthenticatedTitle}>DébrouillePay</Text>
+
+          <Text style={styles.unauthenticatedText}>
+            Connectez-vous pour accéder à votre wallet et à votre historique
+            financier.
+          </Text>
+        </View>
+      </Unauthenticated>
+
+      <Authenticated>
+        <PaiementInner onBack={onBack} />
+      </Authenticated>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  pressed: {
+    opacity: 0.72,
+    transform: [
+      {
+        scale: 0.985,
+      },
+    ],
+  },
+
+  /* HEADER */
+
+  header: {
+    minHeight: 70,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  headerIdentity: {
+    flex: 1,
+    marginLeft: 10,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  walletLogo: {
+    width: 39,
+    height: 39,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(16,185,129,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.18)",
+  },
+
+  headerTitles: {
+    marginLeft: 9,
+  },
+
+  headerTitle: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+
+  headerSubtitle: {
+    marginTop: 3,
+    color: COLORS.muted,
+    fontSize: 7.5,
+    fontWeight: "700",
+  },
+
+  headerActions: {
+    flexDirection: "row",
+    gap: 6,
+  },
+
+  headerAction: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  receiveHeaderAction: {
+    backgroundColor: "rgba(59,130,246,0.07)",
+    borderColor: "rgba(59,130,246,0.14)",
+  },
+
+  /* CONTENT */
+
+  content: {
+    flex: 1,
+  },
+
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 42,
+  },
+
+  /* BALANCE */
+
+  balanceCard: {
+    position: "relative",
+    overflow: "hidden",
+    padding: 16,
+    borderRadius: 23,
+    backgroundColor: "rgba(16,185,129,0.055)",
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.18)",
+  },
+
+  balanceGlow: {
+    position: "absolute",
+    width: 190,
+    height: 190,
+    right: -85,
+    top: -95,
+    borderRadius: 95,
+    backgroundColor: "rgba(16,185,129,0.06)",
+  },
+
+  balanceTop: {
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+
+  balanceLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  balanceLabel: {
+    color: "rgba(167,243,208,0.58)",
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  secureBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(16,185,129,0.08)",
+  },
+
+  secureBadgeText: {
+    color: "rgba(110,231,183,0.72)",
+    fontSize: 6,
+    fontWeight: "900",
+  },
+
+  balanceValue: {
+    marginTop: 7,
+    maxWidth: 245,
+    color: COLORS.white,
+    fontSize: 27,
+    fontWeight: "900",
+    letterSpacing: -1,
+  },
+
+  currencyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(59,130,246,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(59,130,246,0.12)",
+  },
+
+  currencyBadgeText: {
+    color: "#93C5FD",
+    fontSize: 7,
+    fontWeight: "900",
+  },
+
+  balanceDivider: {
+    height: 1,
+    marginVertical: 12,
+    backgroundColor: "rgba(255,255,255,0.065)",
+  },
+
+  monthStats: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  monthStat: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  monthStatIcon: {
+    width: 27,
+    height: 27,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  monthStatLabel: {
+    color: COLORS.muted,
+    fontSize: 7,
+    fontWeight: "700",
+  },
+
+  monthStatValue: {
+    marginTop: 2,
+    color: COLORS.text,
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  monthSeparator: {
+    width: 1,
+    height: 31,
+    marginHorizontal: 8,
+    backgroundColor: "rgba(255,255,255,0.065)",
+  },
+
+  actionGrid: {
+    marginTop: 13,
+    flexDirection: "row",
+    gap: 7,
+  },
+
+  walletAction: {
+    flex: 1,
+    minHeight: 70,
+    paddingHorizontal: 5,
+    paddingVertical: 9,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.065)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  walletActionIcon: {
+    width: 29,
+    height: 29,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  walletActionTitle: {
+    marginTop: 5,
+    color: COLORS.text,
+    fontSize: 7.5,
+    fontWeight: "900",
+  },
+
+  walletActionSubtitle: {
+    marginTop: 2,
+    color: COLORS.muted2,
+    fontSize: 6.5,
+    fontWeight: "600",
+  },
+
+  /* SECTION */
+
+  sectionHeader: {
+    marginTop: 17,
+    marginBottom: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  sectionTitle: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  sectionSubtitle: {
+    marginTop: 3,
+    color: COLORS.muted2,
+    fontSize: 7.5,
+    fontWeight: "600",
+  },
+
+  secureLabel: {
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(16,185,129,0.06)",
+  },
+
+  secureLabelText: {
+    color: "rgba(110,231,183,0.75)",
+    fontSize: 6.5,
+    fontWeight: "900",
+  },
+
+  /* SEARCH */
+
+  searchBox: {
+    minHeight: 41,
+    paddingHorizontal: 11,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+  },
+
+  searchInput: {
+    flex: 1,
+    marginLeft: 7,
+    padding: 0,
+    color: COLORS.white,
+    fontSize: 8.5,
+    fontWeight: "600",
+  },
+
+  filterRow: {
+    paddingVertical: 8,
+    gap: 6,
+  },
+
+  filterChip: {
+    minHeight: 30,
+    paddingHorizontal: 11,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.055)",
+  },
+
+  filterChipActive: {
+    backgroundColor: "rgba(16,185,129,0.10)",
+    borderColor: "rgba(16,185,129,0.20)",
+  },
+
+  filterText: {
+    color: COLORS.muted,
+    fontSize: 7.5,
+    fontWeight: "800",
+  },
+
+  filterTextActive: {
+    color: "#6EE7B7",
+  },
+
+  transactionCountRow: {
+    marginBottom: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  transactionCount: {
+    color: COLORS.muted2,
+    fontSize: 7,
+    fontWeight: "800",
+  },
+
+  currencySmallBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  currencySmallBadgeText: {
+    color: COLORS.muted,
+    fontSize: 6.5,
+    fontWeight: "800",
+  },
+
+  /* TRANSACTIONS */
+
+  transactionList: {
+    gap: 7,
+  },
+
+  transactionItem: {
+    minHeight: 65,
+    padding: 10,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.038)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  transactionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  transactionMiddle: {
+    flex: 1,
+    marginLeft: 9,
+    minWidth: 0,
+  },
+
+  transactionTitle: {
+    color: COLORS.text,
+    fontSize: 8.5,
+    fontWeight: "800",
+  },
+
+  transactionMeta: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  typeBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.055)",
+  },
+
+  typeBadgeText: {
+    color: COLORS.muted,
+    fontSize: 5.8,
+    fontWeight: "800",
+  },
+
+  transactionDate: {
+    flexShrink: 1,
+    color: "#3F3F46",
+    fontSize: 6.8,
+    fontWeight: "600",
+  },
+
+  transactionAmountWrap: {
+    marginLeft: 7,
+    alignItems: "flex-end",
+  },
+
+  transactionAmount: {
+    fontSize: 8.5,
+    fontWeight: "900",
+  },
+
+  /* EMPTY */
+
+  loadingTransactions: {
+    minHeight: 180,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingText: {
+    marginTop: 8,
+    color: COLORS.muted2,
+    fontSize: 8,
+    fontWeight: "700",
+  },
+
+  emptyTransactions: {
+    minHeight: 190,
+    paddingHorizontal: 25,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  emptyIcon: {
+    width: 63,
+    height: 63,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  emptyTitle: {
+    marginTop: 11,
+    color: COLORS.muted,
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  emptyText: {
+    maxWidth: 270,
+    marginTop: 5,
+    color: COLORS.muted2,
+    fontSize: 7.5,
+    lineHeight: 12,
+    textAlign: "center",
+  },
+
+  /* INTEGRITY */
+
+  financialIntegrity: {
+    marginTop: 12,
+    padding: 11,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "rgba(16,185,129,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.085)",
+  },
+
+  financialIntegrityIcon: {
+    width: 31,
+    height: 31,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(16,185,129,0.08)",
+  },
+
+  financialIntegrityBody: {
+    flex: 1,
+    marginLeft: 8,
+  },
+
+  financialIntegrityTitle: {
+    color: "#6EE7B7",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+
+  financialIntegrityText: {
+    marginTop: 3,
+    color: "#52525B",
+    fontSize: 7,
+    lineHeight: 12,
+  },
+
+  globalArchitecture: {
+    marginTop: 9,
+    padding: 11,
+    borderRadius: 15,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "rgba(59,130,246,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(59,130,246,0.08)",
+  },
+
+  globalArchitectureBody: {
+    flex: 1,
+    marginLeft: 7,
+  },
+
+  globalArchitectureTitle: {
+    color: "#93C5FD",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+
+  globalArchitectureText: {
+    marginTop: 3,
+    color: "#475569",
+    fontSize: 7,
+    lineHeight: 12,
+  },
+
+  /* MODALS */
+
+  modalRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.78)",
+  },
+
+  modalSheet: {
+    maxHeight: "90%",
+    paddingBottom: 28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: "#090D19",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.085)",
+  },
+
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    marginTop: 9,
+    alignSelf: "center",
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+
+  sheetHeader: {
+    minHeight: 63,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.055)",
+  },
+
+  sheetTitle: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  sheetSubtitle: {
+    marginTop: 3,
+    color: COLORS.muted2,
+    fontSize: 7,
+    fontWeight: "700",
+  },
+
+  closeButton: {
+    width: 35,
+    height: 35,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.055)",
+  },
+
+  /* RECEIVE */
+
+  unavailablePanel: {
+    margin: 15,
+    padding: 18,
+    borderRadius: 20,
+    alignItems: "center",
+    backgroundColor: "rgba(59,130,246,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(59,130,246,0.08)",
+  },
+
+  unavailableIcon: {
+    width: 63,
+    height: 63,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(59,130,246,0.08)",
+  },
+
+  unavailableTitle: {
+    marginTop: 13,
+    color: COLORS.text,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  unavailableText: {
+    marginTop: 6,
+    color: COLORS.muted,
+    fontSize: 8,
+    lineHeight: 14,
+    textAlign: "center",
+  },
+
+  integrityPanel: {
+    width: "100%",
+    marginTop: 14,
+    padding: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "rgba(16,185,129,0.045)",
+  },
+
+  integrityPanelText: {
+    flex: 1,
+    marginLeft: 7,
+    color: "#64748B",
+    fontSize: 7.5,
+    lineHeight: 12,
+  },
+
+  disabledLikeButton: {
+    width: "100%",
+    minHeight: 43,
+    marginTop: 12,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+
+  disabledLikeText: {
+    color: COLORS.muted,
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  /* ACTION */
+
+  actionUnavailable: {
+    padding: 18,
+    alignItems: "center",
+  },
+
+  actionUnavailableIcon: {
+    width: 63,
+    height: 63,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  actionUnavailableTitle: {
+    marginTop: 13,
+    color: COLORS.text,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  actionUnavailableText: {
+    marginTop: 7,
+    color: COLORS.muted,
+    fontSize: 8,
+    lineHeight: 14,
+    textAlign: "center",
+  },
+
+  securityNotice: {
+    width: "100%",
+    marginTop: 14,
+    padding: 11,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "rgba(16,185,129,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.08)",
+  },
+
+  securityNoticeText: {
+    flex: 1,
+    marginLeft: 7,
+    color: "#64748B",
+    fontSize: 7.5,
+    lineHeight: 12,
+  },
+
+  closePrimaryButton: {
+    width: "100%",
+    minHeight: 45,
+    marginTop: 14,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.green,
+  },
+
+  closePrimaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "900",
+  },
+
+  /* AUTH */
+
+  authLoading: {
+    flex: 1,
+    padding: 16,
+    gap: 12,
+  },
+
+  unauthenticated: {
+    flex: 1,
+    paddingHorizontal: 30,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  unauthenticatedBack: {
+    position: "absolute",
+    top: 14,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  unauthenticatedIcon: {
+    width: 78,
+    height: 78,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  unauthenticatedTitle: {
+    marginTop: 15,
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  unauthenticatedText: {
+    maxWidth: 290,
+    marginTop: 6,
+    color: COLORS.muted2,
+    fontSize: 8.5,
+    lineHeight: 14,
+    textAlign: "center",
+  },
+});

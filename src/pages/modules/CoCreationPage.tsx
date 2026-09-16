@@ -1,46 +1,58 @@
-import { View, Text, Pressable, TextInput } from "react-native";
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
-import { api } from "@/convex/_generated/api.js";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
-import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-
+// src/pages/modules/CoCreationPage.tsx
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import {
   ArrowLeft,
-  Flame,
-  Trophy,
-  Users,
-  Plus,
-  Clock,
-  ChevronRight,
-  Heart,
-  MessageCircle,
-  Share2,
-  Camera,
-  Lightbulb,
-  FileText,
-  Star,
-  CheckCircle,
-  Zap,
-  Crown,
-  Target,
-  TrendingUp,
-  Gift,
-  ThumbsUp,
-  Filter,
-  Search,
-  X,
-  Upload,
-  Send,
   Award,
+  Check,
+  ChevronRight,
+  Clock,
+  Crown,
+  Flame,
+  Gift,
+  Lightbulb,
+  Plus,
+  Search,
+  Send,
+  Share2,
+  Star,
+  Target,
+  ThumbsUp,
+  Users,
+  X,
+  Zap,
 } from "lucide-react-native";
+import { api } from "@/convex/_generated/api.js";
+import { toast } from "sonner";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import { SignInButton } from "@/components/ui/signin.tsx";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════════════════════
+   TYPES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+interface CoCreationPageProps {
+  onBack: () => void;
+}
+
 type ChallengeStatus = "actif" | "vote" | "terminé";
 type StatusFilter = "tous" | ChallengeStatus;
+type TabId = "defis" | "creer";
 
 type Challenge = {
   _id: Id<"coCreationChallenges">;
@@ -69,16 +81,54 @@ type Entry = {
   voted: boolean;
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function getStatusConfig(statut: ChallengeStatus) {
-  switch (statut) {
-    case "actif":
-      return { label: "En cours", color: "#10B981", bg: "#10B98120" };
-    case "vote":
-      return { label: "Vote ouvert", color: "#F59E0B", bg: "#F59E0B20" };
-    case "terminé":
-      return { label: "Terminé", color: "#9CA3AF", bg: "#9CA3AF20" };
-  }
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGN TOKENS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const T = {
+  bg: "#07070C",
+  sheet: "#0E0E14",
+  card: "rgba(255,255,255,0.045)",
+  cardUp: "rgba(255,255,255,0.075)",
+  border: "rgba(255,255,255,0.08)",
+  borderUp: "rgba(255,255,255,0.14)",
+  text: "#FFFFFF",
+  dim: "rgba(255,255,255,0.58)",
+  faint: "rgba(255,255,255,0.32)",
+  ghost: "rgba(255,255,255,0.18)",
+  primary: "#8B5CF6",
+  primarySoft: "#C4B5FD",
+  amber: "#F59E0B",
+  amberSoft: "#FCD34D",
+  success: "#10B981",
+} as const;
+
+const STATUS_META: Record<ChallengeStatus, { label: string; color: string }> = {
+  actif: { label: "En cours", color: "#10B981" },
+  vote: { label: "Vote ouvert", color: "#F59E0B" },
+  terminé: { label: "Terminé", color: "#9CA3AF" },
+};
+
+const FILTERS: { id: StatusFilter; label: string; emoji: string }[] = [
+  { id: "tous", label: "Tous", emoji: "⚡" },
+  { id: "actif", label: "Actifs", emoji: "🔥" },
+  { id: "vote", label: "Vote", emoji: "🗳️" },
+  { id: "terminé", label: "Terminés", emoji: "✅" },
+];
+
+const SCREEN_W = Dimensions.get("window").width;
+const SCREEN_H = Dimensions.get("window").height;
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function alpha(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
 }
 
 function getTimeRemaining(deadline: string): string {
@@ -89,8 +139,66 @@ function getTimeRemaining(deadline: string): string {
   return `Dans ${days} jours`;
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-function StatPill({
+function initialsOf(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function formatShortDate(ts: number): string {
+  return new Date(ts).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PRIMITIVES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function Skeleton({
+  style,
+}: {
+  style?: React.ComponentProps<typeof Animated.View>["style"];
+}) {
+  const opacity = useRef(new Animated.Value(0.28)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.65,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.28,
+          duration: 850,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+  return (
+    <Animated.View
+      style={[
+        {
+          backgroundColor: "rgba(255,255,255,0.06)",
+          borderRadius: 18,
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+}
+
+function StatCard({
   icon: Icon,
   value,
   label,
@@ -102,189 +210,773 @@ function StatPill({
   color: string;
 }) {
   return (
-    <View className="flex flex-col items-center gap-0.5"><View className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}22` }}><Icon size={18} style={{ color }} /></View><Text className="text-white font-bold text-sm">{value}</Text><Text className="text-white/50 text-[10px]">{label}</Text></View>
+    <View style={[styles.statCard, { borderColor: alpha(color, 0.2) }]}>
+      <View style={[styles.statIcon, { backgroundColor: alpha(color, 0.15) }]}>
+        <Icon size={16} color={color} />
+      </View>
+      <Text style={styles.statValue} numberOfLines={1}>
+        {value}
+      </Text>
+      <Text style={styles.statLabel} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
   );
 }
+
+function EmptyState({
+  icon: Icon,
+  title,
+  message,
+}: {
+  icon: React.ElementType;
+  title: string;
+  message: string;
+}) {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIcon}>
+        <Icon size={26} color={T.faint} />
+      </View>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyMessage}>{message}</Text>
+    </View>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CHALLENGE CARD
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function ChallengeCard({
+  challenge,
+  onPress,
+  index,
+}: {
+  challenge: Challenge;
+  onPress: () => void;
+  index: number;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const enter = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: 340,
+      delay: Math.min(index * 55, 400),
+      useNativeDriver: true,
+    }).start();
+  }, [enter, index]);
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scale, {
+        toValue: 0.985,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 4,
+      }),
+    ]).start();
+    onPress();
+  };
+
+  const status = STATUS_META[challenge.status];
+  const color = challenge.couleur || T.primary;
+  const timeLabel = getTimeRemaining(challenge.deadline);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: enter,
+        transform: [
+          {
+            translateY: enter.interpolate({
+              inputRange: [0, 1],
+              outputRange: [14, 0],
+            }),
+          },
+        ],
+      }}
+    >
+      <Pressable onPress={handlePress}>
+        <Animated.View
+          style={[
+            styles.challengeCard,
+            {
+              borderColor: alpha(color, 0.22),
+              transform: [{ scale }],
+            },
+          ]}
+        >
+          {/* Strip colorée */}
+          <View style={[styles.challengeStrip, { backgroundColor: color }]} />
+
+          <View style={styles.challengeBody}>
+            {/* Header */}
+            <View style={styles.challengeHeader}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={styles.challengeTitleRow}>
+                  <Text style={styles.challengeEmoji}>{challenge.emoji}</Text>
+                  <Text numberOfLines={2} style={styles.challengeTitle}>
+                    {challenge.titre}
+                  </Text>
+                </View>
+                <View style={styles.challengeTimeRow}>
+                  <Clock size={10} color={T.faint} />
+                  <Text style={styles.challengeTimeText}>{timeLabel}</Text>
+                </View>
+              </View>
+
+              <View
+                style={[
+                  styles.statusPill,
+                  { backgroundColor: alpha(status.color, 0.16) },
+                ]}
+              >
+                <View
+                  style={[styles.statusDot, { backgroundColor: status.color }]}
+                />
+                <Text style={[styles.statusText, { color: status.color }]}>
+                  {status.label}
+                </Text>
+              </View>
+            </View>
+
+            {/* Description */}
+            <Text numberOfLines={2} style={styles.challengeDescription}>
+              {challenge.description}
+            </Text>
+
+            {/* Footer */}
+            <View style={styles.challengeFooter}>
+              <View style={styles.challengeMeta}>
+                <Users size={11} color={T.faint} />
+                <Text style={styles.challengeMetaText}>
+                  {challenge.participantCount} participant
+                  {challenge.participantCount > 1 ? "s" : ""}
+                </Text>
+              </View>
+
+              <View style={styles.challengeReward}>
+                <Gift size={11} color={color} />
+                <Text style={[styles.challengeRewardText, { color }]}>
+                  +{challenge.rewardPoints} pts
+                </Text>
+              </View>
+
+              <ChevronRight size={14} color={T.faint} />
+            </View>
+          </View>
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ENTRY CARD
+   ════════════════════════════════════════════════════════════════════════════ */
 
 function EntryCard({
   entry,
   onVote,
   showWinner,
+  index,
+  canVote,
 }: {
   entry: Entry;
-  onVote: (id: Id<"coCreationEntries">) => void;
+  onVote: () => void;
   showWinner: boolean;
+  index: number;
+  canVote: boolean;
 }) {
-  const initials = entry.authorName
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const enter = useRef(new Animated.Value(0)).current;
+  const voteScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: 340,
+      delay: Math.min(index * 55, 400),
+      useNativeDriver: true,
+    }).start();
+  }, [enter, index]);
+
+  const handleVote = () => {
+    if (!canVote) {
+      toast.error("Connecte-toi pour voter");
+      return;
+    }
+    Animated.sequence([
+      Animated.timing(voteScale, {
+        toValue: 1.4,
+        duration: 130,
+        useNativeDriver: true,
+      }),
+      Animated.spring(voteScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 4,
+      }),
+    ]).start();
+    onVote();
+  };
+
+  const isWinner = showWinner && entry.winner;
 
   return (
-    <View initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative rounded-2xl overflow-hidden p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-      {showWinner && entry.winner && (
-        <View className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full" style={{  }}><Crown size={10} className="text-black" /><Text className="text-black font-bold text-[10px]">Gagnant</Text></View>
+    <Animated.View
+      style={[
+        styles.entryCard,
+        {
+          opacity: enter,
+          transform: [
+            {
+              translateY: enter.interpolate({
+                inputRange: [0, 1],
+                outputRange: [12, 0],
+              }),
+            },
+          ],
+          borderColor: isWinner ? alpha(T.amber, 0.42) : T.border,
+          backgroundColor: isWinner ? alpha(T.amber, 0.07) : T.card,
+        },
+      ]}
+    >
+      {isWinner && (
+        <View style={styles.winnerBadge}>
+          <Crown size={11} color="#000" />
+          <Text style={styles.winnerBadgeText}>Gagnant</Text>
+        </View>
       )}
 
-      {/* Author */}
-      <View className="flex items-center gap-2 mb-3"><View className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs" style={{  }}>{initials}</View><View><Text className="text-white font-semibold text-sm">{entry.authorName}</Text><Text className="text-white/40 text-[11px]">{new Date(entry._creationTime).toLocaleDateString("fr-FR", {
-              day: "numeric",
-              month: "short",
-            })}</Text></View><Text className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ backgroundColor: "#F59E0B22", color: "#F59E0B" }}><Lightbulb size={10} />Idée
-        </Text></View>
+      <View style={styles.entryHeader}>
+        <View style={styles.entryAvatar}>
+          <Text style={styles.entryAvatarText}>
+            {initialsOf(entry.authorName)}
+          </Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={styles.entryAuthor}>
+            {entry.authorName}
+          </Text>
+          <Text style={styles.entryDate}>
+            {formatShortDate(entry._creationTime)}
+          </Text>
+        </View>
+        <View style={styles.ideaBadge}>
+          <Lightbulb size={10} color={T.amberSoft} />
+          <Text style={styles.ideaBadgeText}>Idée</Text>
+        </View>
+      </View>
 
-      {/* Content */}
-      <Text className="text-white/80 text-sm leading-relaxed mb-3">{entry.content}</Text>
+      <Text style={styles.entryContent}>{entry.content}</Text>
 
-      {/* Actions */}
-      <View className="flex items-center gap-3"><Pressable onPress={() => onVote(entry._id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all active:scale-95" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><ThumbsUp size={13} className={entry.voted ? "text-white" : "text-white/60"} /><Text className={`text-xs font-bold ${entry.voted ? "text-white" : "text-white/60"}`}>{entry.votes}</Text></Pressable><Pressable className="ml-auto p-1.5 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.06)" }}><Share2 size={13} className="text-white/50" /></Pressable></View>
-    </View>
+      <View style={styles.entryActions}>
+        <Pressable
+          onPress={handleVote}
+          style={({ pressed }) => [
+            styles.voteBtn,
+            {
+              backgroundColor: entry.voted
+                ? alpha(T.primary, 0.16)
+                : "rgba(255,255,255,0.05)",
+              borderColor: entry.voted ? alpha(T.primary, 0.42) : T.border,
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <Animated.View style={{ transform: [{ scale: voteScale }] }}>
+            <ThumbsUp
+              size={12}
+              color={entry.voted ? T.primarySoft : T.dim}
+              fill={entry.voted ? T.primarySoft : "transparent"}
+            />
+          </Animated.View>
+          <Text
+            style={[
+              styles.voteBtnText,
+              { color: entry.voted ? T.primarySoft : T.dim },
+            ]}
+          >
+            {entry.votes}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.shareBtn,
+            { opacity: pressed ? 0.75 : 1 },
+          ]}
+        >
+          <Share2 size={12} color={T.faint} />
+        </Pressable>
+      </View>
+    </Animated.View>
   );
 }
 
-function ChallengeCard({
+/* ════════════════════════════════════════════════════════════════════════════
+   DETAIL OVERLAY — plein écran
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function DetailOverlay({
+  visible,
   challenge,
-  onOpen,
+  entries,
+  canVote,
+  onClose,
+  onVote,
+  onContribute,
 }: {
-  challenge: Challenge;
-  onOpen: (c: Challenge) => void;
+  visible: boolean;
+  challenge: Challenge | null;
+  entries: Entry[] | undefined;
+  canVote: boolean;
+  onClose: () => void;
+  onVote: (entryId: Id<"coCreationEntries">) => void;
+  onContribute: (content: string) => Promise<void>;
 }) {
-  const status = getStatusConfig(challenge.status);
-  const timeLabel = getTimeRemaining(challenge.deadline);
+  const slide = useRef(new Animated.Value(1)).current;
+  const [showForm, setShowForm] = useState(false);
+  const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    Animated.timing(slide, {
+      toValue: visible ? 0 : 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, slide]);
+
+  useEffect(() => {
+    if (!visible) {
+      setShowForm(false);
+      setText("");
+    }
+  }, [visible]);
+
+  if (!challenge) return null;
+
+  const status = STATUS_META[challenge.status];
+  const color = challenge.couleur || T.primary;
+  const typedEntries = entries ?? [];
+  const totalVotes = typedEntries.reduce((sum, e) => sum + e.votes, 0);
+
+  const submit = async () => {
+    if (text.trim().length < 5) {
+      toast.error("Ta contribution est trop courte");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onContribute(text.trim());
+      setText("");
+      setShowForm(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <View whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onPress={() => onOpen(challenge)} className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-      {/* Header gradient strip */}
-      <View className="h-2 w-full" style={{  }} />
+    <Modal
+      visible={visible}
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      presentationStyle="overFullScreen"
+    >
+      <Animated.View
+        style={[
+          styles.detailRoot,
+          {
+            transform: [
+              {
+                translateX: slide.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, SCREEN_W],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        {/* Header */}
+        <View style={styles.detailHeader}>
+          <Pressable
+            onPress={onClose}
+            style={({ pressed }) => [
+              styles.detailBackBtn,
+              { transform: [{ scale: pressed ? 0.92 : 1 }] },
+            ]}
+          >
+            <ArrowLeft size={18} color="#fff" />
+          </Pressable>
 
-      <View className="p-4">{}<View className="flex items-start justify-between mb-2"><View className="flex items-center gap-2"><Text className="text-2xl">{challenge.emoji}</Text><View><Text className="text-white font-bold text-sm leading-tight">{challenge.titre}</Text><Text className="text-white/40 text-[11px]">{timeLabel}</Text></View></View><Text className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: status.bg, color: status.color }}>{status.label}</Text></View>{}<Text className="text-white/60 text-xs leading-relaxed mb-3">{challenge.description}</Text>{}<View className="flex items-center gap-4 text-[11px] text-white/50"><Text className="flex items-center gap-1"><Users size={11} />{challenge.participantCount}participants
-          </Text><Text className="flex items-center gap-1 ml-auto font-bold" style={{ color: challenge.couleur }}><Gift size={11} />{challenge.rewardPoints}pts
-          </Text></View></View>
-    </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={styles.detailHeaderTitle}>
+              {challenge.titre}
+            </Text>
+            <View
+              style={[
+                styles.detailHeaderStatus,
+                { backgroundColor: alpha(status.color, 0.16) },
+              ]}
+            >
+              <View
+                style={[styles.statusDot, { backgroundColor: status.color }]}
+              />
+              <Text
+                style={[styles.detailHeaderStatusText, { color: status.color }]}
+              >
+                {status.label}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.detailHeaderEmoji}>{challenge.emoji}</Text>
+        </View>
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Hero */}
+          <View style={{ paddingHorizontal: 20 }}>
+            <View
+              style={[
+                styles.detailHero,
+                {
+                  backgroundColor: alpha(color, 0.09),
+                  borderColor: alpha(color, 0.28),
+                },
+              ]}
+            >
+              <View
+                pointerEvents="none"
+                style={[styles.detailHeroGlow, { backgroundColor: color }]}
+              />
+
+              <Text style={styles.detailDescription}>
+                {challenge.description}
+              </Text>
+
+              <View style={styles.detailStatsRow}>
+                <StatCard
+                  icon={Users}
+                  value={challenge.participantCount}
+                  label="Participants"
+                  color={T.primarySoft}
+                />
+                <StatCard
+                  icon={ThumbsUp}
+                  value={totalVotes}
+                  label="Votes"
+                  color={T.success}
+                />
+                <StatCard
+                  icon={Gift}
+                  value={`+${challenge.rewardPoints}`}
+                  label="Points"
+                  color={T.amberSoft}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Section titre */}
+          <View style={styles.detailSectionHead}>
+            <Text style={styles.detailSectionTitle}>
+              {challenge.status === "vote"
+                ? "Vote pour la meilleure contribution"
+                : "Contributions"}
+            </Text>
+            <View style={styles.detailSectionCount}>
+              <Text style={styles.detailSectionCountText}>
+                {typedEntries.length}
+              </Text>
+            </View>
+          </View>
+
+          {/* Liste */}
+          {entries === undefined ? (
+            <View style={{ paddingHorizontal: 20, gap: 10 }}>
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} style={{ height: 140, borderRadius: 20 }} />
+              ))}
+            </View>
+          ) : typedEntries.length === 0 ? (
+            <EmptyState
+              icon={Lightbulb}
+              title="Sois le premier à contribuer"
+              message={
+                challenge.status === "actif"
+                  ? "Partage ton idée et inspire la communauté."
+                  : "Aucune contribution pour l'instant."
+              }
+            />
+          ) : (
+            <View style={{ paddingHorizontal: 20, gap: 10 }}>
+              {typedEntries.map((e, i) => (
+                <EntryCard
+                  key={e._id}
+                  entry={e}
+                  index={i}
+                  canVote={canVote}
+                  onVote={() => onVote(e._id)}
+                  showWinner={challenge.status === "terminé"}
+                />
+              ))}
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Footer CTA */}
+        {challenge.status === "actif" && (
+          <View style={styles.detailFooter}>
+            <Pressable
+              onPress={() => {
+                if (!canVote) {
+                  toast.error("Connecte-toi pour participer");
+                  return;
+                }
+                setShowForm(true);
+              }}
+              style={({ pressed }) => [
+                styles.detailCta,
+                {
+                  backgroundColor: color,
+                  opacity: pressed ? 0.85 : 1,
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                },
+              ]}
+            >
+              <Zap size={16} color="#fff" fill="#fff" />
+              <Text style={styles.detailCtaText}>Participer au défi</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Modal de contribution */}
+        <Modal
+          visible={showForm}
+          transparent
+          animationType="slide"
+          onRequestClose={() => !submitting && setShowForm(false)}
+          statusBarTranslucent
+        >
+          <View style={styles.contributionBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => !submitting && setShowForm(false)}
+            />
+
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={styles.contributionSheetWrap}
+            >
+              <View style={styles.contributionSheet}>
+                <View style={styles.contributionHandle} />
+
+                <View style={styles.contributionHead}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.contributionTitle}>
+                      Ta contribution
+                    </Text>
+                    <Text style={styles.contributionSubtitle}>
+                      {challenge.titre}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => !submitting && setShowForm(false)}
+                    style={styles.contributionClose}
+                  >
+                    <X size={16} color="#fff" />
+                  </Pressable>
+                </View>
+
+                <TextInput
+                  value={text}
+                  onChangeText={setText}
+                  placeholder="Décris ton idée, ta solution, ton concept…"
+                  placeholderTextColor={T.faint}
+                  style={styles.contributionInput}
+                  multiline
+                  textAlignVertical="top"
+                  maxLength={800}
+                  autoFocus
+                />
+
+                <Text style={styles.contributionHint}>
+                  {text.trim().length}/800 caractères
+                </Text>
+
+                <Pressable
+                  onPress={submit}
+                  disabled={submitting || text.trim().length < 5}
+                  style={({ pressed }) => [
+                    styles.contributionSubmit,
+                    {
+                      backgroundColor: color,
+                      opacity:
+                        submitting || text.trim().length < 5
+                          ? 0.4
+                          : pressed
+                            ? 0.85
+                            : 1,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    },
+                  ]}
+                >
+                  {submitting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Send size={15} color="#fff" />
+                  )}
+                  <Text style={styles.contributionSubmitText}>
+                    {submitting ? "Envoi…" : "Soumettre"}
+                  </Text>
+                </Pressable>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
+      </Animated.View>
+    </Modal>
   );
 }
 
-function ChallengesSkeleton() {
-  return (
-    <View className="flex flex-col gap-3 px-4 pb-6">{Array.from({ length: 3 }).map((_, i) => (
-        <View key={i} className="rounded-2xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Skeleton className="h-2 w-full rounded-none" /><View className="p-4 space-y-3"><View className="flex items-center gap-2"><Skeleton className="h-8 w-8 rounded-full" /><View className="space-y-1.5"><Skeleton className="h-4 w-40" /><Skeleton className="h-3 w-24" /></View></View><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-3/4" /><View className="flex gap-4"><Skeleton className="h-3 w-24" /><Skeleton className="h-3 w-16" /></View></View></View>
-      ))}</View>
-  );
-}
-
-function EntriesSkeleton() {
-  return (
-    <View className="flex flex-col gap-3">{Array.from({ length: 3 }).map((_, i) => (
-        <View key={i} className="rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-3"><Skeleton className="h-8 w-8 rounded-full" /><View className="space-y-1"><Skeleton className="h-3.5 w-28" /><Skeleton className="h-2.5 w-16" /></View></View><Skeleton className="h-3 w-full mb-1.5" /><Skeleton className="h-3 w-4/5 mb-3" /><Skeleton className="h-7 w-20 rounded-xl" /></View>
-      ))}</View>
-  );
-}
-
-// ── Main Component ─────────────────────────────────────────────────────────────
-interface CoCreationPageProps {
-  onBack: () => void;
-}
+/* ════════════════════════════════════════════════════════════════════════════
+   PAGE PRINCIPALE
+   ════════════════════════════════════════════════════════════════════════════ */
 
 export default function CoCreationPage({ onBack }: CoCreationPageProps) {
   const { user } = useFirebaseAuth();
   const isAuthenticated = !!user;
 
-  const [tab, setTab] = useState<"defis" | "creer">("defis");
+  const [tab, setTab] = useState<TabId>("defis");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("tous");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(
     null,
   );
-  const [showContribForm, setShowContribForm] = useState(false);
-  const [contribText, setContribText] = useState("");
+
   const [newDefiTitle, setNewDefiTitle] = useState("");
   const [newDefiDesc, setNewDefiDesc] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  // Seed data on mount
-  const seedChallenges = useMutation(api.coCreation.seedChallenges);
+  /* Debounce search */
   useEffect(() => {
-    if (isAuthenticated) {
-      seedChallenges({}).catch(() => {
-        /* ignore if already seeded */
-      });
-    }
-  }, [isAuthenticated, seedChallenges]);
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
-  // Query challenges
+  /* Queries */
   const queryStatus = statusFilter === "tous" ? undefined : statusFilter;
-  const challenges = useQuery(
+  const challengesRaw = useQuery(
     api.coCreation.listChallenges,
     isAuthenticated ? { status: queryStatus } : "skip",
   );
 
-  // Query entries for selected challenge
   const entries = useQuery(
     api.coCreation.listEntries,
     selectedChallenge ? { challengeId: selectedChallenge._id } : "skip",
   );
 
-  // Mutations
+  /* Mutations */
+  const seedChallenges = useMutation(api.coCreation.seedChallenges);
   const submitEntry = useMutation(api.coCreation.submitEntry);
   const voteEntry = useMutation(api.coCreation.voteEntry);
   const createChallenge = useMutation(api.coCreation.createChallenge);
 
-  // Filter by search locally
-  const filteredChallenges = (challenges ?? []).filter((c) => {
-    const ch = c as Challenge;
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      ch.titre.toLowerCase().includes(q) ||
-      ch.description.toLowerCase().includes(q)
-    );
-  }) as Challenge[];
-
-  const handleVote = async (entryId: Id<"coCreationEntries">) => {
-    if (!isAuthenticated) {
-      toast.error("Connecte-toi pour voter");
-      return;
-    }
-    try {
-      await voteEntry({ entryId });
-    } catch {
-      toast.error("Erreur lors du vote");
-    }
-  };
-
-  const handleSubmitContribution = async () => {
-    if (!selectedChallenge || !contribText.trim()) return;
-    if (!isAuthenticated) {
-      toast.error("Connecte-toi pour participer");
-      return;
-    }
-    try {
-      await submitEntry({
-        challengeId: selectedChallenge._id,
-        content: contribText.trim(),
+  /* Seed unique — une seule fois par session */
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (isAuthenticated && !seededRef.current) {
+      seededRef.current = true;
+      seedChallenges({}).catch(() => {
+        seededRef.current = false;
       });
-      setContribText("");
-      setShowContribForm(false);
-      toast.success("Contribution soumise !");
-    } catch {
-      toast.error("Erreur lors de la soumission");
     }
-  };
+  }, [isAuthenticated, seedChallenges]);
+
+  /* Filtre local */
+  const challenges = useMemo(() => {
+    const list = (challengesRaw ?? []) as Challenge[];
+    if (!debouncedSearch) return list;
+    const q = debouncedSearch.toLowerCase();
+    return list.filter(
+      (c) =>
+        c.titre.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q),
+    );
+  }, [challengesRaw, debouncedSearch]);
+
+  /* Stats hero */
+  const totalParticipants = challenges.reduce(
+    (a, c) => a + c.participantCount,
+    0,
+  );
+  const totalPoints = challenges.reduce((a, c) => a + c.rewardPoints, 0);
+
+  /* Handlers */
+  const handleVote = useCallback(
+    async (entryId: Id<"coCreationEntries">) => {
+      if (!isAuthenticated) {
+        toast.error("Connecte-toi pour voter");
+        return;
+      }
+      try {
+        await voteEntry({ entryId });
+      } catch {
+        toast.error("Erreur lors du vote");
+      }
+    },
+    [isAuthenticated, voteEntry],
+  );
+
+  const handleContribute = useCallback(
+    async (content: string) => {
+      if (!selectedChallenge) return;
+      try {
+        await submitEntry({
+          challengeId: selectedChallenge._id,
+          content,
+        });
+        toast.success("Contribution soumise !");
+      } catch {
+        toast.error("Erreur lors de la soumission");
+      }
+    },
+    [selectedChallenge, submitEntry],
+  );
 
   const handleCreateDefi = async () => {
-    if (!newDefiTitle.trim() || !newDefiDesc.trim()) return;
+    if (newDefiTitle.trim().length < 3 || newDefiDesc.trim().length < 10) {
+      toast.error("Titre et description requis");
+      return;
+    }
     if (!isAuthenticated) {
       toast.error("Connecte-toi pour créer un défi");
       return;
     }
+    setCreating(true);
     try {
       await createChallenge({
         titre: newDefiTitle.trim(),
         description: newDefiDesc.trim(),
         categorie: "créativité",
         emoji: "⚡",
-        couleur: "#8B5CF6",
+        couleur: T.primary,
         rewardPoints: 200,
         deadline: new Date(Date.now() + 7 * 86400000).toISOString(),
       });
@@ -294,134 +986,1133 @@ export default function CoCreationPage({ onBack }: CoCreationPageProps) {
       toast.success("Défi créé avec succès !");
     } catch {
       toast.error("Erreur lors de la création");
+    } finally {
+      setCreating(false);
     }
   };
 
-  // ── Detail view ──────────────────────────────────────────────────────────────
-  if (selectedChallenge) {
-    const status = getStatusConfig(selectedChallenge.status);
-    const typedEntries = (entries ?? []) as Entry[];
+  const canCreate =
+    newDefiTitle.trim().length >= 3 &&
+    newDefiDesc.trim().length >= 10 &&
+    !creating;
 
-    return (
-      <View className="h-full flex flex-col" style={{  }}>{}<View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}><Pressable onPress={() => setSelectedChallenge(null)} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-white font-bold text-sm leading-tight">{selectedChallenge.titre}</Text><Text className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: status.bg, color: status.color }}>{status.label}</Text></View><Text className="text-2xl">{selectedChallenge.emoji}</Text></View><View className="flex-1 overflow-y-auto" style={{  }}>{}<View className="mx-4 mt-4 rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-white/70 text-sm leading-relaxed mb-4">{selectedChallenge.description}</Text><View className="gap-2"><StatPill icon={Users} value={selectedChallenge.participantCount} label="participants" color="#8B5CF6" /><StatPill icon={ThumbsUp} value={typedEntries.reduce((sum, e) => sum + e.votes, 0)} label="votes" color="#10B981" /><StatPill icon={Gift} value={`+${selectedChallenge.rewardPoints}`} label="pts à gagner" color="#F59E0B" /></View></View>{}{selectedChallenge.status === "actif" && (
-            <Pressable onPress={() => {
-                if (!isAuthenticated) {
-                  toast.error("Connecte-toi pour participer");
-                  return;
-                }
-                setShowContribForm(true);
-              }} className="mx-4 mt-3 w-[calc(100%-2rem)] py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all" style={{ boxShadow: "0 4px 20px rgba(139,92,246,0.4)" }}><Zap size={16} className="text-white" /><Text className="text-white font-bold text-sm">Participer au défi
-              </Text></Pressable>
-          )}{}<View className="mx-4 mt-4 mb-6 flex flex-col gap-3"><Text className="text-white font-bold text-sm">{selectedChallenge.status === "vote"
-                ? "🗳️ Vote pour la meilleure contribution"
-                : "💬 Contributions"}<Text className="ml-2 text-white/40 font-normal text-xs">{typedEntries.length}</Text></Text>{entries === undefined ? (
-              <EntriesSkeleton />
-            ) : typedEntries.length === 0 ? (
-              <View className="text-center py-8 text-white/30 text-sm"><Text>Sois le premier à contribuer !</Text></View>
-            ) : (
-              typedEntries.map((e) => (
-                <EntryCard
-                  key={e._id}
-                  entry={e}
-                  onVote={handleVote}
-                  showWinner={selectedChallenge.status === "terminé"}
-                />
-              ))
-            )}</View></View>{}<View>{showContribForm && (
-            <>
-              <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setShowContribForm(false)} className="absolute inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,0.7)" }} />
-              <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl p-5" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-                <View className="flex items-center justify-between mb-4"><Text className="text-white font-bold">Soumettre ma contribution
-                  </Text><Pressable onPress={() => setShowContribForm(false)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><X size={16} className="text-white" /></Pressable></View>
-
-                <TextInput value={contribText} onChangeText={(value) => setContribText(value)} placeholder="Décris ta contribution..." className="w-full rounded-xl px-3 py-3 text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} multiline textAlignVertical="top" />
-
-                <Pressable onPress={handleSubmitContribution} disabled={!contribText.trim()} className="mt-3 w-full py-3 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40" style={{  }}><Send size={15} className="text-white" /><Text className="text-white font-bold text-sm">Soumettre
-                  </Text></Pressable>
-              </View>
-            </>
-          )}</View></View>
-    );
-  }
-
-  // ── Main list view ────────────────────────────────────────────────────────────
+  /* ── Rendu ─────────────────────────────────────────────────────────── */
   return (
-    <View className="h-full flex flex-col" style={{  }}>{}<View className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-40 pointer-events-none" style={{  }} />{}<View className="flex-shrink-0 pt-safe px-4 py-3 flex items-center gap-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}><Pressable onPress={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><ArrowLeft size={18} className="text-white" /></Pressable><View className="flex-1"><Text className="text-white font-black text-lg leading-tight">Co-création
-          </Text><Text className="text-white/40 text-xs">Défis collectifs & contributions
-          </Text></View></View>{}<View className="flex-shrink-0 flex gap-1 px-4 py-3">{[
-          { id: "defis" as const, label: "Défis", icon: Target },
-          { id: "creer" as const, label: "Créer", icon: Plus },
-        ].map(({ id, label, icon: Icon }) => (
-          <Pressable key={id} onPress={() => setTab(id)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all" style={tab === id
-                ? {  }
-                : { backgroundColor: "rgba(255,255,255,0.06)" }}><Icon size={13} />{label}</Pressable>
-        ))}</View><View className="flex-1 overflow-y-auto" style={{  }}>{}{tab === "defis" && (
-          <View className="px-4 pb-6">{}<View className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Search size={15} className="text-white/40" /><TextInput value={searchQuery} onChangeText={(value) => setSearchQuery(value)} placeholder="Rechercher un défi..." className="flex-1 bg-transparent text-white text-sm placeholder-white/30 outline-none" /></View>{}<View className="flex gap-2 overflow-x-auto pb-2 mb-4" style={{  }}>{[
-                { id: "tous" as StatusFilter, label: "Tous", emoji: "⚡" },
-                { id: "actif" as StatusFilter, label: "Actifs", emoji: "🔥" },
-                { id: "vote" as StatusFilter, label: "Vote", emoji: "🗳️" },
-                {
-                  id: "terminé" as StatusFilter,
-                  label: "Terminés",
-                  emoji: "✅",
-                },
-              ].map((cat) => (
-                <Pressable key={cat.id} onPress={() => setStatusFilter(cat.id)} className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all" style={statusFilter === cat.id
-                      ? {  }
-                      : { backgroundColor: "rgba(255,255,255,0.06)" }}><Text>{cat.emoji}</Text>{cat.label}</Pressable>
-              ))}</View>{}<Unauthenticated><View className="text-center py-10"><Text className="text-white/50 text-sm mb-2">Connecte-toi pour voir les défis
-                </Text></View></Unauthenticated><AuthLoading><ChallengesSkeleton /></AuthLoading><Authenticated>{challenges === undefined ? (
-                <ChallengesSkeleton />
-              ) : (
-                <>
-                  {/* Hero stats banner */}
-                  <View className="rounded-2xl p-4 mb-4 flex items-center gap-4" style={{ borderWidth: 1, borderColor: "rgba(139,92,246,0.25)", borderStyle: "solid" }}><View className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{ backgroundColor: "rgba(139,92,246,0.2)" }}><Text>⚡</Text></View><View className="flex-1"><Text className="text-white font-bold text-sm">{filteredChallenges.length}défis
-                      </Text><Text className="text-white/50 text-xs">{filteredChallenges.reduce(
-                          (a, d) => a + d.participantCount,
-                          0,
-                        )}{" "}participants
-                      </Text></View><View className="flex flex-col items-end"><Text className="text-yellow-400 font-black text-sm">{filteredChallenges
-                          .reduce((a, d) => a + d.rewardPoints, 0)
-                          .toLocaleString()}</Text><Text className="text-white/40 text-[10px]">pts à gagner
-                      </Text></View></View>
+    <View style={styles.root}>
+      <View pointerEvents="none" style={styles.glow} />
 
-                  {/* Challenge list */}
-                  <View className="flex flex-col gap-3">{filteredChallenges.length === 0 ? (
-                      <View className="text-center py-10 text-white/30 text-sm"><Text>Aucun défi trouvé</Text></View>
-                    ) : (
-                      filteredChallenges.map((c) => (
-                        <ChallengeCard
-                          key={c._id}
-                          challenge={c}
-                          onOpen={setSelectedChallenge}
-                        />
-                      ))
-                    )}</View>
-                </>
-              )}</Authenticated></View>
-        )}{}{tab === "creer" && (
-          <View className="px-4 pb-6"><View className="rounded-2xl p-5" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><View className="flex items-center gap-3 mb-4"><View className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{  }}><Text>⚡</Text></View><View><Text className="text-white font-bold">Lancer un défi</Text><Text className="text-white/40 text-xs">Inspirez la communauté
-                  </Text></View></View><View className="flex flex-col gap-3"><View><Text className="text-white/60 text-xs mb-1 block">Titre du défi *
-                  </Text><TextInput value={newDefiTitle} onChangeText={(value) => setNewDefiTitle(value)} placeholder="Ex: Meilleure recette africaine" className="w-full px-3 py-2.5 rounded-xl text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View><View><Text className="text-white/60 text-xs mb-1 block">Description *
-                  </Text><TextInput value={newDefiDesc} onChangeText={(value) => setNewDefiDesc(value)} placeholder="Décris le défi, les règles, ce qui sera récompensé..." className="w-full px-3 py-2.5 rounded-xl text-sm text-white placeholder-white/30 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} multiline textAlignVertical="top" /></View>{}<View className="gap-2">{[
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerRow}>
+          <Pressable
+            onPress={onBack}
+            style={({ pressed }) => [
+              styles.backBtn,
+              { transform: [{ scale: pressed ? 0.92 : 1 }] },
+            ]}
+          >
+            <ArrowLeft size={18} color="#fff" />
+          </Pressable>
+
+          <View style={{ flex: 1 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 7 }}
+            >
+              <Zap size={16} color={T.primarySoft} fill={T.primarySoft} />
+              <Text style={styles.title}>Co-création</Text>
+            </View>
+            <Text style={styles.subtitle}>
+              Défis collectifs & contributions
+            </Text>
+          </View>
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.segmented}>
+          {(
+            [
+              { id: "defis" as TabId, label: "Défis", icon: Target },
+              { id: "creer" as TabId, label: "Créer", icon: Plus },
+            ] as const
+          ).map(({ id, label, icon: Icon }) => {
+            const active = tab === id;
+            return (
+              <Pressable
+                key={id}
+                onPress={() => setTab(id)}
+                style={[styles.segment, active && styles.segmentActive]}
+              >
+                <Icon size={13} color={active ? "#fff" : T.faint} />
+                <Text style={[styles.segmentText, active && { color: "#fff" }]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Contenu */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Onglet DÉFIS */}
+        {tab === "defis" && (
+          <View style={{ gap: 18 }}>
+            {/* Search */}
+            <View style={styles.searchWrap}>
+              <Search size={15} color={T.faint} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Rechercher un défi…"
+                placeholderTextColor={T.faint}
+                style={styles.searchInput}
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery("")} hitSlop={10}>
+                  <X size={15} color={T.faint} />
+                </Pressable>
+              )}
+            </View>
+
+            {/* Filtres */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingRight: 20 }}
+              style={{ marginHorizontal: -20, paddingHorizontal: 20 }}
+            >
+              {FILTERS.map((f) => {
+                const active = statusFilter === f.id;
+                return (
+                  <Pressable
+                    key={f.id}
+                    onPress={() => setStatusFilter(f.id)}
+                    style={({ pressed }) => [
+                      styles.filterChip,
+                      {
+                        backgroundColor: active
+                          ? alpha(T.primary, 0.18)
+                          : "rgba(255,255,255,0.05)",
+                        borderColor: active ? alpha(T.primary, 0.42) : T.border,
+                        opacity: pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.filterEmoji}>{f.emoji}</Text>
+                    <Text
+                      style={{
+                        color: active ? T.primarySoft : T.dim,
+                        fontSize: 12,
+                        fontWeight: active ? "800" : "600",
+                      }}
+                    >
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {/* Gate auth */}
+            {!isAuthenticated ? (
+              <View style={styles.authGate}>
+                <View style={styles.authIcon}>
+                  <Zap size={28} color={T.primarySoft} fill={T.primarySoft} />
+                </View>
+                <Text style={styles.authTitle}>Rejoins la co-création</Text>
+                <Text style={styles.authText}>
+                  Connecte-toi pour voir les défis, participer et voter pour les
+                  meilleures idées de la communauté.
+                </Text>
+                <View style={{ marginTop: 8 }}>
+                  <SignInButton />
+                </View>
+              </View>
+            ) : challengesRaw === undefined ? (
+              <View style={{ gap: 10 }}>
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} style={{ height: 150, borderRadius: 22 }} />
+                ))}
+              </View>
+            ) : (
+              <>
+                {/* Hero stats */}
+                {challenges.length > 0 && (
+                  <View style={styles.heroStats}>
+                    <View style={styles.heroStatsEmoji}>
+                      <Text style={{ fontSize: 26 }}>⚡</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.heroStatsValue}>
+                        {challenges.length} défi
+                        {challenges.length > 1 ? "s" : ""}
+                      </Text>
+                      <Text style={styles.heroStatsSub}>
+                        {totalParticipants} participant
+                        {totalParticipants > 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={styles.heroStatsPoints}>
+                        {totalPoints.toLocaleString()}
+                      </Text>
+                      <Text style={styles.heroStatsPointsLabel}>
+                        pts à gagner
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Liste */}
+                {challenges.length === 0 ? (
+                  <EmptyState
+                    icon={Target}
+                    title="Aucun défi trouvé"
+                    message={
+                      debouncedSearch
+                        ? "Essaie un autre mot-clé ou change de filtre."
+                        : "Lance le premier défi de la communauté !"
+                    }
+                  />
+                ) : (
+                  <View style={{ gap: 10 }}>
+                    {challenges.map((c, i) => (
+                      <ChallengeCard
+                        key={c._id}
+                        challenge={c}
+                        index={i}
+                        onPress={() => setSelectedChallenge(c)}
+                      />
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Onglet CRÉER */}
+        {tab === "creer" && (
+          <View style={{ gap: 18 }}>
+            <View style={styles.createCard}>
+              <View style={styles.createHead}>
+                <View style={styles.createEmoji}>
+                  <Text style={{ fontSize: 24 }}>⚡</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.createTitle}>Lancer un défi</Text>
+                  <Text style={styles.createSubtitle}>
+                    Inspire la communauté en 30 secondes
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ gap: 14, marginTop: 16 }}>
+                <View>
+                  <Text style={styles.fieldLabel}>Titre *</Text>
+                  <TextInput
+                    value={newDefiTitle}
+                    onChangeText={setNewDefiTitle}
+                    placeholder="Ex. Meilleure recette africaine"
+                    placeholderTextColor={T.faint}
+                    style={styles.input}
+                    maxLength={100}
+                  />
+                  <Text style={styles.hint}>
+                    {newDefiTitle.trim().length}/100
+                  </Text>
+                </View>
+
+                <View>
+                  <Text style={styles.fieldLabel}>Description *</Text>
+                  <TextInput
+                    value={newDefiDesc}
+                    onChangeText={setNewDefiDesc}
+                    placeholder="Décris le défi, les règles, ce qui sera récompensé…"
+                    placeholderTextColor={T.faint}
+                    style={[styles.input, styles.inputMulti]}
+                    multiline
+                    textAlignVertical="top"
+                    maxLength={500}
+                  />
+                  <Text style={styles.hint}>
+                    {newDefiDesc.trim().length}/500
+                  </Text>
+                </View>
+
+                {/* Règles par défaut */}
+                <View style={{ gap: 8 }}>
+                  {[
                     { icon: Clock, label: "Durée", value: "7 jours" },
                     { icon: Gift, label: "Récompense", value: "200 pts" },
                     { icon: Users, label: "Ouvert à", value: "Tous" },
                     { icon: Award, label: "Gagnants", value: "Top 3" },
                   ].map(({ icon: Icon, label, value }) => (
-                    <View key={label} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}><Icon size={13} className="text-white/40" /><View><Text className="text-white/40 text-[10px]">{label}</Text><Text className="text-white/80 text-xs font-semibold">{value}</Text></View></View>
-                  ))}</View><Pressable onPress={handleCreateDefi} disabled={!newDefiTitle.trim() || !newDefiDesc.trim()} className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40 mt-1" style={{ boxShadow: "0 4px 20px rgba(139,92,246,0.4)" }}><Flame size={16} className="text-white" /><Text className="text-white font-black">Lancer le défi</Text></Pressable></View></View>{}<View className="mt-4 rounded-2xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: "rgba(255,255,255,0.05)", borderStyle: "solid" }}><Text className="text-white/50 text-xs font-semibold mb-2">💡 Conseils pour un bon défi
-              </Text>{[
+                    <View key={label} style={styles.ruleRow}>
+                      <View style={styles.ruleIcon}>
+                        <Icon size={13} color={T.faint} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.ruleLabel}>{label}</Text>
+                        <Text style={styles.ruleValue}>{value}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                <Pressable
+                  onPress={handleCreateDefi}
+                  disabled={!canCreate}
+                  style={({ pressed }) => [
+                    styles.createBtn,
+                    {
+                      opacity: !canCreate ? 0.4 : pressed ? 0.85 : 1,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    },
+                  ]}
+                >
+                  {creating ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Flame size={16} color="#fff" fill="#fff" />
+                  )}
+                  <Text style={styles.createBtnText}>
+                    {creating ? "Création…" : "Lancer le défi"}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Conseils */}
+            <View style={styles.tipsCard}>
+              <View style={styles.tipsHead}>
+                <Lightbulb size={14} color={T.amberSoft} />
+                <Text style={styles.tipsTitle}>Conseils pour un bon défi</Text>
+              </View>
+              {[
                 "Sois précis sur ce qui est attendu",
                 "Fixe un objectif mesurable et atteignable",
                 "Propose une récompense motivante",
                 "Implique ta communauté dès le lancement",
               ].map((tip) => (
-                <View key={tip} className="flex items-center gap-2 py-1">
-                  <Star size={10} className="text-yellow-400 flex-shrink-0" />
-                  <Text className="text-white/40 text-xs">{tip}</Text>
+                <View key={tip} style={styles.tipRow}>
+                  <Star size={10} color={T.amberSoft} fill={T.amberSoft} />
+                  <Text style={styles.tipText}>{tip}</Text>
                 </View>
-              ))}</View></View>
-        )}</View></View>
+              ))}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Overlay détail */}
+      <DetailOverlay
+        visible={selectedChallenge !== null}
+        challenge={selectedChallenge}
+        entries={entries as unknown as Entry[] | undefined}
+        canVote={isAuthenticated}
+        onClose={() => setSelectedChallenge(null)}
+        onVote={handleVote}
+        onContribute={handleContribute}
+      />
+    </View>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   STYLES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: T.bg },
+
+  glow: {
+    position: "absolute",
+    top: -150,
+    left: -80,
+    right: -80,
+    height: 320,
+    borderRadius: 220,
+    backgroundColor: alpha(T.primary, 0.12),
+  },
+
+  /* Header */
+  header: { paddingTop: 56, paddingHorizontal: 20, paddingBottom: 4 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  title: {
+    color: T.text,
+    fontSize: 21,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+  subtitle: { color: T.faint, fontSize: 11.5, marginTop: 2 },
+
+  segmented: {
+    flexDirection: "row",
+    gap: 3,
+    marginTop: 18,
+    padding: 3,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  segment: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 12,
+  },
+  segmentActive: { backgroundColor: T.primary },
+  segmentText: { color: T.faint, fontSize: 12.5, fontWeight: "800" },
+
+  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 60 },
+
+  /* Search */
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 15,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: T.card,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  searchInput: {
+    flex: 1,
+    color: T.text,
+    fontSize: 13.5,
+    paddingVertical: 0,
+  },
+
+  /* Filter */
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 13,
+    borderWidth: 1,
+  },
+  filterEmoji: { fontSize: 12 },
+
+  /* Hero stats */
+  heroStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 22,
+    backgroundColor: alpha(T.primary, 0.08),
+    borderWidth: 1,
+    borderColor: alpha(T.primary, 0.25),
+  },
+  heroStatsEmoji: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: alpha(T.primary, 0.18),
+  },
+  heroStatsValue: {
+    color: T.text,
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  heroStatsSub: {
+    color: T.faint,
+    fontSize: 11.5,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+  heroStatsPoints: {
+    color: T.amberSoft,
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  heroStatsPointsLabel: {
+    color: T.faint,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+    marginTop: 2,
+  },
+
+  /* Challenge card */
+  challengeCard: {
+    borderRadius: 22,
+    backgroundColor: T.card,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  challengeStrip: { height: 3, width: "100%" },
+  challengeBody: { padding: 14, gap: 10 },
+  challengeHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  challengeTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  challengeEmoji: { fontSize: 22, lineHeight: 26 },
+  challengeTitle: {
+    flex: 1,
+    color: T.text,
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 19,
+    letterSpacing: -0.2,
+  },
+  challengeTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 6,
+  },
+  challengeTimeText: {
+    color: T.faint,
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
+  statusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  statusDot: { width: 5, height: 5, borderRadius: 2.5 },
+  statusText: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.2,
+  },
+  challengeDescription: {
+    color: T.dim,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  challengeFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 2,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+  },
+  challengeMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    flex: 1,
+  },
+  challengeMetaText: {
+    color: T.faint,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  challengeReward: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  challengeRewardText: {
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+
+  /* Stats */
+  statCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: T.card,
+    borderWidth: 1,
+    alignItems: "center",
+    gap: 6,
+  },
+  statIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statValue: {
+    color: T.text,
+    fontSize: 17,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  statLabel: {
+    color: T.faint,
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+
+  /* Entry card */
+  entryCard: {
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 12,
+  },
+  winnerBadge: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: T.amber,
+    zIndex: 2,
+  },
+  winnerBadgeText: {
+    color: "#000",
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+  entryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  entryAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: alpha(T.primary, 0.18),
+  },
+  entryAvatarText: {
+    color: T.primarySoft,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  entryAuthor: {
+    color: T.text,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  entryDate: {
+    color: T.faint,
+    fontSize: 10.5,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+  ideaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: alpha(T.amber, 0.14),
+  },
+  ideaBadgeText: {
+    color: T.amberSoft,
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+  entryContent: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  entryActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  voteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  voteBtnText: {
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  shareBtn: {
+    marginLeft: "auto",
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  /* Detail overlay */
+  detailRoot: { flex: 1, backgroundColor: T.bg },
+  detailHeader: {
+    paddingTop: 56,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  detailBackBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  detailHeaderTitle: {
+    color: T.text,
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  detailHeaderStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginTop: 5,
+  },
+  detailHeaderStatusText: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
+  detailHeaderEmoji: { fontSize: 26 },
+
+  detailHero: {
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginTop: 16,
+  },
+  detailHeroGlow: {
+    position: "absolute",
+    top: -60,
+    right: -40,
+    width: 180,
+    height: 180,
+    borderRadius: 180,
+    opacity: 0.1,
+  },
+  detailDescription: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 13.5,
+    lineHeight: 20,
+    fontWeight: "600",
+  },
+  detailStatsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  detailSectionHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 22,
+    marginBottom: 12,
+    paddingHorizontal: 20,
+  },
+  detailSectionTitle: {
+    color: T.text,
+    fontSize: 14.5,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+    flex: 1,
+  },
+  detailSectionCount: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  detailSectionCountText: {
+    color: T.dim,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  detailFooter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === "ios" ? 34 : 22,
+    backgroundColor: "rgba(10,10,15,0.96)",
+    borderTopWidth: 1,
+    borderTopColor: T.border,
+  },
+  detailCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    height: 52,
+    borderRadius: 18,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  detailCtaText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: -0.1,
+  },
+
+  /* Contribution modal */
+  contributionBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    justifyContent: "flex-end",
+  },
+  contributionSheetWrap: { width: "100%" },
+  contributionSheet: {
+    backgroundColor: T.sheet,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
+    borderColor: T.borderUp,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === "ios" ? 34 : 22,
+  },
+  contributionHandle: {
+    alignSelf: "center",
+    width: 42,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  contributionHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  contributionTitle: {
+    color: T.text,
+    fontSize: 17,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  contributionSubtitle: {
+    color: T.faint,
+    fontSize: 11.5,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+  contributionClose: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+  contributionInput: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 14,
+    padding: 14,
+    color: T.text,
+    fontSize: 13.5,
+    minHeight: 130,
+  },
+  contributionHint: {
+    color: T.ghost,
+    fontSize: 10.5,
+    fontWeight: "600",
+    marginTop: 6,
+    textAlign: "right",
+  },
+  contributionSubmit: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 50,
+    borderRadius: 16,
+    marginTop: 14,
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  contributionSubmitText: {
+    color: "#fff",
+    fontSize: 13.5,
+    fontWeight: "900",
+    letterSpacing: -0.1,
+  },
+
+  /* Create tab */
+  createCard: {
+    padding: 18,
+    borderRadius: 24,
+    backgroundColor: T.card,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  createHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  createEmoji: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: alpha(T.primary, 0.18),
+  },
+  createTitle: {
+    color: T.text,
+    fontSize: 16,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  createSubtitle: {
+    color: T.faint,
+    fontSize: 11.5,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+  fieldLabel: {
+    color: T.faint,
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  hint: {
+    color: T.ghost,
+    fontSize: 10.5,
+    fontWeight: "600",
+    marginTop: 6,
+    textAlign: "right",
+  },
+  input: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: T.text,
+    fontSize: 13.5,
+  },
+  inputMulti: { minHeight: 100, paddingTop: 12 },
+  ruleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  ruleIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  ruleLabel: {
+    color: T.faint,
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  ruleValue: {
+    color: T.text,
+    fontSize: 12.5,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  createBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: T.primary,
+    shadowColor: T.primary,
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  createBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: -0.1,
+  },
+
+  /* Tips */
+  tipsCard: {
+    padding: 16,
+    borderRadius: 22,
+    backgroundColor: T.card,
+    borderWidth: 1,
+    borderColor: T.border,
+    gap: 10,
+  },
+  tipsHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  tipsTitle: {
+    color: T.text,
+    fontSize: 13.5,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+  tipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 6,
+  },
+  tipText: {
+    color: T.dim,
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
+  },
+
+  /* Auth gate */
+  authGate: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 50,
+    paddingHorizontal: 24,
+    gap: 14,
+  },
+  authIcon: {
+    width: 78,
+    height: 78,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: alpha(T.primary, 0.14),
+    borderWidth: 1,
+    borderColor: alpha(T.primary, 0.32),
+    marginBottom: 6,
+  },
+  authTitle: {
+    color: T.text,
+    fontSize: 19,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+    textAlign: "center",
+  },
+  authText: {
+    color: T.dim,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    maxWidth: 300,
+  },
+
+  /* Empty */
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    gap: 14,
+    paddingHorizontal: 24,
+  },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  emptyTitle: {
+    color: T.text,
+    fontSize: 15,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+    textAlign: "center",
+  },
+  emptyMessage: {
+    color: T.faint,
+    fontSize: 12.5,
+    textAlign: "center",
+    lineHeight: 18,
+    maxWidth: 260,
+  },
+});

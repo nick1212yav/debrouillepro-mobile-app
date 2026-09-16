@@ -1,119 +1,200 @@
 // convex/health.ts
+
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function requireUser(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity)
+  if (!identity) {
     throw new ConvexError({
       code: "UNAUTHENTICATED",
       message: "Connexion requise",
     });
+  }
+
   const user = await ctx.db
     .query("users")
     .withIndex("by_token", (q) =>
       q.eq("tokenIdentifier", identity.tokenIdentifier),
     )
     .unique();
-  if (!user)
+
+  if (!user) {
     throw new ConvexError({
       code: "NOT_FOUND",
       message: "Utilisateur introuvable",
     });
+  }
+
   return user;
 }
 
 async function requireAdmin(ctx: MutationCtx) {
   const user = await requireUser(ctx);
-  if (!user.roles?.includes("admin"))
-    throw new ConvexError({ code: "FORBIDDEN", message: "Admin requis" });
+  if (!user.roles?.includes("admin")) {
+    throw new ConvexError({
+      code: "FORBIDDEN",
+      message: "Accès administrateur requis",
+    });
+  }
   return user;
 }
 
-// Helper de résolution générique pour lier n'importe quel ID (publication, utilisateur ou direct) au médecin
+async function requireMedicalProfessional(
+  ctx: MutationCtx,
+  professionalId: Id<"medicalProfessionals">,
+) {
+  const user = await requireUser(ctx);
+  const professional = await ctx.db.get(professionalId);
+
+  if (!professional) {
+    throw new ConvexError({
+      code: "NOT_FOUND",
+      message: "Professionnel de santé introuvable",
+    });
+  }
+
+  const isAdmin = user.roles?.includes("admin") === true;
+  const ownerId = ctx.db.normalizeId("users", professional.userId);
+
+  let isOwner = ownerId === user._id;
+
+  if (!isOwner) {
+    const ownerByUid = await ctx.db
+      .query("users")
+      .withIndex("by_uid", (q) => q.eq("uid", professional.userId))
+      .unique();
+
+    isOwner = ownerByUid?._id === user._id;
+  }
+
+  if (!isAdmin && !isOwner) {
+    throw new ConvexError({
+      code: "FORBIDDEN",
+      message: "Vous n'êtes pas autorisé à effectuer cette action",
+    });
+  }
+
+  return { user, professional, isAdmin };
+}
+
+async function isProfessionalOwner(
+  ctx: QueryCtx | MutationCtx,
+  professionalUserId: string,
+  user: Awaited<ReturnType<typeof requireUser>>,
+): Promise<boolean> {
+  if (professionalUserId === user.uid) return true;
+
+  const ownerId = ctx.db.normalizeId("users", professionalUserId);
+  if (ownerId === user._id) return true;
+  if (ownerId) return false;
+
+  const ownerByUid = await ctx.db
+    .query("users")
+    .withIndex("by_uid", (q) => q.eq("uid", professionalUserId))
+    .unique();
+
+  return ownerByUid?._id === user._id;
+}
+
+function assertPositiveLimit(limit: number | undefined, fallback: number) {
+  if (limit === undefined) return fallback;
+
+  if (!Number.isFinite(limit) || limit <= 0) {
+    throw new ConvexError({
+      code: "INVALID_ARGUMENT",
+      message: "La limite doit être un nombre positif",
+    });
+  }
+
+  return Math.min(Math.floor(limit), 100);
+}
+
+function assertValidCoordinates(lat: number, lng: number) {
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    throw new ConvexError({
+      code: "INVALID_ARGUMENT",
+      message: "Coordonnées géographiques invalides",
+    });
+  }
+}
+
+function calculateDistanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+) {
+  const earthRadiusKm = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 async function resolveProfessionalId(
   ctx: QueryCtx,
   inputId: string,
 ): Promise<Id<"medicalProfessionals"> | null> {
-  const directId = ctx.db.normalizeId("medicalProfessionals", inputId);
-  if (directId) return directId;
+  const professionalId = ctx.db.normalizeId("medicalProfessionals", inputId);
 
-  const pubId = ctx.db.normalizeId("publications", inputId);
-  if (pubId) {
-    const publication = await ctx.db.get(pubId);
-    if (publication) {
-      if (publication.meta) {
-        try {
-          const parsed = JSON.parse(publication.meta);
-          const metaId = parsed.professionalId || parsed.id || publication.meta;
-          const testId = ctx.db.normalizeId("medicalProfessionals", metaId);
-          if (testId) return testId;
-        } catch {
-          const testId = ctx.db.normalizeId(
-            "medicalProfessionals",
-            publication.meta,
-          );
-          if (testId) return testId;
-        }
-      }
-
-      const author = await ctx.db.get(publication.authorId);
-      if (author) {
-        const authorAny = author as any;
-        const authUid =
-          authorAny.userId ||
-          authorAny.uid ||
-          authorAny.tokenIdentifier ||
-          String(author._id);
-
-        const professional = await ctx.db
-          .query("medicalProfessionals")
-          .filter((q) =>
-            q.or(
-              q.eq(q.field("userId"), authUid),
-              q.eq(q.field("userId"), String(author._id)),
-              q.eq(q.field("userId"), author._id),
-            ),
-          )
-          .first();
-
-        if (professional) return professional._id;
-
-        if (author.name) {
-          const professionalByName = await ctx.db
-            .query("medicalProfessionals")
-            .filter((q) => q.eq(q.field("name"), author.name))
-            .first();
-          if (professionalByName) return professionalByName._id;
-        }
-      }
-
-      if (publication.title) {
-        const professionalByTitle = await ctx.db
-          .query("medicalProfessionals")
-          .filter((q) => q.eq(q.field("name"), publication.title))
-          .first();
-        if (professionalByTitle) return professionalByTitle._id;
-      }
-    }
+  if (professionalId) {
+    const professional = await ctx.db.get(professionalId);
+    return professional ? professional._id : null;
   }
 
   const userId = ctx.db.normalizeId("users", inputId);
+
   if (userId) {
-    const professional = await ctx.db
-      .query("medicalProfessionals")
-      .filter((q) =>
-        q.or(
-          q.eq(q.field("userId"), String(userId)),
-          q.eq(q.field("userId"), userId),
-        ),
-      )
-      .first();
-    if (professional) return professional._id;
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const professionals = await ctx.db.query("medicalProfessionals").collect();
+
+    const match = professionals.find(
+      (professional) =>
+        professional.userId === user.uid ||
+        ctx.db.normalizeId("users", professional.userId) === user._id,
+    );
+
+    return match?._id ?? null;
+  }
+
+  const userByUid = await ctx.db
+    .query("users")
+    .withIndex("by_uid", (q) => q.eq("uid", inputId))
+    .unique();
+
+  if (userByUid) {
+    const professionals = await ctx.db.query("medicalProfessionals").collect();
+
+    const match = professionals.find(
+      (professional) =>
+        professional.userId === userByUid.uid ||
+        ctx.db.normalizeId("users", professional.userId) === userByUid._id,
+    );
+
+    return match?._id ?? null;
   }
 
   return null;
@@ -135,155 +216,57 @@ export const listProfessionals = query({
   },
   handler: async (ctx, args) => {
     let professionals = await ctx.db.query("medicalProfessionals").collect();
-    if (args.specialty)
+    const limit = assertPositiveLimit(args.limit, 50);
+
+    if (args.specialty) {
       professionals = professionals.filter(
         (p) => p.specialty === args.specialty,
       );
-    if (args.city)
+    }
+
+    if (args.city) {
       professionals = professionals.filter((p) => p.city === args.city);
-    if (args.online !== undefined)
+    }
+
+    if (args.online !== undefined) {
       professionals = professionals.filter((p) => p.online === args.online);
-    if (args.available !== undefined)
+    }
+
+    if (args.available !== undefined) {
       professionals = professionals.filter(
         (p) => p.available === args.available,
       );
-    if (args.minRating)
-      professionals = professionals.filter((p) => p.rating >= args.minRating!);
-    if (args.search) {
-      const s = args.search.toLowerCase();
-      professionals = professionals.filter(
-        (p) =>
-          p.name.toLowerCase().includes(s) ||
-          p.specialty.toLowerCase().includes(s),
-      );
     }
-    professionals.sort((a, b) => b.rating - a.rating);
-    if (args.limit) professionals = professionals.slice(0, args.limit);
-    return professionals;
+
+    if (args.minRating !== undefined) {
+      professionals = professionals.filter((p) => p.rating >= args.minRating!);
+    }
+
+    if (args.search?.trim()) {
+      const search = args.search.trim().toLowerCase();
+      professionals = professionals.filter((p) => {
+        const name = p.name?.toLowerCase() ?? "";
+        const specialty = p.specialty?.toLowerCase() ?? "";
+        const city = p.city?.toLowerCase() ?? "";
+        return (
+          name.includes(search) ||
+          specialty.includes(search) ||
+          city.includes(search)
+        );
+      });
+    }
+
+    professionals.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    return professionals.slice(0, limit);
   },
 });
 
 export const getProfessional = query({
   args: { id: v.string() },
   handler: async (ctx, args) => {
-    console.log("[getProfessional] ID reçu depuis l'URL :", args.id);
     const resolvedId = await resolveProfessionalId(ctx, args.id);
-
-    // Fallback ultime : Si le médecin n'existe pas encore formellement en BDD, on génère son profil depuis la publication [2]
-    if (!resolvedId) {
-      const pubId = ctx.db.normalizeId("publications", args.id);
-      if (pubId) {
-        const publication = await ctx.db.get(pubId);
-        if (publication) {
-          console.log(
-            "[getProfessional] Fallback ultime : Génération dynamique d'un profil fictif depuis la publication.",
-          );
-          const author = await ctx.db.get(publication.authorId);
-          let parsedMeta: any = {};
-          if (publication.meta) {
-            try {
-              parsedMeta = JSON.parse(publication.meta);
-            } catch {
-              // ignore
-            }
-          }
-
-          let resolvedLanguages: string[] = ["Français"];
-          if (parsedMeta.languages) {
-            if (Array.isArray(parsedMeta.languages)) {
-              resolvedLanguages = parsedMeta.languages;
-            } else if (typeof parsedMeta.languages === "string") {
-              resolvedLanguages = parsedMeta.languages
-                .split(",")
-                .map((s: string) => s.trim())
-                .filter(Boolean);
-            }
-          }
-
-          let resolvedSpecialities: string[] = ["Généraliste"];
-          if (parsedMeta.specialities) {
-            if (Array.isArray(parsedMeta.specialities)) {
-              resolvedSpecialities = parsedMeta.specialities;
-            } else if (typeof parsedMeta.specialities === "string") {
-              resolvedSpecialities = parsedMeta.specialities
-                .split(",")
-                .map((s: string) => s.trim())
-                .filter(Boolean);
-            }
-          } else if (parsedMeta.specialty) {
-            resolvedSpecialities = [parsedMeta.specialty];
-          }
-
-          let resolvedInsurances: string[] = [];
-          if (parsedMeta.insurances) {
-            if (Array.isArray(parsedMeta.insurances)) {
-              resolvedInsurances = parsedMeta.insurances;
-            } else if (typeof parsedMeta.insurances === "string") {
-              resolvedInsurances = parsedMeta.insurances
-                .split(",")
-                .map((s: string) => s.trim())
-                .filter(Boolean);
-            }
-          }
-
-          return {
-            _id: publication._id as any,
-            userId: String(publication.authorId),
-            name: publication.title || author?.name || "Professionnel de Santé",
-            specialty: parsedMeta.specialty || "Généraliste",
-            fees:
-              parsedMeta.fees ||
-              parsedMeta.pricePerSeat ||
-              parsedMeta.price ||
-              5,
-            currency: parsedMeta.currency || "FCFA",
-            address: parsedMeta.address || "12 av mania, Kinshasa",
-            city: parsedMeta.city || "Kinshasa",
-            country: parsedMeta.country || "Congo",
-            phone: parsedMeta.phone || author?.phone || "",
-            email: parsedMeta.email || author?.email || "",
-            website: parsedMeta.website || "",
-            videoUrl: parsedMeta.videoUrl || "",
-            bio: publication.description || "Profil en cours de configuration.",
-            experience: parsedMeta.experience || 3,
-            education: parsedMeta.education || [],
-            specialities: resolvedSpecialities,
-            languages: resolvedLanguages,
-            certificates: parsedMeta.certificates || [],
-            awards: parsedMeta.awards || [],
-            insurances: resolvedInsurances,
-            images: publication.images || [],
-            online: true,
-            verified: true,
-            available: true,
-            rating: parsedMeta.rating || 0,
-            reviewCount: parsedMeta.reviewCount || 0,
-            patients: 0,
-            appointments: 0,
-            isLiked: false,
-            isFollowing: false,
-            isLive: false,
-            status: "active",
-          };
-        }
-      }
-    }
-
-    if (!resolvedId) {
-      console.warn(
-        "[getProfessional] ÉCHEC CRITIQUE : Impossible de lier cet ID.",
-      );
-      return null;
-    }
-
-    const professional = await ctx.db.get(resolvedId);
-    if (!professional) return null;
-
-    console.log(
-      "[getProfessional] SUCCÈS : Médecin résolu :",
-      professional.name,
-    );
-    return professional;
+    if (!resolvedId) return null;
+    return ctx.db.get(resolvedId);
   },
 });
 
@@ -294,15 +277,19 @@ export const createProfessional = mutation({
     specialty: v.string(),
     fees: v.number(),
     currency: v.string(),
+
     address: v.optional(v.string()),
     city: v.optional(v.string()),
     country: v.optional(v.string()),
+
     phone: v.optional(v.string()),
     email: v.optional(v.string()),
     website: v.optional(v.string()),
     videoUrl: v.optional(v.string()),
     bio: v.optional(v.string()),
+
     experience: v.number(),
+
     education: v.array(
       v.object({
         id: v.string(),
@@ -311,8 +298,10 @@ export const createProfessional = mutation({
         year: v.optional(v.string()),
       }),
     ),
+
     specialities: v.array(v.string()),
     languages: v.array(v.string()),
+
     certificates: v.array(
       v.object({
         id: v.string(),
@@ -321,6 +310,7 @@ export const createProfessional = mutation({
         year: v.optional(v.string()),
       }),
     ),
+
     awards: v.array(
       v.object({
         id: v.string(),
@@ -329,9 +319,11 @@ export const createProfessional = mutation({
         organization: v.optional(v.string()),
       }),
     ),
+
     insurances: v.array(v.string()),
     schedule: v.optional(v.string()),
     images: v.array(v.string()),
+
     badges: v.array(
       v.object({
         id: v.string(),
@@ -340,6 +332,7 @@ export const createProfessional = mutation({
         color: v.optional(v.string()),
       }),
     ),
+
     online: v.boolean(),
     verified: v.boolean(),
     available: v.boolean(),
@@ -347,9 +340,32 @@ export const createProfessional = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.fees < 0) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Les honoraires ne peuvent pas être négatifs",
+      });
+    }
+
+    if (args.experience < 0) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "L'expérience ne peut pas être négative",
+      });
+    }
+
+    const rating = args.rating ?? 0;
+    if (rating < 0 || rating > 5) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La note doit être comprise entre 0 et 5",
+      });
+    }
+
     return ctx.db.insert("medicalProfessionals", {
       ...args,
-      rating: args.rating ?? 0,
+      rating,
       reviewCount: 0,
       patients: 0,
       appointments: 0,
@@ -439,8 +455,34 @@ export const updateProfessional = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.fees !== undefined && args.fees < 0) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Les honoraires ne peuvent pas être négatifs",
+      });
+    }
+
+    if (args.experience !== undefined && args.experience < 0) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "L'expérience ne peut pas être négative",
+      });
+    }
+
+    if (args.rating !== undefined && (args.rating < 0 || args.rating > 5)) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La note doit être comprise entre 0 et 5",
+      });
+    }
+
     const { id, ...updates } = args;
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
+
+    await ctx.db.patch(id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
   },
 });
 
@@ -448,6 +490,15 @@ export const deleteProfessional = mutation({
   args: { id: v.id("medicalProfessionals") },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    const professional = await ctx.db.get(args.id);
+    if (!professional) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel de santé introuvable",
+      });
+    }
+
     await ctx.db.delete(args.id);
   },
 });
@@ -467,22 +518,35 @@ export const listHospitals = query({
   },
   handler: async (ctx, args) => {
     let hospitals = await ctx.db.query("hospitals").collect();
-    if (args.city) hospitals = hospitals.filter((h) => h.city === args.city);
-    if (args.emergency !== undefined)
+    const limit = assertPositiveLimit(args.limit, 50);
+
+    if (args.city) {
+      hospitals = hospitals.filter((h) => h.city === args.city);
+    }
+
+    if (args.emergency !== undefined) {
       hospitals = hospitals.filter((h) => h.emergency === args.emergency);
-    if (args.specialty)
+    }
+
+    if (args.specialty) {
       hospitals = hospitals.filter((h) =>
         h.services?.includes(args.specialty!),
       );
-    if (args.minRating)
-      hospitals = hospitals.filter((h) => h.rating >= args.minRating!);
-    if (args.search) {
-      const s = args.search.toLowerCase();
-      hospitals = hospitals.filter((h) => h.name.toLowerCase().includes(s));
     }
-    hospitals.sort((a, b) => b.rating - a.rating);
-    if (args.limit) hospitals = hospitals.slice(0, args.limit);
-    return hospitals;
+
+    if (args.minRating !== undefined) {
+      hospitals = hospitals.filter((h) => h.rating >= args.minRating!);
+    }
+
+    if (args.search?.trim()) {
+      const search = args.search.trim().toLowerCase();
+      hospitals = hospitals.filter((h) =>
+        h.name.toLowerCase().includes(search),
+      );
+    }
+
+    hospitals.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    return hospitals.slice(0, limit);
   },
 });
 
@@ -490,11 +554,12 @@ export const getHospital = query({
   args: { id: v.id("hospitals") },
   handler: async (ctx, args) => {
     const hospital = await ctx.db.get(args.id);
-    if (!hospital)
+    if (!hospital) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Hôpital introuvable",
       });
+    }
     return hospital;
   },
 });
@@ -530,9 +595,22 @@ export const createHospital = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
+    const rating = args.rating ?? 0;
+    if (rating < 0 || rating > 5) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La note doit être comprise entre 0 et 5",
+      });
+    }
+
     return ctx.db.insert("hospitals", {
       ...args,
-      rating: args.rating ?? 0,
+      rating,
       reviewCount: 0,
       occupiedBeds: 0,
       createdAt: new Date().toISOString(),
@@ -573,8 +651,23 @@ export const updateHospital = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
+    if (args.rating !== undefined && (args.rating < 0 || args.rating > 5)) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La note doit être comprise entre 0 et 5",
+      });
+    }
+
     const { id, ...updates } = args;
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
+    await ctx.db.patch(id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
   },
 });
 
@@ -583,7 +676,7 @@ export const getHospitalServices = query({
   handler: async (ctx, args) => {
     const hospital = await ctx.db.get(args.hospitalId);
     if (!hospital) return [];
-    return hospital.services || [];
+    return hospital.services ?? [];
   },
 });
 
@@ -603,24 +696,39 @@ export const listPharmacies = query({
   },
   handler: async (ctx, args) => {
     let pharmacies = await ctx.db.query("pharmacies").collect();
-    if (args.city) pharmacies = pharmacies.filter((p) => p.city === args.city);
-    if (args.openNow !== undefined)
-      pharmacies = pharmacies.filter((p) => p.open === args.openNow);
-    if (args.minRating)
-      pharmacies = pharmacies.filter((p) => p.rating >= args.minRating!);
-    if (args.services)
-      pharmacies = pharmacies.filter((p) =>
-        args.services!.every((s) => p.services?.includes(s)),
-      );
-    if (args.delivery !== undefined)
-      pharmacies = pharmacies.filter((p) => p.delivery === args.delivery);
-    if (args.search) {
-      const s = args.search.toLowerCase();
-      pharmacies = pharmacies.filter((p) => p.name.toLowerCase().includes(s));
+    const limit = assertPositiveLimit(args.limit, 50);
+
+    if (args.city) {
+      pharmacies = pharmacies.filter((p) => p.city === args.city);
     }
-    pharmacies.sort((a, b) => b.rating - a.rating);
-    if (args.limit) pharmacies = pharmacies.slice(0, args.limit);
-    return pharmacies;
+
+    if (args.openNow !== undefined) {
+      pharmacies = pharmacies.filter((p) => p.open === args.openNow);
+    }
+
+    if (args.minRating !== undefined) {
+      pharmacies = pharmacies.filter((p) => p.rating >= args.minRating!);
+    }
+
+    if (args.services?.length) {
+      pharmacies = pharmacies.filter((p) =>
+        args.services!.every((service) => p.services?.includes(service)),
+      );
+    }
+
+    if (args.delivery !== undefined) {
+      pharmacies = pharmacies.filter((p) => p.delivery === args.delivery);
+    }
+
+    if (args.search?.trim()) {
+      const search = args.search.trim().toLowerCase();
+      pharmacies = pharmacies.filter((p) =>
+        p.name.toLowerCase().includes(search),
+      );
+    }
+
+    pharmacies.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    return pharmacies.slice(0, limit);
   },
 });
 
@@ -628,11 +736,12 @@ export const getPharmacy = query({
   args: { id: v.id("pharmacies") },
   handler: async (ctx, args) => {
     const pharmacy = await ctx.db.get(args.id);
-    if (!pharmacy)
+    if (!pharmacy) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Pharmacie introuvable",
       });
+    }
     return pharmacy;
   },
 });
@@ -677,9 +786,22 @@ export const createPharmacy = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
+    const rating = args.rating ?? 0;
+    if (rating < 0 || rating > 5) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La note doit être comprise entre 0 et 5",
+      });
+    }
+
     return ctx.db.insert("pharmacies", {
       ...args,
-      rating: args.rating ?? 0,
+      rating,
       reviewCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -730,8 +852,23 @@ export const updatePharmacy = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
+    if (args.rating !== undefined && (args.rating < 0 || args.rating > 5)) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La note doit être comprise entre 0 et 5",
+      });
+    }
+
     const { id, ...updates } = args;
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
+    await ctx.db.patch(id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
   },
 });
 
@@ -748,31 +885,44 @@ export const listLaboratories = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    let labs = await ctx.db.query("laboratories").collect();
-    if (args.city) labs = labs.filter((l) => l.city === args.city);
-    if (args.openNow !== undefined)
-      labs = labs.filter((l) => l.open === args.openNow);
-    if (args.minRating) labs = labs.filter((l) => l.rating >= args.minRating!);
-    if (args.search) {
-      const s = args.search.toLowerCase();
-      labs = labs.filter((l) => l.name.toLowerCase().includes(s));
+    let laboratories = await ctx.db.query("laboratories").collect();
+    const limit = assertPositiveLimit(args.limit, 50);
+
+    if (args.city) {
+      laboratories = laboratories.filter((l) => l.city === args.city);
     }
-    labs.sort((a, b) => b.rating - a.rating);
-    if (args.limit) labs = labs.slice(0, args.limit);
-    return labs;
+
+    if (args.openNow !== undefined) {
+      laboratories = laboratories.filter((l) => l.open === args.openNow);
+    }
+
+    if (args.minRating !== undefined) {
+      laboratories = laboratories.filter((l) => l.rating >= args.minRating!);
+    }
+
+    if (args.search?.trim()) {
+      const search = args.search.trim().toLowerCase();
+      laboratories = laboratories.filter((l) =>
+        l.name.toLowerCase().includes(search),
+      );
+    }
+
+    laboratories.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    return laboratories.slice(0, limit);
   },
 });
 
 export const getLaboratory = query({
   args: { id: v.id("laboratories") },
   handler: async (ctx, args) => {
-    const lab = await ctx.db.get(args.id);
-    if (!lab)
+    const laboratory = await ctx.db.get(args.id);
+    if (!laboratory) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Laboratoire introuvable",
       });
-    return lab;
+    }
+    return laboratory;
   },
 });
 
@@ -796,9 +946,22 @@ export const createLaboratory = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
+    const rating = args.rating ?? 0;
+    if (rating < 0 || rating > 5) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La note doit être comprise entre 0 et 5",
+      });
+    }
+
     return ctx.db.insert("laboratories", {
       ...args,
-      rating: args.rating ?? 0,
+      rating,
       reviewCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -827,8 +990,16 @@ export const updateLaboratory = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
     const { id, ...updates } = args;
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
+    await ctx.db.patch(id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
   },
 });
 
@@ -846,17 +1017,26 @@ export const listClinics = query({
   },
   handler: async (ctx, args) => {
     let clinics = await ctx.db.query("clinics").collect();
-    if (args.city) clinics = clinics.filter((c) => c.city === args.city);
-    if (args.emergency !== undefined)
-      clinics = clinics.filter((c) => c.emergency === args.emergency);
-    if (args.specialty)
-      clinics = clinics.filter((c) => c.specialties?.includes(args.specialty!));
-    if (args.search) {
-      const s = args.search.toLowerCase();
-      clinics = clinics.filter((c) => c.name.toLowerCase().includes(s));
+    const limit = assertPositiveLimit(args.limit, 50);
+
+    if (args.city) {
+      clinics = clinics.filter((c) => c.city === args.city);
     }
-    if (args.limit) clinics = clinics.slice(0, args.limit);
-    return clinics;
+
+    if (args.emergency !== undefined) {
+      clinics = clinics.filter((c) => c.emergency === args.emergency);
+    }
+
+    if (args.specialty) {
+      clinics = clinics.filter((c) => c.specialties?.includes(args.specialty!));
+    }
+
+    if (args.search?.trim()) {
+      const search = args.search.trim().toLowerCase();
+      clinics = clinics.filter((c) => c.name.toLowerCase().includes(search));
+    }
+
+    return clinics.slice(0, limit);
   },
 });
 
@@ -864,11 +1044,12 @@ export const getClinic = query({
   args: { id: v.id("clinics") },
   handler: async (ctx, args) => {
     const clinic = await ctx.db.get(args.id);
-    if (!clinic)
+    if (!clinic) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Clinique introuvable",
       });
+    }
     return clinic;
   },
 });
@@ -892,6 +1073,11 @@ export const createClinic = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
     return ctx.db.insert("clinics", {
       ...args,
       createdAt: new Date().toISOString(),
@@ -920,8 +1106,16 @@ export const updateClinic = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
-    const { id, ...updates } = args; // ✅ Correction de la coquille ici
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
+    const { id, ...updates } = args;
+    await ctx.db.patch(id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
   },
 });
 
@@ -937,11 +1131,17 @@ export const listAmbulances = query({
   },
   handler: async (ctx, args) => {
     let ambulances = await ctx.db.query("ambulances").collect();
-    if (args.city) ambulances = ambulances.filter((a) => a.city === args.city);
-    if (args.available !== undefined)
+    const limit = assertPositiveLimit(args.limit, 50);
+
+    if (args.city) {
+      ambulances = ambulances.filter((a) => a.city === args.city);
+    }
+
+    if (args.available !== undefined) {
       ambulances = ambulances.filter((a) => a.available === args.available);
-    if (args.limit) ambulances = ambulances.slice(0, args.limit);
-    return ambulances;
+    }
+
+    return ambulances.slice(0, limit);
   },
 });
 
@@ -949,11 +1149,12 @@ export const getAmbulance = query({
   args: { id: v.id("ambulances") },
   handler: async (ctx, args) => {
     const ambulance = await ctx.db.get(args.id);
-    if (!ambulance)
+    if (!ambulance) {
       throw new ConvexError({
         code: "NOT_FOUND",
-        message: "Service introuvable",
+        message: "Service ambulancier introuvable",
       });
+    }
     return ambulance;
   },
 });
@@ -975,6 +1176,11 @@ export const createAmbulance = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
     return ctx.db.insert("ambulances", {
       ...args,
       createdAt: new Date().toISOString(),
@@ -1001,8 +1207,16 @@ export const updateAmbulance = mutation({
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
+
+    if (args.latitude !== undefined && args.longitude !== undefined) {
+      assertValidCoordinates(args.latitude, args.longitude);
+    }
+
     const { id, ...updates } = args;
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
+    await ctx.db.patch(id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
   },
 });
 
@@ -1010,51 +1224,367 @@ export const updateAmbulance = mutation({
 // 7. AVAILABILITY & BOOKING
 // ─────────────────────────────────────────────────────────────────────────────
 
+function assertDateOnly(value: string): string {
+  const date = value.trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new ConvexError({
+      code: "INVALID_ARGUMENT",
+      message: "La date doit être au format YYYY-MM-DD",
+    });
+  }
+
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ConvexError({
+      code: "INVALID_ARGUMENT",
+      message: "Date invalide",
+    });
+  }
+
+  if (parsed.toISOString().slice(0, 10) !== date) {
+    throw new ConvexError({
+      code: "INVALID_ARGUMENT",
+      message: "Date invalide",
+    });
+  }
+
+  return date;
+}
+
+function assertTime(value: string, fieldName: string): string {
+  const time = value.trim();
+
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+    throw new ConvexError({
+      code: "INVALID_ARGUMENT",
+      message: `${fieldName} doit être au format HH:mm`,
+    });
+  }
+
+  return time;
+}
+
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function assertValidSlot(start: string, end: string) {
+  const normalizedStart = assertTime(start, "L'heure de début");
+  const normalizedEnd = assertTime(end, "L'heure de fin");
+
+  if (timeToMinutes(normalizedEnd) <= timeToMinutes(normalizedStart)) {
+    throw new ConvexError({
+      code: "INVALID_ARGUMENT",
+      message: "L'heure de fin doit être après l'heure de début",
+    });
+  }
+
+  return { start: normalizedStart, end: normalizedEnd };
+}
+
+function slotsOverlap(
+  firstStart: string,
+  firstEnd: string,
+  secondStart: string,
+  secondEnd: string,
+): boolean {
+  const firstStartMinutes = timeToMinutes(firstStart);
+  const firstEndMinutes = timeToMinutes(firstEnd);
+  const secondStartMinutes = timeToMinutes(secondStart);
+  const secondEndMinutes = timeToMinutes(secondEnd);
+
+  return (
+    firstStartMinutes < secondEndMinutes && secondStartMinutes < firstEndMinutes
+  );
+}
+
 export const getAvailability = query({
   args: {
     professionalId: v.string(),
     date: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const slots = ["09:00", "10:30", "12:00", "14:30", "16:00", "17:30"];
+    const professionalId = await resolveProfessionalId(
+      ctx,
+      args.professionalId,
+    );
+
+    if (!professionalId) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel de santé introuvable",
+      });
+    }
+
+    const professional = await ctx.db.get(professionalId);
+
+    if (!professional) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel de santé introuvable",
+      });
+    }
+
+    const date = assertDateOnly(
+      args.date ?? new Date().toISOString().slice(0, 10),
+    );
+
+    const availability = await ctx.db
+      .query("medicalAvailability")
+      .withIndex("by_professional_date", (q) =>
+        q.eq("professionalId", professionalId).eq("date", date),
+      )
+      .unique();
+
+    if (!availability) {
+      return {
+        professionalId,
+        date,
+        configured: false,
+        available: false,
+        slots: [],
+      };
+    }
+
+    if (professional.status !== "active" || professional.available !== true) {
+      return {
+        professionalId,
+        date,
+        configured: true,
+        available: false,
+        slots: [],
+      };
+    }
+
+    const appointments = await ctx.db
+      .query("medicalAppointments")
+      .withIndex("by_professional_date", (q) =>
+        q.eq("professionalId", professionalId).eq("date", date),
+      )
+      .collect();
+
+    const bookedAppointments = appointments.filter(
+      (a) => a.status === "scheduled",
+    );
+
+    const slots = availability.slots.map((slot) => {
+      const normalized = assertValidSlot(slot.start, slot.end);
+
+      const booked = bookedAppointments.some((appointment) => {
+        if (!appointment.slotStart || !appointment.slotEnd) return false;
+        return slotsOverlap(
+          normalized.start,
+          normalized.end,
+          appointment.slotStart,
+          appointment.slotEnd,
+        );
+      });
+
+      return {
+        start: normalized.start,
+        end: normalized.end,
+        available: !booked,
+      };
+    });
+
     return {
-      available: "Aujourd'hui",
+      professionalId,
+      date,
+      configured: true,
+      available: slots.some((slot) => slot.available),
       slots,
-      waitTime: "15 min",
-      date: args.date || new Date().toISOString().split("T")[0],
     };
+  },
+});
+
+export const setMedicalAvailability = mutation({
+  args: {
+    professionalId: v.id("medicalProfessionals"),
+    date: v.string(),
+    slots: v.array(
+      v.object({
+        start: v.string(),
+        end: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireMedicalProfessional(ctx, args.professionalId);
+
+    const date = assertDateOnly(args.date);
+
+    if (args.slots.length > 100) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Trop de créneaux pour une journée",
+      });
+    }
+
+    const normalizedSlots = args.slots.map((slot) =>
+      assertValidSlot(slot.start, slot.end),
+    );
+
+    const sortedSlots = [...normalizedSlots].sort(
+      (a, b) => timeToMinutes(a.start) - timeToMinutes(b.start),
+    );
+
+    for (let index = 1; index < sortedSlots.length; index += 1) {
+      const previous = sortedSlots[index - 1];
+      const current = sortedSlots[index];
+
+      if (
+        slotsOverlap(previous.start, previous.end, current.start, current.end)
+      ) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message: "Les créneaux ne doivent pas se chevaucher",
+        });
+      }
+    }
+
+    const existing = await ctx.db
+      .query("medicalAvailability")
+      .withIndex("by_professional_date", (q) =>
+        q.eq("professionalId", args.professionalId).eq("date", date),
+      )
+      .unique();
+
+    const now = Date.now();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        slots: sortedSlots,
+        updatedAt: now,
+      });
+      return existing._id;
+    }
+
+    return ctx.db.insert("medicalAvailability", {
+      professionalId: args.professionalId,
+      date,
+      slots: sortedSlots,
+      updatedAt: now,
+    });
   },
 });
 
 export const bookAppointment = mutation({
   args: {
     professionalId: v.id("medicalProfessionals"),
-    slot: v.string(),
+    date: v.string(),
+    slotStart: v.string(),
+    slotEnd: v.string(),
     type: v.union(v.literal("consultation"), v.literal("teleconsultation")),
-    date: v.optional(v.string()),
     notes: v.optional(v.string()),
     reminder: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const professional = await ctx.db.get(args.professionalId);
-    if (!professional)
+
+    if (!professional) {
       throw new ConvexError({
         code: "NOT_FOUND",
-        message: "Médecin introuvable",
+        message: "Professionnel de santé introuvable",
       });
+    }
+
+    if (professional.status !== "active" || professional.available !== true) {
+      throw new ConvexError({
+        code: "UNAVAILABLE",
+        message: "Ce professionnel n'est pas disponible",
+      });
+    }
+
+    const date = assertDateOnly(args.date);
+    const slot = assertValidSlot(args.slotStart, args.slotEnd);
+
+    const availability = await ctx.db
+      .query("medicalAvailability")
+      .withIndex("by_professional_date", (q) =>
+        q.eq("professionalId", args.professionalId).eq("date", date),
+      )
+      .unique();
+
+    if (!availability) {
+      throw new ConvexError({
+        code: "UNAVAILABLE",
+        message:
+          "Aucun calendrier n'est configuré pour ce professionnel à cette date",
+      });
+    }
+
+    const configuredSlot = availability.slots.find(
+      (availableSlot) =>
+        availableSlot.start === slot.start && availableSlot.end === slot.end,
+    );
+
+    if (!configuredSlot) {
+      throw new ConvexError({
+        code: "UNAVAILABLE",
+        message: "Ce créneau n'est pas proposé par le professionnel",
+      });
+    }
+
+    const existingAppointments = await ctx.db
+      .query("medicalAppointments")
+      .withIndex("by_professional_date", (q) =>
+        q.eq("professionalId", args.professionalId).eq("date", date),
+      )
+      .collect();
+
+    const collision = existingAppointments.some((appointment) => {
+      if (appointment.status !== "scheduled") return false;
+      if (!appointment.slotStart || !appointment.slotEnd) return false;
+
+      return slotsOverlap(
+        slot.start,
+        slot.end,
+        appointment.slotStart,
+        appointment.slotEnd,
+      );
+    });
+
+    if (collision) {
+      throw new ConvexError({
+        code: "SLOT_ALREADY_BOOKED",
+        message: "Ce créneau vient d'être réservé par un autre patient",
+      });
+    }
+
+    const scheduledAt = `${date}T${slot.start}:00`;
+    const now = Date.now();
+
     const appointmentId = await ctx.db.insert("medicalAppointments", {
       userId: user._id,
+      professionalId: args.professionalId,
       doctorName: professional.name,
       specialty: professional.specialty,
-      date: args.date || new Date().toISOString(),
+      date,
+      slotStart: slot.start,
+      slotEnd: slot.end,
+      scheduledAt,
+      durationMinutes: timeToMinutes(slot.end) - timeToMinutes(slot.start),
       type: args.type,
-      durationMinutes: 30,
       status: "scheduled",
-      notes: args.notes,
+      notes: args.notes?.trim() || undefined,
       reminder: args.reminder ?? true,
+      createdAt: now,
+      updatedAt: now,
     });
-    return { appointmentId };
+
+    return {
+      appointmentId,
+      professionalId: args.professionalId,
+      date,
+      slotStart: slot.start,
+      slotEnd: slot.end,
+      scheduledAt,
+      status: "scheduled" as const,
+    };
   },
 });
 
@@ -1062,10 +1592,48 @@ export const cancelAppointment = mutation({
   args: { id: v.id("medicalAppointments") },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const apt = await ctx.db.get(args.id);
-    if (!apt || apt.userId !== user._id)
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    await ctx.db.patch(args.id, { status: "cancelled" });
+    const appointment = await ctx.db.get(args.id);
+
+    if (!appointment) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Rendez-vous introuvable",
+      });
+    }
+
+    const isAdmin = user.roles?.includes("admin") === true;
+    let isDoctor = false;
+
+    if (appointment.professionalId) {
+      const professional = await ctx.db.get(appointment.professionalId);
+      isDoctor =
+        professional !== null &&
+        (await isProfessionalOwner(ctx, professional.userId, user));
+    }
+
+    if (!isAdmin && appointment.userId !== user._id && !isDoctor) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Non autorisé",
+      });
+    }
+
+    if (appointment.status !== "scheduled") {
+      throw new ConvexError({
+        code: "INVALID_STATE",
+        message: "Ce rendez-vous ne peut plus être annulé",
+      });
+    }
+
+    await ctx.db.patch(args.id, {
+      status: "cancelled",
+      updatedAt: Date.now(),
+    });
+
+    return {
+      appointmentId: args.id,
+      status: "cancelled" as const,
+    };
   },
 });
 
@@ -1074,16 +1642,71 @@ export const updateAppointment = mutation({
     id: v.id("medicalAppointments"),
     status: v.optional(v.union(v.literal("completed"), v.literal("cancelled"))),
     notes: v.optional(v.string()),
-    slot: v.optional(v.string()),
-    date: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const apt = await ctx.db.get(args.id);
-    if (!apt || apt.userId !== user._id)
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    const { id, ...updates } = args;
-    await ctx.db.patch(id, updates);
+    const appointment = await ctx.db.get(args.id);
+
+    if (!appointment) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Rendez-vous introuvable",
+      });
+    }
+
+    const isAdmin = user.roles?.includes("admin") === true;
+    let isDoctor = false;
+
+    if (appointment.professionalId) {
+      const professional = await ctx.db.get(appointment.professionalId);
+      isDoctor =
+        professional !== null &&
+        (await isProfessionalOwner(ctx, professional.userId, user));
+    }
+
+    if (!isAdmin && appointment.userId !== user._id && !isDoctor) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Non autorisé",
+      });
+    }
+
+    if (args.status === "completed" && appointment.status !== "scheduled") {
+      throw new ConvexError({
+        code: "INVALID_STATE",
+        message: "Seul un rendez-vous planifié peut être terminé",
+      });
+    }
+
+    if (args.status === "cancelled" && appointment.status !== "scheduled") {
+      throw new ConvexError({
+        code: "INVALID_STATE",
+        message: "Seul un rendez-vous planifié peut être annulé",
+      });
+    }
+
+    const updates: {
+      status?: "scheduled" | "completed" | "cancelled";
+      notes?: string;
+      updatedAt: number;
+    } = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.status !== undefined) {
+      updates.status = args.status;
+    }
+
+    if (args.notes !== undefined) {
+      updates.notes = args.notes.trim();
+    }
+
+    await ctx.db.patch(args.id, updates);
+
+    return {
+      appointmentId: args.id,
+      status: args.status ?? appointment.status,
+    };
   },
 });
 
@@ -1091,24 +1714,94 @@ export const getAppointments = query({
   args: {
     patientId: v.optional(v.id("users")),
     doctorId: v.optional(v.id("medicalProfessionals")),
-    status: v.optional(v.string()),
+    status: v.optional(
+      v.union(
+        v.literal("scheduled"),
+        v.literal("completed"),
+        v.literal("cancelled"),
+      ),
+    ),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    let appointments = await ctx.db.query("medicalAppointments").collect();
+    const limit = assertPositiveLimit(args.limit, 50);
+    const isAdmin = user.roles?.includes("admin") === true;
+
     if (args.patientId) {
-      appointments = appointments.filter((a) => a.userId === args.patientId);
-    } else if (args.doctorId) {
-      const doctor = await ctx.db.get(args.doctorId);
-      if (doctor) {
-        appointments = appointments.filter((a) => a.doctorName === doctor.name);
+      if (args.patientId !== user._id && !isAdmin) {
+        throw new ConvexError({
+          code: "FORBIDDEN",
+          message: "Non autorisé",
+        });
       }
-    } else {
-      appointments = appointments.filter((a) => a.userId === user._id);
+
+      const appointments = await ctx.db
+        .query("medicalAppointments")
+        .withIndex("by_user", (q) => q.eq("userId", args.patientId!))
+        .order("desc")
+        .take(limit);
+
+      if (!args.status) return appointments;
+      return appointments
+        .filter((a) => a.status === args.status)
+        .slice(0, limit);
     }
+
+    if (args.doctorId) {
+      const professional = await ctx.db.get(args.doctorId);
+      if (!professional) return [];
+
+      const isDoctorOwner = await isProfessionalOwner(
+        ctx,
+        professional.userId,
+        user,
+      );
+
+      if (!isAdmin && !isDoctorOwner) {
+        throw new ConvexError({
+          code: "FORBIDDEN",
+          message: "Non autorisé",
+        });
+      }
+
+      const appointments = await ctx.db
+        .query("medicalAppointments")
+        .withIndex("by_professional_date", (q) =>
+          q.eq("professionalId", args.doctorId!),
+        )
+        .order("desc")
+        .take(limit);
+
+      if (!args.status) return appointments;
+      return appointments
+        .filter((a) => a.status === args.status)
+        .slice(0, limit);
+    }
+
+    if (!isAdmin) {
+      let appointments = await ctx.db
+        .query("medicalAppointments")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .order("desc")
+        .take(limit);
+
+      if (args.status) {
+        appointments = appointments.filter((a) => a.status === args.status);
+      }
+
+      return appointments;
+    }
+
+    let appointments = await ctx.db
+      .query("medicalAppointments")
+      .order("desc")
+      .take(limit);
+
     if (args.status) {
       appointments = appointments.filter((a) => a.status === args.status);
     }
+
     return appointments;
   },
 });
@@ -1120,31 +1813,19 @@ export const getAppointments = query({
 export const getReviews = query({
   args: { professionalId: v.string() },
   handler: async (ctx, args) => {
-    let resolvedId: Id<"medicalProfessionals"> | null = ctx.db.normalizeId(
-      "medicalProfessionals",
+    const professionalId = await resolveProfessionalId(
+      ctx,
       args.professionalId,
     );
-    if (!resolvedId) {
-      const pubId = ctx.db.normalizeId("publications", args.professionalId);
-      if (pubId) {
-        const publication = await ctx.db.get(pubId);
-        if (publication && publication.title) {
-          const professionalByTitle = await ctx.db
-            .query("medicalProfessionals")
-            .filter((q) => q.eq(q.field("name"), publication.title))
-            .first();
-          if (professionalByTitle) {
-            resolvedId = professionalByTitle._id;
-          }
-        }
-      }
-    }
 
-    if (!resolvedId) return [];
+    if (!professionalId) return [];
 
     return ctx.db
       .query("reviews")
-      .withIndex("by_professional", (q) => q.eq("professionalId", resolvedId!))
+      .withIndex("by_professional", (q) =>
+        q.eq("professionalId", professionalId),
+      )
+      .order("desc")
       .collect();
   },
 });
@@ -1157,533 +1838,418 @@ export const addReview = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const reviewId = await ctx.db.insert("reviews", {
-      professionalId: args.professionalId,
-      patientId: user._id,
-      patientName: user.name || "Anonyme",
-      rating: args.rating,
-      comment: args.comment,
-      date: new Date().toISOString(),
-      likes: 0,
-      verified: true,
-      helpful: 0,
-      status: "published",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    const reviews = await ctx.db
+
+    if (!Number.isFinite(args.rating) || args.rating < 1 || args.rating > 5) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La note doit être comprise entre 1 et 5",
+      });
+    }
+
+    const comment = args.comment.trim();
+
+    if (!comment) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Le commentaire ne peut pas être vide",
+      });
+    }
+
+    if (comment.length > 5000) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Le commentaire est trop long",
+      });
+    }
+
+    const professional = await ctx.db.get(args.professionalId);
+    if (!professional) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel introuvable",
+      });
+    }
+
+    const existing = await ctx.db
       .query("reviews")
       .withIndex("by_professional", (q) =>
         q.eq("professionalId", args.professionalId),
       )
       .collect();
-    const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
-    await ctx.db.patch(args.professionalId, {
-      rating: avg,
-      reviewCount: reviews.length,
+
+    const alreadyReviewed = existing.some(
+      (review) => review.patientId === user._id,
+    );
+
+    if (alreadyReviewed) {
+      throw new ConvexError({
+        code: "ALREADY_EXISTS",
+        message: "Vous avez déjà évalué ce professionnel",
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    const reviewId = await ctx.db.insert("reviews", {
+      professionalId: args.professionalId,
+      patientId: user._id,
+      patientName: user.name ?? "Utilisateur",
+      rating: args.rating,
+      comment,
+      date: now,
+      likes: 0,
+      verified: false,
+      helpful: 0,
+      status: "published",
+      createdAt: now,
+      updatedAt: now,
     });
+
+    const reviewCount = existing.length + 1;
+    const totalRating =
+      existing.reduce((sum, review) => sum + review.rating, 0) + args.rating;
+
+    await ctx.db.patch(args.professionalId, {
+      rating: totalRating / reviewCount,
+      reviewCount,
+      updatedAt: now,
+    });
+
     return reviewId;
   },
 });
 
-export const likeReview = mutation({
-  args: { reviewId: v.id("reviews") },
-  handler: async (ctx, args) => {
-    const review = await ctx.db.get(args.reviewId);
-    if (!review)
-      throw new ConvexError({ code: "NOT_FOUND", message: "Avis introuvable" });
-    await ctx.db.patch(args.reviewId, { likes: review.likes + 1 });
-  },
-});
-
 // ─────────────────────────────────────────────────────────────────────────────
-// 9. QUESTIONS & ANSWERS
+// 9. MEDICAL QUESTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const getQuestions = query({
-  args: { professionalId: v.string() },
-  handler: async (ctx, args) => {
-    let resolvedId: Id<"medicalProfessionals"> | null = ctx.db.normalizeId(
-      "medicalProfessionals",
-      args.professionalId,
-    );
-    if (!resolvedId) {
-      const pubId = ctx.db.normalizeId("publications", args.professionalId);
-      if (pubId) {
-        const publication = await ctx.db.get(pubId);
-        if (publication && publication.title) {
-          const professionalByTitle = await ctx.db
-            .query("medicalProfessionals")
-            .filter((q) => q.eq(q.field("name"), publication.title))
-            .first();
-          if (professionalByTitle) {
-            resolvedId = professionalByTitle._id;
-          }
-        }
-      }
-    }
-
-    if (!resolvedId) return [];
-
-    return ctx.db
-      .query("questions")
-      .withIndex("by_professional", (q) => q.eq("professionalId", resolvedId!))
-      .collect();
-  },
-});
-
-export const askQuestion = mutation({
+export const askMedicalQuestion = mutation({
   args: {
     professionalId: v.id("medicalProfessionals"),
     question: v.string(),
+    category: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+    const question = args.question.trim();
+
+    if (!question) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La question ne peut pas être vide",
+      });
+    }
+
+    if (question.length > 5000) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La question est trop longue",
+      });
+    }
+
+    const professional = await ctx.db.get(args.professionalId);
+    if (!professional) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel introuvable",
+      });
+    }
+
+    const now = new Date().toISOString();
+
     return ctx.db.insert("questions", {
       professionalId: args.professionalId,
       patientId: user._id,
-      patientName: user.name || "Anonyme",
-      question: args.question,
-      date: new Date().toISOString(),
+      patientName: user.name ?? "Utilisateur",
+      question,
+      date: now,
       likes: 0,
       answers: [],
       status: "open",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     });
   },
 });
 
-export const answerQuestion = mutation({
+export const answerMedicalQuestion = mutation({
   args: {
     questionId: v.id("questions"),
-    content: v.string(),
+    answer: v.string(),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const question = await ctx.db.get(args.questionId);
-    if (!question)
+
+    if (!question) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Question introuvable",
       });
-    const answer = {
-      id: `ans_${Date.now()}`,
+    }
+
+    const professional = await ctx.db.get(question.professionalId);
+    if (!professional) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel introuvable",
+      });
+    }
+
+    const isAdmin = user.roles?.includes("admin") === true;
+    const isDoctor = await isProfessionalOwner(ctx, professional.userId, user);
+
+    if (!isAdmin && !isDoctor) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Seul le professionnel concerné peut répondre",
+      });
+    }
+
+    const answer = args.answer.trim();
+    if (!answer) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La réponse ne peut pas être vide",
+      });
+    }
+
+    if (answer.length > 10000) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "La réponse est trop longue",
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    const answerEntry = {
+      id: `${args.questionId}:${now}`,
       authorId: user._id,
-      author: user.name || "Médecin",
-      content: args.content,
-      date: new Date().toISOString(),
+      author: user.name ?? professional.name,
+      content: answer,
+      date: now,
       likes: 0,
     };
-    const answers = [...(question.answers || []), answer];
+
     await ctx.db.patch(args.questionId, {
-      answers,
+      answers: [...question.answers, answerEntry],
       status: "answered",
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     });
+
+    return args.questionId;
   },
 });
 
-export const likeQuestion = mutation({
-  args: { questionId: v.id("questions") },
-  handler: async (ctx, args) => {
-    const question = await ctx.db.get(args.questionId);
-    if (!question)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Question introuvable",
-      });
-    await ctx.db.patch(args.questionId, { likes: question.likes + 1 });
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 10. FOLLOWERS & LIKES
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getFollowers = query({
-  args: { professionalId: v.string() },
-  handler: async (ctx, args) => {
-    let resolvedId: Id<"medicalProfessionals"> | null = ctx.db.normalizeId(
-      "medicalProfessionals",
-      args.professionalId,
-    );
-    if (!resolvedId) {
-      const pubId = ctx.db.normalizeId("publications", args.professionalId);
-      if (pubId) {
-        const publication = await ctx.db.get(pubId);
-        if (publication && publication.title) {
-          const professionalByTitle = await ctx.db
-            .query("medicalProfessionals")
-            .filter((q) => q.eq(q.field("name"), publication.title))
-            .first();
-          if (professionalByTitle) {
-            resolvedId = professionalByTitle._id;
-          }
-        }
-      }
-    }
-
-    if (!resolvedId) return [];
-
-    return ctx.db
-      .query("followers")
-      .withIndex("by_professional", (q) => q.eq("professionalId", resolvedId!))
-      .collect();
-  },
-});
-
-export const toggleFollow = mutation({
-  args: { professionalId: v.id("medicalProfessionals") },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const existing = await ctx.db
-      .query("followers")
-      .withIndex("by_professional_and_user", (q) =>
-        q.eq("professionalId", args.professionalId).eq("userId", user._id),
-      )
-      .unique();
-    if (existing) {
-      await ctx.db.delete(existing._id);
-      return { followed: false };
-    } else {
-      await ctx.db.insert("followers", {
-        professionalId: args.professionalId,
-        userId: user._id,
-        name: user.name || "Utilisateur",
-        avatar: user.avatar,
-        followedAt: new Date().toISOString(),
-      });
-      return { followed: true };
-    }
-  },
-});
-
-export const toggleLike = mutation({
-  args: { professionalId: v.id("medicalProfessionals") },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const existing = await ctx.db
-      .query("likes")
-      .withIndex("by_professional_and_user", (q) =>
-        q.eq("professionalId", args.professionalId).eq("userId", user._id),
-      )
-      .unique();
-    if (existing) {
-      await ctx.db.delete(existing._id);
-      return { liked: false };
-    } else {
-      await ctx.db.insert("likes", {
-        professionalId: args.professionalId,
-        userId: user._id,
-        createdAt: new Date().toISOString(),
-      });
-      return { liked: true };
-    }
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 11. ARTICLES, VIDEOS, STORIES
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getArticles = query({
+export const getMedicalQuestions = query({
   args: {
-    professionalId: v.string(),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    let resolvedId: Id<"medicalProfessionals"> | null = ctx.db.normalizeId(
-      "medicalProfessionals",
-      args.professionalId,
-    );
-    if (!resolvedId) {
-      const pubId = ctx.db.normalizeId("publications", args.professionalId);
-      if (pubId) {
-        const publication = await ctx.db.get(pubId);
-        if (publication && publication.title) {
-          const professionalByTitle = await ctx.db
-            .query("medicalProfessionals")
-            .filter((q) => q.eq(q.field("name"), publication.title))
-            .first();
-          if (professionalByTitle) {
-            resolvedId = professionalByTitle._id;
-          }
-        }
-      }
-    }
-
-    if (!resolvedId) return [];
-
-    return ctx.db
-      .query("articles")
-      .withIndex("by_professional", (q) => q.eq("professionalId", resolvedId!))
-      .take(args.limit ?? 10);
-  },
-});
-
-export const getVideos = query({
-  args: {
-    professionalId: v.string(),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    let resolvedId: Id<"medicalProfessionals"> | null = ctx.db.normalizeId(
-      "medicalProfessionals",
-      args.professionalId,
-    );
-    if (!resolvedId) {
-      const pubId = ctx.db.normalizeId("publications", args.professionalId);
-      if (pubId) {
-        const publication = await ctx.db.get(pubId);
-        if (publication && publication.title) {
-          const professionalByTitle = await ctx.db
-            .query("medicalProfessionals")
-            .filter((q) => q.eq(q.field("name"), publication.title))
-            .first();
-          if (professionalByTitle) {
-            resolvedId = professionalByTitle._id;
-          }
-        }
-      }
-    }
-
-    if (!resolvedId) return [];
-
-    return ctx.db
-      .query("videos")
-      .withIndex("by_professional", (q) => q.eq("professionalId", resolvedId!))
-      .take(args.limit ?? 10);
-  },
-});
-
-export const getStories = query({
-  args: {
-    professionalId: v.string(),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    let resolvedId: Id<"medicalProfessionals"> | null = ctx.db.normalizeId(
-      "medicalProfessionals",
-      args.professionalId,
-    );
-    if (!resolvedId) {
-      const pubId = ctx.db.normalizeId("publications", args.professionalId);
-      if (pubId) {
-        const publication = await ctx.db.get(pubId);
-        if (publication && publication.title) {
-          const professionalByTitle = await ctx.db
-            .query("medicalProfessionals")
-            .filter((q) => q.eq(q.field("name"), publication.title))
-            .first();
-          if (professionalByTitle) {
-            resolvedId = professionalByTitle._id;
-          }
-        }
-      }
-    }
-
-    if (!resolvedId) return [];
-    const professional = await ctx.db.get(resolvedId);
-    if (!professional) return [];
-    const all = await ctx.db.query("stories").collect();
-    return all
-      .filter((s) => s.authorId === professional.userId)
-      .slice(0, args.limit ?? 10);
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 12. MEDICAL RECORDS
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getMedicalRecords = query({
-  args: { patientId: v.optional(v.id("users")) },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity)
-      throw new ConvexError({
-        code: "UNAUTHENTICATED",
-        message: "Connexion requise",
-      });
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier),
-      )
-      .unique();
-    if (!user)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Utilisateur introuvable",
-      });
-    const targetId = args.patientId || user._id;
-    if (targetId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    return ctx.db
-      .query("medicalRecords")
-      .withIndex("by_patient", (q) => q.eq("patientId", targetId))
-      .collect();
-  },
-});
-
-export const addMedicalRecord = mutation({
-  args: {
-    patientId: v.id("users"),
-    type: v.union(
-      v.literal("visit"),
-      v.literal("lab"),
-      v.literal("imaging"),
-      v.literal("vaccination"),
-      v.literal("prescription"),
-      v.literal("surgery"),
-      v.literal("hospitalization"),
+    professionalId: v.optional(v.id("medicalProfessionals")),
+    status: v.optional(
+      v.union(v.literal("open"), v.literal("answered"), v.literal("closed")),
     ),
-    title: v.string(),
-    date: v.string(),
-    doctor: v.optional(v.string()),
-    doctorId: v.optional(v.id("medicalProfessionals")),
-    summary: v.string(),
-    details: v.optional(v.string()),
-    tags: v.optional(v.array(v.string())),
-    attachments: v.optional(v.array(v.string())),
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    if (args.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    return ctx.db.insert("medicalRecords", {
-      ...args,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-  },
-});
+    const limit = assertPositiveLimit(args.limit, 50);
 
-export const updateMedicalRecord = mutation({
-  args: {
-    id: v.id("medicalRecords"),
-    type: v.optional(
-      v.union(
-        v.literal("visit"),
-        v.literal("lab"),
-        v.literal("imaging"),
-        v.literal("vaccination"),
-        v.literal("prescription"),
-        v.literal("surgery"),
-        v.literal("hospitalization"),
-      ),
-    ),
-    title: v.optional(v.string()),
-    date: v.optional(v.string()),
-    doctor: v.optional(v.string()),
-    doctorId: v.optional(v.id("medicalProfessionals")),
-    summary: v.optional(v.string()),
-    details: v.optional(v.string()),
-    tags: v.optional(v.array(v.string())),
-    attachments: v.optional(v.array(v.string())),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const record = await ctx.db.get(args.id);
-    if (!record)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Dossier introuvable",
-      });
-    if (record.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    const { id, ...updates } = args;
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
+    if (args.professionalId) {
+      const professional = await ctx.db.get(args.professionalId);
+      if (!professional) return [];
+
+      const isAdmin = user.roles?.includes("admin") === true;
+      const isDoctor = await isProfessionalOwner(
+        ctx,
+        professional.userId,
+        user,
+      );
+
+      if (!isAdmin && !isDoctor) {
+        throw new ConvexError({
+          code: "FORBIDDEN",
+          message: "Non autorisé",
+        });
+      }
+
+      const questions = await ctx.db
+        .query("questions")
+        .withIndex("by_professional", (q) =>
+          q.eq("professionalId", args.professionalId!),
+        )
+        .order("desc")
+        .take(limit);
+
+      if (!args.status) return questions;
+      return questions.filter((q) => q.status === args.status);
+    }
+
+    const questions = await ctx.db
+      .query("questions")
+      .filter((q) => q.eq(q.field("patientId"), user._id))
+      .order("desc")
+      .take(limit);
+
+    if (!args.status) return questions;
+    return questions.filter((q) => q.status === args.status);
   },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 13. PRESCRIPTIONS
+// 10. PRESCRIPTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const getPrescriptions = query({
+export const createPrescription = mutation({
   args: {
-    patientId: v.optional(v.id("users")),
-    doctorId: v.optional(v.id("medicalProfessionals")),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const targetId = args.patientId || user._id;
-    if (targetId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    let query = ctx.db
-      .query("prescriptions")
-      .withIndex("by_patient", (q) => q.eq("patientId", targetId));
-    if (args.doctorId)
-      query = query.filter((q) => q.eq(q.field("doctorId"), args.doctorId!));
-    return query.collect();
-  },
-});
-
-export const getPrescription = query({
-  args: { id: v.id("prescriptions") },
-  handler: async (ctx, args) => {
-    const prescription = await ctx.db.get(args.id);
-    if (!prescription)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Ordonnance introuvable",
-      });
-    const user = await requireUser(ctx);
-    if (prescription.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    return prescription;
-  },
-});
-
-export const addPrescription = mutation({
-  args: {
+    professionalId: v.id("medicalProfessionals"),
     patientId: v.id("users"),
-    doctorId: v.id("medicalProfessionals"),
-    date: v.string(),
     medications: v.array(
       v.object({
         name: v.string(),
         dosage: v.string(),
         frequency: v.string(),
         duration: v.string(),
-        quantity: v.optional(v.number()),
         instructions: v.optional(v.string()),
-        substitution: v.optional(v.boolean()),
       }),
     ),
+    diagnosis: v.optional(v.string()),
     notes: v.optional(v.string()),
-    validUntil: v.string(),
-    status: v.union(
-      v.literal("active"),
-      v.literal("expired"),
-      v.literal("cancelled"),
-      v.literal("dispensed"),
-    ),
-    refills: v.number(),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    if (!user.roles?.includes("admin") && !user.roles?.includes("doctor"))
+    const professional = await ctx.db.get(args.professionalId);
+
+    if (!professional) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel introuvable",
+      });
+    }
+
+    const patient = await ctx.db.get(args.patientId);
+    if (!patient) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Patient introuvable",
+      });
+    }
+
+    const isAdmin = user.roles?.includes("admin") === true;
+    const isDoctor =
+      user.roles?.includes("doctor") === true &&
+      (await isProfessionalOwner(ctx, professional.userId, user));
+
+    if (!isAdmin && !isDoctor) {
       throw new ConvexError({
         code: "FORBIDDEN",
-        message: "Seul un médecin ou admin peut prescrire",
+        message: "Seul le médecin concerné ou un administrateur peut prescrire",
       });
+    }
+
+    if (args.medications.length === 0) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Une ordonnance doit contenir au moins un médicament",
+      });
+    }
+
+    if (args.medications.length > 50) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Trop de médicaments dans cette ordonnance",
+      });
+    }
+
+    const medications = args.medications.map((m) => ({
+      name: m.name.trim(),
+      dosage: m.dosage.trim(),
+      frequency: m.frequency.trim(),
+      duration: m.duration.trim(),
+      instructions: m.instructions?.trim() || undefined,
+    }));
+
+    if (
+      medications.some(
+        (m) => !m.name || !m.dosage || !m.frequency || !m.duration,
+      )
+    ) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message:
+          "Tous les champs obligatoires des médicaments doivent être remplis",
+      });
+    }
+
+    const now = new Date().toISOString();
+
     return ctx.db.insert("prescriptions", {
-      ...args,
-      patientName: (await ctx.db.get(args.patientId))?.name || "Patient",
-      doctorName: (await ctx.db.get(args.doctorId))?.name || "Médecin",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      refillsRemaining: args.refills,
+      patientId: args.patientId,
+      patientName: patient.name ?? "Patient",
+      doctorId: args.professionalId,
+      doctorName: professional.name,
+      date: now,
+      medications,
+      notes: args.notes?.trim() || undefined,
+      validUntil: now,
+      status: "active",
+      refills: 0,
+      refillsRemaining: 0,
+      createdAt: now,
+      updatedAt: now,
     });
+  },
+});
+
+export const getPrescription = query({
+  args: { id: v.id("prescriptions") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const prescription = await ctx.db.get(args.id);
+
+    if (!prescription) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Ordonnance introuvable",
+      });
+    }
+
+    const isAdmin = user.roles?.includes("admin") === true;
+    let isDoctor = false;
+
+    const professional = await ctx.db.get(prescription.doctorId);
+    if (professional) {
+      isDoctor = await isProfessionalOwner(ctx, professional.userId, user);
+    }
+
+    const isPatient = prescription.patientId === user._id;
+
+    if (!isAdmin && !isDoctor && !isPatient) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Vous n'êtes pas autorisé à consulter cette ordonnance",
+      });
+    }
+
+    return prescription;
   },
 });
 
 export const updatePrescription = mutation({
   args: {
     id: v.id("prescriptions"),
+    medications: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          dosage: v.string(),
+          frequency: v.string(),
+          duration: v.string(),
+          instructions: v.optional(v.string()),
+        }),
+      ),
+    ),
+    diagnosis: v.optional(v.string()),
+    notes: v.optional(v.string()),
     status: v.optional(
       v.union(
         v.literal("active"),
@@ -1692,713 +2258,728 @@ export const updatePrescription = mutation({
         v.literal("dispensed"),
       ),
     ),
-    refills: v.optional(v.number()),
-    notes: v.optional(v.string()),
-    medications: v.optional(
-      v.array(
-        v.object({
-          name: v.string(),
-          dosage: v.string(),
-          frequency: v.string(),
-          duration: v.string(),
-          quantity: v.optional(v.number()),
-          instructions: v.optional(v.string()),
-          substitution: v.optional(v.boolean()),
-        }),
-      ),
-    ),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    if (!user.roles?.includes("admin") && !user.roles?.includes("doctor"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    const { id, ...updates } = args;
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
+    const prescription = await ctx.db.get(args.id);
+
+    if (!prescription) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Ordonnance introuvable",
+      });
+    }
+
+    const isAdmin = user.roles?.includes("admin") === true;
+    const professional = await ctx.db.get(prescription.doctorId);
+
+    const isDoctor =
+      user.roles?.includes("doctor") === true &&
+      professional !== null &&
+      (await isProfessionalOwner(ctx, professional.userId, user));
+
+    if (!isAdmin && !isDoctor) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message:
+          "Seul le médecin concerné ou un administrateur peut modifier cette ordonnance",
+      });
+    }
+
+    if (
+      args.medications !== undefined &&
+      (args.medications.length === 0 || args.medications.length > 50)
+    ) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "L'ordonnance doit contenir entre 1 et 50 médicaments",
+      });
+    }
+
+    const { id, medications, ...rest } = args;
+
+    const updates: {
+      medications?: Array<{
+        name: string;
+        dosage: string;
+        frequency: string;
+        duration: string;
+        instructions?: string;
+      }>;
+      diagnosis?: string;
+      notes?: string;
+      status?: "active" | "expired" | "cancelled" | "dispensed";
+      updatedAt: string;
+    } = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (medications !== undefined) {
+      const normalizedMedications = medications.map((m) => ({
+        name: m.name.trim(),
+        dosage: m.dosage.trim(),
+        frequency: m.frequency.trim(),
+        duration: m.duration.trim(),
+        instructions: m.instructions?.trim() || undefined,
+      }));
+
+      if (
+        normalizedMedications.some(
+          (m) => !m.name || !m.dosage || !m.frequency || !m.duration,
+        )
+      ) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message:
+            "Tous les champs obligatoires des médicaments doivent être remplis",
+        });
+      }
+
+      updates.medications = normalizedMedications;
+    }
+
+    if (rest.diagnosis !== undefined) {
+      updates.diagnosis = rest.diagnosis.trim();
+    }
+
+    if (rest.notes !== undefined) {
+      updates.notes = rest.notes.trim();
+    }
+
+    if (rest.status !== undefined) {
+      updates.status = rest.status;
+    }
+
+    await ctx.db.patch(id, updates);
+
+    return id;
   },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 14. VACCINATIONS
+// 11. MEDICAL STORIES
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const getVaccinations = query({
-  args: { patientId: v.optional(v.id("users")) },
+export const getProfessionalStories = query({
+  args: {
+    professionalId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const professionalId = await resolveProfessionalId(
+      ctx,
+      args.professionalId,
+    );
+
+    if (!professionalId) return [];
+
+    const professional = await ctx.db.get(professionalId);
+    if (!professional) return [];
+
+    const limit = assertPositiveLimit(args.limit, 10);
+
+    const ownerId =
+      ctx.db.normalizeId("users", professional.userId) ??
+      (
+        await ctx.db
+          .query("users")
+          .withIndex("by_uid", (q) => q.eq("uid", professional.userId))
+          .unique()
+      )?._id;
+
+    if (!ownerId) return [];
+
+    const stories = await ctx.db.query("stories").collect();
+    return stories.filter((s) => s.authorId === ownerId).slice(0, limit);
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 12. MEDICAL RECORDS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getMedicalRecords = query({
+  args: {
+    patientId: v.optional(v.id("users")),
+    limit: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const targetId = args.patientId || user._id;
-    if (targetId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
+    const limit = assertPositiveLimit(args.limit, 50);
+    const isAdmin = user.roles?.includes("admin") === true;
+
+    const patientId = args.patientId ?? user._id;
+
+    if (patientId !== user._id && !isAdmin) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Non autorisé",
+      });
+    }
+
     return ctx.db
-      .query("vaccinations")
-      .withIndex("by_patient", (q) => q.eq("patientId", targetId))
-      .collect();
+      .query("medicalRecords")
+      .withIndex("by_patient", (q) => q.eq("patientId", patientId))
+      .order("desc")
+      .take(limit);
   },
 });
 
-export const addVaccination = mutation({
+export const getMedicalRecord = query({
+  args: { id: v.id("medicalRecords") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const record = await ctx.db.get(args.id);
+
+    if (!record) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Dossier médical introuvable",
+      });
+    }
+
+    const isAdmin = user.roles?.includes("admin") === true;
+    if (!isAdmin && record.patientId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Vous n'êtes pas autorisé à consulter ce dossier",
+      });
+    }
+
+    return record;
+  },
+});
+
+export const createMedicalRecord = mutation({
   args: {
     patientId: v.id("users"),
-    name: v.string(),
-    date: v.string(),
-    nextDose: v.optional(v.string()),
-    status: v.union(
-      v.literal("completed"),
-      v.literal("pending"),
-      v.literal("overdue"),
-    ),
-    administeredBy: v.optional(v.string()),
-    location: v.optional(v.string()),
-    batchNumber: v.optional(v.string()),
-    sideEffects: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    if (args.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    return ctx.db.insert("vaccinations", {
-      ...args,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-  },
-});
-
-export const updateVaccination = mutation({
-  args: {
-    id: v.id("vaccinations"),
-    name: v.optional(v.string()),
-    date: v.optional(v.string()),
-    nextDose: v.optional(v.string()),
-    status: v.optional(
-      v.union(
-        v.literal("completed"),
-        v.literal("pending"),
-        v.literal("overdue"),
-      ),
-    ),
-    administeredBy: v.optional(v.string()),
-    location: v.optional(v.string()),
-    batchNumber: v.optional(v.string()),
-    sideEffects: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const vaccination = await ctx.db.get(args.id);
-    if (!vaccination)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Vaccination introuvable",
-      });
-    if (vaccination.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    const { id, ...updates } = args;
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 15. EMERGENCY
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getNearbyEmergencyCenters = query({
-  args: { lat: v.number(), lng: v.number(), radius: v.optional(v.number()) },
-  handler: async () => {
-    return [
-      {
-        _id: "center1",
-        name: "CHU de Kinshasa",
-        address: "1 Avenue de la Clinique",
-        phone: "+243 123456789",
-        type: "hospital",
-        distance: 2.3,
-        eta: 10,
-        open: true,
-        latitude: -4.325,
-        longitude: 15.322,
-      },
-      {
-        _id: "center2",
-        name: "Hôpital Saint-Joseph",
-        address: "45 Rue des Soeurs",
-        phone: "+243 987654321",
-        type: "hospital",
-        distance: 5.1,
-        eta: 15,
-        open: false,
-        latitude: -4.35,
-        longitude: 15.3,
-      },
-    ];
-  },
-});
-
-export const shareEmergencyLocation = mutation({
-  args: { lat: v.number(), lng: v.number() },
-  handler: async (ctx) => {
-    await requireUser(ctx);
-    return { success: true };
-  },
-});
-
-export const notifyEmergencyContacts = mutation({
-  args: { message: v.optional(v.string()) },
-  handler: async (ctx) => {
-    await requireUser(ctx);
-    return { success: true };
-  },
-});
-
-export const sendEmergencyAlert = mutation({
-  args: {
-    type: v.string(),
+    title: v.string(),
     description: v.string(),
-    location: v.object({ lat: v.number(), lng: v.number() }),
-    contactPhone: v.optional(v.string()),
-  },
-  handler: async (ctx) => {
-    await requireUser(ctx);
-    return { alertId: `alert_${Date.now()}` };
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 16. PAYMENTS
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const processPayment = mutation({
-  args: {
-    amount: v.number(),
-    currency: v.string(),
-    method: v.string(),
-    description: v.string(),
-    metadata: v.optional(v.any()),
+    category: v.string(),
+    documentUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireUser(ctx);
-    return {
-      transactionId: `tx_${Date.now()}`,
-      status: "completed",
-      receipt: `https://example.com/receipt/tx_${Date.now()}`,
-      amount: args.amount,
-      currency: args.currency,
-      method: args.method,
-      date: new Date().toISOString(),
+    const user = await requireUser(ctx);
+    const isAdmin = user.roles?.includes("admin") === true;
+
+    if (args.patientId !== user._id && !isAdmin) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Non autorisé",
+      });
+    }
+
+    const title = args.title.trim();
+    const description = args.description.trim();
+    const category = args.category.trim();
+
+    if (!title || !description || !category) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Les champs obligatoires doivent être remplis",
+      });
+    }
+
+    const typeMap: Record<
+      string,
+      | "visit"
+      | "lab"
+      | "imaging"
+      | "vaccination"
+      | "prescription"
+      | "surgery"
+      | "hospitalization"
+    > = {
+      visit: "visit",
+      lab: "lab",
+      imaging: "imaging",
+      vaccination: "vaccination",
+      prescription: "prescription",
+      surgery: "surgery",
+      hospitalization: "hospitalization",
     };
-  },
-});
 
-export const refundPayment = mutation({
-  args: { transactionId: v.string() },
-  handler: async (ctx) => {
-    await requireUser(ctx);
-    return { success: true };
-  },
-});
+    const type = typeMap[category.toLowerCase()];
 
-export const verifyPayment = mutation({
-  args: { transactionId: v.string() },
-  handler: async () => {
-    return { status: "completed", amount: 100 };
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 17. PHARMACY ORDERS
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const createPharmacyOrder = mutation({
-  args: {
-    pharmacyId: v.id("pharmacies"),
-    items: v.array(
-      v.object({
-        productId: v.string(),
-        quantity: v.number(),
-      }),
-    ),
-    deliveryOption: v.union(v.literal("pickup"), v.literal("delivery")),
-    deliveryAddress: v.optional(v.string()),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const pharmacy = await ctx.db.get(args.pharmacyId);
-    if (!pharmacy)
+    if (!type) {
       throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Pharmacie introuvable",
+        code: "INVALID_ARGUMENT",
+        message:
+          "La catégorie doit être l'une des suivantes : visit, lab, imaging, vaccination, prescription, surgery, hospitalization",
       });
-    const total = args.items.reduce((sum, item) => {
-      const product = pharmacy.products.find((p) => p.id === item.productId);
-      return sum + (product ? product.price * item.quantity : 0);
-    }, 0);
-    const order = {
-      pharmacyId: args.pharmacyId,
-      patientId: user._id,
-      items: args.items.map((item) => {
-        const product = pharmacy.products.find((p) => p.id === item.productId);
-        return {
-          ...item,
-          productName: product?.name || "Produit",
-          price: product?.price || 0,
-        };
-      }),
-      total,
-      currency: pharmacy.products?.[0]?.currency || "FCFA",
-      status: "pending" as const,
-      deliveryOption: args.deliveryOption,
-      deliveryAddress: args.deliveryAddress,
-      paymentMethod: "pending",
-      paymentStatus: "pending" as const,
-      notes: args.notes,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    return ctx.db.insert("pharmacyOrders", order);
-  },
-});
+    }
 
-export const updatePharmacyOrder = mutation({
-  args: {
-    id: v.id("pharmacyOrders"),
-    status: v.optional(
-      v.union(
-        v.literal("pending"),
-        v.literal("confirmed"),
-        v.literal("preparing"),
-        v.literal("ready"),
-        v.literal("delivered"),
-        v.literal("cancelled"),
-        v.literal("refunded"),
-      ),
-    ),
-    deliveryAddress: v.optional(v.string()),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const order = await ctx.db.get(args.id);
-    if (!order)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Commande introuvable",
-      });
-    if (order.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    const { id, ...updates } = args;
-    await ctx.db.patch(id, { ...updates, updatedAt: new Date().toISOString() });
-  },
-});
+    const now = new Date().toISOString();
 
-export const cancelPharmacyOrder = mutation({
-  args: { id: v.id("pharmacyOrders") },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const order = await ctx.db.get(args.id);
-    if (!order)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Commande introuvable",
-      });
-    if (order.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    await ctx.db.patch(args.id, { status: "cancelled" });
-  },
-});
-
-export const checkPharmacyStock = mutation({
-  args: {
-    pharmacyId: v.id("pharmacies"),
-    items: v.array(v.object({ productId: v.string(), quantity: v.number() })),
-  },
-  handler: async (ctx, args) => {
-    const pharmacy = await ctx.db.get(args.pharmacyId);
-    if (!pharmacy)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Pharmacie introuvable",
-      });
-    const available = args.items.every((item) => {
-      const product = pharmacy.products.find((p) => p.id === item.productId);
-      return product && product.stock >= item.quantity;
-    });
-    return { available };
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 18. HOSPITAL APPOINTMENTS
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const bookHospitalAppointment = mutation({
-  args: {
-    hospitalId: v.id("hospitals"),
-    service: v.string(),
-    date: v.string(),
-    patientId: v.id("users"),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    if (args.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    const hospital = await ctx.db.get(args.hospitalId);
-    if (!hospital)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Hôpital introuvable",
-      });
-    const appointmentId = await ctx.db.insert("hospitalAppointments", {
-      hospitalId: args.hospitalId,
-      hospitalName: hospital.name,
-      service: args.service,
-      date: args.date,
+    return ctx.db.insert("medicalRecords", {
       patientId: args.patientId,
-      patientName: (await ctx.db.get(args.patientId))?.name || "Patient",
-      notes: args.notes,
-      status: "scheduled",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      type,
+      title,
+      date: now,
+      summary: description,
+      ...(args.documentUrl?.trim()
+        ? { attachments: [args.documentUrl.trim()] }
+        : {}),
+      createdAt: now,
+      updatedAt: now,
     });
-    return { appointmentId };
-  },
-});
-
-export const cancelHospitalAppointment = mutation({
-  args: { appointmentId: v.id("hospitalAppointments") },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const apt = await ctx.db.get(args.appointmentId);
-    if (!apt)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Rendez-vous introuvable",
-      });
-    if (apt.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    await ctx.db.patch(args.appointmentId, { status: "cancelled" });
   },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 19. TELECONSULTATIONS
+// 13. MEDICAL FAVORITES
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const toggleProfessionalFavorite = mutation({
+  args: { professionalId: v.id("medicalProfessionals") },
+  handler: async (ctx, args) => {
+    await requireUser(ctx);
+
+    const professional = await ctx.db.get(args.professionalId);
+    if (!professional) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel introuvable",
+      });
+    }
+
+    throw new ConvexError({
+      code: "FEATURE_NOT_CONFIGURED",
+      message:
+        "Les favoris médicaux ne sont pas encore reliés à une table dédiée dans le schéma actuel.",
+    });
+  },
+});
+
+export const getMyFavoriteProfessionals = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    await requireUser(ctx);
+    assertPositiveLimit(args.limit, 50);
+    return [];
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 14. MEDICAL FOLLOWING
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const toggleProfessionalFollow = mutation({
+  args: { professionalId: v.id("medicalProfessionals") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const professional = await ctx.db.get(args.professionalId);
+
+    if (!professional) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel introuvable",
+      });
+    }
+
+    const existing = await ctx.db
+      .query("followers")
+      .withIndex("by_professional_and_user", (q) =>
+        q.eq("professionalId", args.professionalId).eq("userId", user._id),
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return {
+        following: false,
+        professionalId: args.professionalId,
+      };
+    }
+
+    await ctx.db.insert("followers", {
+      professionalId: args.professionalId,
+      userId: user._id,
+      name: user.name ?? "Utilisateur",
+      ...(user.avatar ? { avatar: user.avatar } : {}),
+      followedAt: new Date().toISOString(),
+    });
+
+    return {
+      following: true,
+      professionalId: args.professionalId,
+    };
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 15. TELECONSULTATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const createTeleconsultation = mutation({
   args: {
-    doctorId: v.id("medicalProfessionals"),
-    scheduledAt: v.string(),
-    durationMinutes: v.optional(v.number()),
-    notes: v.optional(v.string()),
+    appointmentId: v.id("medicalAppointments"),
+    roomUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const doctor = await ctx.db.get(args.doctorId);
-    if (!doctor)
+    const appointment = await ctx.db.get(args.appointmentId);
+
+    if (!appointment) {
       throw new ConvexError({
         code: "NOT_FOUND",
-        message: "Médecin introuvable",
+        message: "Rendez-vous introuvable",
       });
-    const roomUrl = `https://telemed.example.com/room/${Date.now()}`;
-    const id = await ctx.db.insert("teleconsultations", {
-      doctorId: args.doctorId,
-      patientId: user._id,
-      scheduledAt: args.scheduledAt,
-      status: "scheduled",
-      durationMinutes: args.durationMinutes || 30,
-      roomUrl,
-      notes: args.notes,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    return { id, roomUrl };
-  },
-});
-
-export const cancelTeleconsultation = mutation({
-  args: { id: v.id("teleconsultations") },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const tele = await ctx.db.get(args.id);
-    if (!tele)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Téléconsultation introuvable",
-      });
-    if (tele.patientId !== user._id && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    await ctx.db.patch(args.id, { status: "cancelled" });
-  },
-});
-
-export const startTeleconsultation = mutation({
-  args: { id: v.id("teleconsultations") },
-  handler: async (ctx, args) => {
-    const tele = await ctx.db.get(args.id);
-    if (!tele)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Téléconsultation introuvable",
-      });
-    await ctx.db.patch(args.id, { status: "in-progress" });
-    return { roomUrl: tele.roomUrl };
-  },
-});
-
-export const completeTeleconsultation = mutation({
-  args: { id: v.id("teleconsultations") },
-  handler: async (ctx, args) => {
-    const tele = await ctx.db.get(args.id);
-    if (!tele)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Téléconsultation introuvable",
-      });
-    await ctx.db.patch(args.id, { status: "completed" });
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 20. FITNESS, WELLNESS & NUTRITION
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getWorkoutHistory = query({
-  args: { limit: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    return ctx.db
-      .query("workoutSessions")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .take(args.limit ?? 20);
-  },
-});
-
-export const logWorkout = mutation({
-  args: {
-    name: v.string(),
-    type: v.string(),
-    durationMinutes: v.number(),
-    caloriesBurned: v.optional(v.number()),
-    exercises: v.array(
-      v.object({
-        name: v.string(),
-        sets: v.optional(v.number()),
-        reps: v.optional(v.number()),
-        weightKg: v.optional(v.number()),
-        durationSeconds: v.optional(v.number()),
-      }),
-    ),
-    date: v.string(),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    return ctx.db.insert("workoutSessions", { ...args, userId: user._id });
-  },
-});
-
-export const getMeditationHistory = query({
-  args: { limit: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    return ctx.db
-      .query("meditationSessions")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .take(args.limit ?? 20);
-  },
-});
-
-export const logMeditation = mutation({
-  args: {
-    type: v.string(),
-    durationMinutes: v.number(),
-    date: v.string(),
-    moodBefore: v.optional(v.number()),
-    moodAfter: v.optional(v.number()),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    return ctx.db.insert("meditationSessions", { ...args, userId: user._id });
-  },
-});
-
-export const upsertNutritionLog = mutation({
-  args: {
-    date: v.string(),
-    meals: v.array(
-      v.object({
-        name: v.string(),
-        time: v.string(),
-        calories: v.optional(v.number()),
-        proteins: v.optional(v.number()),
-        carbs: v.optional(v.number()),
-        fats: v.optional(v.number()),
-        items: v.array(v.string()),
-      }),
-    ),
-    totalCalories: v.optional(v.number()),
-    waterMl: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const existing = await ctx.db
-      .query("nutritionLogs")
-      .withIndex("by_date", (q) => q.eq("date", args.date))
-      .filter((q) => q.eq(q.field("userId"), user._id))
-      .unique();
-    if (existing) {
-      await ctx.db.patch(existing._id, args);
-      return existing._id;
     }
-    return ctx.db.insert("nutritionLogs", { ...args, userId: user._id });
+
+    if (appointment.type !== "teleconsultation") {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Ce rendez-vous n'est pas configuré pour une téléconsultation",
+      });
+    }
+
+    // ── Fix TS2322 : professionalId est optionnel dans le schéma ─────────
+    if (!appointment.professionalId) {
+      throw new ConvexError({
+        code: "INVALID_STATE",
+        message:
+          "Ce rendez-vous n'a pas de professionnel assigné. Impossible de créer une téléconsultation.",
+      });
+    }
+
+    // ── Fix TS2322 : scheduledAt est optionnel dans le schéma ────────────
+    if (!appointment.scheduledAt) {
+      throw new ConvexError({
+        code: "INVALID_STATE",
+        message:
+          "Ce rendez-vous n'a pas d'heure planifiée. Impossible de créer une téléconsultation.",
+      });
+    }
+
+    const professional = await ctx.db.get(appointment.professionalId);
+
+    if (!professional) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Professionnel de santé introuvable",
+      });
+    }
+
+    const isAdmin = user.roles?.includes("admin") === true;
+    const isDoctor = await isProfessionalOwner(ctx, professional.userId, user);
+    const isPatient = appointment.userId === user._id;
+
+    if (!isAdmin && !isDoctor && !isPatient) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Non autorisé",
+      });
+    }
+
+    const roomUrl = args.roomUrl?.trim();
+
+    if (!roomUrl) {
+      throw new ConvexError({
+        code: "TELECONSULTATION_ROOM_REQUIRED",
+        message:
+          "Une URL de salle de téléconsultation réelle doit être fournie avant la création.",
+      });
+    }
+
+    let parsedRoomUrl: URL;
+    try {
+      parsedRoomUrl = new URL(roomUrl);
+    } catch {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "URL de téléconsultation invalide",
+      });
+    }
+
+    if (
+      parsedRoomUrl.protocol !== "https:" &&
+      parsedRoomUrl.protocol !== "http:"
+    ) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "L'URL de téléconsultation doit utiliser HTTP ou HTTPS",
+      });
+    }
+
+    const existing = await ctx.db
+      .query("teleconsultations")
+      .withIndex("by_patient", (q) => q.eq("patientId", appointment.userId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("doctorId"), appointment.professionalId),
+          q.eq(q.field("scheduledAt"), appointment.scheduledAt),
+        ),
+      )
+      .first();
+
+    if (existing) return existing;
+
+    const now = new Date().toISOString();
+
+    return ctx.db.insert("teleconsultations", {
+      doctorId: appointment.professionalId,
+      patientId: appointment.userId,
+      scheduledAt: appointment.scheduledAt,
+      status: "scheduled",
+      durationMinutes: appointment.durationMinutes,
+      roomUrl: parsedRoomUrl.toString(),
+      ...(appointment.notes ? { notes: appointment.notes } : {}),
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });
 
-export const getHealthSummary = query({
-  args: {},
-  handler: async (ctx) => {
+export const getTeleconsultation = query({
+  args: { appointmentId: v.id("medicalAppointments") },
+  handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const [workouts, meditations, appointments, metrics] = await Promise.all([
-      ctx.db
-        .query("workoutSessions")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .order("desc")
-        .take(7),
-      ctx.db
-        .query("meditationSessions")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .order("desc")
-        .take(7),
-      ctx.db
-        .query("medicalAppointments")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .order("desc")
-        .take(5),
-      ctx.db
-        .query("healthMetrics")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .order("desc")
-        .take(1),
-    ]);
+    const appointment = await ctx.db.get(args.appointmentId);
+
+    if (!appointment) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Rendez-vous introuvable",
+      });
+    }
+
+    const professional = appointment.professionalId
+      ? await ctx.db.get(appointment.professionalId)
+      : null;
+
+    const isAdmin = user.roles?.includes("admin") === true;
+    const isDoctor =
+      professional !== null &&
+      (await isProfessionalOwner(ctx, professional.userId, user));
+    const isPatient = appointment.userId === user._id;
+
+    if (!isAdmin && !isDoctor && !isPatient) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Non autorisé",
+      });
+    }
+
+    return ctx.db
+      .query("teleconsultations")
+      .withIndex("by_patient", (q) => q.eq("patientId", appointment.userId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("doctorId"), appointment.professionalId),
+          q.eq(q.field("scheduledAt"), appointment.scheduledAt),
+        ),
+      )
+      .first();
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 16. NEARBY HEALTH SERVICES
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const findNearbyHospitals = query({
+  args: {
+    latitude: v.number(),
+    longitude: v.number(),
+    radiusKm: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    assertValidCoordinates(args.latitude, args.longitude);
+
+    const radiusKm = args.radiusKm ?? 25;
+    const limit = assertPositiveLimit(args.limit, 20);
+
+    if (!Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 500) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Rayon de recherche invalide",
+      });
+    }
+
+    const hospitals = await ctx.db.query("hospitals").collect();
+
+    return hospitals
+      .filter((h) => h.latitude !== undefined && h.longitude !== undefined)
+      .map((h) => ({
+        hospital: h,
+        distanceKm: calculateDistanceKm(
+          args.latitude,
+          args.longitude,
+          h.latitude!,
+          h.longitude!,
+        ),
+      }))
+      .filter((item) => item.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, limit);
+  },
+});
+
+export const findNearbyPharmacies = query({
+  args: {
+    latitude: v.number(),
+    longitude: v.number(),
+    radiusKm: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    assertValidCoordinates(args.latitude, args.longitude);
+
+    const radiusKm = args.radiusKm ?? 25;
+    const limit = assertPositiveLimit(args.limit, 20);
+
+    if (!Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 500) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Rayon de recherche invalide",
+      });
+    }
+
+    const pharmacies = await ctx.db.query("pharmacies").collect();
+
+    return pharmacies
+      .filter((p) => p.latitude !== undefined && p.longitude !== undefined)
+      .map((p) => ({
+        pharmacy: p,
+        distanceKm: calculateDistanceKm(
+          args.latitude,
+          args.longitude,
+          p.latitude!,
+          p.longitude!,
+        ),
+      }))
+      .filter((item) => item.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, limit);
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 17. HEALTH SEARCH
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const searchHealth = query({
+  args: {
+    query: v.string(),
+    city: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const search = args.query.trim().toLowerCase();
+    const limit = assertPositiveLimit(args.limit, 50);
+
+    if (!search) {
+      return {
+        professionals: [],
+        hospitals: [],
+        pharmacies: [],
+        laboratories: [],
+        clinics: [],
+      };
+    }
+
+    const [professionals, hospitals, pharmacies, laboratories, clinics] =
+      await Promise.all([
+        ctx.db.query("medicalProfessionals").collect(),
+        ctx.db.query("hospitals").collect(),
+        ctx.db.query("pharmacies").collect(),
+        ctx.db.query("laboratories").collect(),
+        ctx.db.query("clinics").collect(),
+      ]);
+
     return {
-      workoutCount: workouts.length,
-      totalWorkoutMinutes: workouts.reduce((s, w) => s + w.durationMinutes, 0),
-      meditationCount: meditations.length,
-      totalMeditationMinutes: meditations.reduce(
-        (s, m) => s + m.durationMinutes,
-        0,
-      ),
-      upcomingAppointments: appointments.filter((a) => a.status === "scheduled")
-        .length,
-      latestMetrics: metrics[0] ?? null,
+      professionals: professionals
+        .filter((p) => {
+          const matchesSearch =
+            p.name?.toLowerCase().includes(search) ||
+            p.specialty?.toLowerCase().includes(search) ||
+            p.city?.toLowerCase().includes(search);
+          const matchesCity = !args.city || p.city === args.city;
+          return matchesSearch && matchesCity;
+        })
+        .slice(0, limit),
+
+      hospitals: hospitals
+        .filter((h) => {
+          const matchesSearch =
+            h.name.toLowerCase().includes(search) ||
+            h.city.toLowerCase().includes(search);
+          const matchesCity = !args.city || h.city === args.city;
+          return matchesSearch && matchesCity;
+        })
+        .slice(0, limit),
+
+      pharmacies: pharmacies
+        .filter((p) => {
+          const matchesSearch =
+            p.name.toLowerCase().includes(search) ||
+            p.city.toLowerCase().includes(search);
+          const matchesCity = !args.city || p.city === args.city;
+          return matchesSearch && matchesCity;
+        })
+        .slice(0, limit),
+
+      laboratories: laboratories
+        .filter((l) => {
+          const matchesSearch =
+            l.name.toLowerCase().includes(search) ||
+            l.city.toLowerCase().includes(search);
+          const matchesCity = !args.city || l.city === args.city;
+          return matchesSearch && matchesCity;
+        })
+        .slice(0, limit),
+
+      clinics: clinics
+        .filter((c) => {
+          const matchesSearch =
+            c.name.toLowerCase().includes(search) ||
+            c.city.toLowerCase().includes(search);
+          const matchesCity = !args.city || c.city === args.city;
+          return matchesSearch && matchesCity;
+        })
+        .slice(0, limit),
     };
   },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 21. PATIENTS (UTILISATEURS)
+// 18. HEALTH DASHBOARD
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const listPatients = query({
-  args: {},
-  handler: async (ctx) => {
-    return ctx.db.query("users").collect();
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 22. PHARMACY PRODUCTS (si besoin)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getPharmacyProducts = query({
-  args: { pharmacyId: v.id("pharmacies"), category: v.optional(v.string()) },
-  handler: async (ctx, args) => {
-    const pharmacy = await ctx.db.get(args.pharmacyId);
-    if (!pharmacy) return [];
-    let products = pharmacy.products || [];
-    if (args.category) {
-      products = products.filter((p) => p.category === args.category);
-    }
-    return products;
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 23. TELECONSULTATIONS (GET)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getTeleconsultations = query({
-  args: {
-    patientId: v.optional(v.id("users")),
-    doctorId: v.optional(v.id("medicalProfessionals")),
-    status: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    let teleconsultations = await ctx.db.query("teleconsultations").collect();
-    if (args.patientId) {
-      teleconsultations = teleconsultations.filter(
-        (t) => t.patientId === args.patientId,
-      );
-    } else if (args.doctorId) {
-      teleconsultations = teleconsultations.filter(
-        (t) => t.doctorId === args.doctorId,
-      );
-    } else {
-      teleconsultations = teleconsultations.filter(
-        (t) => t.patientId === user._id || (t.doctorId as any) === user._id,
-      );
-    }
-    if (args.status) {
-      teleconsultations = teleconsultations.filter(
-        (t) => t.status === args.status,
-      );
-    }
-    return teleconsultations;
-  },
-});
-
-export const getTeleconsultation = query({
-  args: { id: v.id("teleconsultations") },
-  handler: async (ctx, args) => {
-    const tele = await ctx.db.get(args.id);
-    if (!tele)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Téléconsultation introuvable",
-      });
-    return tele;
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 24. HEALTH METRICS (pour le suivi)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getHealthMetrics = query({
+export const getHealthDashboard = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    return ctx.db
-      .query("healthMetrics")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .take(args.limit ?? 30);
-  },
-});
+    const limit = assertPositiveLimit(args.limit, 20);
 
-export const logHealthMetrics = mutation({
-  args: {
-    date: v.string(),
-    weightKg: v.optional(v.number()),
-    heartRateBpm: v.optional(v.number()),
-    stepsCount: v.optional(v.number()),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    return ctx.db.insert("healthMetrics", { ...args, userId: user._id });
+    const [appointments, prescriptions, records] = await Promise.all([
+      ctx.db
+        .query("medicalAppointments")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .order("desc")
+        .take(limit),
+
+      ctx.db
+        .query("prescriptions")
+        .withIndex("by_patient", (q) => q.eq("patientId", user._id))
+        .order("desc")
+        .take(limit),
+
+      ctx.db
+        .query("medicalRecords")
+        .withIndex("by_patient", (q) => q.eq("patientId", user._id))
+        .order("desc")
+        .take(limit),
+    ]);
+
+    return {
+      appointments,
+      questions: [],
+      prescriptions,
+      records,
+      favorites: [],
+    };
   },
 });

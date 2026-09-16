@@ -1,303 +1,3010 @@
-import { View, Text, Pressable, TextInput } from "react-native";
-import { useState } from "react";
+// ============================================================================
+// DÉBROUILLEPAY — WALLET
+// Version finale native / production
+//
+// Principes :
+// - React Native uniquement
+// - Aucun Web API
+// - Aucun faux solde
+// - Aucun faux paiement
+// - Aucun écrit direct dans walletTransactions depuis le client
+// - Recharge = PaymentIntent -> PaymentAttempt -> Provider -> confirmation
+// - Solde = lecture du ledger réel
+// - Budget = données Convex réelles uniquement
+// - Aucun graphique simulé
+// - Aucun QR simulé
+// ============================================================================
+
+import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import {
-  ArrowLeft, Eye, EyeOff, Send, Download, RefreshCw,
-  History, QrCode, Plus, ChevronRight, Clock, TrendingUp,
-  TrendingDown, ArrowUpRight, ArrowDownLeft, Shield, Wifi,
-  CheckCircle2, XCircle, AlertCircle, Target, Edit3, AlertTriangle,
-  Car, ShoppingCart, Heart, Gamepad2, MoreHorizontal, Check, X, Wallet
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowDownLeft,
+  ArrowLeft,
+  ArrowUpRight,
+  Check,
+  CheckCircle2,
+  Clock,
+  Download,
+  Edit3,
+  Eye,
+  EyeOff,
+  History,
+  Plus,
+  RefreshCw,
+  Send,
+  Shield,
+  TrendingDown,
+  TrendingUp,
+  Wallet as WalletIcon,
+  X,
 } from "lucide-react-native";
-import { useQuery, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/convex-auth-compat";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { toast } from "sonner";
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
-} from "recharts";
+  Authenticated,
+  AuthLoading,
+  Unauthenticated,
+} from "@/lib/convex-auth-compat";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  Transport: Car, Alimentation: ShoppingCart, Santé: Heart,
-  Loisirs: Gamepad2, Autres: MoreHorizontal,
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type Tab = "overview" | "transactions" | "budget";
+
+type Provider = "orange_money" | "mpesa" | "airtel_money" | "mtn_momo";
+
+type ProviderOption = {
+  id: Provider;
+  label: string;
+  shortLabel: string;
+  accent: string;
 };
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Transport: "#3B82F6", Alimentation: "#10B981", Santé: "#EF4444",
-  Loisirs: "#8B5CF6", Autres: "#F97316",
+type BudgetCategory = {
+  name: string;
+  allocated: number;
+  spent: number;
 };
 
-function formatAmt(n: number, currency = "XAF") {
-  if (currency === "USD" || currency === "EUR") return (n / 1000).toFixed(2) + " " + currency;
-  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(0) + "k FCFA";
-  return n.toLocaleString() + " FCFA";
+type WalletErrorBoundaryProps = {
+  children: ReactNode;
+};
+
+type WalletErrorBoundaryState = {
+  hasError: boolean;
+};
+
+// ============================================================================
+// CONSTANTES
+// ============================================================================
+
+const COLORS = {
+  background: "#020412",
+  surface: "#0B1020",
+  surfaceElevated: "#10172A",
+  surfaceSoft: "rgba(255,255,255,0.045)",
+  border: "rgba(255,255,255,0.09)",
+  borderStrong: "rgba(255,255,255,0.14)",
+  text: "#FFFFFF",
+  textSecondary: "rgba(255,255,255,0.68)",
+  textMuted: "rgba(255,255,255,0.42)",
+  green: "#10B981",
+  greenSoft: "rgba(16,185,129,0.14)",
+  red: "#EF4444",
+  redSoft: "rgba(239,68,68,0.14)",
+  orange: "#F97316",
+  orangeSoft: "rgba(249,115,22,0.14)",
+  purple: "#8B5CF6",
+  purpleSoft: "rgba(139,92,246,0.14)",
+  blue: "#3B82F6",
+  blueSoft: "rgba(59,130,246,0.14)",
+  yellow: "#FBBF24",
+  yellowSoft: "rgba(251,191,36,0.14)",
+};
+
+const PROVIDERS: ProviderOption[] = [
+  {
+    id: "orange_money",
+    label: "Orange Money",
+    shortLabel: "Orange",
+    accent: "#FF7A00",
+  },
+  {
+    id: "mpesa",
+    label: "M-Pesa",
+    shortLabel: "M-Pesa",
+    accent: "#22C55E",
+  },
+  {
+    id: "airtel_money",
+    label: "Airtel Money",
+    shortLabel: "Airtel",
+    accent: "#EF4444",
+  },
+  {
+    id: "mtn_momo",
+    label: "MTN MoMo",
+    shortLabel: "MTN",
+    accent: "#FACC15",
+  },
+];
+
+const DEFAULT_BUDGET_CATEGORIES: BudgetCategory[] = [
+  {
+    name: "Transport",
+    allocated: 0,
+    spent: 0,
+  },
+  {
+    name: "Alimentation",
+    allocated: 0,
+    spent: 0,
+  },
+  {
+    name: "Santé",
+    allocated: 0,
+    spent: 0,
+  },
+  {
+    name: "Loisirs",
+    allocated: 0,
+    spent: 0,
+  },
+  {
+    name: "Autres",
+    allocated: 0,
+    spent: 0,
+  },
+];
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function formatAmount(amount: number, currency = "CDF"): string {
+  if (!Number.isFinite(amount)) {
+    return `0 ${currency}`;
+  }
+
+  return `${Math.round(amount).toLocaleString("fr-FR")} ${currency}`;
 }
 
-function WalletInner({ onBack }: { onBack: () => void }) {
-  const [balanceVisible, setBalanceVisible] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "budget">("overview");
-  const [showQR, setShowQR] = useState(false);
-  const [editingCat, setEditingCat] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [showSend, setShowSend] = useState(false);
-  const [sendAmt, setSendAmt] = useState("");
-  const [sendDesc, setSendDesc] = useState("");
-  const [showTopUp, setShowTopUp] = useState(false);
-  const [topUpProvider, setTopUpProvider] = useState<string | null>(null);
-  const [topUpAmount, setTopUpAmount] = useState("");
+function parsePositiveAmount(value: string): number | null {
+  const normalized = value.replace(",", ".").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const amount = Number(normalized);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  return amount;
+}
+
+function createIdempotencyKey(
+  operation: string,
+  provider: Provider,
+  amount: number,
+): string {
+  // Pas de Math.random().
+  // Le compteur temporel rend chaque tentative distincte dans cette session.
+  return `${operation}:${provider}:${amount}:${Date.now()}`;
+}
+
+function getTransactionDate(tx: { completedAt?: string }): string {
+  if (!tx.completedAt) {
+    return "Date non disponible";
+  }
+
+  const date = new Date(tx.completedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Date non disponible";
+  }
+
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getTransactionTime(tx: { completedAt?: string }): string {
+  if (!tx.completedAt) {
+    return "";
+  }
+
+  const date = new Date(tx.completedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getProviderLabel(provider?: string): string {
+  switch (provider) {
+    case "orange_money":
+      return "Orange Money";
+    case "mpesa":
+      return "M-Pesa";
+    case "airtel_money":
+      return "Airtel Money";
+    case "mtn_momo":
+      return "MTN MoMo";
+    case "internal":
+      return "DébrouillePay";
+    default:
+      return provider ?? "—";
+  }
+}
+
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case "completed":
+      return "Complété";
+    case "pending":
+      return "En attente";
+    case "failed":
+      return "Échoué";
+    default:
+      return status;
+  }
+}
+
+// ============================================================================
+// ERROR BOUNDARY
+// ============================================================================
+
+class WalletErrorBoundary extends Component<
+  WalletErrorBoundaryProps,
+  WalletErrorBoundaryState
+> {
+  public state: WalletErrorBoundaryState = {
+    hasError: false,
+  };
+
+  static getDerivedStateFromError(): WalletErrorBoundaryState {
+    return {
+      hasError: true,
+    };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error("[Wallet] Render error:", error);
+    console.error("[Wallet] Component stack:", info.componentStack);
+  }
+
+  private handleRetry = (): void => {
+    this.setState({
+      hasError: false,
+    });
+  };
+
+  render(): ReactNode {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.errorScreen}>
+          <View style={styles.errorIcon}>
+            <AlertCircle size={34} color={COLORS.red} />
+          </View>
+
+          <Text style={styles.errorTitle}>
+            Le Wallet n'a pas pu être affiché
+          </Text>
+
+          <Text style={styles.errorDescription}>
+            Une erreur inattendue est survenue. Aucun mouvement financier n'a
+            été créé par cette erreur d'affichage.
+          </Text>
+
+          <Pressable
+            onPress={this.handleRetry}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <RefreshCw size={17} color="#FFFFFF" />
+            <Text style={styles.primaryButtonText}>Réessayer</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// ============================================================================
+// AUTH LOADING
+// ============================================================================
+
+function WalletLoading(): React.ReactElement {
+  return (
+    <View style={styles.loadingScreen}>
+      <View style={styles.loadingLogo}>
+        <WalletIcon size={30} color={COLORS.green} />
+      </View>
+
+      <ActivityIndicator size="small" color={COLORS.green} />
+
+      <Text style={styles.loadingText}>
+        Sécurisation de votre portefeuille…
+      </Text>
+    </View>
+  );
+}
+
+// ============================================================================
+// UNAUTHENTICATED
+// ============================================================================
+
+function WalletUnauthenticated({
+  onBack,
+}: {
+  onBack: () => void;
+}): React.ReactElement {
+  return (
+    <View style={styles.unauthenticatedScreen}>
+      <Pressable
+        onPress={onBack}
+        style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+      >
+        <ArrowLeft size={19} color={COLORS.text} />
+      </Pressable>
+
+      <View style={styles.unauthenticatedIcon}>
+        <WalletIcon size={42} color={COLORS.textMuted} />
+      </View>
+
+      <Text style={styles.unauthenticatedTitle}>Votre Wallet vous attend</Text>
+
+      <Text style={styles.unauthenticatedDescription}>
+        Connectez-vous pour consulter votre solde, vos transactions et vos
+        opérations DébrouillePay.
+      </Text>
+    </View>
+  );
+}
+
+// ============================================================================
+// MAIN WALLET
+// ============================================================================
+
+function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
+  const [balanceVisible, setBalanceVisible] = React.useState(true);
+  const [activeTab, setActiveTab] = React.useState<Tab>("overview");
+
+  const [showTopUp, setShowTopUp] = React.useState(false);
+  const [showSendInfo, setShowSendInfo] = React.useState(false);
+
+  const [topUpProvider, setTopUpProvider] = React.useState<Provider | null>(
+    null,
+  );
+  const [topUpAmount, setTopUpAmount] = React.useState("");
+  const [topUpPhone, setTopUpPhone] = React.useState("");
+  const [topUpSubmitting, setTopUpSubmitting] = React.useState(false);
+
+  const [editingCategory, setEditingCategory] = React.useState<string | null>(
+    null,
+  );
+  const [editingValue, setEditingValue] = React.useState("");
+  const [budgetSaving, setBudgetSaving] = React.useState(false);
 
   const walletData = useQuery(api.finances.getWalletBalance, {});
-  const transactions = useQuery(api.finances.getWalletTransactions, { limit: 20 }) ?? [];
+  const transactions = useQuery(api.finances.getWalletTransactions, {
+    limit: 50,
+  });
   const budget = useQuery(api.finances.getMyBudget, {});
 
-  const addTransaction = useMutation(api.finances.addWalletTransaction);
+  const createPaymentIntent = useMutation(api.payments.createPaymentIntent);
+  const startPayment = useAction(api.payments.startPayment);
+
   const upsertBudget = useMutation(api.finances.upsertBudget);
   const updateBudgetCategory = useMutation(api.finances.updateBudgetCategory);
 
-  const balance = walletData?.balance ?? 0;
-  const monthIn = walletData?.monthIn ?? 0;
-  const monthOut = walletData?.monthOut ?? 0;
+  // --------------------------------------------------------------------------
+  // LOADING
+  // --------------------------------------------------------------------------
 
-  const categories = budget?.categories ?? [
-    { name: "Transport", allocated: 50000, spent: 0 },
-    { name: "Alimentation", allocated: 120000, spent: 0 },
-    { name: "Santé", allocated: 80000, spent: 0 },
-    { name: "Loisirs", allocated: 40000, spent: 0 },
-    { name: "Autres", allocated: 60000, spent: 0 },
-  ];
+  const walletLoading = walletData === undefined;
+  const transactionsLoading = transactions === undefined;
+  const budgetLoading = budget === undefined;
 
-  const totalBudget = categories.reduce((s, c) => s + c.allocated, 0);
-  const totalSpent = categories.reduce((s, c) => s + c.spent, 0);
+  // --------------------------------------------------------------------------
+  // REAL WALLET DATA
+  // --------------------------------------------------------------------------
 
-  const pieData = categories.map(c => ({ name: c.name, value: c.allocated, color: CATEGORY_COLORS[c.name] ?? "#8B5CF6" }));
+  const balances = walletData?.balances ?? [];
 
-  // Build chart data from transactions
-  const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-  const areaData = days.map(day => ({ day, dépenses: 0, revenus: 0 }));
+  /*
+   * Le Payment Core / finances protège déjà la règle :
+   * aucune addition implicite entre plusieurs devises.
+   *
+   * Si plusieurs devises existent, on ne prétend pas avoir un "solde total"
+   * converti. On affiche la première devise comme vue principale et les
+   * autres séparément.
+   */
+  const primaryBalance =
+    balances.length === 1
+      ? balances[0]
+      : (balances.find((entry) => entry.currency === "CDF") ?? balances[0]);
 
-  async function handleSend() {
-    if (!sendAmt || !sendDesc) return;
-    try {
-      await addTransaction({
-        type: "transfer",
-        amount: parseFloat(sendAmt),
-        currency: "XAF",
-        description: sendDesc,
-      });
-      setShowSend(false);
-      setSendAmt("");
-      setSendDesc("");
-      toast.success("Transfert effectué !");
-    } catch {
-      toast.error("Erreur lors du transfert");
-    }
-  }
+  const balance = primaryBalance?.balance ?? 0;
+  const monthIn = primaryBalance?.monthIn ?? 0;
+  const monthOut = primaryBalance?.monthOut ?? 0;
+  const currency = primaryBalance?.currency ?? "CDF";
 
-  async function handleDeposit() {
-    const amt = parseFloat(topUpAmount);
-    if (!topUpProvider || !amt || amt < 500) {
-      toast.error("Sélectionne un opérateur et un montant (min 500 FCFA)");
+  const realTransactions = transactions ?? [];
+
+  const categories: BudgetCategory[] =
+    budget?.categories?.map((category) => ({
+      name: category.name,
+      allocated: category.allocated,
+      spent: category.spent,
+    })) ?? [];
+
+  const totalBudget = categories.reduce(
+    (sum, category) => sum + category.allocated,
+    0,
+  );
+
+  const totalSpent = categories.reduce(
+    (sum, category) => sum + category.spent,
+    0,
+  );
+
+  const budgetRemaining = totalBudget - totalSpent;
+
+  // --------------------------------------------------------------------------
+  // TOP UP — REAL PAYMENT CORE
+  // --------------------------------------------------------------------------
+
+  async function handleTopUp(): Promise<void> {
+    if (topUpSubmitting) {
       return;
     }
+
+    if (!topUpProvider) {
+      Alert.alert(
+        "Opérateur requis",
+        "Sélectionnez l'opérateur Mobile Money utilisé pour la recharge.",
+      );
+      return;
+    }
+
+    const amount = parsePositiveAmount(topUpAmount);
+
+    if (!amount) {
+      Alert.alert("Montant invalide", "Saisissez un montant supérieur à zéro.");
+      return;
+    }
+
+    if (amount < 500) {
+      Alert.alert(
+        "Montant insuffisant",
+        "Le montant minimum de recharge est de 500 CDF.",
+      );
+      return;
+    }
+
+    const phone = topUpPhone.trim();
+
+    if (!phone) {
+      Alert.alert(
+        "Numéro requis",
+        "Saisissez le numéro Mobile Money qui sera utilisé pour la recharge.",
+      );
+      return;
+    }
+
+    setTopUpSubmitting(true);
+
     try {
-      await addTransaction({
-        type: "deposit",
-        amount: amt,
-        currency: "XAF",
-        description: `Recharge ${topUpProvider}`,
+      const idempotencyKey = createIdempotencyKey(
+        "wallet_topup",
+        topUpProvider,
+        amount,
+      );
+
+      /*
+       * ÉTAPE 1
+       * Création de l'intention uniquement.
+       *
+       * Aucun solde n'est crédité ici.
+       */
+      const intent = await createPaymentIntent({
+        type: "wallet_topup",
+        amount,
+        currency: "CDF",
+        provider: topUpProvider,
+        idempotencyKey,
+        customerReference: phone,
       });
+
+      /*
+       * ÉTAPE 2
+       * Démarrage réel auprès du provider.
+       *
+       * Le client ne touche jamais walletTransactions.
+       */
+      const result = await startPayment({
+        paymentIntentId: intent.paymentIntentId,
+      });
+
+      if (result.status === "succeeded") {
+        Alert.alert(
+          "Recharge confirmée",
+          "Le Payment Core a confirmé cette opération.",
+        );
+      } else if (
+        result.status === "processing" ||
+        result.status === "requires_action"
+      ) {
+        Alert.alert(
+          "Recharge en cours",
+          "La recharge a été transmise au circuit de paiement. Le solde ne sera crédité qu'après confirmation réelle du provider.",
+        );
+      } else {
+        Alert.alert(
+          "Recharge non finalisée",
+          "Le paiement n'est pas encore confirmé. Aucun solde fictif n'a été ajouté.",
+        );
+      }
+
       setShowTopUp(false);
       setTopUpProvider(null);
       setTopUpAmount("");
-      toast.success(`Wallet rechargé de ${amt.toLocaleString()} FCFA via ${topUpProvider} !`);
-    } catch {
-      toast.error("Erreur lors de la recharge");
+      setTopUpPhone("");
+    } catch (error) {
+      console.error("[Wallet] Top-up error:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Le paiement n'a pas pu être démarré.";
+
+      Alert.alert(
+        "Recharge non effectuée",
+        `${message}\n\nAucun mouvement financier fictif n'a été créé.`,
+      );
+    } finally {
+      setTopUpSubmitting(false);
     }
   }
 
-  async function handleEditBudget(catName: string) {
-    const val = parseFloat(editValue);
-    if (isNaN(val) || val <= 0) { setEditingCat(null); return; }
+  // --------------------------------------------------------------------------
+  // BUDGET
+  // --------------------------------------------------------------------------
+
+  async function handleCreateBudget(): Promise<void> {
+    if (budgetSaving) {
+      return;
+    }
+
+    setBudgetSaving(true);
+
     try {
-      if (budget) {
-        await updateBudgetCategory({ budgetId: budget._id as Id<"budgets">, categoryName: catName, allocated: val });
-      } else {
-        const now = new Date();
-        const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-        const newCats = categories.map(c => c.name === catName ? { ...c, allocated: val } : c);
-        await upsertBudget({
-          name: "Budget mensuel",
-          categories: newCats,
-          currency: "XAF",
-          totalAllocated: newCats.reduce((s, c) => s + c.allocated, 0),
-          startDate,
-        });
-      }
-      setEditingCat(null);
-      toast.success("Budget mis à jour");
-    } catch {
-      toast.error("Erreur");
+      const draftCategories = DEFAULT_BUDGET_CATEGORIES.map((category) => ({
+        ...category,
+      }));
+
+      await upsertBudget({
+        name: "Budget mensuel",
+        categories: draftCategories,
+        currency: "CDF",
+        totalAllocated: 0,
+        startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+          .toISOString()
+          .slice(0, 10),
+      });
+
+      Alert.alert(
+        "Budget créé",
+        "Votre budget réel a été créé. Vous pouvez maintenant définir les montants par catégorie.",
+      );
+    } catch (error) {
+      console.error("[Wallet] Budget creation error:", error);
+
+      Alert.alert(
+        "Impossible de créer le budget",
+        error instanceof Error ? error.message : "Une erreur est survenue.",
+      );
+    } finally {
+      setBudgetSaving(false);
     }
   }
 
-  function getBarColor(cat: { allocated: number; spent: number }) {
-    const pct = cat.spent / cat.allocated;
-    if (pct >= 1) return "#EF4444";
-    if (pct >= 0.8) return "#F97316";
-    return CATEGORY_COLORS[categories.find(c => c.allocated === cat.allocated)?.name ?? ""] ?? "#10B981";
+  async function handleSaveBudgetCategory(categoryName: string): Promise<void> {
+    if (!budget || budgetSaving) {
+      return;
+    }
+
+    const amount = Number(editingValue);
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      Alert.alert(
+        "Montant invalide",
+        "Le montant doit être supérieur ou égal à zéro.",
+      );
+      return;
+    }
+
+    setBudgetSaving(true);
+
+    try {
+      await updateBudgetCategory({
+        budgetId: budget._id as Id<"budgets">,
+        categoryName,
+        allocated: amount,
+      });
+
+      setEditingCategory(null);
+      setEditingValue("");
+
+      Alert.alert(
+        "Budget mis à jour",
+        `La catégorie ${categoryName} a été enregistrée.`,
+      );
+    } catch (error) {
+      console.error("[Wallet] Budget update error:", error);
+
+      Alert.alert(
+        "Mise à jour impossible",
+        error instanceof Error ? error.message : "Une erreur est survenue.",
+      );
+    } finally {
+      setBudgetSaving(false);
+    }
   }
+
+  // --------------------------------------------------------------------------
+  // RENDER
+  // --------------------------------------------------------------------------
 
   return (
-    <View className="relative h-full w-full overflow-hidden flex flex-col" style={{  }}><View className="absolute top-0 left-0 w-72 h-72 rounded-full pointer-events-none" style={{  }} />{}<View>{showQR && (
-          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setShowQR(false)} className="absolute inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.8)" }}>
-            <View initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} onPress={e => e.stopPropagation()} className="p-6 rounded-3xl flex flex-col items-center gap-4" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", borderStyle: "solid" }}>
-              <View className="w-40 h-40 rounded-2xl overflow-hidden p-3" style={{ backgroundColor: "rgba(255,255,255,0.95)" }}><View className="w-full h-full gap-0.5">{Array.from({ length: 49 }).map((_, i) => (
-                    <View key={i} className="rounded-sm" style={{ backgroundColor: (i * 7 + 3) % 5 > 2 ? "#111" : "transparent", aspectRatio: "1" }} />
-                  ))}</View></View>
-              <Text className="text-white font-bold text-sm">Mon QR de paiement</Text>
-              <Pressable onPress={() => setShowQR(false)} className="px-6 py-2.5 rounded-2xl text-sm font-semibold" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><Text>Fermer</Text></Pressable>
+    <View style={styles.container}>
+      <View pointerEvents="none" style={styles.backgroundGlowOne} />
+      <View pointerEvents="none" style={styles.backgroundGlowTwo} />
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ================================================================
+            HEADER
+        ================================================================ */}
+
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Pressable
+              onPress={onBack}
+              style={({ pressed }) => [
+                styles.iconButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <ArrowLeft size={18} color={COLORS.text} />
+            </Pressable>
+
+            <View>
+              <Text style={styles.headerTitle}>Wallet</Text>
+              <Text style={styles.headerSubtitle}>DébrouillePay</Text>
             </View>
           </View>
-        )}</View><View className="flex-1 overflow-y-auto pb-8" style={{  }}>{}<View className="px-5 pt-14 pb-3 flex items-center justify-between"><View className="flex items-center gap-3"><Pressable onPress={onBack} className="w-9 h-9 rounded-2xl flex items-center justify-center active:scale-90 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><ArrowLeft size={17} className="text-white/80" /></Pressable><View><Text className="text-lg font-black text-white tracking-tight">Wallet</Text><Text className="text-[11px]" style={{ color: "#10B981" }}>Débrouille Pay</Text></View></View><Pressable onPress={() => setShowQR(true)} className="w-9 h-9 rounded-2xl flex items-center justify-center active:scale-90 transition-transform" style={{ backgroundColor: "rgba(16,185,129,0.12)", borderWidth: 1, borderColor: "rgba(16,185,129,0.25)", borderStyle: "solid" }}><QrCode size={16} style={{  }} /></Pressable></View>{}<View className="px-5 mb-4"><View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="relative rounded-3xl p-5 overflow-hidden" style={{ minHeight: 172 }}><View className="absolute top-0 right-0 w-40 h-40 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.06)", transform: "translate(30%, -30%)" }} /><View className="flex items-center justify-between mb-5"><View className="flex items-center gap-1.5"><Wifi size={16} className="text-white/70 rotate-90" /><Text className="text-[11px] text-white/60 font-medium">Débrouille Pay</Text></View><View className="flex items-center gap-1.5"><Shield size={13} className="text-green-200/60" /><Text className="text-[10px] text-white/50">Sécurisé</Text></View></View><View className="mb-4"><Text className="text-[10px] text-white/50 mb-0.5 uppercase tracking-widest">Solde disponible</Text><View className="flex items-center gap-3"><View>{balanceVisible ? (
-                    <Text key="visible" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-4xl font-black text-white tracking-tight">
-                      {formatAmt(balance)}
-                    </Text>
-                  ) : (
-                    <Text key="hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-4xl font-black text-white tracking-widest">
-                      ••••••
-                    </Text>
-                  )}</View><Pressable onPress={() => setBalanceVisible(v => !v)} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>{balanceVisible ? <Eye size={14} className="text-white/80" /> : <EyeOff size={14} className="text-white/80" />}</Pressable></View></View><View className="flex items-end justify-between"><Text className="text-sm text-white/50 tracking-widest font-mono">**** **** **** ****</Text><View className="text-right"><View className="flex items-center gap-1 justify-end"><TrendingDown size={10} className="text-red-300" /><Text className="text-[10px] text-white/50">-{formatAmt(monthOut)}ce mois</Text></View><View className="flex items-center gap-1 justify-end"><TrendingUp size={10} className="text-green-300" /><Text className="text-[10px] text-white/50">+{formatAmt(monthIn)}ce mois</Text></View></View></View></View></View>{}<View className="px-5 mb-5"><View className="gap-3">{[
-              { icon: Send, label: "Envoyer", color: "#10B981", bg: "rgba(16,185,129,0.15)", action: () => setShowSend(true) },
-              { icon: Download, label: "Recevoir", color: "#3B82F6", bg: "rgba(59,130,246,0.15)", action: () => setShowQR(true) },
-              { icon: RefreshCw, label: "Recharger", color: "#8B5CF6", bg: "rgba(139,92,246,0.15)", action: () => setShowTopUp(true) },
-              { icon: History, label: "Historique", color: "#F97316", bg: "rgba(249,115,22,0.15)", action: () => setActiveTab("transactions") },
-            ].map(({ icon: Icon, label, color, bg, action }) => (
-              <Pressable key={label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} onPress={action} className="flex flex-col items-center gap-2 py-3.5 rounded-2xl active:scale-90 transition-transform" style={{ backgroundColor: bg, borderStyle: "solid" }}>
-                <Icon size={18} style={{ color }} />
-                <Text className="text-[10px] font-semibold" style={{ color }}>{label}</Text>
-              </Pressable>
-            ))}</View></View>{}<View className="px-5 mb-4"><View className="flex gap-2 p-1 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>{(["overview", "transactions", "budget"] as const).map(tab => (
-              <Pressable key={tab} onPress={() => setActiveTab(tab)} className="flex-1 py-2 rounded-xl text-[11px] font-semibold transition-all" style={{ backgroundColor: activeTab === tab ? "rgba(16,185,129,0.2)" : "transparent", borderColor: "rgba(16,185,129,0.3)", borderStyle: "solid" }}>{tab === "overview" ? "Aperçu" : tab === "transactions" ? "Transactions" : "Budget"}</Pressable>
-            ))}</View></View>{}{activeTab === "overview" && (
-          <View key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-5 flex flex-col gap-5">
-            <View className="rounded-3xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><Text className="text-xs font-bold text-white/50 mb-4 uppercase tracking-widest">Activité — 7 derniers jours</Text><ResponsiveContainer width="100%" height={110}><AreaChart data={areaData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}><defs><linearGradient id="depGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} /><stop offset="95%" stopColor="#EF4444" stopOpacity={0} /></linearGradient><linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10B981" stopOpacity={0.3} /><stop offset="95%" stopColor="#10B981" stopOpacity={0} /></linearGradient></defs><XAxis dataKey="day" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} /><YAxis tick={{ fill: "rgba(255,255,255,0.2)", fontSize: 9 }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ background: "#0d0d20", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 11, color: "white" }} /><Area type="monotone" dataKey="revenus" stroke="#10B981" strokeWidth={2} fill="url(#revGrad)" dot={false} /><Area type="monotone" dataKey="dépenses" stroke="#EF4444" strokeWidth={2} fill="url(#depGrad)" dot={false} /></AreaChart></ResponsiveContainer></View>
 
-            <View className="rounded-3xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><Text className="text-xs font-bold text-white/50 mb-4 uppercase tracking-widest">Répartition des dépenses</Text><View className="flex items-center gap-4"><ResponsiveContainer width={110} height={110}><PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={30} outerRadius={50} dataKey="value" paddingAngle={3} stroke="none">{pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}</Pie></PieChart></ResponsiveContainer><View className="flex-1 flex flex-col gap-1.5">{pieData.map(entry => (
-                    <View key={entry.name} className="flex items-center justify-between"><View className="flex items-center gap-2"><View className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} /><Text className="text-[11px] text-white/60">{entry.name}</Text></View><Text className="text-[11px] font-bold text-white/80">{formatAmt(entry.value)}</Text></View>
-                  ))}</View></View></View>
-
-            <View className="gap-2">{[
-                { label: "Ce mois", value: formatAmt(monthIn), sub: "Revenus", color: "#10B981", icon: ArrowDownLeft },
-                { label: "Ce mois", value: formatAmt(monthOut), sub: "Dépenses", color: "#EF4444", icon: ArrowUpRight },
-                { label: "Solde", value: formatAmt(balance), sub: "Disponible", color: "#8B5CF6", icon: TrendingUp },
-              ].map(({ label, value, sub, color, icon: Icon }, i) => (
-                <View key={sub} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} className="rounded-2xl p-3 flex flex-col gap-1" style={{ backgroundColor: `${color}10`, borderStyle: "solid" }}>
-                  <Icon size={14} style={{ color }} />
-                  <Text className="text-base font-black text-white leading-tight">{value}</Text>
-                  <Text className="text-[9px] text-white/40 leading-tight">{label}· {sub}</Text>
-                </View>
-              ))}</View>
+          <View style={styles.secureBadge}>
+            <Shield size={13} color={COLORS.green} />
+            <Text style={styles.secureText}>Sécurisé</Text>
           </View>
-        )}{}{activeTab === "transactions" && (
-          <View key="transactions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-5">
-            <Text className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-3">{transactions.length}transaction{transactions.length !== 1 ? "s" : ""}</Text>
-            {transactions.length === 0 && (
-              <View className="flex flex-col items-center justify-center py-12 gap-3"><Wallet size={40} color="#6B7280" /><Text className="text-gray-400 text-sm">Aucune transaction pour l'instant</Text></View>
-            )}
-            <View className="flex flex-col gap-2">{transactions.map((tx, i) => {
-                const isIn = tx.type === "deposit" || tx.type === "refund" || tx.type === "reward";
-                return (
-                  <View key={tx._id} initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)", borderStyle: "solid" }}>
-                    <View className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: isIn ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)" }}>{isIn ? <ArrowDownLeft size={18} color="#10B981" /> : <ArrowUpRight size={18} color="#EF4444" />}</View>
-                    <View className="flex-1 min-w-0"><Text className="text-sm font-bold text-white truncate">{tx.description}</Text><View className="flex items-center gap-1 mt-0.5">{tx.status === "completed" ? <CheckCircle2 size={10} className="text-green-400" /> : tx.status === "pending" ? <AlertCircle size={10} className="text-yellow-400" /> : <XCircle size={10} className="text-red-400" />}<Text className="text-[10px]" style={{ color: tx.status === "completed" ? "#10B981" : tx.status === "pending" ? "#FBBF24" : "#EF4444" }}>{tx.status === "completed" ? "Complété" : tx.status === "pending" ? "En attente" : "Échoué"}</Text><Clock size={9} className="text-white/25 ml-1" /><Text className="text-[10px] text-white/35 truncate">{tx.completedAt ? new Date(tx.completedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</Text></View></View>
-                    <Text className="text-sm font-black flex-shrink-0" style={{ color: isIn ? "#10B981" : "#EF4444" }}>{isIn ? "+" : "-"}{formatAmt(tx.amount, tx.currency)}</Text>
-                  </View>
-                );
-              })}</View>
-          </View>
-        )}{}{activeTab === "budget" && (
-          <View key="budget" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-5 flex flex-col gap-4 pb-4">
-            <View className="rounded-3xl p-4" style={{ backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.07)", borderStyle: "solid" }}><View className="flex items-center gap-2 mb-3"><Target size={14} style={{  }} /><Text className="text-xs font-bold text-white/50 uppercase tracking-widest">Résumé mensuel</Text></View><View className="flex items-end justify-between mb-3"><View><Text className="text-3xl font-black text-white">{formatAmt(totalSpent)}</Text><Text className="text-[11px] text-white/40">dépensé sur <Text className="text-white/60 font-bold">{formatAmt(totalBudget)}</Text>budgétisé</Text></View><View className="text-right"><Text className="text-lg font-bold" style={{ color: totalSpent > totalBudget ? "#EF4444" : "#10B981" }}>{formatAmt(Math.max(0, totalBudget - totalSpent))}</Text><Text className="text-[10px] text-white/30">restants</Text></View></View><View className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}><View initial={{ width: 0 }} animate={{ width: `${Math.min((totalSpent / Math.max(totalBudget, 1)) * 100, 100)}%` }} transition={{ duration: 0.8, ease: "easeOut" }} className="h-full rounded-full" style={{ backgroundColor: totalSpent / Math.max(totalBudget, 1) >= 0.8 ? "#F97316" : "#10B981" }} /></View></View>
+        </View>
 
-            <Text className="text-[10px] font-bold text-white/30 uppercase tracking-widest -mb-1">Par catégorie</Text>
-            {categories.map((cat, i) => {
-              const pct = Math.min((cat.spent / Math.max(cat.allocated, 1)) * 100, 100);
-              const over = cat.spent > cat.allocated;
-              const alert = cat.spent / Math.max(cat.allocated, 1) >= 0.8;
-              const color = CATEGORY_COLORS[cat.name] ?? "#10B981";
-              const Icon = CATEGORY_ICONS[cat.name] ?? MoreHorizontal;
-              return (
-                <View key={cat.name} initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="rounded-2xl p-4" style={{ backgroundColor: over ? "rgba(239,68,68,0.06)" : alert ? "rgba(249,115,22,0.06)" : "rgba(255,255,255,0.04)", borderColor: "rgba(239,68,68,0.25)", borderStyle: "solid" }}>
-                  <View className="flex items-center justify-between mb-2"><View className="flex items-center gap-2.5"><View className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}18` }}><Icon size={15} style={{ color }} /></View><View><Text className="text-sm font-bold text-white">{cat.name}</Text><Text className="text-[10px] text-white/40">{formatAmt(cat.spent)}/ <Text className="text-white/60">{formatAmt(cat.allocated)}</Text></Text></View></View><View className="flex items-center gap-2">{alert && !over && <AlertTriangle size={12} style={{  }} />}{over && <Text className="text-[9px] font-bold px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: "rgba(239,68,68,0.15)", color: "#EF4444" }}>DÉPASSÉ</Text>}{editingCat === cat.name ? (
-                        <View className="flex items-center gap-1"><TextInput value={editValue} onChangeText={value => setEditValue(value)} onKeyPress={e => { if (e.nativeEvent.key === "Enter") handleEditBudget(cat.name); if (e.nativeEvent.key === "Escape") setEditingCat(null); }} className="w-16 text-xs text-white text-right rounded-lg px-2 py-1 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", borderStyle: "solid" }} autoFocus keyboardType="numeric" /><Pressable onPress={() => handleEditBudget(cat.name)} className=""><Check size={13} className="text-green-400" /></Pressable><Pressable onPress={() => setEditingCat(null)} className=""><X size={13} className="text-red-400" /></Pressable></View>
-                      ) : (
-                        <Pressable onPress={() => { setEditingCat(cat.name); setEditValue(String(cat.allocated)); }} className=""><Edit3 size={13} className="text-white/30" /></Pressable>
-                      )}</View></View>
-                  <View className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.07)" }}><View initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.7, ease: "easeOut", delay: i * 0.06 }} className="h-full rounded-full" style={{ backgroundColor: over ? "#EF4444" : alert ? "#F97316" : color }} /></View>
-                </View>
-              );
-            })}
-          </View>
-        )}</View>{}<View>{showTopUp && (
-          <>
-            <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onPress={() => setShowTopUp(false)} className="absolute inset-0 z-40" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} />
-            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="absolute bottom-0 left-0 right-0 z-50 rounded-t-3xl p-5" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-              <View className="w-12 h-1 rounded-full bg-white/20 mx-auto mb-5" />
-              <View className="flex items-center gap-3 mb-5"><View className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "rgba(139,92,246,0.2)" }}><Plus size={20} style={{  }} /></View><View><Text className="text-white font-black text-lg">Recharger le Wallet</Text><Text className="text-white/40 text-xs">Choisissez votre opérateur Mobile Money</Text></View></View>
+        {/* ================================================================
+            MULTI-CURRENCY NOTICE
+        ================================================================ */}
 
-              {/* Providers */}
-              <Text className="text-xs text-white/40 mb-2 uppercase tracking-wider">Opérateur</Text>
-              <View className="flex gap-2 mb-5">{[
-                  { id: "Orange Money", color: "#FF7F00", emoji: "🟠" },
-                  { id: "MTN MoMo", color: "#FFC107", emoji: "🟡" },
-                  { id: "Wave", color: "#0088FF", emoji: "🌊" },
-                  { id: "Airtel Money", color: "#EF4444", emoji: "🔴" },
-                ].map((p) => (
-                  <Pressable key={p.id} onPress={() => setTopUpProvider(p.id)} className="flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all" style={{ backgroundColor: topUpProvider === p.id ? `${p.color}20` : "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><Text className="text-lg">{p.emoji}</Text><Text className="text-[9px] font-semibold text-center leading-tight" style={{ color: topUpProvider === p.id ? p.color : "rgba(255,255,255,0.4)" }}>{p.id.split(" ")[0]}</Text></Pressable>
-                ))}</View>
+        {balances.length > 1 && (
+          <View style={styles.multiCurrencyNotice}>
+            <AlertCircle size={17} color={COLORS.blue} />
 
-              {/* Quick amounts */}
-              <Text className="text-xs text-white/40 mb-2 uppercase tracking-wider">Montant</Text>
-              <View className="gap-2 mb-3">{[1000, 2500, 5000, 10000].map(amt => (
-                  <Pressable key={amt} onPress={() => setTopUpAmount(String(amt))} className="py-2 rounded-xl text-xs font-bold transition-all" style={{ backgroundColor: topUpAmount === String(amt) ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.06)", borderColor: "rgba(139,92,246,0.4)", borderStyle: "solid" }}>{(amt / 1000).toFixed(0)}<Text>k FC</Text></Pressable>
-                ))}</View>
-              <TextInput value={topUpAmount} onChangeText={value => setTopUpAmount(value)} placeholder="Montant personnalisé (FCFA)" className="w-full px-4 py-3 rounded-2xl text-sm text-white placeholder:text-white/25 outline-none mb-4" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} keyboardType="numeric" />
-              <Pressable onPress={() => void handleDeposit()} className="w-full py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all font-black text-white" style={{ opacity: topUpProvider ? 1 : 0.5 }}><Plus size={16} /><Text>Recharger maintenant</Text></Pressable>
-              <Text className="text-[9px] text-white/20 text-center mt-2">Simulation de paiement — Aucun débit réel n'est effectué
+            <View style={styles.multiCurrencyTextContainer}>
+              <Text style={styles.multiCurrencyTitle}>
+                Portefeuille multi-devises
+              </Text>
+
+              <Text style={styles.multiCurrencyDescription}>
+                Les devises sont affichées séparément. Aucun taux de change
+                fictif n'est appliqué.
               </Text>
             </View>
-          </>
-        )}</View>{}<View>{showSend && (
-          <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 flex items-end justify-center" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-            <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="w-full max-w-sm rounded-t-3xl p-5" style={{ backgroundColor: "#0d1117", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-              <View className="flex items-center justify-between mb-5"><Text className="text-base font-bold text-white">Envoyer de l'argent</Text><Pressable onPress={() => setShowSend(false)} className=""><X size={18} className="text-white/60" /></Pressable></View>
-              <View className="space-y-3 mb-4"><View><Text className="text-white/40 text-xs mb-1 block">Montant (FCFA)</Text><TextInput value={sendAmt} onChangeText={value => setSendAmt(value)} placeholder="0" className="w-full px-3 py-2.5 rounded-xl text-white outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} keyboardType="numeric" /></View><View><Text className="text-white/40 text-xs mb-1 block">Description</Text><TextInput value={sendDesc} onChangeText={value => setSendDesc(value)} placeholder="Objet du transfert..." className="w-full px-3 py-2.5 rounded-xl text-white outline-none" style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} /></View></View>
-              <Pressable onPress={handleSend} disabled={!sendAmt || !sendDesc} className="w-full py-3.5 rounded-2xl font-bold text-sm disabled:opacity-40" style={{ backgroundColor: "#10B981" }}><Text>Envoyer</Text></Pressable>
+          </View>
+        )}
+
+        {/* ================================================================
+            BALANCE CARD
+        ================================================================ */}
+
+        <View style={styles.balanceCard}>
+          <View style={styles.balanceCardGlow} />
+
+          <View style={styles.balanceTopRow}>
+            <View style={styles.balanceBrand}>
+              <View style={styles.walletMiniIcon}>
+                <WalletIcon size={16} color={COLORS.green} />
+              </View>
+
+              <View>
+                <Text style={styles.balanceBrandTitle}>DébrouillePay</Text>
+                <Text style={styles.balanceBrandSubtitle}>
+                  Portefeuille principal
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.protectedBadge}>
+              <Shield size={12} color={COLORS.green} />
+              <Text style={styles.protectedText}>Protégé</Text>
             </View>
           </View>
-        )}</View></View>
+
+          <Text style={styles.balanceLabel}>SOLDE DISPONIBLE</Text>
+
+          <View style={styles.balanceValueRow}>
+            {walletLoading ? (
+              <ActivityIndicator size="small" color={COLORS.green} />
+            ) : (
+              <Text style={styles.balanceValue}>
+                {balanceVisible
+                  ? formatAmount(balance, currency)
+                  : `•••••• ${currency}`}
+              </Text>
+            )}
+
+            <Pressable
+              onPress={() => setBalanceVisible((visible) => !visible)}
+              style={({ pressed }) => [
+                styles.eyeButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              {balanceVisible ? (
+                <Eye size={17} color={COLORS.textSecondary} />
+              ) : (
+                <EyeOff size={17} color={COLORS.textSecondary} />
+              )}
+            </Pressable>
+          </View>
+
+          {!walletLoading && balances.length > 0 && (
+            <View style={styles.currencyLine}>
+              {balances.map((entry) => (
+                <View key={entry.currency} style={styles.currencyPill}>
+                  <Text style={styles.currencyPillText}>
+                    {entry.currency}{" "}
+                    {formatAmount(entry.balance, entry.currency)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.balanceFooter}>
+            <View>
+              <Text style={styles.balanceFooterLabel}>ENTRÉES CE MOIS</Text>
+              <View style={styles.balanceFooterValueRow}>
+                <TrendingUp size={13} color={COLORS.green} />
+                <Text style={styles.incomeValue}>
+                  +{formatAmount(monthIn, currency)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.balanceFooterDivider} />
+
+            <View>
+              <Text style={styles.balanceFooterLabel}>SORTIES CE MOIS</Text>
+              <View style={styles.balanceFooterValueRow}>
+                <TrendingDown size={13} color={COLORS.red} />
+                <Text style={styles.expenseValue}>
+                  -{formatAmount(monthOut, currency)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ================================================================
+            ACTIONS
+        ================================================================ */}
+
+        <View style={styles.actionsRow}>
+          <Pressable
+            onPress={() => setShowSendInfo(true)}
+            style={({ pressed }) => [
+              styles.actionCard,
+              styles.actionGreen,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.actionIcon}>
+              <Send size={18} color={COLORS.green} />
+            </View>
+
+            <Text style={styles.actionLabel}>Envoyer</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                "Réception",
+                "La réception directe par QR nécessite encore un endpoint de réception officiel relié au Payment Core. Aucun QR fictif n'est généré.",
+              )
+            }
+            style={({ pressed }) => [
+              styles.actionCard,
+              styles.actionBlue,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.actionIcon}>
+              <Download size={18} color={COLORS.blue} />
+            </View>
+
+            <Text style={styles.actionLabel}>Recevoir</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setShowTopUp(true)}
+            style={({ pressed }) => [
+              styles.actionCard,
+              styles.actionPurple,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.actionIcon}>
+              <RefreshCw size={18} color={COLORS.purple} />
+            </View>
+
+            <Text style={styles.actionLabel}>Recharger</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setActiveTab("transactions")}
+            style={({ pressed }) => [
+              styles.actionCard,
+              styles.actionOrange,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View style={styles.actionIcon}>
+              <History size={18} color={COLORS.orange} />
+            </View>
+
+            <Text style={styles.actionLabel}>Historique</Text>
+          </Pressable>
+        </View>
+
+        {/* ================================================================
+            TABS
+        ================================================================ */}
+
+        <View style={styles.tabsContainer}>
+          {(
+            [
+              ["overview", "Aperçu"],
+              ["transactions", "Transactions"],
+              ["budget", "Budget"],
+            ] as const
+          ).map(([tab, label]) => {
+            const selected = activeTab === tab;
+
+            return (
+              <Pressable
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                style={({ pressed }) => [
+                  styles.tab,
+                  selected && styles.tabSelected,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text
+                  style={[styles.tabText, selected && styles.tabTextSelected]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* ================================================================
+            OVERVIEW
+        ================================================================ */}
+
+        {activeTab === "overview" && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionEyebrow}>ACTIVITÉ RÉELLE</Text>
+                <Text style={styles.sectionTitle}>Votre portefeuille</Text>
+              </View>
+
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>LIVE</Text>
+              </View>
+            </View>
+
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <View
+                  style={[
+                    styles.statIcon,
+                    { backgroundColor: COLORS.greenSoft },
+                  ]}
+                >
+                  <ArrowDownLeft size={16} color={COLORS.green} />
+                </View>
+
+                <Text style={styles.statValue}>
+                  {formatAmount(monthIn, currency)}
+                </Text>
+
+                <Text style={styles.statLabel}>Entrées ce mois</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <View
+                  style={[styles.statIcon, { backgroundColor: COLORS.redSoft }]}
+                >
+                  <ArrowUpRight size={16} color={COLORS.red} />
+                </View>
+
+                <Text style={styles.statValue}>
+                  {formatAmount(monthOut, currency)}
+                </Text>
+
+                <Text style={styles.statLabel}>Sorties ce mois</Text>
+              </View>
+            </View>
+
+            <View style={styles.realDataCard}>
+              <View style={styles.realDataIcon}>
+                <Shield size={20} color={COLORS.green} />
+              </View>
+
+              <View style={styles.realDataContent}>
+                <Text style={styles.realDataTitle}>Solde issu du ledger</Text>
+
+                <Text style={styles.realDataDescription}>
+                  Le solde affiché provient uniquement des transactions
+                  financières confirmées dans Convex. Aucune simulation locale
+                  n'est utilisée.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.recentHeader}>
+              <Text style={styles.sectionEyebrow}>DERNIERS MOUVEMENTS</Text>
+
+              <Pressable onPress={() => setActiveTab("transactions")}>
+                <Text style={styles.seeAll}>Voir tout</Text>
+              </Pressable>
+            </View>
+
+            {transactionsLoading ? (
+              <View style={styles.inlineLoading}>
+                <ActivityIndicator size="small" color={COLORS.green} />
+                <Text style={styles.inlineLoadingText}>
+                  Chargement des transactions…
+                </Text>
+              </View>
+            ) : realTransactions.length === 0 ? (
+              <EmptyTransactions />
+            ) : (
+              <View style={styles.transactionList}>
+                {realTransactions.slice(0, 5).map((tx) => (
+                  <TransactionRow key={tx._id} transaction={tx} />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ================================================================
+            TRANSACTIONS
+        ================================================================ */}
+
+        {activeTab === "transactions" && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionEyebrow}>HISTORIQUE</Text>
+
+                <Text style={styles.sectionTitle}>Transactions</Text>
+              </View>
+
+              {!transactionsLoading && (
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeText}>
+                    {realTransactions.length}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {transactionsLoading ? (
+              <View style={styles.loadingPanel}>
+                <ActivityIndicator size="small" color={COLORS.green} />
+                <Text style={styles.loadingPanelText}>
+                  Chargement de votre historique…
+                </Text>
+              </View>
+            ) : realTransactions.length === 0 ? (
+              <EmptyTransactions />
+            ) : (
+              <View style={styles.transactionList}>
+                {realTransactions.map((tx) => (
+                  <TransactionRow key={tx._id} transaction={tx} expanded />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ================================================================
+            BUDGET
+        ================================================================ */}
+
+        {activeTab === "budget" && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View>
+                <Text style={styles.sectionEyebrow}>PILOTAGE FINANCIER</Text>
+
+                <Text style={styles.sectionTitle}>Budget mensuel</Text>
+              </View>
+            </View>
+
+            {budgetLoading ? (
+              <View style={styles.loadingPanel}>
+                <ActivityIndicator size="small" color={COLORS.green} />
+                <Text style={styles.loadingPanelText}>
+                  Chargement du budget…
+                </Text>
+              </View>
+            ) : !budget ? (
+              <View style={styles.emptyBudgetCard}>
+                <View style={styles.emptyBudgetIcon}>
+                  <WalletIcon size={28} color={COLORS.purple} />
+                </View>
+
+                <Text style={styles.emptyBudgetTitle}>
+                  Aucun budget enregistré
+                </Text>
+
+                <Text style={styles.emptyBudgetDescription}>
+                  Créez votre premier budget pour suivre vos dépenses
+                  directement depuis DébrouillePay.
+                </Text>
+
+                <Pressable
+                  disabled={budgetSaving}
+                  onPress={() => void handleCreateBudget()}
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    pressed && styles.pressed,
+                    budgetSaving && styles.disabled,
+                  ]}
+                >
+                  {budgetSaving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Plus size={17} color="#FFFFFF" />
+                  )}
+
+                  <Text style={styles.primaryButtonText}>Créer mon budget</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <View style={styles.budgetSummary}>
+                  <View>
+                    <Text style={styles.budgetSummaryLabel}>DÉPENSÉ</Text>
+
+                    <Text style={styles.budgetSummaryValue}>
+                      {formatAmount(totalSpent, budget.currency)}
+                    </Text>
+
+                    <Text style={styles.budgetSummarySecondary}>
+                      sur {formatAmount(totalBudget, budget.currency)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.budgetRemaining}>
+                    <Text style={styles.budgetRemainingLabel}>RESTANT</Text>
+
+                    <Text
+                      style={[
+                        styles.budgetRemainingValue,
+                        {
+                          color:
+                            budgetRemaining < 0 ? COLORS.red : COLORS.green,
+                        },
+                      ]}
+                    >
+                      {formatAmount(
+                        Math.max(0, budgetRemaining),
+                        budget.currency,
+                      )}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.budgetProgressTrack}>
+                  <View
+                    style={[
+                      styles.budgetProgressFill,
+                      {
+                        width: `${Math.min(
+                          Math.max(totalSpent / Math.max(totalBudget, 1), 0) *
+                            100,
+                          100,
+                        )}%`,
+                        backgroundColor:
+                          totalSpent > totalBudget
+                            ? COLORS.red
+                            : totalSpent >= totalBudget * 0.8
+                              ? COLORS.orange
+                              : COLORS.green,
+                      },
+                    ]}
+                  />
+                </View>
+
+                <Text style={styles.categoryTitle}>PAR CATÉGORIE</Text>
+
+                <View style={styles.categoryList}>
+                  {categories.map((category) => {
+                    const percentage =
+                      category.allocated > 0
+                        ? (category.spent / category.allocated) * 100
+                        : 0;
+
+                    const over = category.spent > category.allocated;
+
+                    const alert = percentage >= 80;
+
+                    const editing = editingCategory === category.name;
+
+                    return (
+                      <View
+                        key={category.name}
+                        style={[
+                          styles.categoryCard,
+                          over && styles.categoryCardOver,
+                        ]}
+                      >
+                        <View style={styles.categoryHeader}>
+                          <View style={styles.categoryIdentity}>
+                            <View style={styles.categoryDot} />
+
+                            <View>
+                              <Text style={styles.categoryName}>
+                                {category.name}
+                              </Text>
+
+                              <Text style={styles.categoryAmounts}>
+                                {formatAmount(category.spent, budget.currency)}{" "}
+                                /{" "}
+                                {formatAmount(
+                                  category.allocated,
+                                  budget.currency,
+                                )}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.categoryActions}>
+                            {over && (
+                              <Text style={styles.overBudgetBadge}>
+                                DÉPASSÉ
+                              </Text>
+                            )}
+
+                            {alert && !over && (
+                              <AlertTriangle size={15} color={COLORS.orange} />
+                            )}
+
+                            {editing ? (
+                              <>
+                                <TextInput
+                                  value={editingValue}
+                                  onChangeText={setEditingValue}
+                                  keyboardType="numeric"
+                                  autoFocus
+                                  style={styles.categoryInput}
+                                  placeholder="0"
+                                  placeholderTextColor={COLORS.textMuted}
+                                />
+
+                                <Pressable
+                                  disabled={budgetSaving}
+                                  onPress={() =>
+                                    void handleSaveBudgetCategory(category.name)
+                                  }
+                                >
+                                  <Check size={17} color={COLORS.green} />
+                                </Pressable>
+
+                                <Pressable
+                                  disabled={budgetSaving}
+                                  onPress={() => {
+                                    setEditingCategory(null);
+                                    setEditingValue("");
+                                  }}
+                                >
+                                  <X size={17} color={COLORS.red} />
+                                </Pressable>
+                              </>
+                            ) : (
+                              <Pressable
+                                onPress={() => {
+                                  setEditingCategory(category.name);
+                                  setEditingValue(String(category.allocated));
+                                }}
+                              >
+                                <Edit3 size={16} color={COLORS.textMuted} />
+                              </Pressable>
+                            )}
+                          </View>
+                        </View>
+
+                        <View style={styles.categoryProgressTrack}>
+                          <View
+                            style={[
+                              styles.categoryProgressFill,
+                              {
+                                width: `${Math.min(
+                                  Math.max(percentage, 0),
+                                  100,
+                                )}%`,
+                                backgroundColor: over
+                                  ? COLORS.red
+                                  : alert
+                                    ? COLORS.orange
+                                    : COLORS.green,
+                              },
+                            ]}
+                          />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+          </View>
+        )}
+
+        <View style={styles.bottomSpace} />
+      </ScrollView>
+
+      {/* ================================================================
+          TOP UP MODAL
+      ================================================================ */}
+
+      <Modal
+        visible={showTopUp}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!topUpSubmitting) {
+            setShowTopUp(false);
+          }
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
+
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Recharger le Wallet</Text>
+
+                <Text style={styles.modalSubtitle}>
+                  Paiement Mobile Money réel
+                </Text>
+              </View>
+
+              <Pressable
+                disabled={topUpSubmitting}
+                onPress={() => setShowTopUp(false)}
+                style={styles.modalClose}
+              >
+                <X size={18} color={COLORS.textSecondary} />
+              </Pressable>
+            </View>
+
+            <View style={styles.realPaymentNotice}>
+              <Shield size={17} color={COLORS.green} />
+
+              <Text style={styles.realPaymentNoticeText}>
+                Aucun solde ne sera ajouté avant la confirmation réelle du
+                provider.
+              </Text>
+            </View>
+
+            <Text style={styles.fieldLabel}>OPÉRATEUR</Text>
+
+            <View style={styles.providerGrid}>
+              {PROVIDERS.map((provider) => {
+                const selected = topUpProvider === provider.id;
+
+                return (
+                  <Pressable
+                    key={provider.id}
+                    disabled={topUpSubmitting}
+                    onPress={() => setTopUpProvider(provider.id)}
+                    style={({ pressed }) => [
+                      styles.providerCard,
+                      selected && {
+                        borderColor: provider.accent,
+                        backgroundColor: `${provider.accent}18`,
+                      },
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.providerDot,
+                        {
+                          backgroundColor: provider.accent,
+                        },
+                      ]}
+                    />
+
+                    <Text
+                      style={[
+                        styles.providerLabel,
+                        selected && {
+                          color: provider.accent,
+                        },
+                      ]}
+                    >
+                      {provider.shortLabel}
+                    </Text>
+
+                    {selected && (
+                      <CheckCircle2 size={14} color={provider.accent} />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.fieldLabel}>NUMÉRO MOBILE MONEY</Text>
+
+            <TextInput
+              value={topUpPhone}
+              onChangeText={setTopUpPhone}
+              keyboardType="phone-pad"
+              editable={!topUpSubmitting}
+              placeholder="+243 ..."
+              placeholderTextColor={COLORS.textMuted}
+              style={styles.modalInput}
+            />
+
+            <Text style={styles.fieldLabel}>MONTANT — CDF</Text>
+
+            <View style={styles.quickAmounts}>
+              {[1000, 2500, 5000, 10000].map((amount) => {
+                const selected = topUpAmount === String(amount);
+
+                return (
+                  <Pressable
+                    key={amount}
+                    disabled={topUpSubmitting}
+                    onPress={() => setTopUpAmount(String(amount))}
+                    style={({ pressed }) => [
+                      styles.quickAmount,
+                      selected && styles.quickAmountSelected,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.quickAmountText,
+                        selected && styles.quickAmountTextSelected,
+                      ]}
+                    >
+                      {amount.toLocaleString("fr-FR")}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <TextInput
+              value={topUpAmount}
+              onChangeText={setTopUpAmount}
+              keyboardType="numeric"
+              editable={!topUpSubmitting}
+              placeholder="Montant personnalisé"
+              placeholderTextColor={COLORS.textMuted}
+              style={styles.modalInput}
+            />
+
+            <Pressable
+              disabled={topUpSubmitting}
+              onPress={() => void handleTopUp()}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && styles.pressed,
+                topUpSubmitting && styles.disabled,
+              ]}
+            >
+              {topUpSubmitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Plus size={17} color="#FFFFFF" />
+              )}
+
+              <Text style={styles.primaryButtonText}>
+                {topUpSubmitting
+                  ? "Connexion au provider…"
+                  : "Lancer la recharge"}
+              </Text>
+            </Pressable>
+
+            <Text style={styles.modalFootnote}>
+              Le crédit du Wallet intervient uniquement après confirmation
+              serveur du paiement.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================================================================
+          SEND INFORMATION
+      ================================================================ */}
+
+      <Modal
+        visible={showSendInfo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSendInfo(false)}
+      >
+        <View style={styles.centerModalOverlay}>
+          <View style={styles.infoModal}>
+            <View style={styles.infoModalIcon}>
+              <Send size={24} color={COLORS.green} />
+            </View>
+
+            <Text style={styles.infoModalTitle}>Transfert sortant</Text>
+
+            <Text style={styles.infoModalDescription}>
+              Le Payment Core actuel ne finalise pas encore les opérations
+              sortantes. Le flux `peer_transfer` / retrait reste volontairement
+              bloqué tant que le provider ne dispose pas d'une implémentation
+              sortante complète.
+            </Text>
+
+            <View style={styles.infoSecurityBox}>
+              <Shield size={16} color={COLORS.green} />
+
+              <Text style={styles.infoSecurityText}>
+                Aucun débit fictif ne sera effectué. Aucun `walletTransaction`
+                completed ne sera créé pour contourner cette protection.
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => setShowSendInfo(false)}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.primaryButtonText}>Compris</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
-export default function WalletPage({ onBack }: { onBack: () => void }) {
+// ============================================================================
+// TRANSACTION ROW
+// ============================================================================
+
+function TransactionRow({
+  transaction,
+  expanded = false,
+}: {
+  transaction: {
+    _id: Id<"walletTransactions">;
+    type:
+      | "deposit"
+      | "withdrawal"
+      | "transfer"
+      | "payment"
+      | "refund"
+      | "reward";
+    amount: number;
+    currency: string;
+    description: string;
+    status: "pending" | "completed" | "failed";
+    provider?:
+      | "orange_money"
+      | "mpesa"
+      | "airtel_money"
+      | "mtn_momo"
+      | "internal";
+    completedAt?: string;
+    counterpartName?: string;
+    externalReference?: string;
+  };
+  expanded?: boolean;
+}): React.ReactElement {
+  const incoming =
+    transaction.type === "deposit" ||
+    transaction.type === "refund" ||
+    transaction.type === "reward";
+
+  const statusColor =
+    transaction.status === "completed"
+      ? COLORS.green
+      : transaction.status === "pending"
+        ? COLORS.yellow
+        : COLORS.red;
+
+  const statusBackground =
+    transaction.status === "completed"
+      ? COLORS.greenSoft
+      : transaction.status === "pending"
+        ? COLORS.yellowSoft
+        : COLORS.redSoft;
+
   return (
-    <>
-      <AuthLoading>
-        <View className="h-full flex flex-col p-5 gap-4" style={{  }}><Skeleton className="h-12 w-full rounded-xl" /><Skeleton className="h-44 w-full rounded-3xl" /><View className="gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl" />)}</View></View>
-      </AuthLoading>
-      <Unauthenticated>
-        <View className="h-full flex flex-col items-center justify-center gap-4 relative" style={{  }}>
-          <Pressable onPress={onBack} className="absolute top-14 left-5 p-2 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-            <ArrowLeft size={18} color="white" />
-          </Pressable>
-          <Wallet size={48} color="#6B7280" />
-          <Text className="text-gray-400">Connectez-vous pour accéder à votre wallet</Text>
+    <View style={styles.transactionCard}>
+      <View
+        style={[
+          styles.transactionIcon,
+          {
+            backgroundColor: incoming ? COLORS.greenSoft : COLORS.redSoft,
+          },
+        ]}
+      >
+        {incoming ? (
+          <ArrowDownLeft size={18} color={COLORS.green} />
+        ) : (
+          <ArrowUpRight size={18} color={COLORS.red} />
+        )}
+      </View>
+
+      <View style={styles.transactionMain}>
+        <Text numberOfLines={1} style={styles.transactionDescription}>
+          {transaction.description}
+        </Text>
+
+        <View style={styles.transactionMeta}>
+          {transaction.status === "completed" ? (
+            <CheckCircle2 size={11} color={statusColor} />
+          ) : transaction.status === "pending" ? (
+            <Clock size={11} color={statusColor} />
+          ) : (
+            <AlertCircle size={11} color={statusColor} />
+          )}
+
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor: statusBackground,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusText,
+                {
+                  color: statusColor,
+                },
+              ]}
+            >
+              {getStatusLabel(transaction.status)}
+            </Text>
+          </View>
         </View>
+
+        {expanded && (
+          <View style={styles.transactionDetails}>
+            <Text style={styles.transactionDetailText}>
+              {getTransactionDate(transaction)}
+              {getTransactionTime(transaction)
+                ? ` · ${getTransactionTime(transaction)}`
+                : ""}
+            </Text>
+
+            {transaction.provider && (
+              <Text style={styles.transactionDetailText}>
+                {getProviderLabel(transaction.provider)}
+              </Text>
+            )}
+
+            {transaction.counterpartName && (
+              <Text style={styles.transactionDetailText}>
+                {transaction.counterpartName}
+              </Text>
+            )}
+
+            {transaction.externalReference && (
+              <Text numberOfLines={1} style={styles.transactionReference}>
+                Réf. {transaction.externalReference}
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+
+      <Text
+        style={[
+          styles.transactionAmount,
+          {
+            color: incoming ? COLORS.green : COLORS.red,
+          },
+        ]}
+      >
+        {incoming ? "+" : "-"}
+        {formatAmount(transaction.amount, transaction.currency)}
+      </Text>
+    </View>
+  );
+}
+
+// ============================================================================
+// EMPTY TRANSACTIONS
+// ============================================================================
+
+function EmptyTransactions(): React.ReactElement {
+  return (
+    <View style={styles.emptyTransactions}>
+      <View style={styles.emptyTransactionsIcon}>
+        <History size={30} color={COLORS.textMuted} />
+      </View>
+
+      <Text style={styles.emptyTransactionsTitle}>Aucun mouvement</Text>
+
+      <Text style={styles.emptyTransactionsDescription}>
+        Vos transactions confirmées apparaîtront ici automatiquement.
+      </Text>
+    </View>
+  );
+}
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+export default function WalletPage({
+  onBack,
+}: {
+  onBack: () => void;
+}): React.ReactElement {
+  return (
+    <WalletErrorBoundary>
+      <AuthLoading>
+        <WalletLoading />
+      </AuthLoading>
+
+      <Unauthenticated>
+        <WalletUnauthenticated onBack={onBack} />
       </Unauthenticated>
+
       <Authenticated>
         <WalletInner onBack={onBack} />
       </Authenticated>
-    </>
+    </WalletErrorBoundary>
   );
 }
+
+// ============================================================================
+// STYLES
+// ============================================================================
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  backgroundGlowOne: {
+    position: "absolute",
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "rgba(16,185,129,0.045)",
+    top: -120,
+    right: -100,
+  },
+
+  backgroundGlowTwo: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(99,102,241,0.04)",
+    bottom: 100,
+    left: -160,
+  },
+
+  scroll: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    paddingTop: 54,
+    paddingHorizontal: 18,
+  },
+
+  pressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.98 }],
+  },
+
+  disabled: {
+    opacity: 0.45,
+  },
+
+  // --------------------------------------------------------------------------
+  // LOADING
+  // --------------------------------------------------------------------------
+
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 18,
+    paddingHorizontal: 30,
+  },
+
+  loadingLogo: {
+    width: 68,
+    height: 68,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.greenSoft,
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.2)",
+  },
+
+  loadingText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    textAlign: "center",
+  },
+
+  // --------------------------------------------------------------------------
+  // ERROR
+  // --------------------------------------------------------------------------
+
+  errorScreen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 30,
+  },
+
+  errorIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.redSoft,
+    marginBottom: 20,
+  },
+
+  errorTitle: {
+    color: COLORS.text,
+    fontSize: 19,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+
+  errorDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+
+  // --------------------------------------------------------------------------
+  // UNAUTHENTICATED
+  // --------------------------------------------------------------------------
+
+  unauthenticatedScreen: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+
+  backButton: {
+    position: "absolute",
+    top: 54,
+    left: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  unauthenticatedIcon: {
+    width: 86,
+    height: 86,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 20,
+  },
+
+  unauthenticatedTitle: {
+    color: COLORS.text,
+    fontSize: 21,
+    fontWeight: "900",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+
+  unauthenticatedDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+    maxWidth: 330,
+  },
+
+  // --------------------------------------------------------------------------
+  // HEADER
+  // --------------------------------------------------------------------------
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+  },
+
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  headerTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+  },
+
+  headerSubtitle: {
+    color: COLORS.green,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+
+  secureBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: COLORS.greenSoft,
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.18)",
+  },
+
+  secureText: {
+    color: COLORS.green,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  // --------------------------------------------------------------------------
+  // MULTI CURRENCY
+  // --------------------------------------------------------------------------
+
+  multiCurrencyNotice: {
+    flexDirection: "row",
+    gap: 11,
+    padding: 13,
+    borderRadius: 17,
+    backgroundColor: COLORS.blueSoft,
+    borderWidth: 1,
+    borderColor: "rgba(59,130,246,0.15)",
+    marginBottom: 14,
+  },
+
+  multiCurrencyTextContainer: {
+    flex: 1,
+  },
+
+  multiCurrencyTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 3,
+  },
+
+  multiCurrencyDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  // --------------------------------------------------------------------------
+  // BALANCE
+  // --------------------------------------------------------------------------
+
+  balanceCard: {
+    minHeight: 220,
+    borderRadius: 28,
+    padding: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    overflow: "hidden",
+    marginBottom: 16,
+  },
+
+  balanceCardGlow: {
+    position: "absolute",
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: "rgba(16,185,129,0.055)",
+    right: -65,
+    top: -65,
+  },
+
+  balanceTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 27,
+  },
+
+  balanceBrand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+
+  walletMiniIcon: {
+    width: 35,
+    height: 35,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.greenSoft,
+  },
+
+  balanceBrandTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  balanceBrandSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    marginTop: 2,
+  },
+
+  protectedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  protectedText: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  balanceLabel: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    marginBottom: 5,
+  },
+
+  balanceValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  balanceValue: {
+    flexShrink: 1,
+    color: COLORS.text,
+    fontSize: 31,
+    fontWeight: "900",
+    letterSpacing: -1.1,
+  },
+
+  eyeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.09)",
+  },
+
+  currencyLine: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
+  },
+
+  currencyPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  currencyPillText: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  balanceFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 28,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.07)",
+  },
+
+  balanceFooterDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginHorizontal: 20,
+  },
+
+  balanceFooterLabel: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.7,
+    marginBottom: 4,
+  },
+
+  balanceFooterValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  incomeValue: {
+    color: COLORS.green,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  expenseValue: {
+    color: COLORS.red,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  // --------------------------------------------------------------------------
+  // ACTIONS
+  // --------------------------------------------------------------------------
+
+  actionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 18,
+  },
+
+  actionCard: {
+    flex: 1,
+    minHeight: 86,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1,
+  },
+
+  actionGreen: {
+    backgroundColor: COLORS.greenSoft,
+    borderColor: "rgba(16,185,129,0.15)",
+  },
+
+  actionBlue: {
+    backgroundColor: COLORS.blueSoft,
+    borderColor: "rgba(59,130,246,0.15)",
+  },
+
+  actionPurple: {
+    backgroundColor: COLORS.purpleSoft,
+    borderColor: "rgba(139,92,246,0.15)",
+  },
+
+  actionOrange: {
+    backgroundColor: COLORS.orangeSoft,
+    borderColor: "rgba(249,115,22,0.15)",
+  },
+
+  actionIcon: {
+    marginBottom: 7,
+  },
+
+  actionLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 9,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+
+  // --------------------------------------------------------------------------
+  // TABS
+  // --------------------------------------------------------------------------
+
+  tabsContainer: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: 16,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 22,
+  },
+
+  tab: {
+    flex: 1,
+    minHeight: 37,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  tabSelected: {
+    backgroundColor: COLORS.greenSoft,
+  },
+
+  tabText: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  tabTextSelected: {
+    color: COLORS.green,
+  },
+
+  // --------------------------------------------------------------------------
+  // SECTIONS
+  // --------------------------------------------------------------------------
+
+  section: {
+    gap: 14,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  sectionEyebrow: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+  },
+
+  sectionTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+
+  liveIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 9,
+    backgroundColor: COLORS.greenSoft,
+  },
+
+  liveDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: COLORS.green,
+  },
+
+  liveText: {
+    color: COLORS.green,
+    fontSize: 8,
+    fontWeight: "900",
+  },
+
+  statsGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  statCard: {
+    flex: 1,
+    minHeight: 115,
+    borderRadius: 20,
+    padding: 14,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  statIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+
+  statValue: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  statLabel: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    marginTop: 4,
+  },
+
+  realDataCard: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 15,
+    borderRadius: 20,
+    backgroundColor: COLORS.greenSoft,
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.14)",
+  },
+
+  realDataIcon: {
+    width: 39,
+    height: 39,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(16,185,129,0.1)",
+  },
+
+  realDataContent: {
+    flex: 1,
+  },
+
+  realDataTitle: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+
+  realDataDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  recentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+
+  seeAll: {
+    color: COLORS.green,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  countBadge: {
+    minWidth: 28,
+    height: 28,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.greenSoft,
+  },
+
+  countBadgeText: {
+    color: COLORS.green,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  // --------------------------------------------------------------------------
+  // LOADING PANELS
+  // --------------------------------------------------------------------------
+
+  inlineLoading: {
+    minHeight: 90,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+
+  inlineLoadingText: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+  },
+
+  loadingPanel: {
+    minHeight: 180,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  loadingPanelText: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+  },
+
+  // --------------------------------------------------------------------------
+  // TRANSACTIONS
+  // --------------------------------------------------------------------------
+
+  transactionList: {
+    gap: 8,
+  },
+
+  transactionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 17,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  transactionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  transactionMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  transactionDescription: {
+    color: COLORS.text,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  transactionMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 5,
+  },
+
+  statusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+
+  statusText: {
+    fontSize: 7,
+    fontWeight: "900",
+  },
+
+  transactionDetails: {
+    marginTop: 6,
+    gap: 2,
+  },
+
+  transactionDetailText: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+  },
+
+  transactionReference: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+  },
+
+  transactionAmount: {
+    fontSize: 10,
+    fontWeight: "900",
+    flexShrink: 0,
+  },
+
+  // --------------------------------------------------------------------------
+  // EMPTY
+  // --------------------------------------------------------------------------
+
+  emptyTransactions: {
+    minHeight: 190,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 30,
+    borderRadius: 22,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  emptyTransactionsIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    marginBottom: 13,
+  },
+
+  emptyTransactionsTitle: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "800",
+    marginBottom: 5,
+  },
+
+  emptyTransactionsDescription: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    lineHeight: 15,
+    textAlign: "center",
+  },
+
+  // --------------------------------------------------------------------------
+  // BUDGET
+  // --------------------------------------------------------------------------
+
+  emptyBudgetCard: {
+    minHeight: 310,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 25,
+    borderRadius: 24,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  emptyBudgetIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.purpleSoft,
+    marginBottom: 17,
+  },
+
+  emptyBudgetTitle: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 7,
+  },
+
+  emptyBudgetDescription: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    lineHeight: 16,
+    textAlign: "center",
+    maxWidth: 290,
+    marginBottom: 20,
+  },
+
+  budgetSummary: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    padding: 18,
+    borderRadius: 22,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  budgetSummaryLabel: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1,
+    marginBottom: 5,
+  },
+
+  budgetSummaryValue: {
+    color: COLORS.text,
+    fontSize: 23,
+    fontWeight: "900",
+  },
+
+  budgetSummarySecondary: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    marginTop: 3,
+  },
+
+  budgetRemaining: {
+    alignItems: "flex-end",
+  },
+
+  budgetRemainingLabel: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1,
+    marginBottom: 5,
+  },
+
+  budgetRemainingValue: {
+    fontSize: 15,
+    fontWeight: "900",
+  },
+
+  budgetProgressTrack: {
+    height: 8,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  budgetProgressFill: {
+    height: "100%",
+    borderRadius: 8,
+  },
+
+  categoryTitle: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1.3,
+    marginTop: 5,
+  },
+
+  categoryList: {
+    gap: 8,
+  },
+
+  categoryCard: {
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  categoryCardOver: {
+    backgroundColor: COLORS.redSoft,
+    borderColor: "rgba(239,68,68,0.18)",
+  },
+
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  categoryIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    flex: 1,
+  },
+
+  categoryDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: COLORS.green,
+  },
+
+  categoryName: {
+    color: COLORS.text,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  categoryAmounts: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+    marginTop: 3,
+  },
+
+  categoryActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  overBudgetBadge: {
+    color: COLORS.red,
+    fontSize: 7,
+    fontWeight: "900",
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: COLORS.redSoft,
+  },
+
+  categoryInput: {
+    width: 76,
+    height: 31,
+    borderRadius: 9,
+    paddingHorizontal: 8,
+    color: COLORS.text,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+    fontSize: 10,
+    textAlign: "right",
+  },
+
+  categoryProgressTrack: {
+    height: 6,
+    borderRadius: 6,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  categoryProgressFill: {
+    height: "100%",
+    borderRadius: 6,
+  },
+
+  // --------------------------------------------------------------------------
+  // PRIMARY BUTTON
+  // --------------------------------------------------------------------------
+
+  primaryButton: {
+    minHeight: 49,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    backgroundColor: "#2563EB",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.18)",
+  },
+
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  // --------------------------------------------------------------------------
+  // MODAL
+  // --------------------------------------------------------------------------
+
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.76)",
+  },
+
+  modalCard: {
+    maxHeight: "92%",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 28,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+  },
+
+  modalHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 4,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    marginBottom: 18,
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+
+  modalTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+
+  modalSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 3,
+  },
+
+  modalClose: {
+    width: 35,
+    height: 35,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surfaceSoft,
+  },
+
+  realPaymentNotice: {
+    flexDirection: "row",
+    gap: 9,
+    padding: 11,
+    borderRadius: 14,
+    backgroundColor: COLORS.greenSoft,
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.13)",
+    marginBottom: 18,
+  },
+
+  realPaymentNoticeText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 9,
+    lineHeight: 14,
+  },
+
+  fieldLabel: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+    marginBottom: 7,
+    marginTop: 3,
+  },
+
+  providerGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 13,
+  },
+
+  providerCard: {
+    width: "48%",
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 11,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  providerDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+
+  providerLabel: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  modalInput: {
+    minHeight: 47,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    color: COLORS.text,
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    fontSize: 12,
+    marginBottom: 11,
+  },
+
+  quickAmounts: {
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 8,
+  },
+
+  quickAmount: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  quickAmountSelected: {
+    backgroundColor: COLORS.purpleSoft,
+    borderColor: "rgba(139,92,246,0.4)",
+  },
+
+  quickAmountText: {
+    color: COLORS.textSecondary,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  quickAmountTextSelected: {
+    color: COLORS.purple,
+  },
+
+  modalFootnote: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+    lineHeight: 13,
+    textAlign: "center",
+    marginTop: 9,
+  },
+
+  // --------------------------------------------------------------------------
+  // INFO MODAL
+  // --------------------------------------------------------------------------
+
+  centerModalOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 22,
+    backgroundColor: "rgba(0,0,0,0.78)",
+  },
+
+  infoModal: {
+    width: "100%",
+    borderRadius: 26,
+    padding: 22,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.borderStrong,
+  },
+
+  infoModalIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.greenSoft,
+    marginBottom: 16,
+  },
+
+  infoModalTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+
+  infoModalDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    lineHeight: 17,
+    marginBottom: 15,
+  },
+
+  infoSecurityBox: {
+    flexDirection: "row",
+    gap: 9,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: COLORS.greenSoft,
+    marginBottom: 17,
+  },
+
+  infoSecurityText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 9,
+    lineHeight: 14,
+  },
+
+  bottomSpace: {
+    height: 45,
+  },
+});
