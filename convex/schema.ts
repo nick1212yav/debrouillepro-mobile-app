@@ -6,15 +6,15 @@ export default defineSchema({
   // CORE
   // ─────────────────────────────────────────────────────────────────────────
   users: defineTable({
-    uid: v.string(), // ✅ Firebase UID
-    tokenIdentifier: v.string(), // ✅ Convex token
+    uid: v.string(),
+    tokenIdentifier: v.string(),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
     name: v.string(),
     avatar: v.optional(v.string()),
     bio: v.optional(v.string()),
-    roles: v.array(v.string()), // ✅ multi-rôles
-    permissions: v.optional(v.array(v.string())), // ✅ permissions
+    roles: v.array(v.string()),
+    permissions: v.optional(v.array(v.string())),
     emailVerified: v.boolean(),
     onboardingCompleted: v.boolean(),
     reputationScore: v.number(),
@@ -23,6 +23,7 @@ export default defineSchema({
     language: v.optional(v.string()),
     profession: v.optional(v.string()),
     interests: v.optional(v.array(v.string())),
+
     location: v.optional(
       v.object({
         city: v.optional(v.string()),
@@ -32,6 +33,7 @@ export default defineSchema({
         area: v.optional(v.string()),
       }),
     ),
+
     homePreferences: v.optional(
       v.object({
         favoriteModules: v.array(v.string()),
@@ -44,14 +46,23 @@ export default defineSchema({
         }),
       }),
     ),
-    isAdmin: v.optional(v.boolean()), // ⚠️ déprécié (utiliser permissions)
+
+    isAdmin: v.optional(v.boolean()),
     isBanned: v.optional(v.boolean()),
     website: v.optional(v.string()),
+
+    // Texte public dédié à la recherche de profils.
+    // Optionnel pendant la phase de migration/backfill.
+    searchText: v.optional(v.string()),
   })
     .index("by_uid", ["uid"])
     .index("by_token", ["tokenIdentifier"])
     .index("by_email", ["email"])
-    .index("by_phone", ["phone"]),
+    .index("by_phone", ["phone"])
+    .searchIndex("search_users", {
+      searchField: "searchText",
+      filterFields: ["city", "country"],
+    }),
 
   contentFlags: defineTable({
     // Target: either a publication or a comment (one must be set)
@@ -590,7 +601,17 @@ export default defineSchema({
     label: v.string(),
     target: v.optional(v.string()),
     meta: v.optional(v.string()),
-  }).index("by_user", ["userId"]),
+
+    // Ajout : horodatage canonique côté serveur.
+    // Optionnel pour compatibilité avec les documents pré-migration.
+    timestamp: v.optional(v.number()),
+
+    // Ajout : état de lecture explicite.
+    // Optionnel : undefined = document historique (traité comme lu).
+    read: v.optional(v.boolean()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_timestamp", ["userId", "timestamp"]),
 
   userBadges: defineTable({
     userId: v.id("users"),

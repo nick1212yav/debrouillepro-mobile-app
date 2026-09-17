@@ -54,7 +54,16 @@ export interface HomeActivityPulseItem {
   type: HomeActivityPulseType;
   title: string;
   description?: string;
-  timestamp: number | string | Date;
+
+  /**
+   * PATCH — timestamp optionnel.
+   *
+   * undefined = document historique pré-migration côté backend.
+   * On ne fabrique JAMAIS une date. Le composant affiche
+   * "Date inconnue" si absent.
+   */
+  timestamp?: number | string | Date;
+
   read?: boolean;
   href?: string;
   moduleId?: string;
@@ -156,15 +165,46 @@ const TYPE_CONFIG: Record<
  * HELPERS
  * ========================================================================== */
 
-function toTimestamp(value: number | string | Date): number {
-  if (typeof value === "number") return value;
-  if (value instanceof Date) return value.getTime();
+/**
+ * PATCH — convertit une valeur de timestamp en number.
+ *
+ * Retourne `undefined` si la valeur est absente ou invalide.
+ * NE JAMAIS retourner Date.now() en fallback : ce serait inventer
+ * une date pour un document qui n'en a pas.
+ */
+function toTimestamp(
+  value: number | string | Date | undefined | null,
+): number | undefined {
+  if (value === undefined || value === null) return undefined;
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return Number.isFinite(t) ? t : undefined;
+  }
+
   const parsed = new Date(value).getTime();
-  return Number.isFinite(parsed) ? parsed : Date.now();
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function formatRelativeTime(value: number | string | Date): string {
+/**
+ * PATCH — formatage honnête.
+ *
+ * Retourne "Date inconnue" si le timestamp est absent ou invalide.
+ * N'invente jamais "à l'instant".
+ */
+function formatRelativeTime(
+  value: number | string | Date | undefined | null,
+): string {
   const timestamp = toTimestamp(value);
+
+  if (timestamp === undefined) {
+    return "Date inconnue";
+  }
+
   const diff = Math.max(0, Date.now() - timestamp);
   const minute = 60_000;
   const hour = 60 * minute;
@@ -186,10 +226,38 @@ function formatRelativeTime(value: number | string | Date): string {
   }
 }
 
+/**
+ * PATCH — tri honnête.
+ *
+ * Les items sans timestamp valide vont EN FIN de liste (stable).
+ * On ne les écarte pas, on ne leur attribue pas une fausse date.
+ */
 function sortNewestFirst(items: HomeActivityPulseItem[]) {
-  return [...items].sort(
-    (a, b) => toTimestamp(b.timestamp) - toTimestamp(a.timestamp),
-  );
+  return [...items].sort((a, b) => {
+    const ta = toTimestamp(a.timestamp);
+    const tb = toTimestamp(b.timestamp);
+
+    // Items avec timestamp d'abord, triés du plus récent au plus ancien
+    if (ta !== undefined && tb !== undefined) return tb - ta;
+    if (ta !== undefined) return -1;
+    if (tb !== undefined) return 1;
+
+    // Deux items sans timestamp : ordre stable préservé
+    return 0;
+  });
+}
+
+/**
+ * PATCH — helper pour les filtres today/week.
+ *
+ * Retourne true seulement si l'item a un timestamp valide ET
+ * qu'il respecte le seuil. Un item sans timestamp ne peut pas
+ * être "d'aujourd'hui" — on ne peut pas le prouver.
+ */
+function isWithin(item: HomeActivityPulseItem, windowMs: number): boolean {
+  const t = toTimestamp(item.timestamp);
+  if (t === undefined) return false;
+  return Date.now() - t < windowMs;
 }
 
 /* ============================================================================
@@ -581,6 +649,11 @@ function ActivityRow({
                 ) : null}
               </View>
 
+              {/*
+                PATCH — display : formatRelativeTime renvoie
+                "Date inconnue" si l'item n'a pas de timestamp.
+                Plus jamais "À l'instant" inventé.
+              */}
               <Text style={styles.activityTime}>
                 {formatRelativeTime(item.timestamp)}
               </Text>
@@ -808,6 +881,7 @@ export default function HomeActivityPulse({
   maxItems = 5,
   compact = false,
 }: HomeActivityPulseProps) {
+  // `now` reste pour le rafraîchissement périodique des libellés "il y a X min".
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -823,17 +897,23 @@ export default function HomeActivityPulse({
   const unreadCount =
     stats?.unread ?? items.filter((item) => item.read === false).length;
 
+  /*
+    PATCH — comptage honnête.
+
+    Un item sans timestamp ne peut PAS être déclaré "d'aujourd'hui".
+    On ne peut pas prouver quand il a eu lieu. On l'exclut donc
+    du comptage. Le backend fournira les vraies métriques
+    via `stats.today` et `stats.thisWeek` (activity.countToday /
+    countThisWeek). Les fallbacks locaux ne servent que si
+    le parent ne fournit pas de stats.
+  */
   const todayCount =
     stats?.today ??
-    items.filter(
-      (item) => now - toTimestamp(item.timestamp) < 24 * 60 * 60 * 1000,
-    ).length;
+    items.filter((item) => isWithin(item, 24 * 60 * 60 * 1000)).length;
 
   const weekCount =
     stats?.thisWeek ??
-    items.filter(
-      (item) => now - toTimestamp(item.timestamp) < 7 * 24 * 60 * 60 * 1000,
-    ).length;
+    items.filter((item) => isWithin(item, 7 * 24 * 60 * 60 * 1000)).length;
 
   const handleItemClick = useCallback(
     (item: HomeActivityPulseItem) => {

@@ -1280,8 +1280,8 @@ function CreatorHubInner({
     email ? { email } : "skip",
   );
   const videoAnalytics = useQuery(
-    api.shortVideos.getMyAnalytics,
-    email ? { email } : "skip",
+    api.analytics.getMyAnalytics,
+    email ? {} : "skip",
   );
   const myParticipations = useQuery(
     api.creatorHub.getMyParticipations,

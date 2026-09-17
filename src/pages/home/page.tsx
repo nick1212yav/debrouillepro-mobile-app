@@ -588,10 +588,10 @@ export default function HomePage() {
             : "activity",
           title: toString(record.title) ?? "Nouvelle activité",
           description: toString(record.description) ?? toString(record.content),
-          timestamp:
-            toNumber(record.timestamp) ??
-            toNumber(record.createdAt) ??
-            Date.now(),
+          // Timestamp canonique uniquement.
+          // undefined = document historique pré-migration.
+          // Le composant HomeActivityPulse doit gérer ce cas.
+          timestamp: toNumber(record.timestamp) ?? undefined,
           read: record.read === true,
           href: toString(record.href),
           moduleId: toString(record.moduleId) ?? toString(record.module),

@@ -18,6 +18,7 @@ export function useCommunityStories() {
   return {
     stories,
     isLoading: storiesQuery === undefined,
+
     createStory: async (data: {
       mediaUrl: string;
       mediaType: "image" | "video";
@@ -27,13 +28,13 @@ export function useCommunityStories() {
       try {
         const storyId = await createStory(data);
         toast.success("Story publiée");
-        // On retourne l'ID, le composant devra rafraîchir
         return storyId;
       } catch (error) {
         toast.error("Erreur lors de la publication de la story");
         throw error;
       }
     },
+
     viewStory: async (storyId: Id<"stories">) => {
       try {
         await viewStory({ storyId });
@@ -41,10 +42,28 @@ export function useCommunityStories() {
         console.error("Erreur lors du visionnage de la story", error);
       }
     },
+
     deleteStory: async (storyId: Id<"stories">) => {
       try {
-        await deleteStory({ storyId });
+        // community.deleteStory supprime par lots de 500 vues.
+        // Tant que le serveur retourne pendingCleanup: true, la suppression
+        // n'est pas terminée. On relance jusqu'à success: true.
+        // Sans cette boucle : toast "supprimée" alors que la suppression
+        // est partielle → violation de vérité UI.
+        let result = await deleteStory({ storyId });
+
+        while (!result.success && result.pendingCleanup) {
+          result = await deleteStory({ storyId });
+        }
+
+        if (!result.success) {
+          throw new Error(
+            "La suppression de la story n'a pas été confirmée par le serveur.",
+          );
+        }
+
         toast.success("Story supprimée");
+        return result;
       } catch (error) {
         toast.error("Erreur lors de la suppression");
         throw error;
