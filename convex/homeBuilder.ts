@@ -93,38 +93,47 @@ export function getDefaultHomePreferences(): HomePreferences {
  *      ↓
  * Convex Identity
  *      ↓
- * email
+ * tokenIdentifier (source canonique)
  *      ↓
- * users.by_email
+ * users.by_token
+ *
+ * Fallback email :
+ *   utilisé UNIQUEMENT si l'identité Convex ne porte pas
+ *   de tokenIdentifier — cas historique, jamais attendu
+ *   en production, mais on reste tolérant.
  */
 export async function getCurrentHomeUser(ctx: any) {
   const identity = await ctx.auth.getUserIdentity();
 
-  if (!identity?.email) {
+  if (!identity) {
     return null;
   }
 
-  return await ctx.db
-    .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
-    .first();
-}
+  // 1. Résolution canonique par token
+  if (identity.tokenIdentifier) {
+    const byToken = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q: any) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
 
-// ============================================================
-// MODULE VALIDATION
-// ============================================================
+    if (byToken) {
+      return byToken;
+    }
+  }
 
-/**
- * Vérifie qu'un module :
- *
- * 1. existe dans le registry backend ;
- * 2. est activé ;
- * 3. est disponible dans Home.
- */
-export function isHomeModule(moduleId: string): boolean {
-  const module = getModule(moduleId);
+  // 2. Fallback email vérifié — uniquement si présent dans l'identité
+  const identityEmail = identity.email ?? null;
 
-  return module !== null && module.enabled && module.home.enabled;
+  if (identityEmail) {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_email", (q: any) => q.eq("email", identityEmail))
+      .unique();
+  }
+
+  return null;
 }
 
 // ============================================================
@@ -220,10 +229,9 @@ export function buildHomeModuleOrder(
  *
  * Elle NE doit PAS être une query Convex.
  *
- * Elle peut être appelée directement par :
+ * Elle est appelée directement par :
  *
  * - convex/home.ts
- * - convex/homeIntelligence.ts
  *
  * Cela évite la chaîne :
  *
@@ -235,8 +243,8 @@ export function buildHomeModuleOrder(
  *    ↓
  * buildPersonalizedFeed
  *
- * et permet de réutiliser exactement la même construction
- * dans plusieurs contextes Convex.
+ * et permet de réutiliser directement la construction
+ * commune dans le contexte Convex appelant.
  */
 export async function buildHomeData(ctx: any): Promise<HomeData | null> {
   // ----------------------------------------------------------
@@ -272,7 +280,7 @@ export async function buildHomeData(ctx: any): Promise<HomeData | null> {
   // - le feed complet reste disponible via pagination ;
   // - le premier chargement Home doit rester raisonnable.
   //
-  // `buildPersonalizedFeed()` applique désormais lui-même
+  // `buildPersonalizedFeed()` applique lui-même
   // la limite finale demandée après fusion et déduplication.
   //
 
@@ -314,32 +322,4 @@ export async function buildHomeData(ctx: any): Promise<HomeData | null> {
       generatedAt: Date.now(),
     },
   };
-}
-
-// ============================================================
-// MODULE METADATA FOR INTELLIGENCE
-// ============================================================
-
-/**
- * Reconstruit les métadonnées backend des modules Home
- * à partir de `moduleOrder`.
- *
- * `HomeData` conserve volontairement les IDs et l'ordre,
- * tandis que l'intelligence peut avoir besoin des métadonnées
- * du registry backend.
- */
-export function getHomeModulesFromData(home: HomeData): any[] {
-  const modules: any[] = [];
-
-  for (const moduleItem of home.moduleOrder) {
-    const module = getModule(moduleItem.id);
-
-    if (!module || !module.enabled || !module.home.enabled) {
-      continue;
-    }
-
-    modules.push(module);
-  }
-
-  return modules;
 }

@@ -1,8 +1,7 @@
 // convex/homeAnalytics.ts
 
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
 
 // ============================================================
 // TYPES DE VALIDATION
@@ -42,6 +41,19 @@ const homeEventValidator = v.object({
 
   metadata: v.optional(v.record(v.string(), v.any())),
 });
+
+// ============================================================
+// CONSTANTES
+// ============================================================
+
+/**
+ * Borne maximale d'événements acceptés par `trackEventsBatch`.
+ *
+ * Une mutation Convex a une limite de temps d'exécution ; envoyer
+ * 10 000 événements en un seul appel provoquerait un timeout et
+ * saturerait la table `homeEvents`.
+ */
+const MAX_BATCH_SIZE = 100;
 
 // ============================================================
 // HELPERS
@@ -160,6 +172,8 @@ export const trackEvent = mutation({
  * - dismiss
  * - refresh
  * - interactions rapides
+ *
+ * Le nombre d'événements par appel est borné à MAX_BATCH_SIZE.
  */
 export const trackEventsBatch = mutation({
   args: {
@@ -174,6 +188,10 @@ export const trackEventsBatch = mutation({
         success: true,
         count: 0,
       };
+    }
+
+    if (args.events.length > MAX_BATCH_SIZE) {
+      throw new Error(`Maximum ${MAX_BATCH_SIZE} événements par appel`);
     }
 
     const timestamp = Date.now();
@@ -219,55 +237,34 @@ export const trackEventsBatch = mutation({
 
 /**
  * Récupère les statistiques comportementales Home
- * d'un utilisateur.
+ * de l'utilisateur authentifié.
+ *
+ * IMPORTANT (sécurité) :
+ * La query ne prend PLUS de `userId` en argument. La seule source
+ * de vérité est l'identité authentifiée via `ctx.auth.getUserIdentity()`.
+ * Cela empêche un utilisateur authentifié de lire les analytics
+ * comportementales d'un autre utilisateur.
  *
  * Par défaut :
  * - utilisateur actuellement connecté
  * - 30 derniers jours
  * - maximum 1000 événements
- *
- * Cette query alimente notamment :
- *
- * SmartContextSuggestions
- * OpportunityRadar
- * NearbyNow
- * DailyBrief
- * HomeCommandCenter
- * HomePersonalizationSheet
- * HomeActivityPulse
  */
 export const getAnalyticsSummary = query({
   args: {
-    userId: v.optional(v.id("users")),
-
     since: v.optional(v.number()),
 
     limit: v.optional(v.number()),
   },
 
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const user = await getCurrentUser(ctx);
 
-    let targetUserId = args.userId;
-
-    // ----------------------------------------------------------
-    // Déterminer l'utilisateur courant
-    // ----------------------------------------------------------
-
-    if (!targetUserId && identity?.tokenIdentifier) {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_token", (q) =>
-          q.eq("tokenIdentifier", identity.tokenIdentifier),
-        )
-        .unique();
-
-      targetUserId = user?._id;
-    }
-
-    if (!targetUserId) {
+    if (!user) {
       return null;
     }
+
+    const targetUserId = user._id;
 
     // ----------------------------------------------------------
     // Période
@@ -281,10 +278,14 @@ export const getAnalyticsSummary = query({
     // Récupération des événements
     // ----------------------------------------------------------
 
+    // L'index by_user_and_timestamp est déclaré dans le schéma.
+    // Utilisation directe : équivalent fonctionnel au filter précédent,
+    // mais filtré côté index au lieu de filtrer en mémoire après lecture.
     const events = await ctx.db
       .query("homeEvents")
-      .withIndex("by_user", (q: any) => q.eq("userId", targetUserId))
-      .filter((q: any) => q.gte(q.field("timestamp"), since))
+      .withIndex("by_user_and_timestamp", (q: any) =>
+        q.eq("userId", targetUserId).gte("timestamp", since),
+      )
       .order("desc")
       .take(limit);
 
@@ -547,32 +548,6 @@ export const getRecentEvents = query({
     }
 
     return await eventsQuery.take(limit);
-  },
-});
-
-// ============================================================
-// ACTION : TRACK EVENT
-// ============================================================
-
-/**
- * Action serveur permettant d'enregistrer
- * un événement Home.
- *
- * L'action délègue l'écriture à trackEvent.
- */
-export const trackEventAction = action({
-  args: {
-    event: homeEventValidator,
-  },
-
-  handler: async (ctx, args) => {
-    await ctx.runMutation(api.homeAnalytics.trackEvent, {
-      event: args.event,
-    });
-
-    return {
-      success: true,
-    };
   },
 });
 

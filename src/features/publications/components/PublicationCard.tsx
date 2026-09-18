@@ -1,39 +1,46 @@
-import { View, Text, Pressable, GestureResponderEvent } from "react-native";
-
-// src/features/publications/components/PublicationCard.tsx
-import { useNavigate } from "react-router-dom";
+import React, { useCallback } from "react";
 import {
-  MapPin,
-  Clock,
-  Users,
-  Car,
-  Star,
-  UtensilsCrossed,
-  Truck,
-  Bed,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from "react-native";
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
+import { useRouter } from "expo-router";
+import {
+  Award,
   Bath,
-  Square,
+  Bed,
+  Briefcase,
+  Calendar,
+  Car,
+  Clock,
   Home,
   Leaf,
+  MapPin,
   Package,
-  Weight,
-  Tag,
-  UserPlus,
-  Briefcase,
-  GraduationCap,
-  Award,
   Plane,
-  Ticket,
-  Calendar,
+  Square,
+  Star,
+  Tag,
+  Truck,
+  Users,
+  UtensilsCrossed,
 } from "lucide-react-native";
-import { usePublicationActions } from "@/features/publications/hooks/usePublicationActions";
+
 import { getPublicationConfig } from "../config";
 import { PublicationHeader } from "./PublicationHeader";
 import { PublicationGallery } from "./PublicationGallery";
 import { PublicationActions } from "./PublicationActions";
 import { PublicationCTA } from "./PublicationCTA";
 import { PublicationPoll } from "./PublicationPoll";
-import { formatTime, parseMeta, getModuleEmoji } from "../utils/format.utils";
+import { formatTime, getModuleEmoji, parseMeta } from "../utils/format.utils";
 import type { Publication, PublicationType } from "../types";
 
 interface Props {
@@ -47,10 +54,220 @@ interface Props {
   actionsSlot?: React.ReactNode;
 }
 
-/**
- * Carte générique pour les publications.
- * Gère tous les types, y compris "voyages".
- */
+interface PollOption {
+  id?: string;
+  text?: string;
+  label?: string;
+  votes: number;
+}
+
+interface NetworkExperience {
+  title?: string;
+  company?: string;
+}
+
+interface PublicationMeta {
+  postType?: string;
+
+  professionalId?: string;
+  id?: string;
+
+  origin?: string;
+  destination?: string;
+  departureTime?: string;
+  pricePerSeat?: string;
+  currency?: string;
+  seatsAvailable?: number;
+  vehicleType?: string;
+
+  cuisine?: string;
+  location?: string;
+  rating?: string;
+  priceRange?: string;
+  deliveryTime?: string;
+
+  type?: string;
+  price?: string;
+  period?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  area?: number;
+  available?: boolean;
+
+  category?: string;
+  subcategory?: string;
+  variety?: string;
+  quality?: string;
+  quantity?: number;
+  unit?: string;
+  priceUnit?: string;
+  sellerName?: string;
+  sellerVerified?: boolean;
+
+  headline?: string;
+  skills?: string[];
+  experiences?: NetworkExperience[];
+  certifications?: string[];
+
+  operator?: string;
+  transportType?: string;
+  from?: string;
+  to?: string;
+  departure?: string;
+  arrival?: string;
+  duration?: string;
+  availableSeats?: number;
+  totalSeats?: number;
+  amenities?: string[];
+
+  pollOptions?: PollOption[];
+}
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function isFinitePositiveNumber(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
+}
+
+function parsePositiveNumber(value: string | undefined): number {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Number.parseFloat(value);
+  return isFinitePositiveNumber(parsed) ? parsed : 0;
+}
+
+function getMetaValue(
+  meta: PublicationMeta,
+  key: keyof PublicationMeta,
+): unknown {
+  return meta[key];
+}
+
+function parsePublicationMeta(value?: string): PublicationMeta {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return parsed as PublicationMeta;
+  } catch {
+    return {};
+  }
+}
+
+function isPollOption(value: unknown): value is PollOption {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return typeof candidate.votes === "number";
+}
+
+function getPollOptions(meta: PublicationMeta): PollOption[] {
+  const options = getMetaValue(meta, "pollOptions");
+
+  if (!Array.isArray(options)) {
+    return [];
+  }
+
+  return options.filter(isPollOption);
+}
+
+function getStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (item): item is string =>
+      typeof item === "string" && item.trim().length > 0,
+  );
+}
+
+function getExperienceArray(value: unknown): NetworkExperience[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (item): item is NetworkExperience =>
+      Boolean(item) && typeof item === "object" && !Array.isArray(item),
+  );
+}
+
+function getRouteForPublication(
+  publication: Publication,
+  meta: PublicationMeta,
+): string | null {
+  const id = String(publication._id);
+
+  switch (publication.type) {
+    case "community":
+      return `/community/${id}`;
+
+    case "sante": {
+      const professionalId = meta.professionalId ?? meta.id ?? id;
+      return `/sante/${professionalId}`;
+    }
+
+    case "transport":
+      return `/transport/${id}`;
+
+    case "restauration":
+      return `/restauration/${id}`;
+
+    case "hebergement":
+      return `/hebergement/${id}`;
+
+    case "agri":
+      return `/agri/${id}`;
+
+    case "network":
+      return `/network/${id}`;
+
+    case "voyages":
+      return `/voyages/${id}`;
+
+    default:
+      return null;
+  }
+}
+
+function getCtaLabel(type: PublicationType): string {
+  switch (type) {
+    case "transport":
+      return "Réserver";
+
+    case "restauration":
+      return "Voir le menu";
+
+    case "hebergement":
+      return "Voir le logement";
+
+    case "agri":
+      return "Voir le produit";
+
+    case "network":
+      return "Voir le profil";
+
+    case "voyages":
+      return "Voir le voyage";
+
+    default:
+      return "Voir les détails";
+  }
+}
+
 export function PublicationCard({
   publication,
   index,
@@ -61,208 +278,296 @@ export function PublicationCard({
   onCTA,
   actionsSlot,
 }: Props) {
-  const navigate = useNavigate();
+  const router = useRouter();
+
   const config = getPublicationConfig(publication.type as PublicationType);
-  const meta = parseMeta(publication.meta);
-  const postType = meta?.postType ?? "text";
+
+  const meta = parsePublicationMeta(publication.meta);
+
+  const postType = meta.postType ?? "text";
   const emoji = getModuleEmoji(publication.type);
-  const pollOptions = meta?.pollOptions ?? [];
-  const totalVotes =
-    pollOptions?.reduce((s: number, o: { votes: number }) => s + o.votes, 0) ??
-    0;
+
+  const pollOptions = getPollOptions(meta);
+  const totalVotes = pollOptions.reduce((sum, option) => sum + option.votes, 0);
+
   const pollVoted = publication.votedOptionId;
 
-  // Sécurisation des champs qui pourraient être undefined
   const tags = publication.tags ?? [];
   const images = publication.images ?? [];
   const description = publication.description ?? "";
   const title = publication.title ?? "";
 
-  // ─── Gestionnaires de navigation ──────────────────────────────────────────
+  const scale = useSharedValue(1);
 
-  const handleCTA = (e?: GestureResponderEvent) => {
-    e?.stopPropagation();
-    switch (publication.type) {
-      case "community":
-        navigate(`/community/${publication._id}`);
-        break;
-      case "sante": {
-        const professionalId =
-          meta?.professionalId || meta?.id || publication._id;
-        navigate(`/sante/${professionalId}`);
-        break;
-      }
-      case "transport":
-        navigate(`/transport/${publication._id}`);
-        break;
-      case "restauration":
-        navigate(`/restauration/${publication._id}`);
-        break;
-      case "hebergement":
-        navigate(`/hebergement/${publication._id}`);
-        break;
-      case "agri":
-        navigate(`/agri/${publication._id}`);
-        break;
-      case "network":
-        navigate(`/network/${publication._id}`);
-        break;
-      case "voyages":
-        navigate(`/voyages/${publication._id}`);
-        break;
-      default:
-        onCTA();
-        break;
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = useCallback(() => {
+    scale.value = withSpring(0.985, {
+      damping: 18,
+      stiffness: 260,
+      mass: 0.45,
+    });
+  }, [scale]);
+
+  const handlePressOut = useCallback(() => {
+    scale.value = withSpring(1, {
+      damping: 18,
+      stiffness: 260,
+      mass: 0.45,
+    });
+  }, [scale]);
+
+  const navigateToPublication = useCallback(() => {
+    const route = getRouteForPublication(publication, meta);
+
+    if (route) {
+      router.push(route as never);
+      return;
     }
-  };
 
-  const handleCardClick = () => {
-    switch (publication.type) {
-      case "community":
-        navigate(`/community/${publication._id}`);
-        break;
-      case "sante": {
-        const professionalId =
-          meta?.professionalId || meta?.id || publication._id;
-        navigate(`/sante/${professionalId}`);
-        break;
-      }
-      case "transport":
-        navigate(`/transport/${publication._id}`);
-        break;
-      case "restauration":
-        navigate(`/restauration/${publication._id}`);
-        break;
-      case "hebergement":
-        navigate(`/hebergement/${publication._id}`);
-        break;
-      case "agri":
-        navigate(`/agri/${publication._id}`);
-        break;
-      case "network":
-        navigate(`/network/${publication._id}`);
-        break;
-      case "voyages":
-        navigate(`/voyages/${publication._id}`);
-        break;
-      default:
-        break;
-    }
-  };
+    onCTA();
+  }, [meta, onCTA, publication, router]);
 
-  // ─── Rendu spécifique pour le transport ──────────────────────────────────
+  const handleCTA = useCallback(
+    (event?: GestureResponderEvent) => {
+      event?.stopPropagation();
+      navigateToPublication();
+    },
+    [navigateToPublication],
+  );
 
   const renderTransportContent = () => {
-    const origin = meta?.origin ?? "";
-    const destination = meta?.destination ?? "";
-    const departureTime = meta?.departureTime ?? "";
-    const price = meta?.pricePerSeat ? parseFloat(meta.pricePerSeat) : 0;
-    const currency = meta?.currency ?? "FCFA";
-    const seats = meta?.seatsAvailable ?? 0;
-    const vehicleType = meta?.vehicleType ?? "";
+    const origin = meta.origin ?? "";
+    const destination = meta.destination ?? "";
+    const departureTime = meta.departureTime ?? "";
+    const price = parsePositiveNumber(meta.pricePerSeat);
+    const currency = meta.currency ?? "FCFA";
+    const seats = meta.seatsAvailable ?? 0;
+    const vehicleType = meta.vehicleType ?? "";
 
     return (
-      <View className="px-3 pb-3 space-y-1.5">{origin && destination && (
-          <Text className="text-white font-semibold text-sm">{origin}<Text className="text-violet-400">→</Text>{destination}</Text>
-        )}<View className="flex items-center gap-3 flex-wrap text-xs text-white/60">{departureTime && (
-            <Text className="flex items-center gap-1"><Clock size={12} />{departureTime}</Text>
-          )}{vehicleType && (
-            <Text className="flex items-center gap-1"><Car size={12} />{vehicleType}</Text>
-          )}{seats > 0 && (
-            <Text className="flex items-center gap-1"><Users size={12} />{seats}places
-            </Text>
-          )}</View>{price > 0 && (
-          <Text className="text-violet-400 font-bold text-base">{price.toLocaleString()}{currency}</Text>
-        )}<Pressable onPress={handleCTA} className="w-full py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-violet-500 to-indigo-500 transition-opacity"><Text>Réserver</Text></Pressable></View>
+      <View style={styles.contentSection}>
+        {origin && destination ? (
+          <Text style={styles.routeTitle}>
+            {origin}
+            <Text style={styles.routeArrow}> → </Text>
+            {destination}
+          </Text>
+        ) : null}
+
+        <View style={styles.metadataRow}>
+          {departureTime ? (
+            <View style={styles.metadataItem}>
+              <Clock size={12} className="text-slate-400" />
+              <Text style={styles.metadataText}>{departureTime}</Text>
+            </View>
+          ) : null}
+
+          {vehicleType ? (
+            <View style={styles.metadataItem}>
+              <Car size={12} className="text-slate-400" />
+              <Text style={styles.metadataText}>{vehicleType}</Text>
+            </View>
+          ) : null}
+
+          {seats > 0 ? (
+            <View style={styles.metadataItem}>
+              <Users size={12} className="text-slate-400" />
+              <Text style={styles.metadataText}>{seats} places</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {price > 0 ? (
+          <Text style={styles.violetPrice}>
+            {price.toLocaleString()} {currency}
+          </Text>
+        ) : null}
+
+        <CardCTA
+          label={getCtaLabel("transport")}
+          onPress={handleCTA}
+          variant="violet"
+        />
+      </View>
     );
   };
-
-  // ─── Rendu spécifique pour la restauration ──────────────────────────────
 
   const renderRestaurantContent = () => {
     const name = title || "Restaurant";
-    const cuisine = meta?.cuisine ?? "";
-    const location = meta?.location ?? publication.location ?? "";
-    const rating = meta?.rating ? parseFloat(meta.rating) : 0;
-    const priceRange = meta?.priceRange ?? "";
-    const deliveryTime = meta?.deliveryTime ?? "";
-    const desc = description;
+    const cuisine = meta.cuisine ?? "";
+    const location = meta.location ?? publication.location ?? "";
+    const rating = parsePositiveNumber(meta.rating);
+    const priceRange = meta.priceRange ?? "";
+    const deliveryTime = meta.deliveryTime ?? "";
 
     return (
-      <View className="px-3 pb-3 space-y-1.5"><View className="flex items-start justify-between gap-2"><View><Text className="text-white font-semibold text-sm">{name}</Text>{cuisine && (
-              <Text className="text-xs text-white/50 flex items-center gap-1"><UtensilsCrossed size={12} />{cuisine}</Text>
-            )}</View>{rating > 0 && (
-            <View className="flex items-center gap-0.5 text-xs"><Star size={12} className="fill-amber-400 text-amber-400" /><Text className="text-white font-medium">{rating.toFixed(1)}</Text></View>
-          )}</View>{location && (
-          <View className="flex items-center gap-1 text-xs text-white/50"><MapPin size={12} className="text-white/30" /><Text className="truncate">{location}</Text></View>
-        )}<View className="flex items-center gap-3 flex-wrap text-xs text-white/60">{priceRange && <Text>{priceRange}</Text>}{deliveryTime && (
-            <Text className="flex items-center gap-1"><Truck size={12} className="text-white/30" />{deliveryTime}</Text>
-          )}</View>{desc && (
-          <Text className="text-sm text-white/60 leading-relaxed">{desc}</Text>
-        )}<Pressable onPress={handleCTA} className="w-full py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 transition-opacity"><Text>Voir le menu</Text></Pressable></View>
+      <View style={styles.contentSection}>
+        <View style={styles.titleRow}>
+          <View style={styles.flex}>
+            <Text style={styles.sectionTitle}>{name}</Text>
+
+            {cuisine ? (
+              <View style={styles.inlineTextRow}>
+                <UtensilsCrossed size={12} className="text-orange-400" />
+                <Text style={styles.mutedSmall}>{cuisine}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {rating > 0 ? (
+            <View style={styles.rating}>
+              <Star size={12} className="text-amber-400 fill-amber-400" />
+              <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {location ? (
+          <View style={styles.inlineTextRow}>
+            <MapPin size={12} className="text-slate-500" />
+            <Text numberOfLines={1} style={styles.mutedSmall}>
+              {location}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.metadataRow}>
+          {priceRange ? (
+            <Text style={styles.metadataText}>{priceRange}</Text>
+          ) : null}
+
+          {deliveryTime ? (
+            <View style={styles.metadataItem}>
+              <Truck size={12} className="text-slate-500" />
+              <Text style={styles.metadataText}>{deliveryTime}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {description ? (
+          <Text numberOfLines={4} style={styles.description}>
+            {description}
+          </Text>
+        ) : null}
+
+        <CardCTA
+          label={getCtaLabel("restauration")}
+          onPress={handleCTA}
+          variant="orange"
+        />
+      </View>
     );
   };
-
-  // ─── Rendu spécifique pour l'hébergement ────────────────────────────────
 
   const renderHebergementContent = () => {
-    const hebergementTitle = title || "Logement";
-    const type = meta?.type ?? "";
-    const location = meta?.location ?? publication.location ?? "";
-    const price = meta?.price ? parseFloat(meta.price) : 0;
-    const currency = meta?.currency ?? "FCFA";
-    const period = meta?.period ?? "nuit";
-    const bedrooms = meta?.bedrooms ?? 0;
-    const bathrooms = meta?.bathrooms ?? 0;
-    const area = meta?.area ?? 0;
-    const rating = meta?.rating ? parseFloat(meta.rating) : 0;
-    const desc = description;
-    const isAvailable = meta?.available !== false;
+    const accommodationTitle = title || "Logement";
+    const type = meta.type ?? "";
+    const location = meta.location ?? publication.location ?? "";
+    const price = parsePositiveNumber(meta.price);
+    const currency = meta.currency ?? "FCFA";
+    const period = meta.period ?? "nuit";
+    const bedrooms = meta.bedrooms ?? 0;
+    const bathrooms = meta.bathrooms ?? 0;
+    const area = meta.area ?? 0;
+    const rating = parsePositiveNumber(meta.rating);
+    const isAvailable = meta.available !== false;
 
     return (
-      <View className="px-3 pb-3 space-y-1.5"><View className="flex items-start justify-between gap-2"><View><Text className="text-white font-semibold text-sm">{hebergementTitle}</Text>{type && (
-              <Text className="text-xs text-white/50 flex items-center gap-1"><Home size={12} />{type}</Text>
-            )}</View>{rating > 0 && (
-            <View className="flex items-center gap-0.5 text-xs"><Star size={12} className="fill-amber-400 text-amber-400" /><Text className="text-white font-medium">{rating.toFixed(1)}</Text></View>
-          )}</View>{location && (
-          <View className="flex items-center gap-1 text-xs text-white/50"><MapPin size={12} className="text-white/30" /><Text className="truncate">{location}</Text></View>
-        )}{price > 0 && (
-          <Text className="text-emerald-400 font-bold text-base">{price.toLocaleString()}{currency}/ {period}</Text>
-        )}<View className="flex items-center gap-3 flex-wrap text-xs text-white/60">{bedrooms > 0 && (
-            <Text className="flex items-center gap-1"><Bed size={12} className="text-white/30" />{bedrooms}ch.
+      <View style={styles.contentSection}>
+        <View style={styles.titleRow}>
+          <View style={styles.flex}>
+            <Text style={styles.sectionTitle}>{accommodationTitle}</Text>
+
+            {type ? (
+              <View style={styles.inlineTextRow}>
+                <Home size={12} className="text-emerald-400" />
+                <Text style={styles.mutedSmall}>{type}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {rating > 0 ? (
+            <View style={styles.rating}>
+              <Star size={12} className="text-amber-400 fill-amber-400" />
+              <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {location ? (
+          <View style={styles.inlineTextRow}>
+            <MapPin size={12} className="text-slate-500" />
+            <Text numberOfLines={1} style={styles.mutedSmall}>
+              {location}
             </Text>
-          )}{bathrooms > 0 && (
-            <Text className="flex items-center gap-1"><Bath size={12} className="text-white/30" />{bathrooms}sdb
-            </Text>
-          )}{area > 0 && (
-            <Text className="flex items-center gap-1"><Square size={12} className="text-white/30" />{area}m²
-            </Text>
-          )}{!isAvailable && (
-            <Text className="text-rose-400 font-semibold">Indisponible</Text>
-          )}</View>{desc && (
-          <Text className="text-sm text-white/60 leading-relaxed">{desc}</Text>
-        )}<Pressable onPress={handleCTA} className="w-full py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-emerald-500 to-teal-500 transition-opacity"><Text>Voir le logement</Text></Pressable></View>
+          </View>
+        ) : null}
+
+        {price > 0 ? (
+          <Text style={styles.emeraldPrice}>
+            {price.toLocaleString()} {currency} / {period}
+          </Text>
+        ) : null}
+
+        <View style={styles.metadataRow}>
+          {bedrooms > 0 ? (
+            <View style={styles.metadataItem}>
+              <Bed size={12} className="text-slate-500" />
+              <Text style={styles.metadataText}>{bedrooms} ch.</Text>
+            </View>
+          ) : null}
+
+          {bathrooms > 0 ? (
+            <View style={styles.metadataItem}>
+              <Bath size={12} className="text-slate-500" />
+              <Text style={styles.metadataText}>{bathrooms} sdb</Text>
+            </View>
+          ) : null}
+
+          {area > 0 ? (
+            <View style={styles.metadataItem}>
+              <Square size={12} className="text-slate-500" />
+              <Text style={styles.metadataText}>{area} m²</Text>
+            </View>
+          ) : null}
+
+          {!isAvailable ? (
+            <Text style={styles.unavailable}>Indisponible</Text>
+          ) : null}
+        </View>
+
+        {description ? (
+          <Text numberOfLines={4} style={styles.description}>
+            {description}
+          </Text>
+        ) : null}
+
+        <CardCTA
+          label={getCtaLabel("hebergement")}
+          onPress={handleCTA}
+          variant="emerald"
+        />
+      </View>
     );
   };
-
-  // ─── Rendu spécifique pour l'agriculture ──────────────────────────────────
 
   const renderAgriContent = () => {
     const agriTitle = title || "Produit agricole";
-    const category = meta?.category ?? "";
-    const subcategory = meta?.subcategory ?? "";
-    const variety = meta?.variety ?? "";
-    const quality = meta?.quality ?? "";
-    const quantity = meta?.quantity ?? 0;
-    const unit = meta?.unit ?? "kg";
-    const price = meta?.price ? parseFloat(meta.price) : 0;
-    const currency = meta?.currency ?? "FCFA";
-    const priceUnit = meta?.priceUnit ?? "kg";
-    const location = meta?.location ?? publication.location ?? "";
-    const sellerName = meta?.sellerName ?? "";
-    const sellerVerified = meta?.sellerVerified ?? false;
-    const rating = meta?.rating ? parseFloat(meta.rating) : 0;
-    const desc = description;
+    const category = meta.category ?? "";
+    const variety = meta.variety ?? "";
+    const quality = meta.quality ?? "";
+    const quantity = meta.quantity ?? 0;
+    const unit = meta.unit ?? "kg";
+    const price = parsePositiveNumber(meta.price);
+    const currency = meta.currency ?? "FCFA";
+    const priceUnit = meta.priceUnit ?? "kg";
+    const location = meta.location ?? publication.location ?? "";
+    const sellerName = meta.sellerName ?? "";
+    const sellerVerified = meta.sellerVerified ?? false;
+    const rating = parsePositiveNumber(meta.rating);
 
     const categoryLabels: Record<string, string> = {
       cereales: "🌾 Céréales",
@@ -272,201 +577,867 @@ export function PublicationCard({
       materiel: "🚜 Matériel",
       conseil: "🧑‍🌾 Conseil",
     };
-    const categoryLabel = categoryLabels[category] || category;
+
+    const categoryLabel = categoryLabels[category] ?? category;
 
     return (
-      <View className="px-3 pb-3 space-y-1.5"><View className="flex items-start justify-between gap-2"><View><Text className="text-white font-semibold text-sm">{agriTitle}</Text>{categoryLabel && (
-              <Text className="text-xs text-white/50 flex items-center gap-1"><Leaf size={12} className="text-emerald-400" />{categoryLabel}</Text>
-            )}{variety && (
-              <Text className="text-xs text-white/40 block">Variété : {variety}</Text>
-            )}</View>{rating > 0 && (
-            <View className="flex items-center gap-0.5 text-xs"><Star size={12} className="fill-amber-400 text-amber-400" /><Text className="text-white font-medium">{rating.toFixed(1)}</Text></View>
-          )}</View>{sellerName && (
-          <View className="flex items-center gap-1 text-xs text-white/50"><Text>Vendu par : {sellerName}</Text>{sellerVerified && (
-              <Text className="text-emerald-400 text-[10px] font-bold">✓ Vérifié
-              </Text>
-            )}</View>
-        )}{location && (
-          <View className="flex items-center gap-1 text-xs text-white/50"><MapPin size={12} className="text-white/30" /><Text className="truncate">{location}</Text></View>
-        )}{quantity > 0 && (
-          <View className="flex items-center gap-1 text-xs text-white/60"><Package size={12} className="text-white/30" /><Text>Disponible : {quantity}{unit}</Text></View>
-        )}{price > 0 && (
-          <View className="flex items-center gap-1 text-emerald-400 font-bold text-base"><Tag size={14} className="text-emerald-400" /><Text>{price.toLocaleString()}{currency}</Text><Text className="text-xs text-white/40 font-normal">/ {priceUnit}</Text></View>
-        )}{quality && (
-          <View className="flex items-center gap-1 text-xs text-white/50"><Text>Qualité :</Text><Text className="text-white/70 font-medium">{quality}</Text></View>
-        )}{desc && (
-          <Text className="text-sm text-white/60 leading-relaxed">{desc}</Text>
-        )}<Pressable onPress={handleCTA} className="w-full py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-emerald-500 to-green-500 transition-opacity"><Text>Voir le produit</Text></Pressable></View>
+      <View style={styles.contentSection}>
+        <View style={styles.titleRow}>
+          <View style={styles.flex}>
+            <Text style={styles.sectionTitle}>{agriTitle}</Text>
+
+            {categoryLabel ? (
+              <View style={styles.inlineTextRow}>
+                <Leaf size={12} className="text-emerald-400" />
+                <Text style={styles.mutedSmall}>{categoryLabel}</Text>
+              </View>
+            ) : null}
+
+            {variety ? (
+              <Text style={styles.subtleText}>Variété : {variety}</Text>
+            ) : null}
+          </View>
+
+          {rating > 0 ? (
+            <View style={styles.rating}>
+              <Star size={12} className="text-amber-400 fill-amber-400" />
+              <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {sellerName ? (
+          <View style={styles.inlineTextRow}>
+            <Text style={styles.mutedSmall}>Vendu par : {sellerName}</Text>
+
+            {sellerVerified ? (
+              <Text style={styles.verified}>✓ Vérifié</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {location ? (
+          <View style={styles.inlineTextRow}>
+            <MapPin size={12} className="text-slate-500" />
+            <Text numberOfLines={1} style={styles.mutedSmall}>
+              {location}
+            </Text>
+          </View>
+        ) : null}
+
+        {quantity > 0 ? (
+          <View style={styles.inlineTextRow}>
+            <Package size={12} className="text-slate-500" />
+            <Text style={styles.metadataText}>
+              Disponible : {quantity} {unit}
+            </Text>
+          </View>
+        ) : null}
+
+        {price > 0 ? (
+          <View style={styles.priceRow}>
+            <Tag size={14} className="text-emerald-400" />
+            <Text style={styles.emeraldPrice}>
+              {price.toLocaleString()} {currency}
+            </Text>
+            <Text style={styles.subtleText}>/ {priceUnit}</Text>
+          </View>
+        ) : null}
+
+        {quality ? (
+          <View style={styles.inlineTextRow}>
+            <Text style={styles.mutedSmall}>Qualité :</Text>
+            <Text style={styles.strongMuted}>{quality}</Text>
+          </View>
+        ) : null}
+
+        {description ? (
+          <Text numberOfLines={4} style={styles.description}>
+            {description}
+          </Text>
+        ) : null}
+
+        <CardCTA
+          label={getCtaLabel("agri")}
+          onPress={handleCTA}
+          variant="green"
+        />
+      </View>
     );
   };
-
-  // ─── Rendu spécifique pour le réseau (Network) ────────────────────────────
 
   const renderNetworkContent = () => {
     const networkTitle = title || "Profil professionnel";
-    const headline = meta?.headline || "";
-    const location = meta?.location || publication.location || "";
-    const skills = meta?.skills || [];
-    const experiences = meta?.experiences || [];
-    const certifications = meta?.certifications || [];
-    const rating = meta?.rating ? parseFloat(meta.rating) : 0;
-    const desc = description;
+    const headline = meta.headline ?? "";
+    const location = meta.location ?? publication.location ?? "";
+    const skills = getStringArray(meta.skills);
+    const experiences = getExperienceArray(meta.experiences);
+    const certifications = getStringArray(meta.certifications);
+    const rating = parsePositiveNumber(meta.rating);
 
     return (
-      <View className="px-3 pb-3 space-y-2"><View className="flex items-start justify-between gap-2"><View><Text className="text-white font-semibold text-sm">{networkTitle}</Text>{headline && (
-              <Text className="text-xs text-indigo-300 font-medium">{headline}</Text>
-            )}</View>{rating > 0 && (
-            <View className="flex items-center gap-0.5 text-xs"><Star size={12} className="fill-amber-400 text-amber-400" /><Text className="text-white font-medium">{rating.toFixed(1)}</Text></View>
-          )}</View>{location && (
-          <View className="flex items-center gap-1 text-xs text-white/50"><MapPin size={12} className="text-white/30" /><Text className="truncate">{location}</Text></View>
-        )}{skills.length > 0 && (
-          <View className="flex flex-wrap gap-1.5">{skills.slice(0, 3).map((skill: string) => (
-              <Text key={skill} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/15">{skill}</Text>
-            ))}{skills.length > 3 && (
-              <Text className="text-[10px] text-white/40">+{skills.length - 3}</Text>
-            )}</View>
-        )}{experiences.length > 0 && (
-          <View className="space-y-1">{experiences.slice(0, 2).map((exp: any, idx: number) => (
-              <View key={idx} className="flex items-center gap-1.5 text-xs text-white/50"><Briefcase size={11} className="text-white/30" /><Text>{exp.title}– {exp.company}</Text></View>
-            ))}{experiences.length > 2 && (
-              <Text className="text-[10px] text-white/30">+{experiences.length - 2}autres expériences
+      <View style={styles.contentSection}>
+        <View style={styles.titleRow}>
+          <View style={styles.flex}>
+            <Text style={styles.sectionTitle}>{networkTitle}</Text>
+
+            {headline ? (
+              <Text style={styles.networkHeadline}>{headline}</Text>
+            ) : null}
+          </View>
+
+          {rating > 0 ? (
+            <View style={styles.rating}>
+              <Star size={12} className="text-amber-400 fill-amber-400" />
+              <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {location ? (
+          <View style={styles.inlineTextRow}>
+            <MapPin size={12} className="text-slate-500" />
+            <Text numberOfLines={1} style={styles.mutedSmall}>
+              {location}
+            </Text>
+          </View>
+        ) : null}
+
+        {skills.length > 0 ? (
+          <View style={styles.chipsRow}>
+            {skills.slice(0, 3).map((skill) => (
+              <View key={skill} style={styles.skillChip}>
+                <Text style={styles.skillText}>{skill}</Text>
+              </View>
+            ))}
+
+            {skills.length > 3 ? (
+              <Text style={styles.subtleText}>+{skills.length - 3}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {experiences.length > 0 ? (
+          <View style={styles.experienceList}>
+            {experiences.slice(0, 2).map((experience, experienceIndex) => (
+              <View
+                key={`${experience.title ?? "experience"}-${experience.company ?? "company"}-${experienceIndex}`}
+                style={styles.inlineTextRow}
+              >
+                <Briefcase size={11} className="text-slate-500" />
+                <Text numberOfLines={1} style={styles.mutedSmall}>
+                  {experience.title ?? "Expérience"} —{" "}
+                  {experience.company ?? "Entreprise"}
+                </Text>
+              </View>
+            ))}
+
+            {experiences.length > 2 ? (
+              <Text style={styles.subtleText}>
+                +{experiences.length - 2} autres expériences
               </Text>
-            )}</View>
-        )}{certifications.length > 0 && (
-          <View className="flex items-center gap-1.5 text-xs text-white/50"><Award size={11} className="text-white/30" /><Text>{certifications.length}certification(s)</Text></View>
-        )}{desc && (
-          <Text className="text-sm text-white/60 leading-relaxed">{desc}</Text>
-        )}<Pressable onPress={handleCTA} className="w-full py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 transition-opacity"><Text>Voir le profil</Text></Pressable></View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {certifications.length > 0 ? (
+          <View style={styles.inlineTextRow}>
+            <Award size={11} className="text-indigo-400" />
+            <Text style={styles.mutedSmall}>
+              {certifications.length} certification
+              {certifications.length > 1 ? "s" : ""}
+            </Text>
+          </View>
+        ) : null}
+
+        {description ? (
+          <Text numberOfLines={4} style={styles.description}>
+            {description}
+          </Text>
+        ) : null}
+
+        <CardCTA
+          label={getCtaLabel("network")}
+          onPress={handleCTA}
+          variant="indigo"
+        />
+      </View>
     );
   };
-
-  // ─── Rendu spécifique pour les Voyages ────────────────────────────────────
 
   const renderVoyageContent = () => {
     const voyageTitle = title || "Voyage";
-    const operator = meta?.operator || "";
-    const transportType = meta?.transportType || "";
-    const from = meta?.from || "";
-    const to = meta?.to || "";
-    const departure = meta?.departure || "";
-    const arrival = meta?.arrival || "";
-    const duration = meta?.duration || "";
-    const price = meta?.price ? parseFloat(meta.price) : 0;
-    const currency = meta?.currency ?? "FCFA";
-    const availableSeats = meta?.availableSeats ?? 0;
-    const totalSeats = meta?.totalSeats ?? 0;
-    const amenities = meta?.amenities || [];
-    const rating = meta?.rating ? parseFloat(meta.rating) : 0;
-    const desc = description;
+    const operator = meta.operator ?? "";
+    const transportType = meta.transportType ?? "";
+    const from = meta.from ?? "";
+    const to = meta.to ?? "";
+    const departure = meta.departure ?? "";
+    const arrival = meta.arrival ?? "";
+    const duration = meta.duration ?? "";
+    const price = parsePositiveNumber(meta.price);
+    const currency = meta.currency ?? "FCFA";
+    const availableSeats = Math.max(meta.availableSeats ?? 0, 0);
+    const totalSeats = Math.max(meta.totalSeats ?? 0, 0);
+    const amenities = getStringArray(meta.amenities);
+    const rating = parsePositiveNumber(meta.rating);
 
-    // Calcul du taux d'occupation
     const occupancyRate =
       totalSeats > 0
-        ? Math.round(((totalSeats - availableSeats) / totalSeats) * 100)
+        ? Math.min(
+            100,
+            Math.max(
+              0,
+              Math.round(((totalSeats - availableSeats) / totalSeats) * 100),
+            ),
+          )
         : 0;
 
-    // Couleur dynamique selon l'occupation
-    const occupancyColor =
+    const occupancyLabel =
       occupancyRate > 80
-        ? "text-rose-400"
+        ? "Très demandé"
         : occupancyRate > 50
-          ? "text-amber-400"
-          : "text-emerald-400";
+          ? "Demande élevée"
+          : "Bonne disponibilité";
 
     return (
-      <View className="px-3 pb-3 space-y-2">{}{from && to && (
-          <View className="flex items-center justify-between"><View><Text className="text-white font-bold text-sm">{from}<Text className="text-sky-400">✈</Text>{to}</Text>{operator && (
-                <Text className="text-xs text-white/50 flex items-center gap-1"><Plane size={12} className="text-white/30" />{operator}</Text>
-              )}</View>{rating > 0 && (
-              <View className="flex items-center gap-0.5 text-xs"><Star size={12} className="fill-amber-400 text-amber-400" /><Text className="text-white font-medium">{rating.toFixed(1)}</Text></View>
-            )}</View>
-        )}{}<View className="flex items-center justify-between gap-2 text-xs text-white/60">{departure && (
-            <View className="flex items-center gap-1"><Clock size={12} className="text-white/30" /><Text>Départ : {departure}</Text></View>
-          )}{arrival && (
-            <View className="flex items-center gap-1"><Clock size={12} className="text-white/30" /><Text>Arrivée : {arrival}</Text></View>
-          )}{duration && (
-            <View className="flex items-center gap-1"><Calendar size={12} className="text-white/30" /><Text>{duration}</Text></View>
-          )}</View>{}{transportType && (
-          <View className="text-xs text-white/50"><Text className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{transportType}</Text></View>
-        )}{}<View className="flex items-center justify-between">{price > 0 && (
-            <Text className="text-sky-400 font-bold text-base">{price.toLocaleString()}{currency}</Text>
-          )}{totalSeats > 0 && (
-            <View className="flex items-center gap-2"><Text className="text-xs text-white/40">{availableSeats}/{totalSeats}places
-              </Text><View className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden"><View className="h-full rounded-full transition-all" style={{ width: `${occupancyRate}%`, backgroundColor: occupancyRate > 80
-                                      ? "#f43f5e"
-                                      : occupancyRate > 50
-                                        ? "#f59e0b"
-                                        : "#10b981" }} /></View></View>
-          )}</View>{}{amenities.length > 0 && (
-          <View className="flex flex-wrap gap-1.5">{amenities.slice(0, 4).map((a: string) => (
-              <Text key={a} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-white/50 border border-white/10">{a}</Text>
-            ))}{amenities.length > 4 && (
-              <Text className="text-[10px] text-white/30">+{amenities.length - 4}</Text>
-            )}</View>
-        )}{}{desc && (
-          <Text className="text-sm text-white/60 leading-relaxed">{desc}</Text>
-        )}{}<Pressable onPress={handleCTA} className="w-full py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-sky-500 to-blue-500 transition-opacity"><Text>Voir le voyage</Text></Pressable></View>
+      <View style={styles.contentSection}>
+        <View style={styles.titleRow}>
+          <View style={styles.flex}>
+            <Text style={styles.sectionTitle}>{voyageTitle}</Text>
+
+            {operator ? (
+              <View style={styles.inlineTextRow}>
+                <Plane size={12} className="text-sky-400" />
+                <Text numberOfLines={1} style={styles.mutedSmall}>
+                  {operator}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {rating > 0 ? (
+            <View style={styles.rating}>
+              <Star size={12} className="text-amber-400 fill-amber-400" />
+              <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {from && to ? (
+          <Text style={styles.routeTitle}>
+            {from}
+            <Text style={styles.routeArrow}> ✈ </Text>
+            {to}
+          </Text>
+        ) : null}
+
+        <View style={styles.metadataColumn}>
+          {departure ? (
+            <View style={styles.inlineTextRow}>
+              <Clock size={12} className="text-slate-500" />
+              <Text style={styles.mutedSmall}>Départ : {departure}</Text>
+            </View>
+          ) : null}
+
+          {arrival ? (
+            <View style={styles.inlineTextRow}>
+              <Clock size={12} className="text-slate-500" />
+              <Text style={styles.mutedSmall}>Arrivée : {arrival}</Text>
+            </View>
+          ) : null}
+
+          {duration ? (
+            <View style={styles.inlineTextRow}>
+              <Calendar size={12} className="text-slate-500" />
+              <Text style={styles.mutedSmall}>{duration}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {transportType ? (
+          <View style={styles.travelTypeBadge}>
+            <Text style={styles.travelTypeText}>{transportType}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.priceAndSeatsRow}>
+          {price > 0 ? (
+            <Text style={styles.skyPrice}>
+              {price.toLocaleString()} {currency}
+            </Text>
+          ) : (
+            <View />
+          )}
+
+          {totalSeats > 0 ? (
+            <View style={styles.seatsBlock}>
+              <Text style={styles.seatsText}>
+                {availableSeats}/{totalSeats} places
+              </Text>
+
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${occupancyRate}%`,
+                      backgroundColor:
+                        occupancyRate > 80
+                          ? "#f43f5e"
+                          : occupancyRate > 50
+                            ? "#f59e0b"
+                            : "#10b981",
+                    },
+                  ]}
+                />
+              </View>
+
+              <Text style={styles.occupancyLabel}>{occupancyLabel}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {amenities.length > 0 ? (
+          <View style={styles.chipsRow}>
+            {amenities.slice(0, 4).map((amenity) => (
+              <View key={amenity} style={styles.amenityChip}>
+                <Text style={styles.amenityText}>{amenity}</Text>
+              </View>
+            ))}
+
+            {amenities.length > 4 ? (
+              <Text style={styles.subtleText}>+{amenities.length - 4}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {description ? (
+          <Text numberOfLines={4} style={styles.description}>
+            {description}
+          </Text>
+        ) : null}
+
+        <CardCTA
+          label={getCtaLabel("voyages")}
+          onPress={handleCTA}
+          variant="sky"
+        />
+      </View>
     );
   };
 
-  // ─── Rendu générique ──────────────────────────────────────────────────────
-
   const renderGenericContent = () => (
-    <>
-      {title && (
-        <Text className="px-3 pb-1 text-sm font-bold text-white leading-snug">{title}</Text>
-      )}
-      {description && (
-        <Text className="px-3 pb-2 text-sm text-white/70 leading-relaxed">{description}</Text>
-      )}
-      {tags.length > 0 && (
-        <View className="px-3 pb-2 flex gap-1.5 flex-wrap">{tags.map((tag) => (
-            <Text key={tag} className="text-[10px] font-semibold text-purple-400">#{tag}</Text>
-          ))}</View>
-      )}
-    </>
-  );
+    <View style={styles.genericSection}>
+      {title ? <Text style={styles.genericTitle}>{title}</Text> : null}
 
-  // ─── Rendu principal ──────────────────────────────────────────────────────
+      {description ? (
+        <Text numberOfLines={6} style={styles.genericDescription}>
+          {description}
+        </Text>
+      ) : null}
 
-  return (
-    <View initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + index * 0.06 }} onPress={handleCardClick} className="rounded-3xl overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-      <PublicationHeader
-        publication={publication}
-        type={publication.type as PublicationType}
-        emoji={emoji}
-        onDelete={onDelete}
-        isMine={publication.isMine}
-        formatTime={formatTime}
-      />
-
-      {/* Galerie d'images (si présentes) */}
-      {images.length > 0 && (
-        <PublicationGallery images={images} fit="contain" />
-      )}
-
-      {/* Contenu spécifique selon le type */}
-      {publication.type === "transport" && renderTransportContent()}
-      {publication.type === "restauration" && renderRestaurantContent()}
-      {publication.type === "hebergement" && renderHebergementContent()}
-      {publication.type === "agri" && renderAgriContent()}
-      {publication.type === "network" && renderNetworkContent()}
-      {publication.type === "voyages" && renderVoyageContent()}
-      {publication.type !== "transport" &&
-        publication.type !== "restauration" &&
-        publication.type !== "hebergement" &&
-        publication.type !== "agri" &&
-        publication.type !== "network" &&
-        publication.type !== "voyages" &&
-        renderGenericContent()}
-
-      {/* Sondage (poll) */}
-      {postType === "poll" && pollOptions.length > 0 && (
-        <View className="px-3 pb-3"><PublicationPoll options={pollOptions} votedId={pollVoted} totalVotes={totalVotes} onVote={onVote} /></View>
-      )}
-
-      {/* Actions et CTA en bas */}
-      <View className="px-3 py-2.5 border-t border-white/5"><View className="flex items-center justify-between"><View className="flex items-center gap-1"><PublicationActions publication={publication} actions={config.actions} onAction={onAction} />{actionsSlot}</View><PublicationCTA cta={config.cta} onPress={handleCTA} /></View></View>
+      {tags.length > 0 ? (
+        <View style={styles.tagsRow}>
+          {tags.map((tag) => (
+            <Text key={tag} style={styles.tag}>
+              #{tag}
+            </Text>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
+
+  const renderTypeContent = () => {
+    switch (publication.type) {
+      case "transport":
+        return renderTransportContent();
+
+      case "restauration":
+        return renderRestaurantContent();
+
+      case "hebergement":
+        return renderHebergementContent();
+
+      case "agri":
+        return renderAgriContent();
+
+      case "network":
+        return renderNetworkContent();
+
+      case "voyages":
+        return renderVoyageContent();
+
+      default:
+        return renderGenericContent();
+    }
+  };
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(Math.min(index, 12) * 45)
+        .springify()
+        .damping(18)
+        .stiffness(180)}
+      style={[styles.card, animatedCardStyle]}
+    >
+      <AnimatedPressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          title
+            ? `${title}. ${getCtaLabel(publication.type as PublicationType)}`
+            : getCtaLabel(publication.type as PublicationType)
+        }
+        accessibilityHint="Ouvre le contenu correspondant"
+        onPress={navigateToPublication}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={({ pressed }) => [
+          styles.pressableCard,
+          pressed && styles.cardPressed,
+        ]}
+      >
+        <PublicationHeader
+          publication={publication}
+          type={publication.type as PublicationType}
+          emoji={emoji}
+          onDelete={onDelete}
+          isMine={publication.isMine}
+          formatTime={formatTime}
+        />
+
+        {images.length > 0 ? (
+          <View style={styles.galleryContainer}>
+            <PublicationGallery images={images} fit="contain" />
+          </View>
+        ) : null}
+
+        {renderTypeContent()}
+
+        {postType === "poll" && pollOptions.length > 0 ? (
+          <View style={styles.pollContainer}>
+            <PublicationPoll
+              // Le type `PollOption` local diverge du type exporté par
+              // PublicationPoll. Le contrat de données est identique
+              // (id/text/label/votes), le cast aligne les deux signatures.
+              options={pollOptions as never}
+              votedId={pollVoted}
+              totalVotes={totalVotes}
+              onVote={onVote}
+            />
+          </View>
+        ) : null}
+
+        <View style={styles.actionsContainer}>
+          <View style={styles.actionsLeft}>
+            <PublicationActions
+              publication={publication}
+              actions={config.actions}
+              onAction={onAction}
+            />
+
+            {actionsSlot}
+          </View>
+
+          <PublicationCTA
+            cta={config.cta}
+            // PublicationCTA expose `onClick` (pas `onPress`).
+            // Le handler interne gère déjà Pressable.onPress sans argument.
+            onClick={() => handleCTA()}
+          />
+        </View>
+      </AnimatedPressable>
+    </Animated.View>
+  );
 }
+
+interface CardCTAProps {
+  label: string;
+  onPress: (event: GestureResponderEvent) => void;
+  variant: "violet" | "orange" | "emerald" | "green" | "indigo" | "sky";
+}
+
+function CardCTA({ label, onPress, variant }: CardCTAProps) {
+  const backgroundColor =
+    variant === "violet"
+      ? "#6d28d9"
+      : variant === "orange"
+        ? "#ea580c"
+        : variant === "emerald"
+          ? "#059669"
+          : variant === "green"
+            ? "#16a34a"
+            : variant === "indigo"
+              ? "#4f46e5"
+              : "#0284c7";
+
+  const pressedBackgroundColor =
+    variant === "violet"
+      ? "#7c3aed"
+      : variant === "orange"
+        ? "#f97316"
+        : variant === "emerald"
+          ? "#10b981"
+          : variant === "green"
+            ? "#22c55e"
+            : variant === "indigo"
+              ? "#6366f1"
+              : "#0ea5e9";
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.ctaButton,
+        {
+          backgroundColor: pressed ? pressedBackgroundColor : backgroundColor,
+          opacity: pressed ? 0.9 : 1,
+        },
+      ]}
+    >
+      <Text style={styles.ctaText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    width: "100%",
+    marginBottom: 14,
+    borderRadius: 24,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  pressableCard: {
+    width: "100%",
+  },
+
+  cardPressed: {
+    opacity: 0.985,
+  },
+
+  galleryContainer: {
+    width: "100%",
+    overflow: "hidden",
+  },
+
+  contentSection: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    gap: 9,
+  },
+
+  genericSection: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    gap: 7,
+  },
+
+  genericTitle: {
+    color: "#ffffff",
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: "800",
+  },
+
+  genericDescription: {
+    color: "rgba(255,255,255,0.70)",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  tag: {
+    color: "#a78bfa",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  flex: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  sectionTitle: {
+    color: "#ffffff",
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: "800",
+  },
+
+  routeTitle: {
+    color: "#ffffff",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "700",
+  },
+
+  routeArrow: {
+    color: "#38bdf8",
+    fontWeight: "900",
+  },
+
+  metadataRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  metadataColumn: {
+    gap: 5,
+  },
+
+  metadataItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
+  inlineTextRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    minWidth: 0,
+  },
+
+  metadataText: {
+    color: "rgba(255,255,255,0.58)",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+
+  mutedSmall: {
+    flexShrink: 1,
+    color: "rgba(255,255,255,0.52)",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+
+  subtleText: {
+    color: "rgba(255,255,255,0.38)",
+    fontSize: 10,
+    lineHeight: 15,
+  },
+
+  strongMuted: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  description: {
+    color: "rgba(255,255,255,0.62)",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+
+  violetPrice: {
+    color: "#a78bfa",
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "900",
+  },
+
+  emeraldPrice: {
+    color: "#34d399",
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "900",
+  },
+
+  skyPrice: {
+    color: "#38bdf8",
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "900",
+  },
+
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  rating: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  ratingText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  unavailable: {
+    color: "#fb7185",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  verified: {
+    color: "#34d399",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  networkHeadline: {
+    marginTop: 2,
+    color: "#a5b4fc",
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
+
+  chipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  skillChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(99,102,241,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(99,102,241,0.20)",
+  },
+
+  skillText: {
+    color: "#a5b4fc",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  amenityChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+
+  amenityText: {
+    color: "rgba(255,255,255,0.52)",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  experienceList: {
+    gap: 5,
+  },
+
+  travelTypeBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+
+  travelTypeText: {
+    color: "rgba(255,255,255,0.58)",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+
+  priceAndSeatsRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  seatsBlock: {
+    width: 100,
+    alignItems: "flex-end",
+    gap: 4,
+  },
+
+  seatsText: {
+    color: "rgba(255,255,255,0.40)",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  progressTrack: {
+    width: 100,
+    height: 6,
+    overflow: "hidden",
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
+  progressFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
+
+  occupancyLabel: {
+    color: "rgba(255,255,255,0.34)",
+    fontSize: 9,
+    fontWeight: "600",
+  },
+
+  ctaButton: {
+    width: "100%",
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: 11,
+  },
+
+  ctaText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  pollContainer: {
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+
+  actionsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+  },
+
+  actionsLeft: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+});

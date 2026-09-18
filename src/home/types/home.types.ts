@@ -13,7 +13,6 @@ import type {
   HomeSectionItem,
 } from "./home-section.types";
 import type { RecommendationItem } from "./home-recommendation.types";
-import type { RankingInput, RankedItem } from "./home-ranking.types";
 
 /**
  * ============================================================
@@ -113,8 +112,6 @@ export interface HomeData {
   recommendations?: RecommendationItem[];
 
   feed?: HomeSectionItem[];
-
-  rankedItems?: RankedItem[];
 
   generatedAt: Date;
 }
@@ -283,6 +280,4 @@ export type {
   HomeSectionType,
   HomeSectionItem,
   RecommendationItem,
-  RankingInput,
-  RankedItem,
 };

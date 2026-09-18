@@ -1,9 +1,9 @@
 // convex/messages.ts
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { ConvexError } from "convex/values";
-import type { Id } from "./_generated/dataModel.d.ts";
+import type { Id } from "./_generated/dataModel";
+import { buildUserSearchText } from "./lib/userSearch";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -658,6 +658,11 @@ export const seedDemoConversations = mutation({
     let demoUserId1: Id<"users">;
 
     if (!demoUser1) {
+      const demoUserSearchText = buildUserSearchText({
+        name: "Démo",
+        roles: ["user"],
+      });
+
       demoUserId1 = await ctx.db.insert("users", {
         uid: "demo-user-1",
         tokenIdentifier: "demo-user-1",
@@ -668,6 +673,7 @@ export const seedDemoConversations = mutation({
         emailVerified: true,
         onboardingCompleted: true,
         reputationScore: 0,
+        searchText: demoUserSearchText,
       });
     } else {
       demoUserId1 = demoUser1._id;
@@ -681,6 +687,11 @@ export const seedDemoConversations = mutation({
     let demoUserId2: Id<"users">;
 
     if (!demoUser2) {
+      const marieSearchText = buildUserSearchText({
+        name: "Marie",
+        roles: ["user"],
+      });
+
       demoUserId2 = await ctx.db.insert("users", {
         uid: "demo-user-2",
         tokenIdentifier: "demo-user-2",
@@ -691,6 +702,7 @@ export const seedDemoConversations = mutation({
         emailVerified: true,
         onboardingCompleted: true,
         reputationScore: 0,
+        searchText: marieSearchText,
       });
     } else {
       demoUserId2 = demoUser2._id;

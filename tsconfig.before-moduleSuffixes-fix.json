@@ -1,4 +1,4 @@
-﻿{
+{
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
@@ -10,7 +10,7 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
 
-    "moduleSuffixes": [".native", ".ios", ".android", ""],
+    "moduleSuffixes": [".native", ".web", ".ios", ".android", ""],
 
     "paths": {
       "@/*": ["./src/*"],
@@ -26,4 +26,3 @@
   ],
   "exclude": ["node_modules", "dist", "build", ".expo", "android", "ios"]
 }
-

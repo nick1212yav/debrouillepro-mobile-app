@@ -539,6 +539,10 @@ export default defineSchema({
     thirdPartyAds: v.optional(v.boolean()),
     reducedMotion: v.boolean(),
     compactMode: v.boolean(),
+    // Préférences de notification fines (17 types + DND).
+    // Stocké en JSON pour ne pas figer 20 colonnes au schéma.
+    // Parse défensif côté client (src/hooks/use-notifications.ts).
+    notifPrefsJson: v.optional(v.string()),
     // Appearance prefs (synced from use-appearance hook)
     accentColor: v.optional(
       v.union(
@@ -4345,9 +4349,11 @@ export default defineSchema({
     viewCount: v.number(),
     duration: v.optional(v.number()),
     isActive: v.boolean(),
+    city: v.optional(v.string()),
   })
     .index("by_author", ["authorId"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_city_active", ["city", "isActive"]),
 
   shortVideoLikes: defineTable({
     videoId: v.id("shortVideos"),

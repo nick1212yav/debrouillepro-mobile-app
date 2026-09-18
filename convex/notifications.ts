@@ -30,6 +30,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import { internal } from "./_generated/api";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ const notifTypeValidator = v.union(
   v.literal("event"),
   v.literal("streak"),
   v.literal("digest"),
+  v.literal("annonce"), // aligné sur convex/schema.ts
 );
 
 const priorityValidator = v.union(
@@ -106,8 +108,8 @@ async function requireUser(ctx: QueryCtx | MutationCtx) {
 /**
  * Récupérer les notifications de l'utilisateur connecté.
  *
- * Les notifications sont retournées de la plus récente
- * à la plus ancienne.
+ * Bornée à 100. Le client consomme cette query comme un tableau simple.
+ * Une pagination native sera introduite avec une migration client dédiée.
  */
 export const list = query({
   args: {},
@@ -128,6 +130,10 @@ export const list = query({
 
 /**
  * Compter les notifications non lues.
+ *
+ * Bornée à 1000. Au-delà, la valeur retournée est plafonnée.
+ * Un utilisateur avec plus de 1000 non-lues relève d'un problème UX,
+ * pas d'un problème de compteur.
  */
 export const unreadCount = query({
   args: {},
@@ -138,12 +144,14 @@ export const unreadCount = query({
       return 0;
     }
 
+    const MAX_UNREAD_COUNT = 1000;
+
     const unread = await ctx.db
       .query("notifications")
       .withIndex("by_user_and_read", (q) =>
         q.eq("userId", user._id).eq("read", false),
       )
-      .collect();
+      .take(MAX_UNREAD_COUNT);
 
     return unread.length;
   },
@@ -203,6 +211,10 @@ export const markNotificationRead = mutation({
 
 /**
  * Marquer toutes les notifications comme lues.
+ *
+ * Traitement par lot de 500 dans cette mutation. Si un second lot reste
+ * à traiter, la suite est déléguée à `continueMarkAllRead` via le
+ * scheduler — évite tout timeout sur de gros volumes.
  */
 export const markAllRead = mutation({
   args: {},
@@ -210,20 +222,78 @@ export const markAllRead = mutation({
   handler: async (ctx): Promise<void> => {
     const user = await requireUser(ctx);
 
-    const unread = await ctx.db
+    const BATCH = 500;
+
+    const batch = await ctx.db
       .query("notifications")
       .withIndex("by_user_and_read", (q) =>
         q.eq("userId", user._id).eq("read", false),
       )
-      .collect();
+      .take(BATCH);
+
+    if (batch.length === 0) {
+      return;
+    }
 
     await Promise.all(
-      unread.map((notification) =>
+      batch.map((notification) =>
         ctx.db.patch(notification._id, {
           read: true,
         }),
       ),
     );
+
+    if (batch.length === BATCH) {
+      // Il peut rester d'autres non-lues. On délègue la suite.
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notifications.continueMarkAllRead,
+        { userId: user._id },
+      );
+    }
+  },
+});
+
+/**
+ * Continuation de `markAllRead`.
+ *
+ * Internal uniquement : déclenchée par scheduler, jamais exposée au client.
+ * Traite le lot suivant et se re-planifie tant qu'il reste des non-lues.
+ */
+export const continueMarkAllRead = internalMutation({
+  args: {
+    userId: v.id("users"),
+  },
+
+  handler: async (ctx, args): Promise<void> => {
+    const BATCH = 500;
+
+    const batch = await ctx.db
+      .query("notifications")
+      .withIndex("by_user_and_read", (q) =>
+        q.eq("userId", args.userId).eq("read", false),
+      )
+      .take(BATCH);
+
+    if (batch.length === 0) {
+      return;
+    }
+
+    await Promise.all(
+      batch.map((notification) =>
+        ctx.db.patch(notification._id, {
+          read: true,
+        }),
+      ),
+    );
+
+    if (batch.length === BATCH) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notifications.continueMarkAllRead,
+        { userId: args.userId },
+      );
+    }
   },
 });
 
@@ -393,200 +463,21 @@ export const unregisterPush = mutation({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SEED DEMO
+// SEED DEMO — SUPPRIMÉ
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Insérer des notifications de démonstration
- * pour un nouvel utilisateur.
- */
-export const seedDemo = mutation({
-  args: {},
-
-  handler: async (ctx): Promise<void> => {
-    const user = await getAuthenticatedUser(ctx);
-
-    if (!user) {
-      return;
-    }
-
-    const existing = await ctx.db
-      .query("notifications")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .take(1);
-
-    if (existing.length > 0) {
-      return;
-    }
-
-    const demos = [
-      {
-        userId: user._id,
-        type: "payment" as const,
-        module: "Paiement",
-        title: "Paiement reçu",
-        body: "Vous avez reçu 25 000 FCFA de Aminata Diallo via Mobile Money.",
-        read: false,
-        pinned: true,
-        priority: "high" as const,
-        initials: "AD",
-        actionPage: "paiement",
-        amount: "+25 000 FCFA",
-        actionButtons: [
-          {
-            label: "Voir le reçu",
-            variant: "primary" as const,
-          },
-        ],
-      },
-
-      {
-        userId: user._id,
-        type: "message" as const,
-        module: "Messages",
-        title: "Moussa Konaté",
-        body: '"Bonjour, est-ce que l\'appartement du Plateau est encore disponible ?"',
-
-        read: false,
-        pinned: false,
-        priority: "high" as const,
-        initials: "MK",
-        actionPage: "messages",
-
-        actionButtons: [
-          {
-            label: "Répondre",
-            variant: "primary" as const,
-          },
-          {
-            label: "Ignorer",
-            variant: "danger" as const,
-          },
-        ],
-      },
-
-      {
-        userId: user._id,
-        type: "sante" as const,
-        module: "Santé",
-        title: "RDV demain à 10h00",
-        body: "Dr. Aissatou Fall — Centre Médical Gombe. N'oubliez pas votre carnet de santé.",
-
-        read: false,
-        pinned: true,
-        priority: "high" as const,
-        initials: "SF",
-        actionPage: "sante",
-
-        actionButtons: [
-          {
-            label: "Confirmer",
-            variant: "primary" as const,
-          },
-          {
-            label: "Annuler RDV",
-            variant: "danger" as const,
-          },
-        ],
-      },
-
-      {
-        userId: user._id,
-        type: "delivery" as const,
-        module: "Livraison",
-        title: "Colis en route",
-        body: "Votre colis DBP-2024-4821 est en route. Arrivée estimée : 14 min.",
-
-        read: false,
-        pinned: false,
-        priority: "normal" as const,
-        initials: "LV",
-        actionPage: "livraison",
-
-        actionButtons: [
-          {
-            label: "Suivre en live",
-            variant: "primary" as const,
-          },
-        ],
-      },
-
-      {
-        userId: user._id,
-        type: "job" as const,
-        module: "Jobs",
-        title: "Candidature vue",
-        body: "Talents Pro a consulté votre profil pour le poste de Développeur React Senior.",
-
-        read: false,
-        pinned: false,
-        priority: "normal" as const,
-        initials: "TP",
-        actionPage: "jobs",
-      },
-
-      {
-        userId: user._id,
-        type: "agri" as const,
-        module: "Agri",
-        title: "Alerte météo agricole",
-        body: "Risque de sécheresse détecté — moins de 5mm prévus cette semaine. Irrigation conseillée.",
-
-        read: true,
-        pinned: false,
-        priority: "high" as const,
-        initials: "AG",
-        actionPage: "agri",
-      },
-
-      {
-        userId: user._id,
-        type: "transport" as const,
-        module: "Transport",
-        title: "Chauffeur confirmé",
-        body: "Patrick K. a accepté votre course. Il arrive dans 3 min. Plaque : KIN-7845-A",
-
-        read: true,
-        pinned: false,
-        priority: "normal" as const,
-        initials: "TR",
-        actionPage: "transport",
-      },
-
-      {
-        userId: user._id,
-        type: "community" as const,
-        module: "Communauté",
-        title: "Nouvelle réponse",
-        body: 'Emile B. a commenté votre post : "Bonne initiative ! Je serais partant pour le covoiturage"',
-
-        read: true,
-        pinned: false,
-        priority: "low" as const,
-        initials: "CM",
-        actionPage: "community",
-      },
-
-      {
-        userId: user._id,
-        type: "system" as const,
-        module: "Système",
-        title: "Bienvenue sur Débrouille Pro !",
-        body: "Votre compte est prêt. Explorez les modules disponibles et commencez votre expérience.",
-
-        read: false,
-        pinned: false,
-        priority: "normal" as const,
-        initials: "DB",
-        actionPage: "explorer",
-      },
-    ];
-
-    for (const demo of demos) {
-      await ctx.db.insert("notifications", demo);
-    }
-  },
-});
+//
+// `seedDemo` insérait 9 notifications fictives présentées comme réelles
+// (faux paiement de 25 000 FCFA, faux RDV médical, faux colis en livraison,
+// faux commentaire d'utilisateur…).
+//
+// Cette mutation violait la règle « zéro donnée fabriquée présentée comme
+// réelle ». Elle a été supprimée ainsi que son appel automatique côté
+// client (useNotificationsSeeder).
+//
+// Si un mode démonstration est nécessaire pour un test utilisateur,
+// il devra être un bouton explicite dans les réglages dev, et construire
+// un état observable dans une table dédiée (jamais dans `notifications`
+// qui est la source de vérité de l'utilisateur).
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTIFICATIONS SOCIALES INTERNES
@@ -628,7 +519,7 @@ export const createSocial = internalMutation({
       return;
     }
 
-    // Éviter les doublons immédiats.
+    // Éviter les doublons immédiats (fenêtre d'une minute).
     const recent = await ctx.db
       .query("notifications")
       .withIndex("by_user", (q) => q.eq("userId", args.toUserId))
@@ -690,6 +581,12 @@ export const createSocial = internalMutation({
  *
  * - danger du streak
  * - digest matinal
+ *
+ * IMPORTANT :
+ * - Aucun contenu fabriqué (pas de greeting aléatoire).
+ * - Aucune clé technique dans `body` (le `body` est lu par l'UI).
+ * - La déduplication se fait via `actionPage`, qui contient la clé
+ *   technique `streak-danger-YYYY-MM-DD` / `digest-YYYY-MM-DD`.
  */
 export const sendSmartNotifs = mutation({
   args: {},
@@ -726,12 +623,12 @@ export const sendSmartNotifs = mutation({
       const isInDanger = streak.lastClaimedDate === yesterday;
 
       if (isInDanger) {
-        const duplicateKey = `streak-danger-${today}`;
+        const dedupKey = `streak-danger-${today}`;
 
         const existingDanger = await ctx.db
           .query("notifications")
           .withIndex("by_user", (q) => q.eq("userId", user._id))
-          .filter((q) => q.eq(q.field("body"), duplicateKey))
+          .filter((q) => q.eq(q.field("actionPage"), dedupKey))
           .first();
 
         if (!existingDanger) {
@@ -744,7 +641,7 @@ export const sendSmartNotifs = mutation({
 
             title: `🔥 Ton streak de ${streak.currentStreak} jours est en danger !`,
 
-            body: duplicateKey,
+            body: `Reviens aujourd'hui pour le conserver.`,
 
             read: false,
 
@@ -752,7 +649,7 @@ export const sendSmartNotifs = mutation({
 
             priority: "high",
 
-            actionPage: "home",
+            actionPage: dedupKey,
           });
         }
       }
@@ -763,24 +660,15 @@ export const sendSmartNotifs = mutation({
     // ───────────────────────────────────────────────────────────────────────
 
     if (hour >= 6 && hour < 10) {
-      const duplicateKey = `digest-${today}`;
+      const dedupKey = `digest-${today}`;
 
       const existingDigest = await ctx.db
         .query("notifications")
         .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .filter((q) => q.eq(q.field("body"), duplicateKey))
+        .filter((q) => q.eq(q.field("actionPage"), dedupKey))
         .first();
 
       if (!existingDigest) {
-        const greetings = [
-          "Prêt à conquérir ta journée ? ⚡",
-          "Ta communauté t'attend ! 👥",
-          "Explore de nouvelles opportunités. 🌍",
-          "Une action suffit pour tout changer. 💪",
-        ];
-
-        const message = greetings[Math.floor(Math.random() * greetings.length)];
-
         await ctx.db.insert("notifications", {
           userId: user._id,
 
@@ -788,9 +676,9 @@ export const sendSmartNotifs = mutation({
 
           module: "Débrouille Pro",
 
-          title: `Bonjour ! ${message}`,
+          title: `Ton résumé du jour est prêt`,
 
-          body: duplicateKey,
+          body: "",
 
           read: false,
 
@@ -798,7 +686,7 @@ export const sendSmartNotifs = mutation({
 
           priority: "normal",
 
-          actionPage: "dashboard",
+          actionPage: dedupKey,
         });
       }
     }

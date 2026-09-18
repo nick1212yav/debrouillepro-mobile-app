@@ -1,0 +1,37 @@
+﻿===== GROUPE 1 : USER MUTATIONS =====
+src\features\auth\services\firebase\auth.service.ts:5: updateProfile,
+src\features\auth\services\firebase\auth.service.ts:82: await updateProfile(credential.user, {
+src\features\community\components\CommunityProfile.tsx:24: onUpdateProfile?: (data: {
+src\features\community\components\CommunityProfile.tsx:42: onUpdateProfile,
+src\features\community\components\CommunityProfile.tsx:54: await onUpdateProfile?.({
+src\features\network\services\profile.service.ts:46: static async updateProfile(
+src\features\network\sheets\EditProfileSheet.tsx:49: const updateProfile = useMutation(api.network.updateProfile); // ✅ Pointera vers votre api de réseau unifiée
+src\features\network\sheets\EditProfileSheet.tsx:112: await updateProfile({
+src\features\profile\components\EditProfileSheet.tsx:26: const updateProfile = useMutation(api.users.updateProfile);
+src\features\profile\components\EditProfileSheet.tsx:80: await updateProfile({
+src\features\profile\components\EditProfileSheet.tsx:105: await updateProfile({
+src\pages\home\_components\OnboardingFlow.tsx:1307: const completeOnboarding = useMutation(api.users.completeOnboarding);
+src\pages\home\_components\OnboardingFlow.tsx:1357: await completeOnboarding({
+src\pages\home\_components\OnboardingFlow.tsx:1380: completeOnboarding,
+
+===== GROUPE 2 : RECOMMENDATIONS =====
+src\features\community\hooks\useCommunityRecommendations.ts:10: api.community.getRecommendations,
+src\features\marketplace\hooks\useRecommendations.ts:9: api.commerce.getRecommendations,
+src\features\restauration\ai\FoodRecommender.ts:45: public static getRecommendations(
+src\features\restauration\services\AIService.ts:23: return FoodRecommender.getRecommendations(profile, restaurants, limit);
+src\home\engine\HomeEngine.ts:140: (await this.recommendationEngine.getRecommendations(
+src\home\engine\HomeEngine.ts:205: async getRecommendations(
+src\home\engine\HomeEngine.ts:210: return this.recommendationEngine.getRecommendations(items, context, {
+src\home\engine\HomeRecommendationEngine.ts:57: async getRecommendations(
+src\home\engine\HomeRecommendationEngine.ts:86: return this.getRecommendations(items, context, options);
+src\home\services\HomeRecommendationService.ts:52: export interface GetRecommendationsOptions {
+src\home\services\HomeRecommendationService.ts:105: async getRecommendations(
+src\home\services\HomeRecommendationService.ts:108: options: GetRecommendationsOptions = {},
+src\home\services\HomeRecommendationService.ts:126: return this.recommendationEngine.getRecommendations(
+src\home\services\HomeRecommendationService.ts:145: options: GetRecommendationsOptions = {},
+src\home\services\HomeService.ts:246: async getRecommendations(
+src\home\services\HomeService.ts:251: return this.recommendationEngine.getRecommendations(items, context, {
+
+===== GROUPE 3 : HOME LEGACY ENDPOINTS =====
+src\home\hooks\useHomeContext.ts:22: const getHomeDataWithContext = useAction(api.home.getHomeDataWithContext);
+src\home\hooks\useHomeContext.ts:25: return getHomeDataWithContext({});

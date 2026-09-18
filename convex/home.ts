@@ -1,11 +1,10 @@
 // convex/home.ts
 
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { getModule, getHomeModules } from "./moduleRegistry";
 import { buildHomeData } from "./homeBuilder";
-import { buildHomeIntelligence } from "./homeIntelligence";
 
 // ============================================================
 // TYPES
@@ -229,63 +228,19 @@ function buildHomeModuleOrder(preferences: HomePreferences): HomeModule[] {
  * Récupère les données principales nécessaires
  * au Shell Home.
  *
- * Cette query est conservée pour compatibilité avec
- * les autres usages du projet.
+ * Cette query est la seule source de vérité Home
+ * actuellement consommée côté client :
  *
- * La construction réelle est désormais centralisée
- * dans homeBuilder.ts.
+ *   useHome.ts             → api.home.getHomeData
+ *   OpportunityRadar.tsx   → api.home.getHomeData
+ *
+ * La construction réelle est centralisée dans homeBuilder.ts.
  */
 export const getHomeData = query({
   args: {},
 
   handler: async (ctx): Promise<HomeData | null> => {
     return await buildHomeData(ctx);
-  },
-});
-
-// ============================================================
-// QUERY — GET HOME SCREEN DATA
-// ============================================================
-
-/**
- * Agrège les données principales du Home et son intelligence
- * dans une seule requête Convex.
- *
- * Architecture :
- *
- * getHomeScreenData
- *      ↓
- * buildHomeData()
- *      ↓
- * buildHomeIntelligence(ctx, data)
- *
- * L'intelligence réutilise les données Home déjà construites
- * et ne relance donc pas getHomeData via ctx.runQuery().
- *
- * Cela évite une double souscription côté frontend et réduit
- * le travail/payload du chargement initial du Home.
- */
-export const getHomeScreenData = query({
-  args: {},
-
-  handler: async (
-    ctx,
-  ): Promise<{
-    data: HomeData;
-    intelligence: any;
-  } | null> => {
-    const data = await buildHomeData(ctx);
-
-    if (!data) {
-      return null;
-    }
-
-    const intelligence = await buildHomeIntelligence(ctx, data);
-
-    return {
-      data,
-      intelligence,
-    };
   },
 });
 
@@ -544,18 +499,6 @@ export const reorderSections = mutation({
       success: true,
       customSectionOrder: cleanedOrder,
     };
-  },
-});
-
-// ============================================================
-// ACTION — HOME DATA WITH CONTEXT
-// ============================================================
-
-export const getHomeDataWithContext = action({
-  args: {},
-
-  handler: async (ctx): Promise<HomeData | null> => {
-    return await ctx.runQuery(api.home.getHomeData, {});
   },
 });
 

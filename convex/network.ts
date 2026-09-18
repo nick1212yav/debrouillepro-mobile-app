@@ -1,36 +1,49 @@
 // convex/network.ts
+
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import {
+  buildUserSearchText,
+  normalizeUserSearchQuery,
+} from "./lib/userSearch";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function requireUser(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity)
+
+  if (!identity) {
     throw new ConvexError({
       code: "UNAUTHENTICATED",
       message: "Connexion requise",
     });
+  }
+
   const user = await ctx.db
     .query("users")
     .withIndex("by_token", (q) =>
       q.eq("tokenIdentifier", identity.tokenIdentifier),
     )
     .unique();
-  if (!user)
+
+  if (!user) {
     throw new ConvexError({
       code: "NOT_FOUND",
       message: "Utilisateur introuvable",
     });
+  }
+
   return user;
 }
 
 async function getCurrentUser(ctx: QueryCtx) {
   try {
     const identity = await ctx.auth.getUserIdentity();
+
     if (!identity) return null;
+
     return await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
@@ -49,16 +62,21 @@ async function ensureOwnership<T extends { userId: Id<"users"> }>(
   userId: Id<"users">,
 ): Promise<T> {
   const entity = (await ctx.db.get(entityId)) as T | null;
-  if (!entity)
+
+  if (!entity) {
     throw new ConvexError({
       code: "NOT_FOUND",
       message: "Élément introuvable",
     });
-  if (entity.userId !== userId)
+  }
+
+  if (entity.userId !== userId) {
     throw new ConvexError({
       code: "FORBIDDEN",
       message: "Vous n'êtes pas autorisé à modifier cet élément",
     });
+  }
+
   return entity;
 }
 
@@ -68,8 +86,10 @@ async function ensureOwnership<T extends { userId: Id<"users"> }>(
 
 export const getPublicProfile = query({
   args: { userId: v.id("users") },
+
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
+
     if (!user) return null;
 
     const experiences = await ctx.db
@@ -98,9 +118,11 @@ export const getPublicProfile = query({
       .collect();
 
     const follows = await ctx.db.query("follows").collect();
+
     const followerCount = follows.filter(
       (f) => f.followingId === args.userId,
     ).length;
+
     const followingCount = follows.filter(
       (f) => f.followerId === args.userId,
     ).length;
@@ -137,22 +159,85 @@ export const updateProfile = mutation({
       ),
     ),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const updates: any = {};
-    if (args.name !== undefined) updates.name = args.name;
-    if (args.headline !== undefined) updates.headline = args.headline;
-    if (args.bio !== undefined) updates.bio = args.bio;
-    if (args.city !== undefined) updates.city = args.city;
-    if (args.country !== undefined) updates.country = args.country;
-    if (args.roles !== undefined) updates.roles = args.roles;
-    if (args.interests !== undefined) updates.interests = args.interests;
-    if (args.avatar !== undefined) updates.avatar = args.avatar;
-    if (args.cover !== undefined) updates.cover = args.cover;
-    if (args.availability !== undefined)
+
+    const name = args.name ?? user.name;
+    const bio = args.bio ?? user.bio;
+    const city = args.city ?? user.city;
+    const country = args.country ?? user.country;
+    const roles = args.roles ?? user.roles;
+    const interests = args.interests ?? user.interests;
+
+    const updates: {
+      name?: string;
+      headline?: string;
+      bio?: string;
+      city?: string;
+      country?: string;
+      roles?: string[];
+      interests?: string[];
+      avatar?: string;
+      cover?: string;
+      availability?: "available" | "limited" | "unavailable";
+      searchText: string;
+      updatedAt: string;
+    } = {
+      searchText: buildUserSearchText({
+        name,
+        bio,
+        city,
+        country,
+        roles,
+        interests,
+        profession: user.profession,
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (args.name !== undefined) {
+      updates.name = args.name;
+    }
+
+    if (args.headline !== undefined) {
+      updates.headline = args.headline;
+    }
+
+    if (args.bio !== undefined) {
+      updates.bio = args.bio;
+    }
+
+    if (args.city !== undefined) {
+      updates.city = args.city;
+    }
+
+    if (args.country !== undefined) {
+      updates.country = args.country;
+    }
+
+    if (args.roles !== undefined) {
+      updates.roles = args.roles;
+    }
+
+    if (args.interests !== undefined) {
+      updates.interests = args.interests;
+    }
+
+    if (args.avatar !== undefined) {
+      updates.avatar = args.avatar;
+    }
+
+    if (args.cover !== undefined) {
+      updates.cover = args.cover;
+    }
+
+    if (args.availability !== undefined) {
       updates.availability = args.availability;
-    updates.updatedAt = new Date().toISOString();
+    }
+
     await ctx.db.patch(user._id, updates);
+
     return { success: true };
   },
 });
@@ -163,6 +248,7 @@ export const updateProfile = mutation({
 
 export const getUserExperiences = query({
   args: { userId: v.id("users") },
+
   handler: async (ctx, args) => {
     return await ctx.db
       .query("networkExperiences")
@@ -182,8 +268,10 @@ export const addExperience = mutation({
     description: v.optional(v.string()),
     achievements: v.optional(v.array(v.string())),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const id = await ctx.db.insert("networkExperiences", {
       userId: user._id,
       title: args.title,
@@ -197,6 +285,7 @@ export const addExperience = mutation({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
     return id;
   },
 });
@@ -213,30 +302,47 @@ export const updateExperience = mutation({
     description: v.optional(v.string()),
     achievements: v.optional(v.array(v.string())),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkExperiences", user._id);
-    const updates: any = { updatedAt: new Date().toISOString() };
+
+    const updates: any = {
+      updatedAt: new Date().toISOString(),
+    };
+
     if (args.title !== undefined) updates.title = args.title;
     if (args.company !== undefined) updates.company = args.company;
     if (args.location !== undefined) updates.location = args.location;
     if (args.startDate !== undefined) updates.startDate = args.startDate;
     if (args.endDate !== undefined) updates.endDate = args.endDate;
     if (args.current !== undefined) updates.current = args.current;
-    if (args.description !== undefined) updates.description = args.description;
-    if (args.achievements !== undefined)
+    if (args.description !== undefined) {
+      updates.description = args.description;
+    }
+    if (args.achievements !== undefined) {
       updates.achievements = args.achievements;
+    }
+
     await ctx.db.patch(args.id, updates);
+
     return { success: true };
   },
 });
 
 export const deleteExperience = mutation({
-  args: { id: v.id("networkExperiences") },
+  args: {
+    id: v.id("networkExperiences"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkExperiences", user._id);
+
     await ctx.db.delete(args.id);
+
     return { success: true };
   },
 });
@@ -247,6 +353,7 @@ export const deleteExperience = mutation({
 
 export const getUserEducations = query({
   args: { userId: v.id("users") },
+
   handler: async (ctx, args) => {
     return await ctx.db
       .query("networkEducations")
@@ -266,8 +373,10 @@ export const addEducation = mutation({
     current: v.boolean(),
     description: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const id = await ctx.db.insert("networkEducations", {
       userId: user._id,
       school: args.school,
@@ -281,6 +390,7 @@ export const addEducation = mutation({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
     return id;
   },
 });
@@ -297,10 +407,16 @@ export const updateEducation = mutation({
     current: v.optional(v.boolean()),
     description: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkEducations", user._id);
-    const updates: any = { updatedAt: new Date().toISOString() };
+
+    const updates: any = {
+      updatedAt: new Date().toISOString(),
+    };
+
     if (args.school !== undefined) updates.school = args.school;
     if (args.degree !== undefined) updates.degree = args.degree;
     if (args.field !== undefined) updates.field = args.field;
@@ -308,18 +424,28 @@ export const updateEducation = mutation({
     if (args.startDate !== undefined) updates.startDate = args.startDate;
     if (args.endDate !== undefined) updates.endDate = args.endDate;
     if (args.current !== undefined) updates.current = args.current;
-    if (args.description !== undefined) updates.description = args.description;
+    if (args.description !== undefined) {
+      updates.description = args.description;
+    }
+
     await ctx.db.patch(args.id, updates);
+
     return { success: true };
   },
 });
 
 export const deleteEducation = mutation({
-  args: { id: v.id("networkEducations") },
+  args: {
+    id: v.id("networkEducations"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkEducations", user._id);
+
     await ctx.db.delete(args.id);
+
     return { success: true };
   },
 });
@@ -330,6 +456,7 @@ export const deleteEducation = mutation({
 
 export const getUserSkills = query({
   args: { userId: v.id("users") },
+
   handler: async (ctx, args) => {
     return await ctx.db
       .query("networkSkills")
@@ -339,20 +466,26 @@ export const getUserSkills = query({
 });
 
 export const addSkill = mutation({
-  args: { name: v.string() },
+  args: {
+    name: v.string(),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const existing = await ctx.db
       .query("networkSkills")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .filter((q) => q.eq(q.field("name"), args.name))
       .first();
+
     if (existing) {
       throw new ConvexError({
         code: "CONFLICT",
         message: "Cette compétence existe déjà",
       });
     }
+
     const id = await ctx.db.insert("networkSkills", {
       userId: user._id,
       name: args.name,
@@ -361,49 +494,68 @@ export const addSkill = mutation({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
     return id;
   },
 });
 
 export const deleteSkill = mutation({
-  args: { id: v.id("networkSkills") },
+  args: {
+    id: v.id("networkSkills"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkSkills", user._id);
+
     await ctx.db.delete(args.id);
+
     return { success: true };
   },
 });
 
 export const endorseSkill = mutation({
-  args: { skillId: v.id("networkSkills") },
+  args: {
+    skillId: v.id("networkSkills"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const skill = await ctx.db.get(args.skillId);
-    if (!skill)
+
+    if (!skill) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Compétence introuvable",
       });
+    }
+
     if (skill.userId === user._id) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Vous ne pouvez pas endorser votre propre compétence",
       });
     }
+
     const endorsedBy = skill.endorsedBy || [];
+
     if (endorsedBy.includes(user._id)) {
       throw new ConvexError({
         code: "CONFLICT",
         message: "Vous avez déjà endorsé cette compétence",
       });
     }
+
     endorsedBy.push(user._id);
+
     await ctx.db.patch(args.skillId, {
       endorsements: (skill.endorsements || 0) + 1,
       endorsedBy,
       updatedAt: new Date().toISOString(),
     });
+
     return { success: true };
   },
 });
@@ -414,6 +566,7 @@ export const endorseSkill = mutation({
 
 export const getUserCertifications = query({
   args: { userId: v.id("users") },
+
   handler: async (ctx, args) => {
     return await ctx.db
       .query("networkCertifications")
@@ -431,8 +584,10 @@ export const addCertification = mutation({
     credentialId: v.optional(v.string()),
     credentialUrl: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const id = await ctx.db.insert("networkCertifications", {
       userId: user._id,
       name: args.name,
@@ -444,6 +599,7 @@ export const addCertification = mutation({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
     return id;
   },
 });
@@ -458,29 +614,47 @@ export const updateCertification = mutation({
     credentialId: v.optional(v.string()),
     credentialUrl: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkCertifications", user._id);
-    const updates: any = { updatedAt: new Date().toISOString() };
+
+    const updates: any = {
+      updatedAt: new Date().toISOString(),
+    };
+
     if (args.name !== undefined) updates.name = args.name;
     if (args.issuer !== undefined) updates.issuer = args.issuer;
     if (args.issueDate !== undefined) updates.issueDate = args.issueDate;
     if (args.expiryDate !== undefined) updates.expiryDate = args.expiryDate;
-    if (args.credentialId !== undefined)
+
+    if (args.credentialId !== undefined) {
       updates.credentialId = args.credentialId;
-    if (args.credentialUrl !== undefined)
+    }
+
+    if (args.credentialUrl !== undefined) {
       updates.credentialUrl = args.credentialUrl;
+    }
+
     await ctx.db.patch(args.id, updates);
+
     return { success: true };
   },
 });
 
 export const deleteCertification = mutation({
-  args: { id: v.id("networkCertifications") },
+  args: {
+    id: v.id("networkCertifications"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkCertifications", user._id);
+
     await ctx.db.delete(args.id);
+
     return { success: true };
   },
 });
@@ -491,6 +665,7 @@ export const deleteCertification = mutation({
 
 export const getUserServices = query({
   args: { userId: v.id("users") },
+
   handler: async (ctx, args) => {
     return await ctx.db
       .query("networkServices")
@@ -508,8 +683,10 @@ export const addService = mutation({
     location: v.optional(v.string()),
     deliveryTime: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const id = await ctx.db.insert("networkServices", {
       userId: user._id,
       title: args.title,
@@ -521,6 +698,7 @@ export const addService = mutation({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
     return id;
   },
 });
@@ -535,28 +713,45 @@ export const updateService = mutation({
     location: v.optional(v.string()),
     deliveryTime: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkServices", user._id);
-    const updates: any = { updatedAt: new Date().toISOString() };
+
+    const updates: any = {
+      updatedAt: new Date().toISOString(),
+    };
+
     if (args.title !== undefined) updates.title = args.title;
-    if (args.description !== undefined) updates.description = args.description;
+    if (args.description !== undefined) {
+      updates.description = args.description;
+    }
     if (args.price !== undefined) updates.price = args.price;
     if (args.category !== undefined) updates.category = args.category;
     if (args.location !== undefined) updates.location = args.location;
-    if (args.deliveryTime !== undefined)
+    if (args.deliveryTime !== undefined) {
       updates.deliveryTime = args.deliveryTime;
+    }
+
     await ctx.db.patch(args.id, updates);
+
     return { success: true };
   },
 });
 
 export const deleteService = mutation({
-  args: { id: v.id("networkServices") },
+  args: {
+    id: v.id("networkServices"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkServices", user._id);
+
     await ctx.db.delete(args.id);
+
     return { success: true };
   },
 });
@@ -567,6 +762,7 @@ export const deleteService = mutation({
 
 export const getUserPortfolio = query({
   args: { userId: v.id("users") },
+
   handler: async (ctx, args) => {
     return await ctx.db
       .query("networkPortfolio")
@@ -588,8 +784,10 @@ export const addPortfolioItem = mutation({
     url: v.string(),
     thumbnail: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const id = await ctx.db.insert("networkPortfolio", {
       userId: user._id,
       title: args.title,
@@ -600,16 +798,23 @@ export const addPortfolioItem = mutation({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
     return id;
   },
 });
 
 export const deletePortfolioItem = mutation({
-  args: { id: v.id("networkPortfolio") },
+  args: {
+    id: v.id("networkPortfolio"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     await ensureOwnership<any>(ctx, args.id, "networkPortfolio", user._id);
+
     await ctx.db.delete(args.id);
+
     return { success: true };
   },
 });
@@ -620,6 +825,7 @@ export const deletePortfolioItem = mutation({
 
 export const getUserRecommendations = query({
   args: { userId: v.id("users") },
+
   handler: async (ctx, args) => {
     return await ctx.db
       .query("networkRecommendations")
@@ -634,14 +840,17 @@ export const addRecommendation = mutation({
     rating: v.number(),
     comment: v.string(),
   },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     if (user._id === args.receiverId) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Vous ne pouvez pas vous recommander vous-même",
       });
     }
+
     const id = await ctx.db.insert("networkRecommendations", {
       fromUserId: user._id,
       fromName: user.name || "Utilisateur",
@@ -651,27 +860,37 @@ export const addRecommendation = mutation({
       comment: args.comment,
       createdAt: new Date().toISOString(),
     });
+
     return id;
   },
 });
 
 export const deleteRecommendation = mutation({
-  args: { id: v.id("networkRecommendations") },
+  args: {
+    id: v.id("networkRecommendations"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const rec = await ctx.db.get(args.id);
-    if (!rec)
+
+    if (!rec) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Recommandation introuvable",
       });
+    }
+
     if (rec.fromUserId !== user._id && rec.receiverId !== user._id) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Action non autorisée",
       });
     }
+
     await ctx.db.delete(args.id);
+
     return { success: true };
   },
 });
@@ -681,15 +900,20 @@ export const deleteRecommendation = mutation({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const toggleFollow = mutation({
-  args: { targetUserId: v.id("users") },
+  args: {
+    targetUserId: v.id("users"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     if (user._id === args.targetUserId) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Vous ne pouvez pas vous suivre vous-même",
       });
     }
+
     const existing = await ctx.db
       .query("follows")
       .withIndex("by_follower_and_following", (q) =>
@@ -700,23 +924,28 @@ export const toggleFollow = mutation({
     if (existing) {
       await ctx.db.delete(existing._id);
       return false;
-    } else {
-      await ctx.db.insert("follows", {
-        followerId: user._id,
-        followingId: args.targetUserId,
-      });
-      return true;
     }
+
+    await ctx.db.insert("follows", {
+      followerId: user._id,
+      followingId: args.targetUserId,
+    });
+
+    return true;
   },
 });
 
 export const getFollowStats = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
+
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
     const follows = await ctx.db.query("follows").collect();
 
     const followers = follows.filter((f) => f.followingId === args.userId);
+
     const following = follows.filter((f) => f.followerId === args.userId);
 
     const isFollowing = currentUser
@@ -735,18 +964,26 @@ export const getFollowStats = query({
 });
 
 export const getFollowers = query({
-  args: { userId: v.id("users"), limit: v.optional(v.number()) },
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
     const follows = await ctx.db.query("follows").collect();
+
     const followerRelations = follows.filter(
       (f) => f.followingId === args.userId,
     );
+
     const limit = args.limit || 20;
 
     const followers = [];
+
     for (const rel of followerRelations.slice(0, limit)) {
       const user = await ctx.db.get(rel.followerId);
+
       if (user) {
         const isFollowedByMe = currentUser
           ? follows.some(
@@ -754,6 +991,7 @@ export const getFollowers = query({
                 f.followerId === currentUser._id && f.followingId === user._id,
             )
           : false;
+
         followers.push({
           ...user,
           isFollowedByMe,
@@ -761,23 +999,32 @@ export const getFollowers = query({
         });
       }
     }
+
     return followers;
   },
 });
 
 export const getFollowing = query({
-  args: { userId: v.id("users"), limit: v.optional(v.number()) },
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
     const follows = await ctx.db.query("follows").collect();
+
     const followingRelations = follows.filter(
       (f) => f.followerId === args.userId,
     );
+
     const limit = args.limit || 20;
 
     const following = [];
+
     for (const rel of followingRelations.slice(0, limit)) {
       const user = await ctx.db.get(rel.followingId);
+
       if (user) {
         const isFollowedByMe = currentUser
           ? follows.some(
@@ -785,6 +1032,7 @@ export const getFollowing = query({
                 f.followerId === currentUser._id && f.followingId === user._id,
             )
           : false;
+
         following.push({
           ...user,
           isFollowedByMe,
@@ -792,54 +1040,71 @@ export const getFollowing = query({
         });
       }
     }
+
     return following;
   },
 });
 
 export const removeFollower = mutation({
-  args: { userId: v.id("users"), followerId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+    followerId: v.id("users"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     if (user._id !== args.userId) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Action non autorisée",
       });
     }
+
     const relation = await ctx.db
       .query("follows")
       .withIndex("by_follower_and_following", (q) =>
         q.eq("followerId", args.followerId).eq("followingId", args.userId),
       )
       .first();
+
     if (!relation) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Relation introuvable",
       });
     }
+
     await ctx.db.delete(relation._id);
+
     return { success: true };
   },
 });
 
 export const unfollow = mutation({
-  args: { targetUserId: v.id("users") },
+  args: {
+    targetUserId: v.id("users"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const relation = await ctx.db
       .query("follows")
       .withIndex("by_follower_and_following", (q) =>
         q.eq("followerId", user._id).eq("followingId", args.targetUserId),
       )
       .first();
+
     if (!relation) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Relation introuvable",
       });
     }
+
     await ctx.db.delete(relation._id);
+
     return { success: true };
   },
 });
@@ -849,26 +1114,34 @@ export const unfollow = mutation({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const sendConnectionRequest = mutation({
-  args: { targetUserId: v.id("users"), message: v.optional(v.string()) },
+  args: {
+    targetUserId: v.id("users"),
+    message: v.optional(v.string()),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     if (user._id === args.targetUserId) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Vous ne pouvez pas vous envoyer une demande à vous-même",
       });
     }
+
     const existing = await ctx.db
       .query("networkConnectionRequests")
       .withIndex("by_sender", (q) => q.eq("senderId", user._id))
       .filter((q) => q.eq(q.field("receiverId"), args.targetUserId))
       .first();
+
     if (existing) {
       throw new ConvexError({
         code: "CONFLICT",
         message: "Une demande est déjà en cours",
       });
     }
+
     const id = await ctx.db.insert("networkConnectionRequests", {
       senderId: user._id,
       receiverId: args.targetUserId,
@@ -877,71 +1150,97 @@ export const sendConnectionRequest = mutation({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+
     return id;
   },
 });
 
 export const acceptConnectionRequest = mutation({
-  args: { requestId: v.id("networkConnectionRequests") },
+  args: {
+    requestId: v.id("networkConnectionRequests"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const request = await ctx.db.get(args.requestId);
-    if (!request)
+
+    if (!request) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Demande introuvable",
       });
+    }
+
     if (request.receiverId !== user._id) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Vous n'êtes pas le destinataire",
       });
     }
+
     await ctx.db.patch(args.requestId, {
       status: "accepted",
       updatedAt: new Date().toISOString(),
     });
+
     await ctx.db.insert("follows", {
       followerId: request.senderId,
       followingId: user._id,
     });
+
     await ctx.db.insert("follows", {
       followerId: user._id,
       followingId: request.senderId,
     });
+
     return { success: true };
   },
 });
 
 export const declineConnectionRequest = mutation({
-  args: { requestId: v.id("networkConnectionRequests") },
+  args: {
+    requestId: v.id("networkConnectionRequests"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const request = await ctx.db.get(args.requestId);
-    if (!request)
+
+    if (!request) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Demande introuvable",
       });
+    }
+
     if (request.receiverId !== user._id && request.senderId !== user._id) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Action non autorisée",
       });
     }
+
     await ctx.db.patch(args.requestId, {
       status: "declined",
       updatedAt: new Date().toISOString(),
     });
+
     return { success: true };
   },
 });
 
 export const getConnectionRequests = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
+
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
+
     if (!currentUser) return [];
+
     const requests = await ctx.db
       .query("networkConnectionRequests")
       .filter((q) =>
@@ -951,18 +1250,30 @@ export const getConnectionRequests = query({
         ),
       )
       .collect();
+
     const enriched = [];
+
     for (const req of requests) {
       const sender = await ctx.db.get(req.senderId);
       const receiver = await ctx.db.get(req.receiverId);
+
       enriched.push({
         ...req,
-        sender: sender ? { name: sender.name, avatar: sender.avatar } : null,
+        sender: sender
+          ? {
+              name: sender.name,
+              avatar: sender.avatar,
+            }
+          : null,
         receiver: receiver
-          ? { name: receiver.name, avatar: receiver.avatar }
+          ? {
+              name: receiver.name,
+              avatar: receiver.avatar,
+            }
           : null,
       });
     }
+
     return enriched;
   },
 });
@@ -978,36 +1289,52 @@ export const searchProfiles = query({
     type: v.optional(v.string()),
     location: v.optional(v.string()),
   },
+
   handler: async (ctx, args) => {
-    const q = args.query.toLowerCase().trim();
-    const limit = args.limit || 20;
-    const users = await ctx.db.query("users").collect();
+    const query = normalizeUserSearchQuery(args.query);
 
-    let results = users.filter((u) => {
-      if (!q) return true;
-      return (
-        u.name?.toLowerCase().includes(q) ||
-        u.bio?.toLowerCase().includes(q) ||
-        u.interests?.some((i) => i.toLowerCase().includes(q)) ||
-        u.city?.toLowerCase().includes(q)
-      );
-    });
-
-    if (args.type) {
-      results = results.filter((u) => u.roles?.includes(args.type as string));
-    }
-    if (args.location) {
-      results = results.filter(
-        (u) => u.city?.toLowerCase() === args.location?.toLowerCase(),
-      );
+    if (!query) {
+      return [];
     }
 
-    return results.slice(0, limit);
+    const limit = Math.min(Math.max(args.limit ?? 20, 1), 50);
+
+    const results = await ctx.db
+      .query("users")
+      .withSearchIndex("search_users", (search) => {
+        let builder = search.search("searchText", query);
+
+        if (args.location) {
+          builder = builder.eq("city", args.location);
+        }
+
+        return builder;
+      })
+      .take(limit);
+
+    const filtered = args.type
+      ? results.filter((user) => user.roles.includes(args.type!))
+      : results;
+
+    return filtered.slice(0, limit).map((user) => ({
+      _id: user._id,
+      name: user.name,
+      bio: user.bio,
+      avatar: user.avatar,
+      city: user.city,
+      country: user.country,
+      profession: user.profession,
+      interests: user.interests,
+      roles: user.roles,
+    }));
   },
 });
 
 export const getNetworkSuggestions = query({
-  args: { limit: v.optional(v.number()) },
+  args: {
+    limit: v.optional(v.number()),
+  },
+
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
     const limit = args.limit || 10;
@@ -1018,6 +1345,7 @@ export const getNetworkSuggestions = query({
     }
 
     const follows = await ctx.db.query("follows").collect();
+
     const followedIds = follows
       .filter((f) => f.followerId === currentUser._id)
       .map((f) => f.followingId);
@@ -1028,32 +1356,48 @@ export const getNetworkSuggestions = query({
 
     const scored = candidates.map((u) => {
       let score = 0;
-      if (u.city && currentUser.city && u.city === currentUser.city)
+
+      if (u.city && currentUser.city && u.city === currentUser.city) {
         score += 10;
+      }
+
       if (u.interests && currentUser.interests) {
         const common = u.interests.filter((i) =>
           currentUser.interests?.includes(i),
         );
+
         score += common.length * 5;
       }
+
       if (
         u.roles?.includes("verified_seller") ||
         u.roles?.includes("professionnel")
       ) {
         score += 3;
       }
-      return { user: u, score };
+
+      return {
+        user: u,
+        score,
+      };
     });
 
     scored.sort((a, b) => b.score - a.score);
+
     return scored.map((s) => s.user).slice(0, limit);
   },
 });
 
 export const getNearbyUsers = query({
-  args: { lat: v.number(), lng: v.number(), radius: v.optional(v.number()) },
+  args: {
+    lat: v.number(),
+    lng: v.number(),
+    radius: v.optional(v.number()),
+  },
+
   handler: async (ctx, args) => {
     const users = await ctx.db.query("users").collect();
+
     return users.slice(0, 10);
   },
 });
@@ -1063,27 +1407,37 @@ export const getNearbyUsers = query({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getProfileAnalytics = query({
-  args: { userId: v.id("users"), period: v.optional(v.string()) },
+  args: {
+    userId: v.id("users"),
+    period: v.optional(v.string()),
+  },
+
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
+
     if (!currentUser || currentUser._id !== args.userId) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Accès non autorisé",
       });
     }
+
     const follows = await ctx.db.query("follows").collect();
+
     const followers = follows.filter((f) => f.followingId === args.userId);
+
     const posts = await ctx.db
       .query("publications")
       .withIndex("by_author", (q) => q.eq("authorId", args.userId))
       .collect();
 
     const totalLikes = posts.reduce((acc, p) => acc + (p.likeCount || 0), 0);
+
     const totalComments = posts.reduce(
       (acc, p) => acc + (p.commentCount || 0),
       0,
     );
+
     const engagement =
       posts.length > 0 ? (totalLikes + totalComments) / posts.length : 0;
 
@@ -1099,11 +1453,16 @@ export const getProfileAnalytics = query({
 });
 
 export const trackProfileView = mutation({
-  args: { viewedUserId: v.id("users") },
+  args: {
+    viewedUserId: v.id("users"),
+  },
+
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
+
     if (!user) return;
     if (user._id === args.viewedUserId) return;
+
     // Pourrait stocker dans une table profileViews
   },
 });
@@ -1113,63 +1472,90 @@ export const trackProfileView = mutation({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getUserNotifications = query({
-  args: { userId: v.id("users"), limit: v.optional(v.number()) },
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+
   handler: async (ctx, args) => {
     const limit = args.limit || 20;
+
     const notifications = await ctx.db
       .query("networkNotifications")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .order("desc")
       .take(limit);
+
     return notifications;
   },
 });
 
 export const markNotificationRead = mutation({
-  args: { id: v.id("networkNotifications") },
+  args: {
+    id: v.id("networkNotifications"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const notif = await ctx.db.get(args.id);
-    if (!notif)
+
+    if (!notif) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Notification introuvable",
       });
+    }
+
     if (notif.userId !== user._id) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Action non autorisée",
       });
     }
-    await ctx.db.patch(args.id, { read: true });
+
+    await ctx.db.patch(args.id, {
+      read: true,
+    });
+
     return { success: true };
   },
 });
 
 export const markAllNotificationsRead = mutation({
   args: {},
+
   handler: async (ctx) => {
     const user = await requireUser(ctx);
+
     const notifications = await ctx.db
       .query("networkNotifications")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .filter((q) => q.eq(q.field("read"), false))
       .collect();
+
     for (const n of notifications) {
-      await ctx.db.patch(n._id, { read: true });
+      await ctx.db.patch(n._id, {
+        read: true,
+      });
     }
+
     return { success: true };
   },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 14. NOUVEAU : Récupération d'une publication réseau (type "network") ──────
+// 14. NOUVEAU : Récupération d'une publication réseau (type "network")
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const getPost = query({
-  args: { publicationId: v.id("publications") },
+  args: {
+    publicationId: v.id("publications"),
+  },
+
   handler: async (ctx, args) => {
     const publication = await ctx.db.get(args.publicationId);
+
     if (!publication) return null;
 
     // Seules les publications de type "network" sont gérées ici
@@ -1182,6 +1568,7 @@ export const getPost = query({
 
     // Vérifier si l'utilisateur courant a liké cette publication
     let likedByMe = false;
+
     if (currentUser) {
       const like = await ctx.db
         .query("publicationLikes")
@@ -1191,6 +1578,7 @@ export const getPost = query({
             .eq("publicationId", args.publicationId),
         )
         .unique();
+
       likedByMe = like !== null;
     }
 
@@ -1199,10 +1587,12 @@ export const getPost = query({
 
     // Résoudre les images (storage IDs → URLs)
     const imageSources = publication.images ?? [];
+
     const images = (
       await Promise.all(
         imageSources.map(async (imgId) => {
           if (!imgId) return null;
+
           // Déjà une URL publique
           if (
             imgId.startsWith("http://") ||
@@ -1211,8 +1601,12 @@ export const getPost = query({
           ) {
             return imgId;
           }
+
           // Blob URL : inutilisable côté serveur
-          if (imgId.startsWith("blob:")) return null;
+          if (imgId.startsWith("blob:")) {
+            return null;
+          }
+
           try {
             return await ctx.storage.getUrl(imgId as Id<"_storage">);
           } catch {
@@ -1226,7 +1620,7 @@ export const getPost = query({
     return {
       ...publication,
       images,
-      likedByMe, // ✅ Ajout pour savoir si l'utilisateur actuel a liké
+      likedByMe,
       author: author
         ? {
             _id: author._id,
@@ -1235,7 +1629,7 @@ export const getPost = query({
             bio: author.bio ?? null,
             city: author.city ?? null,
             country: author.country ?? null,
-            headline: (author as any).headline ?? null, // si le champ existe
+            headline: (author as any).headline ?? null,
             roles: author.roles ?? [],
           }
         : null,

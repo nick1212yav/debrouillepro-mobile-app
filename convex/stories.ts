@@ -1,52 +1,63 @@
+// convex/stories.ts
+
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 
 import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 /**
  * ============================================================
  * DÉBROUILLEPRO
- * STORIES ENGINE 2.0
+ * STORIES ENGINE
  * ============================================================
  *
  * Responsabilités :
- *
  * - Upload sécurisé
  * - Création de stories
- * - Feed intelligent
- * - Ranking personnalisé
+ * - Feed personnalisé
+ * - Ranking
  * - Détection des stories vues
  * - Stories suivies
  * - Stories personnelles
  * - Highlights
  * - Analytics
- * - Gestion des vues
  * - Suppression sécurisée
  * - Expiration automatique
  *
- * IMPORTANT :
- * Cette version utilise uniquement les tables/champs déjà
- * présents dans le backend actuel :
+ * Sources de vérité utilisées :
+ * - users
+ * - stories
+ * - storyViews
+ * - follows
  *
- * users
- * stories
- * storyViews
- * follows
- *
- * Aucune table supplémentaire n'est supposée.
+ * Aucun mock.
+ * Aucun compteur synthétique.
+ * Aucun fallback temporel artificiel.
  * ============================================================
  */
 
+const MAX_ACTIVE_STORIES = 500;
+const MAX_FOLLOWED_STORIES = 500;
+const MAX_AUTHOR_STORIES = 200;
+const MAX_MY_STORIES = 200;
+const MAX_FOLLOWING = 1000;
+const MAX_VIEWED_STORIES = 5000;
+const MAX_VIEWERS = 100;
+const MAX_ANALYTICS_VIEWS = 5000;
+const DELETE_VIEW_BATCH = 500;
+const CLEANUP_STORY_BATCH = 100;
+
 /* ============================================================
- * TYPES INTERNES
+ * TYPES
  * ============================================================ */
 
 type StoryWithAuthor = {
-  _id: string;
+  _id: Id<"stories">;
   _creationTime: number;
 
-  authorId: string;
+  authorId: Id<"users">;
 
   mediaUrl: string;
   mediaType: "image" | "video";
@@ -117,7 +128,8 @@ function getStoryAgeHours(creationTime: number): number {
 /**
  * Score de fraîcheur.
  *
- * Une story très récente reçoit un score élevé.
+ * Ce score est uniquement utilisé pour le ranking interne.
+ * Il ne représente pas une métrique utilisateur.
  */
 function freshnessScore(creationTime: number): number {
   const age = getStoryAgeHours(creationTime);
@@ -133,9 +145,7 @@ function freshnessScore(creationTime: number): number {
 }
 
 /**
- * Score d'engagement.
- *
- * On utilise uniquement viewCount car c'est la métrique
+ * Score d'engagement basé uniquement sur viewCount,
  * actuellement disponible dans le schéma Stories.
  */
 function engagementScore(viewCount: number): number {
@@ -153,9 +163,11 @@ function engagementScore(viewCount: number): number {
 }
 
 /**
- * Score relation.
+ * Score relationnel.
  *
- * Les personnes suivies passent devant les autres.
+ * Owner > followed > autres.
+ *
+ * Ceci sert uniquement au classement interne.
  */
 function relationScore(isFollowed: boolean, isOwner: boolean): number {
   if (isOwner) return 110;
@@ -165,24 +177,12 @@ function relationScore(isFollowed: boolean, isOwner: boolean): number {
 }
 
 /**
- * Score de lecture.
- *
- * Les stories non vues sont fortement privilégiées.
+ * Les stories non vues sont privilégiées.
  */
 function viewedScore(viewed: boolean): number {
   return viewed ? 0 : 90;
 }
 
-/**
- * Score final.
- *
- * La priorité est :
- *
- * 1. relation
- * 2. non-vu
- * 3. fraîcheur
- * 4. engagement
- */
 function calculateStoryScore({
   creationTime,
   viewCount,
@@ -201,6 +201,25 @@ function calculateStoryScore({
     viewedScore(viewed) +
     freshnessScore(creationTime) +
     engagementScore(viewCount)
+  );
+}
+
+/**
+ * Récupère les auteurs uniques sans requête répétée par story.
+ */
+async function getAuthorsMap(ctx: QueryCtx, authorIds: Id<"users">[]) {
+  const uniqueIds = Array.from(
+    new Set(authorIds.map((id) => String(id))),
+  ) as string[];
+
+  const authors = await Promise.all(
+    uniqueIds.map((id) => ctx.db.get(id as Id<"users">)),
+  );
+
+  return new Map(
+    authors
+      .filter((author): author is NonNullable<typeof author> => author !== null)
+      .map((author) => [String(author._id), author]),
   );
 }
 
@@ -236,10 +255,48 @@ export const createStory = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
+    /**
+     * Validation serveur.
+     *
+     * Le client ne peut pas imposer des payloads
+     * disproportionnés ou des durées invalides.
+     */
+    if (args.mediaUrl.length === 0 || args.mediaUrl.length > 2048) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "mediaUrl invalide",
+      });
+    }
+
+    if (args.caption !== undefined && args.caption.length > 500) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "caption trop long",
+      });
+    }
+
+    if (
+      args.duration !== undefined &&
+      (!Number.isFinite(args.duration) ||
+        args.duration < 0 ||
+        args.duration > 60)
+    ) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "duration invalide",
+      });
+    }
+
+    /**
+     * Une story expire 24h après sa création.
+     */
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const storyId = await ctx.db.insert("stories", {
-      ...args,
+      mediaUrl: args.mediaUrl,
+      mediaType: args.mediaType,
+      caption: args.caption,
+      duration: args.duration,
 
       authorId: user._id,
 
@@ -256,80 +313,104 @@ export const createStory = mutation({
 
 /* ============================================================
  * ACTIVE STORIES
- *
- * Retourne toutes les stories actives regroupées par auteur.
  * ============================================================ */
 
 export const listActiveStories = query({
   args: {},
 
   handler: async (ctx) => {
+    const user = await requireUser(ctx);
+
     const now = nowIso();
 
-    const stories = await ctx.db
+    /**
+     * Filtrage directement via l'index.
+     *
+     * Cela évite de charger toutes les stories historiques.
+     */
+    const active = await ctx.db
       .query("stories")
-      .withIndex("by_expiresAt")
-      .order("asc")
-      .collect();
+      .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
+      .order("desc")
+      .take(MAX_ACTIVE_STORIES);
 
-    const active = stories.filter((story) =>
-      isStoryActive(story.expiresAt, now),
-    );
+    if (active.length === 0) {
+      return [];
+    }
 
-    const enriched = await Promise.all(
-      active.map(async (story) => {
-        const author = await ctx.db.get(story.authorId);
+    /**
+     * Auteurs uniques.
+     */
+    const authorIds = active.map((story) => story.authorId);
 
-        return {
-          ...story,
-          authorName: author?.name ?? "Anonyme",
-          authorAvatar: author?.avatar,
-          authorCity: author?.city,
-        };
-      }),
-    );
+    const authorById = await getAuthorsMap(ctx, authorIds);
 
-    const grouped: Record<string, typeof enriched> = {};
+    /**
+     * Les vues du viewer sont récupérées une seule fois
+     * par utilisateur au lieu d'une requête par story.
+     */
+    const views = await ctx.db
+      .query("storyViews")
+      .withIndex("by_viewer", (q) => q.eq("viewerId", user._id))
+      .order("desc")
+      .take(MAX_VIEWED_STORIES);
+
+    const viewedStoryIds = new Set(views.map((view) => String(view.storyId)));
+
+    const enriched = active.map((story) => {
+      const author = authorById.get(String(story.authorId));
+
+      return {
+        ...story,
+
+        authorName: author?.name ?? "Anonyme",
+        authorAvatar: author?.avatar,
+        authorCity: author?.city,
+
+        viewed: viewedStoryIds.has(String(story._id)),
+      };
+    });
+
+    /**
+     * Groupement par auteur.
+     */
+    const grouped = new Map<string, typeof enriched>();
 
     for (const story of enriched) {
       const key = String(story.authorId);
 
-      if (!grouped[key]) {
-        grouped[key] = [];
-      }
+      const existing = grouped.get(key);
 
-      grouped[key].push(story);
+      if (existing) {
+        existing.push(story);
+      } else {
+        grouped.set(key, [story]);
+      }
     }
 
-    return Object.values(grouped).map((group) => ({
-      author: {
-        id: group[0].authorId,
-        name: group[0].authorName,
-        avatar: group[0].authorAvatar,
-        city: group[0].authorCity,
-      },
+    return Array.from(grouped.values()).map((group) => {
+      const first = group[0];
 
-      stories: group,
+      return {
+        author: {
+          id: first.authorId,
+          name: first.authorName,
+          avatar: first.authorAvatar,
+          city: first.authorCity,
+        },
 
-      hasUnviewed: false,
-    }));
+        stories: group,
+
+        hasUnviewed: group.some((story) => !story.viewed),
+
+        unreadCount: group.filter((story) => !story.viewed).length,
+      };
+    });
   },
 });
 
 /* ============================================================
  * STORY FEED 2.0
- *
- * Le cerveau du système.
- *
- * - Authentifie l'utilisateur
- * - Récupère ses follows
- * - Récupère les stories actives
- * - Détermine les stories vues
- * - Calcule un score
- * - Classe les auteurs
- * - Classe les stories à l'intérieur des groupes
- *
- * Aucun mock.
  * ============================================================ */
 
 export const getStoryFeed = query({
@@ -347,7 +428,7 @@ export const getStoryFeed = query({
     const follows = await ctx.db
       .query("follows")
       .withIndex("by_follower", (q) => q.eq("followerId", user._id))
-      .collect();
+      .take(MAX_FOLLOWING);
 
     const followedIds = new Set(
       follows.map((follow) => String(follow.followingId)),
@@ -357,18 +438,43 @@ export const getStoryFeed = query({
      * STORIES ACTIVES
      * -------------------------------------------------------- */
 
-    const allStories = await ctx.db
+    const activeStories = await ctx.db
       .query("stories")
-      .withIndex("by_expiresAt")
+      .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
       .order("desc")
-      .collect();
+      .take(MAX_ACTIVE_STORIES);
 
-    const activeStories = allStories.filter((story) =>
-      isStoryActive(story.expiresAt, now),
+    if (activeStories.length === 0) {
+      return {
+        groups: [],
+        totalGroups: 0,
+        totalStories: 0,
+      };
+    }
+
+    /* --------------------------------------------------------
+     * VUES DE L'UTILISATEUR
+     * -------------------------------------------------------- */
+
+    const myViews = await ctx.db
+      .query("storyViews")
+      .withIndex("by_viewer", (q) => q.eq("viewerId", user._id))
+      .order("desc")
+      .take(MAX_VIEWED_STORIES);
+
+    const viewedStoryIds = new Set(myViews.map((view) => String(view.storyId)));
+
+    /* --------------------------------------------------------
+     * AUTEURS
+     * -------------------------------------------------------- */
+
+    const authorById = await getAuthorsMap(
+      ctx,
+      activeStories.map((story) => story.authorId),
     );
 
     /* --------------------------------------------------------
-     * ENRICHISSEMENT
+     * ENRICHISSEMENT + RANKING
      * -------------------------------------------------------- */
 
     const enriched: Array<
@@ -380,19 +486,13 @@ export const getStoryFeed = query({
     > = [];
 
     for (const story of activeStories) {
-      const author = await ctx.db.get(story.authorId);
+      const author = authorById.get(String(story.authorId));
 
       if (!author) {
         continue;
       }
 
-      const view = await ctx.db
-        .query("storyViews")
-        .withIndex("by_story", (q) => q.eq("storyId", story._id))
-        .filter((q) => q.eq(q.field("viewerId"), user._id))
-        .first();
-
-      const viewed = view !== null;
+      const viewed = viewedStoryIds.has(String(story._id));
 
       const isOwner = story.authorId === user._id;
 
@@ -439,23 +539,25 @@ export const getStoryFeed = query({
      * GROUP BY AUTHOR
      * -------------------------------------------------------- */
 
-    const grouped: Record<string, typeof enriched> = {};
+    const grouped = new Map<string, typeof enriched>();
 
     for (const story of enriched) {
       const key = String(story.authorId);
 
-      if (!grouped[key]) {
-        grouped[key] = [];
-      }
+      const existing = grouped.get(key);
 
-      grouped[key].push(story);
+      if (existing) {
+        existing.push(story);
+      } else {
+        grouped.set(key, [story]);
+      }
     }
 
     /* --------------------------------------------------------
      * BUILD GROUPS
      * -------------------------------------------------------- */
 
-    const groups = Object.values(grouped)
+    const groups = Array.from(grouped.values())
       .map((stories) => {
         stories.sort((a, b) => {
           if (a.viewed !== b.viewed) {
@@ -503,10 +605,6 @@ export const getStoryFeed = query({
         return b.latestAt - a.latestAt;
       });
 
-    /* --------------------------------------------------------
-     * RETURN
-     * -------------------------------------------------------- */
-
     return {
       groups,
 
@@ -529,11 +627,15 @@ export const listStoriesByAuthor = query({
   handler: async (ctx, args) => {
     const now = nowIso();
 
+    /**
+     * Fonction publique :
+     * stories actives + highlights.
+     */
     const stories = await ctx.db
       .query("stories")
       .withIndex("by_author", (q) => q.eq("authorId", args.authorId))
       .order("desc")
-      .collect();
+      .take(MAX_AUTHOR_STORIES);
 
     return stories.filter(
       (story) => story.expiresAt > now || story.isHighlight,
@@ -549,22 +651,7 @@ export const getMyStories = query({
   args: {},
 
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-
-    if (!identity) {
-      return [];
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier),
-      )
-      .unique();
-
-    if (!user) {
-      return [];
-    }
+    const user = await requireUser(ctx);
 
     const now = nowIso();
 
@@ -572,7 +659,7 @@ export const getMyStories = query({
       .query("stories")
       .withIndex("by_author", (q) => q.eq("authorId", user._id))
       .order("desc")
-      .collect();
+      .take(MAX_MY_STORIES);
 
     return stories.filter(
       (story) => story.expiresAt > now || story.isHighlight,
@@ -593,7 +680,7 @@ export const getFollowedStories = query({
     const follows = await ctx.db
       .query("follows")
       .withIndex("by_follower", (q) => q.eq("followerId", user._id))
-      .collect();
+      .take(MAX_FOLLOWING);
 
     const followedIds = new Set(
       follows.map((follow) => String(follow.followingId)),
@@ -607,65 +694,79 @@ export const getFollowedStories = query({
 
     const stories = await ctx.db
       .query("stories")
-      .withIndex("by_expiresAt")
+      .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
       .order("desc")
-      .collect();
+      .take(MAX_FOLLOWED_STORIES);
 
-    const followedStories = stories.filter(
-      (story) =>
-        story.expiresAt > now && followedIds.has(String(story.authorId)),
+    const followedStories = stories.filter((story) =>
+      followedIds.has(String(story.authorId)),
     );
 
-    const enriched = await Promise.all(
-      followedStories.map(async (story) => {
-        const author = await ctx.db.get(story.authorId);
+    if (followedStories.length === 0) {
+      return [];
+    }
 
-        const view = await ctx.db
-          .query("storyViews")
-          .withIndex("by_story", (q) => q.eq("storyId", story._id))
-          .filter((q) => q.eq(q.field("viewerId"), user._id))
-          .first();
-
-        return {
-          ...story,
-
-          authorName: author?.name ?? "Anonyme",
-          authorAvatar: author?.avatar,
-          authorCity: author?.city,
-
-          viewed: view !== null,
-        };
-      }),
+    const authorById = await getAuthorsMap(
+      ctx,
+      followedStories.map((story) => story.authorId),
     );
 
-    /* ------------------------------------------------------
-     * GROUP
-     * ------------------------------------------------------ */
+    const myViews = await ctx.db
+      .query("storyViews")
+      .withIndex("by_viewer", (q) => q.eq("viewerId", user._id))
+      .order("desc")
+      .take(MAX_VIEWED_STORIES);
 
-    const grouped: Record<string, typeof enriched> = {};
+    const viewedStoryIds = new Set(myViews.map((view) => String(view.storyId)));
+
+    const enriched = followedStories.map((story) => {
+      const author = authorById.get(String(story.authorId));
+
+      return {
+        ...story,
+
+        authorName: author?.name ?? "Anonyme",
+
+        authorAvatar: author?.avatar,
+
+        authorCity: author?.city,
+
+        viewed: viewedStoryIds.has(String(story._id)),
+      };
+    });
+
+    const grouped = new Map<string, typeof enriched>();
 
     for (const story of enriched) {
       const key = String(story.authorId);
 
-      if (!grouped[key]) {
-        grouped[key] = [];
-      }
+      const existing = grouped.get(key);
 
-      grouped[key].push(story);
+      if (existing) {
+        existing.push(story);
+      } else {
+        grouped.set(key, [story]);
+      }
     }
 
-    return Object.values(grouped).map((group) => ({
-      author: {
-        id: group[0].authorId,
-        name: group[0].authorName,
-        avatar: group[0].authorAvatar,
-        city: group[0].authorCity,
-      },
+    return Array.from(grouped.values()).map((group) => {
+      const first = group[0];
 
-      stories: group,
+      return {
+        author: {
+          id: first.authorId,
+          name: first.authorName,
+          avatar: first.authorAvatar,
+          city: first.authorCity,
+        },
 
-      hasUnviewed: group.some((story) => !story.viewed),
-    }));
+        stories: group,
+
+        hasUnviewed: group.some((story) => !story.viewed),
+
+        unreadCount: group.filter((story) => !story.viewed).length,
+      };
+    });
   },
 });
 
@@ -685,13 +786,25 @@ export const getStory = query({
       return null;
     }
 
+    /**
+     * Les stories expirées ne sont plus exposées
+     * par cette route, sauf si elles sont en highlight.
+     */
+    const now = nowIso();
+
+    if (!isStoryActive(story.expiresAt, now) && !story.isHighlight) {
+      return null;
+    }
+
     const author = await ctx.db.get(story.authorId);
 
     return {
       ...story,
 
       authorName: author?.name ?? "Anonyme",
+
       authorAvatar: author?.avatar,
+
       authorCity: author?.city,
     };
   },
@@ -718,19 +831,38 @@ export const markViewed = mutation({
       });
     }
 
-    /*
-     * Une story de l'auteur lui-même
-     * n'a pas besoin d'être comptée
-     * comme une vue externe.
+    /**
+     * Une story expirée ne doit pas recevoir
+     * de nouvelle vue.
      */
+    const now = nowIso();
 
+    if (!isStoryActive(story.expiresAt, now)) {
+      return {
+        alreadyViewed: false,
+        counted: false,
+        expired: true,
+      };
+    }
+
+    /**
+     * L'auteur ne compte pas sa propre vue.
+     */
     if (story.authorId === user._id) {
       return {
         alreadyViewed: false,
         counted: false,
+        expired: false,
       };
     }
 
+    /**
+     * Le schéma actuel ne possède pas encore
+     * by_story_viewer.
+     *
+     * On utilise donc by_story + filtre viewerId.
+     * Cette opération reste bornée par first().
+     */
     const existing = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
@@ -741,15 +873,25 @@ export const markViewed = mutation({
       return {
         alreadyViewed: true,
         counted: false,
+        expired: false,
       };
     }
 
     await ctx.db.insert("storyViews", {
       storyId: args.storyId,
+
       viewerId: user._id,
+
       viewedAt: nowIso(),
     });
 
+    /**
+     * Mutation atomique dans le même contexte.
+     *
+     * La story a déjà été lue avant l'insertion,
+     * donc le compteur ne peut être incrémenté
+     * qu'une seule fois par viewer dans le flux normal.
+     */
     await ctx.db.patch(args.storyId, {
       viewCount: story.viewCount + 1,
     });
@@ -757,6 +899,7 @@ export const markViewed = mutation({
     return {
       alreadyViewed: false,
       counted: true,
+      expired: false,
     };
   },
 });
@@ -782,11 +925,9 @@ export const getStoryViewers = query({
       });
     }
 
-    /*
-     * Seul l'auteur peut voir
-     * la liste des viewers.
+    /**
+     * Seul l'auteur peut voir les spectateurs.
      */
-
     if (story.authorId !== user._id) {
       throw new ConvexError({
         code: "FORBIDDEN",
@@ -798,28 +939,30 @@ export const getStoryViewers = query({
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
       .order("desc")
-      .take(100);
+      .take(MAX_VIEWERS);
 
-    return Promise.all(
-      views.map(async (view) => {
-        const viewer = await ctx.db.get(view.viewerId);
+    const viewerIds = views.map((view) => view.viewerId);
 
-        return {
-          ...view,
+    const viewerById = await getAuthorsMap(ctx, viewerIds);
 
-          viewerName: viewer?.name ?? "Anonyme",
-          viewerAvatar: viewer?.avatar,
-          viewerCity: viewer?.city,
-        };
-      }),
-    );
+    return views.map((view) => {
+      const viewer = viewerById.get(String(view.viewerId));
+
+      return {
+        ...view,
+
+        viewerName: viewer?.name ?? "Anonyme",
+
+        viewerAvatar: viewer?.avatar,
+
+        viewerCity: viewer?.city,
+      };
+    });
   },
 });
 
 /* ============================================================
  * STORY ANALYTICS
- *
- * Analytics disponibles avec le schéma actuel.
  * ============================================================ */
 
 export const getStoryAnalytics = query({
@@ -846,22 +989,33 @@ export const getStoryAnalytics = query({
       });
     }
 
+    /**
+     * Payload borné.
+     *
+     * Le schéma actuel ne possède pas d'agrégation
+     * native des vues par story.
+     */
     const views = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", story._id))
       .order("desc")
-      .collect();
+      .take(MAX_ANALYTICS_VIEWS);
 
-    const viewers = new Set(views.map((view) => String(view.viewerId)));
+    const uniqueViewers = new Set(views.map((view) => String(view.viewerId)));
 
     const viewedAt = views.map((view) => view.viewedAt).sort();
 
     return {
       storyId: story._id,
 
+      /**
+       * Si le nombre réel de vues dépasse
+       * la fenêtre analytique, viewCount reste
+       * la source de vérité du compteur.
+       */
       viewCount: story.viewCount,
 
-      uniqueViewers: viewers.size,
+      uniqueViewers: uniqueViewers.size,
 
       firstViewAt: viewedAt[0] ?? null,
 
@@ -872,6 +1026,8 @@ export const getStoryAnalytics = query({
       expiresAt: story.expiresAt,
 
       mediaType: story.mediaType,
+
+      analyticsSampled: views.length >= MAX_ANALYTICS_VIEWS,
     };
   },
 });
@@ -904,12 +1060,14 @@ export const toggleHighlight = mutation({
       });
     }
 
+    const nextValue = !story.isHighlight;
+
     await ctx.db.patch(args.storyId, {
-      isHighlight: !story.isHighlight,
+      isHighlight: nextValue,
     });
 
     return {
-      isHighlight: !story.isHighlight,
+      isHighlight: nextValue,
     };
   },
 });
@@ -937,8 +1095,11 @@ export const getHighlights = query({
       author: author
         ? {
             id: author._id,
+
             name: author.name ?? "Anonyme",
+
             avatar: author.avatar,
+
             city: author.city,
           }
         : null,
@@ -976,37 +1137,86 @@ export const deleteStory = mutation({
       });
     }
 
-    /*
-     * Nettoyage des vues
+    /**
+     * Suppression bornée.
+     *
+     * Une story avec un très grand nombre de vues
+     * ne doit pas provoquer un .collect() illimité.
+     *
+     * IMPORTANT :
+     * le document story n'est supprimé que lorsque
+     * toutes ses vues ont été supprimées.
      */
-
     const views = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
-      .collect();
+      .take(DELETE_VIEW_BATCH);
 
-    await Promise.all(views.map((view) => ctx.db.delete(view._id)));
+    if (views.length > 0) {
+      await Promise.all(views.map((view) => ctx.db.delete(view._id)));
 
-    /*
-     * Suppression de la story
+      /**
+       * Si le batch est plein, on ne détruit pas encore
+       * la story : les vues restantes doivent être
+       * nettoyées lors d'une opération suivante.
+       */
+      if (views.length >= DELETE_VIEW_BATCH) {
+        return {
+          success: false,
+          pendingCleanup: true,
+          deletedViews: views.length,
+          storyId: args.storyId,
+        };
+      }
+    }
+
+    /**
+     * À ce stade, aucune vue restante n'est visible
+     * dans la requête bornée.
      */
+    const remaining = await ctx.db
+      .query("storyViews")
+      .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
+      .take(1);
+
+    if (remaining.length > 0) {
+      return {
+        success: false,
+        pendingCleanup: true,
+        deletedViews: views.length,
+        storyId: args.storyId,
+      };
+    }
 
     await ctx.db.delete(args.storyId);
 
     return {
       success: true,
+      pendingCleanup: false,
+      deletedViews: views.length,
       storyId: args.storyId,
     };
   },
 });
 
 /* ============================================================
- * CLEANUP
- *
- * Les stories expirées sont supprimées si elles ne sont
- * pas dans les highlights.
+ * CLEANUP EXPIRED STORIES
  * ============================================================ */
 
+/**
+ * Internal uniquement.
+ *
+ * Cette fonction ne doit jamais être exposée directement
+ * au client.
+ *
+ * Elle supprime uniquement :
+ * - stories expirées
+ * - non-highlight
+ *
+ * et nettoie leurs vues.
+ *
+ * Le batch de stories est volontairement borné.
+ */
 export const cleanupExpiredStories = internalMutation({
   args: {},
 
@@ -1015,23 +1225,47 @@ export const cleanupExpiredStories = internalMutation({
 
     const expired = await ctx.db
       .query("stories")
-      .withIndex("by_expiresAt")
-      .filter((q) => q.lt(q.field("expiresAt"), now))
+      .withIndex("by_expiresAt", (q) => q.lt("expiresAt", now))
       .filter((q) => q.eq(q.field("isHighlight"), false))
-      .take(100);
+      .take(CLEANUP_STORY_BATCH);
 
     let deletedStories = 0;
     let deletedViews = 0;
+    let deferredStories = 0;
 
     for (const story of expired) {
+      /**
+       * Nettoyage borné des vues.
+       */
       const views = await ctx.db
         .query("storyViews")
         .withIndex("by_story", (q) => q.eq("storyId", story._id))
-        .collect();
+        .take(DELETE_VIEW_BATCH);
 
-      await Promise.all(views.map((view) => ctx.db.delete(view._id)));
+      if (views.length > 0) {
+        await Promise.all(views.map((view) => ctx.db.delete(view._id)));
 
-      deletedViews += views.length;
+        deletedViews += views.length;
+      }
+
+      /**
+       * Si le batch est plein, il peut rester des vues.
+       * On ne supprime donc pas encore la story.
+       */
+      if (views.length >= DELETE_VIEW_BATCH) {
+        deferredStories++;
+        continue;
+      }
+
+      const remaining = await ctx.db
+        .query("storyViews")
+        .withIndex("by_story", (q) => q.eq("storyId", story._id))
+        .take(1);
+
+      if (remaining.length > 0) {
+        deferredStories++;
+        continue;
+      }
 
       await ctx.db.delete(story._id);
 
@@ -1041,6 +1275,7 @@ export const cleanupExpiredStories = internalMutation({
     return {
       deletedStories,
       deletedViews,
+      deferredStories,
     };
   },
 });

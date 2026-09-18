@@ -1,6 +1,9 @@
 // convex/globalContext.ts
 
+import { ConvexError } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 /**
@@ -8,35 +11,46 @@ import { v } from "convex/values";
  * GLOBAL CONTEXT ENGINE
  * ============================================================================
  *
- * Source unique du contexte global de l'utilisateur.
+ * Source unique du contexte global utilisateur.
  *
- * Utilisé notamment par :
- * - GlobalContextBar
+ * Utilisé par :
  * - Home
- * - SmartSearch
+ * - Smart Search
  * - Feed personnalisé
  * - IA
  * - recommandations
  * - modules géolocalisés
  *
  * IMPORTANT :
- * Cette version utilise UNIQUEMENT les champs réellement présents
- * dans convex/schema.ts.
+ * Ce moteur ne fabrique aucune information métier.
  *
- * Aucun champ fictif :
- * ❌ timezone
- * ❌ currency
- * ❌ latitude
- * ❌ longitude
+ * Il expose uniquement les données réellement présentes dans `users`
+ * et `homePreferences`.
  *
- * Ces informations pourront être ajoutées plus tard dans un modèle
- * de contexte dédié si nécessaire.
+ * Les informations non présentes dans le schéma ne sont PAS inventées :
+ * - timezone
+ * - currency
+ * - latitude
+ * - longitude
  * ============================================================================
  */
 
 /* ============================================================================
  * TYPES
  * ========================================================================== */
+
+type UserDoc = Doc<"users">;
+
+type HomePreferences = {
+  favoriteModules: string[];
+  hiddenSections: string[];
+  customSectionOrder: string[];
+  notificationPreferences: {
+    newRecommendations: boolean;
+    nearbyAlerts: boolean;
+    opportunities: boolean;
+  };
+};
 
 export interface GlobalContext {
   userId: string;
@@ -61,16 +75,7 @@ export interface GlobalContext {
     roles: string[];
   };
 
-  home: {
-    favoriteModules: string[];
-    hiddenSections: string[];
-    customSectionOrder: string[];
-    notificationPreferences: {
-      newRecommendations: boolean;
-      nearbyAlerts: boolean;
-      opportunities: boolean;
-    };
-  };
+  home: HomePreferences;
 
   onboardingCompleted: boolean;
 
@@ -78,20 +83,124 @@ export interface GlobalContext {
 }
 
 /* ============================================================================
- * DEFAULT HOME PREFERENCES
+ * CONSTANTS
  * ========================================================================== */
 
-function getDefaultHomePreferences() {
-  return {
-    favoriteModules: [],
-    hiddenSections: [],
-    customSectionOrder: [],
+const MAX_CITY_LENGTH = 120;
+const MAX_COUNTRY_LENGTH = 120;
+const MAX_LANGUAGE_LENGTH = 20;
 
-    notificationPreferences: {
-      newRecommendations: true,
-      nearbyAlerts: true,
-      opportunities: true,
-    },
+const MAX_HOME_MODULES = 50;
+const MAX_HIDDEN_SECTIONS = 100;
+const MAX_SECTION_ORDER = 100;
+
+const DEFAULT_NOTIFICATION_PREFERENCES: HomePreferences["notificationPreferences"] =
+  {
+    newRecommendations: true,
+    nearbyAlerts: true,
+    opportunities: true,
+  };
+
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
+
+function normalizeOptionalString(
+  value: unknown,
+  maxLength: number,
+): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  return normalized.slice(0, maxLength);
+}
+
+function normalizeStringArray(
+  value: unknown,
+  maxItems: number,
+  maxItemLength = 100,
+): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => item.slice(0, maxItemLength))
+    .slice(0, maxItems);
+}
+
+function normalizeNotificationPreferences(
+  value: unknown,
+): HomePreferences["notificationPreferences"] {
+  if (!value || typeof value !== "object") {
+    return { ...DEFAULT_NOTIFICATION_PREFERENCES };
+  }
+
+  const preferences = value as Partial<
+    HomePreferences["notificationPreferences"]
+  >;
+
+  return {
+    newRecommendations:
+      typeof preferences.newRecommendations === "boolean"
+        ? preferences.newRecommendations
+        : DEFAULT_NOTIFICATION_PREFERENCES.newRecommendations,
+
+    nearbyAlerts:
+      typeof preferences.nearbyAlerts === "boolean"
+        ? preferences.nearbyAlerts
+        : DEFAULT_NOTIFICATION_PREFERENCES.nearbyAlerts,
+
+    opportunities:
+      typeof preferences.opportunities === "boolean"
+        ? preferences.opportunities
+        : DEFAULT_NOTIFICATION_PREFERENCES.opportunities,
+  };
+}
+
+function normalizeHomePreferences(user: UserDoc): HomePreferences {
+  const raw = user.homePreferences;
+
+  if (!raw || typeof raw !== "object") {
+    return {
+      favoriteModules: [],
+      hiddenSections: [],
+      customSectionOrder: [],
+      notificationPreferences: {
+        ...DEFAULT_NOTIFICATION_PREFERENCES,
+      },
+    };
+  }
+
+  return {
+    favoriteModules: normalizeStringArray(
+      raw.favoriteModules,
+      MAX_HOME_MODULES,
+    ),
+
+    hiddenSections: normalizeStringArray(
+      raw.hiddenSections,
+      MAX_HIDDEN_SECTIONS,
+    ),
+
+    customSectionOrder: normalizeStringArray(
+      raw.customSectionOrder,
+      MAX_SECTION_ORDER,
+    ),
+
+    notificationPreferences: normalizeNotificationPreferences(
+      raw.notificationPreferences,
+    ),
   };
 }
 
@@ -100,29 +209,28 @@ function getDefaultHomePreferences() {
  * ========================================================================== */
 
 /**
- * Résout l'utilisateur connecté.
+ * Résout l'utilisateur authentifié.
  *
- * Stratégie :
- * 1. tokenIdentifier Convex
- * 2. email Firebase/Convex en fallback
+ * Ordre :
+ * 1. tokenIdentifier
+ * 2. email
  *
- * Cela rend le moteur compatible avec ton intégration Firebase + Convex.
+ * Le fallback email est conservé pour la compatibilité avec
+ * l'intégration Firebase + Convex existante.
  */
-async function getCurrentUser(ctx: any) {
+async function getCurrentUser(
+  ctx: QueryCtx | MutationCtx,
+): Promise<UserDoc | null> {
   const identity = await ctx.auth.getUserIdentity();
 
   if (!identity) {
     return null;
   }
 
-  /* ------------------------------------------------------------------------
-   * 1. Token Convex
-   * ---------------------------------------------------------------------- */
-
   if (identity.tokenIdentifier) {
     const userByToken = await ctx.db
       .query("users")
-      .withIndex("by_token", (q: any) =>
+      .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .first();
@@ -132,14 +240,10 @@ async function getCurrentUser(ctx: any) {
     }
   }
 
-  /* ------------------------------------------------------------------------
-   * 2. Email fallback
-   * ---------------------------------------------------------------------- */
-
   if (identity.email) {
     const userByEmail = await ctx.db
       .query("users")
-      .withIndex("by_email", (q: any) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email))
       .first();
 
     if (userByEmail) {
@@ -150,55 +254,70 @@ async function getCurrentUser(ctx: any) {
   return null;
 }
 
+function requireCurrentUser(user: UserDoc | null): UserDoc {
+  if (!user) {
+    throw new ConvexError("Utilisateur non authentifié.");
+  }
+
+  return user;
+}
+
 /* ============================================================================
  * BUILD GLOBAL CONTEXT
  * ========================================================================== */
 
-function buildGlobalContext(user: any): GlobalContext {
-  const homePreferences = user.homePreferences ?? getDefaultHomePreferences();
+function buildGlobalContext(user: UserDoc): GlobalContext {
+  const homePreferences = normalizeHomePreferences(user);
+
+  const name =
+    normalizeOptionalString(user.name, 200) ??
+    normalizeOptionalString(user.email, 320) ??
+    "Utilisateur";
+
+  const email = normalizeOptionalString(user.email, 320);
+  const avatar = normalizeOptionalString(user.avatar, 2048);
+
+  const city = normalizeOptionalString(user.city, MAX_CITY_LENGTH);
+  const country = normalizeOptionalString(user.country, MAX_COUNTRY_LENGTH);
+
+  const language = normalizeOptionalString(user.language, MAX_LANGUAGE_LENGTH);
+
+  const profession = normalizeOptionalString(user.profession, 160);
+
+  const interests = normalizeStringArray(user.interests, 100, 100);
+
+  const roles = normalizeStringArray(user.roles, 50, 100);
+
+  const reputationScore =
+    typeof user.reputationScore === "number" &&
+    Number.isFinite(user.reputationScore)
+      ? user.reputationScore
+      : 0;
 
   return {
     userId: String(user._id),
 
     identity: {
-      name: user.name,
-      email: user.email ?? undefined,
-      avatar: user.avatar ?? undefined,
+      name,
+      ...(email !== undefined ? { email } : {}),
+      ...(avatar !== undefined ? { avatar } : {}),
     },
 
     location: {
-      city: user.city ?? undefined,
-      country: user.country ?? undefined,
+      ...(city !== undefined ? { city } : {}),
+      ...(country !== undefined ? { country } : {}),
     },
 
-    language: user.language ?? undefined,
+    ...(language !== undefined ? { language } : {}),
 
     profile: {
-      profession: user.profession ?? undefined,
-
-      interests: Array.isArray(user.interests) ? user.interests : [],
-
-      reputationScore:
-        typeof user.reputationScore === "number" ? user.reputationScore : 0,
-
-      roles: Array.isArray(user.roles) ? user.roles : [],
+      ...(profession !== undefined ? { profession } : {}),
+      interests,
+      reputationScore,
+      roles,
     },
 
-    home: {
-      favoriteModules: Array.isArray(homePreferences.favoriteModules)
-        ? homePreferences.favoriteModules
-        : [],
-
-      hiddenSections: Array.isArray(homePreferences.hiddenSections)
-        ? homePreferences.hiddenSections
-        : [],
-
-      customSectionOrder: Array.isArray(homePreferences.customSectionOrder)
-        ? homePreferences.customSectionOrder
-        : [],
-
-      notificationPreferences: homePreferences.notificationPreferences,
-    },
+    home: homePreferences,
 
     onboardingCompleted: user.onboardingCompleted === true,
 
@@ -225,17 +344,24 @@ export const getMyContext = query({
 });
 
 /* ============================================================================
- * GET MY LOCATION CONTEXT
+ * GET MY LOCATION
  * ========================================================================== */
 
 /**
- * Version légère pour les composants qui ont uniquement besoin
- * du contexte géographique.
+ * Version légère du contexte.
+ *
+ * IMPORTANT :
+ * Aucune latitude/longitude n'est inventée.
  */
 export const getMyLocation = query({
   args: {},
 
-  handler: async (ctx) => {
+  handler: async (
+    ctx,
+  ): Promise<{
+    city: string | null;
+    country: string | null;
+  } | null> => {
     const user = await getCurrentUser(ctx);
 
     if (!user) {
@@ -243,8 +369,10 @@ export const getMyLocation = query({
     }
 
     return {
-      city: user.city ?? null,
-      country: user.country ?? null,
+      city: normalizeOptionalString(user.city, MAX_CITY_LENGTH) ?? null,
+
+      country:
+        normalizeOptionalString(user.country, MAX_COUNTRY_LENGTH) ?? null,
     };
   },
 });
@@ -256,14 +384,14 @@ export const getMyLocation = query({
 export const getMyLanguage = query({
   args: {},
 
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<string | null> => {
     const user = await getCurrentUser(ctx);
 
     if (!user) {
       return null;
     }
 
-    return user.language ?? null;
+    return normalizeOptionalString(user.language, MAX_LANGUAGE_LENGTH) ?? null;
   },
 });
 
@@ -278,11 +406,17 @@ export const updateMyLocation = mutation({
   },
 
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+    const user = requireCurrentUser(await getCurrentUser(ctx));
 
-    if (!user) {
-      throw new Error("Utilisateur non authentifié");
-    }
+    const city =
+      args.city !== undefined
+        ? normalizeOptionalString(args.city, MAX_CITY_LENGTH)
+        : undefined;
+
+    const country =
+      args.country !== undefined
+        ? normalizeOptionalString(args.country, MAX_COUNTRY_LENGTH)
+        : undefined;
 
     const patch: {
       city?: string;
@@ -290,11 +424,19 @@ export const updateMyLocation = mutation({
     } = {};
 
     if (args.city !== undefined) {
-      patch.city = args.city;
+      if (!city) {
+        throw new ConvexError("La ville fournie est invalide.");
+      }
+
+      patch.city = city;
     }
 
     if (args.country !== undefined) {
-      patch.country = args.country;
+      if (!country) {
+        throw new ConvexError("Le pays fourni est invalide.");
+      }
+
+      patch.country = country;
     }
 
     if (Object.keys(patch).length > 0) {
@@ -303,8 +445,8 @@ export const updateMyLocation = mutation({
 
     return {
       success: true,
-      city: args.city ?? user.city ?? null,
-      country: args.country ?? user.country ?? null,
+      city: patch.city ?? user.city ?? null,
+      country: patch.country ?? user.country ?? null,
     };
   },
 });
@@ -319,19 +461,24 @@ export const updateMyLanguage = mutation({
   },
 
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+    const user = requireCurrentUser(await getCurrentUser(ctx));
 
-    if (!user) {
-      throw new Error("Utilisateur non authentifié");
+    const language = normalizeOptionalString(
+      args.language,
+      MAX_LANGUAGE_LENGTH,
+    );
+
+    if (!language) {
+      throw new ConvexError("La langue fournie est invalide.");
     }
 
     await ctx.db.patch(user._id, {
-      language: args.language,
+      language,
     });
 
     return {
       success: true,
-      language: args.language,
+      language,
     };
   },
 });
@@ -348,11 +495,7 @@ export const updateMyContext = mutation({
   },
 
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-
-    if (!user) {
-      throw new Error("Utilisateur non authentifié");
-    }
+    const user = requireCurrentUser(await getCurrentUser(ctx));
 
     const patch: {
       city?: string;
@@ -361,22 +504,43 @@ export const updateMyContext = mutation({
     } = {};
 
     if (args.city !== undefined) {
-      patch.city = args.city;
+      const city = normalizeOptionalString(args.city, MAX_CITY_LENGTH);
+
+      if (!city) {
+        throw new ConvexError("La ville fournie est invalide.");
+      }
+
+      patch.city = city;
     }
 
     if (args.country !== undefined) {
-      patch.country = args.country;
+      const country = normalizeOptionalString(args.country, MAX_COUNTRY_LENGTH);
+
+      if (!country) {
+        throw new ConvexError("Le pays fourni est invalide.");
+      }
+
+      patch.country = country;
     }
 
     if (args.language !== undefined) {
-      patch.language = args.language;
+      const language = normalizeOptionalString(
+        args.language,
+        MAX_LANGUAGE_LENGTH,
+      );
+
+      if (!language) {
+        throw new ConvexError("La langue fournie est invalide.");
+      }
+
+      patch.language = language;
     }
 
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(user._id, patch);
     }
 
-    const updatedUser = {
+    const updatedUser: UserDoc = {
       ...user,
       ...patch,
     };

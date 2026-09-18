@@ -1,0 +1,35 @@
+﻿
+Count Name                                                      
+----- ----                                                      
+  223 src/pages/modules/MarketplacePage.tsx                     
+  209 src/pages/modules/JuridiquePage.tsx                       
+  202 src/pages/modules/UrbanismePage.tsx                       
+  182 src/pages/modules/JusticePage.tsx                         
+  182 src/pages/modules/LiveStreamingPage.tsx                   
+  157 src/pages/modules/RevenusPage.tsx                         
+  156 src/pages/modules/FitnessPage.tsx                         
+  155 src/pages/modules/LiveStoriesPage.tsx                     
+  144 src/pages/modules/SanteDetailPage.tsx                     
+  143 src/pages/modules/PubPage.tsx                             
+  142 src/pages/modules/SportPage.tsx                           
+  130 src/pages/modules/LivraisonPage.tsx                       
+  125 src/pages/modules/ProfilePage.tsx                         
+  109 src/pages/modules/JobsPage.tsx                            
+  108 src/pages/modules/QuizPage.tsx                            
+  105 src/pages/modules/LogementPage.tsx                        
+   97 src/pages/modules/TrackingPage.tsx                        
+   96 src/pages/modules/PrescriptionPage.tsx                    
+   89 src/pages/modules/ThemePage.tsx                           
+   83 src/pages/modules/HospitalDetailPage.tsx                  
+   82 src/pages/modules/JobDetailPage.tsx                       
+   74 src/pages/modules/SettingsPage.tsx                        
+   68 src/pages/modules/LaboratoryDetailPage.tsx                
+   65 src/pages/modules/HelpPage.tsx                            
+   61 src/pages/modules/Map3DPage.tsx                           
+   51 src/pages/modules/LicensesPage.tsx                        
+   28 src/pages/modules/PrivacyPage.tsx                         
+   17 src/features/transport/pages/BecomeTransportDriverPage.tsx
+   15 src/features/auth/components/AuthLayout.tsx               
+   12 src/features/messages/immo/components/PropertyPreview.tsx 
+
+

@@ -3,6 +3,10 @@
 // ✅ Gestion des données base64 (data:image/...) sans appeler storage.getUrl
 // ✅ Types corrigés (undefined au lieu de null)
 // ✅ Ajout de likeCount: 0 dans les insertions de commentaires
+// ✅ Option C : deleteStory bornée (.take(500) au lieu de .collect())
+// ✅ Batch 2.5 : listStories (sémantique + borne), createStory (durée),
+//    viewStory (.first() + expiration), deleteStory (check remaining)
+// ✅ Fix TS : postsQuery typé explicitement (Doc<"publications">[])
 
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
@@ -45,24 +49,12 @@ async function getCurrentUser(ctx: QueryCtx) {
   }
 }
 
-/**
- * Résout une URL de fichier en tenant compte des différents formats :
- * - URLs HTTP(S) déjà publiques
- * - données base64 (data:image/..., data:video/..., data:audio/...)
- * - storageId Convex (ex: "kg...")
- */
 async function resolveStorageUrl(
   ctx: QueryCtx,
   file: string | undefined | null,
 ): Promise<string | null> {
   if (!file) return null;
-
-  // Déjà une URL HTTP
-  if (file.startsWith("http://") || file.startsWith("https://")) {
-    return file;
-  }
-
-  // Données base64 (images, vidéos, audio)
+  if (file.startsWith("http://") || file.startsWith("https://")) return file;
   if (
     file.startsWith("data:image") ||
     file.startsWith("data:video") ||
@@ -70,8 +62,6 @@ async function resolveStorageUrl(
   ) {
     return file;
   }
-
-  // Sinon, on suppose que c'est un storageId Convex (ex: "kg...")
   try {
     return await ctx.storage.getUrl(file as Id<"_storage">);
   } catch {
@@ -290,7 +280,9 @@ export const listFeed = query({
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
     const currentUserId = currentUser?._id;
-    let postsQuery;
+    // Annotation explicite : sans elle, TS infère `any` et la résolution
+    // de `ctx.db.get(p.authorId)` retourne l'union de tous les documents.
+    let postsQuery: Doc<"publications">[];
     if (args.search) {
       postsQuery = await ctx.db
         .query("publications")
@@ -341,7 +333,6 @@ export const listFeed = query({
           } catch {}
         }
 
-        // ✅ Utilisation de resolveStorageUrl pour tous les médias
         const images = (
           await Promise.all(
             (meta.images || []).map((id: string) => resolveStorageUrl(ctx, id)),
@@ -369,7 +360,7 @@ export const listFeed = query({
 
         return {
           ...p,
-          images, // champ principal pour les composants
+          images,
           authorName: author?.name ?? "Inconnu",
           authorAvatar: author?.avatar ?? undefined,
           likedByMe,
@@ -449,14 +440,12 @@ export const deletePost = mutation({
         code: "FORBIDDEN",
         message: "Vous n'êtes pas l'auteur",
       });
-    // Delete likes
     const allLikes = await ctx.db.query("publicationLikes").collect();
     const likes = allLikes.filter(
       (l) => l.publicationId === args.publicationId,
     );
     for (const like of likes) await ctx.db.delete(like._id);
 
-    // Delete comments
     const comments = await ctx.db
       .query("comments")
       .withIndex("by_publication", (q) =>
@@ -465,7 +454,6 @@ export const deletePost = mutation({
       .collect();
     for (const comment of comments) await ctx.db.delete(comment._id);
 
-    // Delete bookmarks
     const allBookmarks = await ctx.db.query("bookmarks").collect();
     const bookmarks = allBookmarks.filter(
       (b) => b.publicationId === args.publicationId,
@@ -578,7 +566,7 @@ export const addComment = mutation({
       publicationId: args.postId,
       authorId: user._id,
       text: args.text,
-      likeCount: 0, // ✅ Ajout obligatoire suite à la mise à jour du schéma
+      likeCount: 0,
     });
     await ctx.db.patch(args.postId, {
       commentCount: (post.commentCount || 0) + 1,
@@ -609,7 +597,7 @@ export const addReply = mutation({
       authorId: user._id,
       parentId: args.parentId,
       text: args.text,
-      likeCount: 0, // ✅ Ajout obligatoire suite à la mise à jour du schéma
+      likeCount: 0,
     });
     await ctx.db.patch(args.postId, {
       commentCount: (post.commentCount || 0) + 1,
@@ -679,7 +667,6 @@ export const listEvents = query({
             .unique();
           isAttending = rsvp !== null && rsvp.status === "attending";
         }
-        // Résoudre coverImage avec undefined au lieu de null
         let coverImage: string | undefined = e.coverImage;
         if (
           coverImage &&
@@ -901,12 +888,14 @@ export const listStories = query({
   args: {},
   handler: async (ctx) => {
     const currentUser = await getCurrentUser(ctx);
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Une story active est une story dont expiresAt est strictement postérieur
+    // à maintenant. `now - 24h` réintroduirait des stories déjà expirées.
+    const now = new Date().toISOString();
     const stories = await ctx.db
       .query("stories")
-      .withIndex("by_expiresAt", (q) => q.gt("expiresAt", yesterday))
+      .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
       .order("desc")
-      .collect();
+      .take(200);
     const enriched = await Promise.all(
       stories.map(async (s) => {
         const author = await ctx.db.get(s.authorId);
@@ -916,10 +905,9 @@ export const listStories = query({
             .query("storyViews")
             .withIndex("by_story", (q) => q.eq("storyId", s._id))
             .filter((q) => q.eq(q.field("viewerId"), currentUser._id))
-            .unique();
+            .first();
           isViewed = view !== null;
         }
-        // Résoudre mediaUrl avec undefined au lieu de null
         let mediaUrl: string | undefined = s.mediaUrl;
         if (
           mediaUrl &&
@@ -961,7 +949,7 @@ export const createStory = mutation({
       mediaUrl: args.mediaUrl,
       mediaType: args.mediaType,
       caption: args.caption,
-      duration: args.duration || (args.mediaType === "video" ? 15 : 5),
+      duration: args.duration, // champ optionnel — aucune valeur inventée
       viewCount: 0,
       expiresAt,
       isHighlight: false,
@@ -980,45 +968,93 @@ export const viewStory = mutation({
         code: "NOT_FOUND",
         message: "Story introuvable",
       });
+
+    // Refuser une vue sur une story expirée.
+    const now = new Date().toISOString();
+    if (story.expiresAt <= now) return;
+
+    // .first() : ne crash pas si deux vues existent (double-tap rapide avant insert).
     const existing = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
       .filter((q) => q.eq(q.field("viewerId"), user._id))
-      .unique();
-    if (!existing) {
-      await ctx.db.insert("storyViews", {
-        storyId: args.storyId,
-        viewerId: user._id,
-        viewedAt: new Date().toISOString(),
-      });
-      await ctx.db.patch(args.storyId, {
-        viewCount: (story.viewCount || 0) + 1,
-      });
-    }
+      .first();
+
+    if (existing) return;
+
+    await ctx.db.insert("storyViews", {
+      storyId: args.storyId,
+      viewerId: user._id,
+      viewedAt: now,
+    });
+
+    // viewCount est v.number() non-optionnel : aucun fallback `|| 0`.
+    await ctx.db.patch(args.storyId, {
+      viewCount: story.viewCount + 1,
+    });
   },
 });
 
 export const deleteStory = mutation({
-  args: { storyId: v.id("stories") },
+  args: {
+    storyId: v.id("stories"),
+  },
+
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
     const story = await ctx.db.get(args.storyId);
-    if (!story)
+
+    if (!story) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Story introuvable",
       });
-    if (story.authorId !== user._id)
+    }
+
+    if (story.authorId !== user._id) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Vous n'êtes pas l'auteur",
       });
+    }
+
+    // Suppression bornée : une mutation ne doit jamais collecter
+    // toutes les vues d'une Story sans limite.
     const views = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
-      .collect();
-    for (const v of views) await ctx.db.delete(v._id);
+      .take(500);
+
+    for (const view of views) {
+      await ctx.db.delete(view._id);
+    }
+
+    // Après suppression du batch, on vérifie qu'il ne reste PLUS aucune vue.
+    // Sans ce check, une story avec exactement 500 vues retournerait
+    // pendingCleanup: true alors que tout est supprimé → boucle infinie client.
+    if (views.length === 500) {
+      const remaining = await ctx.db
+        .query("storyViews")
+        .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
+        .take(1);
+
+      if (remaining.length > 0) {
+        return {
+          success: false,
+          pendingCleanup: true,
+          deletedViews: views.length,
+        };
+      }
+    }
+
     await ctx.db.delete(args.storyId);
+
+    return {
+      success: true,
+      pendingCleanup: false,
+      deletedViews: views.length,
+    };
   },
 });
 
@@ -1052,12 +1088,15 @@ export const startLive = mutation({
         code: "CONFLICT",
         message: "Vous avez déjà un live en cours",
       });
-    const streamUrl = `live_${user._id}_${Date.now()}`;
+    // streamUrl est v.optional(v.string()) dans le schéma.
+    // Aucune URL de flux n'est générée : la vraie URL RTMP/HLS dépend
+    // d'un pipeline CDN qui n'existe pas encore (décision produit).
+    // CommunityLive.tsx affiche un placeholder quand streamUrl est absent.
     await ctx.db.insert("liveStreams", {
       hostId: user._id,
       title: args.title,
       description: args.description,
-      streamUrl,
+      // streamUrl: volontairement non renseigné
       status: "live",
       startedAt: new Date().toISOString(),
       viewerCount: 0,
@@ -1080,11 +1119,13 @@ export const startLive = mutation({
       status: "active",
       meta: JSON.stringify({
         postType: "live",
-        liveUrl: streamUrl,
         emoji: "🔴",
       }),
     });
-    return { streamUrl };
+    // useCommunityLive.ts lit `result.streamUrl` puis appelle
+    // setStreamUrl(string | null). On retourne `null` — la forme du contrat
+    // client est préservée, aucune URL fabriquée n'est exposée.
+    return { streamUrl: null };
   },
 });
 
@@ -1147,7 +1188,6 @@ export const search = query({
             meta = typeof p.meta === "string" ? JSON.parse(p.meta) : p.meta;
           } catch {}
         }
-        // ✅ Utilisation de resolveStorageUrl
         const images = (
           await Promise.all(
             (meta.images || []).map((id: string) => resolveStorageUrl(ctx, id)),
@@ -1201,7 +1241,6 @@ export const getRecommendations = query({
             meta = typeof p.meta === "string" ? JSON.parse(p.meta) : p.meta;
           } catch {}
         }
-        // ✅ Utilisation de resolveStorageUrl
         const images = (
           await Promise.all(
             (meta.images || []).map((id: string) => resolveStorageUrl(ctx, id)),
@@ -1267,7 +1306,6 @@ export const listBookmarks = query({
               typeof post.meta === "string" ? JSON.parse(post.meta) : post.meta;
           } catch {}
         }
-        // ✅ Utilisation de resolveStorageUrl
         const images = (
           await Promise.all(
             (meta.images || []).map((id: string) => resolveStorageUrl(ctx, id)),

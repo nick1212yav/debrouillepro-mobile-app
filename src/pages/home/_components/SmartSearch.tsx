@@ -1,4 +1,5 @@
 // src/pages/home/_components/SmartSearch.tsx
+
 import {
   View,
   Pressable,
@@ -65,7 +66,7 @@ type ResultCategory =
   | "Événements"
   | "Voyages"
   | "Modules"
-  | "Bien‑être"
+  | "Bien-être"
   | "Éducation"
   | "Finance"
   | "Communauté"
@@ -83,7 +84,7 @@ interface SearchResult {
 }
 
 /* ============================================================
- * MODULE DIRECTORY (80+ modules)
+ * MODULE DIRECTORY
  * ============================================================ */
 
 const MODULE_ENTRIES: SearchResult[] = [
@@ -118,36 +119,6 @@ const MODULE_ENTRIES: SearchResult[] = [
     page: "hebergement",
   },
   {
-    id: "mod-urbanisme",
-    category: "Modules",
-    title: "Urbanisme",
-    subtitle: "Permis de construire, plans d'occupation",
-    meta: "→ Ouvrir",
-    badge: "Urbain",
-    badgeColor: "#818CF8",
-    page: "urbanisme",
-  },
-  {
-    id: "mod-amenagement",
-    category: "Modules",
-    title: "Aménagement",
-    subtitle: "Projets d'aménagement territorial",
-    meta: "→ Ouvrir",
-    badge: "Territoire",
-    badgeColor: "#818CF8",
-    page: "amenagement",
-  },
-  {
-    id: "mod-cityhabitat",
-    category: "Modules",
-    title: "City‑Habitat",
-    subtitle: "Habitat urbain intelligent",
-    meta: "→ Ouvrir",
-    badge: "Smart",
-    badgeColor: "#A78BFA",
-    page: "city-habitat",
-  },
-  {
     id: "mod-jobs",
     category: "Modules",
     title: "Emploi & Jobs",
@@ -156,26 +127,6 @@ const MODULE_ENTRIES: SearchResult[] = [
     badge: "Emploi",
     badgeColor: "#A78BFA",
     page: "jobs",
-  },
-  {
-    id: "mod-emploi",
-    category: "Modules",
-    title: "Emploi formel",
-    subtitle: "Fonctions publiques, CDI, CDD",
-    meta: "→ Ouvrir",
-    badge: "Formel",
-    badgeColor: "#A78BFA",
-    page: "emploi",
-  },
-  {
-    id: "mod-business",
-    category: "Modules",
-    title: "Business & Entreprises",
-    subtitle: "Création, financement, annuaire",
-    meta: "→ Ouvrir",
-    badge: "Business",
-    badgeColor: "#FB923C",
-    page: "business",
   },
   {
     id: "mod-marketplace",
@@ -188,16 +139,6 @@ const MODULE_ENTRIES: SearchResult[] = [
     page: "marketplace",
   },
   {
-    id: "mod-mkpro",
-    category: "Modules",
-    title: "Marketplace Pro",
-    subtitle: "Boutiques professionnelles",
-    meta: "→ Ouvrir",
-    badge: "Pro",
-    badgeColor: "#F472B6",
-    page: "marketplace-pro",
-  },
-  {
     id: "mod-annonces",
     category: "Modules",
     title: "Annonces",
@@ -206,126 +147,6 @@ const MODULE_ENTRIES: SearchResult[] = [
     badge: "Annonces",
     badgeColor: "#FBBF24",
     page: "annonces",
-  },
-  {
-    id: "mod-revenus",
-    category: "Modules",
-    title: "Revenus & Monétisation",
-    subtitle: "Générer des revenus en ligne",
-    meta: "→ Ouvrir",
-    badge: "Revenus",
-    badgeColor: "#34D399",
-    page: "revenus",
-  },
-  {
-    id: "mod-revdash",
-    category: "Modules",
-    title: "Tableau de bord Revenus",
-    subtitle: "Suivi de vos gains",
-    meta: "→ Ouvrir",
-    badge: "Dashboard",
-    badgeColor: "#34D399",
-    page: "revenus-dashboard",
-  },
-  {
-    id: "mod-transport",
-    category: "Modules",
-    title: "Transport",
-    subtitle: "Bus, taxi, moto, covoiturage",
-    meta: "→ Ouvrir",
-    badge: "Transport",
-    badgeColor: "#818CF8",
-    page: "transport",
-  },
-  {
-    id: "mod-voyages",
-    category: "Modules",
-    title: "Voyages",
-    subtitle: "Billets de voyage inter-villes",
-    meta: "→ Ouvrir",
-    badge: "Voyages",
-    badgeColor: "#818CF8",
-    page: "voyages",
-  },
-  {
-    id: "mod-destinations",
-    category: "Modules",
-    title: "Destinations",
-    subtitle: "Explorer des destinations en Afrique",
-    meta: "→ Ouvrir",
-    badge: "Discover",
-    badgeColor: "#818CF8",
-    page: "destinations",
-  },
-  {
-    id: "mod-planificateur",
-    category: "Modules",
-    title: "Planificateur Voyage",
-    subtitle: "Planifier votre itinéraire",
-    meta: "→ Ouvrir",
-    badge: "Planning",
-    badgeColor: "#818CF8",
-    page: "planificateur",
-  },
-  {
-    id: "mod-carnet",
-    category: "Modules",
-    title: "Carnet de Voyage",
-    subtitle: "Journal de bord de vos aventures",
-    meta: "→ Ouvrir",
-    badge: "Journal",
-    badgeColor: "#818CF8",
-    page: "carnet-voyage",
-  },
-  {
-    id: "mod-budget",
-    category: "Modules",
-    title: "Budget Voyage",
-    subtitle: "Gérer vos dépenses de voyage",
-    meta: "→ Ouvrir",
-    badge: "Budget",
-    badgeColor: "#FBBF24",
-    page: "budget-voyage",
-  },
-  {
-    id: "mod-livraison",
-    category: "Modules",
-    title: "Livraison",
-    subtitle: "Commande et suivi de colis",
-    meta: "→ Ouvrir",
-    badge: "Livraison",
-    badgeColor: "#FB923C",
-    page: "livraison",
-  },
-  {
-    id: "mod-tracking",
-    category: "Modules",
-    title: "Tracking & Suivi",
-    subtitle: "Suivi GPS et logistique",
-    meta: "→ Ouvrir",
-    badge: "GPS",
-    badgeColor: "#FB923C",
-    page: "tracking",
-  },
-  {
-    id: "mod-map3d",
-    category: "Modules",
-    title: "Carte 3D",
-    subtitle: "Visualisation cartographique 3D",
-    meta: "→ Ouvrir",
-    badge: "Map",
-    badgeColor: "#818CF8",
-    page: "map3d",
-  },
-  {
-    id: "mod-carte",
-    category: "Modules",
-    title: "Carte interactive",
-    subtitle: "Carte locale des services",
-    meta: "→ Ouvrir",
-    badge: "Carte",
-    badgeColor: "#818CF8",
-    page: "carte",
   },
   {
     id: "mod-sante",
@@ -338,356 +159,6 @@ const MODULE_ENTRIES: SearchResult[] = [
     page: "sante",
   },
   {
-    id: "mod-fitness",
-    category: "Modules",
-    title: "Fitness & Sport",
-    subtitle: "Programmes d'entraînement",
-    meta: "→ Ouvrir",
-    badge: "Fitness",
-    badgeColor: "#FB923C",
-    page: "fitness",
-  },
-  {
-    id: "mod-nutrition",
-    category: "Modules",
-    title: "Nutrition",
-    subtitle: "Journal alimentaire & recettes",
-    meta: "→ Ouvrir",
-    badge: "Nutrition",
-    badgeColor: "#A3E635",
-    page: "nutrition",
-  },
-  {
-    id: "mod-meditation",
-    category: "Modules",
-    title: "Méditation",
-    subtitle: "Séances de respiration & pleine conscience",
-    meta: "→ Ouvrir",
-    badge: "Zen",
-    badgeColor: "#C4B5FD",
-    page: "meditation",
-  },
-  {
-    id: "mod-bienetre",
-    category: "Modules",
-    title: "Bien‑être Dashboard",
-    subtitle: "Tableau de bord santé global",
-    meta: "→ Ouvrir",
-    badge: "Wellness",
-    badgeColor: "#C4B5FD",
-    page: "bienetre",
-  },
-  {
-    id: "mod-sport",
-    category: "Modules",
-    title: "Sport",
-    subtitle: "Clubs, compétitions, résultats",
-    meta: "→ Ouvrir",
-    badge: "Sport",
-    badgeColor: "#FB923C",
-    page: "sport",
-  },
-  {
-    id: "mod-sos",
-    category: "Modules",
-    title: "SOS Urgences",
-    subtitle: "Appels d'urgence et secours",
-    meta: "→ Ouvrir",
-    badge: "Urgence",
-    badgeColor: "#F87171",
-    page: "sos",
-  },
-  {
-    id: "mod-apprendre",
-    category: "Modules",
-    title: "Apprendre",
-    subtitle: "Cours en ligne & tutoriels",
-    meta: "→ Ouvrir",
-    badge: "Learn",
-    badgeColor: "#818CF8",
-    page: "apprendre",
-  },
-  {
-    id: "mod-cours",
-    category: "Modules",
-    title: "Cours & Catalogue",
-    subtitle: "Catalogue complet des formations",
-    meta: "→ Ouvrir",
-    badge: "Cours",
-    badgeColor: "#818CF8",
-    page: "cours",
-  },
-  {
-    id: "mod-quiz",
-    category: "Modules",
-    title: "Quiz & Évaluations",
-    subtitle: "Testez vos connaissances",
-    meta: "→ Ouvrir",
-    badge: "Quiz",
-    badgeColor: "#A78BFA",
-    page: "quiz",
-  },
-  {
-    id: "mod-certifs",
-    category: "Modules",
-    title: "Certifications",
-    subtitle: "Diplômes & badges numériques",
-    meta: "→ Ouvrir",
-    badge: "Certif",
-    badgeColor: "#FBBF24",
-    page: "certifications",
-  },
-  {
-    id: "mod-mentorat",
-    category: "Modules",
-    title: "Mentorat & Communauté",
-    subtitle: "Mentors & groupes d'apprentissage",
-    meta: "→ Ouvrir",
-    badge: "Mentor",
-    badgeColor: "#34D399",
-    page: "mentorat",
-  },
-  {
-    id: "mod-eduformelle",
-    category: "Modules",
-    title: "Éducation Formelle",
-    subtitle: "Écoles, universités, inscriptions",
-    meta: "→ Ouvrir",
-    badge: "Académique",
-    badgeColor: "#818CF8",
-    page: "edu-formelle",
-  },
-  {
-    id: "mod-ecole",
-    category: "Modules",
-    title: "École & Église",
-    subtitle: "Calendrier scolaire & paroissial",
-    meta: "→ Ouvrir",
-    badge: "École",
-    badgeColor: "#818CF8",
-    page: "ecole",
-  },
-  {
-    id: "mod-wallet",
-    category: "Modules",
-    title: "Wallet & Portefeuille",
-    subtitle: "Argent mobile & transferts",
-    meta: "→ Ouvrir",
-    badge: "Wallet",
-    badgeColor: "#34D399",
-    page: "wallet",
-  },
-  {
-    id: "mod-paiement",
-    category: "Modules",
-    title: "Paiements",
-    subtitle: "Mobile money, cartes, crypto",
-    meta: "→ Ouvrir",
-    badge: "Pay",
-    badgeColor: "#34D399",
-    page: "paiement",
-  },
-  {
-    id: "mod-finances",
-    category: "Modules",
-    title: "Finances Personnelles",
-    subtitle: "Budget, épargne, investissements",
-    meta: "→ Ouvrir",
-    badge: "Finance",
-    badgeColor: "#34D399",
-    page: "finances",
-  },
-  {
-    id: "mod-dashboard",
-    category: "Modules",
-    title: "Dashboard",
-    subtitle: "Tableau de bord global de l'app",
-    meta: "→ Ouvrir",
-    badge: "Stats",
-    badgeColor: "#A78BFA",
-    page: "dashboard",
-  },
-  {
-    id: "mod-community",
-    category: "Modules",
-    title: "Communauté",
-    subtitle: "Forum, entraide & réseau local",
-    meta: "→ Ouvrir",
-    badge: "Community",
-    badgeColor: "#F472B6",
-    page: "community",
-  },
-  {
-    id: "mod-groupes",
-    category: "Modules",
-    title: "Groupes",
-    subtitle: "Groupes de discussion & clubs",
-    meta: "→ Ouvrir",
-    badge: "Groupes",
-    badgeColor: "#F472B6",
-    page: "groupes",
-  },
-  {
-    id: "mod-messages",
-    category: "Modules",
-    title: "Messages",
-    subtitle: "Chat privé & conversations",
-    meta: "→ Ouvrir",
-    badge: "Chat",
-    badgeColor: "#818CF8",
-    page: "messages",
-  },
-  {
-    id: "mod-network",
-    category: "Modules",
-    title: "Réseau Professionnel",
-    subtitle: "Connexions & opportunités business",
-    meta: "→ Ouvrir",
-    badge: "Network",
-    badgeColor: "#A78BFA",
-    page: "network",
-  },
-  {
-    id: "mod-parrainage",
-    category: "Modules",
-    title: "Parrainage",
-    subtitle: "Invitez vos proches & gagnez des points",
-    meta: "→ Ouvrir",
-    badge: "Parrainage",
-    badgeColor: "#FBBF24",
-    page: "parrainage",
-  },
-  {
-    id: "mod-reputation",
-    category: "Modules",
-    title: "Réputation",
-    subtitle: "Avis, score & crédibilité",
-    meta: "→ Ouvrir",
-    badge: "Score",
-    badgeColor: "#FBBF24",
-    page: "reputation",
-  },
-  {
-    id: "mod-cocreation",
-    category: "Modules",
-    title: "Co‑création",
-    subtitle: "Projets collaboratifs & hackathons",
-    meta: "→ Ouvrir",
-    badge: "Collab",
-    badgeColor: "#F472B6",
-    page: "cocreation",
-  },
-  {
-    id: "mod-media",
-    category: "Modules",
-    title: "Médias & Actualités",
-    subtitle: "News, podcasts, vidéos",
-    meta: "→ Ouvrir",
-    badge: "Media",
-    badgeColor: "#FB923C",
-    page: "media",
-  },
-  {
-    id: "mod-live",
-    category: "Modules",
-    title: "Live Stories",
-    subtitle: "Vidéos en direct & stories",
-    meta: "→ Ouvrir",
-    badge: "Live",
-    badgeColor: "#F87171",
-    page: "live",
-  },
-  {
-    id: "mod-livestreaming",
-    category: "Modules",
-    title: "Live Streaming",
-    subtitle: "Diffusion en direct professionnelle",
-    meta: "→ Ouvrir",
-    badge: "Stream",
-    badgeColor: "#F87171",
-    page: "live-streaming",
-  },
-  {
-    id: "mod-editeur",
-    category: "Modules",
-    title: "Éditeur de contenu",
-    subtitle: "Créer articles, posts et pages",
-    meta: "→ Ouvrir",
-    badge: "Éditeur",
-    badgeColor: "#A78BFA",
-    page: "editeur",
-  },
-  {
-    id: "mod-studio",
-    category: "Modules",
-    title: "Studio Photo",
-    subtitle: "Édition photo & filtres IA",
-    meta: "→ Ouvrir",
-    badge: "Photo",
-    badgeColor: "#F472B6",
-    page: "studio",
-  },
-  {
-    id: "mod-storiescreator",
-    category: "Modules",
-    title: "Créateur de Stories",
-    subtitle: "Créez des stories animées",
-    meta: "→ Ouvrir",
-    badge: "Stories",
-    badgeColor: "#F472B6",
-    page: "stories-creator",
-  },
-  {
-    id: "mod-templates",
-    category: "Modules",
-    title: "Modèles & Templates",
-    subtitle: "Templates prêts à l'emploi",
-    meta: "→ Ouvrir",
-    badge: "Templates",
-    badgeColor: "#818CF8",
-    page: "templates",
-  },
-  {
-    id: "mod-pub",
-    category: "Modules",
-    title: "Publicité",
-    subtitle: "Créer et gérer vos campagnes pub",
-    meta: "→ Ouvrir",
-    badge: "Pub",
-    badgeColor: "#FB923C",
-    page: "pub",
-  },
-  {
-    id: "mod-evenements",
-    category: "Modules",
-    title: "Événements",
-    subtitle: "Concerts, foires, sorties",
-    meta: "→ Ouvrir",
-    badge: "Events",
-    badgeColor: "#F472B6",
-    page: "evenements",
-  },
-  {
-    id: "mod-evenementspro",
-    category: "Modules",
-    title: "Événements Pro",
-    subtitle: "Conférences, salons, networking",
-    meta: "→ Ouvrir",
-    badge: "Pro",
-    badgeColor: "#F472B6",
-    page: "evenements-pro",
-  },
-  {
-    id: "mod-agenda",
-    category: "Modules",
-    title: "Agenda",
-    subtitle: "Calendrier personnel & rappels",
-    meta: "→ Ouvrir",
-    badge: "Agenda",
-    badgeColor: "#818CF8",
-    page: "agenda",
-  },
-  {
     id: "mod-agri",
     category: "Modules",
     title: "Agriculture",
@@ -696,26 +167,6 @@ const MODULE_ENTRIES: SearchResult[] = [
     badge: "Agri",
     badgeColor: "#A3E635",
     page: "agri",
-  },
-  {
-    id: "mod-environnement",
-    category: "Modules",
-    title: "Environnement",
-    subtitle: "Écologie, climat, biodiversité",
-    meta: "→ Ouvrir",
-    badge: "Éco",
-    badgeColor: "#A3E635",
-    page: "environnement",
-  },
-  {
-    id: "mod-energie",
-    category: "Modules",
-    title: "Énergie",
-    subtitle: "Solaire, électricité, efficacité",
-    meta: "→ Ouvrir",
-    badge: "Énergie",
-    badgeColor: "#FBBF24",
-    page: "energie",
   },
   {
     id: "mod-services",
@@ -728,84 +179,74 @@ const MODULE_ENTRIES: SearchResult[] = [
     page: "services",
   },
   {
-    id: "mod-restauration",
+    id: "mod-evenements",
     category: "Modules",
-    title: "Restauration",
-    subtitle: "Restaurants, livraison repas",
+    title: "Événements",
+    subtitle: "Concerts, foires, sorties",
     meta: "→ Ouvrir",
-    badge: "Restau",
-    badgeColor: "#FB923C",
-    page: "restauration",
+    badge: "Events",
+    badgeColor: "#F472B6",
+    page: "evenements",
   },
   {
-    id: "mod-documents",
+    id: "mod-voyages",
     category: "Modules",
-    title: "Documents",
-    subtitle: "Stockage & gestion de documents",
+    title: "Voyages",
+    subtitle: "Billets de voyage inter-villes",
     meta: "→ Ouvrir",
-    badge: "Docs",
+    badge: "Voyages",
     badgeColor: "#818CF8",
-    page: "documents",
+    page: "voyages",
   },
   {
-    id: "mod-juridique",
+    id: "mod-apprendre",
     category: "Modules",
-    title: "Juridique",
-    subtitle: "Aide légale & conseils juridiques",
+    title: "Apprendre",
+    subtitle: "Cours en ligne & tutoriels",
     meta: "→ Ouvrir",
-    badge: "Droit",
-    badgeColor: "#A78BFA",
-    page: "juridique",
+    badge: "Learn",
+    badgeColor: "#818CF8",
+    page: "apprendre",
   },
   {
-    id: "mod-justice",
+    id: "mod-paiement",
     category: "Modules",
-    title: "Justice",
-    subtitle: "Accès au droit & procédures",
+    title: "Paiements",
+    subtitle: "Mobile money, cartes, crypto",
     meta: "→ Ouvrir",
-    badge: "Justice",
-    badgeColor: "#A78BFA",
-    page: "justice",
-  },
-  {
-    id: "mod-ong",
-    category: "Modules",
-    title: "ONG & Solidarité",
-    subtitle: "Actions humanitaires & bénévolat",
-    meta: "→ Ouvrir",
-    badge: "ONG",
+    badge: "Pay",
     badgeColor: "#34D399",
-    page: "ong",
+    page: "paiement",
   },
   {
-    id: "mod-securite",
+    id: "mod-community",
     category: "Modules",
-    title: "Sécurité Publique",
-    subtitle: "Alertes, signalements, prévention",
+    title: "Communauté",
+    subtitle: "Forum, entraide & réseau local",
     meta: "→ Ouvrir",
-    badge: "Sécurité",
-    badgeColor: "#F87171",
-    page: "securite",
+    badge: "Community",
+    badgeColor: "#F472B6",
+    page: "community",
   },
   {
-    id: "mod-datapublique",
+    id: "mod-messages",
     category: "Modules",
-    title: "Data Publique",
-    subtitle: "Données ouvertes & statistiques",
+    title: "Messages",
+    subtitle: "Chat privé & conversations",
     meta: "→ Ouvrir",
-    badge: "Data",
+    badge: "Chat",
     badgeColor: "#818CF8",
-    page: "data-publique",
+    page: "messages",
   },
   {
-    id: "mod-eglise",
+    id: "mod-live",
     category: "Modules",
-    title: "Église & Communauté religieuse",
-    subtitle: "Services paroissiaux & annonces",
+    title: "Live",
+    subtitle: "Vidéos en direct & stories",
     meta: "→ Ouvrir",
-    badge: "Religion",
-    badgeColor: "#C4B5FD",
-    page: "eglise",
+    badge: "Live",
+    badgeColor: "#F87171",
+    page: "live",
   },
   {
     id: "mod-profile",
@@ -817,80 +258,10 @@ const MODULE_ENTRIES: SearchResult[] = [
     badgeColor: "#A78BFA",
     page: "profile",
   },
-  {
-    id: "mod-premium",
-    category: "Modules",
-    title: "Premium",
-    subtitle: "Plans premium & avantages",
-    meta: "→ Ouvrir",
-    badge: "Premium",
-    badgeColor: "#FBBF24",
-    page: "premium",
-  },
-  {
-    id: "mod-recompenses",
-    category: "Modules",
-    title: "Récompenses",
-    subtitle: "Points fidélité & cashback",
-    meta: "→ Ouvrir",
-    badge: "Points",
-    badgeColor: "#FBBF24",
-    page: "recompenses",
-  },
-  {
-    id: "mod-favorites",
-    category: "Modules",
-    title: "Favoris",
-    subtitle: "Vos contenus sauvegardés",
-    meta: "→ Ouvrir",
-    badge: "Favoris",
-    badgeColor: "#F87171",
-    page: "favorites",
-  },
-  {
-    id: "mod-notifications",
-    category: "Modules",
-    title: "Notifications",
-    subtitle: "Alertes et messages reçus",
-    meta: "→ Ouvrir",
-    badge: "Notifs",
-    badgeColor: "#818CF8",
-    page: "notifications",
-  },
-  {
-    id: "mod-settings",
-    category: "Modules",
-    title: "Paramètres",
-    subtitle: "Langue, thème, confidentialité",
-    meta: "→ Ouvrir",
-    badge: "Config",
-    badgeColor: "#818CF8",
-    page: "settings",
-  },
-  {
-    id: "mod-explorer",
-    category: "Modules",
-    title: "Explorer",
-    subtitle: "Découvrir tous les modules",
-    meta: "→ Ouvrir",
-    badge: "Explorer",
-    badgeColor: "#A78BFA",
-    page: "explorer",
-  },
-  {
-    id: "mod-actions",
-    category: "Modules",
-    title: "Actions rapides",
-    subtitle: "Raccourcis & actions contextuelles",
-    meta: "→ Ouvrir",
-    badge: "Actions",
-    badgeColor: "#A78BFA",
-    page: "actions",
-  },
 ];
 
 /* ============================================================
- * CONTENT RESULTS
+ * SEARCH CONTENT
  * ============================================================ */
 
 const CONTENT_RESULTS: SearchResult[] = [
@@ -902,36 +273,6 @@ const CONTENT_RESULTS: SearchResult[] = [
     meta: "$450/mois",
     badge: "À louer",
     badgeColor: "#34D399",
-    page: "immo",
-  },
-  {
-    id: "i2",
-    category: "Immo",
-    title: "Studio meublé – Dakar Plateau",
-    subtitle: "Dakar, Sénégal",
-    meta: "85 000 FCFA/mois",
-    badge: "Nouveau",
-    badgeColor: "#818CF8",
-    page: "immo",
-  },
-  {
-    id: "i3",
-    category: "Immo",
-    title: "Villa avec piscine – Abidjan",
-    subtitle: "Cocody, Côte d'Ivoire",
-    meta: "$1 200/mois",
-    badge: "Premium",
-    badgeColor: "#FBBF24",
-    page: "immo",
-  },
-  {
-    id: "i4",
-    category: "Immo",
-    title: "Terrain 500m² – Bamako",
-    subtitle: "ACI 2000, Mali",
-    meta: "$8 000",
-    badge: "À vendre",
-    badgeColor: "#FB923C",
     page: "immo",
   },
   {
@@ -955,337 +296,66 @@ const CONTENT_RESULTS: SearchResult[] = [
     page: "jobs",
   },
   {
-    id: "j3",
-    category: "Jobs/Pro",
-    title: "Comptable certifié",
-    subtitle: "Banque Atlantique – Abidjan",
-    meta: "350 000 FCFA",
-    badge: "CDD",
-    badgeColor: "#818CF8",
-    page: "jobs",
-  },
-  {
-    id: "j4",
-    category: "Jobs/Pro",
-    title: "Chauffeur Uber Eats",
-    subtitle: "Dakar, Sénégal",
-    meta: "Commission 25%",
-    badge: "Flexible",
-    badgeColor: "#A78BFA",
-    page: "jobs",
-  },
-  {
     id: "s1",
     category: "Santé",
-    title: "Dr Aminata Koné – Cardiologue",
-    subtitle: "Clinique Avicenne, Abidjan",
-    meta: "Disponible aujourd'hui",
-    badge: "En ligne",
-    badgeColor: "#34D399",
-    page: "sante",
-  },
-  {
-    id: "s2",
-    category: "Santé",
-    title: "Pharmacie Centrale Dakar",
-    subtitle: "Plateau, Dakar",
-    meta: "Ouvert 24h/24",
-    badge: "Urgence",
-    badgeColor: "#F87171",
-    page: "sante",
-  },
-  {
-    id: "s3",
-    category: "Santé",
     title: "Consultation générale",
-    subtitle: "MediConnect Telehealth",
-    meta: "5 000 FCFA / 15 min",
-    badge: "Télé",
-    badgeColor: "#818CF8",
+    subtitle: "Téléconsultation",
+    meta: "Disponible",
+    badge: "Santé",
+    badgeColor: "#F87171",
     page: "sante",
   },
   {
     id: "a1",
     category: "Agri",
     title: "Sac de maïs 50kg",
-    subtitle: "Coopérative Sahel Vert",
-    meta: "12 500 FCFA",
-    badge: "Stock OK",
-    badgeColor: "#34D399",
+    subtitle: "Agriculture",
+    meta: "Stock disponible",
+    badge: "Agri",
+    badgeColor: "#A3E635",
     page: "agri",
-  },
-  {
-    id: "a2",
-    category: "Agri",
-    title: "Engrais NPK 25kg",
-    subtitle: "AgroInputs Mali",
-    meta: "8 000 FCFA",
-    badge: "Promo -10%",
-    badgeColor: "#FB923C",
-    page: "agri",
-  },
-  {
-    id: "a3",
-    category: "Agri",
-    title: "Alerte : Criquet pèlerin",
-    subtitle: "Zone nord Sénégal",
-    meta: "Risque élevé",
-    badge: "Alerte",
-    badgeColor: "#F87171",
-    page: "agri",
-  },
-  {
-    id: "m1",
-    category: "Media",
-    title: "Sommet UA : les décisions clés",
-    subtitle: "Politique · il y a 2h",
-    meta: "8 min de lecture",
-    badge: "Trending",
-    badgeColor: "#FB923C",
-    page: "media",
-  },
-  {
-    id: "m2",
-    category: "Media",
-    title: "Podcast : Entrepreneuriat en Afrique",
-    subtitle: "Business Africa FM",
-    meta: "45 min",
-    badge: "Nouveau",
-    badgeColor: "#818CF8",
-    page: "media",
-  },
-  {
-    id: "m3",
-    category: "Media",
-    title: "AFCON 2025 : résultats du jour",
-    subtitle: "Sport · il y a 1h",
-    meta: "3 min de lecture",
-    badge: "Sport",
-    badgeColor: "#34D399",
-    page: "media",
   },
   {
     id: "e1",
     category: "Événements",
-    title: "Foire Internationale de Dakar",
-    subtitle: "CICES, Dakar",
-    meta: "15-22 mars 2024",
-    badge: "Gratuit",
-    badgeColor: "#34D399",
-    page: "evenements",
-  },
-  {
-    id: "e2",
-    category: "Événements",
-    title: "Concert Burna Boy",
-    subtitle: "Stade Léopold Sédar Senghor",
-    meta: "25 000 FCFA",
-    badge: "Chaud 🔥",
-    badgeColor: "#F87171",
-    page: "evenements",
-  },
-  {
-    id: "e3",
-    category: "Événements",
-    title: "Tech Summit Africa 2024",
-    subtitle: "Sofitel Abidjan",
-    meta: "50 000 FCFA",
-    badge: "Pro",
-    badgeColor: "#818CF8",
+    title: "Événements à proximité",
+    subtitle: "Concerts, foires, sorties",
+    meta: "À découvrir",
+    badge: "Events",
+    badgeColor: "#F472B6",
     page: "evenements",
   },
   {
     id: "v1",
     category: "Voyages",
-    title: "Dakar → Abidjan",
-    subtitle: "Trans-Sahel Express",
-    meta: "18 500 FCFA · 15h30",
-    badge: "Bus",
-    badgeColor: "#FB923C",
-    page: "voyages",
-  },
-  {
-    id: "v2",
-    category: "Voyages",
-    title: "Dakar → Bamako",
-    subtitle: "Rapid Sahel",
-    meta: "9 500 FCFA · 12h",
-    badge: "Minibus",
-    badgeColor: "#34D399",
-    page: "voyages",
-  },
-  {
-    id: "v3",
-    category: "Voyages",
-    title: "Abidjan → Accra",
-    subtitle: "Air Afrique Connect",
-    meta: "85 000 FCFA · 2h30",
-    badge: "Avion",
+    title: "Voyages inter-villes",
+    subtitle: "Transport & destinations",
+    meta: "Réserver",
+    badge: "Voyages",
     badgeColor: "#818CF8",
     page: "voyages",
-  },
-  {
-    id: "be1",
-    category: "Bien‑être",
-    title: "Séance HIIT 30 min",
-    subtitle: "Fitness · Niveau intermédiaire",
-    meta: "300 kcal",
-    badge: "Fitness",
-    badgeColor: "#FB923C",
-    page: "fitness",
-  },
-  {
-    id: "be2",
-    category: "Bien‑être",
-    title: "Méditation pleine conscience",
-    subtitle: "10 min · Débutant",
-    meta: "Gratuit",
-    badge: "Zen",
-    badgeColor: "#C4B5FD",
-    page: "meditation",
-  },
-  {
-    id: "be3",
-    category: "Bien‑être",
-    title: "Recette : Thiébou djeun allégé",
-    subtitle: "Nutrition · 450 kcal",
-    meta: "35 min",
-    badge: "Recette",
-    badgeColor: "#A3E635",
-    page: "nutrition",
-  },
-  {
-    id: "ed1",
-    category: "Éducation",
-    title: "Cours JavaScript complet",
-    subtitle: "TechAfrika Academy",
-    meta: "6h · Débutant → Pro",
-    badge: "Populaire",
-    badgeColor: "#818CF8",
-    page: "cours",
-  },
-  {
-    id: "ed2",
-    category: "Éducation",
-    title: "Quiz : Histoire de l'Afrique",
-    subtitle: "Éducation générale · 20 questions",
-    meta: "~15 min",
-    badge: "Quiz",
-    badgeColor: "#A78BFA",
-    page: "quiz",
-  },
-  {
-    id: "ed3",
-    category: "Éducation",
-    title: "Certification Marketing Digital",
-    subtitle: "Reconnue CEDEAO",
-    meta: "Gratuit",
-    badge: "Certif",
-    badgeColor: "#FBBF24",
-    page: "certifications",
-  },
-  {
-    id: "fi1",
-    category: "Finance",
-    title: "Transfert Orange Money",
-    subtitle: "Dakar → Bamako instantané",
-    meta: "0.5% de frais",
-    badge: "Mobile Money",
-    badgeColor: "#34D399",
-    page: "paiement",
-  },
-  {
-    id: "fi2",
-    category: "Finance",
-    title: "Épargne tontine numérique",
-    subtitle: "Groupe 10 personnes · 50 000 FCFA/mois",
-    meta: "Rotation mensuelle",
-    badge: "Épargne",
-    badgeColor: "#818CF8",
-    page: "finances",
-  },
-  {
-    id: "fi3",
-    category: "Finance",
-    title: "Solde portefeuille",
-    subtitle: "Wallet DébrouillApp",
-    meta: "125 500 FCFA",
-    badge: "Wallet",
-    badgeColor: "#34D399",
-    page: "wallet",
-  },
-  {
-    id: "co1",
-    category: "Communauté",
-    title: "Groupe Diaspora Sénégal France",
-    subtitle: "2 340 membres",
-    meta: "Très actif",
-    badge: "Groupe",
-    badgeColor: "#F472B6",
-    page: "groupes",
-  },
-  {
-    id: "co2",
-    category: "Communauté",
-    title: "Forum Entrepreneuriat Africain",
-    subtitle: "Communauté · 5 600 membres",
-    meta: "128 posts cette semaine",
-    badge: "Forum",
-    badgeColor: "#F472B6",
-    page: "community",
-  },
-  {
-    id: "co3",
-    category: "Communauté",
-    title: "Mentorat : Marie Diallo – Fintech",
-    subtitle: "Mentor certifiée",
-    meta: "3 créneaux dispo",
-    badge: "Mentor",
-    badgeColor: "#34D399",
-    page: "mentorat",
   },
   {
     id: "sv1",
     category: "Services",
-    title: "Restaurant Le Baobab",
-    subtitle: "Cuisine africaine · Dakar Plateau",
-    meta: "Note 4.8 ★",
-    badge: "Ouvert",
-    badgeColor: "#FB923C",
-    page: "restauration",
-  },
-  {
-    id: "sv2",
-    category: "Services",
-    title: "Avocat en droit du travail",
-    subtitle: "Maître Traoré · Abidjan",
-    meta: "Consultation 25 000 FCFA",
-    badge: "Juridique",
-    badgeColor: "#A78BFA",
-    page: "juridique",
-  },
-  {
-    id: "sv3",
-    category: "Services",
-    title: "Hôtel Teranga Palace",
-    subtitle: "Dakar, Sénégal · 4 étoiles",
-    meta: "$85/nuit",
-    badge: "Hôtel",
-    badgeColor: "#34D399",
-    page: "hebergement",
+    title: "Services à proximité",
+    subtitle: "Professionnels & artisans",
+    meta: "Explorer",
+    badge: "Services",
+    badgeColor: "#FBBF24",
+    page: "services",
   },
 ];
 
 const ALL_RESULTS: SearchResult[] = [...MODULE_ENTRIES, ...CONTENT_RESULTS];
 
 const TRENDING = [
-  "Appartement Dakar",
-  "Emploi soudeur",
-  "Trajet Bamako",
-  "Concert Abidjan",
-  "Maïs 50kg",
-  "Fitness",
-  "Cours JavaScript",
+  "Appartement",
+  "Emploi",
+  "Service",
+  "Acheter",
+  "Vendre",
+  "Voyage",
 ];
 
 const CATEGORY_COLORS: Record<ResultCategory, string> = {
@@ -1297,18 +367,18 @@ const CATEGORY_COLORS: Record<ResultCategory, string> = {
   Événements: "#F472B6",
   Voyages: "#818CF8",
   Modules: "#C4B5FD",
-  "Bien‑être": "#F9A8D4",
+  "Bien-être": "#F9A8D4",
   Éducation: "#22D3EE",
   Finance: "#34D399",
   Communauté: "#FB7185",
   Services: "#FBBF24",
 };
 
-const HISTORY_KEY = "debrouille_search_history";
-
 /* ============================================================
- * STORAGE SHIM (works native + web)
+ * STORAGE
  * ============================================================ */
+
+const HISTORY_KEY = "debrouille_search_history";
 
 const memoryStore: Record<string, string> = {};
 
@@ -1321,22 +391,29 @@ const store = {
         return null;
       }
     }
+
     return memoryStore[key] ?? null;
   },
-  set(key: string, value: string) {
+
+  set(key: string, value: string): void {
     if (isBrowser) {
       try {
         window.localStorage.setItem(key, value);
-      } catch {}
+      } catch {
+        // Storage unavailable: search remains fully usable in memory.
+      }
     } else {
       memoryStore[key] = value;
     }
   },
-  remove(key: string) {
+
+  remove(key: string): void {
     if (isBrowser) {
       try {
         window.localStorage.removeItem(key);
-      } catch {}
+      } catch {
+        // Storage unavailable.
+      }
     } else {
       delete memoryStore[key];
     }
@@ -1346,23 +423,41 @@ const store = {
 function getHistory(): string[] {
   try {
     const raw = store.get(HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+
+    if (!raw) {
+      return [];
+    }
+
+    const parsed: unknown = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((value): value is string => typeof value === "string");
   } catch {
     return [];
   }
 }
 
-function saveHistory(query: string) {
-  const prev = getHistory().filter((h) => h !== query);
-  const next = [query, ...prev].slice(0, 8);
+function saveHistory(value: string): void {
+  const query = value.trim();
+
+  if (!query) {
+    return;
+  }
+
+  const previous = getHistory().filter((item) => item !== query);
+  const next = [query, ...previous].slice(0, 8);
+
   store.set(HISTORY_KEY, JSON.stringify(next));
 }
 
-function removeHistory(query: string) {
-  const next = getHistory().filter((h) => h !== query);
-  store.set(HISTORY_KEY, JSON.stringify(next));
+function removeHistory(value: string): void {
+  store.set(
+    HISTORY_KEY,
+    JSON.stringify(getHistory().filter((item) => item !== value)),
+  );
 }
 
 /* ============================================================
@@ -1379,28 +474,61 @@ function normalizeSearchValue(value: unknown): string {
 
 function categoryFromType(type: unknown): ResultCategory {
   const value = normalizeSearchValue(type);
-  if (["job", "emploi", "employment"].includes(value)) return "Jobs/Pro";
+
+  if (["job", "emploi", "employment"].includes(value)) {
+    return "Jobs/Pro";
+  }
+
   if (
     ["property", "immo", "immobilier", "realestate", "real_estate"].includes(
       value,
     )
-  )
+  ) {
     return "Immo";
-  if (["sante", "health", "medical"].includes(value)) return "Santé";
-  if (["agri", "agriculture"].includes(value)) return "Agri";
-  if (["evenement", "evenements", "event", "events"].includes(value))
+  }
+
+  if (["sante", "health", "medical"].includes(value)) {
+    return "Santé";
+  }
+
+  if (["agri", "agriculture"].includes(value)) {
+    return "Agri";
+  }
+
+  if (["evenement", "evenements", "event", "events"].includes(value)) {
     return "Événements";
-  if (["voyage", "voyages", "travel"].includes(value)) return "Voyages";
-  if (["education", "apprendre", "course", "cours"].includes(value))
+  }
+
+  if (["voyage", "voyages", "travel"].includes(value)) {
+    return "Voyages";
+  }
+
+  if (["education", "apprendre", "course", "cours"].includes(value)) {
     return "Éducation";
-  if (["finance", "paiement", "wallet", "pay"].includes(value))
+  }
+
+  if (["finance", "paiement", "wallet", "pay"].includes(value)) {
     return "Finance";
-  if (["community", "communaute", "group", "groupe"].includes(value))
+  }
+
+  if (["community", "communaute", "group", "groupe"].includes(value)) {
     return "Communauté";
-  if (["service", "services"].includes(value)) return "Services";
-  if (["media", "article", "video", "podcast"].includes(value)) return "Media";
-  if (["fitness", "sport", "nutrition", "bienetre", "wellness"].includes(value))
-    return "Bien‑être";
+  }
+
+  if (["service", "services"].includes(value)) {
+    return "Services";
+  }
+
+  if (["media", "article", "video", "podcast"].includes(value)) {
+    return "Media";
+  }
+
+  if (
+    ["fitness", "sport", "nutrition", "bienetre", "wellness"].includes(value)
+  ) {
+    return "Bien-être";
+  }
+
   return "Services";
 }
 
@@ -1413,49 +541,70 @@ function getPageForCategory(category: ResultCategory): string {
     Media: "media",
     Événements: "evenements",
     Voyages: "voyages",
-    "Bien‑être": "bienetre",
+    "Bien-être": "bienetre",
     Éducation: "cours",
     Finance: "finances",
     Communauté: "community",
     Services: "services",
+    Modules: "explorer",
   };
+
   return pages[category] ?? "explorer";
 }
 
 function getCategoryIcon(category: ResultCategory, size = 13): ReactNode {
-  const props = { size, color: CATEGORY_COLORS[category] };
+  const props = {
+    size,
+    color: CATEGORY_COLORS[category],
+  };
+
   switch (category) {
     case "Immo":
       return <Home {...props} />;
+
     case "Jobs/Pro":
       return <Briefcase {...props} />;
+
     case "Santé":
       return <Stethoscope {...props} />;
+
     case "Agri":
       return <Leaf {...props} />;
+
     case "Media":
       return <Newspaper {...props} />;
+
     case "Événements":
       return <Calendar {...props} />;
+
     case "Voyages":
       return <Plane {...props} />;
+
     case "Modules":
       return <LayoutGrid {...props} />;
-    case "Bien‑être":
+
+    case "Bien-être":
       return <Heart {...props} />;
+
     case "Éducation":
       return <BookOpen {...props} />;
+
     case "Finance":
       return <Wallet {...props} />;
+
     case "Communauté":
       return <Users {...props} />;
+
     case "Services":
       return <Package {...props} />;
+
+    default:
+      return <Search {...props} />;
   }
 }
 
 /* ============================================================
- * FADE UP WRAPPER
+ * FADE-UP
  * ============================================================ */
 
 function FadeUp({
@@ -1467,29 +616,29 @@ function FadeUp({
   delay?: number;
   distance?: number;
   children: ReactNode;
-  style?: any;
+  style?: object;
 }) {
-  const anim = useRef(new Animated.Value(0)).current;
+  const animation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(anim, {
+    Animated.timing(animation, {
       toValue: 1,
       duration: 380,
       delay,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [anim, delay]);
+  }, [animation, delay]);
 
   return (
     <Animated.View
       style={[
         style,
         {
-          opacity: anim,
+          opacity: animation,
           transform: [
             {
-              translateY: anim.interpolate({
+              translateY: animation.interpolate({
                 inputRange: [0, 1],
                 outputRange: [distance, 0],
               }),
@@ -1504,14 +653,58 @@ function FadeUp({
 }
 
 /* ============================================================
- * ANIMATED TRIGGER ICON (mic)
+ * HOME SEARCH ACTION
  * ============================================================ */
 
-function TriggerMicIcon() {
+interface HomeAction {
+  id: string;
+  label: string;
+  query: string;
+  icon: ReactNode;
+}
+
+const HOME_ACTIONS: HomeAction[] = [
+  {
+    id: "emploi",
+    label: "Emploi",
+    query: "emploi",
+    icon: <Briefcase size={13} color="#A78BFA" strokeWidth={2} />,
+  },
+  {
+    id: "service",
+    label: "Service",
+    query: "service",
+    icon: <Package size={13} color="#FBBF24" strokeWidth={2} />,
+  },
+  {
+    id: "acheter",
+    label: "Acheter",
+    query: "acheter",
+    icon: <LayoutGrid size={13} color="#F472B6" strokeWidth={2} />,
+  },
+  {
+    id: "vendre",
+    label: "Vendre",
+    query: "vendre",
+    icon: <ArrowUpRight size={13} color="#34D399" strokeWidth={2} />,
+  },
+];
+
+/* ============================================================
+ * HOME TRIGGER
+ * ============================================================ */
+
+function HomeSearchTrigger({
+  onOpen,
+  onQuickSearch,
+}: {
+  onOpen: () => void;
+  onQuickSearch: (value: string) => void;
+}) {
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
@@ -1526,44 +719,135 @@ function TriggerMicIcon() {
           useNativeDriver: true,
         }),
       ]),
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [pulse]);
 
-  const scale = pulse.interpolate({
+  const sparkleScale = pulse.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.08],
   });
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <LinearGradient
-        colors={["#A78BFA", "#7C3AED", "#6366F1"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.triggerMic}
+    <FadeUp delay={120} distance={8} style={styles.homeTriggerWrap}>
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel="Que veux-tu faire ?"
+        accessibilityHint="Ouvre la recherche DébrouillePro"
+        style={({ pressed }) => [
+          styles.homeSearchCard,
+          pressed && styles.homeSearchCardPressed,
+        ]}
       >
-        <Mic size={14} color="#fff" strokeWidth={2.4} />
-      </LinearGradient>
-    </Animated.View>
-  );
-}
+        <LinearGradient
+          colors={[
+            "rgba(167,139,250,0.11)",
+            "rgba(255,255,255,0.035)",
+            "rgba(99,102,241,0.10)",
+          ]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
 
-/* ============================================================
- * SECTION LABEL
- * ============================================================ */
+        <View style={styles.homeSearchTopRow}>
+          <View style={styles.homeSearchIcon}>
+            <Search size={17} color="#C4B5FD" strokeWidth={2.4} />
+          </View>
 
-function SectionLabel({
-  icon,
-  children,
-}: {
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <View style={styles.sectionLabelRow}>
-      {icon}
-      <Text style={styles.sectionLabelText}>{children}</Text>
-    </View>
+          <View style={styles.homeSearchTitleWrap}>
+            <Text numberOfLines={1} style={styles.homeSearchTitle}>
+              Que veux-tu faire ?
+            </Text>
+
+            <Text numberOfLines={1} style={styles.homeSearchHint}>
+              Recherche intelligente dans DébrouillePro
+            </Text>
+          </View>
+
+          <Animated.View
+            style={{
+              transform: [{ scale: sparkleScale }],
+            }}
+          >
+            <View style={styles.homeSearchSparkle}>
+              <Sparkles size={15} color="#C4B5FD" strokeWidth={2} />
+            </View>
+          </Animated.View>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.homeActionRow}
+          scrollEnabled
+        >
+          {HOME_ACTIONS.map((action) => (
+            <Pressable
+              key={action.id}
+              onPress={() => onQuickSearch(action.query)}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+              style={({ pressed }) => [
+                styles.homeActionPill,
+                pressed && styles.homeActionPillPressed,
+              ]}
+            >
+              {action.icon}
+
+              <Text style={styles.homeActionText}>{action.label}</Text>
+            </Pressable>
+          ))}
+
+          <Pressable
+            onPress={() => onQuickSearch("annonces")}
+            accessibilityRole="button"
+            accessibilityLabel="Annonces"
+            style={({ pressed }) => [
+              styles.homeActionPill,
+              pressed && styles.homeActionPillPressed,
+            ]}
+          >
+            <Newspaper size={13} color="#818CF8" strokeWidth={2} />
+
+            <Text style={styles.homeActionText}>Annonces</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => onQuickSearch("voyage")}
+            accessibilityRole="button"
+            accessibilityLabel="Voyager"
+            style={({ pressed }) => [
+              styles.homeActionPill,
+              pressed && styles.homeActionPillPressed,
+            ]}
+          >
+            <Plane size={13} color="#818CF8" strokeWidth={2} />
+
+            <Text style={styles.homeActionText}>Voyager</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={onOpen}
+            accessibilityRole="button"
+            accessibilityLabel="Plus d'actions"
+            style={({ pressed }) => [
+              styles.homeActionMore,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Text style={styles.homeActionMoreText}>…</Text>
+          </Pressable>
+        </ScrollView>
+      </Pressable>
+    </FadeUp>
   );
 }
 
@@ -1583,30 +867,37 @@ function ResultRow({
   onSelect: (result: SearchResult) => void;
 }) {
   const color = result.badgeColor ?? CATEGORY_COLORS[result.category];
+
   const scale = useRef(new Animated.Value(1)).current;
 
-  const onPressIn = () => {
+  const onPressIn = useCallback(() => {
     Animated.spring(scale, {
       toValue: 0.99,
       useNativeDriver: true,
       speed: 40,
     }).start();
-  };
-  const onPressOut = () => {
+  }, [scale]);
+
+  const onPressOut = useCallback(() => {
     Animated.spring(scale, {
       toValue: 1,
       useNativeDriver: true,
       speed: 40,
     }).start();
-  };
+  }, [scale]);
 
   return (
     <FadeUp delay={Math.min(index * 25, 300)} distance={5}>
-      <Animated.View style={{ transform: [{ scale }] }}>
+      <Animated.View
+        style={{
+          transform: [{ scale }],
+        }}
+      >
         <Pressable
           onPress={() => onSelect(result)}
           onPressIn={onPressIn}
           onPressOut={onPressOut}
+          accessibilityRole="button"
           accessibilityLabel={`${result.title} — ${result.category}`}
           style={[styles.resultRow, compact && styles.resultRowCompact]}
         >
@@ -1620,16 +911,25 @@ function ResultRow({
           <View
             style={[
               compact ? styles.resultIconCompact : styles.resultIcon,
-              { backgroundColor: `${color}22`, borderColor: `${color}44` },
+              {
+                backgroundColor: `${color}22`,
+                borderColor: `${color}44`,
+              },
             ]}
           >
             {getCategoryIcon(result.category, compact ? 13 : 14)}
           </View>
 
-          <View style={{ flex: 1, minWidth: 0 }}>
+          <View
+            style={{
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
             <Text style={styles.resultTitle} numberOfLines={1}>
               {result.title}
             </Text>
+
             <Text style={styles.resultSubtitle} numberOfLines={1}>
               {result.subtitle}
             </Text>
@@ -1641,13 +941,20 @@ function ResultRow({
                 {result.meta}
               </Text>
             ) : null}
+
             {result.badge ? (
               <View
-                style={[styles.resultBadge, { backgroundColor: `${color}22` }]}
+                style={[
+                  styles.resultBadge,
+                  {
+                    backgroundColor: `${color}22`,
+                  },
+                ]}
               >
                 {result.badge === "En direct" ? (
                   <Radio size={8} color={color} />
                 ) : null}
+
                 <Text
                   style={[styles.resultBadgeText, { color }]}
                   numberOfLines={1}
@@ -1662,6 +969,26 @@ function ResultRow({
         </Pressable>
       </Animated.View>
     </FadeUp>
+  );
+}
+
+/* ============================================================
+ * SECTION LABEL
+ * ============================================================ */
+
+function SectionLabel({
+  icon,
+  children,
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.sectionLabelRow}>
+      {icon}
+
+      <Text style={styles.sectionLabelText}>{children}</Text>
+    </View>
   );
 }
 
@@ -1692,6 +1019,7 @@ export default function SmartSearch({
   const inputRef = useRef<TextInput>(null);
 
   const backdropAnim = useRef(new Animated.Value(0)).current;
+
   const panelAnim = useRef(new Animated.Value(0)).current;
 
   const liveData = useQuery(
@@ -1699,89 +1027,98 @@ export default function SmartSearch({
     query.trim().length >= 2 ? { query: query.trim() } : "skip",
   );
 
-  /* ───── voice support detection ───── */
   useEffect(() => {
-    if (!isBrowser) return;
+    if (!isBrowser) {
+      return;
+    }
+
     setIsVoiceSupported(
       "SpeechRecognition" in window || "webkitSpeechRecognition" in window,
     );
   }, []);
 
-  /* ───── entrance/exit animation ───── */
   useEffect(() => {
-    if (open) {
-      backdropAnim.setValue(0);
-      panelAnim.setValue(0);
-      Animated.parallel([
-        Animated.timing(backdropAnim, {
-          toValue: 1,
-          duration: 240,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.spring(panelAnim, {
-          toValue: 1,
-          stiffness: 340,
-          damping: 30,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    if (!open) {
+      return;
     }
+
+    backdropAnim.setValue(0);
+    panelAnim.setValue(0);
+
+    Animated.parallel([
+      Animated.timing(backdropAnim, {
+        toValue: 1,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(panelAnim, {
+        toValue: 1,
+        stiffness: 340,
+        damping: 30,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, [open, backdropAnim, panelAnim]);
 
-  /* ───── live results mapping ───── */
   const liveResults = useMemo<SearchResult[]>(() => {
-    if (!liveData) return [];
+    if (!liveData) {
+      return [];
+    }
 
     const mapped: SearchResult[] = [];
 
-    for (const r of liveData.publications) {
-      const category = categoryFromType(r.type);
+    for (const publication of liveData.publications) {
+      const category = categoryFromType(publication.type);
+
       mapped.push({
-        id: `live-pub-${r._id}`,
+        id: `live-pub-${publication._id}`,
         category,
-        title: r.title,
-        subtitle: r.location ?? r.type ?? "Contenu DébrouillePro",
-        meta: r.price ?? "",
+        title: publication.title,
+        subtitle:
+          publication.location ?? publication.type ?? "Contenu DébrouillePro",
+        meta: publication.price ?? "",
         badge: "En direct",
         badgeColor: CATEGORY_COLORS[category],
         page: getPageForCategory(category),
       });
     }
 
-    for (const r of liveData.jobs) {
+    for (const job of liveData.jobs) {
       mapped.push({
-        id: `live-job-${r._id}`,
+        id: `live-job-${job._id}`,
         category: "Jobs/Pro",
-        title: r.title,
-        subtitle: `${r.company} – ${r.city}`,
-        meta: r.contractType.toUpperCase(),
+        title: job.title,
+        subtitle: `${job.company} – ${job.city}`,
+        meta: job.contractType.toUpperCase(),
         badge: "En direct",
         badgeColor: CATEGORY_COLORS["Jobs/Pro"],
         page: "jobs",
       });
     }
 
-    for (const r of liveData.properties) {
+    for (const property of liveData.properties) {
       mapped.push({
-        id: `live-prop-${r._id}`,
+        id: `live-prop-${property._id}`,
         category: "Immo",
-        title: r.title,
-        subtitle: `${r.type} – ${r.city}`,
-        meta: `${r.price.toLocaleString()} FCFA`,
+        title: property.title,
+        subtitle: `${property.type} – ${property.city}`,
+        meta: `${property.price.toLocaleString()} FCFA`,
         badge: "En direct",
         badgeColor: CATEGORY_COLORS.Immo,
         page: "immo",
       });
     }
 
-    for (const r of liveData.courses) {
+    for (const course of liveData.courses) {
       mapped.push({
-        id: `live-course-${r._id}`,
+        id: `live-course-${course._id}`,
         category: "Éducation",
-        title: r.title,
-        subtitle: r.category,
-        meta: r.isFree ? "Gratuit" : `${r.price.toLocaleString()} FCFA`,
+        title: course.title,
+        subtitle: course.category,
+        meta: course.isFree
+          ? "Gratuit"
+          : `${course.price.toLocaleString()} FCFA`,
         badge: "En direct",
         badgeColor: CATEGORY_COLORS.Éducation,
         page: "cours",
@@ -1791,15 +1128,18 @@ export default function SmartSearch({
     return mapped;
   }, [liveData]);
 
-  /* ───── static results filtering ───── */
   const staticResults = useMemo<SearchResult[]>(() => {
     const normalizedQuery = normalizeSearchValue(query);
-    if (normalizedQuery.length < 2) return [];
+
+    if (normalizedQuery.length < 2) {
+      return [];
+    }
 
     return ALL_RESULTS.filter((result) => {
       if (activeCategory !== "Tout" && result.category !== activeCategory) {
         return false;
       }
+
       return [result.title, result.subtitle, result.category, result.badge]
         .filter(Boolean)
         .some((value) => normalizeSearchValue(value).includes(normalizedQuery));
@@ -1822,25 +1162,16 @@ export default function SmartSearch({
   const grouped = useMemo(
     () =>
       results.reduce<Partial<Record<ResultCategory, SearchResult[]>>>(
-        (acc, result) => {
-          (acc[result.category] ??= []).push(result);
-          return acc;
+        (accumulator, result) => {
+          (
+            accumulator[result.category] ?? (accumulator[result.category] = [])
+          ).push(result);
+
+          return accumulator;
         },
         {},
       ),
     [results],
-  );
-
-  const groupedEntries = useMemo(
-    () =>
-      (Object.entries(grouped) as [ResultCategory, SearchResult[]][]).sort(
-        ([a], [b]) => {
-          if (a === "Modules") return -1;
-          if (b === "Modules") return 1;
-          return 0;
-        },
-      ),
-    [grouped],
   );
 
   const allCategories: (ResultCategory | "Tout")[] = [
@@ -1853,7 +1184,7 @@ export default function SmartSearch({
     "Media",
     "Événements",
     "Voyages",
-    "Bien‑être",
+    "Bien-être",
     "Éducation",
     "Finance",
     "Communauté",
@@ -1862,7 +1193,6 @@ export default function SmartSearch({
 
   const quickModules = MODULE_ENTRIES.slice(0, 12);
 
-  /* ───── actions ───── */
   const handleClose = useCallback(() => {
     Animated.parallel([
       Animated.timing(backdropAnim, {
@@ -1888,7 +1218,10 @@ export default function SmartSearch({
 
   const handleOpen = useCallback(() => {
     setOpen(true);
-    setTimeout(() => inputRef.current?.focus(), 200);
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 200);
   }, []);
 
   const handleSelect = useCallback(
@@ -1901,10 +1234,23 @@ export default function SmartSearch({
     [handleClose, onNavigate],
   );
 
+  const handleQuickSearch = useCallback((value: string) => {
+    setQuery(value);
+    setActiveCategory("Tout");
+    setOpen(true);
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 220);
+  }, []);
+
   const handleHistorySelect = useCallback((value: string) => {
     setQuery(value);
     setActiveCategory("Tout");
-    setTimeout(() => inputRef.current?.focus(), 0);
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
   }, []);
 
   const handleRemoveHistory = useCallback(
@@ -1916,27 +1262,70 @@ export default function SmartSearch({
     [],
   );
 
-  const handleVoice = useCallback(() => {
-    if (!isBrowser || !isVoiceSupported || listening) return;
+  const handleSubmit = useCallback((value: string) => {
+    const trimmed = value.trim();
 
-    const w = window as typeof window & {
-      webkitSpeechRecognition?: new () => any;
-      SpeechRecognition?: new () => any;
+    if (trimmed.length < 2) {
+      return;
+    }
+
+    saveHistory(trimmed);
+    setHistory(getHistory());
+  }, []);
+
+  const handleVoice = useCallback(() => {
+    if (!isBrowser || !isVoiceSupported || listening) {
+      return;
+    }
+
+    type SpeechRecognitionResultEvent = Event & {
+      results?: {
+        [index: number]: {
+          [index: number]: {
+            transcript?: string;
+          };
+        };
+      };
+    };
+
+    type SpeechRecognitionInstance = {
+      lang: string;
+      interimResults: boolean;
+      onstart?: () => void;
+      onend?: () => void;
+      onerror?: () => void;
+      onresult?: (event: SpeechRecognitionResultEvent) => void;
+      start: () => void;
+    };
+
+    type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+    const browserWindow = window as typeof window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
     };
 
     const SpeechRecognitionAPI =
-      w.webkitSpeechRecognition ?? w.SpeechRecognition;
+      browserWindow.webkitSpeechRecognition ?? browserWindow.SpeechRecognition;
 
-    if (!SpeechRecognitionAPI) return;
+    if (!SpeechRecognitionAPI) {
+      return;
+    }
 
     const recognition = new SpeechRecognitionAPI();
+
     recognition.lang = "fr-FR";
     recognition.interimResults = false;
+
     recognition.onstart = () => setListening(true);
+
     recognition.onend = () => setListening(false);
+
     recognition.onerror = () => setListening(false);
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0]?.[0]?.transcript ?? "";
+
+    recognition.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript ?? "";
+
       setQuery(transcript);
       setActiveCategory("Tout");
     };
@@ -1948,94 +1337,53 @@ export default function SmartSearch({
     }
   }, [isVoiceSupported, listening]);
 
-  const handleSubmit = useCallback((value: string) => {
-    const trimmed = value.trim();
-    if (trimmed.length < 2) return;
-    saveHistory(trimmed);
-    setHistory(getHistory());
-  }, []);
-
-  /* ───── web escape key ───── */
   useEffect(() => {
-    if (!isBrowser || !open) return;
+    if (!isBrowser || !open) {
+      return;
+    }
+
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") handleClose();
+      if (event.key === "Escape") {
+        handleClose();
+      }
     };
+
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+
+    return () => {
+      window.removeEventListener("keydown", handler);
+    };
   }, [handleClose, open]);
 
   const showResults = query.trim().length >= 2;
-  const resultCategoryCount = Object.keys(grouped).length;
 
   const backdropOpacity = backdropAnim;
+
   const panelTranslateY = panelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [SCREEN_HEIGHT * 0.04, 0],
   });
+
   const panelScale = panelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.985, 1],
   });
 
-  /* ========================================================================
-   * RENDER
-   * ====================================================================== */
-
   return (
     <>
-      {/* ═══════════ TRIGGER ═══════════ */}
-      <FadeUp delay={120} distance={8} style={styles.triggerWrap}>
-        <Pressable
-          onPress={handleOpen}
-          accessibilityLabel="Ouvrir la recherche intelligente"
-          style={({ pressed }) => [styles.trigger, pressed && { opacity: 0.9 }]}
-        >
-          <LinearGradient
-            colors={[
-              "rgba(167,139,250,0.08)",
-              "rgba(255,255,255,0.02)",
-              "rgba(99,102,241,0.08)",
-            ]}
-            locations={[0, 0.5, 1]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={StyleSheet.absoluteFill}
-          />
+      {/* ======================================================
+       * HOME TRIGGER
+       * ==================================================== */}
 
-          <View style={styles.triggerSearchIcon}>
-            <Search size={17} color="rgba(255,255,255,0.6)" />
-          </View>
+      <HomeSearchTrigger
+        onOpen={handleOpen}
+        onQuickSearch={handleQuickSearch}
+      />
 
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.triggerTitle} numberOfLines={1}>
-              Rechercher dans 80+ modules…
-            </Text>
-            <Text style={styles.triggerSub} numberOfLines={1}>
-              Services · emplois · immobilier · événements · contenus
-            </Text>
-          </View>
+      {/* ======================================================
+       * SEARCH MODAL
+       * ==================================================== */}
 
-          <TriggerMicIcon />
-        </Pressable>
-
-        {onAdvancedSearch ? (
-          <Pressable
-            onPress={onAdvancedSearch}
-            style={({ pressed }) => [
-              styles.advancedBtn,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <Sparkles size={11} color="rgba(196,181,253,0.85)" />
-            <Text style={styles.advancedBtnText}>Recherche avancée</Text>
-            <Text style={styles.advancedBtnDot}>·</Text>
-            <Text style={styles.advancedBtnText}>Tendances</Text>
-          </Pressable>
-        ) : null}
-      </FadeUp>
-
-      {/* ═══════════ MODAL ═══════════ */}
       {open ? (
         <Modal
           transparent
@@ -2045,9 +1393,13 @@ export default function SmartSearch({
           statusBarTranslucent
         >
           <View style={StyleSheet.absoluteFill}>
-            {/* Backdrop */}
             <Animated.View
-              style={[styles.backdrop, { opacity: backdropOpacity }]}
+              style={[
+                styles.backdrop,
+                {
+                  opacity: backdropOpacity,
+                },
+              ]}
             >
               <Pressable
                 onPress={handleClose}
@@ -2056,14 +1408,17 @@ export default function SmartSearch({
               />
             </Animated.View>
 
-            {/* Panel */}
             <Animated.View
               style={[
                 styles.panel,
                 {
                   transform: [
-                    { translateY: panelTranslateY },
-                    { scale: panelScale },
+                    {
+                      translateY: panelTranslateY,
+                    },
+                    {
+                      scale: panelScale,
+                    },
                   ],
                 },
               ]}
@@ -2072,16 +1427,23 @@ export default function SmartSearch({
               <LinearGradient
                 colors={["#06061A", "#0A0620", "#06061A"]}
                 locations={[0, 0.5, 1]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+                start={{
+                  x: 0,
+                  y: 0,
+                }}
+                end={{
+                  x: 1,
+                  y: 1,
+                }}
                 style={StyleSheet.absoluteFill}
               />
 
-              {/* Ambient glows */}
               <View style={styles.ambientGlowTop} pointerEvents="none" />
+
               <View style={styles.ambientGlowRight} pointerEvents="none" />
 
-              {/* ─── HEADER ─── */}
+              {/* HEADER */}
+
               <View
                 style={[
                   styles.header,
@@ -2091,28 +1453,39 @@ export default function SmartSearch({
                 ]}
               >
                 <View style={styles.headerTopRow}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
+                  <View
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                    }}
+                  >
                     <Text style={styles.headerEyebrow}>
                       DÉBROUILLEPRO SEARCH
                     </Text>
+
                     <Text style={styles.headerTitle}>Que cherches-tu ?</Text>
                   </View>
+
                   <Pressable
                     onPress={handleClose}
                     hitSlop={8}
                     accessibilityLabel="Fermer la recherche"
                     style={({ pressed }) => [
                       styles.headerCloseBtn,
-                      pressed && { opacity: 0.75 },
+                      pressed && {
+                        opacity: 0.75,
+                      },
                     ]}
                   >
                     <X size={17} color="rgba(255,255,255,0.75)" />
                   </Pressable>
                 </View>
 
-                {/* Search bar */}
+                {/* SEARCH INPUT */}
+
                 <View style={styles.searchBar}>
                   <Search size={18} color="#C4B5FD" strokeWidth={2.4} />
+
                   <TextInput
                     ref={inputRef}
                     value={query}
@@ -2128,6 +1501,7 @@ export default function SmartSearch({
                     autoCapitalize="none"
                     accessibilityLabel="Rechercher"
                   />
+
                   {query ? (
                     <Pressable
                       onPress={() => setQuery("")}
@@ -2135,12 +1509,15 @@ export default function SmartSearch({
                       accessibilityLabel="Effacer la recherche"
                       style={({ pressed }) => [
                         styles.searchClearBtn,
-                        pressed && { opacity: 0.7 },
+                        pressed && {
+                          opacity: 0.7,
+                        },
                       ]}
                     >
                       <X size={15} color="rgba(255,255,255,0.6)" />
                     </Pressable>
                   ) : null}
+
                   {isVoiceSupported ? (
                     <Pressable
                       onPress={handleVoice}
@@ -2149,12 +1526,16 @@ export default function SmartSearch({
                           ? "Arrêter la dictée"
                           : "Rechercher avec la voix"
                       }
-                      accessibilityState={{ selected: listening }}
+                      accessibilityState={{
+                        selected: listening,
+                      }}
                       hitSlop={6}
                       style={({ pressed }) => [
                         styles.searchMicBtn,
                         listening && styles.searchMicBtnActive,
-                        pressed && { opacity: 0.85 },
+                        pressed && {
+                          opacity: 0.85,
+                        },
                       ]}
                     >
                       <Mic
@@ -2166,7 +1547,8 @@ export default function SmartSearch({
                   ) : null}
                 </View>
 
-                {/* Category chips */}
+                {/* CATEGORIES */}
+
                 {showResults && results.length > 0 ? (
                   <FadeUp distance={6}>
                     <ScrollView
@@ -2181,7 +1563,9 @@ export default function SmartSearch({
                             : (grouped[category as ResultCategory]?.length ??
                               0);
 
-                        if (category !== "Tout" && count === 0) return null;
+                        if (category !== "Tout" && count === 0) {
+                          return null;
+                        }
 
                         const color =
                           category === "Tout"
@@ -2204,20 +1588,26 @@ export default function SmartSearch({
                                   ? `${color}66`
                                   : "rgba(255,255,255,0.08)",
                               },
-                              pressed && { opacity: 0.8 },
+                              pressed && {
+                                opacity: 0.8,
+                              },
                             ]}
                           >
                             {category !== "Tout"
                               ? getCategoryIcon(category as ResultCategory, 11)
                               : null}
+
                             <Text
                               style={[
                                 styles.chipText,
-                                active && { color: "#fff" },
+                                active && {
+                                  color: "#fff",
+                                },
                               ]}
                             >
                               {category}
                             </Text>
+
                             <Text style={styles.chipCount}>{count}</Text>
                           </Pressable>
                         );
@@ -2227,17 +1617,25 @@ export default function SmartSearch({
                 ) : null}
               </View>
 
-              {/* ─── BODY ─── */}
+              {/* BODY */}
+
               <ScrollView
-                style={{ flex: 1 }}
+                style={{
+                  flex: 1,
+                }}
                 contentContainerStyle={styles.bodyContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
               >
-                {/* Idle state */}
                 {!showResults ? (
-                  <View style={{ gap: 28, paddingTop: 12 }}>
-                    {/* Quick modules */}
+                  <View
+                    style={{
+                      gap: 28,
+                      paddingTop: 12,
+                    }}
+                  >
+                    {/* QUICK MODULES */}
+
                     <View>
                       <SectionLabel
                         icon={
@@ -2249,6 +1647,7 @@ export default function SmartSearch({
                       >
                         Accès rapide
                       </SectionLabel>
+
                       <View style={styles.quickGrid}>
                         {quickModules.map((module, index) => (
                           <FadeUp
@@ -2261,7 +1660,9 @@ export default function SmartSearch({
                               onPress={() => handleSelect(module)}
                               style={({ pressed }) => [
                                 styles.quickModule,
-                                pressed && { opacity: 0.85 },
+                                pressed && {
+                                  opacity: 0.85,
+                                },
                               ]}
                             >
                               <LinearGradient
@@ -2269,8 +1670,14 @@ export default function SmartSearch({
                                   `${module.badgeColor ?? "#A78BFA"}22`,
                                   `${module.badgeColor ?? "#A78BFA"}08`,
                                 ]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
+                                start={{
+                                  x: 0,
+                                  y: 0,
+                                }}
+                                end={{
+                                  x: 1,
+                                  y: 1,
+                                }}
                                 style={[
                                   styles.quickModuleIcon,
                                   {
@@ -2280,6 +1687,7 @@ export default function SmartSearch({
                               >
                                 {getCategoryIcon("Modules", 15)}
                               </LinearGradient>
+
                               <Text
                                 style={styles.quickModuleLabel}
                                 numberOfLines={2}
@@ -2290,24 +1698,10 @@ export default function SmartSearch({
                           </FadeUp>
                         ))}
                       </View>
-                      <Pressable
-                        onPress={() => setQuery("module")}
-                        style={({ pressed }) => [
-                          styles.seeAllBtn,
-                          pressed && { opacity: 0.7 },
-                        ]}
-                      >
-                        <Text style={styles.seeAllBtnText}>
-                          Voir tous les modules
-                        </Text>
-                        <ArrowUpRight
-                          size={11}
-                          color="rgba(196,181,253,0.85)"
-                        />
-                      </Pressable>
                     </View>
 
-                    {/* History */}
+                    {/* HISTORY */}
+
                     {history.length > 0 ? (
                       <FadeUp>
                         <View>
@@ -2322,33 +1716,19 @@ export default function SmartSearch({
                             >
                               Récent
                             </SectionLabel>
+
                             <Pressable
                               onPress={() => {
                                 store.remove(HISTORY_KEY);
                                 setHistory([]);
                               }}
                               hitSlop={6}
-                              style={({ pressed }) => [
-                                pressed && { opacity: 0.6 },
-                              ]}
                             >
                               <Text style={styles.historyClear}>Effacer</Text>
                             </Pressable>
                           </View>
+
                           <View style={styles.historyCard}>
-                            <LinearGradient
-                              colors={[
-                                "rgba(255,255,255,0.035)",
-                                "rgba(255,255,255,0.015)",
-                              ]}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={StyleSheet.absoluteFill}
-                            />
-                            <View
-                              style={styles.historyBorder}
-                              pointerEvents="none"
-                            />
                             {history.map((item, index) => (
                               <Pressable
                                 key={item}
@@ -2365,20 +1745,20 @@ export default function SmartSearch({
                                   size={14}
                                   color="rgba(255,255,255,0.35)"
                                 />
+
                                 <Text
                                   style={styles.historyText}
                                   numberOfLines={1}
                                 >
                                   {item}
                                 </Text>
+
                                 <Pressable
-                                  onPress={(e) => handleRemoveHistory(item, e)}
+                                  onPress={(event) =>
+                                    handleRemoveHistory(item, event)
+                                  }
                                   hitSlop={8}
                                   accessibilityLabel={`Supprimer ${item}`}
-                                  style={({ pressed }) => [
-                                    styles.historyRemoveBtn,
-                                    pressed && { opacity: 0.7 },
-                                  ]}
                                 >
                                   <X size={12} color="rgba(255,255,255,0.4)" />
                                 </Pressable>
@@ -2389,7 +1769,8 @@ export default function SmartSearch({
                       </FadeUp>
                     ) : null}
 
-                    {/* Trending */}
+                    {/* TRENDS */}
+
                     <FadeUp>
                       <View>
                         <SectionLabel
@@ -2402,6 +1783,7 @@ export default function SmartSearch({
                         >
                           Tendances
                         </SectionLabel>
+
                         <View style={styles.trendingRow}>
                           {TRENDING.map((item, index) => (
                             <FadeUp key={item} delay={index * 35} distance={6}>
@@ -2409,13 +1791,16 @@ export default function SmartSearch({
                                 onPress={() => setQuery(item)}
                                 style={({ pressed }) => [
                                   styles.trendingChip,
-                                  pressed && { opacity: 0.85 },
+                                  pressed && {
+                                    opacity: 0.85,
+                                  },
                                 ]}
                               >
                                 <TrendingUp
                                   size={11}
                                   color="rgba(251,146,60,0.85)"
                                 />
+
                                 <Text style={styles.trendingChipText}>
                                   {item}
                                 </Text>
@@ -2426,7 +1811,8 @@ export default function SmartSearch({
                       </View>
                     </FadeUp>
 
-                    {/* AI banner */}
+                    {/* AI */}
+
                     <FadeUp>
                       <View style={styles.aiCard}>
                         <LinearGradient
@@ -2436,46 +1822,50 @@ export default function SmartSearch({
                             "rgba(15,7,32,0.6)",
                           ]}
                           locations={[0, 0.5, 1]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
+                          start={{
+                            x: 0,
+                            y: 0,
+                          }}
+                          end={{
+                            x: 1,
+                            y: 1,
+                          }}
                           style={StyleSheet.absoluteFill}
                         />
-                        <View
-                          style={styles.aiCardBorder}
-                          pointerEvents="none"
-                        />
-                        <View style={styles.aiCardOrb} pointerEvents="none" />
 
                         <View style={styles.aiCardRow}>
-                          <LinearGradient
-                            colors={[
-                              "rgba(167,139,250,0.4)",
-                              "rgba(99,102,241,0.15)",
-                            ]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.aiCardIcon}
-                          >
+                          <View style={styles.aiCardIcon}>
                             <Sparkles size={16} color="#C4B5FD" />
-                          </LinearGradient>
-                          <View style={{ flex: 1, minWidth: 0 }}>
+                          </View>
+
+                          <View
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                            }}
+                          >
                             <Text style={styles.aiCardEyebrow}>
                               DÉBROUILLE AI
                             </Text>
+
                             <Text style={styles.aiCardText}>
                               Je peux t'aider à trouver un emploi, un logement,
                               un service ou une opportunité plus rapidement.
                             </Text>
+
                             <Pressable
                               onPress={() => setQuery("emploi")}
                               style={({ pressed }) => [
                                 styles.aiCardBtn,
-                                pressed && { opacity: 0.7 },
+                                pressed && {
+                                  opacity: 0.7,
+                                },
                               ]}
                             >
                               <Text style={styles.aiCardBtnText}>
                                 Explorer les opportunités
                               </Text>
+
                               <ArrowUpRight size={11} color="#C4B5FD" />
                             </Pressable>
                           </View>
@@ -2485,91 +1875,60 @@ export default function SmartSearch({
                   </View>
                 ) : null}
 
-                {/* No results */}
+                {/* NO RESULTS */}
+
                 {showResults && results.length === 0 ? (
                   <FadeUp>
                     <View style={styles.noResultsWrap}>
-                      <LinearGradient
-                        colors={[
-                          "rgba(167,139,250,0.14)",
-                          "rgba(99,102,241,0.04)",
-                        ]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.noResultsIcon}
-                      >
+                      <View style={styles.noResultsIcon}>
                         <Search size={24} color="rgba(196,181,253,0.85)" />
-                      </LinearGradient>
+                      </View>
+
                       <Text style={styles.noResultsTitle}>
                         Aucun résultat trouvé
                       </Text>
+
                       <Text style={styles.noResultsQuery} numberOfLines={1}>
                         « {query.trim()} »
                       </Text>
-                      <Text style={styles.noResultsSub}>
-                        Essaie un autre mot-clé ou explore les modules.
-                      </Text>
+
+                      <Pressable
+                        onPress={() => setQuery("")}
+                        style={styles.noResultsButton}
+                      >
+                        <Text style={styles.noResultsButtonText}>
+                          Nouvelle recherche
+                        </Text>
+                      </Pressable>
                     </View>
                   </FadeUp>
                 ) : null}
 
-                {/* Results */}
+                {/* RESULTS */}
+
                 {showResults && results.length > 0 ? (
-                  <View style={{ gap: 24, paddingTop: 8, paddingBottom: 24 }}>
-                    <View style={styles.summaryRow}>
-                      <View style={styles.summaryLeft}>
-                        <Sparkles size={11} color="#C4B5FD" />
-                        <Text style={styles.summaryCount}>
-                          {results.length}
-                        </Text>
-                        <Text style={styles.summaryText}>
-                          résultat{results.length > 1 ? "s" : ""}
-                        </Text>
+                  <View style={styles.resultsContainer}>
+                    {(
+                      Object.entries(grouped) as [
+                        ResultCategory,
+                        SearchResult[],
+                      ][]
+                    ).map(([category, categoryResults], categoryIndex) => (
+                      <View key={category} style={styles.resultGroup}>
+                        <SectionLabel icon={getCategoryIcon(category, 12)}>
+                          {category}
+                        </SectionLabel>
+
+                        {categoryResults.map((result, resultIndex) => (
+                          <ResultRow
+                            key={result.id}
+                            result={result}
+                            index={categoryIndex + resultIndex}
+                            onSelect={handleSelect}
+                          />
+                        ))}
                       </View>
-                      <Text style={styles.summaryCategories}>
-                        {resultCategoryCount} catégorie
-                        {resultCategoryCount > 1 ? "s" : ""}
-                      </Text>
-                    </View>
-
-                    {groupedEntries.map(([category, items]) => {
-                      const color = CATEGORY_COLORS[category];
-                      return (
-                        <View key={category}>
-                          <View style={styles.groupHeader}>
-                            <View
-                              style={[
-                                styles.groupIcon,
-                                {
-                                  backgroundColor: `${color}22`,
-                                  borderColor: `${color}44`,
-                                },
-                              ]}
-                            >
-                              {getCategoryIcon(category, 12)}
-                            </View>
-                            <Text style={[styles.groupTitle, { color }]}>
-                              {category.toUpperCase()}
-                            </Text>
-                            <Text style={styles.groupCount}>
-                              {items.length}
-                            </Text>
-                          </View>
-
-                          <View style={{ gap: 6 }}>
-                            {items.map((result, index) => (
-                              <ResultRow
-                                key={result.id}
-                                result={result}
-                                index={index}
-                                compact={category === "Modules"}
-                                onSelect={handleSelect}
-                              />
-                            ))}
-                          </View>
-                        </View>
-                      );
-                    })}
+                    ))}
                   </View>
                 ) : null}
               </ScrollView>
@@ -2586,617 +1945,584 @@ export default function SmartSearch({
  * ============================================================ */
 
 const styles = StyleSheet.create({
-  /* ── Trigger ────────────────────────────────────── */
-  triggerWrap: {
-    marginHorizontal: 20,
-    marginTop: 12,
+  /* HOME */
+
+  homeTriggerWrap: {
+    marginTop: 8,
+    marginHorizontal: 16,
   },
-  trigger: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.05)",
+
+  homeSearchCard: {
+    minHeight: 112,
+    overflow: "hidden",
+    padding: 11,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.045)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.09)",
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
   },
-  triggerSearchIcon: {
+
+  homeSearchCardPressed: {
+    backgroundColor: "rgba(255,255,255,0.065)",
+    borderColor: "rgba(196,181,253,0.20)",
+    transform: [
+      {
+        scale: 0.99,
+      },
+    ],
+  },
+
+  homeSearchTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  homeSearchIcon: {
     width: 36,
     height: 36,
+    marginRight: 10,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(167,139,250,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(196,181,253,0.13)",
+  },
+
+  homeSearchTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  homeSearchTitle: {
+    color: "#F8FAFC",
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: "800",
+    letterSpacing: -0.25,
+  },
+
+  homeSearchHint: {
+    marginTop: 2,
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: "600",
+  },
+
+  homeSearchSparkle: {
+    width: 34,
+    height: 34,
+    marginLeft: 8,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(196,181,253,0.12)",
+  },
+
+  homeActionRow: {
+    paddingTop: 11,
+    paddingRight: 4,
+    gap: 7,
+  },
+
+  homeActionPill: {
+    minHeight: 30,
+    paddingHorizontal: 10,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,255,255,0.045)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
-  triggerTitle: {
-    fontSize: 13.5,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: -0.2,
-  },
-  triggerSub: {
-    marginTop: 3,
-    fontSize: 10,
-    color: "rgba(255,255,255,0.3)",
-    fontWeight: "500",
-  },
-  triggerMic: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.55,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  advancedBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 6,
-    marginTop: 6,
-  },
-  advancedBtnText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "rgba(196,181,253,0.85)",
-    letterSpacing: 0.1,
-  },
-  advancedBtnDot: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.2)",
+
+  homeActionPillPressed: {
+    backgroundColor: "rgba(196,181,253,0.10)",
+    borderColor: "rgba(196,181,253,0.18)",
   },
 
-  /* ── Backdrop ───────────────────────────────────── */
+  homeActionText: {
+    color: "#CBD5E1",
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "700",
+  },
+
+  homeActionMore: {
+    width: 30,
+    height: 30,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  homeActionMoreText: {
+    color: "#94A3B8",
+    fontSize: 17,
+    lineHeight: 20,
+    fontWeight: "800",
+  },
+
+  /* MODAL */
+
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.85)",
+    backgroundColor: "rgba(2,4,18,0.78)",
   },
 
-  /* ── Panel ──────────────────────────────────────── */
   panel: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#06061A",
+    flex: 1,
     overflow: "hidden",
+    backgroundColor: "#06061A",
   },
+
   ambientGlowTop: {
     position: "absolute",
-    top: -140,
-    left: "15%",
-    right: "15%",
-    height: 260,
-    borderRadius: 9999,
-    backgroundColor: "rgba(124,58,237,0.22)",
+    top: -180,
+    right: -80,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    backgroundColor: "rgba(124,58,237,0.08)",
   },
+
   ambientGlowRight: {
     position: "absolute",
     top: "35%",
-    right: -180,
-    width: 260,
-    height: 260,
-    borderRadius: 9999,
-    backgroundColor: "rgba(99,102,241,0.16)",
+    right: -160,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: "rgba(79,70,229,0.06)",
   },
 
-  /* ── Header ─────────────────────────────────────── */
   header: {
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
+
   headerTopRow: {
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 12,
-    maxWidth: 720,
-    width: "100%",
-    alignSelf: "center",
   },
+
   headerEyebrow: {
-    fontSize: 10,
+    color: "#8B5CF6",
+    fontSize: 8,
+    lineHeight: 11,
     fontWeight: "900",
-    letterSpacing: 2,
-    color: "rgba(196,181,253,0.85)",
+    letterSpacing: 1.2,
   },
+
   headerTitle: {
-    marginTop: 4,
-    fontSize: 18,
+    marginTop: 3,
+    color: "#F8FAFC",
+    fontSize: 22,
+    lineHeight: 27,
     fontWeight: "900",
-    color: "#fff",
-    letterSpacing: -0.5,
+    letterSpacing: -0.6,
   },
+
   headerCloseBtn: {
     width: 38,
     height: 38,
-    borderRadius: 12,
+    marginLeft: 10,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.045)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
 
-  /* ── Search bar ─────────────────────────────────── */
   searchBar: {
+    minHeight: 54,
+    paddingHorizontal: 14,
+    borderRadius: 17,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.055)",
     borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.35)",
-    maxWidth: 720,
-    width: "100%",
-    alignSelf: "center",
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
+    borderColor: "rgba(196,181,253,0.14)",
   },
+
   searchInput: {
     flex: 1,
     minWidth: 0,
-    paddingVertical: 6,
+    marginLeft: 10,
+    color: "#FFFFFF",
     fontSize: 14,
-    color: "#fff",
-    fontWeight: "500",
+    fontWeight: "600",
   },
+
   searchClearBtn: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
   },
+
   searchMicBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 31,
+    height: 31,
+    marginLeft: 4,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(139,92,246,0.4)",
-    borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.5)",
-  },
-  searchMicBtnActive: {
-    backgroundColor: "rgba(239,68,68,0.25)",
-    borderColor: "rgba(248,113,113,0.5)",
+    backgroundColor: "rgba(167,139,250,0.10)",
   },
 
-  /* ── Chips ──────────────────────────────────────── */
-  chipsRow: {
-    gap: 8,
-    paddingVertical: 10,
-    maxWidth: 720,
-    alignSelf: "center",
+  searchMicBtnActive: {
+    backgroundColor: "rgba(248,113,113,0.14)",
   },
+
+  chipsRow: {
+    paddingTop: 9,
+    paddingRight: 8,
+    gap: 7,
+  },
+
   chip: {
+    minHeight: 30,
+    paddingHorizontal: 9,
+    borderRadius: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
+    gap: 5,
     borderWidth: 1,
   },
+
   chipText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.65)",
-    letterSpacing: 0.1,
-  },
-  chipCount: {
-    fontSize: 10,
-    color: "rgba(255,255,255,0.4)",
+    color: "#94A3B8",
+    fontSize: 9,
     fontWeight: "700",
-    marginLeft: 2,
   },
 
-  /* ── Body ───────────────────────────────────────── */
+  chipCount: {
+    color: "#64748B",
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
   bodyContent: {
     paddingHorizontal: 16,
     paddingBottom: 40,
-    maxWidth: 720,
-    width: "100%",
-    alignSelf: "center",
   },
 
-  /* ── Section label ──────────────────────────────── */
   sectionLabelRow: {
+    marginBottom: 9,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 12,
-  },
-  sectionLabelText: {
-    fontSize: 10.5,
-    fontWeight: "900",
-    letterSpacing: 1.8,
-    color: "rgba(255,255,255,0.5)",
   },
 
-  /* ── Quick grid ─────────────────────────────────── */
+  sectionLabelText: {
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+
   quickGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-  },
-  quickGridItemWrap: {
-    flexBasis: "23%",
-    flexGrow: 1,
-    minWidth: 76,
-  },
-  quickModule: {
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-  },
-  quickModuleIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  quickModuleLabel: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.7)",
-    textAlign: "center",
-    letterSpacing: 0.1,
-    minHeight: 26,
-  },
-  seeAllBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    marginTop: 8,
-  },
-  seeAllBtnText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "rgba(196,181,253,0.9)",
-    letterSpacing: 0.1,
+    gap: 9,
   },
 
-  /* ── History ────────────────────────────────────── */
+  quickGridItemWrap: {
+    width: "22.5%",
+  },
+
+  quickModule: {
+    minHeight: 78,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  quickModuleIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+
+  quickModuleLabel: {
+    marginTop: 7,
+    color: "#CBD5E1",
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+
   historyHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  historyClear: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "rgba(196,181,253,0.85)",
-    letterSpacing: 0.1,
-  },
-  historyCard: {
-    borderRadius: 18,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  historyBorder: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
-  },
-  historyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  historyRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.05)",
-  },
-  historyText: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 13,
-    color: "rgba(255,255,255,0.75)",
-    fontWeight: "500",
-  },
-  historyRemoveBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
   },
 
-  /* ── Trending ───────────────────────────────────── */
+  historyClear: {
+    color: "#8B5CF6",
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  historyCard: {
+    overflow: "hidden",
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  historyRow: {
+    minHeight: 46,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  historyRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+  },
+
+  historyText: {
+    flex: 1,
+    color: "#CBD5E1",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
   trendingRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-  },
-  trendingChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  trendingChipText: {
-    fontSize: 11.5,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.65)",
-    letterSpacing: 0.1,
+    gap: 7,
   },
 
-  /* ── AI card ────────────────────────────────────── */
-  aiCard: {
-    borderRadius: 20,
-    padding: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.28)",
-  },
-  aiCardBorder: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-  },
-  aiCardOrb: {
-    position: "absolute",
-    top: -60,
-    right: -60,
-    width: 160,
-    height: 160,
-    borderRadius: 9999,
-    backgroundColor: "rgba(139,92,246,0.22)",
-  },
-  aiCardRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  aiCardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.4)",
-  },
-  aiCardEyebrow: {
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.6,
-    color: "rgba(196,181,253,0.85)",
-  },
-  aiCardText: {
-    marginTop: 6,
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: "rgba(255,255,255,0.7)",
-    fontWeight: "500",
-  },
-  aiCardBtn: {
+  trendingChip: {
+    minHeight: 31,
+    paddingHorizontal: 10,
+    borderRadius: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginTop: 8,
-    alignSelf: "flex-start",
-  },
-  aiCardBtnText: {
-    fontSize: 11.5,
-    fontWeight: "800",
-    color: "rgba(196,181,253,0.95)",
-    letterSpacing: 0.1,
-  },
-
-  /* ── No results ─────────────────────────────────── */
-  noResultsWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-    paddingHorizontal: 20,
-  },
-  noResultsIcon: {
-    width: 68,
-    height: 68,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.3)",
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
-    marginBottom: 20,
-  },
-  noResultsTitle: {
-    fontSize: 14,
-    fontWeight: "900",
-    color: "rgba(255,255,255,0.7)",
-    letterSpacing: -0.2,
-  },
-  noResultsQuery: {
-    marginTop: 6,
-    maxWidth: 260,
-    fontSize: 14,
-    fontWeight: "900",
-    color: "#fff",
-    letterSpacing: -0.2,
-  },
-  noResultsSub: {
-    marginTop: 10,
-    maxWidth: 260,
-    fontSize: 11.5,
-    lineHeight: 17,
-    color: "rgba(255,255,255,0.4)",
-    textAlign: "center",
-    fontWeight: "500",
-  },
-
-  /* ── Results summary ────────────────────────────── */
-  summaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 8,
-  },
-  summaryLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  summaryCount: {
-    fontSize: 12,
-    fontWeight: "900",
-    color: "#fff",
-    letterSpacing: -0.1,
-  },
-  summaryText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: 0.1,
-  },
-  summaryCategories: {
-    fontSize: 10.5,
-    color: "rgba(255,255,255,0.35)",
-    fontWeight: "600",
-    letterSpacing: 0.2,
-  },
-
-  /* ── Group header ───────────────────────────────── */
-  groupHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 10,
-  },
-  groupIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  groupTitle: {
-    flex: 1,
-    fontSize: 10.5,
-    fontWeight: "900",
-    letterSpacing: 1.6,
-  },
-  groupCount: {
-    fontSize: 10.5,
-    color: "rgba(255,255,255,0.35)",
-    fontWeight: "700",
-  },
-
-  /* ── Result row ─────────────────────────────────── */
-  resultRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.035)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  trendingChipText: {
+    color: "#94A3B8",
+    fontSize: 9,
+    fontWeight: "700",
+  },
+
+  aiCard: {
     overflow: "hidden",
+    padding: 14,
+    borderRadius: 19,
+    backgroundColor: "rgba(124,58,237,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.14)",
   },
+
+  aiCardRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+
+  aiCardIcon: {
+    width: 38,
+    height: 38,
+    marginRight: 11,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(196,181,253,0.16)",
+  },
+
+  aiCardEyebrow: {
+    color: "#A78BFA",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+  },
+
+  aiCardText: {
+    marginTop: 4,
+    color: "#CBD5E1",
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
+
+  aiCardBtn: {
+    alignSelf: "flex-start",
+    marginTop: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  aiCardBtnText: {
+    color: "#C4B5FD",
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  resultsContainer: {
+    gap: 22,
+    paddingTop: 12,
+  },
+
+  resultGroup: {
+    gap: 7,
+  },
+
+  resultRow: {
+    minHeight: 66,
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.065)",
+  },
+
   resultRowCompact: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 10,
+    minHeight: 56,
   },
+
   resultIcon: {
     width: 38,
     height: 38,
+    marginRight: 10,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
   },
+
   resultIconCompact: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
+    width: 32,
+    height: 32,
+    marginRight: 9,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
   },
+
   resultTitle: {
-    fontSize: 13,
-    fontWeight: "900",
-    color: "rgba(255,255,255,0.92)",
-    letterSpacing: -0.2,
+    color: "#F8FAFC",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800",
   },
+
   resultSubtitle: {
-    marginTop: 3,
-    fontSize: 10.5,
-    color: "rgba(255,255,255,0.45)",
-    fontWeight: "500",
+    marginTop: 2,
+    color: "#64748B",
+    fontSize: 9,
+    lineHeight: 13,
+    fontWeight: "600",
   },
+
   resultMetaCol: {
+    maxWidth: 75,
+    marginLeft: 8,
     alignItems: "flex-end",
-    gap: 4,
-    maxWidth: 120,
   },
+
   resultMeta: {
-    fontSize: 10.5,
+    color: "#94A3B8",
+    fontSize: 8,
     fontWeight: "700",
-    color: "rgba(255,255,255,0.55)",
   },
+
   resultBadge: {
+    minHeight: 17,
+    marginTop: 3,
+    paddingHorizontal: 5,
+    borderRadius: 5,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 999,
+    gap: 3,
   },
+
   resultBadgeText: {
-    fontSize: 9,
+    fontSize: 7,
     fontWeight: "900",
-    letterSpacing: 0.3,
+  },
+
+  noResultsWrap: {
+    minHeight: 300,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+
+  noResultsIcon: {
+    width: 64,
+    height: 64,
+    marginBottom: 14,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(196,181,253,0.13)",
+  },
+
+  noResultsTitle: {
+    color: "#F8FAFC",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  noResultsQuery: {
+    maxWidth: "90%",
+    marginTop: 5,
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  noResultsButton: {
+    minHeight: 38,
+    marginTop: 17,
+    paddingHorizontal: 15,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.18)",
+  },
+
+  noResultsButtonText: {
+    color: "#C4B5FD",
+    fontSize: 10,
+    fontWeight: "800",
   },
 });

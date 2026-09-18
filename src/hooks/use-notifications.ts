@@ -1,5 +1,5 @@
 // src/hooks/use-notifications.ts
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -24,7 +24,8 @@ export type NotifType =
   | "boost"
   | "event"
   | "streak"
-  | "digest";
+  | "digest"
+  | "annonce";
 
 export type NotifPriority = "high" | "normal" | "low";
 
@@ -52,9 +53,7 @@ export interface NotifPrefs {
   dndTo: string;
 }
 
-// ── Preferences ──────────────────────────────────────────────────────────────
-const PREFS_KEY = "dbp_notif_prefs_v3";
-
+// ── Préférences par défaut ───────────────────────────────────────────────────
 const DEFAULT_PREFS: NotifPrefs = {
   enabled: {
     message: true,
@@ -74,17 +73,35 @@ const DEFAULT_PREFS: NotifPrefs = {
     event: true,
     streak: true,
     digest: true,
+    annonce: true,
   },
   dndEnabled: false,
   dndFrom: "22:00",
   dndTo: "07:00",
 };
 
-function loadPrefs(): NotifPrefs {
+function parsePrefs(raw: string | undefined): NotifPrefs {
+  if (!raw) return DEFAULT_PREFS;
   try {
-    return (
-      JSON.parse(localStorage.getItem(PREFS_KEY) ?? "null") || DEFAULT_PREFS
-    );
+    const parsed = JSON.parse(raw);
+    return {
+      dndEnabled:
+        typeof parsed?.dndEnabled === "boolean"
+          ? parsed.dndEnabled
+          : DEFAULT_PREFS.dndEnabled,
+      dndFrom:
+        typeof parsed?.dndFrom === "string"
+          ? parsed.dndFrom
+          : DEFAULT_PREFS.dndFrom,
+      dndTo:
+        typeof parsed?.dndTo === "string" ? parsed.dndTo : DEFAULT_PREFS.dndTo,
+      enabled: {
+        ...DEFAULT_PREFS.enabled,
+        ...(parsed?.enabled && typeof parsed.enabled === "object"
+          ? parsed.enabled
+          : {}),
+      },
+    };
   } catch {
     return DEFAULT_PREFS;
   }
@@ -106,31 +123,11 @@ function fmtRelative(ts: number): string {
   });
 }
 
-// ── Seeder hook ──────────────────────────────────────────────────────────────
-export function useNotificationsSeeder() {
-  const { isAuthenticated } = useFirebaseAuth();
-  const seed = useMutation(api.notifications.seedDemo);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      seed({}).catch(() => {
-        /* ignore */
-      });
-    }
-  }, [isAuthenticated, seed]);
-}
-
-// ── Main hook ──────────────────────────────────────────────────────────────────
+// ── Main hook ────────────────────────────────────────────────────────────────
 export function useNotifications() {
   const { isAuthenticated } = useFirebaseAuth();
-  const [prefs, setPrefs] = useState<NotifPrefs>(loadPrefs);
 
-  const savePrefs = useCallback((next: NotifPrefs) => {
-    setPrefs(next);
-    localStorage.setItem(PREFS_KEY, JSON.stringify(next));
-  }, []);
-
-  // ✅ Requêtes Convex sans email (l'identité est récupérée via ctx.auth)
+  // ── Queries
   const rawNotifs = useQuery(
     api.notifications.list,
     isAuthenticated ? {} : "skip",
@@ -141,43 +138,63 @@ export function useNotifications() {
     isAuthenticated ? {} : "skip",
   ) as number | undefined;
 
-  // Mutations sans email
+  const rawPrefsJson = useQuery(
+    api.preferences.getMyNotifPrefs,
+    isAuthenticated ? {} : "skip",
+  ) as string | undefined;
+
+  // ── Mutations
   const markReadMutation = useMutation(api.notifications.markNotificationRead);
   const markAllReadMutation = useMutation(api.notifications.markAllRead);
   const dismissMutation = useMutation(api.notifications.dismiss);
+  const savePrefsMutation = useMutation(api.preferences.saveNotifPrefs);
 
-  // ✅ Transformation en Notif[]
-  const notifs: Notif[] = (rawNotifs ?? []).map((n) => ({
-    id: n._id,
-    type: n.type as NotifType,
-    module: n.module,
-    title: n.title,
-    body: n.body,
-    time: fmtRelative(n._creationTime),
-    timestamp: n._creationTime,
-    read: n.read,
-    pinned: n.pinned,
-    priority: n.priority as NotifPriority,
-    initials: n.initials,
-    actionPage: n.actionPage,
-    amount: n.amount,
-    actionButtons: n.actionButtons,
-  }));
+  // ── Préférences
+  const prefs: NotifPrefs = useMemo(
+    () => parsePrefs(rawPrefsJson),
+    [rawPrefsJson],
+  );
+
+  // ── Notifications enrichies
+  const notifs: Notif[] = useMemo(
+    () =>
+      (rawNotifs ?? []).map((n) => ({
+        id: n._id,
+        type: n.type as NotifType,
+        module: n.module,
+        title: n.title,
+        body: n.body,
+        time: fmtRelative(n._creationTime),
+        timestamp: n._creationTime,
+        read: n.read,
+        pinned: n.pinned,
+        priority: n.priority as NotifPriority,
+        initials: n.initials,
+        actionPage: n.actionPage,
+        amount: n.amount,
+        actionButtons: n.actionButtons,
+      })),
+    [rawNotifs],
+  );
 
   const unreadTotal = unreadRaw ?? 0;
 
-  const badgeCounts: Record<string, number> = {};
-  notifs.forEach((n) => {
-    if (!n.read && prefs.enabled[n.type]) {
-      badgeCounts[n.module] = (badgeCounts[n.module] ?? 0) + 1;
-    }
-  });
+  const badgeCounts: Record<string, number> = useMemo(() => {
+    const counts: Record<string, number> = {};
+    notifs.forEach((n) => {
+      if (!n.read && prefs.enabled[n.type]) {
+        counts[n.module] = (counts[n.module] ?? 0) + 1;
+      }
+    });
+    return counts;
+  }, [notifs, prefs.enabled]);
 
+  // ── Actions
   const markRead = useCallback(
     (id: Id<"notifications">) => {
       if (!isAuthenticated) return;
       markReadMutation({ id }).catch(() => {
-        /* ignore */
+        /* silent — l'erreur n'empêche pas l'UI de fonctionner */
       });
     },
     [markReadMutation, isAuthenticated],
@@ -186,7 +203,7 @@ export function useNotifications() {
   const markAllRead = useCallback(() => {
     if (!isAuthenticated) return;
     markAllReadMutation({}).catch(() => {
-      /* ignore */
+      /* silent */
     });
   }, [markAllReadMutation, isAuthenticated]);
 
@@ -194,15 +211,29 @@ export function useNotifications() {
     (id: Id<"notifications">) => {
       if (!isAuthenticated) return;
       dismissMutation({ id }).catch(() => {
-        /* ignore */
+        /* silent */
       });
     },
     [dismissMutation, isAuthenticated],
   );
 
+  // ── Écriture préférences (serveur = source de vérité)
+  const savePrefs = useCallback(
+    (next: NotifPrefs) => {
+      if (!isAuthenticated) return;
+      savePrefsMutation({ prefsJson: JSON.stringify(next) }).catch(() => {
+        /* silent */
+      });
+    },
+    [savePrefsMutation, isAuthenticated],
+  );
+
   const updatePref = useCallback(
     (type: NotifType, enabled: boolean) => {
-      savePrefs({ ...prefs, enabled: { ...prefs.enabled, [type]: enabled } });
+      savePrefs({
+        ...prefs,
+        enabled: { ...prefs.enabled, [type]: enabled },
+      });
     },
     [prefs, savePrefs],
   );

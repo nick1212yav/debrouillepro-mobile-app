@@ -1,4 +1,5 @@
 // src/pages/home/_components/LiveFeed.tsx
+
 import {
   View,
   Pressable,
@@ -7,10 +8,14 @@ import {
   Animated,
   Easing,
   StyleSheet,
-  Platform,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
+
 import { LinearGradient } from "expo-linear-gradient";
+
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+
 import {
   RefreshCw,
   Plus,
@@ -27,7 +32,6 @@ import type { Publication } from "@/features/publications/types";
 import { usePublicationActions } from "@/features/publications/hooks/usePublicationActions";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 
 import {
   PUBLICATION_TYPES,
@@ -65,18 +69,24 @@ function FadeUp({
   delay?: number;
   distance?: number;
   children: ReactNode;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(anim, {
+    const animation = Animated.timing(anim, {
       toValue: 1,
       duration: 420,
       delay,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start();
+    });
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [anim, delay]);
 
   return (
@@ -102,7 +112,7 @@ function FadeUp({
 }
 
 /* ============================================================================
- * PULSING SPARKLE (header icon)
+ * PULSING SPARKLE — HEADER ICON
  * ========================================================================== */
 
 function PulsingHeaderIcon({
@@ -113,7 +123,7 @@ function PulsingHeaderIcon({
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
@@ -128,7 +138,13 @@ function PulsingHeaderIcon({
           useNativeDriver: true,
         }),
       ]),
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [pulse]);
 
   const scale = pulse.interpolate({
@@ -137,18 +153,21 @@ function PulsingHeaderIcon({
   });
 
   return (
-    <Animated.View style={[styles.headerIconWrap, { transform: [{ scale }] }]}>
+    <Animated.View
+      style={[
+        styles.headerIconWrap,
+        {
+          transform: [{ scale }],
+        },
+      ]}
+    >
       <LinearGradient
         colors={["#A78BFA", "#7C3AED", "#6366F1"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerIconGradient}
       >
-        {activeType === "all" ? (
-          <Sparkles size={16} color="#fff" strokeWidth={2.4} />
-        ) : (
-          <LayoutGrid size={16} color="#fff" strokeWidth={2.4} />
-        )}
+        {activeType === "all" ? <Sparkles /> : <LayoutGrid />}
       </LinearGradient>
     </Animated.View>
   );
@@ -173,12 +192,18 @@ function FilterChip({
   const activeAnim = useRef(new Animated.Value(active ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.timing(activeAnim, {
+    const animation = Animated.timing(activeAnim, {
       toValue: active ? 1 : 0,
       duration: 260,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
-    }).start();
+    });
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [active, activeAnim]);
 
   const onPressIn = () => {
@@ -188,6 +213,7 @@ function FilterChip({
       speed: 40,
     }).start();
   };
+
   const onPressOut = () => {
     Animated.spring(scale, {
       toValue: 1,
@@ -196,13 +222,21 @@ function FilterChip({
     }).start();
   };
 
-  const borderColor = activeAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["rgba(255,255,255,0.09)", "rgba(255,255,255,0.15)"],
-  });
+  /*
+   * Native Animated does not safely type string color interpolation here.
+   * The active state is therefore represented by a deterministic native color,
+   * while the gradient opacity remains animated.
+   */
+  const borderColor = active
+    ? "rgba(255,255,255,0.15)"
+    : "rgba(255,255,255,0.09)";
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View
+      style={{
+        transform: [{ scale }],
+      }}
+    >
       <Pressable
         onPress={onPress}
         onPressIn={onPressIn}
@@ -211,7 +245,7 @@ function FilterChip({
         accessibilityState={{ selected: active }}
         style={styles.filterChip}
       >
-        {/* Base bg (inactive) */}
+        {/* Base background */}
         <View
           pointerEvents="none"
           style={[
@@ -237,7 +271,10 @@ function FilterChip({
               shadowColor: color,
               shadowOpacity: 0.4,
               shadowRadius: 12,
-              shadowOffset: { width: 0, height: 6 },
+              shadowOffset: {
+                width: 0,
+                height: 6,
+              },
             },
           ]}
         >
@@ -272,7 +309,7 @@ function LiveFeedSkeleton() {
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
@@ -287,7 +324,13 @@ function LiveFeedSkeleton() {
           useNativeDriver: true,
         }),
       ]),
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [pulse]);
 
   const opacity = pulse.interpolate({
@@ -302,19 +345,36 @@ function LiveFeedSkeleton() {
       style={{ gap: 16 }}
     >
       {[0, 1, 2].map((index) => (
-        <Animated.View key={index} style={[styles.skeletonCard, { opacity }]}>
+        <Animated.View
+          key={index}
+          style={[
+            styles.skeletonCard,
+            {
+              opacity,
+            },
+          ]}
+        >
           <Skeleton style={styles.skeletonHero} />
+
           <View style={styles.skeletonBody}>
             <View style={styles.skeletonAuthorRow}>
               <Skeleton style={styles.skeletonAvatar} />
-              <View style={{ flex: 1, gap: 8 }}>
+
+              <View
+                style={{
+                  flex: 1,
+                  gap: 8,
+                }}
+              >
                 <Skeleton style={styles.skeletonLine1} />
                 <Skeleton style={styles.skeletonLine2} />
               </View>
             </View>
+
             <Skeleton style={styles.skeletonTitle} />
             <Skeleton style={styles.skeletonText} />
             <Skeleton style={styles.skeletonTextShort} />
+
             <View style={styles.skeletonActionsRow}>
               <Skeleton style={styles.skeletonAction} />
               <Skeleton style={styles.skeletonAction} />
@@ -343,7 +403,7 @@ function EmptyFeed({
   const float = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(float, {
           toValue: 1,
@@ -358,13 +418,20 @@ function EmptyFeed({
           useNativeDriver: true,
         }),
       ]),
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [float]);
 
   const translateY = float.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -6],
   });
+
   const rotate = float.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: ["0deg", "3deg", "-3deg"],
@@ -384,14 +451,18 @@ function EmptyFeed({
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
+
         <View style={styles.emptyBorder} pointerEvents="none" />
+
         <View style={styles.emptyOrb} pointerEvents="none" />
 
         <View style={styles.emptyContent}>
           <Animated.View
             style={[
               styles.emptyIconWrap,
-              { transform: [{ translateY }, { rotate }] },
+              {
+                transform: [{ translateY }, { rotate }],
+              },
             ]}
           >
             <LinearGradient
@@ -400,11 +471,7 @@ function EmptyFeed({
               end={{ x: 1, y: 1 }}
               style={styles.emptyIconGradient}
             >
-              {isFiltered ? (
-                <LayoutGrid size={26} color="#C4B5FD" />
-              ) : (
-                <Sparkles size={26} color="#C4B5FD" />
-              )}
+              {isFiltered ? <LayoutGrid /> : <Sparkles />}
             </LinearGradient>
           </Animated.View>
 
@@ -446,7 +513,8 @@ function EmptyFeed({
                 end={{ x: 1, y: 1 }}
                 style={styles.emptyPrimary}
               >
-                <Plus size={14} color="#fff" strokeWidth={2.6} />
+                <Plus />
+
                 <Text style={styles.emptyPrimaryText}>
                   Créer une publication
                 </Text>
@@ -471,26 +539,39 @@ function LoadingDots() {
   ];
 
   useEffect(() => {
-    dots.forEach((dot, i) => {
+    const animations = dots.map((dot, i) =>
       Animated.loop(
         Animated.sequence([
           Animated.delay(i * 140),
+
           Animated.timing(dot, {
             toValue: 1,
             duration: 400,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
+
           Animated.timing(dot, {
             toValue: 0,
             duration: 400,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
+
           Animated.delay((2 - i) * 140),
         ]),
-      ).start();
+      ),
+    );
+
+    animations.forEach((animation) => {
+      animation.start();
     });
+
+    return () => {
+      animations.forEach((animation) => {
+        animation.stop();
+      });
+    };
   }, [dots]);
 
   return (
@@ -508,6 +589,7 @@ function LoadingDots() {
                 inputRange: [0, 1],
                 outputRange: [0.2, 1],
               }),
+
               transform: [
                 {
                   scale: dot.interpolate({
@@ -536,14 +618,21 @@ function RefreshSpinner({ active }: { active: boolean }) {
       rotate.setValue(0);
       return;
     }
-    Animated.loop(
+
+    const animation = Animated.loop(
       Animated.timing(rotate, {
         toValue: 1,
         duration: 900,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [active, rotate]);
 
   const rotation = rotate.interpolate({
@@ -552,8 +641,12 @@ function RefreshSpinner({ active }: { active: boolean }) {
   });
 
   return (
-    <Animated.View style={{ transform: [{ rotate: rotation }] }}>
-      <RefreshCw size={14} color="rgba(255,255,255,0.7)" />
+    <Animated.View
+      style={{
+        transform: [{ rotate: rotation }],
+      }}
+    >
+      <RefreshCw />
     </Animated.View>
   );
 }
@@ -584,6 +677,7 @@ function FeedPagination({
       speed: 40,
     }).start();
   };
+
   const onPressOut = () => {
     Animated.spring(scale, {
       toValue: 1,
@@ -595,7 +689,11 @@ function FeedPagination({
   return (
     <View style={styles.paginationWrap}>
       {canLoadMore ? (
-        <Animated.View style={{ transform: [{ scale }] }}>
+        <Animated.View
+          style={{
+            transform: [{ scale }],
+          }}
+        >
           <Pressable
             onPress={onLoadMore}
             onPressIn={onPressIn}
@@ -608,12 +706,12 @@ function FeedPagination({
             ]}
           >
             <RefreshSpinner active={isLoadingMore} />
+
             <Text style={styles.loadMoreText}>
               {isLoadingMore ? "Chargement…" : "Charger plus"}
             </Text>
-            {!isLoadingMore ? (
-              <ChevronRight size={14} color="rgba(255,255,255,0.5)" />
-            ) : null}
+
+            {!isLoadingMore ? <ChevronRight /> : null}
           </Pressable>
         </Animated.View>
       ) : null}
@@ -624,7 +722,9 @@ function FeedPagination({
         <FadeUp distance={6}>
           <View style={styles.exhaustedRow}>
             <View style={styles.exhaustedLine} />
+
             <Text style={styles.exhaustedText}>Vous avez tout vu</Text>
+
             <View style={styles.exhaustedLine} />
           </View>
         </FadeUp>
@@ -639,6 +739,7 @@ function FeedPagination({
 
 export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
   const [activeType, setActiveType] = useState<PublicationType | "all">("all");
+
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   /* --------------------------------------------------------------------------
@@ -648,12 +749,22 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.publications.listFeed,
     activeType !== "all" ? { type: activeType } : {},
-    { initialNumItems: PAGE_SIZE },
+    {
+      initialNumItems: PAGE_SIZE,
+    },
   );
 
   const likePublication = useMutation(api.publications.likePublication);
+
   const deletePublication = useMutation(api.publications.deletePublication);
+
   const { handleAction, handleCTA } = usePublicationActions();
+
+  /*
+   * Kept in the public component contract for compatibility
+   * with the parent navigation architecture.
+   */
+  void onNavigate;
 
   /* --------------------------------------------------------------------------
    * DERIVED
@@ -670,8 +781,12 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
    * ------------------------------------------------------------------------ */
 
   const handleLike = async (id: string) => {
-    if (actionInProgress === `like:${id}`) return;
+    if (actionInProgress === `like:${id}`) {
+      return;
+    }
+
     setActionInProgress(`like:${id}`);
+
     try {
       await likePublication({
         publicationId: id as Parameters<
@@ -690,8 +805,12 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
    * ------------------------------------------------------------------------ */
 
   const handleDelete = async (id: string) => {
-    if (actionInProgress === `delete:${id}`) return;
+    if (actionInProgress === `delete:${id}`) {
+      return;
+    }
+
     setActionInProgress(`delete:${id}`);
+
     try {
       await deletePublication({
         publicationId: id as Parameters<
@@ -713,7 +832,10 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
    * ------------------------------------------------------------------------ */
 
   const handleTypeChange = (type: PublicationType | "all") => {
-    if (type === activeType) return;
+    if (type === activeType) {
+      return;
+    }
+
     setActiveType(type);
     setActionInProgress(null);
   };
@@ -723,17 +845,21 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
    * ------------------------------------------------------------------------ */
 
   const isLoading = status === "LoadingFirstPage";
+
   const isLoadingMore = status === "LoadingMore";
+
   const canLoadMore = status === "CanLoadMore";
+
   const isExhausted = status === "Exhausted";
 
-  /* ========================================================================
+  /* ==========================================================================
    * RENDER
-   * ====================================================================== */
+   * ======================================================================== */
 
   return (
     <View style={styles.root} accessibilityLabel="Fil d'actualité">
-      {/* ═══════════ HEADER STICKY ═══════════ */}
+      {/* ═════════════════ HEADER ═════════════════ */}
+
       <View style={styles.headerWrap}>
         <LinearGradient
           colors={["rgba(6,6,18,0.96)", "rgba(6,6,18,0.72)"]}
@@ -741,20 +867,28 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
           end={{ x: 0, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
+
         <View style={styles.headerBorder} pointerEvents="none" />
 
         <View style={styles.headerInner}>
           {/* Row 1 */}
+
           <View style={styles.headerTopRow}>
             <View style={styles.headerLeft}>
               <PulsingHeaderIcon activeType={activeType} />
 
-              <View style={{ flex: 1, minWidth: 0 }}>
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
                 <Text style={styles.headerTitle} numberOfLines={1}>
                   {activeType === "all"
                     ? "À découvrir"
                     : (TYPE_LABELS[activeType] ?? "Publications")}
                 </Text>
+
                 <Text style={styles.headerSub} numberOfLines={1}>
                   {isLoading
                     ? "Chargement du feed…"
@@ -775,12 +909,14 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
                 pressed && styles.pressed,
               ]}
             >
-              <Plus size={13} color="#DDD6FE" strokeWidth={2.6} />
+              <Plus />
+
               <Text style={styles.publishBtnText}>Publier</Text>
             </Pressable>
           </View>
 
           {/* Row 2 — filters */}
+
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -793,6 +929,7 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
               color="#8B5CF6"
               onPress={() => handleTypeChange("all")}
             />
+
             {PUBLICATION_TYPES.map((type) => (
               <FilterChip
                 key={type.value}
@@ -810,7 +947,8 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
         </View>
       </View>
 
-      {/* ═══════════ CONTENT ═══════════ */}
+      {/* ═════════════════ CONTENT ═════════════════ */}
+
       <View style={styles.content}>
         {isLoading ? <LiveFeedSkeleton /> : null}
 
@@ -828,11 +966,13 @@ export default function LiveFeed({ onNavigate, onCreateOpen }: LiveFeedProps) {
               {visibleResults.map((item, index) => {
                 const publication: Publication = {
                   ...item,
+
                   author: {
                     id: item.authorId,
                     name: item.author?.name ?? "Utilisateur",
                     avatar: item.author?.avatar,
                   },
+
                   isMine: "isMine" in item ? Boolean(item.isMine) : false,
                 };
 
@@ -879,14 +1019,19 @@ const styles = StyleSheet.create({
   root: {
     width: "100%",
   },
-  pressed: { opacity: 0.85 },
+
+  pressed: {
+    opacity: 0.85,
+  },
 
   /* ── Header ─────────────────────────────────────── */
+
   headerWrap: {
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.05)",
     zIndex: 20,
   },
+
   headerBorder: {
     position: "absolute",
     left: 0,
@@ -895,11 +1040,13 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "rgba(139,92,246,0.12)",
   },
+
   headerInner: {
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 12,
   },
+
   headerTopRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -907,6 +1054,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
+
   headerLeft: {
     flex: 1,
     minWidth: 0,
@@ -914,10 +1062,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+
   headerIconWrap: {
     width: 38,
     height: 38,
   },
+
   headerIconGradient: {
     width: 38,
     height: 38,
@@ -929,20 +1079,26 @@ const styles = StyleSheet.create({
     shadowColor: "#7C3AED",
     shadowOpacity: 0.6,
     shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
   },
+
   headerTitle: {
     fontSize: 14,
     fontWeight: "900",
     color: "#fff",
     letterSpacing: -0.3,
   },
+
   headerSub: {
     marginTop: 2,
     fontSize: 10.5,
     color: "rgba(255,255,255,0.4)",
     fontWeight: "600",
   },
+
   publishBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -954,6 +1110,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(167,139,250,0.4)",
   },
+
   publishBtnText: {
     fontSize: 11.5,
     fontWeight: "900",
@@ -962,10 +1119,12 @@ const styles = StyleSheet.create({
   },
 
   /* ── Filters ────────────────────────────────────── */
+
   filtersRow: {
     gap: 8,
     paddingRight: 16,
   },
+
   filterChip: {
     height: 36,
     minWidth: 60,
@@ -975,6 +1134,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
   },
+
   filterChipText: {
     fontSize: 11,
     fontWeight: "800",
@@ -983,12 +1143,14 @@ const styles = StyleSheet.create({
   },
 
   /* ── Content ────────────────────────────────────── */
+
   content: {
     paddingTop: 16,
     paddingHorizontal: 16,
   },
 
   /* ── Skeleton ───────────────────────────────────── */
+
   skeletonCard: {
     borderRadius: 28,
     overflow: "hidden",
@@ -996,62 +1158,73 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.06)",
     backgroundColor: "rgba(255,255,255,0.025)",
   },
+
   skeletonHero: {
     height: 200,
     width: "100%",
     borderRadius: 0,
     backgroundColor: "rgba(255,255,255,0.06)",
   },
+
   skeletonBody: {
     padding: 16,
     gap: 12,
   },
+
   skeletonAuthorRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
+
   skeletonAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.06)",
   },
+
   skeletonLine1: {
     height: 12,
     width: 110,
     borderRadius: 6,
     backgroundColor: "rgba(255,255,255,0.06)",
   },
+
   skeletonLine2: {
     height: 10,
     width: 80,
     borderRadius: 5,
     backgroundColor: "rgba(255,255,255,0.06)",
   },
+
   skeletonTitle: {
     height: 16,
     width: "75%",
     borderRadius: 8,
     backgroundColor: "rgba(255,255,255,0.06)",
   },
+
   skeletonText: {
     height: 12,
     width: "100%",
     borderRadius: 6,
     backgroundColor: "rgba(255,255,255,0.05)",
   },
+
   skeletonTextShort: {
     height: 12,
     width: "83%",
     borderRadius: 6,
     backgroundColor: "rgba(255,255,255,0.05)",
   },
+
   skeletonActionsRow: {
     flexDirection: "row",
     gap: 8,
     paddingTop: 4,
   },
+
   skeletonAction: {
     height: 32,
     width: 80,
@@ -1060,6 +1233,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Empty ──────────────────────────────────────── */
+
   emptyCard: {
     borderRadius: 32,
     overflow: "hidden",
@@ -1067,12 +1241,14 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(10,6,24,0.55)",
   },
+
   emptyBorder: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 32,
     borderWidth: 1,
     borderColor: "rgba(139,92,246,0.15)",
   },
+
   emptyOrb: {
     position: "absolute",
     top: -60,
@@ -1082,14 +1258,17 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     backgroundColor: "rgba(139,92,246,0.22)",
   },
+
   emptyContent: {
     paddingHorizontal: 24,
     paddingVertical: 40,
     alignItems: "center",
   },
+
   emptyIconWrap: {
     marginBottom: 20,
   },
+
   emptyIconGradient: {
     width: 64,
     height: 64,
@@ -1101,8 +1280,12 @@ const styles = StyleSheet.create({
     shadowColor: "#7C3AED",
     shadowOpacity: 0.6,
     shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
   },
+
   emptyTitle: {
     fontSize: 16,
     fontWeight: "900",
@@ -1110,6 +1293,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     letterSpacing: -0.3,
   },
+
   emptySub: {
     marginTop: 10,
     maxWidth: 340,
@@ -1119,6 +1303,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "500",
   },
+
   emptyActions: {
     marginTop: 24,
     flexDirection: "row",
@@ -1127,6 +1312,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   emptySecondaryBtn: {
     paddingHorizontal: 18,
     paddingVertical: 12,
@@ -1135,21 +1321,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
+
   emptySecondaryText: {
     fontSize: 12,
     fontWeight: "800",
     color: "rgba(255,255,255,0.75)",
     letterSpacing: 0.2,
   },
+
   emptyPrimaryOuter: {
     borderRadius: 14,
     overflow: "hidden",
     shadowColor: "#7C3AED",
     shadowOpacity: 0.55,
     shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
     elevation: 8,
   },
+
   emptyPrimary: {
     flexDirection: "row",
     alignItems: "center",
@@ -1157,6 +1349,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 12,
   },
+
   emptyPrimaryText: {
     fontSize: 12,
     fontWeight: "900",
@@ -1165,12 +1358,14 @@ const styles = StyleSheet.create({
   },
 
   /* ── Pagination ─────────────────────────────────── */
+
   paginationWrap: {
     alignItems: "center",
     paddingTop: 8,
     paddingBottom: 32,
     gap: 12,
   },
+
   loadMoreBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1182,34 +1377,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
+
   loadMoreText: {
     fontSize: 12.5,
     fontWeight: "800",
     color: "rgba(255,255,255,0.75)",
     letterSpacing: 0.2,
   },
+
   loadingDotsRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
+
   loadingDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: "#A78BFA",
   },
+
   exhaustedRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingVertical: 8,
   },
+
   exhaustedLine: {
     height: 1,
     width: 32,
     backgroundColor: "rgba(255,255,255,0.1)",
   },
+
   exhaustedText: {
     fontSize: 10.5,
     fontWeight: "700",

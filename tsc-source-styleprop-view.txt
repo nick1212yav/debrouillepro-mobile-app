@@ -1,0 +1,127 @@
+﻿
+      Type 'StyleProp<TextStyle>' is not assignable to type 'CSSProperties | undefined'.
+        Type 'null' is not assignable to type 'CSSProperties | undefined'.
+  src/components/ui/breadcrumb.tsx(36,6): error TS2322: Type '{ onHoverIn?: ((event: MouseEvent) => void) | null | undefined; onHoverOut?: ((event: MouseEvent) => void) | null | undefined; onPress?: ((event: 
+GestureResponderEvent) => void) | null | undefined; ... 105 more ...; className: string; }' is not assignable to type 'AnchorHTMLAttributes<HTMLAnchorElement>'.
+    Types of property 'style' are incompatible.
+>     Type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)' is not assignable to type 'CSSProperties | undefined'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+      Type '"group"' is not assignable to type 'AccessibilityRole | undefined'.
+  src/components/ui/button-group.tsx(44,6): error TS2322: Type '{ children?: ReactNode; hitSlop?: number | Insets | null | undefined; id?: string | undefined; needsOffscreenAlphaCompositing?: boolean | 
+undefined; onLayout?: ((event: LayoutChangeEvent) => void) | undefined; ... 86 more ...; className: string; }' is not assignable to type 'HTMLAttributes<HTMLDivElement>'.
+    Types of property 'style' are incompatible.
+>     Type 'StyleProp<ViewStyle>' is not assignable to type 'CSSProperties | undefined'.
+        Type 'null' is not assignable to type 'CSSProperties | undefined'.
+> src/components/ui/button.tsx(126,58): error TS2322: Type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)' is not assignable to type 'StyleProp<ViewStyle>'.
+>   Type '(state: PressableStateCallbackType) => StyleProp<ViewStyle>' is not assignable to type 'StyleProp<ViewStyle>'.
+  src/components/ui/carousel.tsx(163,7): error TS2322: Type 'RefObject<ScrollView | null>' is not assignable to type 'RefObject<ScrollView>'.
+    Type 'ScrollView | null' is not assignable to type 'ScrollView'.
+      Type 'null' is not assignable to type 'ScrollView'.
+> src/components/ui/carousel.tsx(307,9): error TS2322: Type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)' is not assignable to type 'ViewStyle | Falsy | 
+RegisteredStyle<ViewStyle> | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | readonly (ViewStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+>   Type '(state: PressableStateCallbackType) => StyleProp<ViewStyle>' is not assignable to type 'ViewStyle | Falsy | RegisteredStyle<ViewStyle> | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> 
+| readonly (ViewStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+> src/components/ui/carousel.tsx(338,9): error TS2322: Type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)' is not assignable to type 'ViewStyle | Falsy | 
+RegisteredStyle<ViewStyle> | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | readonly (ViewStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+>   Type '(state: PressableStateCallbackType) => StyleProp<ViewStyle>' is not assignable to type 'ViewStyle | Falsy | RegisteredStyle<ViewStyle> | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> 
+| readonly (ViewStyle | ... 1 more ... | RegisteredStyle<...>)[]'.
+  src/components/ui/chart.tsx(108,3): error TS2339: Property 'color' does not exist on type 'Props<ValueType, NameType> & { accessibilityLayer?: boolean | undefined; active?: boolean | undefined; 
+includeHidden?: boolean | undefined; allowEscapeViewBox?: AllowInDimension | undefined; ... 16 more ...; wrapperStyle?: CSSProperties | undefined; } & ViewProps & { ...; }'.
+  src/components/ui/chart.tsx(186,29): error TS2345: Argument of type '{ "h-2.5 w-2.5": boolean; "w-1": boolean; "w-0 border-[1.5px] border-dashed bg-transparent": boolean; "my-0.5": boolean; }' is not 
+assignable to parameter of type 'string | false | null | undefined'.
+  src/components/ui/chart.tsx(193,30): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+>     Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>       Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+            Types of property 'cursor' are incompatible.
+              Type 'string | undefined' is not assignable to type 'CursorValue | undefined'.
+                Type 'string' is not assignable to type 'CursorValue | undefined'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+>     Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>       Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+  src/components/ui/empty.tsx(56,6): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ allowFontScaling?: boolean | undefined; children?: ReactNode; ellipsizeMode?: "head" | "clip" | "middle" | "tail" | undefined; id?: string | undefined; lineBreakMode?: "head" | ... 3 more ... | 
+undefined; ... 65 more ...; className: string; }' is not assignable to type 'Readonly<ViewProps>'.
+        Types of property 'style' are incompatible.
+>         Type 'StyleProp<TextStyle>' is not assignable to type 'StyleProp<ViewStyle>'.
+>           Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+                    Type 'string' is not assignable to type 'CursorValue | undefined'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+      Type '{ allowFontScaling?: boolean | undefined; children?: ReactNode; ellipsizeMode?: "head" | "clip" | "middle" | "tail" | undefined; id?: string | undefined; lineBreakMode?: "head" | ... 3 more ... | 
+undefined; ... 65 more ...; className: string; }' is not assignable to type 'Readonly<ViewProps>'.
+        Types of property 'style' are incompatible.
+>         Type 'StyleProp<TextStyle>' is not assignable to type 'StyleProp<ViewStyle>'.
+>           Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+                    Type 'string' is not assignable to type 'CursorValue | undefined'.
+  src/components/ui/field.tsx(10,6): error TS2322: Type '{ children?: ReactNode; hitSlop?: number | Insets | null | undefined; id?: string | undefined; needsOffscreenAlphaCompositing?: boolean | undefined; 
+onLayout?: ((event: LayoutChangeEvent) => void) | undefined; ... 87 more ...; className: string; }' is not assignable to type 'DetailedHTMLProps<FieldsetHTMLAttributes<HTMLFieldSetElement>, 
+HTMLFieldSetElement>'.
+    Type '{ children?: ReactNode; hitSlop?: number | Insets | null | undefined; id?: string | undefined; needsOffscreenAlphaCompositing?: boolean | undefined; onLayout?: ((event: LayoutChangeEvent) => void) | 
+undefined; ... 87 more ...; className: string; }' is not assignable to type 'FieldsetHTMLAttributes<HTMLFieldSetElement>'.
+      Types of property 'style' are incompatible.
+>       Type 'StyleProp<ViewStyle>' is not assignable to type 'CSSProperties | undefined'.
+          Type 'null' is not assignable to type 'CSSProperties | undefined'.
+  src/components/ui/field.tsx(28,6): error TS2322: Type '{ children?: ReactNode; hitSlop?: number | Insets | null | undefined; id?: string | undefined; needsOffscreenAlphaCompositing?: boolean | undefined; 
+onLayout?: ((event: LayoutChangeEvent) => void) | undefined; ... 88 more ...; className: string; }' is not assignable to type 'DetailedHTMLProps<HTMLAttributes<HTMLLegendElement>, HTMLLegendElement>'.
+    Type '{ children?: ReactNode; hitSlop?: number | Insets | null | undefined; id?: string | undefined; needsOffscreenAlphaCompositing?: boolean | undefined; onLayout?: ((event: LayoutChangeEvent) => void) | 
+undefined; ... 88 more ...; className: string; }' is not assignable to type 'HTMLAttributes<HTMLLegendElement>'.
+      Types of property 'style' are incompatible.
+>       Type 'StyleProp<ViewStyle>' is not assignable to type 'CSSProperties | undefined'.
+      Type '"separator"' is not assignable to type 'AccessibilityRole | undefined'.
+  src/components/ui/input.tsx(5,29): error TS2339: Property 'type' does not exist on type 'TextInputProps'.
+  src/components/ui/item.tsx(59,6): error TS2322: Type '{ children?: ReactNode; hitSlop?: number | Insets | null | undefined; id?: string | undefined; needsOffscreenAlphaCompositing?: boolean | undefined; 
+onLayout?: ((event: LayoutChangeEvent) => void) | undefined; ... 89 more ...; className: string; }' is not assignable to type 'HTMLAttributes<HTMLDivElement>'.
+    Types of property 'style' are incompatible.
+>     Type 'StyleProp<ViewStyle>' is not assignable to type 'CSSProperties | undefined'.
+          Type 'null' is not assignable to type 'CSSProperties | undefined'.
+  src/components/ui/kbd.tsx(21,6): error TS2322: Type '{ children?: ReactNode; hitSlop?: number | Insets | null | undefined; id?: string | undefined; needsOffscreenAlphaCompositing?: boolean | undefined; 
+onLayout?: ((event: LayoutChangeEvent) => void) | undefined; ... 87 more ...; className: string; }' is not assignable to type 'DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>'.
+    Type '{ children?: ReactNode; hitSlop?: number | Insets | null | undefined; id?: string | undefined; needsOffscreenAlphaCompositing?: boolean | undefined; onLayout?: ((event: LayoutChangeEvent) => void) | 
+undefined; ... 87 more ...; className: string; }' is not assignable to type 'HTMLAttributes<HTMLElement>'.
+      Types of property 'style' are incompatible.
+>       Type 'StyleProp<ViewStyle>' is not assignable to type 'CSSProperties | undefined'.
+          Types of parameters 'event' and 'evt' are incompatible.
+            Type 'Event' is missing the following properties from type 'NativeSyntheticEvent<TextInputKeyPressEventData>': nativeEvent, isDefaultPrevented, isPropagationStopped, persist
+  src/components/ui/sidebar.tsx(132,43): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+>     Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>       Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+            Types of property 'cursor' are incompatible.
+              Type 'string | undefined' is not assignable to type 'CursorValue | undefined'.
+                Type 'string' is not assignable to type 'CursorValue | undefined'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+>     Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>       Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+          Type 'number' is not assignable to type 'AnimationDelay<string & {}> | undefined'.
+  src/components/ui/sidebar.tsx(217,3): error TS2339: Property 'onClick' does not exist on type 'ButtonProps & RefAttributes<View>'.
+  src/components/ui/sidebar.tsx(330,6): error TS2322: Type '{ children?: ReactNode; hitSlop?: number | Insets | null | undefined; id?: string | undefined; needsOffscreenAlphaCompositing?: boolean | undefined; 
+onLayout?: ((event: LayoutChangeEvent) => void) | undefined; ... 88 more ...; className: string; }' is not assignable to type 'HTMLAttributes<HTMLDivElement>'.
+    Types of property 'style' are incompatible.
+>     Type 'StyleProp<ViewStyle>' is not assignable to type 'CSSProperties | undefined'.
+      Type 'boolean | null | undefined' is not assignable to type 'boolean | undefined'.
+        Type 'null' is not assignable to type 'boolean | undefined'.
+  src/components/ui/sidebar.tsx(448,23): error TS2322: Type '{ children: Element; asChild: true; }' is not assignable to type 'IntrinsicAttributes & TooltipTriggerProps'.
+    Property 'asChild' does not exist on type 'IntrinsicAttributes & TooltipTriggerProps'.
+> src/components/ui/sidebar.tsx(451,9): error TS2322: Type '{ children: ReactNode; className?: string | undefined; sideOffset?: number | undefined; style?: StyleProp<ViewStyle>; side: "top" | "right" | 
+"bottom" | "left"; align: string; hidden: boolean; }' is not assignable to type 'IntrinsicAttributes & TooltipContentProps'.
+  src/components/ui/sidebar.tsx(471,6): error TS2322: Type '{ onHoverIn?: ((event: MouseEvent) => void) | null | undefined; onHoverOut?: ((event: MouseEvent) => void) | null | undefined; onPress?: ((event: 
+GestureResponderEvent) => void) | null | undefined; ... 106 more ...; className: string; }' is not assignable to type 'ButtonHTMLAttributes<HTMLButtonElement>'.
+    Types of property 'disabled' are incompatible.
+      Type 'boolean | null | undefined' is not assignable to type 'boolean | undefined'.
+        Type 'null' is not assignable to type 'boolean | undefined'.
+> src/components/ui/sidebar.tsx(531,9): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>   Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+          Type 'string | undefined' is not assignable to type 'CursorValue | undefined'.
+            Type 'string' is not assignable to type 'CursorValue | undefined'.
+  src/components/ui/sidebar.tsx(574,6): error TS2322: Type '{ onHoverIn?: ((event: MouseEvent) => void) | null | undefined; onHoverOut?: ((event: MouseEvent) => void) | null | undefined; onPress?: ((event: 
+GestureResponderEvent) => void) | null | undefined; ... 108 more ...; className: string; }' is not assignable to type 'AnchorHTMLAttributes<HTMLAnchorElement>'.
+    Types of property 'style' are incompatible.
+>     Type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)' is not assignable to type 'CSSProperties | undefined'.
+        Type 'null' is not assignable to type 'CSSProperties | undefined'.
+  src/components/ui/spinner.tsx(8,7): error TS2322: Type '"status"' is not assignable to type 'AccessibilityRole | undefined'.
+  src/components/ui/star-rating.tsx(17,204): error TS2353: Object literal may only specify known properties, and 'lineHeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | 
+RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+> src/components/ui/star-rating.tsx(20,15): error TS2322: Type '{ fill: string; }' is not assignable to type 'StyleProp<ViewStyle>'.
+
+

@@ -4,6 +4,7 @@ import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -24,6 +25,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
  *   - compteurs synchronisés avec les tables d'interactions
  *   - aucune API Web
  *   - aucune dépendance frontend
+ *   - city dérivée du profil utilisateur
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -38,9 +40,6 @@ const MAX_THUMBNAIL_URL_LENGTH = 4096;
  * Retourne l'utilisateur applicatif correspondant à l'identité Convex.
  *
  * Compatible avec les queries ET les mutations.
- *
- * Le projet utilise `tokenIdentifier` comme clé d'identité Convex
- * dans la table users.
  */
 async function getCurrentUser(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
@@ -61,9 +60,6 @@ async function getCurrentUser(ctx: QueryCtx | MutationCtx) {
 
 /**
  * Authentification obligatoire pour les mutations.
- *
- * Ce helper reste volontairement MutationCtx :
- * il est utilisé uniquement par les mutations.
  */
 async function requireCurrentUser(ctx: MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
@@ -91,6 +87,19 @@ async function requireCurrentUser(ctx: MutationCtx) {
 }
 
 /**
+ * Résolution typée d'un utilisateur.
+ *
+ * Contrat :
+ *   Id<"users"> → Doc<"users"> | null
+ */
+async function getUserById(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<Doc<"users"> | null> {
+  return await ctx.db.get(userId);
+}
+
+/**
  * Nettoie et normalise les hashtags.
  */
 function normalizeHashtags(input: string[]): string[] {
@@ -110,9 +119,6 @@ function normalizeHashtags(input: string[]): string[] {
 
 /**
  * Vérifie qu'une URL est une URL absolue valide.
- *
- * Le backend conserve volontairement une string URL car le schéma
- * actuel de shortVideos utilise videoUrl / thumbnailUrl en string.
  */
 function validateUrl(
   value: string,
@@ -149,33 +155,44 @@ function validateUrl(
  * LIST
  * ─────────────────────────────────────────────────────────────────────────────
  *
- * Utilisé par :
+ * Sans ville :
+ *   → feed global via by_active
  *
- * usePaginatedQuery(
- *   api.shortVideos.list,
- *   {},
- *   { initialNumItems: 5 }
- * )
- *
- * Les vidéos inactives ne sont jamais exposées.
+ * Avec ville :
+ *   → feed local via by_city_active
  */
 export const list = query({
   args: {
     paginationOpts: paginationOptsValidator,
+    city: v.optional(v.string()),
   },
 
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
 
-    const page = await ctx.db
-      .query("shortVideos")
-      .withIndex("by_active", (q) => q.eq("isActive", true))
-      .order("desc")
-      .paginate(args.paginationOpts);
+    const city = args.city?.trim() || undefined;
+
+    let page;
+
+    if (city) {
+      page = await ctx.db
+        .query("shortVideos")
+        .withIndex("by_city_active", (q) =>
+          q.eq("city", city).eq("isActive", true),
+        )
+        .order("desc")
+        .paginate(args.paginationOpts);
+    } else {
+      page = await ctx.db
+        .query("shortVideos")
+        .withIndex("by_active", (q) => q.eq("isActive", true))
+        .order("desc")
+        .paginate(args.paginationOpts);
+    }
 
     const enrichedPage = await Promise.all(
       page.page.map(async (video) => {
-        const author = await ctx.db.get(video.authorId);
+        const author = await getUserById(ctx, video.authorId);
 
         let likedByMe = false;
 
@@ -223,7 +240,7 @@ export const get = query({
       return null;
     }
 
-    const author = await ctx.db.get(video.authorId);
+    const author = await getUserById(ctx, video.authorId);
     const currentUser = await getCurrentUser(ctx);
 
     let likedByMe = false;
@@ -253,10 +270,14 @@ export const get = query({
  * CREATE
  * ─────────────────────────────────────────────────────────────────────────────
  *
- * Création authentifiée uniquement.
+ * La ville est automatiquement dérivée du profil du créateur.
  *
- * Le schéma actuel reçoit directement videoUrl / thumbnailUrl.
- * Il n'invente donc aucun pipeline Storage qui n'existe pas encore.
+ * Important :
+ *   - aucune ville n'est reçue depuis le client ;
+ *   - aucune ville n'est inventée ;
+ *   - aucune coordonnée n'est utilisée ;
+ *   - si le profil n'a pas de ville, city reste absente ;
+ *   - le reel reste alors disponible dans le feed global.
  */
 export const create = mutation({
   args: {
@@ -295,6 +316,12 @@ export const create = mutation({
 
     const hashtags = normalizeHashtags(args.hashtags);
 
+    /**
+     * Source unique de la ville :
+     * profil utilisateur authentifié.
+     */
+    const city = user.city?.trim();
+
     const videoId = await ctx.db.insert("shortVideos", {
       authorId: user._id,
       videoUrl,
@@ -307,6 +334,7 @@ export const create = mutation({
       viewCount: 0,
       ...(args.duration !== undefined ? { duration: args.duration } : {}),
       isActive: true,
+      ...(city ? { city } : {}),
     });
 
     return videoId;
@@ -317,11 +345,6 @@ export const create = mutation({
  * ─────────────────────────────────────────────────────────────────────────────
  * TOGGLE LIKE
  * ─────────────────────────────────────────────────────────────────────────────
- *
- * Source de vérité :
- *   shortVideoLikes
- *
- * Le compteur shortVideos.likeCount est maintenu dans la même mutation.
  */
 export const toggleLike = mutation({
   args: {
@@ -347,13 +370,15 @@ export const toggleLike = mutation({
     if (existingLike) {
       await ctx.db.delete(existingLike._id);
 
+      const likeCount = Math.max(0, video.likeCount - 1);
+
       await ctx.db.patch(args.videoId, {
-        likeCount: Math.max(0, video.likeCount - 1),
+        likeCount,
       });
 
       return {
         liked: false,
-        likeCount: Math.max(0, video.likeCount - 1),
+        likeCount,
       };
     }
 
@@ -362,13 +387,15 @@ export const toggleLike = mutation({
       userId: user._id,
     });
 
+    const likeCount = video.likeCount + 1;
+
     await ctx.db.patch(args.videoId, {
-      likeCount: video.likeCount + 1,
+      likeCount,
     });
 
     return {
       liked: true,
-      likeCount: video.likeCount + 1,
+      likeCount,
     };
   },
 });
@@ -377,11 +404,6 @@ export const toggleLike = mutation({
  * ─────────────────────────────────────────────────────────────────────────────
  * GET COMMENTS
  * ─────────────────────────────────────────────────────────────────────────────
- *
- * Le schéma ne possède actuellement pas de createdAt sur
- * shortVideoComments.
- *
- * On ne fabrique donc pas de date fictive.
  */
 export const getComments = query({
   args: {
@@ -402,7 +424,7 @@ export const getComments = query({
 
     return Promise.all(
       comments.map(async (comment) => {
-        const user = await ctx.db.get(comment.userId);
+        const user = await getUserById(ctx, comment.userId);
 
         return {
           ...comment,
@@ -451,13 +473,15 @@ export const addComment = mutation({
       likeCount: 0,
     });
 
+    const commentCount = video.commentCount + 1;
+
     await ctx.db.patch(args.videoId, {
-      commentCount: video.commentCount + 1,
+      commentCount,
     });
 
     return {
       commentId,
-      commentCount: video.commentCount + 1,
+      commentCount,
     };
   },
 });
@@ -466,12 +490,6 @@ export const addComment = mutation({
  * ─────────────────────────────────────────────────────────────────────────────
  * DELETE COMMENT
  * ─────────────────────────────────────────────────────────────────────────────
- *
- * CRITIQUE :
- * la suppression est protégée par ownership côté serveur.
- *
- * Le client ne peut jamais supprimer le commentaire
- * d'un autre utilisateur simplement en envoyant son ID.
  */
 export const deleteComment = mutation({
   args: {
@@ -496,13 +514,15 @@ export const deleteComment = mutation({
     await ctx.db.delete(args.commentId);
 
     if (video) {
+      const commentCount = Math.max(0, video.commentCount - 1);
+
       await ctx.db.patch(comment.videoId, {
-        commentCount: Math.max(0, video.commentCount - 1),
+        commentCount,
       });
 
       return {
         deleted: true,
-        commentCount: Math.max(0, video.commentCount - 1),
+        commentCount,
       };
     }
 
@@ -517,15 +537,6 @@ export const deleteComment = mutation({
  * ─────────────────────────────────────────────────────────────────────────────
  * SHARE
  * ─────────────────────────────────────────────────────────────────────────────
- *
- * Le schéma shortVideos possède shareCount mais aucune table
- * shortVideoShares.
- *
- * Cette mutation incrémente donc uniquement le compteur serveur.
- *
- * Pour une vraie analytics mondiale :
- *   shortVideoShares
- * ou un système d'events idempotent doit être ajouté au schema.
  */
 export const recordShare = mutation({
   args: {
@@ -557,11 +568,6 @@ export const recordShare = mutation({
  * ─────────────────────────────────────────────────────────────────────────────
  * DEACTIVATE
  * ─────────────────────────────────────────────────────────────────────────────
- *
- * Soft delete.
- *
- * La vidéo n'est pas détruite :
- * elle devient simplement invisible dans le feed public.
  */
 export const deactivate = mutation({
   args: {
@@ -601,8 +607,6 @@ export const deactivate = mutation({
  * ─────────────────────────────────────────────────────────────────────────────
  * REACTIVATE
  * ─────────────────────────────────────────────────────────────────────────────
- *
- * Permet au propriétaire de remettre une vidéo active.
  */
 export const reactivate = mutation({
   args: {
@@ -642,9 +646,6 @@ export const reactivate = mutation({
  * ─────────────────────────────────────────────────────────────────────────────
  * UPDATE
  * ─────────────────────────────────────────────────────────────────────────────
- *
- * Permet au créateur de modifier les métadonnées
- * sans changer les compteurs.
  */
 export const update = mutation({
   args: {

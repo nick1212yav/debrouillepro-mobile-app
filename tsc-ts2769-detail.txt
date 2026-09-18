@@ -1,0 +1,89 @@
+﻿
+> app/sante/[id].tsx(429,9): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ onPress: any; className: string; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'onPress' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/FavoriteButton.tsx(22,46): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ children: Element; key: string; initial: { scale: number; opacity: number; }; animate: { scale: number; opacity: number; }; exit: { scale: number; opacity: number; }; transition: { duration: 
+number; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'initial' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/PageTransition.tsx(57,33): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ children: ReactNode; className: string; initial: Record<string, unknown>; animate: Record<string, unknown>; exit: Record<string, unknown>; transition: { duration: number; ease: readonly [...]; } 
+| { ...; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'initial' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/PageTransition.tsx(73,33): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ children: ReactNode; className: string; initial: string; animate: string; variants: { hidden: {}; visible: { transition: { staggerChildren: number; delayChildren: number; }; }; }; }' is not 
+assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'initial' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/PageTransition.tsx(90,33): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ children: ReactNode; className: string; variants: { hidden: { opacity: number; y: number; }; visible: { opacity: number; y: number; transition: { duration: number; ease: readonly [0.25, 0.46, 
+0.45, 0.94]; }; }; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'variants' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/PageTransition.tsx(115,33): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ children: ReactNode; className: string; whileTap: { scale: number; }; whileHover: { scale: number; }; transition: { type: string; stiffness: number; damping: number; }; onPress: (() => void) | 
+undefined; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'whileTap' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/ProfileProgressBar.tsx(47,13): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ children: Element; initial: { opacity: number; y: number; }; animate: { opacity: number; y: number; }; exit: { opacity: number; y: number; }; transition: { duration: number; }; className: string; 
+style: { ...; }; onPress: () => void; accessibilityRole: "button"; accessibilityLabel: string; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'initial' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/ProfileProgressBar.tsx(54,281): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ className: string; style: {}; initial: { width: number; }; animate: { width: string; }; transition: { duration: number; ease: "easeOut"; }; }' is not assignable to type 'IntrinsicAttributes & 
+IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'initial' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/ProfileProgressBar.tsx(57,38): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ key: string; animate: { scale: number | number[]; }; transition: { duration: number; }; className: string; style: { backgroundColor: string; }; }' is not assignable to type 'IntrinsicAttributes & 
+IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'animate' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/shared/Avatar.tsx(26,154): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Object literal may only specify known properties, and 'fontSize' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+      Object literal may only specify known properties, and 'fontSize' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>>'.
+> src/components/ui/button-group.tsx(30,11): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '"group"' is not assignable to type 'AccessibilityRole | undefined'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+      Type '"group"' is not assignable to type 'AccessibilityRole | undefined'.
+> src/components/ui/chart.tsx(193,30): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+        Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+          Type 'TextStyle' is not assignable to type 'ViewStyle'.
+> src/components/ui/confirm-dialog.tsx(69,32): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ key: string; initial: { opacity: number; }; animate: { opacity: number; }; exit: { opacity: number; }; transition: { duration: number; }; className: string; onPress: () => void; }' is not 
+assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'initial' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/ui/confirm-dialog.tsx(72,30): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ children: Element[]; key: string; initial: { opacity: number; scale: number; y: number; }; animate: { opacity: number; scale: number; y: number; }; exit: { opacity: number; scale: number; y: 
+number; }; transition: { ...; }; className: string; style: { ...; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'initial' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+> src/components/ui/confirm-dialog.tsx(78,19): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type '{ children: Element; initial: { scale: number; rotate: number; }; animate: { scale: number; rotate: number; }; transition: { delay: number; type: string; stiffness: number; damping: number; }; 
+className: string; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+        Property 'initial' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<View> & Readonly<ViewProps>'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+
+

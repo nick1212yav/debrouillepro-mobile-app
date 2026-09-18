@@ -1,0 +1,156 @@
+﻿
+  src/components/ui/chart.tsx(193,30): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+        Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>         Type 'TextStyle' is not assignable to type 'ViewStyle'.
+                Type 'string' is not assignable to type 'CursorValue | undefined'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+      Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+        Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>         Type 'TextStyle' is not assignable to type 'ViewStyle'.
+      Type '{ allowFontScaling?: boolean | undefined; children?: ReactNode; ellipsizeMode?: "head" | "clip" | "middle" | "tail" | undefined; id?: string | undefined; lineBreakMode?: "head" | ... 3 more ... | 
+undefined; ... 65 more ...; className: string; }' is not assignable to type 'Readonly<ViewProps>'.
+        Types of property 'style' are incompatible.
+          Type 'StyleProp<TextStyle>' is not assignable to type 'StyleProp<ViewStyle>'.
+            Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>             Type 'TextStyle' is not assignable to type 'ViewStyle'.
+      Type '{ allowFontScaling?: boolean | undefined; children?: ReactNode; ellipsizeMode?: "head" | "clip" | "middle" | "tail" | undefined; id?: string | undefined; lineBreakMode?: "head" | ... 3 more ... | 
+undefined; ... 65 more ...; className: string; }' is not assignable to type 'Readonly<ViewProps>'.
+        Types of property 'style' are incompatible.
+          Type 'StyleProp<TextStyle>' is not assignable to type 'StyleProp<ViewStyle>'.
+            Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>             Type 'TextStyle' is not assignable to type 'ViewStyle'.
+  src/components/ui/sidebar.tsx(132,43): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+        Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>         Type 'TextStyle' is not assignable to type 'ViewStyle'.
+                Type 'string' is not assignable to type 'CursorValue | undefined'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+      Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+        Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>         Type 'TextStyle' is not assignable to type 'ViewStyle'.
+      Type 'boolean | null | undefined' is not assignable to type 'boolean | undefined'.
+        Type 'null' is not assignable to type 'boolean | undefined'.
+  src/components/ui/sidebar.tsx(531,9): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+    Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>     Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+        Type '{ size: number; style?: ViewStyle | TextStyle | ImageStyle | undefined; }' is not assignable to type 'LucideProps'.
+          Types of property 'style' are incompatible.
+            Type 'ViewStyle | TextStyle | ImageStyle | undefined' is not assignable to type 'StyleProp<ViewStyle>'.
+              Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>               Type 'TextStyle' is not assignable to type 'ViewStyle'.
+  src/features/messages/immo/components/PropertyMessage.tsx(61,13): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+        Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>         Type 'TextStyle' is not assignable to type 'ViewStyle'.
+                Type 'string' is not assignable to type 'CursorValue | undefined'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+      Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+        Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>         Type 'TextStyle' is not assignable to type 'ViewStyle'.
+              Type 'string | undefined' is not assignable to type 'CursorValue | undefined'.
+                Type 'string' is not assignable to type 'CursorValue | undefined'.
+  src/features/messages/immo/components/PropertyMessage.tsx(63,63): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: 
+PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+    Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+>     Type 'TextStyle' is not assignable to type 'ViewStyle'.
+            Type 'string' is not assignable to type 'CursorValue | undefined'.
+  src/features/messages/immo/components/PropertyMessage.tsx(69,17): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>       Type 'TextStyle' is not assignable to type 'ViewStyle'.
+            Type 'string | undefined' is not assignable to type 'CursorValue | undefined'.
+              Type 'string' is not assignable to type 'CursorValue | undefined'.
+    Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+      Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>       Type 'TextStyle' is not assignable to type 'ViewStyle'.
+  src/features/messages/immo/components/PropertyMessage.tsx(74,15): error TS2769: No overload matches this call.
+    Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+      Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+        Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle>'.
+>         Type 'TextStyle' is not assignable to type 'ViewStyle'.
+
+

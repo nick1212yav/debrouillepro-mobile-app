@@ -1,0 +1,84 @@
+﻿src\components\ui\button.tsx:34: style?: StyleProp<ViewStyle>;
+src\components\ui\chart.tsx:196: } as ViewStyle | TextStyle | ImageStyle} />
+src\components\ui\dialog.tsx:72: style?: StyleProp<ViewStyle>;
+src\components\ui\dialog.tsx:97: style?: StyleProp<ViewStyle>;
+src\components\ui\dialog.tsx:127: style?: StyleProp<ViewStyle>;
+src\components\ui\dialog.tsx:195: style?: StyleProp<TextStyle>;
+src\components\ui\dialog.tsx:205: style?: StyleProp<TextStyle>;
+src\components\ui\sidebar.tsx:136: } as ViewStyle | TextStyle | ImageStyle} className={cn(
+src\components\ui\sidebar.tsx:179: } as ViewStyle | TextStyle | ImageStyle
+src\components\ui\sidebar.tsx:534: } as ViewStyle | TextStyle | ImageStyle
+src\components\ui\tooltip.tsx:97: style?: StyleProp<ViewStyle>;
+src\components\ui\tooltip.tsx:127: style?: StyleProp<ViewStyle>;
+src\features\events\components\CreateEventSheet.tsx:61: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\components\CreateEventSheet.tsx:87: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\components\CreateEventSheet.tsx:109: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\create\shared\FieldInput.tsx:4: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\create\shared\FieldTextarea.tsx:4: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\create\shared\SectionHeader.tsx:6: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\marketplace\create\shared\SectionHeader.tsx:8: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\messages\immo\components\PropertyMessage.tsx:81: const wrapperStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyMessage.tsx:85: const actionsStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyMessage.tsx:89: const formStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyMessage.tsx:97: const labelStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyMessage.tsx:116: const inputStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyMessage.tsx:125: const formActionsStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyMessage.tsx:130: const primaryButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyMessage.tsx:141: const secondaryButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyMessage.tsx:162: const errorStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:66: const cardStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:98: const contentStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:102: const badgeRowStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:109: const badgeStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:119: const typeStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:124: const titleStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:132: const priceStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:138: const detailsStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:147: const ownerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:158: const ownerAvatarStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\immo\components\PropertyPreview.tsx:165: const ownerPlaceholderStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\notifications\components\MessageNotification.tsx:88: const containerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentComposer.tsx:48: const containerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentComposer.tsx:58: const headerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentComposer.tsx:62: const amountRowStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentComposer.tsx:68: const amountInputStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentComposer.tsx:77: const currencyStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentComposer.tsx:82: const descriptionStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentComposer.tsx:90: const buttonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentMessage.tsx:53: const containerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentMessage.tsx:62: const headerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentMessage.tsx:68: const iconStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentMessage.tsx:80: const statusStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentMessage.tsx:86: const amountStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentMessage.tsx:92: const descriptionStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentMessage.tsx:97: const confirmButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentMessage.tsx:109: const referenceStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentStatus.tsx:60: const containerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentStatus.tsx:70: const errorContainerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentStatus.tsx:81: const iconStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\payments\components\PaymentStatus.tsx:93: const contentStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\BlockUserDialog.tsx:60: const overlayStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\BlockUserDialog.tsx:71: const dialogStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\BlockUserDialog.tsx:80: const descriptionStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\BlockUserDialog.tsx:86: const labelStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\BlockUserDialog.tsx:104: const actionsStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\BlockUserDialog.tsx:110: const secondaryButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\BlockUserDialog.tsx:118: const primaryButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ConversationSecurity.tsx:117: const containerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ConversationSecurity.tsx:124: const buttonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ConversationSecurity.tsx:134: const disabledButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ReportMessageDialog.tsx:109: const overlayStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ReportMessageDialog.tsx:120: const dialogStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ReportMessageDialog.tsx:129: const descriptionStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ReportMessageDialog.tsx:135: const labelStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ReportMessageDialog.tsx:143: const inputStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ReportMessageDialog.tsx:163: const actionsStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ReportMessageDialog.tsx:170: const secondaryButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\security\components\ReportMessageDialog.tsx:178: const primaryButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\shared\components\OnlineIndicator.tsx:29: const indicatorStyle: ViewStyle | TextStyle | ImageStyle = {
+src\features\messages\shared\components\UserAvatar.tsx:40: const containerStyle: ViewStyle | TextStyle | ImageStyle = {
+src\pages\home\_components\LiveFeed.tsx:72: style?: StyleProp<ViewStyle>;
+src\pages\home\_components\OnboardingScreen.tsx:90: style?: ViewStyle | TextStyle | ImageStyle;
+src\pages\home\_components\SmartContextSuggestions.tsx:358: style?: StyleProp<ViewStyle>;
+src\pages\modules\TrackingPage.tsx:152: style?: StyleProp<ViewStyle>;
+src\shims\react-router-dom.tsx:184: style?: StyleProp<TextStyle>;

@@ -1,0 +1,33 @@
+﻿src\components\ui\chart.tsx:14: icon?: React.ComponentType;
+src\features\community\components\CommunityCard.tsx:142: icon: React.ComponentType<{ size?: number; className?: string }>;
+src\features\events\components\CreateEventSheet.tsx:61: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\components\CreateEventSheet.tsx:87: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\components\CreateEventSheet.tsx:109: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\components\EventShare.tsx:38: Icon: React.ComponentType<{ size?: number; color?: string }>;
+src\features\events\create\shared\FieldInput.tsx:4: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\create\shared\FieldTextarea.tsx:4: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\events\create\shared\SectionHeader.tsx:6: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\hebergement\components\common\AmenityBadge.tsx:36: icon: React.ComponentType<{ size?: number; className?: string }>;
+src\features\hebergement\components\common\BookingStatus.tsx:22: icon: React.ComponentType<{ size?: number; className?: string }>;
+src\features\hebergement\components\common\RoomBadge.tsx:16: icon: React.ComponentType<{ size?: number; className?: string }>;
+src\features\marketplace\components\CreateProductSheet.tsx:199: icon?: React.ComponentType<{ size: number; className?: string }>;
+src\features\marketplace\components\CreateProductSheet.tsx:223: icon?: React.ComponentType<{ size: number; className?: string }>;
+src\features\marketplace\components\EditProductSheet.tsx:52: icon?: React.ComponentType<{ size: number; className?: string }>;
+src\features\marketplace\components\EditProductSheet.tsx:76: icon?: React.ComponentType<{ size: number; className?: string }>;
+src\features\marketplace\components\EscrowPayment.tsx:47: icon: React.ComponentType<{ size?: number; className?: string }>;
+src\features\marketplace\create\shared\FieldInput.tsx:14: icon?: React.ComponentType<{ size: number; className?: string }>;
+src\features\marketplace\create\shared\FieldSelect.tsx:20: icon?: React.ComponentType<{ size: number; className?: string }>;
+src\features\marketplace\create\shared\FieldTextarea.tsx:14: icon?: React.ComponentType<{ size: number; className?: string }>;
+src\features\marketplace\create\shared\SectionHeader.tsx:8: icon: React.ComponentType<{ size: number; style?: ViewStyle | TextStyle | ImageStyle }>;
+src\features\restauration\create\shared\SubmitBtn.tsx:8: icon?: React.ComponentType<any>;
+src\features\sante\components\CreateHealthSheet.tsx:46: icon: React.ComponentType<{ size?: number; className?: string }>;
+src\features\transport\constants\categories.ts:38: icon: React.ComponentType<{ size?: number; className?: string }>;
+src\features\transport\constants\paymentMethods.ts:8: icon: React.ComponentType<{ size?: number; className?: string }>;
+src\pages\home\_components\NotificationCenter.tsx:109: Icon: ComponentType<{ size?: number; color?: string; style?: any }>;
+src\pages\home\_components\StoryCreator.tsx:93: icon: React.ComponentType<{ size?: number; color?: string }>;
+src\pages\modules\EglisePage.tsx:64: icon: React.ComponentType<{
+src\pages\modules\EmergencyPage.tsx:83: icon: React.ComponentType<{
+src\pages\modules\LaboratoryDetailPage.tsx:167: icon: React.ComponentType<{
+src\pages\modules\LaboratoryDetailPage.tsx:217: icon: React.ComponentType<{
+src\pages\modules\PrivacyPage.tsx:27: icon: React.ComponentType<{
+src\pages\modules\PubPage.tsx:146: icon: React.ComponentType<{
