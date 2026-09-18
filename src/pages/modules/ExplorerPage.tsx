@@ -85,6 +85,8 @@ import {
   type LucideIcon,
 } from "lucide-react-native";
 import { useMemo, useState } from "react";
+import AIBanner from "@/pages/home/_components/AIBanner.tsx";
+import AIPersonalizedSuggestion from "@/pages/home/_components/AIPersonalizedSuggestion.tsx";
 
 /* ============================================================================
  * TYPES
@@ -234,7 +236,7 @@ const MODULES: Module[] = [
   {
     id: "jobs",
     label: "Jobs / Pro",
-    icon: BriefcaseIcon,
+    icon: Briefcase,
     color: "#8B5CF6",
     desc: "Postuler · Recruter",
     implemented: true,
@@ -1019,7 +1021,7 @@ const DISCOVERY_SPOTLIGHTS = [
     id: "jobs",
     label: "Trouver une opportunité",
     desc: "Jobs, missions et business",
-    icon: BriefcaseIcon,
+    icon: Briefcase, // ← APRÈS
     color: "#8B5CF6",
   },
   {
@@ -1260,7 +1262,7 @@ function HeroSearch({
           </View>
 
           <View style={styles.chip}>
-            <BriefcaseIcon size={10} color="rgba(255,255,255,0.4)" />
+            <Briefcase size={10} color="rgba(255,255,255,0.4)" />
             <Text style={styles.chipText}>Opportunités</Text>
           </View>
 
@@ -1372,7 +1374,7 @@ function BackendCardView({
             ]}
           >
             {card.kind === "job" ? (
-              <BriefcaseIcon size={20} color={color} />
+              <Briefcase size={20} color={color} />
             ) : card.kind === "immo" ? (
               <Home size={20} color={color} />
             ) : card.kind === "event" ? (
@@ -2206,6 +2208,22 @@ export default function ExplorerPage({
           onSurprise={handleSurprise}
         />
 
+        {/* IA DISCOVERY ---------------------------------------------------- */}
+
+        {!searching ? (
+          <View style={styles.aiDiscoverySection}>
+            <AIBanner
+              onOpenAI={() => onNavigate("ai-studio")}
+              onOpenStudio={() => onNavigate("ai-studio")}
+            />
+
+            <AIPersonalizedSuggestion
+              onNavigate={onNavigate}
+              onOpenStudio={() => onNavigate("ai-studio")}
+            />
+          </View>
+        ) : null}
+
         {/* QUICK DOORS ---------------------------------------------------- */}
 
         {!searching ? (
@@ -2740,6 +2758,10 @@ const styles = StyleSheet.create({
     maxWidth: 1100,
     alignSelf: "center",
     width: "100%",
+  },
+
+  aiDiscoverySection: {
+    gap: 12,
   },
 
   hero: {
@@ -3577,14 +3599,3 @@ const styles = StyleSheet.create({
     height: 20,
   },
 });
-
-/* ============================================================================
- * ICON ALIAS
- *
- * Gardé en bas pour éviter de polluer le catalogue avec une dépendance
- * supplémentaire dans chaque déclaration.
- * ========================================================================== */
-
-function BriefcaseIcon(props: React.ComponentProps<typeof Briefcase>) {
-  return <Briefcase {...props} />;
-}

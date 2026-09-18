@@ -40,6 +40,10 @@ import { HomeLive } from "./_components/HomeLive.tsx";
 import HomeForYou from "./_components/HomeForYou.tsx";
 import HomeNearby from "./_components/HomeNearby.tsx";
 import { useLocation } from "@/hooks/use-location.ts";
+import HomePersonalizationSheet, {
+  type HomeModulePreference,
+  type HomePersonalizationPreferences,
+} from "./_components/HomePersonalizationSheet.tsx";
 
 /* -------------------------------------------------------------------------- */
 /* Lazy-loaded module pages                                                   */
@@ -439,6 +443,34 @@ const IMPLEMENTED: readonly PageKey[] = [
 ];
 
 /* -------------------------------------------------------------------------- */
+/* Home personalization — module catalogue                                    */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Ces entrées alimentent le panneau "Personnaliser ma Home".
+ *
+ * Les identifiants sont alignés sur :
+ *   - le PageKey du routeur (colonne route)
+ *   - les visuels du HomePersonalizationSheet (colonne id)
+ *
+ * Aucune donnée fictive : ce sont de vrais modules existants.
+ */
+const HOME_MODULES_PREFERENCES: HomeModulePreference[] = [
+  { id: "jobs", label: "Emploi & Jobs", route: "jobs" },
+  { id: "immo", label: "Immobilier", route: "immo" },
+  { id: "marketplace", label: "Marketplace", route: "marketplace" },
+  { id: "annonces", label: "Annonces", route: "annonces" },
+  { id: "evenements", label: "Événements", route: "evenements" },
+  { id: "services", label: "Services", route: "services" },
+  { id: "transport", label: "Transport", route: "transport" },
+  { id: "sante", label: "Santé", route: "sante" },
+  { id: "voyages", label: "Voyages", route: "voyages" },
+  { id: "community", label: "Communauté", route: "community" },
+  { id: "live", label: "Live", route: "live" },
+  { id: "agri", label: "Agriculture", route: "agri" },
+];
+
+/* -------------------------------------------------------------------------- */
 /* Home                                                                       */
 /* -------------------------------------------------------------------------- */
 
@@ -468,6 +500,12 @@ export default function HomePage() {
   const [selectedVoyageId, setSelectedVoyageId] = useState<string | null>(null);
 
   const [smartNotifsSent, setSmartNotifsSent] = useState(false);
+
+  const [personalizeOpen, setPersonalizeOpen] = useState(false);
+
+  const [personalizationPrefs, setPersonalizationPrefs] = useState<
+    HomePersonalizationPreferences | undefined
+  >(undefined);
 
   const currentUser = useQuery(api.users.getCurrentUser, {});
   const { coords: userCoords } = useLocation();
@@ -695,7 +733,10 @@ export default function HomePage() {
     return lazy$(<CartePage onBack={goHome} onNavigate={navigate} />);
 
   if (currentPage === "dashboard")
-    return withAI(<DashboardPage onBack={goHome} />, "dashboard");
+    return withAI(
+      <DashboardPage onBack={goHome} onNavigate={navigate} />,
+      "dashboard",
+    );
 
   if (currentPage === "favorites")
     return lazy$(<FavoritesPage onBack={goHome} onNavigate={navigate} />);
@@ -980,6 +1021,10 @@ export default function HomePage() {
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onNavigate={navigate}
+        onOpenHomePersonalization={() => {
+          setDrawerOpen(false);
+          setPersonalizeOpen(true);
+        }}
       />
 
       <CreateBottomSheet
@@ -990,6 +1035,15 @@ export default function HomePage() {
       <CommandPalette onNavigate={navigate} />
 
       {confettiEl}
+
+      <HomePersonalizationSheet
+        open={personalizeOpen}
+        onClose={() => setPersonalizeOpen(false)}
+        modules={HOME_MODULES_PREFERENCES}
+        preferences={personalizationPrefs}
+        onSave={(next) => setPersonalizationPrefs(next)}
+        onReset={() => setPersonalizationPrefs(undefined)}
+      />
 
       {/* ------------------------------------------------------------------ */}
       {/* AI assistant                                                        */}
@@ -1143,7 +1197,8 @@ export default function HomePage() {
             aiOpen ||
             notifCenterOpen ||
             advancedSearchOpen ||
-            mapOpen
+            mapOpen ||
+            personalizeOpen
           }
           onChange={(tab) => {
             setActiveTab(tab);

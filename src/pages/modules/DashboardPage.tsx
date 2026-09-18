@@ -38,9 +38,14 @@ import {
   Trophy,
   Zap,
 } from "lucide-react-native";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
+import type { Id } from "@/convex/_generated/dataModel.js";
+import HomeActivityPulse, {
+  type HomeActivityPulseItem,
+  type HomeActivityPulseType,
+} from "@/pages/home/_components/HomeActivityPulse.tsx";
 
 /* ════════════════════════════════════════════════════════════════════════════
    TYPES
@@ -48,6 +53,7 @@ import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 
 interface DashboardPageProps {
   onBack: () => void;
+  onNavigate?: (page: string) => void;
 }
 
 type TabId = "activite" | "modules" | "badges" | "analytics";
@@ -70,7 +76,26 @@ type ModuleStat = {
   color: string;
   icon: React.ElementType;
 };
-
+/*
+ * Mapping userActivity.type (backend) → HomeActivityPulseType (UI).
+ *
+ * Le backend ne produit aujourd'hui que 4 types d'événements :
+ *   view_module | view_publication | search | create_publication
+ *
+ * Les types riches côté UI (like, comment, follow, opportunity, …)
+ * seront ajoutés quand le backend les émettra. On ne les simule pas.
+ */
+function mapActivityType(type: string): HomeActivityPulseType {
+  switch (type) {
+    case "create_publication":
+      return "success";
+    case "view_module":
+    case "view_publication":
+    case "search":
+    default:
+      return "activity";
+  }
+}
 /* ════════════════════════════════════════════════════════════════════════════
    DESIGN TOKENS
    ════════════════════════════════════════════════════════════════════════════ */
@@ -840,6 +865,7 @@ function Podium() {
 
 function ActiviteTab({
   weeklySummary,
+  activityContent,
 }: {
   weeklySummary: {
     icon: React.ElementType;
@@ -847,12 +873,12 @@ function ActiviteTab({
     value: string;
     color: string;
   }[];
+  activityContent?: React.ReactNode;
 }) {
   const radialData = WEEKLY_ACTIVITY.map((d) => ({
     label: d.day,
     value: d.score,
   }));
-
   const quickStats = [
     { label: "Actions totales", value: "66", icon: Zap, color: "#F97316" },
     { label: "Jours actifs", value: "7 / 7", icon: Flame, color: "#EF4444" },
@@ -861,6 +887,8 @@ function ActiviteTab({
 
   return (
     <View style={{ gap: 16 }}>
+      {activityContent}
+
       {/* Score + stats */}
       <View style={{ flexDirection: "row", gap: 12 }}>
         <View style={[styles.scoreCard, { flex: 1 }]}>
@@ -1420,7 +1448,10 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: "analytics", label: "Analytics", icon: BarChart2 },
 ];
 
-export default function DashboardPage({ onBack }: DashboardPageProps) {
+export default function DashboardPage({
+  onBack,
+  onNavigate,
+}: DashboardPageProps) {
   const [activeTab, setActiveTab] = useState<TabId>("activite");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -1475,6 +1506,53 @@ export default function DashboardPage({ onBack }: DashboardPageProps) {
 
   const { user } = useFirebaseAuth();
   const liveStats = useQuery(api.utility.getDashboardStats, user ? {} : "skip");
+
+  // ── Activité réelle (backend activity.ts) ────────────────────────────────
+  const activityEntries = useQuery(api.activity.list, user ? {} : "skip");
+  const activityUnread = useQuery(api.activity.countUnread, user ? {} : "skip");
+  const activityToday = useQuery(api.activity.countToday, user ? {} : "skip");
+  const activityWeek = useQuery(api.activity.countThisWeek, user ? {} : "skip");
+  const markActivityRead = useMutation(api.activity.markRead);
+
+  const activityItems = useMemo<HomeActivityPulseItem[]>(() => {
+    if (!activityEntries) return [];
+    return activityEntries.map((entry) => ({
+      id: entry._id,
+      type: mapActivityType(entry.type),
+      title: entry.label,
+      description: entry.meta,
+      timestamp: entry.timestamp,
+      read: entry.read,
+      href: entry.target,
+    }));
+  }, [activityEntries]);
+
+  const activityStats = useMemo(
+    () => ({
+      unread: activityUnread,
+      today: activityToday,
+      thisWeek: activityWeek,
+    }),
+    [activityUnread, activityToday, activityWeek],
+  );
+
+  const handleActivityMarkRead = useCallback(
+    (item: HomeActivityPulseItem) => {
+      void markActivityRead({
+        activityId: item.id as Id<"userActivity">,
+      });
+    },
+    [markActivityRead],
+  );
+
+  const handleActivityMarkAllRead = useCallback(() => {
+    const unread = activityItems.filter((item) => item.read === false);
+    void Promise.all(
+      unread.map((item) =>
+        markActivityRead({ activityId: item.id as Id<"userActivity"> }),
+      ),
+    );
+  }, [activityItems, markActivityRead]);
 
   const xpCurrent = liveStats?.totalXp ?? XP_CURRENT_FALLBACK;
   const xpLevel = liveStats?.level ?? XP_LEVEL_FALLBACK;
@@ -1649,7 +1727,20 @@ export default function DashboardPage({ onBack }: DashboardPageProps) {
           }}
         >
           {activeTab === "activite" && (
-            <ActiviteTab weeklySummary={weeklySummary} />
+            <ActiviteTab
+              weeklySummary={weeklySummary}
+              activityContent={
+                <HomeActivityPulse
+                  items={activityItems}
+                  stats={activityStats}
+                  loading={activityEntries === undefined}
+                  onMarkRead={handleActivityMarkRead}
+                  onMarkAllRead={handleActivityMarkAllRead}
+                  onNavigate={onNavigate}
+                  maxItems={5}
+                />
+              }
+            />
           )}
           {activeTab === "modules" && <ModulesTab />}
           {activeTab === "badges" && (

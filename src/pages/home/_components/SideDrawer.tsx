@@ -1,4 +1,5 @@
 // src/pages/home/_components/SideDrawer.tsx
+
 import {
   View,
   ScrollView,
@@ -8,6 +9,7 @@ import {
   Pressable,
   Platform,
   useWindowDimensions,
+  Text,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { signOut } from "firebase/auth";
@@ -32,6 +34,15 @@ interface SideDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (page: string) => void;
+
+  /**
+   * Ouvre le panneau de personnalisation de la Home.
+   *
+   * Le drawer ne possède pas directement le HomePersonalizationSheet :
+   * le parent conserve le contrôle de l'overlay afin d'éviter que le sheet
+   * soit démonté lorsque le drawer se ferme.
+   */
+  onOpenHomePersonalization?: () => void;
 }
 
 /* ============================================================================
@@ -42,6 +53,7 @@ export default function SideDrawer({
   isOpen,
   onClose,
   onNavigate,
+  onOpenHomePersonalization,
 }: SideDrawerProps) {
   const { width: SCREEN_WIDTH } = useWindowDimensions();
 
@@ -55,6 +67,7 @@ export default function SideDrawer({
   const { navSections, badges } = useNavigation();
 
   /* ───── animations ───── */
+
   const [mounted, setMounted] = useState(isOpen);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -62,9 +75,11 @@ export default function SideDrawer({
   const contentStagger = useRef(new Animated.Value(0)).current;
 
   /* ───── mount / unmount lifecycle ───── */
+
   useEffect(() => {
     if (isOpen) {
       setMounted(true);
+
       slideAnim.setValue(0);
       backdropAnim.setValue(0);
       contentStagger.setValue(0);
@@ -76,6 +91,7 @@ export default function SideDrawer({
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
+
         Animated.spring(slideAnim, {
           toValue: 1,
           damping: 30,
@@ -84,7 +100,6 @@ export default function SideDrawer({
           useNativeDriver: true,
         }),
       ]).start(() => {
-        // Content stagger after drawer is mostly visible
         Animated.timing(contentStagger, {
           toValue: 1,
           duration: 320,
@@ -100,6 +115,7 @@ export default function SideDrawer({
           easing: Easing.in(Easing.cubic),
           useNativeDriver: true,
         }),
+
         Animated.timing(slideAnim, {
           toValue: 0,
           duration: 260,
@@ -110,19 +126,13 @@ export default function SideDrawer({
         setMounted(false);
       });
     }
+
+    // Les refs Animated sont stables pendant la durée de vie du composant.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   /* ───── web escape key ───── */
-  //
-  // ✅ CORRECTION CRITIQUE :
-  //   On utilise `Platform.OS !== "web"` au lieu de
-  //   `typeof window === "undefined"`.
-  //
-  //   Sur React Native (Hermes), `window` existe (ce n'est pas
-  //   `undefined`), mais `window.addEventListener` n'existe pas
-  //   → l'ancien check laissait passer le code et crashait.
-  //
+
   useEffect(() => {
     if (Platform.OS !== "web") return;
 
@@ -133,7 +143,10 @@ export default function SideDrawer({
     };
 
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+
+    return () => {
+      window.removeEventListener("keydown", handler);
+    };
   }, [isOpen, onClose]);
 
   /* ───── handlers ───── */
@@ -147,6 +160,21 @@ export default function SideDrawer({
   const handleNav = (id: string) => {
     onNavigate(id);
     onClose();
+  };
+
+  /**
+   * Point d'entrée vers "Ma Home".
+   *
+   * Le parent possède le HomePersonalizationSheet.
+   * Le drawer se contente donc d'émettre l'intention.
+   */
+  const handleOpenHomePersonalization = () => {
+    if (!onOpenHomePersonalization) {
+      return;
+    }
+
+    onClose();
+    onOpenHomePersonalization();
   };
 
   /**
@@ -166,6 +194,7 @@ export default function SideDrawer({
   };
 
   /* ───── derived animations ───── */
+
   const translateX = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [-drawerWidth, 0],
@@ -176,7 +205,9 @@ export default function SideDrawer({
     outputRange: [-12, 0],
   });
 
-  if (!mounted) return null;
+  if (!mounted) {
+    return null;
+  }
 
   /* ========================================================================
    * RENDER
@@ -189,18 +220,26 @@ export default function SideDrawer({
       accessibilityLabel="Menu DébrouillePro"
     >
       {/* ═══════════ BACKDROP ═══════════ */}
+
       <Animated.View
         pointerEvents="auto"
-        style={[styles.backdrop, { opacity: backdropAnim }]}
+        style={[
+          styles.backdrop,
+          {
+            opacity: backdropAnim,
+          },
+        ]}
       >
         <Pressable
           onPress={onClose}
           style={StyleSheet.absoluteFill}
+          accessibilityRole="button"
           accessibilityLabel="Fermer le menu"
         />
       </Animated.View>
 
       {/* ═══════════ DRAWER ═══════════ */}
+
       <Animated.View
         style={[
           styles.drawer,
@@ -212,6 +251,7 @@ export default function SideDrawer({
         accessibilityRole="menu"
       >
         {/* Base gradient */}
+
         <LinearGradient
           colors={["#0C0A1F", "#0A0818", "#070512"]}
           locations={[0, 0.55, 1]}
@@ -220,17 +260,22 @@ export default function SideDrawer({
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Left ambient orb */}
+        {/* Ambient orbs */}
+
         <View style={styles.orbTop} pointerEvents="none" />
+
         <View style={styles.orbBottom} pointerEvents="none" />
 
         {/* Right border ring */}
+
         <View style={styles.borderRing} pointerEvents="none" />
 
         {/* Top light line */}
+
         <View style={styles.topLine} pointerEvents="none" />
 
         {/* ═══════════ HEADER ═══════════ */}
+
         <Animated.View
           style={{
             opacity: contentStagger,
@@ -247,6 +292,7 @@ export default function SideDrawer({
         </Animated.View>
 
         {/* ═══════════ NAVIGATION ═══════════ */}
+
         <Animated.View
           style={[
             styles.navigationWrap,
@@ -257,7 +303,7 @@ export default function SideDrawer({
           ]}
         >
           <ScrollView
-            style={{ flex: 1 }}
+            style={styles.navigationScroll}
             contentContainerStyle={styles.navigationContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -270,9 +316,60 @@ export default function SideDrawer({
                 badges={badges}
               />
             ))}
+
+            {/* ═══════════ MA HOME ═══════════ */}
+
+            {onOpenHomePersonalization ? (
+              <View style={styles.personalizationSection}>
+                <Text style={styles.personalizationEyebrow}>MA HOME</Text>
+
+                <Pressable
+                  onPress={handleOpenHomePersonalization}
+                  accessibilityRole="button"
+                  accessibilityLabel="Personnaliser ma Home"
+                  accessibilityHint="Ouvre les réglages de personnalisation de votre Home"
+                  style={({ pressed }) => [
+                    styles.personalizationButton,
+                    pressed && styles.personalizationButtonPressed,
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["rgba(99,102,241,0.20)", "rgba(139,92,246,0.12)"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+
+                  <View style={styles.personalizationIcon}>
+                    <Text style={styles.personalizationIconText}>✦</Text>
+                  </View>
+
+                  <View style={styles.personalizationCopy}>
+                    <Text numberOfLines={1} style={styles.personalizationTitle}>
+                      Personnaliser ma Home
+                    </Text>
+
+                    <Text
+                      numberOfLines={2}
+                      style={styles.personalizationSubtitle}
+                    >
+                      Modules, ordre et alertes
+                    </Text>
+                  </View>
+
+                  <Text
+                    accessibilityElementsHidden
+                    style={styles.personalizationArrow}
+                  >
+                    ›
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
           </ScrollView>
 
           {/* Bottom fade over scroll content */}
+
           <LinearGradient
             colors={["rgba(10,6,24,0)", "rgba(10,6,24,0.9)"]}
             start={{ x: 0, y: 0 }}
@@ -283,6 +380,7 @@ export default function SideDrawer({
         </Animated.View>
 
         {/* ═══════════ FOOTER ═══════════ */}
+
         <Animated.View
           style={{
             opacity: contentStagger,
@@ -302,12 +400,14 @@ export default function SideDrawer({
 
 const styles = StyleSheet.create({
   /* ── Backdrop ───────────────────────────────────── */
+
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.72)",
   },
 
   /* ── Drawer ─────────────────────────────────────── */
+
   drawer: {
     position: "absolute",
     top: 0,
@@ -318,11 +418,15 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.75,
     shadowRadius: 40,
-    shadowOffset: { width: 20, height: 0 },
+    shadowOffset: {
+      width: 20,
+      height: 0,
+    },
     elevation: 28,
   },
 
-  /* Ambient orbs */
+  /* ── Ambient orbs ───────────────────────────────── */
+
   orbTop: {
     position: "absolute",
     top: -80,
@@ -332,6 +436,7 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     backgroundColor: "rgba(139,92,246,0.22)",
   },
+
   orbBottom: {
     position: "absolute",
     bottom: -100,
@@ -342,7 +447,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(99,102,241,0.16)",
   },
 
-  /* Border ring (right edge) */
+  /* ── Border ring ────────────────────────────────── */
+
   borderRing: {
     position: "absolute",
     top: 0,
@@ -352,7 +458,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(167,139,250,0.18)",
   },
 
-  /* Top light line */
+  /* ── Top light line ─────────────────────────────── */
+
   topLine: {
     position: "absolute",
     top: 0,
@@ -363,21 +470,109 @@ const styles = StyleSheet.create({
   },
 
   /* ── Navigation ─────────────────────────────────── */
+
   navigationWrap: {
     flex: 1,
     minHeight: 0,
     position: "relative",
   },
+
+  navigationScroll: {
+    flex: 1,
+  },
+
   navigationContent: {
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
+
   bottomFade: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
     height: 32,
-    pointerEvents: "none",
+  },
+
+  /* ── Home personalization ───────────────────────── */
+
+  personalizationSection: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.07)",
+  },
+
+  personalizationEyebrow: {
+    marginBottom: 9,
+    paddingHorizontal: 4,
+    color: "rgba(196,181,253,0.68)",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+
+  personalizationButton: {
+    minHeight: 68,
+    position: "relative",
+    overflow: "hidden",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.22)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  personalizationButtonPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.985 }],
+  },
+
+  personalizationIcon: {
+    width: 38,
+    height: 38,
+    marginRight: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.22)",
+    backgroundColor: "rgba(99,102,241,0.14)",
+  },
+
+  personalizationIconText: {
+    color: "#C4B5FD",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+
+  personalizationCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  personalizationTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: -0.1,
+  },
+
+  personalizationSubtitle: {
+    marginTop: 3,
+    color: "rgba(203,213,225,0.62)",
+    fontSize: 11,
+    lineHeight: 15,
+  },
+
+  personalizationArrow: {
+    marginLeft: 8,
+    color: "rgba(196,181,253,0.72)",
+    fontSize: 25,
+    fontWeight: "300",
+    lineHeight: 28,
   },
 });
