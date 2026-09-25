@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Image } from "react-native";
+import { View, Text, Pressable, Image, StyleSheet } from "react-native";
 
 // src/features/messages/contacts/components/ContactMessage.tsx
 
@@ -11,23 +11,28 @@ import type {
 
 export interface ContactMessageProps {
   message: ContactMessageData;
-
   onOpenProfile?: (userId: Id<"users">) => void;
-
   onMessage?: (userId: Id<"users">) => void;
-
   onCall?: (phone?: string) => void;
 }
 
 function Avatar({ name, avatar }: { name: string; avatar?: string }) {
   if (avatar) {
     return (
-      <Image style={{ width: 48, height: 48, borderRadius: 50, flexShrink: 0 }} source={{ uri: avatar }} accessibilityLabel={name} />
+      <Image
+        style={styles.avatarImage}
+        source={{ uri: avatar }}
+        accessibilityLabel={name}
+      />
     );
   }
 
   return (
-    <View style={{ width: 48, height: 48, borderRadius: 50, display: "grid", placeItems: "center", fontWeight: 800, fontSize: 18, flexShrink: 0 }}>{name.charAt(0).toUpperCase()}</View>
+    <View style={styles.avatarPlaceholder}>
+      <Text style={styles.avatarInitial}>
+        {name.charAt(0).toUpperCase()}
+      </Text>
+    </View>
   );
 }
 
@@ -57,36 +62,146 @@ export function ContactMessage({
 
   if (!contact) {
     return (
-      <View style={{ padding: 12, borderRadius: 14, backgroundColor: "#f8fafc", fontSize: 13 }}><Text>Contact indisponible</Text></View>
+      <View style={styles.unavailableContainer}>
+        <Text style={styles.unavailableText}>Contact indisponible</Text>
+      </View>
     );
   }
 
   return (
-    <View style={{ width: "100%", maxWidth: 380, overflow: "hidden", borderRadius: 16, borderWidth: 1, borderColor: "#e2e8f0", borderStyle: "solid", backgroundColor: "#fff" }}>{}<Pressable onPress={() => onOpenProfile?.(contact._id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, borderWidth: 0, backgroundColor: "#fff", textAlign: "left" }}><Avatar name={contact.name} avatar={contact.avatar} /><View style={{
-            minWidth: 0,
-            flex: 1,
-          }}><View style={{ fontWeight: 800, fontSize: 15 }}>{contact.name}</View>{contact.profession && (
-            <View style={{ marginTop: 3, fontSize: 12 }}>
-              {contact.profession}
-            </View>
-          )}{contact.city && (
-            <View style={{ marginTop: 2, fontSize: 11 }}>
-              {contact.city}
-            </View>
-          )}</View></Pressable>{}{contact.phone && (
-        <View style={{ paddingTop: 0, paddingHorizontal: 14, paddingBottom: 11, fontSize: 13 }}>
-          📞 {contact.phone}
+    <View style={styles.container}>
+      <Pressable
+        onPress={() => onOpenProfile?.(contact._id)}
+        style={styles.header}
+      >
+        <Avatar name={contact.name} avatar={contact.avatar} />
+        <View style={styles.headerText}>
+          <Text style={styles.name}>{contact.name}</Text>
+          {contact.profession && (
+            <Text style={styles.profession}>{contact.profession}</Text>
+          )}
+          {contact.city && (
+            <Text style={styles.city}>{contact.city}</Text>
+          )}
         </View>
-      )}{}<View style={{ display: "grid", borderTopWidth: 1, borderTopColor: "#e2e8f0" }}>{onMessage && (
-          <Pressable onPress={() => onMessage(contact._id)} style={{ padding: 11, borderWidth: 0, backgroundColor: "#fff", fontWeight: 700, fontSize: 12 }}>
-            💬 Message
+      </Pressable>
+
+      {contact.phone && (
+        <View style={styles.phoneRow}>
+          <Text style={styles.phoneText}>📞 {contact.phone}</Text>
+        </View>
+      )}
+
+      <View style={styles.actions}>
+        {onMessage && (
+          <Pressable
+            onPress={() => onMessage(contact._id)}
+            style={styles.actionButton}
+          >
+            <Text style={styles.actionText}>💬 Message</Text>
           </Pressable>
-        )}{onCall && contact.phone && (
-          <Pressable onPress={() => onCall(contact.phone)} style={{ padding: 11, borderWidth: 0, borderLeftWidth: 1, borderLeftColor: "#e2e8f0", backgroundColor: "#fff", fontWeight: 700, fontSize: 12 }}>
-            📞 Appeler
+        )}
+        {onCall && contact.phone && (
+          <Pressable
+            onPress={() => onCall(contact.phone)}
+            style={[styles.actionButton, styles.actionButtonRight]}
+          >
+            <Text style={styles.actionText}>📞 Appeler</Text>
           </Pressable>
-        )}</View></View>
+        )}
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    width: "100%",
+    maxWidth: 380,
+    overflow: "hidden",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#fff",
+  },
+  unavailableContainer: {
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "#f8fafc",
+  },
+  unavailableText: {
+    fontSize: 13,
+    color: "#4b5563",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+  },
+  headerText: {
+    flex: 1,
+  },
+  name: {
+    fontWeight: "800",
+    fontSize: 15,
+    color: "#111827",
+  },
+  profession: {
+    marginTop: 3,
+    fontSize: 12,
+    color: "#4b5563",
+  },
+  city: {
+    marginTop: 2,
+    fontSize: 11,
+    color: "#6b7280",
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  avatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitial: {
+    fontWeight: "800",
+    fontSize: 18,
+    color: "#111827",
+  },
+  phoneRow: {
+    paddingHorizontal: 14,
+    paddingBottom: 11,
+  },
+  phoneText: {
+    fontSize: 13,
+    color: "#4b5563",
+  },
+  actions: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+  },
+  actionButton: {
+    flex: 1,
+    padding: 11,
+    alignItems: "center",
+  },
+  actionButtonRight: {
+    borderLeftWidth: 1,
+    borderLeftColor: "#e2e8f0",
+  },
+  actionText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#111827",
+  },
+});
 
 export default ContactMessage;
