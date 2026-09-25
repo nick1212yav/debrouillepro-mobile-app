@@ -1,11 +1,14 @@
-import { View, Text } from "react-native";
-import { useEffect, useRef } from "react";
+import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { useCallback } from "react";
+import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 
 import type { Id } from "@/convex/_generated/dataModel";
 
 import type { Message } from "../services/chat.service";
 
 import { MessageBubble } from "./MessageBubble";
+
+// src/features/messages/chat/components/MessagesArea.tsx
 
 interface MessagesAreaProps {
   messages: Message[];
@@ -26,37 +29,34 @@ export function MessagesArea({
   onReply,
   onForward,
 }: MessagesAreaProps) {
-  const containerRef = useRef<View | null>(null);
-
-  useEffect(() => {
-    const container = containerRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    const handleScroll = () => {
-      if (
-        container.scrollTop <= 120 &&
-        !isLoadingMore &&
-        !isDone &&
-        onLoadMore
-      ) {
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const y = event.nativeEvent.contentOffset.y;
+      if (y <= 120 && !isLoadingMore && !isDone && onLoadMore) {
         onLoadMore(30);
       }
-    };
-
-    container.addEventListener("scroll", handleScroll);
-
-    return () => {
-      container.removeEventListener("scroll", handleScroll);
-    };
-  }, [isLoadingMore, isDone, onLoadMore]);
+    },
+    [isLoadingMore, isDone, onLoadMore],
+  );
 
   return (
-    <View ref={containerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{isLoadingMore && (
-        <View className="mb-4 text-center text-xs text-white/30"><Text>Chargement des anciens messages...</Text></View>
-      )}<View className="mx-auto flex max-w-3xl flex-col gap-2">{messages.map((message) => (
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.content}
+      onScroll={handleScroll}
+      scrollEventThrottle={100}
+      keyboardShouldPersistTaps="handled"
+    >
+      {isLoadingMore && (
+        <View style={styles.loadingRow}>
+          <Text style={styles.loadingText}>
+            Chargement des anciens messages...
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.list}>
+        {messages.map((message) => (
           <MessageBubble
             key={String(message._id)}
             message={message}
@@ -64,12 +64,50 @@ export function MessagesArea({
             onReply={onReply}
             onForward={onForward}
           />
-        ))}{messages.length === 0 && (
-          <View className="flex flex-1 items-center justify-center py-20 text-sm text-white/30">
-            Aucun message.
+        ))}
+
+        {messages.length === 0 && (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>Aucun message.</Text>
           </View>
-        )}</View></View>
+        )}
+      </View>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  content: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  loadingRow: {
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.3)",
+  },
+  list: {
+    maxWidth: 768,
+    alignSelf: "center",
+    width: "100%",
+    gap: 8,
+  },
+  empty: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 80,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.3)",
+  },
+});
 
 export default MessagesArea;

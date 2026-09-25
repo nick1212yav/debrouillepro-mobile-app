@@ -1,4 +1,6 @@
-import { Text } from "react-native";
+import { Text, StyleSheet } from "react-native";
+
+// src/features/messages/chat/components/MessageStatus.tsx
 
 interface MessageStatusProps {
   status?: string;
@@ -8,21 +10,30 @@ export function MessageStatus({ status }: MessageStatusProps) {
   switch (status) {
     case "read":
       return (
-        <Text title="Lu" accessibilityLabel="Lu" className="font-semibold">
+        <Text
+          accessibilityLabel="Lu"
+          style={styles.read}
+        >
           ✓✓
         </Text>
       );
 
     case "delivered":
       return (
-        <Text title="Distribué" accessibilityLabel="Distribué">
+        <Text
+          accessibilityLabel="Distribué"
+          style={styles.delivered}
+        >
           ✓✓
         </Text>
       );
 
     case "sent":
       return (
-        <Text title="Envoyé" accessibilityLabel="Envoyé">
+        <Text
+          accessibilityLabel="Envoyé"
+          style={styles.sent}
+        >
           ✓
         </Text>
       );
@@ -31,5 +42,23 @@ export function MessageStatus({ status }: MessageStatusProps) {
       return null;
   }
 }
+
+const styles = StyleSheet.create({
+  read: {
+    fontWeight: "600",
+    color: "#22c55e",
+    fontSize: 12,
+  },
+  delivered: {
+    fontWeight: "600",
+    color: "#9ca3af",
+    fontSize: 12,
+  },
+  sent: {
+    fontWeight: "600",
+    color: "#9ca3af",
+    fontSize: 12,
+  },
+});
 
 export default MessageStatus;
