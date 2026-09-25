@@ -1,24 +1,24 @@
-import { Text } from "react-native";
+import { View, StyleSheet } from "react-native";
 import type { Id } from "@/convex/_generated/dataModel";
+
+// src/features/messages/presence/components/PresenceIndicator.tsx
 
 import { usePresence } from "../hooks/usePresence";
 
 interface PresenceIndicatorProps {
   userId: Id<"users">;
   size?: "sm" | "md" | "lg";
-  className?: string;
 }
 
-const sizeClasses = {
-  sm: "h-2 w-2",
-  md: "h-2.5 w-2.5",
-  lg: "h-3 w-3",
+const SIZES = {
+  sm: 8,
+  md: 10,
+  lg: 12,
 } as const;
 
 export function PresenceIndicator({
   userId,
   size = "md",
-  className = "",
 }: PresenceIndicatorProps) {
   const { presence } = usePresence({
     userId,
@@ -26,18 +26,39 @@ export function PresenceIndicator({
   });
 
   const status = presence?.status ?? "offline";
-
   const isOnline = status === "online";
-
   const isAway = status === "away";
 
+  const dimension = SIZES[size];
+  const color = isOnline
+    ? "#10b981"
+    : isAway
+      ? "#fbbf24"
+      : "rgba(255,255,255,0.25)";
+
+  const label = isOnline ? "En ligne" : isAway ? "Absent" : "Hors ligne";
+
   return (
-    <Text className={`inline-flex items-center justify-center ${className}`} title={isOnline ? "En ligne" : isAway ? "Absent" : "Hors ligne"} accessibilityLabel={isOnline ? "En ligne" : isAway ? "Absent" : "Hors ligne"}>
-      <Text className={`${sizeClasses[size]} rounded-full ${
-          isOnline ? "bg-emerald-500" : isAway ? "bg-amber-400" : "bg-white/25"
-        }`} />
-    </Text>
+    <View
+      accessibilityLabel={label}
+      style={[
+        styles.container,
+        {
+          width: dimension,
+          height: dimension,
+          borderRadius: dimension / 2,
+          backgroundColor: color,
+        },
+      ]}
+    />
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
 
 export default PresenceIndicator;

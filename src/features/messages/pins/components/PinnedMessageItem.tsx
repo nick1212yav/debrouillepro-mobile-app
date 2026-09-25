@@ -1,8 +1,7 @@
-import { View, Text, GestureResponderEvent, Pressable } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import {
   FileText,
   Image as ImageIcon,
-  MapPin,
   Mic,
   Pin,
   Play,
@@ -13,37 +12,28 @@ import {
 
 import type { Id } from "@/convex/_generated/dataModel";
 
+// src/features/messages/pins/components/PinnedMessageItem.tsx
+
 interface PinnedMessageItemProps {
   message: {
     _id: Id<"messages">;
     _creationTime: number;
     text: string;
-
     senderId: Id<"users">;
-
     isPinned?: boolean;
-
     type?: string;
-
     voiceDuration?: number;
-
     attachmentIds?: Id<"_storage">[];
-
     replyToId?: Id<"messages">;
-
     sharedPublicationId?: Id<"publications">;
   };
-
   senderName?: string;
-
   onUnpin?: (messageId: Id<"messages">) => void | Promise<void>;
-
   onSelect?: (messageId: Id<"messages">) => void;
-
   isUnpinning?: boolean;
 }
 
-function formatMessageDate(timestamp: number) {
+function formatMessageDate(timestamp: number): string {
   return new Intl.DateTimeFormat("fr-FR", {
     day: "2-digit",
     month: "2-digit",
@@ -53,59 +43,26 @@ function formatMessageDate(timestamp: number) {
   }).format(new Date(timestamp));
 }
 
-function getMessagePreview(message: PinnedMessageItemProps["message"]) {
+function getMessagePreview(message: PinnedMessageItemProps["message"]): string {
   const type = message.type;
-
-  if (type === "voice") {
-    return "Message vocal";
-  }
-
-  if (type === "image") {
-    return "Photo";
-  }
-
-  if (type === "video") {
-    return "Vidéo";
-  }
-
-  if (type === "file") {
-    return "Fichier";
-  }
-
-  if (type === "publication" || message.sharedPublicationId) {
-    return "Publication partagée";
-  }
-
-  if (message.attachmentIds?.length) {
-    return "Pièce jointe";
-  }
-
-  if (message.text?.trim()) {
-    return message.text;
-  }
-
+  if (type === "voice") return "Message vocal";
+  if (type === "image") return "Photo";
+  if (type === "video") return "Vidéo";
+  if (type === "file") return "Fichier";
+  if (type === "publication" || message.sharedPublicationId) return "Publication partagée";
+  if (message.attachmentIds?.length) return "Pièce jointe";
+  if (message.text?.trim()) return message.text;
   return "Message";
 }
 
 function getMessageIcon(message: PinnedMessageItemProps["message"]) {
   switch (message.type) {
-    case "voice":
-      return <Mic size={15} />;
-
-    case "image":
-      return <ImageIcon size={15} />;
-
-    case "video":
-      return <Video size={15} />;
-
-    case "file":
-      return <FileText size={15} />;
-
-    case "publication":
-      return <Play size={15} />;
-
-    default:
-      return null;
+    case "voice": return <Mic size={15} />;
+    case "image": return <ImageIcon size={15} />;
+    case "video": return <Video size={15} />;
+    case "file": return <FileText size={15} />;
+    case "publication": return <Play size={15} />;
+    default: return null;
   }
 }
 
@@ -123,36 +80,142 @@ export function PinnedMessageItem({
     onSelect?.(message._id);
   };
 
-  const handleUnpin = async (event: GestureResponderEvent) => {
-    event.stopPropagation();
-
-    if (isUnpinning) {
-      return;
-    }
-
+  const handleUnpin = async () => {
+    if (isUnpinning) return;
     await onUnpin?.(message._id);
   };
 
   return (
-    <View className="group relative flex w-full gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 transition" onPress={handleSelect} accessibilityRole={onSelect ? "button" : undefined} tabIndex={onSelect ? 0 : undefined} onKeyPress={(event) => {
-        if (onSelect && (event.nativeEvent.key === "Enter" || event.nativeEvent.key === " ")) {
-          handleSelect();
-        }
-      }}>{}<View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/10"><Pin size={16} className="rotate-[-35deg] text-violet-400" /></View>{}<View className="min-w-0 flex-1"><View className="mb-1 flex items-center gap-2"><Text className="truncate text-xs font-semibold text-white/80">{senderName ?? "Utilisateur"}</Text><Text className="shrink-0 text-[10px] text-white/30">{formatMessageDate(message._creationTime)}</Text></View><View className="flex min-w-0 items-center gap-2">{icon && <Text className="shrink-0 text-violet-400/70">{icon}</Text>}<Text className="min-w-0 text-sm text-white/60">{preview}</Text></View>{message.replyToId && (
-          <View className="mt-1 flex items-center gap-1 text-[10px] text-white/25">
-            <Reply size={11} />
-            Réponse à un message
+    <Pressable
+      onPress={onSelect ? handleSelect : undefined}
+      disabled={!onSelect}
+      accessibilityRole={onSelect ? "button" : undefined}
+      style={styles.container}
+    >
+      <View style={styles.iconWrapper}>
+        <Pin size={16} color="#a78bfa" />
+      </View>
+
+      <View style={styles.body}>
+        <View style={styles.headerRow}>
+          <Text style={styles.senderName} numberOfLines={1}>
+            {senderName ?? "Utilisateur"}
+          </Text>
+          <Text style={styles.date}>
+            {formatMessageDate(message._creationTime)}
+          </Text>
+        </View>
+
+        <View style={styles.previewRow}>
+          {icon && <View style={styles.previewIcon}>{icon}</View>}
+          <Text style={styles.previewText} numberOfLines={1}>
+            {preview}
+          </Text>
+        </View>
+
+        {message.replyToId && (
+          <View style={styles.replyRow}>
+            <Reply size={11} color="rgba(255,255,255,0.25)" />
+            <Text style={styles.replyText}>Réponse à un message</Text>
           </View>
-        )}</View>{}{onUnpin && (
-        <Pressable onPress={handleUnpin} disabled={isUnpinning} accessibilityLabel="Désépingler le message" title="Désépingler" className="flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-lg text-white/25 opacity-0 transition disabled:opacity-40">
+        )}
+      </View>
+
+      {onUnpin && (
+        <Pressable
+          onPress={handleUnpin}
+          disabled={isUnpinning}
+          accessibilityLabel="Désépingler le message"
+          style={styles.unpinButton}
+        >
           {isUnpinning ? (
-            <Text className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
+            <Text style={styles.unpinSpinner}>...</Text>
           ) : (
-            <X size={15} />
+            <X size={15} color="rgba(255,255,255,0.4)" />
           )}
         </Pressable>
-      )}</View>
+      )}
+    </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    width: "100%",
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    padding: 12,
+  },
+  iconWrapper: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "rgba(139,92,246,0.10)",
+  },
+  body: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  senderName: {
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.80)",
+  },
+  date: {
+    flexShrink: 0,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.30)",
+  },
+  previewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+  },
+  previewIcon: {
+    flexShrink: 0,
+  },
+  previewText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    color: "rgba(255,255,255,0.60)",
+  },
+  replyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  replyText: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.25)",
+  },
+  unpinButton: {
+    width: 32,
+    height: 32,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+  },
+  unpinSpinner: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.4)",
+  },
+});
 
 export default PinnedMessageItem;

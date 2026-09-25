@@ -1,7 +1,5 @@
-import { Text, Pressable, StyleSheet } from "react-native";
+import { Text, Pressable } from "react-native";
 import type { Id } from "@/convex/_generated/dataModel";
-
-// src/features/messages/readReceipts/components/ReadReceipt.tsx
 
 import { useReadReceipts } from "../hooks/useReadReceipts";
 
@@ -11,6 +9,7 @@ interface ReadReceiptProps {
   senderId?: Id<"users">;
   currentUserId?: Id<"users">;
   status?: "sent" | "delivered" | "read" | "failed";
+  className?: string;
   onRead?: (messageId: Id<"messages">) => void;
 }
 
@@ -20,6 +19,7 @@ export function ReadReceipt({
   senderId,
   currentUserId,
   status,
+  className = "",
   onRead,
 }: ReadReceiptProps) {
   const { getReceiptForMessage, markAsRead } = useReadReceipts({
@@ -27,6 +27,7 @@ export function ReadReceipt({
   });
 
   const receipts = getReceiptForMessage(messageId);
+
   const isOwnMessage = Boolean(
     senderId && currentUserId && senderId === currentUserId,
   );
@@ -36,53 +37,55 @@ export function ReadReceipt({
       await markAsRead(messageId);
       onRead?.(messageId);
     } catch {
-      // erreur gérée par le hook
+      // L'erreur est déjà journalisée par le hook.
     }
   };
 
+  /*
+   * Pour un message reçu, le composant peut être utilisé
+   * directement pour déclencher la lecture.
+   */
   if (!isOwnMessage && status !== "read") {
     return (
-      <Pressable
-        onPress={handleMarkAsRead}
-        style={styles.markAsReadButton}
-        accessibilityLabel="Marquer comme lu"
-      >
-        <Text style={styles.markAsReadText}>Marquer comme lu</Text>
+      <Pressable onPress={handleMarkAsRead} className={`text-xs text-white/40 transition hover:text-white/70 ${className}`} accessibilityLabel="Marquer comme lu">
+        Marquer comme lu
       </Pressable>
     );
   }
 
+  /*
+   * Pour un message envoyé par l'utilisateur :
+   * - 1 coche : envoyé
+   * - 2 coches : délivré
+   * - 2 coches accentuées : lu
+   */
   if (isOwnMessage) {
     const hasBeenRead = status === "read" || receipts.length > 0;
+
     const isDelivered =
       status === "delivered" || status === "read" || receipts.length > 0;
 
     if (status === "failed") {
       return (
-        <Text
-          style={styles.failedText}
-          accessibilityLabel="Échec de l'envoi"
-        >
+        <Text className={`text-xs text-red-400 ${className}`} title="Échec de l'envoi" accessibilityLabel="Échec de l'envoi">
           !
         </Text>
       );
     }
 
-    const label = hasBeenRead ? "Lu" : isDelivered ? "Distribué" : "Envoyé";
-
     return (
-      <Text
-        style={[styles.statusText, hasBeenRead && styles.statusTextRead]}
-        accessibilityLabel={label}
-      >
+      <Text className={`inline-flex items-center text-xs ${hasBeenRead ? "text-blue-400" : "text-white/40"} ${className}`} title={hasBeenRead ? "Lu" : isDelivered ? "Délivré" : "Envoyé"} accessibilityLabel={hasBeenRead ? "Lu" : isDelivered ? "Délivré" : "Envoyé"}>
         {isDelivered ? "✓✓" : "✓"}
       </Text>
     );
   }
 
+  /*
+   * Message reçu déjà lu.
+   */
   if (status === "read") {
     return (
-      <Text style={styles.readText} accessibilityLabel="Lu">
+      <Text className={`text-xs text-white/40 ${className}`} accessibilityLabel="Lu">
         Lu
       </Text>
     );
@@ -90,30 +93,5 @@ export function ReadReceipt({
 
   return null;
 }
-
-const styles = StyleSheet.create({
-  markAsReadButton: {
-    paddingVertical: 4,
-  },
-  markAsReadText: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
-  },
-  failedText: {
-    fontSize: 12,
-    color: "#f87171",
-  },
-  statusText: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
-  },
-  statusTextRead: {
-    color: "#60a5fa",
-  },
-  readText: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
-  },
-});
 
 export default ReadReceipt;
