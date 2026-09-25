@@ -25,8 +25,15 @@ export function usePublicationActions() {
         return;
       case "share":
         try {
-          if (navigator.share) {
-            await Share.share({ message: String(publication.description ?? "") + "\n" + "\n" + String(window.location.href), title: publication.title });
+          if (typeof navigator !== "undefined" && "share" in navigator) {
+            await Share.share({
+              message:
+                String(publication.description ?? "") +
+                "\n" +
+                "\n" +
+                String(window.location.href),
+              title: publication.title,
+            });
           } else {
             await Clipboard.setString(window.location.href);
             toast.success("Lien copié !");

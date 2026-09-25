@@ -14,7 +14,10 @@
 
     "paths": {
       "@/*": ["./src/*"],
-      "@/convex/*": ["./convex/*"]
+      "@/convex/*": ["./convex/*"],
+      "@react-native-clipboard/clipboard": [
+        "./src/shims/react-native-clipboard.ts"
+      ]
     }
   },
   "include": [
@@ -26,4 +29,3 @@
   ],
   "exclude": ["node_modules", "dist", "build", ".expo", "android", "ios"]
 }
-

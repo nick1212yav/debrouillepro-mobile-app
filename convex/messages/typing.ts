@@ -3,6 +3,7 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import { requireAuthenticatedUser } from "../auth/helpers";
+import type { Id } from "../_generated/dataModel";
 
 // ============================================================================
 // SIGNALER QUE L'UTILISATEUR EST EN TRAIN D'ÉCRIRE
@@ -172,7 +173,12 @@ export const getTypingUsers = query({
     // Charger les profils utilisateurs
     // ------------------------------------------------------------------------
 
-    const users = [];
+    const users: Array<{
+      userId: Id<"users">;
+      name: string;
+      image: string | undefined;
+      lastActiveAt: number;
+    }> = [];
 
     for (const indicator of activeIndicators) {
       const typingUser = await ctx.db.get(indicator.userId);

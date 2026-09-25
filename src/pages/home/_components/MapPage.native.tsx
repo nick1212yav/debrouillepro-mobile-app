@@ -1,4 +1,5 @@
 // src/pages/home/_components/MapPage.native.tsx
+
 import {
   View,
   Pressable,
@@ -12,6 +13,8 @@ import {
   Platform,
   Share,
   useWindowDimensions,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import MapView, {
@@ -74,7 +77,14 @@ type GeoPublication = {
   description: string;
   price?: string;
   location?: string;
+
+  /**
+   * La carte backend ne charge volontairement pas les images.
+   * Le tableau reste présent dans le modèle UI afin que SelectedCard
+   * puisse fonctionner avec une donnée homogène.
+   */
   images: string[];
+
   likeCount: number;
   commentCount: number;
   latitude: number;
@@ -98,19 +108,71 @@ type TypeConfig = {
  * ========================================================================== */
 
 const TYPE_CONFIG: Record<string, TypeConfig> = {
-  job: { label: "Emploi", color: "#818CF8", Icon: Briefcase },
-  immo: { label: "Immobilier", color: "#F59E0B", Icon: HomeIcon },
-  restauration: { label: "Restauration", color: "#F87171", Icon: Utensils },
-  evenement: { label: "Événement", color: "#A78BFA", Icon: Calendar },
-  transport: { label: "Transport", color: "#60A5FA", Icon: Truck },
-  agri: { label: "Agriculture", color: "#4ADE80", Icon: Leaf },
-  sante: { label: "Santé", color: "#F472B6", Icon: Heart },
-  energie: { label: "Énergie", color: "#FB923C", Icon: Zap },
-  annonce: { label: "Annonce", color: "#2DD4BF", Icon: Megaphone },
-  hebergement: { label: "Hébergement", color: "#C4B5FD", Icon: Building2 },
-  service: { label: "Service", color: "#22D3EE", Icon: ShoppingBag },
-  community: { label: "Communauté", color: "#A3E635", Icon: Users },
-  ong: { label: "ONG", color: "#FDBA74", Icon: Heart },
+  job: {
+    label: "Emploi",
+    color: "#818CF8",
+    Icon: Briefcase,
+  },
+  immo: {
+    label: "Immobilier",
+    color: "#F59E0B",
+    Icon: HomeIcon,
+  },
+  restauration: {
+    label: "Restauration",
+    color: "#F87171",
+    Icon: Utensils,
+  },
+  evenement: {
+    label: "Événement",
+    color: "#A78BFA",
+    Icon: Calendar,
+  },
+  transport: {
+    label: "Transport",
+    color: "#60A5FA",
+    Icon: Truck,
+  },
+  agri: {
+    label: "Agriculture",
+    color: "#4ADE80",
+    Icon: Leaf,
+  },
+  sante: {
+    label: "Santé",
+    color: "#F472B6",
+    Icon: Heart,
+  },
+  energie: {
+    label: "Énergie",
+    color: "#FB923C",
+    Icon: Zap,
+  },
+  annonce: {
+    label: "Annonce",
+    color: "#2DD4BF",
+    Icon: Megaphone,
+  },
+  hebergement: {
+    label: "Hébergement",
+    color: "#C4B5FD",
+    Icon: Building2,
+  },
+  service: {
+    label: "Service",
+    color: "#22D3EE",
+    Icon: ShoppingBag,
+  },
+  community: {
+    label: "Communauté",
+    color: "#A3E635",
+    Icon: Users,
+  },
+  ong: {
+    label: "ONG",
+    color: "#FDBA74",
+    Icon: Heart,
+  },
 };
 
 const ALL_TYPES = Object.keys(TYPE_CONFIG);
@@ -128,7 +190,7 @@ const DEFAULT_ICON = MapPin;
  * UTILS
  * ========================================================================== */
 
-function cleanText(value?: string) {
+function cleanText(value?: string): string {
   return (value ?? "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
@@ -148,7 +210,7 @@ function FadeUp({
   delay?: number;
   distance?: number;
   children: ReactNode;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }) {
   const anim = useRef(new Animated.Value(0)).current;
 
@@ -198,7 +260,7 @@ function PulsingIcon({
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
@@ -213,7 +275,13 @@ function PulsingIcon({
           useNativeDriver: true,
         }),
       ]),
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [pulse]);
 
   const scale = pulse.interpolate({
@@ -222,7 +290,14 @@ function PulsingIcon({
   });
 
   return (
-    <Animated.View style={[styles.pulsingIconWrap, { transform: [{ scale }] }]}>
+    <Animated.View
+      style={[
+        styles.pulsingIconWrap,
+        {
+          transform: [{ scale }],
+        },
+      ]}
+    >
       <LinearGradient
         colors={[color, `${color}CC`]}
         start={{ x: 0, y: 0 }}
@@ -261,6 +336,7 @@ function ControlButton({
       speed: 40,
     }).start();
   };
+
   const onPressOut = () => {
     Animated.spring(scale, {
       toValue: 1,
@@ -270,7 +346,11 @@ function ControlButton({
   };
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View
+      style={{
+        transform: [{ scale }],
+      }}
+    >
       <Pressable
         onPress={onPress}
         onPressIn={onPressIn}
@@ -286,7 +366,9 @@ function ControlButton({
             style={StyleSheet.absoluteFill}
           />
         ) : null}
+
         <Icon size={20} color="#fff" strokeWidth={2.2} />
+
         {badge && badge > 0 ? (
           <View style={styles.controlBtnBadge}>
             <Text style={styles.controlBtnBadgeText}>{badge}</Text>
@@ -303,20 +385,57 @@ function ControlButton({
 
 export default function MapPage({ onClose }: MapPageProps) {
   const { width: W, height: H } = useWindowDimensions();
+
+  // Ces valeurs sont utilisées implicitement par la composition responsive.
+  void W;
+  void H;
+
   const mapRef = useRef<MapView | null>(null);
 
   const rawPublications = useQuery(api.map.listGeoPublications, {});
 
+  /**
+   * Adaptation explicite du contrat Convex vers le modèle UI.
+   *
+   * IMPORTANT :
+   * listGeoPublications ne retourne volontairement pas `images`.
+   * On ne fait donc aucun cast du résultat serveur vers GeoPublication.
+   *
+   * La carte conserve un modèle UI homogène avec `images: []`.
+   */
   const pubs = useMemo<GeoPublication[]>(() => {
-    if (!Array.isArray(rawPublications)) return [];
-    return rawPublications.filter(
-      (p) =>
-        p &&
-        typeof p.latitude === "number" &&
-        typeof p.longitude === "number" &&
-        Number.isFinite(p.latitude) &&
-        Number.isFinite(p.longitude),
-    ) as GeoPublication[];
+    if (!Array.isArray(rawPublications)) {
+      return [];
+    }
+
+    return rawPublications.flatMap((publication) => {
+      if (
+        typeof publication.latitude !== "number" ||
+        typeof publication.longitude !== "number" ||
+        !Number.isFinite(publication.latitude) ||
+        !Number.isFinite(publication.longitude)
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          _id: String(publication._id),
+          type: publication.type,
+          title: publication.title,
+          description: publication.description ?? "",
+          price: publication.price,
+          location: publication.location,
+          images: [],
+          likeCount: publication.likeCount,
+          commentCount: publication.commentCount,
+          latitude: publication.latitude,
+          longitude: publication.longitude,
+          authorName: publication.authorName,
+          authorAvatar: publication.authorAvatar,
+        },
+      ];
+    });
   }, [rawPublications]);
 
   const isLoading = rawPublications === undefined;
@@ -324,23 +443,31 @@ export default function MapPage({ onClose }: MapPageProps) {
   const [activeTypes, setActiveTypes] = useState<Set<string>>(
     () => new Set(ALL_TYPES),
   );
+
   const [showFilters, setShowFilters] = useState(false);
+
   const [userLocation, setUserLocation] = useState<[number, number] | null>(
     null,
   );
+
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState(false);
+
   const [selectedPub, setSelectedPub] = useState<GeoPublication | null>(null);
+
   const [region, setRegion] = useState<Region>(WORLD_REGION);
+
   const [mapMode, setMapMode] = useState<"explore" | "nearby">("explore");
+
   const [search, setSearch] = useState("");
   const [sheetExpanded, setSheetExpanded] = useState(false);
 
-  const [mounted, setMounted] = useState(true);
   const backdropFade = useRef(new Animated.Value(0)).current;
+
   const cardSlide = useRef(new Animated.Value(0)).current;
 
-  /* entrance */
+  /* ───── ENTRANCE ───── */
+
   useEffect(() => {
     Animated.timing(backdropFade, {
       toValue: 1,
@@ -350,9 +477,11 @@ export default function MapPage({ onClose }: MapPageProps) {
     }).start();
   }, [backdropFade]);
 
-  /* selected card slide */
+  /* ───── SELECTED CARD ───── */
+
   useEffect(() => {
     cardSlide.setValue(0);
+
     if (selectedPub) {
       Animated.spring(cardSlide, {
         toValue: 1,
@@ -364,57 +493,78 @@ export default function MapPage({ onClose }: MapPageProps) {
   }, [selectedPub, cardSlide]);
 
   /* ───── FILTERED ───── */
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return pubs.filter((p) => {
-      if (!activeTypes.has(p.type)) return false;
-      if (!q) return true;
-      return [p.title, p.description, p.location, p.authorName, p.type]
+
+    return pubs.filter((publication) => {
+      if (!activeTypes.has(publication.type)) {
+        return false;
+      }
+
+      if (!q) {
+        return true;
+      }
+
+      return [
+        publication.title,
+        publication.description,
+        publication.location,
+        publication.authorName,
+        publication.type,
+      ]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q));
+        .some((value) => String(value).toLowerCase().includes(q));
     });
   }, [pubs, activeTypes, search]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const p of pubs) counts[p.type] = (counts[p.type] ?? 0) + 1;
+
+    for (const publication of pubs) {
+      counts[publication.type] = (counts[publication.type] ?? 0) + 1;
+    }
+
     return counts;
   }, [pubs]);
 
   /* ───── LOCATION ───── */
+
   const locateMe = useCallback(async () => {
     setLocating(true);
     setLocationError(false);
+
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
+
       if (status !== "granted") {
         setLocationError(true);
         setLocating(false);
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({
+
+      const position = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+
       const coords: [number, number] = [
-        pos.coords.latitude,
-        pos.coords.longitude,
+        position.coords.latitude,
+        position.coords.longitude,
       ];
+
       setUserLocation(coords);
-      setRegion({
+
+      const nextRegion: Region = {
         latitude: coords[0],
         longitude: coords[1],
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
-      });
-      mapRef.current?.animateToRegion(
-        {
-          latitude: coords[0],
-          longitude: coords[1],
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        },
-        700,
-      );
+      };
+
+      setRegion(nextRegion);
+
+      mapRef.current?.animateToRegion(nextRegion, 700);
+
       setMapMode("nearby");
     } catch {
       setLocationError(true);
@@ -424,13 +574,20 @@ export default function MapPage({ onClose }: MapPageProps) {
   }, []);
 
   /* ───── FILTERS ───── */
+
   const toggleType = useCallback((type: string) => {
-    setActiveTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
+    setActiveTypes((previous) => {
+      const next = new Set(previous);
+
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+
       return next;
     });
+
     setSelectedPub(null);
   }, []);
 
@@ -448,19 +605,24 @@ export default function MapPage({ onClose }: MapPageProps) {
     setRegion(WORLD_REGION);
     setMapMode("explore");
     setSelectedPub(null);
+
     mapRef.current?.animateToRegion(WORLD_REGION, 700);
   }, []);
 
   /* ───── SHARE ───── */
+
   const handleShare = useCallback(async () => {
-    if (!selectedPub) return;
+    if (!selectedPub) {
+      return;
+    }
+
     try {
       await Share.share({
         title: selectedPub.title,
         message: cleanText(selectedPub.description) || selectedPub.title,
       });
     } catch {
-      // ignore
+      // L'utilisateur peut fermer le dialogue de partage.
     }
   }, [selectedPub]);
 
@@ -472,15 +634,21 @@ export default function MapPage({ onClose }: MapPageProps) {
     outputRange: [120, 0],
   });
 
-  if (!mounted) return null;
-
-  /* ========================================================================
+  /* ==========================================================================
    * RENDER
-   * ====================================================================== */
+   * ======================================================================== */
 
   return (
-    <Animated.View style={[styles.root, { opacity: backdropFade }]}>
+    <Animated.View
+      style={[
+        styles.root,
+        {
+          opacity: backdropFade,
+        },
+      ]}
+    >
       {/* ═══════════ MAP ═══════════ */}
+
       <MapView
         ref={mapRef}
         provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
@@ -510,6 +678,7 @@ export default function MapPage({ onClose }: MapPageProps) {
               fillColor="rgba(129,140,248,0.08)"
               strokeWidth={1}
             />
+
             <Circle
               center={{
                 latitude: userLocation[0],
@@ -523,25 +692,27 @@ export default function MapPage({ onClose }: MapPageProps) {
           </>
         ) : null}
 
-        {filtered.map((pub) => {
-          const config = TYPE_CONFIG[pub.type] ?? {
-            label: pub.type || "Autre",
+        {filtered.map((publication) => {
+          const config = TYPE_CONFIG[publication.type] ?? {
+            label: publication.type || "Autre",
             color: "#64748B",
             Icon: DEFAULT_ICON,
           };
+
           const Icon = config.Icon;
-          const isSelected = selectedPub?._id === pub._id;
+
+          const isSelected = selectedPub?._id === publication._id;
 
           return (
             <Marker
-              key={pub._id}
+              key={publication._id}
               coordinate={{
-                latitude: pub.latitude,
-                longitude: pub.longitude,
+                latitude: publication.latitude,
+                longitude: publication.longitude,
               }}
               zIndex={isSelected ? 1000 : 0}
               onPress={() => {
-                setSelectedPub(pub);
+                setSelectedPub(publication);
                 setSheetExpanded(false);
               }}
             >
@@ -555,7 +726,8 @@ export default function MapPage({ onClose }: MapPageProps) {
         })}
       </MapView>
 
-      {/* ═══════════ TOP / BOTTOM SHADOWS ═══════════ */}
+      {/* ═══════════ SHADOWS ═══════════ */}
+
       <LinearGradient
         colors={["rgba(2,6,23,0.85)", "rgba(2,6,23,0)"]}
         start={{ x: 0.5, y: 0 }}
@@ -563,6 +735,7 @@ export default function MapPage({ onClose }: MapPageProps) {
         style={styles.topShadow}
         pointerEvents="none"
       />
+
       <LinearGradient
         colors={["rgba(2,6,23,0)", "rgba(2,6,23,0.9)"]}
         start={{ x: 0.5, y: 0 }}
@@ -572,10 +745,13 @@ export default function MapPage({ onClose }: MapPageProps) {
       />
 
       {/* ═══════════ HEADER ═══════════ */}
+
       <View
         style={[
           styles.header,
-          { paddingTop: Platform.OS === "android" ? 44 : 54 },
+          {
+            paddingTop: Platform.OS === "android" ? 44 : 54,
+          },
         ]}
       >
         <View style={styles.headerRow}>
@@ -594,20 +770,30 @@ export default function MapPage({ onClose }: MapPageProps) {
             <View style={styles.headerPanelInner}>
               <View style={styles.headerPanelTop}>
                 <PulsingIcon Icon={Globe2} color="#A78BFA" />
-                <View style={{ flex: 1, minWidth: 0 }}>
+
+                <View
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
                   <Text style={styles.headerTitle} numberOfLines={1}>
                     Carte DébrouillePro
                   </Text>
+
                   <Text style={styles.headerSub} numberOfLines={1}>
                     {isLoading
                       ? "Chargement…"
-                      : `${filtered.length} résultat${filtered.length > 1 ? "s" : ""} · Explore les opportunités`}
+                      : `${filtered.length} résultat${
+                          filtered.length > 1 ? "s" : ""
+                        } · Explore les opportunités`}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.searchRow}>
                 <Search size={15} color="rgba(255,255,255,0.55)" />
+
                 <TextInput
                   value={search}
                   onChangeText={setSearch}
@@ -616,6 +802,7 @@ export default function MapPage({ onClose }: MapPageProps) {
                   style={styles.searchInput}
                   accessibilityLabel="Rechercher sur la carte"
                 />
+
                 {search ? (
                   <Pressable
                     onPress={() => setSearch("")}
@@ -632,6 +819,7 @@ export default function MapPage({ onClose }: MapPageProps) {
       </View>
 
       {/* ═══════════ RIGHT CONTROLS ═══════════ */}
+
       <View style={styles.controlsCol}>
         <ControlButton
           Icon={Navigation}
@@ -639,14 +827,16 @@ export default function MapPage({ onClose }: MapPageProps) {
           active={locating}
           accessibilityLabel="Me localiser"
         />
+
         <ControlButton
           Icon={Globe2}
           onPress={resetWorldView}
           accessibilityLabel="Vue mondiale"
         />
+
         <ControlButton
           Icon={SlidersHorizontal}
-          onPress={() => setShowFilters((v) => !v)}
+          onPress={() => setShowFilters((value) => !value)}
           active={showFilters}
           badge={activeFilterCount}
           accessibilityLabel="Filtres"
@@ -654,6 +844,7 @@ export default function MapPage({ onClose }: MapPageProps) {
       </View>
 
       {/* ═══════════ MODE SWITCH ═══════════ */}
+
       <View style={styles.modeSwitchWrap}>
         <View style={styles.modeSwitch}>
           <Pressable
@@ -670,15 +861,19 @@ export default function MapPage({ onClose }: MapPageProps) {
               }
               strokeWidth={2.4}
             />
+
             <Text
               style={[
                 styles.modeBtnText,
-                mapMode === "explore" && { color: "#0F172A" },
+                mapMode === "explore" && {
+                  color: "#0F172A",
+                },
               ]}
             >
               Explorer
             </Text>
           </Pressable>
+
           <Pressable
             onPress={() => {
               setMapMode("nearby");
@@ -694,12 +889,14 @@ export default function MapPage({ onClose }: MapPageProps) {
               color={mapMode === "nearby" ? "#fff" : "rgba(255,255,255,0.7)"}
               strokeWidth={2.4}
             />
+
             <Text style={styles.modeBtnText}>Autour de moi</Text>
           </Pressable>
         </View>
       </View>
 
       {/* ═══════════ FILTER PANEL ═══════════ */}
+
       {showFilters ? (
         <FilterPanel
           activeTypes={activeTypes}
@@ -712,18 +909,27 @@ export default function MapPage({ onClose }: MapPageProps) {
       ) : null}
 
       {/* ═══════════ LOCATION ERROR ═══════════ */}
+
       {locationError ? (
         <FadeUp distance={-10} style={styles.errorWrap}>
           <View style={styles.errorCard}>
             <View style={styles.errorIconWrap}>
               <AlertCircle size={16} color="#FBBF24" />
             </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
+
+            <View
+              style={{
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
               <Text style={styles.errorTitle}>Localisation indisponible</Text>
+
               <Text style={styles.errorSub}>
                 Vérifie l'autorisation de localisation de ton appareil.
               </Text>
             </View>
+
             <Pressable
               onPress={() => setLocationError(false)}
               hitSlop={8}
@@ -736,6 +942,7 @@ export default function MapPage({ onClose }: MapPageProps) {
       ) : null}
 
       {/* ═══════════ EMPTY STATE ═══════════ */}
+
       {!isLoading && filtered.length === 0 ? (
         <View style={styles.emptyWrap} pointerEvents="box-none">
           <FadeUp distance={15}>
@@ -746,6 +953,7 @@ export default function MapPage({ onClose }: MapPageProps) {
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
+
               <View style={styles.emptyBorder} pointerEvents="none" />
 
               <LinearGradient
@@ -758,6 +966,7 @@ export default function MapPage({ onClose }: MapPageProps) {
               </LinearGradient>
 
               <Text style={styles.emptyTitle}>Aucun résultat ici</Text>
+
               <Text style={styles.emptySub}>
                 Essaie une autre catégorie ou modifie ta recherche. Les contenus
                 géolocalisés apparaîtront automatiquement sur la carte.
@@ -781,14 +990,24 @@ export default function MapPage({ onClose }: MapPageProps) {
       ) : null}
 
       {/* ═══════════ SELECTED PUBLICATION ═══════════ */}
+
       {selectedPub ? (
         <Animated.View
-          style={[styles.card, { transform: [{ translateY: cardTranslateY }] }]}
+          style={[
+            styles.card,
+            {
+              transform: [
+                {
+                  translateY: cardTranslateY,
+                },
+              ],
+            },
+          ]}
         >
           <SelectedCard
             pub={selectedPub}
             expanded={sheetExpanded}
-            onToggleExpand={() => setSheetExpanded((v) => !v)}
+            onToggleExpand={() => setSheetExpanded((value) => !value)}
             onClose={() => setSelectedPub(null)}
             onCenter={() => {
               mapRef.current?.animateToRegion(
@@ -807,15 +1026,20 @@ export default function MapPage({ onClose }: MapPageProps) {
       ) : null}
 
       {/* ═══════════ BOTTOM STATUS ═══════════ */}
+
       {!selectedPub ? (
         <FadeUp delay={80} distance={8} style={styles.statusWrap}>
           <View style={styles.statusCard}>
             <View style={styles.statusDot} />
+
             <Text style={styles.statusText} numberOfLines={1}>
               {isLoading
                 ? "Synchronisation…"
-                : `${filtered.length} point${filtered.length > 1 ? "s" : ""} visible${filtered.length > 1 ? "s" : ""}`}
+                : `${filtered.length} point${
+                    filtered.length > 1 ? "s" : ""
+                  } visible${filtered.length > 1 ? "s" : ""}`}
             </Text>
+
             {userLocation ? (
               <Text style={styles.statusActive}>• Position active</Text>
             ) : null}
@@ -840,6 +1064,7 @@ function PremiumMarker({
   selected: boolean;
 }) {
   const size = selected ? 42 : 34;
+
   const scale = useRef(new Animated.Value(selected ? 1 : 0.94)).current;
 
   useEffect(() => {
@@ -883,10 +1108,14 @@ function PremiumMarker({
           <Icon size={size * 0.34} color={color} strokeWidth={2.6} />
         </View>
       </View>
+
       <View
         style={[
           styles.markerArrow,
-          { borderTopColor: color, transform: [{ scaleX: 1.4 }] },
+          {
+            borderTopColor: color,
+            transform: [{ scaleX: 1.4 }],
+          },
         ]}
       />
     </Animated.View>
@@ -907,7 +1136,7 @@ function FilterPanel({
 }: {
   activeTypes: Set<string>;
   categoryCounts: Record<string, number>;
-  onToggle: (t: string) => void;
+  onToggle: (type: string) => void;
   onAll: () => void;
   onNone: () => void;
   onClose: () => void;
@@ -927,6 +1156,7 @@ function FilterPanel({
     inputRange: [0, 1],
     outputRange: [0.97, 1],
   });
+
   const translateY = anim.interpolate({
     inputRange: [0, 1],
     outputRange: [-12, 0],
@@ -936,7 +1166,10 @@ function FilterPanel({
     <Animated.View
       style={[
         styles.filterWrap,
-        { opacity: anim, transform: [{ translateY }, { scale }] },
+        {
+          opacity: anim,
+          transform: [{ translateY }, { scale }],
+        },
       ]}
     >
       <View style={styles.filterCard}>
@@ -946,15 +1179,23 @@ function FilterPanel({
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
+
         <View style={styles.filterBorder} pointerEvents="none" />
 
         <View style={styles.filterHeader}>
-          <View style={{ flex: 1, minWidth: 0 }}>
+          <View
+            style={{
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
             <Text style={styles.filterTitle}>Explorer par catégorie</Text>
+
             <Text style={styles.filterSub}>
               Affiche uniquement ce qui t'intéresse
             </Text>
           </View>
+
           <Pressable
             onPress={onAll}
             style={({ pressed }) => [
@@ -964,6 +1205,7 @@ function FilterPanel({
           >
             <Text style={styles.filterQuickTextAll}>Tout</Text>
           </Pressable>
+
           <Pressable
             onPress={onNone}
             style={({ pressed }) => [
@@ -973,10 +1215,11 @@ function FilterPanel({
           >
             <Text style={styles.filterQuickTextNone}>Aucun</Text>
           </Pressable>
+
           <Pressable
             onPress={onClose}
             hitSlop={8}
-            style={({ pressed }) => [pressed && styles.pressed]}
+            style={({ pressed }) => (pressed ? [styles.pressed] : undefined)}
           >
             <X size={15} color="rgba(255,255,255,0.6)" />
           </Pressable>
@@ -984,12 +1227,16 @@ function FilterPanel({
 
         <ScrollView
           style={{ maxHeight: 380 }}
-          contentContainerStyle={{ gap: 8 }}
+          contentContainerStyle={{
+            gap: 8,
+          }}
           showsVerticalScrollIndicator={false}
         >
           {Object.entries(TYPE_CONFIG).map(([key, config]) => {
             const active = activeTypes.has(key);
+
             const count = categoryCounts[key] ?? 0;
+
             const Icon = config.Icon;
 
             return (
@@ -1021,16 +1268,30 @@ function FilterPanel({
                     strokeWidth={2.4}
                   />
                 </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
+
+                <View
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
                   <Text
-                    style={[styles.filterRowTitle, active && { color: "#fff" }]}
+                    style={[
+                      styles.filterRowTitle,
+                      active && {
+                        color: "#fff",
+                      },
+                    ]}
                   >
                     {config.label}
                   </Text>
+
                   <Text style={styles.filterRowCount}>
-                    {count} résultat{count > 1 ? "s" : ""}
+                    {count} résultat
+                    {count > 1 ? "s" : ""}
                   </Text>
                 </View>
+
                 {active ? (
                   <Check size={14} color="#C4B5FD" strokeWidth={3} />
                 ) : null}
@@ -1067,6 +1328,7 @@ function SelectedCard({
     color: "#64748B",
     Icon: DEFAULT_ICON,
   };
+
   const Icon = config.Icon;
 
   return (
@@ -1078,9 +1340,9 @@ function SelectedCard({
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+
       <View style={styles.selectedBorder} pointerEvents="none" />
 
-      {/* Grab handle */}
       <Pressable
         onPress={onToggleExpand}
         style={styles.selectedHandle}
@@ -1090,7 +1352,6 @@ function SelectedCard({
       </Pressable>
 
       <View style={{ padding: 14 }}>
-        {/* Close */}
         <Pressable
           onPress={onClose}
           style={styles.selectedCloseBtn}
@@ -1100,16 +1361,19 @@ function SelectedCard({
         </Pressable>
 
         <View style={styles.selectedRow}>
-          {/* Image */}
           <View
             style={[
               styles.selectedImageWrap,
-              { borderColor: `${config.color}44` },
+              {
+                borderColor: `${config.color}44`,
+              },
             ]}
           >
-            {pub.images?.[0] ? (
+            {pub.images[0] ? (
               <Image
-                source={{ uri: pub.images[0] }}
+                source={{
+                  uri: pub.images[0],
+                }}
                 style={styles.selectedImage}
                 accessibilityLabel={pub.title}
               />
@@ -1118,6 +1382,7 @@ function SelectedCard({
                 <MapPin size={26} color="rgba(255,255,255,0.3)" />
               </View>
             )}
+
             <LinearGradient
               colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.55)"]}
               start={{ x: 0, y: 0 }}
@@ -1127,8 +1392,13 @@ function SelectedCard({
             />
           </View>
 
-          {/* Info */}
-          <View style={{ flex: 1, minWidth: 0, paddingRight: 28 }}>
+          <View
+            style={{
+              flex: 1,
+              minWidth: 0,
+              paddingRight: 28,
+            }}
+          >
             <View style={styles.selectedBadgeRow}>
               <View
                 style={[
@@ -1139,8 +1409,10 @@ function SelectedCard({
                 ]}
               >
                 <Icon size={10} color="#fff" strokeWidth={2.6} />
+
                 <Text style={styles.selectedBadgeText}>{config.label}</Text>
               </View>
+
               {pub.price ? (
                 <Text style={styles.selectedPrice} numberOfLines={1}>
                   {pub.price}
@@ -1155,6 +1427,7 @@ function SelectedCard({
             {pub.location ? (
               <View style={styles.selectedLocationRow}>
                 <MapPin size={11} color="rgba(255,255,255,0.5)" />
+
                 <Text style={styles.selectedLocation} numberOfLines={1}>
                   {pub.location}
                 </Text>
@@ -1164,14 +1437,26 @@ function SelectedCard({
             <View style={styles.selectedStatsRow}>
               <View style={styles.selectedStat}>
                 <HeartIcon size={11} color="rgba(255,255,255,0.5)" />
+
                 <Text style={styles.selectedStatText}>{pub.likeCount}</Text>
               </View>
+
               <View style={styles.selectedStat}>
                 <MessageCircle size={11} color="rgba(255,255,255,0.5)" />
+
                 <Text style={styles.selectedStatText}>{pub.commentCount}</Text>
               </View>
-              <View style={[styles.selectedStat, { marginLeft: "auto" }]}>
+
+              <View
+                style={[
+                  styles.selectedStat,
+                  {
+                    marginLeft: "auto",
+                  },
+                ]}
+              >
                 <Users size={11} color="rgba(255,255,255,0.5)" />
+
                 <Text style={styles.selectedStatText} numberOfLines={1}>
                   {pub.authorName}
                 </Text>
@@ -1180,7 +1465,6 @@ function SelectedCard({
           </View>
         </View>
 
-        {/* Description (expanded) */}
         {expanded ? (
           <FadeUp distance={8}>
             <View style={styles.selectedDescriptionWrap}>
@@ -1191,7 +1475,6 @@ function SelectedCard({
           </FadeUp>
         ) : null}
 
-        {/* Actions */}
         <View style={styles.selectedActions}>
           <Pressable
             onPress={onCenter}
@@ -1207,6 +1490,7 @@ function SelectedCard({
               style={styles.selectedPrimaryGradient}
             >
               <Navigation size={14} color="#fff" strokeWidth={2.4} />
+
               <Text style={styles.selectedPrimaryText}>Voir sur la carte</Text>
             </LinearGradient>
           </Pressable>
@@ -1243,9 +1527,18 @@ function SelectedCard({
  * ========================================================================== */
 
 const DARK_MAP_STYLE = [
-  { elementType: "geometry", stylers: [{ color: "#0F172A" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0F172A" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#94A3B8" }] },
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#0F172A" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#0F172A" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#94A3B8" }],
+  },
   {
     featureType: "administrative.locality",
     elementType: "labels.text.fill",
@@ -1317,9 +1610,13 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#020617",
   },
-  pressed: { opacity: 0.85 },
+
+  pressed: {
+    opacity: 0.85,
+  },
 
   /* ── Shadows ────────────────────────────────────── */
+
   topShadow: {
     position: "absolute",
     top: 0,
@@ -1328,6 +1625,7 @@ const styles = StyleSheet.create({
     height: 180,
     zIndex: 10,
   },
+
   bottomShadow: {
     position: "absolute",
     bottom: 0,
@@ -1338,6 +1636,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Header ─────────────────────────────────────── */
+
   header: {
     position: "absolute",
     top: 0,
@@ -1346,11 +1645,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     zIndex: 30,
   },
+
   headerRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
   },
+
   closeBtn: {
     width: 48,
     height: 48,
@@ -1363,8 +1664,12 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.4,
     shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
   },
+
   headerPanel: {
     flex: 1,
     minWidth: 0,
@@ -1375,12 +1680,17 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.45,
     shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
     overflow: "hidden",
   },
+
   headerPanelInner: {
     padding: 8,
   },
+
   headerPanelTop: {
     flexDirection: "row",
     alignItems: "center",
@@ -1388,10 +1698,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
+
   pulsingIconWrap: {
     width: 38,
     height: 38,
   },
+
   pulsingIconGradient: {
     width: 38,
     height: 38,
@@ -1403,20 +1715,26 @@ const styles = StyleSheet.create({
     shadowColor: "#7C3AED",
     shadowOpacity: 0.6,
     shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
   },
+
   headerTitle: {
     fontSize: 14,
     fontWeight: "900",
     color: "#fff",
     letterSpacing: -0.3,
   },
+
   headerSub: {
     marginTop: 2,
     fontSize: 11,
     color: "rgba(255,255,255,0.5)",
     fontWeight: "600",
   },
+
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1428,6 +1746,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
+
   searchInput: {
     flex: 1,
     minWidth: 0,
@@ -1438,6 +1757,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Controls ───────────────────────────────────── */
+
   controlsCol: {
     position: "absolute",
     right: 12,
@@ -1445,6 +1765,7 @@ const styles = StyleSheet.create({
     gap: 10,
     zIndex: 30,
   },
+
   controlBtn: {
     width: 48,
     height: 48,
@@ -1457,12 +1778,17 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.4,
     shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
     overflow: "hidden",
   },
+
   controlBtnActive: {
     borderColor: "rgba(167,139,250,0.55)",
   },
+
   controlBtnBadge: {
     position: "absolute",
     top: -4,
@@ -1477,6 +1803,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#020617",
   },
+
   controlBtnBadgeText: {
     fontSize: 10,
     fontWeight: "900",
@@ -1484,14 +1811,20 @@ const styles = StyleSheet.create({
   },
 
   /* ── Mode switch ────────────────────────────────── */
+
   modeSwitchWrap: {
     position: "absolute",
     top: 148,
     alignSelf: "center",
     left: "50%",
-    transform: [{ translateX: -110 }],
+    transform: [
+      {
+        translateX: -110,
+      },
+    ],
     zIndex: 30,
   },
+
   modeSwitch: {
     flexDirection: "row",
     padding: 4,
@@ -1502,8 +1835,12 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.4,
     shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
   },
+
   modeBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1512,12 +1849,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 14,
   },
+
   modeBtnActiveLight: {
     backgroundColor: "#fff",
   },
+
   modeBtnActiveViolet: {
     backgroundColor: "#7C3AED",
   },
+
   modeBtnText: {
     fontSize: 11.5,
     fontWeight: "800",
@@ -1526,6 +1866,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Filter panel ───────────────────────────────── */
+
   filterWrap: {
     position: "absolute",
     top: 210,
@@ -1533,53 +1874,62 @@ const styles = StyleSheet.create({
     right: 12,
     zIndex: 40,
   },
+
   filterCard: {
     borderRadius: 26,
     padding: 16,
     overflow: "hidden",
     backgroundColor: "rgba(10,6,24,0.9)",
   },
+
   filterBorder: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 26,
     borderWidth: 1,
     borderColor: "rgba(167,139,250,0.2)",
   },
+
   filterHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginBottom: 12,
   },
+
   filterTitle: {
     fontSize: 13.5,
     fontWeight: "900",
     color: "#fff",
     letterSpacing: -0.3,
   },
+
   filterSub: {
     marginTop: 2,
     fontSize: 11,
     color: "rgba(255,255,255,0.45)",
     fontWeight: "500",
   },
+
   filterQuickBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
   },
+
   filterQuickTextAll: {
     fontSize: 10.5,
     fontWeight: "800",
     color: "#C4B5FD",
     letterSpacing: 0.1,
   },
+
   filterQuickTextNone: {
     fontSize: 10.5,
     fontWeight: "800",
     color: "rgba(255,255,255,0.45)",
     letterSpacing: 0.1,
   },
+
   filterRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1591,10 +1941,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
   },
+
   filterRowActive: {
     backgroundColor: "rgba(255,255,255,0.08)",
     borderColor: "rgba(255,255,255,0.14)",
   },
+
   filterRowIcon: {
     width: 30,
     height: 30,
@@ -1603,12 +1955,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
+
   filterRowTitle: {
     fontSize: 11.5,
     fontWeight: "800",
     color: "rgba(255,255,255,0.55)",
     letterSpacing: -0.1,
   },
+
   filterRowCount: {
     marginTop: 2,
     fontSize: 9.5,
@@ -1617,6 +1971,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Location error ─────────────────────────────── */
+
   errorWrap: {
     position: "absolute",
     top: 118,
@@ -1624,6 +1979,7 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 40,
   },
+
   errorCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -1636,8 +1992,12 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.5,
     shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
   },
+
   errorIconWrap: {
     width: 36,
     height: 36,
@@ -1648,12 +2008,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(251,191,36,0.3)",
   },
+
   errorTitle: {
     fontSize: 12.5,
     fontWeight: "800",
     color: "#fff",
     letterSpacing: -0.2,
   },
+
   errorSub: {
     marginTop: 2,
     fontSize: 10,
@@ -1662,6 +2024,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Empty ──────────────────────────────────────── */
+
   emptyWrap: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
@@ -1669,6 +2032,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     zIndex: 25,
   },
+
   emptyCard: {
     width: "100%",
     maxWidth: 380,
@@ -1680,12 +2044,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(167,139,250,0.25)",
   },
+
   emptyBorder: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 32,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
   },
+
   emptyIcon: {
     width: 64,
     height: 64,
@@ -1697,15 +2063,20 @@ const styles = StyleSheet.create({
     shadowColor: "#7C3AED",
     shadowOpacity: 0.6,
     shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
     marginBottom: 16,
   },
+
   emptyTitle: {
     fontSize: 16,
     fontWeight: "900",
     color: "#fff",
     letterSpacing: -0.3,
   },
+
   emptySub: {
     marginTop: 8,
     fontSize: 12,
@@ -1715,285 +2086,317 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     maxWidth: 280,
   },
+
   emptyBtn: {
     marginTop: 20,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: "#fff",
+    backgroundColor: "#7C3AED",
+    borderWidth: 1,
+    borderColor: "rgba(196,181,253,0.25)",
   },
+
   emptyBtnText: {
     fontSize: 12,
-    fontWeight: "900",
-    color: "#0F172A",
-    letterSpacing: 0.2,
+    fontWeight: "800",
+    color: "#fff",
   },
 
   /* ── Selected card ──────────────────────────────── */
+
   card: {
     position: "absolute",
-    bottom: Platform.OS === "android" ? 12 : 24,
     left: 12,
     right: 12,
-    zIndex: 45,
+    bottom: 12,
+    zIndex: 50,
   },
+
   selectedCard: {
-    borderRadius: 32,
+    borderRadius: 28,
     overflow: "hidden",
-    backgroundColor: "#0A0818",
+    backgroundColor: "#0C0A1E",
     borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.28)",
+    borderColor: "rgba(167,139,250,0.2)",
     shadowColor: "#000",
-    shadowOpacity: 0.7,
-    shadowRadius: 32,
-    shadowOffset: { width: 0, height: -14 },
-    elevation: 20,
+    shadowOpacity: 0.55,
+    shadowRadius: 30,
+    shadowOffset: {
+      width: 0,
+      height: 16,
+    },
   },
+
   selectedBorder: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 32,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
   },
+
   selectedHandle: {
     alignItems: "center",
-    paddingVertical: 8,
+    justifyContent: "center",
+    height: 26,
   },
+
   selectedHandleBar: {
-    width: 40,
+    width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.18)",
   },
+
   selectedCloseBtn: {
     position: "absolute",
-    top: 10,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    top: 8,
+    right: 0,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    zIndex: 10,
+    borderColor: "rgba(255,255,255,0.08)",
+    zIndex: 5,
   },
+
   selectedRow: {
     flexDirection: "row",
     gap: 12,
   },
+
   selectedImageWrap: {
-    width: 96,
-    height: 96,
+    width: 92,
+    height: 108,
     borderRadius: 18,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
+
   selectedImage: {
     width: "100%",
     height: "100%",
   },
+
   selectedImageFallback: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
+
   selectedImageOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 40,
+    ...StyleSheet.absoluteFillObject,
   },
+
   selectedBadgeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 8,
   },
+
   selectedBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
+    gap: 4,
+    paddingHorizontal: 7,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: 8,
   },
+
   selectedBadgeText: {
     fontSize: 9,
     fontWeight: "900",
     color: "#fff",
-    letterSpacing: 0.3,
   },
+
   selectedPrice: {
-    fontSize: 10.5,
+    flex: 1,
+    fontSize: 11,
     fontWeight: "900",
     color: "#C4B5FD",
-    letterSpacing: 0.1,
-    flexShrink: 1,
+    textAlign: "right",
   },
+
   selectedTitle: {
-    fontSize: 14,
+    marginTop: 8,
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: "900",
     color: "#fff",
     letterSpacing: -0.3,
-    lineHeight: 19,
   },
+
   selectedLocationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: 6,
+    marginTop: 7,
   },
+
   selectedLocation: {
     flex: 1,
-    fontSize: 10.5,
+    fontSize: 10,
     color: "rgba(255,255,255,0.5)",
-    fontWeight: "500",
+    fontWeight: "600",
   },
+
   selectedStatsRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginTop: 8,
+    marginTop: 10,
   },
+
   selectedStat: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    maxWidth: "55%",
   },
+
   selectedStatText: {
-    fontSize: 10.5,
+    fontSize: 9.5,
     color: "rgba(255,255,255,0.5)",
     fontWeight: "700",
   },
+
   selectedDescriptionWrap: {
     marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.06)",
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
   },
+
   selectedDescription: {
-    fontSize: 12,
+    fontSize: 11.5,
     lineHeight: 18,
-    color: "rgba(255,255,255,0.6)",
+    color: "rgba(255,255,255,0.62)",
     fontWeight: "500",
   },
+
   selectedActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     marginTop: 14,
   },
+
   selectedPrimaryBtn: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 15,
     overflow: "hidden",
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
   },
+
   selectedPrimaryGradient: {
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
+    gap: 7,
+    paddingHorizontal: 14,
   },
+
   selectedPrimaryText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "900",
     color: "#fff",
-    letterSpacing: 0.2,
   },
+
   selectedIconBtn: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.09)",
   },
+
   selectedIconBtnPrimary: {
     backgroundColor: "#7C3AED",
-    borderColor: "#7C3AED",
+    borderColor: "rgba(196,181,253,0.25)",
   },
 
   /* ── Status ─────────────────────────────────────── */
+
   statusWrap: {
     position: "absolute",
-    bottom: Platform.OS === "android" ? 12 : 24,
-    left: 12,
-    zIndex: 30,
+    bottom: 18,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 20,
   },
+
   statusCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 16,
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
     backgroundColor: "rgba(2,6,23,0.78)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    shadowColor: "#000",
-    shadowOpacity: 0.4,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
+    borderColor: "rgba(255,255,255,0.08)",
   },
+
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#34D399",
-    shadowColor: "#34D399",
-    shadowOpacity: 0.9,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#4ADE80",
   },
+
   statusText: {
-    fontSize: 10.5,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.75)",
-    letterSpacing: 0.1,
-  },
-  statusActive: {
-    fontSize: 9.5,
-    color: "#C4B5FD",
+    fontSize: 10,
+    color: "rgba(255,255,255,0.55)",
     fontWeight: "700",
   },
 
+  statusActive: {
+    fontSize: 10,
+    color: "#A78BFA",
+    fontWeight: "800",
+  },
+
   /* ── Marker ─────────────────────────────────────── */
+
   markerOuter: {
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.95)",
-    shadowOpacity: 0.55,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 6,
+    borderColor: "rgba(255,255,255,0.85)",
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    elevation: 8,
   },
+
   markerInner: {
-    backgroundColor: "rgba(255,255,255,0.96)",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.92)",
   },
+
   markerArrow: {
     width: 0,
     height: 0,
     borderLeftWidth: 6,
     borderRightWidth: 6,
-    borderTopWidth: 8,
+    borderTopWidth: 10,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    marginTop: -2,
   },
 });

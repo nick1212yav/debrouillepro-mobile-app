@@ -3,6 +3,7 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
 import { requireAuthenticatedUser } from "../auth/helpers";
+import type { Doc, Id } from "../_generated/dataModel";
 
 // ============================================================================
 // TYPES
@@ -284,7 +285,16 @@ export const searchConversations = query({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
-    const results = [];
+    const results: Array<{
+      conversationId: Id<"conversations">;
+      isGroup: boolean;
+      name: string;
+      avatar: string | undefined;
+      otherUserId?: Id<"users">;
+      lastMessageText: string | undefined;
+      lastMessageSenderId: Id<"users"> | undefined;
+      updatedAt: string;
+    }> = [];
 
     for (const membership of memberships) {
       if (results.length >= limit) {
@@ -407,7 +417,14 @@ export const globalSearch = query({
       memberships.map((member) => member.conversationId),
     );
 
-    const conversationResults = [];
+    const conversationResults: Array<{
+      conversationId: Id<"conversations">;
+      isGroup: boolean;
+      name: string;
+      avatar: string | undefined;
+      otherUserId?: Id<"users">;
+      updatedAt: string;
+    }> = [];
 
     for (const membership of memberships) {
       if (conversationResults.length >= limit) {
@@ -466,7 +483,16 @@ export const globalSearch = query({
     // Messages
     // ------------------------------------------------------------------------
 
-    const messageResults = [];
+    const messageResults: Array<{
+      messageId: Id<"messages">;
+      conversationId: Id<"conversations">;
+      senderId: Id<"users">;
+      senderName: string;
+      senderAvatar: string | undefined;
+      text: string;
+      status: "sent" | "delivered" | "read" | "failed";
+      conversationName: string;
+    }> = [];
 
     for (const conversationId of allowedConversationIds) {
       if (messageResults.length >= limit) {

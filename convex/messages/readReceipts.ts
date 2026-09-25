@@ -3,6 +3,7 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import { requireAuthenticatedUser } from "../auth/helpers";
+import type { Doc, Id } from "../_generated/dataModel";
 
 // ============================================================================
 // MARQUER UN MESSAGE COMME LU
@@ -108,7 +109,7 @@ export const markManyAsRead = mutation({
 
     const now = new Date().toISOString();
 
-    const receiptIds = [];
+    const receiptIds: Id<"readReceipts">[] = [];
 
     for (const messageIdString of uniqueMessageIds) {
       const messageId = args.messageIds.find(
@@ -267,7 +268,10 @@ export const getConversationReadReceipts = query({
     // Récupérer les receipts de chaque message
     // ------------------------------------------------------------------------
 
-    const result = [];
+    const result: Array<{
+      messageId: Id<"messages">;
+      receipts: Doc<"readReceipts">[];
+    }> = [];
 
     for (const message of messages) {
       const receipts = await ctx.db

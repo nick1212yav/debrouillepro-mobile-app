@@ -1,5 +1,5 @@
-import { View, Image, Text, Pressable } from "react-native";
-import { Users, Trash2 } from "lucide-react-native";
+import { Image, Pressable, Text, View } from "react-native";
+import { Trash2, Users } from "lucide-react-native";
 import { PublicationBadge } from "./PublicationBadge";
 import type { Publication, PublicationType } from "../types";
 
@@ -20,26 +20,80 @@ export function PublicationHeader({
   isMine,
   formatTime,
 }: Props) {
-  // Sécurisation des informations auteur
-  const authorName =
-    publication.author?.name ??
-    (publication as any).authorName ??
-    "Utilisateur";
+  const authorName = publication.author?.name ?? "Utilisateur";
+  const authorAvatar = publication.author?.avatar;
 
-  const authorAvatar =
-    publication.author?.avatar ??
-    (publication as any).authorAvatar ??
-    undefined;
+  const initials = authorName.trim().charAt(0).toUpperCase() || "U";
 
   return (
-    <View className="p-3 pb-2 flex items-center gap-2"><View className="relative">{authorAvatar ? (
-          <Image className="w-9 h-9 rounded-xl object-cover" source={{ uri: authorAvatar }} accessibilityLabel={authorName} />
+    <View className="flex-row items-center gap-2 p-3 pb-2">
+      <View className="relative">
+        {authorAvatar ? (
+          <Image
+            className="h-9 w-9 rounded-xl"
+            source={{ uri: authorAvatar }}
+            accessibilityLabel={`Avatar de ${authorName}`}
+          />
         ) : (
-          <View className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold text-white/60" style={{ backgroundColor: "rgba(139,92,246,0.2)" }}>{authorName.charAt(0).toUpperCase()}</View>
-        )}<View className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs" style={{ backgroundColor: "#0a0a1a", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>{emoji}</View></View><View className="flex-1 min-w-0"><Text className="text-xs font-bold text-white truncate">{authorName}</Text><View className="flex items-center gap-1"><Users size={9} className="text-purple-400 flex-shrink-0" /><Text className="text-[10px] text-purple-400 truncate">{type}</Text><Text className="text-white/20 text-[10px] flex-shrink-0">· {formatTime(publication._creationTime)}</Text></View></View><View className="flex items-center gap-2"><PublicationBadge type={type} />{isMine && (
-          <Pressable onPress={onDelete} className="active:scale-90 transition-transform">
-            <Trash2 size={13} className="text-white/25" />
+          <View
+            className="h-9 w-9 items-center justify-center rounded-xl"
+            style={{
+              backgroundColor: "rgba(139,92,246,0.2)",
+            }}
+          >
+            <Text className="text-sm font-bold text-white/60">{initials}</Text>
+          </View>
+        )}
+
+        <View
+          className="absolute -right-1 -top-1 h-5 w-5 items-center justify-center rounded-full"
+          style={{
+            backgroundColor: "#0a0a1a",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.1)",
+          }}
+        >
+          <Text className="text-xs">{emoji}</Text>
+        </View>
+      </View>
+
+      <View className="min-w-0 flex-1">
+        <Text numberOfLines={1} className="text-xs font-bold text-white">
+          {authorName}
+        </Text>
+
+        <View className="flex-row items-center gap-1">
+          <Users
+            size={9}
+            color="#A78BFA"
+            accessibilityLabel="Type de publication"
+          />
+
+          <Text numberOfLines={1} className="text-[10px] text-purple-400">
+            {type}
+          </Text>
+
+          <Text className="flex-shrink-0 text-[10px] text-white/20">
+            · {formatTime(publication._creationTime)}
+          </Text>
+        </View>
+      </View>
+
+      <View className="flex-row items-center gap-2">
+        <PublicationBadge type={type} />
+
+        {isMine && onDelete ? (
+          <Pressable
+            onPress={onDelete}
+            accessibilityRole="button"
+            accessibilityLabel="Supprimer la publication"
+            hitSlop={8}
+            className="items-center justify-center rounded-lg p-1"
+          >
+            <Trash2 size={13} color="rgba(255,255,255,0.25)" />
           </Pressable>
-        )}</View></View>
+        ) : null}
+      </View>
+    </View>
   );
 }

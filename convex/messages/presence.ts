@@ -3,6 +3,7 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import { requireAuthenticatedUser } from "../auth/helpers";
+import type { Doc, Id } from "../_generated/dataModel";
 
 // ============================================================================
 // METTRE À JOUR LA PRÉSENCE
@@ -234,7 +235,15 @@ export const getUsersPresence = query({
 
     const uniqueUserIds = [...new Set(args.userIds.map((id) => id.toString()))];
 
-    const results = [];
+    const results: Array<
+      | Doc<"presence">
+      | {
+          userId: Id<"users">;
+          status: "offline";
+          lastSeen: null;
+          device: null;
+        }
+    > = [];
 
     for (const userIdString of uniqueUserIds) {
       const userId = args.userIds.find((id) => id.toString() === userIdString);

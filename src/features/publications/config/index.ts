@@ -1,3 +1,5 @@
+// src/features/publications/config/index.ts
+
 import type { PublicationConfig, PublicationType } from "../types";
 
 import { communityConfig } from "./modules/community.config";
@@ -23,6 +25,10 @@ import { networkConfig } from "./modules/network.config";
 import { businessConfig } from "./modules/business.config";
 import { creatorConfig } from "./modules/creator.config";
 import { groupesConfig } from "./modules/groupes.config";
+import { marketplaceConfig } from "./modules/marketplace.config";
+import { videoConfig } from "./modules/video.config";
+import { articleConfig } from "./modules/article.config";
+import { sondageConfig } from "./modules/sondage.config";
 
 /* ============================================================================
  * DEFAULT CONFIG
@@ -46,167 +52,74 @@ const DEFAULT_CONFIG: PublicationConfig = {
 
 /* ============================================================================
  * PUBLICATION CONFIGURATION
+ * ============================================================================
+ *
+ * 27 types canoniques alignés avec :
+ *   - convex/schema.ts          → publications.type
+ *   - features/publications/types/index.ts → PublicationType
+ *
+ * Aucun alias ici. Les correspondances UX (emploi → job, logement → immo,
+ * tourisme → voyages, culture → evenement, tech → media) sont gérées par
+ * les mappings côté frontend, jamais par la base.
  * ========================================================================== */
 
 export const PUBLICATION_CONFIG: Record<PublicationType, PublicationConfig> = {
-  /* --------------------------------------------------------------------------
-   * Core
-   * ------------------------------------------------------------------------ */
-
-  community: communityConfig,
-  evenement: evenementConfig,
-
-  /* --------------------------------------------------------------------------
-   * Emploi
-   * ------------------------------------------------------------------------ */
-
-  job: jobConfig,
-  emploi: jobConfig,
-
-  /* --------------------------------------------------------------------------
-   * Immobilier
-   * ------------------------------------------------------------------------ */
+  /* ─── Vie quotidienne ─────────────────────────────────────────────── */
 
   immo: immoConfig,
-  logement: immoConfig,
-
-  /* --------------------------------------------------------------------------
-   * Services
-   * ------------------------------------------------------------------------ */
-
+  hebergement: hebergementConfig,
+  restauration: restaurationConfig,
   service: serviceConfig,
 
-  /* --------------------------------------------------------------------------
-   * Santé
-   * ------------------------------------------------------------------------ */
+  /* ─── Travail & finances ──────────────────────────────────────────── */
 
-  sante: santeConfig,
+  job: jobConfig,
+  finance: financeConfig,
+  business: businessConfig,
+  marketplace: marketplaceConfig,
 
-  /* --------------------------------------------------------------------------
-   * Transport & voyages
-   * ------------------------------------------------------------------------ */
+  /* ─── Mobilité ────────────────────────────────────────────────────── */
 
   transport: transportConfig,
   voyages: voyagesConfig,
-  tourisme: voyagesConfig,
 
-  /* --------------------------------------------------------------------------
-   * Éducation / justice
-   * ------------------------------------------------------------------------ */
+  /* ─── Santé & bien-être ───────────────────────────────────────────── */
+
+  sante: santeConfig,
+
+  /* ─── Éducation ───────────────────────────────────────────────────── */
 
   education: educationConfig,
-  justice: justiceConfig,
 
-  /* --------------------------------------------------------------------------
-   * Annonces / agriculture
-   * ------------------------------------------------------------------------ */
+  /* ─── Communauté & social ─────────────────────────────────────────── */
 
-  annonce: annonceConfig,
-  agri: agriConfig,
-  environnement: environnementConfig,
+  community: communityConfig,
+  groupes: groupesConfig,
+  network: networkConfig,
+  evenement: evenementConfig,
 
-  /* --------------------------------------------------------------------------
-   * Énergie / ONG
-   * ------------------------------------------------------------------------ */
-
-  energie: energieConfig,
-  ong: ongConfig,
-
-  /* --------------------------------------------------------------------------
-   * Commerce / restauration / hébergement
-   * ------------------------------------------------------------------------ */
-
-  restauration: restaurationConfig,
-  hebergement: hebergementConfig,
-  marketplace: serviceConfig,
-
-  /* --------------------------------------------------------------------------
-   * Media
-   * ------------------------------------------------------------------------ */
+  /* ─── Médias & création ───────────────────────────────────────────── */
 
   media: mediaConfig,
-
-  /**
-   * Vidéo et article utilisent actuellement la configuration Media.
-   *
-   * On garde des entrées explicites afin que le type PublicationType
-   * reste exhaustif et que Record<PublicationType, PublicationConfig>
-   * soit garanti par TypeScript.
-   */
-  video: {
-    ...mediaConfig,
-    type: "video",
-    label: "Vidéo",
-    badge: "Vidéo",
-    placeholder: "Partager une vidéo",
-    aiCategory: "video",
-  },
-
-  article: {
-    ...mediaConfig,
-    type: "article",
-    label: "Article",
-    badge: "Article",
-    placeholder: "Publier un article",
-    aiCategory: "article",
-  },
-
-  /* --------------------------------------------------------------------------
-   * Finance / réseau / business
-   * ------------------------------------------------------------------------ */
-
-  finance: financeConfig,
-  network: networkConfig,
-  business: businessConfig,
+  video: videoConfig,
+  article: articleConfig,
   creator: creatorConfig,
+  sondage: sondageConfig,
 
-  /* --------------------------------------------------------------------------
-   * Communauté / contenu spécialisé
-   * ------------------------------------------------------------------------ */
+  /* ─── Agriculture & environnement ─────────────────────────────────── */
 
-  sport: communityConfig,
-  culture: mediaConfig,
-  tech: serviceConfig,
+  agri: agriConfig,
+  environnement: environnementConfig,
+  energie: energieConfig,
 
-  /* --------------------------------------------------------------------------
-   * Sondages
-   * ------------------------------------------------------------------------ */
+  /* ─── Gouvernance ─────────────────────────────────────────────────── */
 
-  sondage: {
-    ...communityConfig,
-    type: "sondage",
-    label: "Sondage",
-    badge: "Sondage",
-    placeholder: "Créer un sondage",
-    aiCategory: "poll",
-  },
+  justice: justiceConfig,
+  ong: ongConfig,
 
-  /* --------------------------------------------------------------------------
-   * Premium / Boost
-   * ------------------------------------------------------------------------ */
+  /* ─── Annonces ────────────────────────────────────────────────────── */
 
-  premium: serviceConfig,
-  boost: serviceConfig,
-
-  /* --------------------------------------------------------------------------
-   * Engagement / fidélité
-   * ------------------------------------------------------------------------ */
-
-  reputation: communityConfig,
-  recompenses: communityConfig,
-  parrainage: communityConfig,
-
-  /* --------------------------------------------------------------------------
-   * Sécurité
-   * ------------------------------------------------------------------------ */
-
-  sos: communityConfig,
-
-  /* --------------------------------------------------------------------------
-   * Groupes
-   * ------------------------------------------------------------------------ */
-
-  groupes: groupesConfig,
+  annonce: annonceConfig,
 };
 
 /* ============================================================================

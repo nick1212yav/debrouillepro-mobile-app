@@ -139,7 +139,7 @@ async function enrichConversation(
 ) {
   const participants = await getParticipants(ctx, conversation.participantIds);
 
-  const members = [];
+  const members: Array<{ userId: Id<"users">; unreadCount: number }> = [];
 
   for (const userId of conversation.participantIds) {
     const member = await ctx.db

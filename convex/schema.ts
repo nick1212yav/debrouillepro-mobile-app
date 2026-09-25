@@ -301,24 +301,32 @@ export default defineSchema({
   publications: defineTable({
     authorId: v.id("users"),
     type: v.union(
+      v.literal("agri"),
+      v.literal("annonce"),
+      v.literal("article"),
+      v.literal("business"),
+      v.literal("community"),
+      v.literal("creator"),
+      v.literal("education"),
+      v.literal("energie"),
+      v.literal("environnement"),
+      v.literal("evenement"),
+      v.literal("finance"),
+      v.literal("groupes"),
+      v.literal("hebergement"),
       v.literal("immo"),
       v.literal("job"),
-      v.literal("service"),
-      v.literal("evenement"),
-      v.literal("community"),
-      v.literal("agri"),
-      v.literal("sante"),
-      v.literal("transport"),
-      v.literal("annonce"),
-      v.literal("restauration"),
-      v.literal("hebergement"),
-      v.literal("energie"),
-      v.literal("ong"),
-      v.literal("video"),
-      v.literal("article"),
-      v.literal("sondage"),
+      v.literal("justice"),
       v.literal("marketplace"),
+      v.literal("media"),
       v.literal("network"),
+      v.literal("ong"),
+      v.literal("restauration"),
+      v.literal("sante"),
+      v.literal("service"),
+      v.literal("sondage"),
+      v.literal("transport"),
+      v.literal("video"),
       v.literal("voyages"),
     ),
     title: v.string(),
@@ -5793,6 +5801,61 @@ export default defineSchema({
     startedAt: v.string(),
     endedAt: v.optional(v.string()),
   }).index("by_conversation", ["conversationId"]),
+  // ─────────────────────────────────────────────────────────────────────────
+  // AMÉNAGEMENT — INSPIRATIONS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  inspirations: defineTable({
+    title: v.string(),
+    style: v.string(),
+    imageUrl: v.string(),
+    likeCount: v.number(),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+  })
+    .index("by_created", ["createdAt"])
+    .index("by_style", ["style"]),
+
+  inspirationLikes: defineTable({
+    inspirationId: v.id("inspirations"),
+    userId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_inspiration", ["inspirationId"])
+    .index("by_user", ["userId"])
+    .index("by_user_and_inspiration", ["userId", "inspirationId"]),
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // AMÉNAGEMENT — SUIVI DES PROJETS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  projectTrackings: defineTable({
+    userId: v.id("users"),
+
+    title: v.string(),
+
+    budget: v.number(),
+
+    durationLabel: v.string(),
+
+    progress: v.number(),
+
+    steps: v.array(
+      v.object({
+        _id: v.string(),
+        label: v.string(),
+        done: v.boolean(),
+        dateLabel: v.string(),
+      }),
+    ),
+
+    isActive: v.boolean(),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_active", ["userId", "isActive"]),
 
   // Clés de chiffrement des utilisateurs
   userKeys: defineTable({

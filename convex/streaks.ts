@@ -12,32 +12,60 @@ function yesterdayUTC(): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Get streak info for current user. Returns null if no streak started yet. */
+/** Get streak info for current user. Returns null if no authenticated user/streak context. */
 export const getMyStreak = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+
+    if (!identity) {
+      return null;
+    }
+
     const user = await ctx.db
       .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
       .unique();
-    if (!user) return null;
+
+    if (!user) {
+      return null;
+    }
 
     const streak = await ctx.db
       .query("userStreaks")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .unique();
 
+    /*
+     * Keep the return shape identical whether the user has
+     * already started a streak or not.
+     *
+     * This is important for the frontend contract:
+     * StreakWidget can safely destructure isStreakInDanger
+     * without dealing with a discriminated union.
+     */
     if (!streak) {
-      return { currentStreak: 0, longestStreak: 0, lastClaimedDate: null, totalDaysClaimed: 0, canClaim: true };
+      return {
+        currentStreak: 0,
+        longestStreak: 0,
+        lastClaimedDate: null,
+        totalDaysClaimed: 0,
+        canClaim: true,
+        isStreakInDanger: false,
+      };
     }
 
     const today = todayUTC();
+    const yesterday = yesterdayUTC();
+
     const canClaim = streak.lastClaimedDate !== today;
 
-    // If last claim was more than 1 day ago AND not today, streak is broken
-    const isStreakAlive = streak.lastClaimedDate === today || streak.lastClaimedDate === yesterdayUTC();
+    // A streak remains alive when the last claim was today or yesterday.
+    const isStreakAlive =
+      streak.lastClaimedDate === today || streak.lastClaimedDate === yesterday;
+
     const effectiveStreak = isStreakAlive ? streak.currentStreak : 0;
 
     return {
@@ -46,23 +74,44 @@ export const getMyStreak = query({
       lastClaimedDate: streak.lastClaimedDate,
       totalDaysClaimed: streak.totalDaysClaimed,
       canClaim,
-      isStreakInDanger: streak.lastClaimedDate === yesterdayUTC() && effectiveStreak > 0,
+      isStreakInDanger:
+        streak.lastClaimedDate === yesterday && effectiveStreak > 0,
     };
   },
 });
 
-/** Claim daily streak XP. Returns xpEarned and new streak count. */
+/** Claim daily streak XP. */
 export const claimDailyStreak = mutation({
   args: {},
-  handler: async (ctx): Promise<{ xpEarned: number; newStreak: number; isNewRecord: boolean }> => {
+  handler: async (
+    ctx,
+  ): Promise<{
+    xpEarned: number;
+    newStreak: number;
+    isNewRecord: boolean;
+  }> => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError({ message: "Non authentifié", code: "UNAUTHENTICATED" });
+
+    if (!identity) {
+      throw new ConvexError({
+        message: "Non authentifié",
+        code: "UNAUTHENTICATED",
+      });
+    }
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
       .unique();
-    if (!user) throw new ConvexError({ message: "Utilisateur introuvable", code: "NOT_FOUND" });
+
+    if (!user) {
+      throw new ConvexError({
+        message: "Utilisateur introuvable",
+        code: "NOT_FOUND",
+      });
+    }
 
     const today = todayUTC();
     const yesterday = yesterdayUTC();
@@ -73,28 +122,53 @@ export const claimDailyStreak = mutation({
       .unique();
 
     if (existing?.lastClaimedDate === today) {
-      throw new ConvexError({ message: "Déjà réclamé aujourd'hui", code: "CONFLICT" });
+      throw new ConvexError({
+        message: "Déjà réclamé aujourd'hui",
+        code: "CONFLICT",
+      });
     }
 
-    // Compute new streak
-    const prevStreak = existing?.lastClaimedDate === yesterday ? (existing.currentStreak) : 0;
+    /*
+     * Continue the streak only when the previous claim
+     * was yesterday. Otherwise start a new series at 1.
+     */
+    const prevStreak =
+      existing?.lastClaimedDate === yesterday ? existing.currentStreak : 0;
+
     const newStreak = prevStreak + 1;
+
     const longestStreak = Math.max(existing?.longestStreak ?? 0, newStreak);
+
     const totalDaysClaimed = (existing?.totalDaysClaimed ?? 0) + 1;
 
-    // XP formula: base 20 + 5 per milestone (every 7 days = big bonus)
+    // XP formula:
+    // - milestone: 100 + 2 XP per streak day
+    // - otherwise: 20 + 5 XP for every completed 7-day block
     const milestones = [7, 14, 30, 60, 100, 365];
-    const isMilestone = milestones.includes(newStreak);
-    const xpEarned = isMilestone ? 100 + newStreak * 2 : 20 + Math.floor(newStreak / 7) * 5;
 
-    // Upsert streak
+    const isMilestone = milestones.includes(newStreak);
+
+    const xpEarned = isMilestone
+      ? 100 + newStreak * 2
+      : 20 + Math.floor(newStreak / 7) * 5;
+
     if (existing) {
-      await ctx.db.patch(existing._id, { currentStreak: newStreak, longestStreak, lastClaimedDate: today, totalDaysClaimed });
+      await ctx.db.patch(existing._id, {
+        currentStreak: newStreak,
+        longestStreak,
+        lastClaimedDate: today,
+        totalDaysClaimed,
+      });
     } else {
-      await ctx.db.insert("userStreaks", { userId: user._id, currentStreak: newStreak, longestStreak, lastClaimedDate: today, totalDaysClaimed });
+      await ctx.db.insert("userStreaks", {
+        userId: user._id,
+        currentStreak: newStreak,
+        longestStreak,
+        lastClaimedDate: today,
+        totalDaysClaimed,
+      });
     }
 
-    // Log XP
     await ctx.db.insert("xpLog", {
       userId: user._id,
       amount: xpEarned,
@@ -102,6 +176,10 @@ export const claimDailyStreak = mutation({
       sourceType: "daily_streak",
     });
 
-    return { xpEarned, newStreak, isNewRecord: newStreak === longestStreak && newStreak > 1 };
+    return {
+      xpEarned,
+      newStreak,
+      isNewRecord: newStreak === longestStreak && newStreak > 1,
+    };
   },
 });

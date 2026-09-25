@@ -60,7 +60,7 @@ import NetworkProfilePage from "./pages/modules/NetworkProfilePage";
 // import VoyagesDetailPage from "./pages/modules/VoyagesDetailPage";
 
 import CheckoutPage from "./pages/CheckoutPage";
-
+import "@/features/publications/register-modules";
 // ===============================
 // Wrappers
 // ===============================

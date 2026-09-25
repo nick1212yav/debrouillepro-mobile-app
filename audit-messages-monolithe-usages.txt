@@ -1,0 +1,134 @@
+########## USAGES du monolithe convex/messages.ts ##########
+
+===== 1. Recherche dans TOUT le projet (src + convex) =====
+
+--- listConversations ---
+  (aucun usage)
+
+--- getMessages ---
+  (aucun usage)
+
+--- totalUnread ---
+  src\navigation\hooks\useNavigation.ts:20
+      useQuery(api.messages.totalUnread, isAuthenticated ? {} : "skip") ?? 0;
+
+--- sendMessage ---
+  src\features\messages\chat\hooks\useMessageActions.ts:21
+      const sendMessage = async (input: SendMessageInput) => {
+  src\features\messages\chat\hooks\useMessageActions.ts:84
+      sendMessage,
+  src\features\messages\chat\hooks\useMessageComposer.ts:96
+      const { sendMessage } = useMessageActions();
+  src\features\messages\chat\hooks\useMessageComposer.ts:440
+      const result = await sendMessage({
+  src\features\messages\chat\hooks\useMessageComposer.ts:476
+      sendMessage,
+  src\features\transport\components\detail\TransportChat.tsx:30
+      const { messages, sendMessage } = useDriverChat(bookingId);
+  src\features\transport\components\detail\TransportChat.tsx:37
+      sendMessage(inputText);
+  src\features\transport\hooks\useDriverChat.ts:32
+      const sendMessage = (text: string) => {
+  src\features\transport\hooks\useDriverChat.ts:47
+      sendMessage,
+  src\pages\home\_components\AIAssistant.tsx:944
+      const sendMessage = useCallback(
+  src\pages\home\_components\AIAssistant.tsx:1271
+      onPress={() => void sendMessage(suggestion)}
+  src\pages\home\_components\AIAssistant.tsx:1318
+      onSubmitEditing={() => void sendMessage(input)}
+  src\pages\home\_components\AIAssistant.tsx:1323
+      void sendMessage(input);
+  src\pages\home\_components\AIAssistant.tsx:1345
+      onPress={() => void sendMessage(input)}
+  src\pages\modules\JuridiquePage.tsx:1420
+      const sendMessage = async (suggestion?: string) => {
+  src\pages\modules\JuridiquePage.tsx:1508
+      onPress={() => sendMessage(suggestion)}
+  src\pages\modules\JuridiquePage.tsx:1614
+      onPress={() => sendMessage()}
+  src\pages\modules\LiveStoriesPage.tsx:654
+      const sendMessageMut = useMutation(api.liveStreams.sendMessage);
+  src\pages\modules\LiveStoriesPage.tsx:708
+      const sendMessage = useCallback(async () => {
+  src\pages\modules\LiveStoriesPage.tsx:941
+      void sendMessage();
+  src\pages\modules\LiveStoriesPage.tsx:950
+      void sendMessage();
+  src\pages\modules\LiveStreamingPage.tsx:432
+      const sendMessage = useMutation(api.liveStreams.sendMessage);
+  src\pages\modules\LiveStreamingPage.tsx:583
+      await sendMessage({
+  src\pages\modules\LiveStreamingPage.tsx:598
+      }, [chatText, isAuthenticated, messagePending, sendMessage, streamId]);
+  convex\liveStreams.ts:232
+      export const sendMessage = mutation({
+
+--- markMessageRead ---
+  convex\index.ts:9
+      export * from "./messages"; // contient markMessageRead
+
+--- reactToMessage ---
+  convex\messages\reactions.ts:128
+      export const reactToMessage = mutation({
+
+--- getOrCreateDirectConversation ---
+  (aucun usage)
+
+--- getOrCreateConversation ---
+  (aucun usage)
+
+--- createGroup ---
+  src\features\community\hooks\useCommunityGroups.ts:12
+      const createGroup = useMutation(api.community.createGroup);
+  src\features\community\hooks\useCommunityGroups.ts:32
+      createGroup: async (data: {
+  src\features\community\hooks\useCommunityGroups.ts:46
+      const groupId = await createGroup(payload);
+  src\features\community\sheets\GroupSheet.tsx:17
+      const { createGroup } = useCommunityGroups();
+  src\features\community\sheets\GroupSheet.tsx:36
+      await createGroup({
+  src\features\community\permissions.ts:10
+      createGroup: ["user"],
+  src\features\messages\conversations\hooks\useConversationActions.ts:11
+      const createGroup = useMutation(api.messages.conversations.createGroup);
+  src\features\messages\conversations\hooks\useConversationActions.ts:38
+      return createGroup({
+  src\features\messages\groups\components\CreateGroup.tsx:18
+      export function CreateGroup({
+  src\features\messages\groups\components\CreateGroup.tsx:96
+      export default CreateGroup;
+  src\pages\modules\GroupesPage.tsx:623
+      const createGroup = useMutation(api.community.createGroup);
+  src\pages\modules\GroupesPage.tsx:659
+      await createGroup({
+  convex\community\index.ts:96
+      export const createGroup = mutation({
+  convex\messages\conversations.ts:428
+      export const createGroup = mutation({
+  convex\community.ts:142
+      export const createGroup = mutation({
+  convex\social.ts:121
+      export const createGroup = mutation({
+
+--- seedDemoConversations ---
+  (aucun usage)
+
+--- setTyping ---
+  (aucun usage)
+
+--- getTypingUsers ---
+  src\features\messages\typing\hooks\useTyping.ts:22
+      api.messages.typing.getTypingUsers,
+  convex\messages\typing.ts:124
+      export const getTypingUsers = query({
+
+===== 2. Imports directs de './messages' dans convex/ =====
+  convex\messages\index.ts:8
+      export * as messages from "./messages";
+  convex\index.ts:9
+      export * from "./messages"; // contient markMessageRead
+
+===== 3. Usages internal.messages.* =====
+

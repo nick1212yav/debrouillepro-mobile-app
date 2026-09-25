@@ -1,4 +1,5 @@
 // src/pages/modules/CommunityDetailPage.tsx
+
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +16,7 @@ import {
   View,
   Image as RNImage,
 } from "react-native";
+
 import {
   Component,
   useCallback,
@@ -25,6 +27,7 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from "react";
+
 import {
   ArrowLeft,
   Bookmark,
@@ -46,7 +49,9 @@ import {
   TrendingUp,
   X,
 } from "lucide-react-native";
+
 import { useMutation, useQuery } from "convex/react";
+import { useRouter } from "expo-router";
 import { api } from "@/convex/_generated/api.js";
 import { toast } from "sonner";
 import { Clipboard } from "@react-native-clipboard/clipboard";
@@ -65,12 +70,14 @@ import {
   CommunityShare,
   CommunityStatistics,
 } from "@/features/community/components";
+
 import {
   useCommunityAI,
   useCommunityBookmarks,
   useCommunityComments,
   useCommunityNotifications,
 } from "@/features/community/hooks";
+
 import { adaptCommunityPost } from "@/features/community/adapter";
 import type { CommunityPost } from "@/features/community/types";
 
@@ -80,7 +87,7 @@ import type { CommunityPost } from "@/features/community/types";
 
 interface CommunityDetailPageProps {
   id?: string;
-  onBack: () => void;
+  onBack?: () => void;
   onOpenProfile?: (userId: string) => void;
   onEdit?: (postId: string) => void;
 }
@@ -96,7 +103,11 @@ type CommunityMeta = {
   location?: string;
   latitude?: number;
   longitude?: number;
-  pollOptions?: { _id: string; text: string; votes?: number }[];
+  pollOptions?: {
+    _id: string;
+    text: string;
+    votes?: number;
+  }[];
   eventDate?: string;
   eventLocation?: string;
   audience?: string;
@@ -141,9 +152,11 @@ const SCREEN_W = Dimensions.get("window").width;
 
 function alpha(hex: string, a: number): string {
   const h = hex.replace("#", "");
+
   const r = parseInt(h.slice(0, 2), 16);
   const g = parseInt(h.slice(2, 4), 16);
   const b = parseInt(h.slice(4, 6), 16);
+
   return `rgba(${r},${g},${b},${a})`;
 }
 
@@ -152,17 +165,27 @@ function buildShareUrl(postId: string): string {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   ERROR BOUNDARY (native)
+   ERROR BOUNDARY
    ════════════════════════════════════════════════════════════════════════════ */
 
 class ErrorBoundary extends Component<
-  { children: ReactNode; fallback: ReactNode; label?: string },
-  { hasError: boolean }
+  {
+    children: ReactNode;
+    fallback: ReactNode;
+    label?: string;
+  },
+  {
+    hasError: boolean;
+  }
 > {
-  state = { hasError: false };
+  state = {
+    hasError: false,
+  };
 
   static getDerivedStateFromError() {
-    return { hasError: true };
+    return {
+      hasError: true,
+    };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -173,7 +196,10 @@ class ErrorBoundary extends Component<
   }
 
   render() {
-    if (this.state.hasError) return this.props.fallback;
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+
     return this.props.children;
   }
 }
@@ -198,6 +224,7 @@ function Skeleton({
   style?: React.ComponentProps<typeof Animated.View>["style"];
 }) {
   const opacity = useRef(new Animated.Value(0.28)).current;
+
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -213,9 +240,12 @@ function Skeleton({
         }),
       ]),
     );
+
     loop.start();
+
     return () => loop.stop();
   }, [opacity]);
+
   return (
     <Animated.View
       style={[
@@ -288,24 +318,28 @@ function MenuSheet({
           },
         ]
       : []),
+
     {
       icon: LinkIcon,
       label: "Copier le lien",
       color: T.text,
       onPress: onCopyLink,
     },
+
     {
       icon: Flag,
       label: "Signaler",
       color: T.text,
       onPress: onReport,
     },
+
     {
       icon: EyeOff,
       label: "Masquer",
       color: T.text,
       onPress: onHide,
     },
+
     ...(canEdit
       ? [
           {
@@ -349,6 +383,7 @@ function MenuSheet({
 
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>Options</Text>
+
             <Pressable
               onPress={onClose}
               hitSlop={10}
@@ -358,7 +393,12 @@ function MenuSheet({
             </Pressable>
           </View>
 
-          <View style={{ gap: 4, paddingBottom: 12 }}>
+          <View
+            style={{
+              gap: 4,
+              paddingBottom: 12,
+            }}
+          >
             {items.map(({ icon: Icon, label, color, onPress, destructive }) => (
               <Pressable
                 key={label}
@@ -384,10 +424,13 @@ function MenuSheet({
                 >
                   <Icon size={15} color={color} />
                 </View>
+
                 <Text
                   style={[
                     styles.menuLabel,
-                    { color: destructive ? T.danger : T.text },
+                    {
+                      color: destructive ? T.danger : T.text,
+                    },
                   ]}
                 >
                   {label}
@@ -423,10 +466,14 @@ function ReportSheet({
   onSubmit: (reason: ReportReason) => void;
 }) {
   const slide = useRef(new Animated.Value(1)).current;
+
   const [selected, setSelected] = useState<ReportReason | null>(null);
 
   useEffect(() => {
-    if (visible) setSelected(null);
+    if (visible) {
+      setSelected(null);
+    }
+
     Animated.timing(slide, {
       toValue: visible ? 0 : 1,
       duration: 280,
@@ -466,22 +513,32 @@ function ReportSheet({
             <View
               style={[
                 styles.sheetHeaderIcon,
-                { backgroundColor: alpha(T.danger, 0.14) },
+                {
+                  backgroundColor: alpha(T.danger, 0.14),
+                },
               ]}
             >
               <Flag size={15} color={T.danger} />
             </View>
+
             <View style={{ flex: 1 }}>
               <Text style={styles.sheetTitle}>Signaler ce post</Text>
+
               <Text style={styles.sheetSubtitle}>
                 Pourquoi signales-tu ce contenu ?
               </Text>
             </View>
           </View>
 
-          <View style={{ gap: 6, paddingTop: 4 }}>
+          <View
+            style={{
+              gap: 6,
+              paddingTop: 4,
+            }}
+          >
             {REPORT_REASONS.map((reason) => {
               const active = selected === reason;
+
               return (
                 <Pressable
                   key={reason}
@@ -501,11 +558,14 @@ function ReportSheet({
                   <Text
                     style={[
                       styles.reportRowText,
-                      { color: active ? T.danger : T.text },
+                      {
+                        color: active ? T.danger : T.text,
+                      },
                     ]}
                   >
                     {reason}
                   </Text>
+
                   <View
                     style={[
                       styles.radioOuter,
@@ -529,11 +589,16 @@ function ReportSheet({
               styles.reportSubmit,
               {
                 opacity: !selected ? 0.4 : pressed ? 0.85 : 1,
-                transform: [{ scale: pressed ? 0.98 : 1 }],
+                transform: [
+                  {
+                    scale: pressed ? 0.98 : 1,
+                  },
+                ],
               },
             ]}
           >
             <Send size={15} color="#fff" />
+
             <Text style={styles.reportSubmitText}>Envoyer le signalement</Text>
           </Pressable>
         </Animated.View>
@@ -543,16 +608,41 @@ function ReportSheet({
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   AUTHOR HEADER FALLBACK (si CommunityHeader casse)
+   AUTHOR HEADER FALLBACK
    ════════════════════════════════════════════════════════════════════════════ */
 
 function AuthorSkeleton() {
   return (
     <View style={styles.authorSkeleton}>
-      <Skeleton style={{ width: 44, height: 44, borderRadius: 15 }} />
-      <View style={{ flex: 1, gap: 6 }}>
-        <Skeleton style={{ width: 140, height: 14, borderRadius: 7 }} />
-        <Skeleton style={{ width: 80, height: 10, borderRadius: 5 }} />
+      <Skeleton
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 15,
+        }}
+      />
+
+      <View
+        style={{
+          flex: 1,
+          gap: 6,
+        }}
+      >
+        <Skeleton
+          style={{
+            width: 140,
+            height: 14,
+            borderRadius: 7,
+          }}
+        />
+
+        <Skeleton
+          style={{
+            width: 80,
+            height: 10,
+            borderRadius: 5,
+          }}
+        />
       </View>
     </View>
   );
@@ -568,39 +658,70 @@ export default function CommunityDetailPage({
   onOpenProfile,
   onEdit,
 }: CommunityDetailPageProps) {
+  const router = useRouter();
+
+  /*
+   * Le parent peut fournir onBack.
+   * Si le composant est monté directement par Expo Router,
+   * on revient naturellement à la route précédente.
+   */
+  const handleBack = onBack ?? (() => router.back());
+
   /* ── États ───────────────────────────────────────────────────────────── */
+
   const [post, setPost] = useState<CommunityPost | null>(null);
+
   const [loading, setLoading] = useState(true);
+
   const [showComments, setShowComments] = useState(false);
+
   const [showShare, setShowShare] = useState(false);
+
   const [showReport, setShowReport] = useState(false);
+
   const [showMenu, setShowMenu] = useState(false);
+
   const [userReaction, setUserReaction] = useState<string | null>(null);
+
   const [reactions, setReactions] = useState<Record<string, number>>({});
+
   const [isFollowing, setIsFollowing] = useState(false);
 
   const entryAnim = useRef(new Animated.Value(0)).current;
 
   /* ── Queries / mutations ─────────────────────────────────────────────── */
+
   const publicationId = id as Id<"publications"> | undefined;
 
   const publication = useQuery(
     api.publications.getPublication,
-    publicationId ? { id: publicationId } : "skip",
+    publicationId
+      ? {
+          id: publicationId,
+        }
+      : "skip",
   );
 
   const trackView = useMutation(api.publications.trackView);
+
   const likePost = useMutation(api.community.likePost);
+
   const bookmarkPost = useMutation(api.bookmarks.toggle);
+
   const deletePost = useMutation(api.community.deletePost);
+
   const votePoll = useMutation(api.community.votePoll);
 
   const { comments, addComment, addReply } = useCommunityComments(post?._id);
+
   const { addBookmark, removeBookmark } = useCommunityBookmarks();
+
   const { sendNotification } = useCommunityNotifications();
+
   const { moderateText } = useCommunityAI();
 
-  /* ── Effet : adapter la publication ─────────────────────────────────── */
+  /* ── Adapter publication ─────────────────────────────────────────────── */
+
   useEffect(() => {
     if (publication === undefined) {
       setLoading(true);
@@ -615,13 +736,20 @@ export default function CommunityDetailPage({
 
     try {
       const adapted = adaptCommunityPost(publication);
+
       setPost(adapted);
-      setReactions({ "❤️": adapted.likeCount || 0 });
+
+      setReactions({
+        "❤️": adapted.likeCount || 0,
+      });
+
       setUserReaction(adapted.likedByMe ? "❤️" : null);
+
       setLoading(false);
 
-      // Tracking une seule fois
-      trackView({ publicationId: publication._id }).catch(() => {
+      trackView({
+        publicationId: publication._id,
+      }).catch(() => {
         /* silencieux */
       });
     } catch {
@@ -631,6 +759,7 @@ export default function CommunityDetailPage({
   }, [publication, trackView]);
 
   /* ── Animation d'entrée ──────────────────────────────────────────────── */
+
   useEffect(() => {
     if (!loading && post) {
       Animated.timing(entryAnim, {
@@ -642,32 +771,53 @@ export default function CommunityDetailPage({
   }, [loading, post, entryAnim]);
 
   /* ── Données dérivées ────────────────────────────────────────────────── */
+
   const canEdit = useMemo(() => {
-    // à remplacer par la vraie vérification : user._id === post.authorId
     return false;
   }, []);
 
   const safeMeta = useMemo<CommunityMeta>(() => {
-    const meta = (post as unknown as { meta?: CommunityMeta })?.meta ?? {};
+    const meta =
+      (
+        post as unknown as {
+          meta?: CommunityMeta;
+        }
+      )?.meta ?? {};
+
     return {
       location: meta.location ?? "",
+
       latitude: meta.latitude,
+
       longitude: meta.longitude,
+
       pollOptions: meta.pollOptions ?? [],
+
       eventDate: meta.eventDate,
+
       eventLocation: meta.eventLocation ?? "",
+
       audience: meta.audience ?? "public",
+
       mood: meta.mood,
+
       videos: meta.videos ?? [],
+
       audio: meta.audio ?? [],
+
       mentions: meta.mentions ?? [],
+
       images: meta.images ?? [],
+
       postType: meta.postType ?? "text",
     };
   }, [post]);
 
   const images = useMemo(() => {
-    if (!post) return [];
+    if (!post) {
+      return [];
+    }
+
     return safeMeta.images && safeMeta.images.length > 0
       ? safeMeta.images
       : (post.images ?? []);
@@ -676,9 +826,15 @@ export default function CommunityDetailPage({
   /* ── Handlers ────────────────────────────────────────────────────────── */
 
   const handleLike = useCallback(async () => {
-    if (!post) return;
+    if (!post) {
+      return;
+    }
+
     try {
-      await likePost({ publicationId: post._id });
+      await likePost({
+        publicationId: post._id,
+      });
+
       setPost((prev) =>
         prev
           ? {
@@ -690,9 +846,10 @@ export default function CommunityDetailPage({
             }
           : prev,
       );
-      setReactions((r) => ({
-        ...r,
-        "❤️": Math.max(0, (r["❤️"] ?? 0) + (post.likedByMe ? -1 : 1)),
+
+      setReactions((current) => ({
+        ...current,
+        "❤️": Math.max(0, (current["❤️"] ?? 0) + (post.likedByMe ? -1 : 1)),
       }));
     } catch {
       toast.error("Erreur lors du like");
@@ -700,13 +857,26 @@ export default function CommunityDetailPage({
   }, [post, likePost]);
 
   const handleBookmark = useCallback(async () => {
-    if (!post) return;
+    if (!post) {
+      return;
+    }
+
     try {
-      await bookmarkPost({ publicationId: post._id });
+      await bookmarkPost({
+        publicationId: post._id,
+      });
+
       const wasBookmarked = post.bookmarkedByMe;
+
       setPost((prev) =>
-        prev ? { ...prev, bookmarkedByMe: !prev.bookmarkedByMe } : prev,
+        prev
+          ? {
+              ...prev,
+              bookmarkedByMe: !prev.bookmarkedByMe,
+            }
+          : prev,
       );
+
       if (wasBookmarked) {
         removeBookmark(post._id);
         toast.success("Retiré des favoris");
@@ -719,27 +889,40 @@ export default function CommunityDetailPage({
     }
   }, [post, bookmarkPost, addBookmark, removeBookmark]);
 
-  const handleShare = useCallback(() => setShowShare(true), []);
+  const handleShare = useCallback(() => {
+    setShowShare(true);
+  }, []);
+
   const handleReport = useCallback(() => {
     setShowMenu(false);
     setShowReport(true);
   }, []);
 
   const handleDelete = useCallback(() => {
-    if (!post) return;
+    if (!post) {
+      return;
+    }
+
     Alert.alert(
       "Supprimer ce post ?",
       "Cette action est définitive et ne peut pas être annulée.",
       [
-        { text: "Annuler", style: "cancel" },
+        {
+          text: "Annuler",
+          style: "cancel",
+        },
         {
           text: "Supprimer",
           style: "destructive",
           onPress: async () => {
             try {
-              await deletePost({ publicationId: post._id });
+              await deletePost({
+                publicationId: post._id,
+              });
+
               toast.success("Post supprimé");
-              onBack();
+
+              handleBack();
             } catch {
               toast.error("Erreur lors de la suppression");
             }
@@ -747,11 +930,15 @@ export default function CommunityDetailPage({
         },
       ],
     );
-  }, [post, deletePost, onBack]);
+  }, [post, deletePost, handleBack]);
 
   const handleCopyLink = useCallback(() => {
-    if (!post) return;
+    if (!post) {
+      return;
+    }
+
     Clipboard.setString(buildShareUrl(post._id));
+
     toast.success("Lien copié");
     setShowMenu(false);
   }, [post]);
@@ -763,7 +950,11 @@ export default function CommunityDetailPage({
 
   const handleEdit = useCallback(() => {
     setShowMenu(false);
-    if (!post) return;
+
+    if (!post) {
+      return;
+    }
+
     if (onEdit) {
       onEdit(post._id);
     } else {
@@ -773,9 +964,13 @@ export default function CommunityDetailPage({
 
   const handleComment = useCallback(
     async (text: string) => {
-      if (!post) return;
+      if (!post) {
+        return;
+      }
+
       try {
         await addComment(text);
+
         toast.success("Commentaire ajouté");
       } catch {
         toast.error("Erreur lors de l'ajout du commentaire");
@@ -788,6 +983,7 @@ export default function CommunityDetailPage({
     async (text: string, parentId: string) => {
       try {
         await addReply(text, parentId as Id<"comments">);
+
         toast.success("Réponse ajoutée");
       } catch {
         toast.error("Erreur lors de l'ajout de la réponse");
@@ -798,15 +994,23 @@ export default function CommunityDetailPage({
 
   const handleReportSubmit = useCallback(
     async (reason: ReportReason) => {
-      if (!post) return;
+      if (!post) {
+        return;
+      }
+
       try {
         await moderateText(reason);
+
         await sendNotification({
-          type: "report",
-          postId: post._id,
-          message: reason,
+          recipientId: post.authorId,
+          type: "community",
+          title: "Signalement de publication",
+          body: reason,
+          link: `/community/${post._id}`,
         });
+
         toast.success("Signalement envoyé");
+
         setShowReport(false);
       } catch {
         toast.error("Erreur lors du signalement");
@@ -817,9 +1021,16 @@ export default function CommunityDetailPage({
 
   const handleVote = useCallback(
     async (optionId: string) => {
-      if (!post) return;
+      if (!post) {
+        return;
+      }
+
       try {
-        await votePoll({ publicationId: post._id, optionId });
+        await votePoll({
+          publicationId: post._id,
+          optionId,
+        });
+
         toast.success("Vote enregistré");
       } catch {
         toast.error("Erreur lors du vote");
@@ -830,28 +1041,44 @@ export default function CommunityDetailPage({
 
   const handleReaction = useCallback(
     (emoji: string) => {
-      if (!post) return;
+      if (!post) {
+        return;
+      }
 
       if (emoji === userReaction) {
         setUserReaction(null);
+
         setReactions((prev) => {
-          const next = { ...prev };
+          const next = {
+            ...prev,
+          };
+
           if (next[emoji] && next[emoji] > 0) {
             next[emoji] -= 1;
-            if (next[emoji] === 0) delete next[emoji];
+
+            if (next[emoji] === 0) {
+              delete next[emoji];
+            }
           }
+
           return next;
         });
+
         void handleLike();
         return;
       }
 
       setUserReaction(emoji);
+
       setReactions((prev) => ({
         ...prev,
         [emoji]: (prev[emoji] || 0) + 1,
       }));
-      if (!post.likedByMe) void handleLike();
+
+      if (!post.likedByMe) {
+        void handleLike();
+      }
+
       toast.success(`Réaction ${emoji} ajoutée`);
     },
     [post, userReaction, handleLike],
@@ -859,32 +1086,44 @@ export default function CommunityDetailPage({
 
   const handleFollow = useCallback(() => {
     setIsFollowing(true);
+
     toast.success("Tu suis maintenant cet auteur");
   }, []);
 
   const handleUnfollow = useCallback(() => {
     setIsFollowing(false);
+
     toast.info("Tu ne suis plus cet auteur");
   }, []);
 
   const handleAuthorClick = useCallback(
     (authorId: string) => {
-      if (onOpenProfile) onOpenProfile(authorId);
-      else toast.info("Profil bientôt disponible");
+      if (onOpenProfile) {
+        onOpenProfile(authorId);
+      } else {
+        toast.info("Profil bientôt disponible");
+      }
     },
     [onOpenProfile],
   );
 
   const handleNativeShare = useCallback(async () => {
-    if (!post) return;
+    if (!post) {
+      return;
+    }
+
     try {
       await Share.share(
         {
           title: post.title ?? "Publication",
+
           message: `${post.title ?? "Publication"}\n${buildShareUrl(post._id)}`,
+
           url: buildShareUrl(post._id),
         },
-        { dialogTitle: "Partager cette publication" },
+        {
+          dialogTitle: "Partager cette publication",
+        },
       );
     } catch {
       toast.info("Partage annulé");
@@ -892,10 +1131,12 @@ export default function CommunityDetailPage({
   }, [post]);
 
   /* ── États de chargement ─────────────────────────────────────────────── */
+
   if (!id) {
     return (
       <View style={styles.root}>
-        <Header onBack={onBack} onMenu={() => {}} />
+        <Header onBack={handleBack} onMenu={() => {}} />
+
         <View style={styles.centerState}>
           <Text style={styles.centerStateText}>
             Identifiant de publication manquant
@@ -908,13 +1149,40 @@ export default function CommunityDetailPage({
   if (loading) {
     return (
       <View style={styles.root}>
-        <Header onBack={onBack} onMenu={() => {}} />
+        <Header onBack={handleBack} onMenu={() => {}} />
+
         <View style={styles.content}>
           <AuthorSkeleton />
-          <Skeleton style={{ height: 260, borderRadius: 22 }} />
-          <Skeleton style={{ height: 26, width: "75%", borderRadius: 12 }} />
-          <Skeleton style={{ height: 18, width: "50%", borderRadius: 10 }} />
-          <Skeleton style={{ height: 130, borderRadius: 18 }} />
+
+          <Skeleton
+            style={{
+              height: 260,
+              borderRadius: 22,
+            }}
+          />
+
+          <Skeleton
+            style={{
+              height: 26,
+              width: "75%",
+              borderRadius: 12,
+            }}
+          />
+
+          <Skeleton
+            style={{
+              height: 18,
+              width: "50%",
+              borderRadius: 10,
+            }}
+          />
+
+          <Skeleton
+            style={{
+              height: 130,
+              borderRadius: 18,
+            }}
+          />
         </View>
       </View>
     );
@@ -923,12 +1191,15 @@ export default function CommunityDetailPage({
   if (!post) {
     return (
       <View style={styles.root}>
-        <Header onBack={onBack} onMenu={() => {}} />
+        <Header onBack={handleBack} onMenu={() => {}} />
+
         <View style={styles.centerState}>
           <View style={styles.centerIcon}>
             <EyeOff size={28} color={T.faint} />
           </View>
+
           <Text style={styles.centerTitle}>Publication introuvable</Text>
+
           <Text style={styles.centerText}>
             Elle a peut-être été supprimée ou masquée.
           </Text>
@@ -938,11 +1209,12 @@ export default function CommunityDetailPage({
   }
 
   /* ── Rendu principal ─────────────────────────────────────────────────── */
+
   return (
     <View style={styles.root}>
       <View pointerEvents="none" style={styles.glow} />
 
-      <Header onBack={onBack} onMenu={() => setShowMenu(true)} />
+      <Header onBack={handleBack} onMenu={() => setShowMenu(true)} />
 
       <ScrollView
         style={{ flex: 1 }}
@@ -965,6 +1237,7 @@ export default function CommunityDetailPage({
           }}
         >
           {/* Auteur */}
+
           <ErrorBoundary label="AuthorHeader" fallback={<AuthorSkeleton />}>
             <CommunityHeader
               authorId={post.authorId}
@@ -980,6 +1253,7 @@ export default function CommunityDetailPage({
           </ErrorBoundary>
 
           {/* Galerie */}
+
           {images.length > 0 && (
             <ErrorBoundary
               label="Gallery"
@@ -990,14 +1264,17 @@ export default function CommunityDetailPage({
           )}
 
           {/* Titre + description */}
+
           <View style={{ gap: 10 }}>
             {!!post.title && <Text style={styles.postTitle}>{post.title}</Text>}
+
             {!!post.description && (
               <Text style={styles.postDescription}>{post.description}</Text>
             )}
           </View>
 
           {/* Tags */}
+
           {post.tags.length > 0 && (
             <ErrorBoundary
               label="Hashtags"
@@ -1008,6 +1285,7 @@ export default function CommunityDetailPage({
           )}
 
           {/* Localisation */}
+
           {!!safeMeta.location && (
             <ErrorBoundary
               label="Location"
@@ -1018,6 +1296,7 @@ export default function CommunityDetailPage({
           )}
 
           {/* Carte */}
+
           {safeMeta.latitude !== undefined &&
             safeMeta.longitude !== undefined && (
               <ErrorBoundary
@@ -1032,13 +1311,21 @@ export default function CommunityDetailPage({
             )}
 
           {/* Événement */}
+
           {post.type === "evenement" && safeMeta.eventDate && (
             <View style={styles.eventCard}>
               <View style={styles.eventIcon}>
                 <Calendar size={15} color={T.primarySoft} />
               </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
+
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
                 <Text style={styles.eventLabel}>Événement</Text>
+
                 <Text style={styles.eventDate}>
                   {new Date(safeMeta.eventDate).toLocaleDateString("fr-FR", {
                     weekday: "long",
@@ -1046,9 +1333,11 @@ export default function CommunityDetailPage({
                     month: "long",
                   })}
                 </Text>
+
                 {!!safeMeta.eventLocation && (
                   <View style={styles.eventLocationRow}>
                     <MapPin size={11} color={T.faint} />
+
                     <Text style={styles.eventLocationText} numberOfLines={1}>
                       {safeMeta.eventLocation}
                     </Text>
@@ -1059,6 +1348,7 @@ export default function CommunityDetailPage({
           )}
 
           {/* Sondage */}
+
           {post.type === "poll" &&
             safeMeta.pollOptions &&
             safeMeta.pollOptions.length > 0 && (
@@ -1067,7 +1357,11 @@ export default function CommunityDetailPage({
                 fallback={<SectionFallback label="Sondage" />}
               >
                 <CommunityPoll
-                  options={safeMeta.pollOptions}
+                  options={safeMeta.pollOptions.map((option) => ({
+                    id: option._id,
+                    text: option.text,
+                    votes: option.votes ?? 0,
+                  }))}
                   votedOptionId={post.votedOptionId}
                   onVote={handleVote}
                 />
@@ -1075,6 +1369,7 @@ export default function CommunityDetailPage({
             )}
 
           {/* Question */}
+
           {post.type === "question" && (
             <ErrorBoundary
               label="Question"
@@ -1082,12 +1377,15 @@ export default function CommunityDetailPage({
             >
               <CommunityQuestion
                 question={post.title || "Question"}
-                onAnswer={() => toast.info("Réponse bientôt disponible")}
+                onAnswer={async () => {
+                  toast.info("Réponse bientôt disponible");
+                }}
               />
             </ErrorBoundary>
           )}
 
           {/* Statistiques */}
+
           <ErrorBoundary
             label="Statistics"
             fallback={<SectionFallback label="Statistiques" />}
@@ -1099,20 +1397,21 @@ export default function CommunityDetailPage({
               shares={post.shareCount || 0}
               bookmarks={post.bookmarkCount || 0}
               onLikesClick={() => toast.info("Liste des likes à venir")}
-              onCommentsClick={() => setShowComments((v) => !v)}
+              onCommentsClick={() => setShowComments((value) => !value)}
               onSharesClick={() => setShowShare(true)}
               onBookmarksClick={() => toast.info("Liste des favoris à venir")}
             />
           </ErrorBoundary>
 
           {/* Actions */}
+
           <ErrorBoundary
             label="Actions"
             fallback={<SectionFallback label="Actions" />}
           >
             <CommunityActions
               onLike={handleLike}
-              onComment={() => setShowComments((v) => !v)}
+              onComment={() => setShowComments((value) => !value)}
               onShare={handleShare}
               onBookmark={handleBookmark}
               onReport={handleReport}
@@ -1128,6 +1427,7 @@ export default function CommunityDetailPage({
           </ErrorBoundary>
 
           {/* Commentaires */}
+
           {showComments && (
             <ErrorBoundary
               label="Comments"
@@ -1138,9 +1438,9 @@ export default function CommunityDetailPage({
                 comments={comments || []}
                 onAddComment={handleComment}
                 onReply={handleReply}
-                onLikeComment={() =>
-                  toast.info("Like des commentaires bientôt disponible")
-                }
+                onLikeComment={async () => {
+                  toast.info("Like des commentaires bientôt disponible");
+                }}
                 onAuthorClick={handleAuthorClick}
               />
             </ErrorBoundary>
@@ -1148,7 +1448,8 @@ export default function CommunityDetailPage({
         </Animated.View>
       </ScrollView>
 
-      {/* Barre d'actions rapides en bas */}
+      {/* Barre d'actions rapides */}
+
       <View style={styles.bottomBar}>
         <Pressable
           onPress={handleLike}
@@ -1164,10 +1465,13 @@ export default function CommunityDetailPage({
             color={post.likedByMe ? T.rose : T.dim}
             fill={post.likedByMe ? T.rose : "transparent"}
           />
+
           <Text
             style={[
               styles.bottomActionText,
-              { color: post.likedByMe ? T.rose : T.dim },
+              {
+                color: post.likedByMe ? T.rose : T.dim,
+              },
             ]}
           >
             {post.likeCount}
@@ -1175,13 +1479,16 @@ export default function CommunityDetailPage({
         </Pressable>
 
         <Pressable
-          onPress={() => setShowComments((v) => !v)}
+          onPress={() => setShowComments((value) => !value)}
           style={({ pressed }) => [
             styles.bottomAction,
-            { opacity: pressed ? 0.7 : 1 },
+            {
+              opacity: pressed ? 0.7 : 1,
+            },
           ]}
         >
           <MessageCircle size={18} color={T.dim} />
+
           <Text style={styles.bottomActionText}>{post.commentCount}</Text>
         </Pressable>
 
@@ -1189,7 +1496,9 @@ export default function CommunityDetailPage({
           onPress={handleShare}
           style={({ pressed }) => [
             styles.bottomAction,
-            { opacity: pressed ? 0.7 : 1 },
+            {
+              opacity: pressed ? 0.7 : 1,
+            },
           ]}
         >
           <Share2 size={18} color={T.dim} />
@@ -1199,7 +1508,9 @@ export default function CommunityDetailPage({
           onPress={handleBookmark}
           style={({ pressed }) => [
             styles.bottomAction,
-            { opacity: pressed ? 0.7 : 1 },
+            {
+              opacity: pressed ? 0.7 : 1,
+            },
           ]}
         >
           <Bookmark
@@ -1211,6 +1522,7 @@ export default function CommunityDetailPage({
       </View>
 
       {/* Modales */}
+
       <MenuSheet
         visible={showMenu}
         onClose={() => setShowMenu(false)}
@@ -1260,15 +1572,27 @@ function Header({
         onPress={onBack}
         style={({ pressed }) => [
           styles.headerBtn,
-          { transform: [{ scale: pressed ? 0.92 : 1 }] },
+          {
+            transform: [
+              {
+                scale: pressed ? 0.92 : 1,
+              },
+            ],
+          },
         ]}
         hitSlop={10}
       >
         <ArrowLeft size={19} color="#fff" />
       </Pressable>
 
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <View
+        style={{
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
         <Text style={styles.headerTitle}>Publication</Text>
+
         <Text style={styles.headerSubtitle}>Détail du post</Text>
       </View>
 
@@ -1276,7 +1600,13 @@ function Header({
         onPress={onMenu}
         style={({ pressed }) => [
           styles.headerBtn,
-          { transform: [{ scale: pressed ? 0.92 : 1 }] },
+          {
+            transform: [
+              {
+                scale: pressed ? 0.92 : 1,
+              },
+            ],
+          },
         ]}
         hitSlop={10}
       >
@@ -1291,7 +1621,10 @@ function Header({
    ════════════════════════════════════════════════════════════════════════════ */
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: T.bg },
+  root: {
+    flex: 1,
+    backgroundColor: T.bg,
+  },
 
   glow: {
     position: "absolute",
@@ -1303,7 +1636,6 @@ const styles = StyleSheet.create({
     backgroundColor: alpha(T.primary, 0.1),
   },
 
-  /* Header */
   header: {
     paddingTop: 56,
     paddingHorizontal: 16,
@@ -1312,6 +1644,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+
   headerBtn: {
     width: 42,
     height: 42,
@@ -1322,12 +1655,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: T.border,
   },
+
   headerTitle: {
     color: T.text,
     fontSize: 17,
     fontWeight: "900",
     letterSpacing: -0.3,
   },
+
   headerSubtitle: {
     color: T.faint,
     fontSize: 11,
@@ -1335,19 +1670,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  /* Content */
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 120,
   },
+
   content: {
     paddingHorizontal: 20,
     paddingTop: 8,
     gap: 14,
   },
 
-  /* Post content */
   postTitle: {
     color: T.text,
     fontSize: 20,
@@ -1355,6 +1689,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     lineHeight: 27,
   },
+
   postDescription: {
     color: "rgba(255,255,255,0.78)",
     fontSize: 14,
@@ -1362,7 +1697,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  /* Event card */
   eventCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -1373,6 +1707,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: alpha(T.primary, 0.22),
   },
+
   eventIcon: {
     width: 40,
     height: 40,
@@ -1381,6 +1716,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: alpha(T.primary, 0.16),
   },
+
   eventLabel: {
     color: T.faint,
     fontSize: 10,
@@ -1388,6 +1724,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: "uppercase",
   },
+
   eventDate: {
     color: T.text,
     fontSize: 13.5,
@@ -1395,12 +1732,14 @@ const styles = StyleSheet.create({
     marginTop: 3,
     letterSpacing: -0.2,
   },
+
   eventLocationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
     marginTop: 5,
   },
+
   eventLocationText: {
     color: T.faint,
     fontSize: 11.5,
@@ -1408,7 +1747,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  /* Fallback */
   sectionFallback: {
     padding: 16,
     borderRadius: 16,
@@ -1416,13 +1754,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: alpha(T.danger, 0.22),
   },
+
   sectionFallbackText: {
     color: alpha(T.danger, 0.85),
     fontSize: 12,
     fontWeight: "600",
   },
 
-  /* Author skeleton */
   authorSkeleton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1430,7 +1768,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  /* Bottom bar */
   bottomBar: {
     position: "absolute",
     left: 0,
@@ -1446,6 +1783,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: T.border,
   },
+
   bottomAction: {
     flexDirection: "row",
     alignItems: "center",
@@ -1454,18 +1792,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
   },
+
   bottomActionText: {
     color: T.dim,
     fontSize: 12.5,
     fontWeight: "800",
   },
 
-  /* Modal sheets */
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.75)",
     justifyContent: "flex-end",
   },
+
   menuSheet: {
     backgroundColor: T.sheet,
     borderTopLeftRadius: 28,
@@ -1475,6 +1814,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: Platform.OS === "ios" ? 34 : 24,
   },
+
   sheetHandle: {
     alignSelf: "center",
     width: 42,
@@ -1484,12 +1824,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 16,
   },
+
   sheetHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     marginBottom: 16,
   },
+
   sheetHeaderIcon: {
     width: 40,
     height: 40,
@@ -1497,18 +1839,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   sheetTitle: {
     color: T.text,
     fontSize: 17,
     fontWeight: "900",
     letterSpacing: -0.3,
   },
+
   sheetSubtitle: {
     color: T.faint,
     fontSize: 11.5,
     marginTop: 2,
     fontWeight: "600",
   },
+
   sheetCloseBtn: {
     width: 34,
     height: 34,
@@ -1518,7 +1863,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.07)",
   },
 
-  /* Menu item */
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -1526,6 +1870,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 14,
   },
+
   menuIcon: {
     width: 38,
     height: 38,
@@ -1533,13 +1878,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   menuLabel: {
     fontSize: 14,
     fontWeight: "700",
     letterSpacing: -0.2,
   },
 
-  /* Report */
   reportRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1549,11 +1894,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: T.border,
   },
+
   reportRowText: {
     fontSize: 13.5,
     fontWeight: "700",
     flex: 1,
   },
+
   radioOuter: {
     width: 22,
     height: 22,
@@ -1563,6 +1910,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   reportSubmit: {
     flexDirection: "row",
     alignItems: "center",
@@ -1575,9 +1923,13 @@ const styles = StyleSheet.create({
     shadowColor: T.danger,
     shadowOpacity: 0.45,
     shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
     elevation: 6,
   },
+
   reportSubmitText: {
     color: "#fff",
     fontSize: 13.5,
@@ -1585,7 +1937,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
 
-  /* Center state */
   centerState: {
     flex: 1,
     alignItems: "center",
@@ -1593,12 +1944,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     gap: 14,
   },
+
   centerStateText: {
     color: T.dim,
     fontSize: 13.5,
     fontWeight: "600",
     textAlign: "center",
   },
+
   centerIcon: {
     width: 76,
     height: 76,
@@ -1610,6 +1963,7 @@ const styles = StyleSheet.create({
     borderColor: T.border,
     marginBottom: 6,
   },
+
   centerTitle: {
     color: T.text,
     fontSize: 18,
@@ -1617,6 +1971,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     textAlign: "center",
   },
+
   centerText: {
     color: T.dim,
     fontSize: 13,

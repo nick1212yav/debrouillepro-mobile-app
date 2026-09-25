@@ -1,3 +1,5 @@
+// src/features/publications/types/index.ts
+
 import type { Id } from "@/convex/_generated/dataModel";
 
 /* ============================================================================
@@ -5,51 +7,54 @@ import type { Id } from "@/convex/_generated/dataModel";
  * ========================================================================== */
 
 /**
- * Types de publications supportés par l'interface.
+ * Types de publications canoniques de DébrouillePro.
  *
- * Ce contrat doit rester compatible avec les valeurs renvoyées
- * par Convex et utilisées par le LiveFeed.
+ * Ce contrat est aligné à l'identique avec :
+ *   - convex/schema.ts          → publications.type
+ *   - config/index.ts           → registre central
+ *   - config/modules/*          → configurations par type
+ *
+ * Ne JAMAIS ajouter un type ici sans avoir :
+ *   1. étendu `publications.type` dans le schema Convex
+ *   2. créé la config correspondante dans `config/modules/`
+ *   3. vérifié qu'un producteur réel existe (form / sheet / mutation)
+ *
+ * Les modules qui ne produisent PAS de publications (Pay, Wallet, SOS,
+ * Premium, Boost, Réputation, Récompenses, Parrainage, Sport autonome,
+ * Settings, Messages, etc.) ne doivent PAS apparaître ici.
+ *
+ * Les aliases UX (emploi → job, logement → immo, tourisme → voyages,
+ * culture → evenement, tech → media) sont gérés par les mappings côté
+ * frontend, JAMAIS par la base.
  */
 export type PublicationType =
-  | "community"
-  | "evenement"
-  | "job"
-  | "emploi"
-  | "immo"
-  | "logement"
-  | "service"
-  | "sante"
-  | "transport"
-  | "voyages"
-  | "education"
-  | "justice"
-  | "annonce"
   | "agri"
-  | "environnement"
+  | "annonce"
+  | "article"
+  | "business"
+  | "community"
+  | "creator"
+  | "education"
   | "energie"
+  | "environnement"
+  | "evenement"
+  | "finance"
+  | "groupes"
+  | "hebergement"
+  | "immo"
+  | "job"
+  | "justice"
+  | "marketplace"
+  | "media"
+  | "network"
   | "ong"
   | "restauration"
-  | "hebergement"
-  | "media"
-  | "finance"
-  | "network"
-  | "business"
-  | "creator"
-  | "tourisme"
-  | "sport"
-  | "culture"
-  | "tech"
-  | "marketplace"
-  | "premium"
-  | "boost"
-  | "groupes"
-  | "reputation"
-  | "recompenses"
-  | "parrainage"
-  | "sos"
+  | "sante"
+  | "service"
+  | "sondage"
+  | "transport"
   | "video"
-  | "article"
-  | "sondage";
+  | "voyages";
 
 /* ============================================================================
  * AUTHOR

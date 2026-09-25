@@ -20,6 +20,11 @@ const MAX_RESULTS = 250;
 
 const EARTH_RADIUS_KM = 6371;
 
+type GeoCenter = {
+  lat: number;
+  lng: number;
+};
+
 function toRadians(value: number): number {
   return (value * Math.PI) / 180;
 }
@@ -52,21 +57,35 @@ function normalizeRadius(radiusKm: number | undefined): number {
   return Math.min(MAX_RADIUS_KM, Math.max(1, radiusKm));
 }
 
+function getCenter(
+  lat: number | undefined,
+  lng: number | undefined,
+): GeoCenter | null {
+  if (
+    typeof lat !== "number" ||
+    typeof lng !== "number" ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ) {
+    return null;
+  }
+
+  return {
+    lat,
+    lng,
+  };
+}
+
 export const listGeoPublications = query({
   args: {
     types: v.optional(v.array(v.string())),
-
     lat: v.optional(v.number()),
-
     lng: v.optional(v.number()),
-
     radiusKm: v.optional(v.number()),
   },
 
   handler: async (ctx, args) => {
-    const hasCenter =
-      typeof args.lat === "number" && typeof args.lng === "number";
-
+    const center = getCenter(args.lat, args.lng);
     const radiusKm = normalizeRadius(args.radiusKm);
 
     const requestedTypes =
@@ -78,14 +97,14 @@ export const listGeoPublications = query({
       .take(MAX_RESULTS);
 
     const geoRows = rows.filter((publication) => {
-      if (publication.latitude == null || publication.longitude == null) {
+      const latitude = publication.latitude;
+      const longitude = publication.longitude;
+
+      if (latitude == null || longitude == null) {
         return false;
       }
 
-      if (
-        !Number.isFinite(publication.latitude) ||
-        !Number.isFinite(publication.longitude)
-      ) {
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
         return false;
       }
 
@@ -93,16 +112,11 @@ export const listGeoPublications = query({
         return false;
       }
 
-      if (!hasCenter) {
+      if (center == null) {
         return true;
       }
 
-      const distance = distanceKm(
-        args.lat as number,
-        args.lng as number,
-        publication.latitude,
-        publication.longitude,
-      );
+      const distance = distanceKm(center.lat, center.lng, latitude, longitude);
 
       return distance <= radiusKm;
     });
@@ -111,48 +125,51 @@ export const listGeoPublications = query({
       geoRows.map(async (publication) => {
         const author = await ctx.db.get(publication.authorId);
 
-        const distance = hasCenter
-          ? distanceKm(
-              args.lat as number,
-              args.lng as number,
-              publication.latitude as number,
-              publication.longitude as number,
-            )
-          : undefined;
+        const latitude = publication.latitude;
+        const longitude = publication.longitude;
+
+        // geoRows garantit que ces deux valeurs existent
+        // et sont des nombres finis.
+        if (
+          latitude == null ||
+          longitude == null ||
+          !Number.isFinite(latitude) ||
+          !Number.isFinite(longitude)
+        ) {
+          return null;
+        }
+
+        const distance =
+          center == null
+            ? undefined
+            : distanceKm(center.lat, center.lng, latitude, longitude);
 
         return {
           _id: publication._id,
-
           type: publication.type,
-
           title: publication.title,
-
           description: publication.description,
-
           price: publication.price,
-
           location: publication.location,
-
-          latitude: publication.latitude as number,
-
-          longitude: publication.longitude as number,
-
+          latitude,
+          longitude,
           likeCount: publication.likeCount,
-
           commentCount: publication.commentCount,
-
           authorName: author?.name ?? "Anonyme",
-
           authorAvatar: author?.avatar,
-
           distanceKm:
             distance != null ? Math.round(distance * 10) / 10 : undefined,
         };
       }),
     );
 
-    if (hasCenter) {
-      result.sort((a, b) => {
+    const validResult = result.filter(
+      (publication): publication is NonNullable<typeof publication> =>
+        publication !== null,
+    );
+
+    if (center != null) {
+      validResult.sort((a, b) => {
         const distanceA = a.distanceKm ?? Number.POSITIVE_INFINITY;
 
         const distanceB = b.distanceKm ?? Number.POSITIVE_INFINITY;
@@ -161,6 +178,6 @@ export const listGeoPublications = query({
       });
     }
 
-    return result;
+    return validResult;
   },
 });

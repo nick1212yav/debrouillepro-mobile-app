@@ -1,0 +1,609 @@
+########## AUDIT MESSAGES — 2026-09-25 14:02:56 ##########
+
+===== 1. FAÇADE convex/messages.ts =====
+EXISTS  |  26059 bytes  |  LastWrite=18/09/2026 06:27:55
+
+===== 2. BACKEND convex/messages/ =====
+Nb fichiers .ts : 20
+  convex\messages\ai.ts                                                     376 lines  2026-08-18
+  convex\messages\attachments.ts                                            159 lines  2026-08-19
+  convex\messages\calls.ts                                                  334 lines  2026-08-18
+  convex\messages\conversations.ts                                          618 lines  2026-08-18
+  convex\messages\forwarding.ts                                             179 lines  2026-08-18
+  convex\messages\index.ts                                                   23 lines  2026-08-18
+  convex\messages\locations.ts                                              402 lines  2026-08-18
+  convex\messages\members.ts                                                782 lines  2026-08-18
+  convex\messages\messages.ts                                               666 lines  2026-08-18
+  convex\messages\moderation.ts                                             352 lines  2026-08-18
+  convex\messages\notifications.ts                                          354 lines  2026-08-18
+  convex\messages\pins.ts                                                    77 lines  2026-08-18
+  convex\messages\polls.ts                                                  397 lines  2026-08-18
+  convex\messages\presence.ts                                               206 lines  2026-08-18
+  convex\messages\reactions.ts                                              424 lines  2026-08-18
+  convex\messages\readReceipts.ts                                           247 lines  2026-08-18
+  convex\messages\replies.ts                                                331 lines  2026-08-18
+  convex\messages\search.ts                                                 417 lines  2026-08-18
+  convex\messages\typing.ts                                                 232 lines  2026-08-18
+  convex\messages\voice.ts                                                  123 lines  2026-08-18
+
+===== 3. FRONTEND src/features/messages/ =====
+Nb fichiers .ts/.tsx : 191
+  src\features\messages\ai\components\AiActions.tsx                                              77 lines  2026-09-12
+  src\features\messages\ai\components\ConversationSummary.tsx                                    53 lines  2026-09-12
+  src\features\messages\ai\components\SuggestedReply.tsx                                         51 lines  2026-09-12
+  src\features\messages\ai\components\TranslationPanel.tsx                                       71 lines  2026-09-12
+  src\features\messages\ai\hooks\useMessageAI.ts                                                173 lines  2026-09-12
+  src\features\messages\ai\services\ai.service.ts                                               155 lines  2026-09-12
+  src\features\messages\analytics\components\AnalyticsCard.tsx                                   24 lines  2026-09-12
+  src\features\messages\analytics\components\AnalyticsChart.tsx                                  48 lines  2026-09-12
+  src\features\messages\analytics\components\AnalyticsDashboard.tsx                              72 lines  2026-09-12
+  src\features\messages\analytics\components\AnalyticsPeriod.tsx                                 30 lines  2026-09-12
+  src\features\messages\analytics\components\AnalyticsSummary.tsx                                62 lines  2026-09-12
+  src\features\messages\analytics\components\TopPublications.tsx                                 47 lines  2026-09-12
+  src\features\messages\analytics\hooks\useAnalytics.ts                                          56 lines  2026-09-12
+  src\features\messages\analytics\services\analytics.service.ts                                 160 lines  2026-09-12
+  src\features\messages\calls\components\ActiveCall.tsx                                          66 lines  2026-09-12
+  src\features\messages\calls\components\CallControls.tsx                                        36 lines  2026-09-12
+  src\features\messages\calls\components\CallHistory.tsx                                         40 lines  2026-09-12
+  src\features\messages\calls\components\IncomingCall.tsx                                        29 lines  2026-09-12
+  src\features\messages\calls\components\MinimizedCall.tsx                                       16 lines  2026-09-12
+  src\features\messages\calls\components\OutgoingCall.tsx                                        34 lines  2026-09-12
+  src\features\messages\calls\components\VideoGrid.tsx                                           57 lines  2026-09-12
+  src\features\messages\calls\hooks\useCall.ts                                                  225 lines  2026-09-12
+  src\features\messages\calls\hooks\useCallDevices.ts                                            78 lines  2026-09-12
+  src\features\messages\calls\hooks\useWebRTC.ts                                                185 lines  2026-09-12
+  src\features\messages\calls\services\call.service.ts                                           46 lines  2026-09-12
+  src\features\messages\calls\services\signaling.service.ts                                      36 lines  2026-09-12
+  src\features\messages\calls\types\call.types.ts                                                61 lines  2026-09-12
+  src\features\messages\chat\components\ChatHeader.tsx                                          280 lines  2026-09-12
+  src\features\messages\chat\components\ChatView.tsx                                             98 lines  2026-09-12
+  src\features\messages\chat\components\DateSeparator.tsx                                        14 lines  2026-09-12
+  src\features\messages\chat\components\ForwardPreview.tsx                                       19 lines  2026-09-12
+  src\features\messages\chat\components\MessageAttachments.tsx                                   14 lines  2026-09-12
+  src\features\messages\chat\components\MessageBubble.tsx                                        43 lines  2026-09-12
+  src\features\messages\chat\components\MessageComposer.tsx                                     496 lines  2026-09-12
+  src\features\messages\chat\components\MessageContextMenu.tsx                                   34 lines  2026-09-12
+  src\features\messages\chat\components\MessageReactions.tsx                                     32 lines  2026-09-12
+  src\features\messages\chat\components\MessagesArea.tsx                                         63 lines  2026-09-12
+  src\features\messages\chat\components\MessageStatus.tsx                                        29 lines  2026-09-12
+  src\features\messages\chat\components\MessageTypeRenderer.tsx                                 226 lines  2026-09-12
+  src\features\messages\chat\components\ReplyPreview.tsx                                         40 lines  2026-09-12
+  src\features\messages\chat\hooks\useChat.ts                                                    54 lines  2026-09-12
+  src\features\messages\chat\hooks\useMessageActions.ts                                          78 lines  2026-09-12
+  src\features\messages\chat\hooks\useMessageComposer.ts                                        428 lines  2026-09-12
+  src\features\messages\chat\hooks\useMessages.ts                                                30 lines  2026-09-12
+  src\features\messages\chat\services\chat.service.ts                                           144 lines  2026-09-12
+  src\features\messages\contacts\components\ContactMessage.tsx                                   77 lines  2026-09-12
+  src\features\messages\contacts\components\ContactPicker.tsx                                   145 lines  2026-09-12
+  src\features\messages\contacts\hooks\useContacts.ts                                            66 lines  2026-09-12
+  src\features\messages\contacts\services\contacts.service.ts                                    80 lines  2026-09-12
+  src\features\messages\conversations\components\ConversationHeader.tsx                          53 lines  2026-09-12
+  src\features\messages\conversations\components\ConversationItem.tsx                            41 lines  2026-09-12
+  src\features\messages\conversations\components\ConversationList.tsx                            31 lines  2026-09-12
+  src\features\messages\conversations\components\ConversationSearch.tsx                          44 lines  2026-09-12
+  src\features\messages\conversations\components\EmptyConversations.tsx                          18 lines  2026-09-12
+  src\features\messages\conversations\components\NewConversation.tsx                             53 lines  2026-09-12
+  src\features\messages\conversations\hooks\useConversation.ts                                   46 lines  2026-09-12
+  src\features\messages\conversations\hooks\useConversationActions.ts                           106 lines  2026-09-12
+  src\features\messages\conversations\hooks\useConversations.ts                                  23 lines  2026-09-12
+  src\features\messages\conversations\services\conversations.service.ts                         121 lines  2026-09-12
+  src\features\messages\events\components\EventActions.tsx                                       55 lines  2026-09-12
+  src\features\messages\events\components\EventMessage.tsx                                       71 lines  2026-09-12
+  src\features\messages\events\components\EventPreview.tsx                                      136 lines  2026-09-12
+  src\features\messages\events\hooks\useMessageEvents.ts                                        118 lines  2026-09-12
+  src\features\messages\events\services\events.service.ts                                        90 lines  2026-09-12
+  src\features\messages\forwarding\components\ForwardDialog.tsx                                 134 lines  2026-09-12
+  src\features\messages\forwarding\components\ForwardPreview.tsx                                 74 lines  2026-09-12
+  src\features\messages\forwarding\components\index.ts                                            2 lines  2026-09-12
+  src\features\messages\forwarding\hooks\index.ts                                                 1 lines  2026-09-12
+  src\features\messages\forwarding\hooks\useForwarding.ts                                        31 lines  2026-09-12
+  src\features\messages\forwarding\services\forwarding.service.ts                                36 lines  2026-09-12
+  src\features\messages\forwarding\services\index.ts                                              1 lines  2026-09-12
+  src\features\messages\forwarding\index.ts                                                       3 lines  2026-09-12
+  src\features\messages\groups\components\CreateGroup.tsx                                        79 lines  2026-09-12
+  src\features\messages\groups\components\GroupHeader.tsx                                        42 lines  2026-09-12
+  src\features\messages\groups\components\GroupItem.tsx                                          38 lines  2026-09-12
+  src\features\messages\groups\components\GroupList.tsx                                          34 lines  2026-09-12
+  src\features\messages\groups\components\GroupMemberActions.tsx                                 36 lines  2026-09-12
+  src\features\messages\groups\components\GroupMembers.tsx                                       27 lines  2026-09-12
+  src\features\messages\groups\components\GroupPermissions.tsx                                   16 lines  2026-09-12
+  src\features\messages\groups\components\GroupSettings.tsx                                      34 lines  2026-09-12
+  src\features\messages\groups\hooks\useGroupActions.ts                                          73 lines  2026-09-12
+  src\features\messages\groups\hooks\useGroupMembers.ts                                          24 lines  2026-09-12
+  src\features\messages\groups\hooks\useGroups.ts                                                47 lines  2026-09-12
+  src\features\messages\groups\services\groups.service.ts                                       104 lines  2026-09-12
+  src\features\messages\hooks\useMessagePermissions.ts                                           55 lines  2026-09-12
+  src\features\messages\hooks\useMessagesFeature.ts                                              99 lines  2026-09-12
+  src\features\messages\immo\components\PropertyMessage.tsx                                     250 lines  2026-09-18
+  src\features\messages\immo\components\PropertyPreview.tsx                                     147 lines  2026-09-12
+  src\features\messages\immo\hooks\usePropertyMessages.ts                                       112 lines  2026-09-12
+  src\features\messages\immo\services\immo.service.ts                                            99 lines  2026-09-12
+  src\features\messages\jobs\components\JobMessage.tsx                                           45 lines  2026-09-12
+  src\features\messages\jobs\components\JobPreview.tsx                                           81 lines  2026-09-12
+  src\features\messages\jobs\hooks\useJobMessages.ts                                            127 lines  2026-09-12
+  src\features\messages\jobs\services\jobs.service.ts                                            82 lines  2026-09-12
+  src\features\messages\locations\components\LiveLocation.tsx                                   106 lines  2026-09-12
+  src\features\messages\locations\components\LocationMessage.tsx                                 80 lines  2026-09-12
+  src\features\messages\locations\components\LocationPicker.tsx                                 116 lines  2026-09-12
+  src\features\messages\locations\hooks\useLocation.ts                                          244 lines  2026-09-12
+  src\features\messages\locations\services\locations.service.ts                                 166 lines  2026-09-12
+  src\features\messages\media\components\AttachmentPicker.tsx                                    32 lines  2026-09-12
+  src\features\messages\media\components\AttachmentPreview.tsx                                   33 lines  2026-09-12
+  src\features\messages\media\components\AudioPlayer.tsx                                         15 lines  2026-09-12
+  src\features\messages\media\components\FilePreview.tsx                                         53 lines  2026-09-12
+  src\features\messages\media\components\ImagePreview.tsx                                        16 lines  2026-09-12
+  src\features\messages\media\components\MediaGallery.tsx                                        35 lines  2026-09-12
+  src\features\messages\media\components\MediaViewer.tsx                                         46 lines  2026-09-12
+  src\features\messages\media\components\UploadProgress.tsx                                      17 lines  2026-09-12
+  src\features\messages\media\components\VideoPreview.tsx                                        24 lines  2026-09-12
+  src\features\messages\media\hooks\useAttachments.ts                                            44 lines  2026-09-12
+  src\features\messages\media\hooks\useFileUpload.ts                                            115 lines  2026-09-12
+  src\features\messages\media\hooks\useMediaGallery.ts                                           55 lines  2026-09-12
+  src\features\messages\media\services\media.service.ts                                         183 lines  2026-09-12
+  src\features\messages\notifications\components\MessageNotification.tsx                        118 lines  2026-09-12
+  src\features\messages\notifications\hooks\useMessageNotifications.ts                          128 lines  2026-09-12
+  src\features\messages\notifications\services\notifications.service.ts                         338 lines  2026-09-12
+  src\features\messages\offline\hooks\useOfflineMessages.ts                                     147 lines  2026-09-12
+  src\features\messages\offline\hooks\useOutbox.ts                                              135 lines  2026-09-12
+  src\features\messages\offline\services\offline.service.ts                                     231 lines  2026-09-12
+  src\features\messages\offline\services\outbox.service.ts                                      176 lines  2026-09-12
+  src\features\messages\offline\types\offline.types.ts                                           87 lines  2026-09-12
+  src\features\messages\payments\components\PaymentComposer.tsx                                  80 lines  2026-09-12
+  src\features\messages\payments\components\PaymentMessage.tsx                                   96 lines  2026-09-12
+  src\features\messages\payments\components\PaymentStatus.tsx                                    83 lines  2026-09-12
+  src\features\messages\payments\hooks\useMessagePayments.ts                                    155 lines  2026-09-12
+  src\features\messages\payments\services\payments.service.ts                                    49 lines  2026-09-12
+  src\features\messages\pins\components\index.ts                                                  2 lines  2026-09-12
+  src\features\messages\pins\components\PinnedMessageItem.tsx                                   122 lines  2026-09-12
+  src\features\messages\pins\components\PinnedMessages.tsx                                       61 lines  2026-09-12
+  src\features\messages\pins\hooks\index.ts                                                       1 lines  2026-09-12
+  src\features\messages\pins\hooks\usePinnedMessages.ts                                          25 lines  2026-09-12
+  src\features\messages\pins\services\index.ts                                                    1 lines  2026-09-12
+  src\features\messages\pins\services\pins.service.ts                                            22 lines  2026-09-12
+  src\features\messages\pins\index.ts                                                             3 lines  2026-09-12
+  src\features\messages\polls\components\PollMessage.tsx                                         58 lines  2026-09-12
+  src\features\messages\polls\hooks\PollComposer.tsx                                            115 lines  2026-09-12
+  src\features\messages\polls\hooks\PollMessage.tsx                                             151 lines  2026-09-12
+  src\features\messages\polls\hooks\PollResults.tsx                                              55 lines  2026-09-12
+  src\features\messages\polls\hooks\usePolls.ts                                                 107 lines  2026-09-12
+  src\features\messages\polls\services\polls.service.ts                                          84 lines  2026-09-12
+  src\features\messages\presence\components\PresenceIndicator.tsx                                34 lines  2026-09-12
+  src\features\messages\presence\components\PresenceStatus.tsx                                   83 lines  2026-09-12
+  src\features\messages\presence\hooks\usePresence.ts                                           175 lines  2026-09-12
+  src\features\messages\presence\services\presence.service.ts                                    92 lines  2026-09-12
+  src\features\messages\readReceipts\components\ReadReceipt.tsx                                  83 lines  2026-09-12
+  src\features\messages\readReceipts\hooks\useReadReceipts.ts                                   132 lines  2026-09-12
+  src\features\messages\readReceipts\services\readReceipts.service.ts                            37 lines  2026-09-12
+  src\features\messages\search\components\index.ts                                                3 lines  2026-09-12
+  src\features\messages\search\components\MessageSearch.tsx                                      68 lines  2026-09-12
+  src\features\messages\search\components\SearchFilters.tsx                                      42 lines  2026-09-12
+  src\features\messages\search\components\SearchResults.tsx                                      56 lines  2026-09-12
+  src\features\messages\search\hooks\index.ts                                                     1 lines  2026-09-12
+  src\features\messages\search\hooks\useMessageSearch.ts                                         97 lines  2026-09-12
+  src\features\messages\search\services\index.ts                                                  1 lines  2026-09-12
+  src\features\messages\search\services\search.service.ts                                       109 lines  2026-09-12
+  src\features\messages\search\index.ts                                                           3 lines  2026-09-12
+  src\features\messages\security\components\BlockUserDialog.tsx                                 105 lines  2026-09-12
+  src\features\messages\security\components\ConversationSecurity.tsx                            108 lines  2026-09-12
+  src\features\messages\security\components\ReportMessageDialog.tsx                             160 lines  2026-09-12
+  src\features\messages\security\hooks\useMessageSecurity.ts                                    126 lines  2026-09-12
+  src\features\messages\security\services\security.service.ts                                   190 lines  2026-09-12
+  src\features\messages\shared\components\EmptyState.tsx                                         49 lines  2026-09-12
+  src\features\messages\shared\components\ErrorState.tsx                                         47 lines  2026-09-12
+  src\features\messages\shared\components\LoadingState.tsx                                       47 lines  2026-09-12
+  src\features\messages\shared\components\OnlineIndicator.tsx                                    36 lines  2026-09-12
+  src\features\messages\shared\components\UserAvatar.tsx                                         62 lines  2026-09-12
+  src\features\messages\shared\constants\message.constants.ts                                   231 lines  2026-09-12
+  src\features\messages\shared\utils\attachment.utils.ts                                        291 lines  2026-09-12
+  src\features\messages\shared\utils\conversation.utils.ts                                      297 lines  2026-09-12
+  src\features\messages\shared\utils\message.utils.ts                                           212 lines  2026-09-12
+  src\features\messages\stores\calls.store.ts                                                   140 lines  2026-09-12
+  src\features\messages\stores\chat.store.ts                                                     88 lines  2026-09-12
+  src\features\messages\stores\conversations.store.ts                                           126 lines  2026-09-12
+  src\features\messages\stores\messages.store.ts                                                125 lines  2026-09-12
+  src\features\messages\sync\hooks\useMessageSync.ts                                            185 lines  2026-09-12
+  src\features\messages\sync\services\sync.service.ts                                           155 lines  2026-09-12
+  src\features\messages\typing\components\TypingIndicator.tsx                                    35 lines  2026-09-12
+  src\features\messages\typing\hooks\useTyping.ts                                               121 lines  2026-09-12
+  src\features\messages\typing\services\typing.service.ts                                        30 lines  2026-09-12
+  src\features\messages\typing\index.ts                                                           3 lines  2026-09-12
+  src\features\messages\voice\components\VoiceMessage.tsx                                        38 lines  2026-09-12
+  src\features\messages\voice\components\VoicePlayer.tsx                                         49 lines  2026-09-12
+  src\features\messages\voice\components\VoiceRecorder.tsx                                       55 lines  2026-09-12
+  src\features\messages\voice\components\VoiceTranscription.tsx                                  35 lines  2026-09-12
+  src\features\messages\voice\components\VoiceWaveform.tsx                                       34 lines  2026-09-12
+  src\features\messages\voice\hooks\useVoicePlayer.ts                                           109 lines  2026-09-12
+  src\features\messages\voice\hooks\useVoiceRecorder.ts                                         319 lines  2026-09-12
+  src\features\messages\voice\hooks\useVoiceTranscription.ts                                     37 lines  2026-09-12
+  src\features\messages\voice\services\voice.service.ts                                          38 lines  2026-09-12
+  src\features\messages\index.ts                                                                148 lines  2026-09-12
+  src\features\messages\MessagesPage.tsx                                                        353 lines  2026-09-12
+  src\features\messages\types.ts                                                                386 lines  2026-09-12
+
+===== 4. POINTS D'ENTREE frontend (hors features/messages) =====
+  src\features\marketplace\components\MarketplaceMessages.tsx                                    44 lines
+  src\pages\modules\MessagesPage.tsx                                                              3 lines
+
+===== 5. SCHEMA convex/schema.ts (tables/index messages) =====
+  L   72  reportedBy: v.id("users"),
+  L   90  moderationReports: defineTable({
+  L   91  messageId: v.id("messages"),
+  L   92  reportedBy: v.id("users"),
+  L  118  .index("by_reporter", ["reportedBy"])
+  L  119  .index("by_message", ["messageId"])
+  L  135  conversations: defineTable({
+  L  140  lastMessageText: v.optional(v.string()),
+  L  141  lastMessageSenderId: v.optional(v.id("users")),
+  L  145  messages: defineTable({
+  L  146  conversationId: v.id("conversations"),
+  L  152  // Type de message
+  L  175  reactions: v.array(
+  L  183  replyToId: v.optional(v.id("messages")),
+  L  194  // Épinglage
+  L  195  isPinned: v.optional(v.boolean()),
+  L  196  pinnedAt: v.optional(v.number()),
+  L  197  pinnedBy: v.optional(v.id("users")),
+  L  199  // Message vocal
+  L  216  .index("by_conversation", ["conversationId"])
+  L  218  .index("by_conversation_and_sender", ["conversationId", "senderId"])
+  L  221  typingStatus: defineTable({
+  L  222  conversationId: v.id("conversations"),
+  L  226  .index("by_conversation", ["conversationId"])
+  L  227  .index("by_user_and_conversation", ["userId", "conversationId"]),
+  L  229  typingIndicators: defineTable({
+  L  230  conversationId: v.id("conversations"),
+  L  232  isTyping: v.boolean(),
+  L  235  .index("by_conversation", ["conversationId"])
+  L  236  .index("by_conversation_user", ["conversationId", "userId"])
+  L  257  v.literal("message"),
+  L  284  pinned: v.boolean(),
+  L  391  message: v.string(),
+  L  536  notifMessages: v.boolean(),
+  L  773  conversationMembers: defineTable({
+  L  774  conversationId: v.id("conversations"),
+  L  780  v.union(v.literal("owner"), v.literal("admin"), v.literal("member")),
+  L  787  .index("by_conversation", ["conversationId"])
+  L  789  .index("by_user_and_conversation", ["userId", "conversationId"])
+  L  790  .index("by_conversation_and_user", ["conversationId", "userId"]),
+  L 1069  message: v.string(),
+  L 1112  v.literal("camping"),
+  L 1154  message: v.optional(v.string()),
+  L 1178  reason: v.optional(v.string()), // "reserved", "maintenance", "owner_blocked"
+  L 1515  memberCount: v.number(),
+  L 1521  sportClubMembers: defineTable({
+  L 1524  role: v.union(v.literal("member"), v.literal("coach"), v.literal("admin")),
+  L 1885  attachments: v.optional(v.array(v.string())),
+  L 2174  message: v.optional(v.string()),
+  L 2365  memberCount: v.number(),
+  L 2376  groupMembers: defineTable({
+  L 2380  v.literal("member"),
+  L 2403  pinned: v.boolean(),
+  L 2453  message: v.optional(v.string()),
+  L 3047  message: v.optional(v.string()),
+  L 3340  // - PIN
+  L 3530  * Message technique non sensible destiné à l'application.
+  L 3532  failureMessage: v.optional(v.string()),
+  L 3541  *   message: "Confirmez la demande sur votre téléphone"
+  L 3549  message: v.optional(v.string()),
+  L 3715  * Message d'erreur non sensible.
+  L 3717  errorMessage: v.optional(v.string()),
+  L 3893  * - PIN
+  L 3992  receiptUrl: v.optional(v.string()),
+  L 4149  liveStreamMessages: defineTable({
+  L 4228  message: v.string(),
+  L 4276  providerMessageId: v.optional(v.string()),
+  L 4306  message: v.string(),
+  L 4880  message: v.optional(v.string()),
+  L 4929  schoolMessages: defineTable({
+  L 4959  justiceReports: defineTable({
+  L 5222  message: v.string(),
+  L 5252  message: v.string(),
+  L 5393  v.literal("blocked"),
+  L 5539  welcomeMessage: v.optional(v.string()),
+  L 5672  // MESSAGERIE AVANCÉE (V1.1+)
+  L 5675  // Messages épinglés (dans une conversation)
+  L 5676  conversationPins: defineTable({
+  L 5677  conversationId: v.id("conversations"),
+  L 5679  pinnedAt: v.string(),
+  L 5683  readReceipts: defineTable({
+  L 5684  messageId: v.id("messages"),
+  L 5688  .index("by_message", ["messageId"])
+  L 5690  .index("by_message_user", ["messageId", "userId"]),
+  L 5693  presence: defineTable({
+  L 5704  // Pièces jointes aux messages
+  L 5705  attachments: defineTable({
+  L 5706  messageId: v.id("messages"),
+  L 5715  }).index("by_message", ["messageId"]),
+  L 5718  // MESSAGERIE — SONDAGES
+  L 5721  polls: defineTable({
+  L 5722  conversationId: v.id("conversations"),
+  L 5739  messageId: v.optional(v.id("messages")),
+  L 5746  .index("by_conversation", ["conversationId"])
+  L 5748  .index("by_message", ["messageId"])
+  L 5751  pollVotes: defineTable({
+  L 5752  pollId: v.id("polls"),
+  L 5757  .index("by_poll", ["pollId"])
+  L 5759  .index("by_poll_and_user", ["pollId", "userId"])
+  L 5760  .index("by_poll_and_option", ["pollId", "optionId"]),
+  L 5762  messageLocations: defineTable({
+  L 5763  conversationId: v.id("conversations"),
+  L 5777  messageId: v.optional(v.id("messages")),
+  L 5785  .index("by_conversation", ["conversationId"])
+  L 5787  .index("by_conversation_and_user", ["conversationId", "userId"])
+  L 5788  .index("by_message", ["messageId"]),
+  L 5791  calls: defineTable({
+  L 5792  conversationId: v.id("conversations"),
+  L 5803  }).index("by_conversation", ["conversationId"]),
+
+===== 6. ERREURS TSC (convex/messages | features/messages) =====
+convex/messages/conversations.ts(152,18): error TS2345: Argument of type '{ userId: Id<"users">; unreadCount: any; }' is not assignable to parameter of type 'never'.
+convex/messages/members.ts(213,19): error TS2345: Argument of type '{ user: { _id: Id<"users">; _creationTime: number; email?: string | undefined; phone?: string | undefined; avatar?: string | undefined; bio?: string | undefined; permissions?: string[] | undefined; ... 17 more ...; reputationScore: number; }; ... 8 more ...; unreadCount: number; }' is not assignable to parameter of type 'never'.
+convex/messages/members.ts(228,28): error TS2339: Property 'userId' does not exist on type 'never'.
+convex/messages/members.ts(241,19): error TS2345: Argument of type '{ conversationId: Id<"conversations">; userId: any; unreadCount: number; user: { _id: Id<"users">; _creationTime: number; email?: string | undefined; phone?: string | undefined; ... 20 more ...; reputationScore: number; } | ... 245 more ... | { ...; }; }' is not assignable to parameter of type 'never'.
+convex/messages/presence.ts(250,9): error TS2345: Argument of type '{ _id: Id<"presence">; _creationTime: number; device?: string | undefined; status: "online" | "away" | "offline"; userId: Id<"users">; lastSeen: string; } | { userId: Id<"users">; status: "offline"; lastSeen: null; device: null; }' is not assignable to parameter of type 'never'.
+convex/messages/readReceipts.ts(156,25): error TS2345: Argument of type 'Id<"readReceipts">' is not assignable to parameter of type 'never'.
+convex/messages/readReceipts.ts(164,25): error TS2345: Argument of type 'Id<"readReceipts">' is not assignable to parameter of type 'never'.
+convex/messages/readReceipts.ts(279,21): error TS2345: Argument of type '{ messageId: Id<"messages">; receipts: { _id: Id<"readReceipts">; _creationTime: number; messageId: Id<"messages">; userId: Id<"users">; readAt: string; }[]; }' is not assignable to parameter of type 'never'.
+convex/messages/search.ts(308,24): error TS2345: Argument of type '{ conversationId: Id<"conversations">; isGroup: boolean; name: string; avatar: string | undefined; lastMessageText: string | undefined; lastMessageSenderId: Id<"users"> | undefined; updatedAt: string; }' is not assignable to parameter of type 'never'.
+convex/messages/search.ts(344,20): error TS2345: Argument of type '{ conversationId: Id<"conversations">; isGroup: boolean; name: string; avatar: string | undefined; otherUserId: Id<"users">; lastMessageText: string | undefined; lastMessageSenderId: Id<...> | undefined; updatedAt: string; }' is not assignable to parameter of type 'never'.
+convex/messages/search.ts(360,30): error TS2339: Property 'updatedAt' does not exist on type 'never'.
+convex/messages/search.ts(360,56): error TS2339: Property 'updatedAt' does not exist on type 'never'.
+convex/messages/search.ts(427,36): error TS2345: Argument of type '{ conversationId: Id<"conversations">; isGroup: boolean; name: string; avatar: string | undefined; updatedAt: string; }' is not assignable to parameter of type 'never'.
+convex/messages/search.ts(454,34): error TS2345: Argument of type '{ conversationId: Id<"conversations">; isGroup: boolean; name: string; avatar: string | undefined; otherUserId: Id<"users">; updatedAt: string; }' is not assignable to parameter of type 'never'.
+convex/messages/search.ts(504,29): error TS2345: Argument of type '{ messageId: Id<"messages">; conversationId: Id<"conversations">; senderId: Id<"users">; senderName: string; senderAvatar: string | undefined; text: string; status: "sent" | "delivered" | "read" | "failed"; conversationName: string; }' is not assignable to parameter of type 'never'.
+convex/messages/search.ts(523,42): error TS2339: Property 'updatedAt' does not exist on type 'never'.
+convex/messages/search.ts(523,68): error TS2339: Property 'updatedAt' does not exist on type 'never'.
+convex/messages/typing.ts(184,18): error TS2345: Argument of type '{ userId: Id<"users">; name: string; image: string | undefined; lastActiveAt: number; }' is not assignable to parameter of type 'never'.
+src/features/messages/analytics/components/AnalyticsChart.tsx(45,22): error TS2769: No overload matches this call.
+src/features/messages/calls/components/VideoGrid.tsx(25,22): error TS2339: Property 'srcObject' does not exist on type 'View'.
+src/features/messages/calls/components/VideoGrid.tsx(29,26): error TS2339: Property 'srcObject' does not exist on type 'View'.
+src/features/messages/calls/components/VideoGrid.tsx(38,11): error TS2322: Type 'RefObject<View | null>' is not assignable to type 'Ref<HTMLVideoElement> | undefined'.
+src/features/messages/chat/components/ChatHeader.tsx(102,26): error TS2339: Property 'contains' does not exist on type 'View'.
+src/features/messages/chat/components/ChatHeader.tsx(109,17): error TS2339: Property 'key' does not exist on type 'NativeSyntheticEvent<TextInputKeyPressEventData>'.
+src/features/messages/chat/components/ChatHeader.tsx(114,46): error TS2769: No overload matches this call.
+src/features/messages/chat/components/ChatHeader.tsx(115,42): error TS2769: No overload matches this call.
+src/features/messages/chat/components/ChatHeader.tsx(118,51): error TS2769: No overload matches this call.
+src/features/messages/chat/components/ChatHeader.tsx(119,47): error TS2769: No overload matches this call.
+src/features/messages/chat/components/MessageComposer.tsx(265,15): error TS2339: Property 'key' does not exist on type 'NativeSyntheticEvent<TextInputKeyPressEventData>'.
+src/features/messages/chat/components/MessageComposer.tsx(265,40): error TS2339: Property 'shiftKey' does not exist on type 'NativeSyntheticEvent<TextInputKeyPressEventData>'.
+src/features/messages/chat/components/MessageComposer.tsx(310,38): error TS2339: Property 'files' does not exist on type 'NativeMethods'.
+src/features/messages/chat/components/MessageComposer.tsx(311,18): error TS2339: Property 'value' does not exist on type 'NativeMethods'.
+src/features/messages/chat/components/MessageComposer.tsx(316,38): error TS2339: Property 'files' does not exist on type 'NativeMethods'.
+src/features/messages/chat/components/MessageComposer.tsx(317,18): error TS2339: Property 'value' does not exist on type 'NativeMethods'.
+src/features/messages/chat/components/MessageComposer.tsx(322,38): error TS2339: Property 'files' does not exist on type 'NativeMethods'.
+src/features/messages/chat/components/MessageComposer.tsx(323,18): error TS2339: Property 'value' does not exist on type 'NativeMethods'.
+src/features/messages/chat/components/MessageComposer.tsx(422,310): error TS2339: Property 'click' does not exist on type 'TextInput'.
+src/features/messages/chat/components/MessageComposer.tsx(425,96): error TS2339: Property 'click' does not exist on type 'TextInput'.
+src/features/messages/chat/components/MessageComposer.tsx(428,97): error TS2339: Property 'click' does not exist on type 'TextInput'.
+src/features/messages/chat/components/MessageComposer.tsx(447,102): error TS2769: No overload matches this call.
+src/features/messages/chat/components/MessageComposer.tsx(562,84): error TS2769: No overload matches this call.
+src/features/messages/chat/components/MessageComposer.tsx(562,174): error TS2769: No overload matches this call.
+src/features/messages/chat/components/MessageComposer.tsx(562,266): error TS2769: No overload matches this call.
+src/features/messages/chat/components/MessagesArea.tsx(40,19): error TS2339: Property 'scrollTop' does not exist on type 'View'.
+src/features/messages/chat/components/MessagesArea.tsx(49,15): error TS2339: Property 'addEventListener' does not exist on type 'View'.
+src/features/messages/chat/components/MessagesArea.tsx(52,17): error TS2339: Property 'removeEventListener' does not exist on type 'View'.
+src/features/messages/chat/components/MessageStatus.tsx(11,15): error TS2769: No overload matches this call.
+src/features/messages/chat/components/MessageStatus.tsx(18,15): error TS2769: No overload matches this call.
+src/features/messages/chat/components/MessageStatus.tsx(25,15): error TS2769: No overload matches this call.
+src/features/messages/chat/components/MessageTypeRenderer.tsx(27,8): error TS2613: Module '"C:/Dev/my-app_RETRANSIFY_TEST/debrouillepro-mobile-test/src/features/messages/immo/components/PropertyMessage"' has no default export. Did you mean to use 'import { PropertyMessage } from "C:/Dev/my-app_RETRANSIFY_TEST/debrouillepro-mobile-test/src/features/messages/immo/components/PropertyMessage"' instead?
+src/features/messages/contacts/components/ContactMessage.tsx(30,11): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactMessage.tsx(60,81): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactMessage.tsx(65,361): error TS2353: Object literal may only specify known properties, and 'textAlign' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/contacts/components/ContactMessage.tsx(68,29): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactMessage.tsx(69,42): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactMessage.tsx(73,42): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactMessage.tsx(77,81): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactMessage.tsx(80,17): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactMessage.tsx(81,124): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/contacts/components/ContactMessage.tsx(85,171): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/contacts/components/ContactPicker.tsx(43,11): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactPicker.tsx(111,11): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactPicker.tsx(111,245): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactPicker.tsx(118,164): error TS2353: Object literal may only specify known properties, and 'fontSize' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/contacts/components/ContactPicker.tsx(125,41): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactPicker.tsx(127,41): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactPicker.tsx(128,19): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactPicker.tsx(136,251): error TS2353: Object literal may only specify known properties, and 'textAlign' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/contacts/components/ContactPicker.tsx(145,61): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactPicker.tsx(150,27): error TS2769: No overload matches this call.
+src/features/messages/contacts/components/ContactPicker.tsx(168,252): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/conversations/components/ConversationList.tsx(30,11): error TS2322: Type '{ key: string; conversation: ConversationPreview; active: boolean; onPress: () => void; }' is not assignable to type 'IntrinsicAttributes & ConversationItemProps'.
+src/features/messages/events/components/EventActions.tsx(38,285): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/events/components/EventActions.tsx(42,287): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/events/components/EventActions.tsx(55,270): error TS2353: Object literal may only specify known properties, and 'fontSize' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/events/components/EventActions.tsx(61,279): error TS2353: Object literal may only specify known properties, and 'fontSize' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/events/components/EventMessage.tsx(70,173): error TS2769: No overload matches this call.
+src/features/messages/events/components/EventMessage.tsx(76,173): error TS2769: No overload matches this call.
+src/features/messages/events/components/EventPreview.tsx(90,40): error TS2769: No overload matches this call.
+src/features/messages/events/components/EventPreview.tsx(90,277): error TS2769: No overload matches this call.
+src/features/messages/events/components/EventPreview.tsx(104,67): error TS2769: No overload matches this call.
+src/features/messages/events/components/EventPreview.tsx(109,241): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/events/components/EventPreview.tsx(113,244): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/events/components/EventPreview.tsx(140,21): error TS2769: No overload matches this call.
+src/features/messages/forwarding/components/ForwardDialog.tsx(107,108): error TS2769: No overload matches this call.
+src/features/messages/groups/components/GroupList.tsx(33,11): error TS2322: Type '{ key: string; member: GroupMember; isCurrentUser: boolean; onPress: () => void | undefined; }' is not assignable to type 'IntrinsicAttributes & GroupItemProps'.
+src/features/messages/immo/components/PropertyPreview.tsx(37,13): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(37,40): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(37,68): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(37,151): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(37,226): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(37,274): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(37,362): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(42,17): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(44,22): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(46,21): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(56,18): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(60,50): error TS2322: Type 'TextStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+src/features/messages/immo/components/PropertyPreview.tsx(61,13): error TS2769: No overload matches this call.
+src/features/messages/immo/components/PropertyPreview.tsx(69,3): error TS2353: Object literal may only specify known properties, and 'border' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/immo/components/PropertyPreview.tsx(78,3): error TS2353: Object literal may only specify known properties, and 'border' does not exist in type 'TextStyle'.
+src/features/messages/immo/components/PropertyPreview.tsx(87,3): error TS2322: Type '"block"' is not assignable to type '"none" | "flex" | "contents" | undefined'.
+src/features/messages/immo/components/PropertyPreview.tsx(94,3): error TS2322: Type '"block"' is not assignable to type '"none" | "flex" | "contents" | undefined'.
+src/features/messages/immo/components/PropertyPreview.tsx(110,3): error TS2322: Type '"inline-flex"' is not assignable to type '"none" | "flex" | "contents" | undefined'.
+src/features/messages/immo/components/PropertyPreview.tsx(111,3): error TS2322: Type '"4px 8px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/immo/components/PropertyPreview.tsx(125,3): error TS2322: Type '"9px 0 5px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/immo/components/PropertyPreview.tsx(153,3): error TS2353: Object literal may only specify known properties, and 'borderTop' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/immo/components/PropertyPreview.tsx(172,3): error TS2353: Object literal may only specify known properties, and 'background' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/index.ts(136,10): error TS2305: Module '"./immo/components/PropertyMessage"' has no exported member 'default'.
+src/features/messages/jobs/components/JobMessage.tsx(37,115): error TS2769: No overload matches this call.
+src/features/messages/jobs/components/JobMessage.tsx(45,140): error TS2769: No overload matches this call.
+src/features/messages/jobs/components/JobPreview.tsx(58,100): error TS2769: No overload matches this call.
+src/features/messages/jobs/components/JobPreview.tsx(64,63): error TS2769: No overload matches this call.
+src/features/messages/jobs/components/JobPreview.tsx(70,17): error TS2769: No overload matches this call.
+src/features/messages/jobs/components/JobPreview.tsx(71,17): error TS2769: No overload matches this call.
+src/features/messages/jobs/components/JobPreview.tsx(84,219): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/jobs/components/JobPreview.tsx(88,226): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/locations/components/LiveLocation.tsx(116,33): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LiveLocation.tsx(116,136): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LiveLocation.tsx(121,24): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LiveLocation.tsx(134,180): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/locations/components/LocationMessage.tsx(36,81): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationMessage.tsx(64,177): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationMessage.tsx(74,40): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationMessage.tsx(76,40): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationMessage.tsx(77,40): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationMessage.tsx(89,210): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/locations/components/LocationMessage.tsx(91,193): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/locations/components/LocationPicker.tsx(83,11): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationPicker.tsx(90,136): error TS2353: Object literal may only specify known properties, and 'fontSize' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/locations/components/LocationPicker.tsx(94,105): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationPicker.tsx(94,268): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/locations/components/LocationPicker.tsx(96,41): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationPicker.tsx(97,19): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationPicker.tsx(112,124): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationPicker.tsx(112,226): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationPicker.tsx(113,48): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationPicker.tsx(122,21): error TS2769: No overload matches this call.
+src/features/messages/locations/components/LocationPicker.tsx(123,227): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/locations/components/LocationPicker.tsx(127,260): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/locations/components/LocationPicker.tsx(134,194): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/media/components/AttachmentPicker.tsx(20,43): error TS2339: Property 'files' does not exist on type 'NativeMethods'.
+src/features/messages/media/components/AttachmentPicker.tsx(23,23): error TS2345: Argument of type 'unknown[]' is not assignable to parameter of type 'File[]'.
+src/features/messages/media/components/AttachmentPicker.tsx(26,18): error TS2339: Property 'value' does not exist on type 'NativeMethods'.
+src/features/messages/media/components/AttachmentPicker.tsx(31,71): error TS2339: Property 'click' does not exist on type 'TextInput'.
+src/features/messages/media/components/AttachmentPicker.tsx(35,35): error TS2769: No overload matches this call.
+src/features/messages/media/components/MediaViewer.tsx(31,91): error TS2769: No overload matches this call.
+src/features/messages/MessagesPage.tsx(285,155): error TS2322: Type '{ children: Element; viewBox: string; fill: string; stroke: string; strokeWidth: string; className: string; accessibilityElementsHidden: boolean; importantForAccessibility: string; }' is not assignable to type 'SVGProps<SVGSVGElement>'.
+src/features/messages/MessagesPage.tsx(310,166): error TS2322: Type '{ children: Element[]; viewBox: string; fill: string; stroke: string; strokeWidth: string; className: string; accessibilityElementsHidden: boolean; importantForAccessibility: string; }' is not assignable to type 'SVGProps<SVGSVGElement>'.
+src/features/messages/MessagesPage.tsx(337,891): error TS2322: Type '{ children: Element; viewBox: string; fill: string; stroke: string; strokeWidth: string; className: string; accessibilityElementsHidden: boolean; importantForAccessibility: string; }' is not assignable to type 'SVGProps<SVGSVGElement>'.
+src/features/messages/MessagesPage.tsx(362,127): error TS2322: Type '{ children: Element[]; viewBox: string; fill: string; stroke: string; strokeWidth: string; className: string; accessibilityElementsHidden: boolean; importantForAccessibility: string; }' is not assignable to type 'SVGProps<SVGSVGElement>'.
+src/features/messages/MessagesPage.tsx(383,26): error TS2769: No overload matches this call.
+src/features/messages/MessagesPage.tsx(400,153): error TS2322: Type '{ children: Element[]; viewBox: string; fill: string; stroke: string; strokeWidth: string; className: string; accessibilityElementsHidden: boolean; importantForAccessibility: string; }' is not assignable to type 'SVGProps<SVGSVGElement>'.
+src/features/messages/notifications/components/MessageNotification.tsx(93,5): error TS2322: Type '"12px 14px" | "8px 10px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/notifications/components/MessageNotification.tsx(108,10): error TS2769: No overload matches this call.
+src/features/messages/notifications/components/MessageNotification.tsx(111,327): error TS2769: No overload matches this call.
+src/features/messages/notifications/components/MessageNotification.tsx(129,26): error TS2769: No overload matches this call.
+src/features/messages/notifications/components/MessageNotification.tsx(135,174): error TS2353: Object literal may only specify known properties, and 'fontSize' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/payments/components/PaymentComposer.tsx(40,11): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentComposer.tsx(40,40): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentComposer.tsx(40,109): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentComposer.tsx(40,240): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentComposer.tsx(40,350): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentComposer.tsx(40,537): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentComposer.tsx(40,672): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+src/features/messages/payments/components/PaymentComposer.tsx(54,3): error TS2353: Object literal may only specify known properties, and 'border' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/payments/components/PaymentComposer.tsx(71,3): error TS2322: Type '"12px 14px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/payments/components/PaymentComposer.tsx(85,3): error TS2322: Type '"10px 12px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/payments/components/PaymentComposer.tsx(92,3): error TS2322: Type '"11px 14px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/payments/components/PaymentMessage.tsx(40,11): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentMessage.tsx(43,16): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentMessage.tsx(43,42): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentMessage.tsx(43,118): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentMessage.tsx(43,196): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentMessage.tsx(44,15): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentMessage.tsx(46,95): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+src/features/messages/payments/components/PaymentMessage.tsx(49,31): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'CSSProperties | undefined'.
+src/features/messages/payments/components/PaymentMessage.tsx(54,3): error TS2322: Type '"min(320px, 100%)"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/payments/components/PaymentMessage.tsx(75,3): error TS2353: Object literal may only specify known properties, and 'background' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/payments/components/PaymentMessage.tsx(93,3): error TS2322: Type '"8px 0 0"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/payments/components/PaymentMessage.tsx(100,3): error TS2322: Type '"10px 12px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/payments/components/PaymentMessage.tsx(110,3): error TS2322: Type '"block"' is not assignable to type '"none" | "flex" | "contents" | undefined'.
+src/features/messages/payments/components/PaymentStatus.tsx(37,13): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentStatus.tsx(46,11): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentStatus.tsx(46,61): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentStatus.tsx(52,34): error TS2769: No overload matches this call.
+src/features/messages/payments/components/PaymentStatus.tsx(66,3): error TS2353: Object literal may only specify known properties, and 'border' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/payments/components/PaymentStatus.tsx(76,3): error TS2353: Object literal may only specify known properties, and 'border' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/payments/components/PaymentStatus.tsx(89,3): error TS2353: Object literal may only specify known properties, and 'background' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/payments/hooks/useMessagePayments.ts(55,48): error TS2339: Property 'getPaymentMethods' does not exist on type '{ createPaymentIntent: FunctionReference<"mutation", "public", { referenceId?: string | undefined; customerReference?: string | undefined; type: "refund" | "wallet_topup" | "wallet_withdrawal" | "merchant_payment" | "peer_transfer"; amount: number; currency: string; provider: "orange_money" | ... 2 more ... | "mtn_m...'.
+src/features/messages/payments/hooks/useMessagePayments.ts(61,59): error TS2339: Property 'processPayment' does not exist on type '{ createPaymentIntent: FunctionReference<"mutation", "public", { referenceId?: string | undefined; customerReference?: string | undefined; type: "refund" | "wallet_topup" | "wallet_withdrawal" | "merchant_payment" | "peer_transfer"; amount: number; currency: string; provider: "orange_money" | ... 2 more ... | "mtn_m...'.
+src/features/messages/pins/components/PinnedMessageItem.tsx(137,122): error TS2769: No overload matches this call.
+src/features/messages/pins/components/PinnedMessageItem.tsx(147,109): error TS2322: Type '{ children: Element; onPress: (event: GestureResponderEvent) => Promise<void>; disabled: boolean; accessibilityLabel: string; title: string; className: string; }' is not assignable to type 'IntrinsicAttributes & PressableProps & RefAttributes<View>'.
+src/features/messages/polls/hooks/PollComposer.tsx(135,89): error TS2339: Property 'checked' does not exist on type 'NativeMethods'.
+src/features/messages/polls/hooks/PollComposer.tsx(136,84): error TS2339: Property 'checked' does not exist on type 'NativeMethods'.
+src/features/messages/polls/hooks/PollComposer.tsx(137,97): error TS2339: Property 'checked' does not exist on type 'NativeMethods'.
+src/features/messages/presence/components/PresenceIndicator.tsx(35,78): error TS2769: No overload matches this call.
+src/features/messages/presence/hooks/usePresence.ts(161,48): error TS2339: Property 'userId' does not exist on type 'never'.
+src/features/messages/readReceipts/components/ReadReceipt.tsx(70,63): error TS2769: No overload matches this call.
+src/features/messages/readReceipts/components/ReadReceipt.tsx(77,124): error TS2769: No overload matches this call.
+src/features/messages/readReceipts/hooks/useReadReceipts.ts(105,24): error TS2339: Property 'messageId' does not exist on type 'never'.
+src/features/messages/readReceipts/hooks/useReadReceipts.ts(112,20): error TS2339: Property 'receipts' does not exist on type 'never'.
+src/features/messages/security/components/BlockUserDialog.tsx(52,54): error TS2769: No overload matches this call.
+src/features/messages/security/components/BlockUserDialog.tsx(52,76): error TS2769: No overload matches this call.
+src/features/messages/security/components/BlockUserDialog.tsx(52,296): error TS2769: No overload matches this call.
+src/features/messages/security/components/BlockUserDialog.tsx(53,17): error TS2769: No overload matches this call.
+src/features/messages/security/components/BlockUserDialog.tsx(55,17): error TS2769: No overload matches this call.
+src/features/messages/security/components/BlockUserDialog.tsx(55,67): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+src/features/messages/security/components/BlockUserDialog.tsx(56,58): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+src/features/messages/security/components/BlockUserDialog.tsx(68,3): error TS2353: Object literal may only specify known properties, and 'background' does not exist in type 'ViewStyle | TextStyle'.
+src/features/messages/security/components/BlockUserDialog.tsx(76,3): error TS2353: Object literal may only specify known properties, and 'background' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/security/components/BlockUserDialog.tsx(96,3): error TS2353: Object literal may only specify known properties, and 'resize' does not exist in type 'TextStyle'.
+src/features/messages/security/components/BlockUserDialog.tsx(114,3): error TS2322: Type '"10px 16px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/security/components/BlockUserDialog.tsx(123,3): error TS2322: Type '"10px 16px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/security/components/ConversationSecurity.tsx(78,13): error TS2769: No overload matches this call.
+src/features/messages/security/components/ConversationSecurity.tsx(79,61): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+src/features/messages/security/components/ConversationSecurity.tsx(84,91): error TS2322: Type '{ backfaceVisibility?: "hidden" | "visible" | undefined; backgroundColor?: ColorValue | undefined; borderBlockColor?: ColorValue | undefined; borderBlockEndColor?: ColorValue | undefined; ... 169 more ...; translateY?: AnimatableNumericValue | undefined; } | ... 7 more ... | { ...; }' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+src/features/messages/security/components/ConversationSecurity.tsx(129,3): error TS2322: Type '"8px 12px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/security/components/ReportMessageDialog.tsx(99,54): error TS2769: No overload matches this call.
+src/features/messages/security/components/ReportMessageDialog.tsx(99,76): error TS2769: No overload matches this call.
+src/features/messages/security/components/ReportMessageDialog.tsx(99,316): error TS2769: No overload matches this call.
+src/features/messages/security/components/ReportMessageDialog.tsx(99,392): error TS2769: No overload matches this call.
+src/features/messages/security/components/ReportMessageDialog.tsx(100,79): error TS2769: No overload matches this call.
+src/features/messages/security/components/ReportMessageDialog.tsx(102,38): error TS2769: No overload matches this call.
+src/features/messages/security/components/ReportMessageDialog.tsx(103,223): error TS2769: No overload matches this call.
+src/features/messages/security/components/ReportMessageDialog.tsx(103,273): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+src/features/messages/security/components/ReportMessageDialog.tsx(104,58): error TS2322: Type 'ViewStyle | TextStyle | ImageStyle' is not assignable to type 'StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>)'.
+src/features/messages/security/components/ReportMessageDialog.tsx(117,3): error TS2353: Object literal may only specify known properties, and 'background' does not exist in type 'ViewStyle | TextStyle'.
+src/features/messages/security/components/ReportMessageDialog.tsx(125,3): error TS2353: Object literal may only specify known properties, and 'background' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/security/components/ReportMessageDialog.tsx(148,3): error TS2353: Object literal may only specify known properties, and 'border' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/features/messages/security/components/ReportMessageDialog.tsx(156,3): error TS2353: Object literal may only specify known properties, and 'resize' does not exist in type 'TextStyle'.
+src/features/messages/security/components/ReportMessageDialog.tsx(174,3): error TS2322: Type '"10px 16px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/security/components/ReportMessageDialog.tsx(183,3): error TS2322: Type '"10px 16px"' is not assignable to type 'DimensionValue | undefined'.
+src/features/messages/shared/components/EmptyState.tsx(15,29): error TS2339: Property 'onClick' does not exist on type 'PressableProps'.
+src/features/messages/shared/components/EmptyState.tsx(28,196): error TS2769: No overload matches this call.
+src/features/messages/shared/components/EmptyState.tsx(30,13): error TS2769: No overload matches this call.
+src/features/messages/shared/components/EmptyState.tsx(35,11): error TS2769: No overload matches this call.
+src/features/messages/shared/components/EmptyState.tsx(40,13): error TS2769: No overload matches this call.
+src/features/messages/shared/components/EmptyState.tsx(47,138): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/shared/components/ErrorState.tsx(15,28): error TS2339: Property 'onClick' does not exist on type 'PressableProps'.
+src/features/messages/shared/components/ErrorState.tsx(28,222): error TS2769: No overload matches this call.
+src/features/messages/shared/components/ErrorState.tsx(29,11): error TS2769: No overload matches this call.
+src/features/messages/shared/components/ErrorState.tsx(33,11): error TS2769: No overload matches this call.
+src/features/messages/shared/components/ErrorState.tsx(38,13): error TS2769: No overload matches this call.
+src/features/messages/shared/components/ErrorState.tsx(45,137): error TS2353: Object literal may only specify known properties, and 'fontWeight' does not exist in type 'ViewStyle | RecursiveArray<ViewStyle | Falsy | RegisteredStyle<ViewStyle>> | ((state: PressableStateCallbackType) => StyleProp<...>)'.
+src/features/messages/shared/components/LoadingState.tsx(28,6): error TS2769: No overload matches this call.
+src/features/messages/shared/components/OnlineIndicator.tsx(30,5): error TS2322: Type '"inline-flex"' is not assignable to type '"none" | "flex" | "contents" | undefined'.
+src/features/messages/shared/components/OnlineIndicator.tsx(31,5): error TS2322: Type 'AlignItems' is not assignable to type 'FlexAlignType | undefined'.
+src/features/messages/shared/components/OnlineIndicator.tsx(37,44): error TS2769: No overload matches this call.
+src/features/messages/shared/components/OnlineIndicator.tsx(38,96): error TS2769: No overload matches this call.
+src/features/messages/shared/components/UserAvatar.tsx(55,5): error TS2698: Spread types may only be created from object types.
+src/features/messages/shared/components/UserAvatar.tsx(59,44): error TS2769: No overload matches this call.
+src/features/messages/sync/hooks/useMessageSync.ts(16,10): error TS2614: Module '"@react-native-community/netinfo"' has no exported member 'NetInfo'. Did you mean to use 'import NetInfo from "@react-native-community/netinfo"' instead?
+src/features/messages/sync/hooks/useMessageSync.ts(177,16): error TS2339: Property 'removeEventListener' does not exist on type 'AppStateStatic'.
+src/features/messages/typing/components/TypingIndicator.tsx(26,157): error TS2769: No overload matches this call.
+src/features/messages/voice/hooks/useVoicePlayer.ts(19,47): error TS2339: Property 'src' does not exist on type '{}'.
+src/features/messages/voice/hooks/useVoicePlayer.ts(66,19): error TS2339: Property 'play' does not exist on type '{}'.
+src/features/messages/voice/hooks/useVoicePlayer.ts(77,23): error TS2339: Property 'pause' does not exist on type '{}'.
+src/features/messages/voice/hooks/useVoicePlayer.ts(87,15): error TS2339: Property 'paused' does not exist on type '{}'.
+src/features/messages/voice/hooks/useVoicePlayer.ts(103,44): error TS2339: Property 'duration' does not exist on type '{}'.
+src/features/messages/voice/hooks/useVoicePlayer.ts(103,62): error TS2339: Property 'duration' does not exist on type '{}'.
+src/features/messages/voice/hooks/useVoicePlayer.ts(106,11): error TS2339: Property 'currentTime' does not exist on type '{}'.
+src/features/messages/voice/hooks/useVoicePlayer.ts(122,14): error TS2339: Property 'pause' does not exist on type '{}'.
+src/features/messages/voice/hooks/useVoicePlayer.ts(125,15): error TS2339: Property 'src' does not exist on type '{}'.
+
+TOTAL erreurs ciblées Messages : 264
+
+===== 7. TOTAL global tsc (pour contexte) =====
+Total erreurs TS dans le projet : 5662
+
+########## FIN AUDIT ##########

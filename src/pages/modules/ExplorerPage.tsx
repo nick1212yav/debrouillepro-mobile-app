@@ -87,6 +87,7 @@ import {
 import { useMemo, useState } from "react";
 import AIBanner from "@/pages/home/_components/AIBanner.tsx";
 import AIPersonalizedSuggestion from "@/pages/home/_components/AIPersonalizedSuggestion.tsx";
+import WeatherBar from "@/pages/home/_components/WeatherBar.tsx";
 
 /* ============================================================================
  * TYPES
@@ -2200,6 +2201,10 @@ export default function ExplorerPage({
           isTablet && styles.contentTablet,
         ]}
       >
+        {/* WEATHER --------------------------------------------------------- */}
+
+        <WeatherBar />
+
         {/* HERO ------------------------------------------------------------ */}
 
         <HeroSearch

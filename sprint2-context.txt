@@ -1,0 +1,492 @@
+########## SPRINT 2 — CONTEXTES 22 ERREURS BACKEND ##########
+
+===== .\convex\messages\conversations.ts  —  L152  (Famille A) =====
+      138    conversation: Doc<"conversations">,
+      139  ) {
+      140    const participants = await getParticipants(ctx, conversation.participantIds);
+      141  
+      142    const members = [];
+      143  
+      144    for (const userId of conversation.participantIds) {
+      145      const member = await ctx.db
+      146        .query("conversationMembers")
+      147        .withIndex("by_user_and_conversation", (q: any) =>
+      148          q.eq("userId", userId).eq("conversationId", conversation._id),
+      149        )
+      150        .unique();
+      151  
+ >>   152      members.push({
+      153        userId,
+      154        unreadCount: member?.unreadCount ?? 0,
+      155      });
+      156    }
+      157  
+      158    return {
+      159      ...conversation,
+      160      participants,
+      161      members,
+      162    };
+      163  }
+      164  
+      165  // ============================================================================
+
+
+===== .\convex\messages\members.ts  —  L213  (Famille A) =====
+      199        .withIndex("by_conversation", (q) =>
+      200          q.eq("conversationId", args.conversationId),
+      201        )
+      202        .collect();
+      203  
+      204      const result = [];
+      205  
+      206      for (const member of members) {
+      207        const user = await ctx.db.get(member.userId);
+      208  
+      209        if (!user) {
+      210          continue;
+      211        }
+      212  
+ >>   213        result.push({
+      214          ...member,
+      215          user,
+      216        });
+      217      }
+      218  
+      219      // ------------------------------------------------------------------------
+      220      // CompatibilitÃ© avec les anciennes conversations
+      221      //
+      222      // Si participantIds contient un utilisateur absent de
+      223      // conversationMembers, on le retourne quand mÃªme.
+      224      // ------------------------------------------------------------------------
+      225  
+      226      for (const participantId of conversation.participantIds) {
+
+
+===== .\convex\messages\members.ts  —  L228  (Famille B) =====
+      214          ...member,
+      215          user,
+      216        });
+      217      }
+      218  
+      219      // ------------------------------------------------------------------------
+      220      // CompatibilitÃ© avec les anciennes conversations
+      221      //
+      222      // Si participantIds contient un utilisateur absent de
+      223      // conversationMembers, on le retourne quand mÃªme.
+      224      // ------------------------------------------------------------------------
+      225  
+      226      for (const participantId of conversation.participantIds) {
+      227        const alreadyIncluded = result.some(
+ >>   228          (member) => member.userId === participantId,
+      229        );
+      230  
+      231        if (alreadyIncluded) {
+      232          continue;
+      233        }
+      234  
+      235        const user = await ctx.db.get(participantId);
+      236  
+      237        if (!user) {
+      238          continue;
+      239        }
+      240  
+      241        result.push({
+
+
+===== .\convex\messages\members.ts  —  L241  (Famille A) =====
+      227        const alreadyIncluded = result.some(
+      228          (member) => member.userId === participantId,
+      229        );
+      230  
+      231        if (alreadyIncluded) {
+      232          continue;
+      233        }
+      234  
+      235        const user = await ctx.db.get(participantId);
+      236  
+      237        if (!user) {
+      238          continue;
+      239        }
+      240  
+ >>   241        result.push({
+      242          conversationId: args.conversationId,
+      243          userId: participantId,
+      244          unreadCount: 0,
+      245          user,
+      246        });
+      247      }
+      248  
+      249      return result;
+      250    },
+      251  });
+      252  
+      253  // ============================================================================
+      254  // COUNT MEMBERS
+
+
+===== .\convex\messages\presence.ts  —  L250  (Famille A) =====
+      236  
+      237      const results = [];
+      238  
+      239      for (const userIdString of uniqueUserIds) {
+      240        const userId = args.userIds.find((id) => id.toString() === userIdString);
+      241  
+      242        if (!userId) continue;
+      243  
+      244        const presence = await ctx.db
+      245          .query("presence")
+      246          .withIndex("by_user", (q) => q.eq("userId", userId))
+      247          .unique();
+      248  
+      249        results.push(
+ >>   250          presence ?? {
+      251            userId,
+      252            status: "offline" as const,
+      253            lastSeen: null,
+      254            device: null,
+      255          },
+      256        );
+      257      }
+      258  
+      259      return results;
+      260    },
+      261  });
+
+
+===== .\convex\messages\readReceipts.ts  —  L156  (Famille A) =====
+      142        }
+      143  
+      144        const existing = await ctx.db
+      145          .query("readReceipts")
+      146          .withIndex("by_message_user", (q) =>
+      147            q.eq("messageId", messageId).eq("userId", user._id),
+      148          )
+      149          .unique();
+      150  
+      151        if (existing) {
+      152          await ctx.db.patch(existing._id, {
+      153            readAt: now,
+      154          });
+      155  
+ >>   156          receiptIds.push(existing._id);
+      157        } else {
+      158          const receiptId = await ctx.db.insert("readReceipts", {
+      159            messageId,
+      160            userId: user._id,
+      161            readAt: now,
+      162          });
+      163  
+      164          receiptIds.push(receiptId);
+      165        }
+      166  
+      167        if (message.status !== "read") {
+      168          await ctx.db.patch(message._id, {
+      169            status: "read",
+
+
+===== .\convex\messages\readReceipts.ts  —  L164  (Famille A) =====
+      150  
+      151        if (existing) {
+      152          await ctx.db.patch(existing._id, {
+      153            readAt: now,
+      154          });
+      155  
+      156          receiptIds.push(existing._id);
+      157        } else {
+      158          const receiptId = await ctx.db.insert("readReceipts", {
+      159            messageId,
+      160            userId: user._id,
+      161            readAt: now,
+      162          });
+      163  
+ >>   164          receiptIds.push(receiptId);
+      165        }
+      166  
+      167        if (message.status !== "read") {
+      168          await ctx.db.patch(message._id, {
+      169            status: "read",
+      170          });
+      171        }
+      172      }
+      173  
+      174      return receiptIds;
+      175    },
+      176  });
+      177  
+
+
+===== .\convex\messages\readReceipts.ts  —  L279  (Famille A) =====
+      265  
+      266      // ------------------------------------------------------------------------
+      267      // RÃ©cupÃ©rer les receipts de chaque message
+      268      // ------------------------------------------------------------------------
+      269  
+      270      const result = [];
+      271  
+      272      for (const message of messages) {
+      273        const receipts = await ctx.db
+      274          .query("readReceipts")
+      275          .withIndex("by_message", (q) => q.eq("messageId", message._id))
+      276          .collect();
+      277  
+      278        if (receipts.length > 0) {
+ >>   279          result.push({
+      280            messageId: message._id,
+      281            receipts,
+      282          });
+      283        }
+      284      }
+      285  
+      286      return result;
+      287    },
+      288  });
+      289  
+      290  // ============================================================================
+      291  // VÃ‰RIFIER SI UN UTILISATEUR A LU UN MESSAGE
+      292  // ============================================================================
+
+
+===== .\convex\messages\search.ts  —  L308  (Famille A) =====
+      294        const conversation = await ctx.db.get(membership.conversationId);
+      295  
+      296        if (!conversation) {
+      297          continue;
+      298        }
+      299  
+      300        // ----------------------------------------------------------------------
+      301        // Groupe
+      302        // ----------------------------------------------------------------------
+      303  
+      304        if (conversation.isGroup) {
+      305          const name = conversation.groupName ?? "Groupe";
+      306  
+      307          if (name.toLowerCase().includes(searchText)) {
+ >>   308            results.push({
+      309              conversationId: conversation._id,
+      310              isGroup: true,
+      311              name,
+      312              avatar: conversation.groupAvatar,
+      313              lastMessageText: conversation.lastMessageText,
+      314              lastMessageSenderId: conversation.lastMessageSenderId,
+      315              updatedAt: conversation.updatedAt,
+      316            });
+      317          }
+      318  
+      319          continue;
+      320        }
+      321  
+
+
+===== .\convex\messages\search.ts  —  L344  (Famille A) =====
+      330        if (!otherMember) {
+      331          continue;
+      332        }
+      333  
+      334        const otherUser = await ctx.db.get(otherMember);
+      335  
+      336        if (!otherUser) {
+      337          continue;
+      338        }
+      339  
+      340        if (!otherUser.name.toLowerCase().includes(searchText)) {
+      341          continue;
+      342        }
+      343  
+ >>   344        results.push({
+      345          conversationId: conversation._id,
+      346          isGroup: false,
+      347          name: otherUser.name,
+      348          avatar: otherUser.avatar,
+      349          otherUserId: otherUser._id,
+      350          lastMessageText: conversation.lastMessageText,
+      351          lastMessageSenderId: conversation.lastMessageSenderId,
+      352          updatedAt: conversation.updatedAt,
+      353        });
+      354      }
+      355  
+      356      // ------------------------------------------------------------------------
+      357      // Plus rÃ©cemment mise Ã  jour en premier
+
+
+===== .\convex\messages\search.ts  —  L360  (Famille B) =====
+      346          isGroup: false,
+      347          name: otherUser.name,
+      348          avatar: otherUser.avatar,
+      349          otherUserId: otherUser._id,
+      350          lastMessageText: conversation.lastMessageText,
+      351          lastMessageSenderId: conversation.lastMessageSenderId,
+      352          updatedAt: conversation.updatedAt,
+      353        });
+      354      }
+      355  
+      356      // ------------------------------------------------------------------------
+      357      // Plus rÃ©cemment mise Ã  jour en premier
+      358      // ------------------------------------------------------------------------
+      359  
+ >>   360      results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      361  
+      362      return results.slice(0, limit);
+      363    },
+      364  });
+      365  
+      366  // ============================================================================
+      367  // RECHERCHE GLOBALE
+      368  // ============================================================================
+      369  //
+      370  // Recherche simultanÃ©ment :
+      371  //   1. les messages
+      372  //   2. les conversations
+      373  //
+
+
+===== .\convex\messages\search.ts  —  L427  (Famille A) =====
+      413        if (conversationResults.length >= limit) {
+      414          break;
+      415        }
+      416  
+      417        const conversation = await ctx.db.get(membership.conversationId);
+      418  
+      419        if (!conversation) {
+      420          continue;
+      421        }
+      422  
+      423        if (conversation.isGroup) {
+      424          const name = conversation.groupName ?? "Groupe";
+      425  
+      426          if (name.toLowerCase().includes(searchText)) {
+ >>   427            conversationResults.push({
+      428              conversationId: conversation._id,
+      429              isGroup: true,
+      430              name,
+      431              avatar: conversation.groupAvatar,
+      432              updatedAt: conversation.updatedAt,
+      433            });
+      434          }
+      435  
+      436          continue;
+      437        }
+      438  
+      439        const otherMember = conversation.participantIds.find(
+      440          (participantId) => participantId !== user._id,
+
+
+===== .\convex\messages\search.ts  —  L454  (Famille A) =====
+      440          (participantId) => participantId !== user._id,
+      441        );
+      442  
+      443        if (!otherMember) {
+      444          continue;
+      445        }
+      446  
+      447        const otherUser = await ctx.db.get(otherMember);
+      448  
+      449        if (!otherUser) {
+      450          continue;
+      451        }
+      452  
+      453        if (otherUser.name.toLowerCase().includes(searchText)) {
+ >>   454          conversationResults.push({
+      455            conversationId: conversation._id,
+      456            isGroup: false,
+      457            name: otherUser.name,
+      458            avatar: otherUser.avatar,
+      459            otherUserId: otherUser._id,
+      460            updatedAt: conversation.updatedAt,
+      461          });
+      462        }
+      463      }
+      464  
+      465      // ------------------------------------------------------------------------
+      466      // Messages
+      467      // ------------------------------------------------------------------------
+
+
+===== .\convex\messages\search.ts  —  L504  (Famille A) =====
+      490          if (messageResults.length >= limit) {
+      491            break;
+      492          }
+      493  
+      494          if (!message.text.toLowerCase().includes(searchText)) {
+      495            continue;
+      496          }
+      497  
+      498          const sender = await ctx.db.get(message.senderId);
+      499  
+      500          if (!sender) {
+      501            continue;
+      502          }
+      503  
+ >>   504          messageResults.push({
+      505            messageId: message._id,
+      506            conversationId: message.conversationId,
+      507            senderId: message.senderId,
+      508            senderName: sender.name,
+      509            senderAvatar: sender.avatar,
+      510            text: message.text,
+      511            status: message.status,
+      512            conversationName: conversation.isGroup
+      513              ? (conversation.groupName ?? "Groupe")
+      514              : sender.name,
+      515          });
+      516        }
+      517      }
+
+
+===== .\convex\messages\search.ts  —  L523  (Famille B) =====
+      509            senderAvatar: sender.avatar,
+      510            text: message.text,
+      511            status: message.status,
+      512            conversationName: conversation.isGroup
+      513              ? (conversation.groupName ?? "Groupe")
+      514              : sender.name,
+      515          });
+      516        }
+      517      }
+      518  
+      519      // ------------------------------------------------------------------------
+      520      // Tri
+      521      // ------------------------------------------------------------------------
+      522  
+ >>   523      conversationResults.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      524  
+      525      messageResults.reverse();
+      526  
+      527      return {
+      528        conversations: conversationResults.slice(0, limit),
+      529        messages: messageResults.slice(0, limit),
+      530      };
+      531    },
+      532  });
+
+
+===== .\convex\messages\typing.ts  —  L184  (Famille A) =====
+      170  
+      171      // ------------------------------------------------------------------------
+      172      // Charger les profils utilisateurs
+      173      // ------------------------------------------------------------------------
+      174  
+      175      const users = [];
+      176  
+      177      for (const indicator of activeIndicators) {
+      178        const typingUser = await ctx.db.get(indicator.userId);
+      179  
+      180        if (!typingUser) {
+      181          continue;
+      182        }
+      183  
+ >>   184        users.push({
+      185          userId: indicator.userId,
+      186          name: typingUser.name,
+      187          image: typingUser.avatar,
+      188          lastActiveAt: indicator.lastActiveAt,
+      189        });
+      190      }
+      191  
+      192      return users;
+      193    },
+      194  });
+      195  
+      196  // ============================================================================
+      197  // VÃ‰RIFIER SI UN UTILISATEUR EST EN TRAIN D'Ã‰CRIRE
+
+

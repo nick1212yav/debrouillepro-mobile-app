@@ -1,0 +1,52 @@
+########## Usages RACINE api.<monolithe> ##########
+
+--- api.listConversations (racine) ---
+  (aucun)
+
+--- api.getMessages (racine) ---
+  (aucun)
+
+--- api.totalUnread (racine) ---
+  (aucun)
+
+--- api.sendMessage (racine) ---
+  (aucun)
+
+--- api.markMessageRead (racine) ---
+  (aucun)
+
+--- api.reactToMessage (racine) ---
+  (aucun)
+
+--- api.getOrCreateDirectConversation (racine) ---
+  (aucun)
+
+--- api.getOrCreateConversation (racine) ---
+  (aucun)
+
+--- api.createGroup (racine) ---
+  (aucun)
+
+--- api.seedDemoConversations (racine) ---
+  (aucun)
+
+--- api.setTyping (racine) ---
+  (aucun)
+
+--- api.getTypingUsers (racine) ---
+  (aucun)
+
+===== convex/index.ts INTEGRAL =====
+   1  // convex/index.ts
+   2  
+   3  // ✅ Exporter tous les modules (après les renommages)
+   4  export * from "./employment"; // contient getJobByPublication
+   5  export * from "./publications";
+   6  export * from "./users";
+   7  export * from "./feed";
+   8  export * from "./notifications"; // contient markNotificationRead
+   9  export * from "./messages"; // contient markMessageRead
+  10  export * from "./bookmarks";
+  11  
+  12  // ✅ Si tu as un fichier storage, exporte-le aussi
+  13  // export * from "./storage";

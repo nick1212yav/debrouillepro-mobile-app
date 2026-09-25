@@ -1,4 +1,3 @@
-// src/pages/modules/AnnoncesDetailPage.tsx
 import {
   ActivityIndicator,
   Animated,
@@ -13,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "convex/react";
 import { ArrowLeft, AlertCircle, EyeOff } from "lucide-react-native";
 import { api } from "@/convex/_generated/api";
@@ -56,7 +56,7 @@ import { adaptAnnonce } from "@/features/annonce/adapter";
 
 interface AnnoncesDetailPageProps {
   id?: string;
-  onBack: () => void;
+  onBack?: () => void;
   onOpenMessages?: (userId: string) => void;
 }
 
@@ -84,6 +84,7 @@ function Skeleton({
   style?: React.ComponentProps<typeof Animated.View>["style"];
 }) {
   const opacity = useRef(new Animated.Value(0.28)).current;
+
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -99,7 +100,9 @@ function Skeleton({
         }),
       ]),
     );
+
     loop.start();
+
     return () => loop.stop();
   }, [opacity]);
 
@@ -124,7 +127,9 @@ function BackButton({ onPress }: { onPress: () => void }) {
       hitSlop={10}
       style={({ pressed }) => [
         styles.backBtn,
-        { transform: [{ scale: pressed ? 0.92 : 1 }] },
+        {
+          transform: [{ scale: pressed ? 0.92 : 1 }],
+        },
       ]}
     >
       <ArrowLeft size={18} color="#fff" />
@@ -142,17 +147,50 @@ function LoadingState({ onBack }: { onBack: () => void }) {
       <View style={styles.header}>
         <BackButton onPress={onBack} />
       </View>
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={styles.loadingContent}
         showsVerticalScrollIndicator={false}
       >
         <Skeleton style={{ height: 260, borderRadius: 22 }} />
-        <Skeleton style={{ height: 44, width: "70%", marginTop: 18 }} />
-        <Skeleton style={{ height: 22, width: "45%", marginTop: 12 }} />
-        <Skeleton style={{ height: 180, marginTop: 20 }} />
-        <Skeleton style={{ height: 90, marginTop: 14 }} />
-        <Skeleton style={{ height: 90, marginTop: 14 }} />
+
+        <Skeleton
+          style={{
+            height: 44,
+            width: "70%",
+            marginTop: 18,
+          }}
+        />
+
+        <Skeleton
+          style={{
+            height: 22,
+            width: "45%",
+            marginTop: 12,
+          }}
+        />
+
+        <Skeleton
+          style={{
+            height: 180,
+            marginTop: 20,
+          }}
+        />
+
+        <Skeleton
+          style={{
+            height: 90,
+            marginTop: 14,
+          }}
+        />
+
+        <Skeleton
+          style={{
+            height: 90,
+            marginTop: 14,
+          }}
+        />
       </ScrollView>
     </View>
   );
@@ -164,11 +202,14 @@ function InvalidIdState({ onBack }: { onBack: () => void }) {
       <View style={styles.header}>
         <BackButton onPress={onBack} />
       </View>
+
       <View style={styles.centerState}>
         <View style={styles.centerIcon}>
           <AlertCircle size={28} color={T.faint} />
         </View>
+
         <Text style={styles.centerTitle}>Identifiant invalide</Text>
+
         <Text style={styles.centerText}>
           Le lien est peut-être incomplet. Retourne à la liste et réessaie.
         </Text>
@@ -183,11 +224,14 @@ function NotFoundState({ onBack }: { onBack: () => void }) {
       <View style={styles.header}>
         <BackButton onPress={onBack} />
       </View>
+
       <View style={styles.centerState}>
         <View style={styles.centerIcon}>
           <EyeOff size={28} color={T.faint} />
         </View>
+
         <Text style={styles.centerTitle}>Annonce introuvable</Text>
+
         <Text style={styles.centerText}>
           Elle a peut-être été supprimée ou vendue. Découvre d'autres annonces
           dans la liste.
@@ -206,6 +250,15 @@ export default function AnnoncesDetailPage({
   onBack,
   onOpenMessages,
 }: AnnoncesDetailPageProps) {
+  const router = useRouter();
+
+  /*
+   * onBack est optionnel côté parent.
+   * handleBack garantit donc toujours une fonction valide pour
+   * les sous-composants qui exigent onBack: () => void.
+   */
+  const handleBack = onBack ?? (() => router.back());
+
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLikedLocal, setIsLikedLocal] = useState(false);
 
@@ -217,7 +270,7 @@ export default function AnnoncesDetailPage({
   );
 
   const trackView = useMutation(api.publications.trackView);
-  const createOffer = useMutation(api.publications.createOffer);
+
   const incrementShare = useMutation(api.publications.incrementShare);
 
   const annonce: Annonce | null = useMemo(
@@ -230,63 +283,71 @@ export default function AnnoncesDetailPage({
     isLikedLocal,
   );
 
-  /* ── Tracking des vues (une seule fois par publication) ─────────────── */
+  /* ── Tracking des vues : une seule fois par publication ─────────────── */
+
   const trackedRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!annonce?._id) return;
-    if (trackedRef.current === annonce._id) return;
+    if (!annonce?._id) {
+      return;
+    }
+
+    if (trackedRef.current === annonce._id) {
+      return;
+    }
+
     trackedRef.current = annonce._id;
-    trackView({ publicationId: annonce._id as Id<"publications"> }).catch(
-      () => {
-        /* silencieux */
-      },
-    );
+
+    trackView({
+      publicationId: annonce._id as Id<"publications">,
+    }).catch(() => {
+      /* best-effort */
+    });
   }, [annonce?._id, trackView]);
 
   /* ── Handlers ───────────────────────────────────────────────────────── */
-  const handleMakeOffer = async (amount: number, message: string) => {
-    if (!annonce?._id) return;
-    try {
-      await createOffer({
-        publicationId: annonce._id as Id<"publications">,
-        amount,
-        message: message || "Offre d'achat",
-      });
-      toast.success("Offre envoyée !");
-    } catch {
-      toast.error("Erreur lors de l'envoi de l'offre");
-    }
-  };
 
   const handleContact = () => {
-    if (!annonce?.ownerId) return;
+    if (!annonce?.ownerId) {
+      return;
+    }
+
     if (onOpenMessages) {
       onOpenMessages(annonce.ownerId);
-    } else {
-      toast.info("Messagerie bientôt disponible");
+      return;
     }
+
+    toast.info("Messagerie bientôt disponible");
   };
 
   const handleShare = async () => {
-    if (!annonce?._id) return;
+    if (!annonce?._id) {
+      return;
+    }
 
-    // Incrémente le compteur (best-effort, silencieux en cas d'erreur)
-    incrementShare({ publicationId: annonce._id as Id<"publications"> }).catch(
-      () => {
-        /* silencieux */
-      },
-    );
+    incrementShare({
+      publicationId: annonce._id as Id<"publications">,
+    }).catch(() => {
+      /* best-effort */
+    });
 
     const shareUrl = `https://debrouille.pro/annonces/${annonce._id}`;
-    const title = annonce.title ?? "Annonce";
+
+    const title = annonce.title || "Annonce";
 
     try {
       if (
         Platform.OS === "web" &&
         typeof navigator !== "undefined" &&
-        (navigator as any).share
+        "share" in navigator &&
+        typeof navigator.share === "function"
       ) {
-        await (navigator as any).share({ title, text: title, url: shareUrl });
+        await navigator.share({
+          title,
+          text: title,
+          url: shareUrl,
+        });
+
         toast.success("Annonce partagée !");
         return;
       }
@@ -297,14 +358,15 @@ export default function AnnoncesDetailPage({
           message: `${title}\n${shareUrl}`,
           url: shareUrl,
         },
-        { dialogTitle: "Partager cette annonce" },
+        {
+          dialogTitle: "Partager cette annonce",
+        },
       );
 
       if (result.action === Share.sharedAction) {
         toast.success("Annonce partagée !");
       }
     } catch {
-      // Fallback : copie dans le presse-papier
       try {
         Clipboard.setString(shareUrl);
         toast.info("Lien copié dans le presse-papier");
@@ -315,8 +377,13 @@ export default function AnnoncesDetailPage({
   };
 
   const handleCall = () => {
-    if (!annonce?.ownerPhone) return;
-    Linking.openURL(`tel:${annonce.ownerPhone}`);
+    if (!annonce?.ownerPhone) {
+      return;
+    }
+
+    Linking.openURL(`tel:${annonce.ownerPhone}`).catch(() => {
+      toast.error("Impossible d'ouvrir l'application téléphone");
+    });
   };
 
   const handleBuy = () => {
@@ -332,22 +399,25 @@ export default function AnnoncesDetailPage({
   };
 
   const handleToggleFavorite = () => {
-    setIsLikedLocal((v) => !v);
+    setIsLikedLocal((value) => !value);
     toggleFavoriteHandler();
   };
 
-  /* ── Rendu ─────────────────────────────────────────────────────────── */
+  /* ── États ───────────────────────────────────────────────────────────── */
+
   if (!id) {
-    return <InvalidIdState onBack={onBack} />;
+    return <InvalidIdState onBack={handleBack} />;
   }
 
   if (publication === undefined) {
-    return <LoadingState onBack={onBack} />;
+    return <LoadingState onBack={handleBack} />;
   }
 
   if (!annonce) {
-    return <NotFoundState onBack={onBack} />;
+    return <NotFoundState onBack={handleBack} />;
   }
+
+  /* ── Rendu ───────────────────────────────────────────────────────────── */
 
   return (
     <View style={styles.root}>
@@ -356,7 +426,7 @@ export default function AnnoncesDetailPage({
         isFavorited={isFavorited}
         onFavorite={handleToggleFavorite}
         onShare={handleShare}
-        onBack={onBack}
+        onBack={handleBack}
       />
 
       <ScrollView
@@ -378,9 +448,12 @@ export default function AnnoncesDetailPage({
           {/* Titre + meta */}
           <View style={{ marginTop: 4 }}>
             <Text style={styles.title}>{annonce.title}</Text>
+
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>{annonce.type}</Text>
+
               <View style={styles.metaDot} />
+
               <Text style={styles.metaText} numberOfLines={1}>
                 {annonce.location || "Localisation non spécifiée"}
               </Text>
@@ -470,17 +543,19 @@ export default function AnnoncesDetailPage({
           {/* Questions */}
           <AnnonceQuestions
             publicationId={annonce._id as Id<"publications">}
-            canAsk={!!annonce.ownerId}
+            canAsk={Boolean(annonce.ownerId)}
           />
 
-          {/* Offres */}
+          {/* Offres
+              Le composant AnnonceOffers possède déjà sa propre mutation
+              createOffer. Le callback onSubmitOffer n'existe pas dans son
+              contrat et n'est donc pas injecté artificiellement ici. */}
           <AnnonceOffers
             publicationId={annonce._id as Id<"publications">}
             canMakeOffer={!annonce.isSold && !annonce.isReserved}
-            onSubmitOffer={handleMakeOffer}
           />
 
-          {/* Médias (vidéos) */}
+          {/* Médias */}
           {annonce.videos && annonce.videos.length > 0 ? (
             <AnnonceMedia
               videos={annonce.videos}
@@ -489,20 +564,20 @@ export default function AnnoncesDetailPage({
             />
           ) : null}
 
-          {/* Documents */}
-          <AnnonceDocuments publicationId={annonce._id as Id<"publications">} />
+          {/* Documents
+              Aucun backend annonceDocuments n'existe actuellement.
+              On ne fabrique donc aucun document fictif. */}
+          <AnnonceDocuments documents={[]} />
 
-          {/* À proximité */}
-          <AnnonceNearby
-            latitude={annonce.latitude}
-            longitude={annonce.longitude}
-            city={annonce.location}
-          />
+          {/* À proximité
+              Le composant actuel accepte city/places, pas latitude/longitude.
+              Le vrai backend Nearby reste un chantier séparé. */}
+          <AnnonceNearby city={annonce.location} />
 
           {/* Avis */}
           <AnnonceReviews
             publicationId={annonce._id as Id<"publications">}
-            canReview={!!annonce.ownerId}
+            canReview={Boolean(annonce.ownerId)}
           />
 
           {/* Recommandations */}
@@ -518,13 +593,13 @@ export default function AnnoncesDetailPage({
             promotionEnd={annonce.promotionEnd}
           />
 
-          {/* Footer — like / comment / share / bookmark */}
+          {/* Footer */}
           <AnnonceFooter
             publicationId={annonce._id as Id<"publications">}
             onLike={handleToggleFavorite}
             onComment={handleContact}
             onShare={handleShare}
-            onBookmark={() => setIsBookmarked((b) => !b)}
+            onBookmark={() => setIsBookmarked((value) => !value)}
             onReport={handleReport}
             isLiked={isFavorited}
             isBookmarked={isBookmarked}
@@ -543,13 +618,17 @@ export default function AnnoncesDetailPage({
    ════════════════════════════════════════════════════════════════════════════ */
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: T.bg },
+  root: {
+    flex: 1,
+    backgroundColor: T.bg,
+  },
 
   header: {
     paddingTop: 56,
     paddingHorizontal: 16,
     paddingBottom: 6,
   },
+
   backBtn: {
     width: 42,
     height: 42,
@@ -565,12 +644,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 60,
   },
+
   content: {
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 80,
   },
-  section: { gap: 18 },
+
+  section: {
+    gap: 18,
+  },
 
   title: {
     color: T.text,
@@ -579,6 +662,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     lineHeight: 28,
   },
+
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -586,11 +670,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
     flexWrap: "wrap",
   },
+
   metaText: {
     color: T.faint,
     fontSize: 12,
     fontWeight: "600",
   },
+
   metaDot: {
     width: 3,
     height: 3,
@@ -598,7 +684,6 @@ const styles = StyleSheet.create({
     backgroundColor: T.faint,
   },
 
-  /* Center states */
   centerState: {
     flex: 1,
     alignItems: "center",
@@ -606,6 +691,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     gap: 14,
   },
+
   centerIcon: {
     width: 76,
     height: 76,
@@ -617,6 +703,7 @@ const styles = StyleSheet.create({
     borderColor: T.border,
     marginBottom: 4,
   },
+
   centerTitle: {
     color: T.text,
     fontSize: 18,
@@ -624,6 +711,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     textAlign: "center",
   },
+
   centerText: {
     color: T.dim,
     fontSize: 13,

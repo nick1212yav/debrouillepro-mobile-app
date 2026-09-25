@@ -1,0 +1,174 @@
+===== A. convex/messages/conversations.ts � 60 premieres lignes =====
+   1  // convex/messages/conversations.ts
+   2  
+   3  import { v } from "convex/values";
+   4  import { mutation, query } from "../_generated/server";
+   5  import type { Doc, Id } from "../_generated/dataModel";
+   6  
+   7  // ============================================================================
+   8  // HELPERS
+   9  // ============================================================================
+  10  
+  11  /**
+  12   * Retourne l'utilisateur Convex correspondant à l'identité authentifiée.
+  13   *
+  14   * Le schéma users utilise :
+  15   *   tokenIdentifier: v.string()
+  16   *
+  17   * On utilise donc l'index by_token.
+  18   */
+  19  async function getCurrentUser(ctx: any): Promise<Doc<"users">> {
+  20    const identity = await ctx.auth.getUserIdentity();
+  21  
+  22    if (!identity) {
+  23      throw new Error("UNAUTHENTICATED");
+  24    }
+  25  
+  26    const tokenIdentifier = identity.tokenIdentifier;
+  27  
+  28    if (!tokenIdentifier) {
+  29      throw new Error("AUTH_TOKEN_IDENTIFIER_MISSING");
+  30    }
+  31  
+  32    const user = await ctx.db
+  33      .query("users")
+  34      .withIndex("by_token", (q: any) => q.eq("tokenIdentifier", tokenIdentifier))
+  35      .unique();
+  36  
+  37    if (!user) {
+  38      throw new Error("USER_NOT_FOUND");
+  39    }
+  40  
+  41    return user;
+  42  }
+  43  
+  44  /**
+  45   * Vérifie qu'un utilisateur fait partie d'une conversation.
+  46   */
+  47  async function getConversationMember(
+  48    ctx: any,
+  49    conversationId: Id<"conversations">,
+  50    userId: Id<"users">,
+  51  ) {
+  52    return await ctx.db
+  53      .query("conversationMembers")
+  54      .withIndex("by_user_and_conversation", (q: any) =>
+  55        q.eq("userId", userId).eq("conversationId", conversationId),
+  56      )
+  57      .unique();
+  58  }
+  59  
+  60  /**
+
+===== B. convex/messages/conversations.ts � 30 dernieres lignes =====
+ 735  
+ 736      const member = await getConversationMember(
+ 737        ctx,
+ 738        args.conversationId,
+ 739        currentUser._id,
+ 740      );
+ 741  
+ 742      if (member) {
+ 743        await ctx.db.delete(member._id);
+ 744      }
+ 745  
+ 746      // ------------------------------------------------------------------------
+ 747      // Mettre à jour participantIds
+ 748      // ------------------------------------------------------------------------
+ 749  
+ 750      const remainingParticipants = conversation.participantIds.filter(
+ 751        (id: Id<"users">) => id !== currentUser._id,
+ 752      );
+ 753  
+ 754      await ctx.db.patch(args.conversationId, {
+ 755        participantIds: remainingParticipants,
+ 756        updatedAt: new Date().toISOString(),
+ 757      });
+ 758  
+ 759      return {
+ 760        success: true,
+ 761        conversationId: args.conversationId,
+ 762      };
+ 763    },
+ 764  });
+
+===== C. convex/auth/helpers.ts � existe ? contenu ? =====
+[EXISTE]
+   1  import type { QueryCtx, MutationCtx } from "../_generated/server";
+   2  import type { Doc } from "../_generated/dataModel";
+   3  
+   4  type AuthCtx = QueryCtx | MutationCtx;
+   5  
+   6  export async function getAuthenticatedUser(
+   7    ctx: AuthCtx,
+   8  ): Promise<Doc<"users"> | null> {
+   9    const identity = await ctx.auth.getUserIdentity();
+  10    if (!identity) return null;
+  11  
+  12    const user = await ctx.db
+  13      .query("users")
+  14      .withIndex("by_token", (q) =>
+  15        q.eq("tokenIdentifier", identity.tokenIdentifier),
+  16      )
+  17      .first();
+  18  
+  19    return user ?? null;
+  20  }
+  21  
+  22  export async function requireAuthenticatedUser(
+  23    ctx: AuthCtx,
+  24  ): Promise<Doc<"users">> {
+  25    const user = await getAuthenticatedUser(ctx);
+  26  
+  27    if (!user) {
+  28      throw new Error("Non authentifié");
+  29    }
+  30  
+  31    return user;
+  32  }
+
+===== D. convex/messages/presence.ts � 25 premieres lignes (pattern auth) =====
+   1  // convex/messages/presence.ts
+   2  
+   3  import { mutation, query } from "../_generated/server";
+   4  import { v } from "convex/values";
+   5  import { requireAuthenticatedUser } from "../auth/helpers";
+   6  
+   7  // ============================================================================
+   8  // METTRE À JOUR LA PRÉSENCE
+   9  // ============================================================================
+  10  
+  11  export const setPresence = mutation({
+  12    args: {
+  13      status: v.union(
+  14        v.literal("online"),
+  15        v.literal("away"),
+  16        v.literal("offline"),
+  17      ),
+  18      device: v.optional(v.string()),
+  19    },
+  20  
+  21    handler: async (ctx, args) => {
+  22      const user = await requireAuthenticatedUser(ctx);
+  23  
+  24      const existing = await ctx.db
+  25        .query("presence")
+
+===== E. useNavigation.ts � 30 lignes autour de la ligne 20 =====
+  15  
+  16    // ✅ Plus besoin de `email` – les requêtes utilisent `isAuthenticated` pour `{}` ou `"skip"`
+  17    // Le backend récupère l'identité via `ctx.auth.getUserIdentity()`
+  18  
+  19    const msgUnread =
+  20      useQuery(api.messages.totalUnread, isAuthenticated ? {} : "skip") ?? 0;
+  21  
+  22    // ✅ Correction : plus d'email – on utilise `isAuthenticated`
+  23    const notifUnread =
+  24      useQuery(api.notifications.unreadCount, isAuthenticated ? {} : "skip") ?? 0;
+  25  
+  26    // ✅ Fallback si buildNavigation retourne undefined
+  27    const navSections =
+  28      buildNavigation({
+  29        isAdmin,
+  30        isPremium,
+  31        isVerified,

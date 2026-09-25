@@ -13,17 +13,17 @@ export function useNavigation() {
   const { favorites } = useFavorites();
   const { badgeCounts } = useNotifications();
 
-  // ✅ Plus besoin de `email` – les requêtes utilisent `isAuthenticated` pour `{}` ou `"skip"`
-  // Le backend récupère l'identité via `ctx.auth.getUserIdentity()`
+  // âœ… Plus besoin de `email` â€“ les requÃªtes utilisent `isAuthenticated` pour `{}` ou `"skip"`
+  // Le backend rÃ©cupÃ¨re l'identitÃ© via `ctx.auth.getUserIdentity()`
 
   const msgUnread =
-    useQuery(api.messages.totalUnread, isAuthenticated ? {} : "skip") ?? 0;
+    useQuery(api.messages.conversations.getUnreadCount, isAuthenticated ? {} : "skip") ?? 0;
 
-  // ✅ Correction : plus d'email – on utilise `isAuthenticated`
+  // âœ… Correction : plus d'email â€“ on utilise `isAuthenticated`
   const notifUnread =
     useQuery(api.notifications.unreadCount, isAuthenticated ? {} : "skip") ?? 0;
 
-  // ✅ Fallback si buildNavigation retourne undefined
+  // âœ… Fallback si buildNavigation retourne undefined
   const navSections =
     buildNavigation({
       isAdmin,
@@ -32,10 +32,10 @@ export function useNavigation() {
       role,
     }) ?? [];
 
-  // ✅ Préparation des badges avec vérifications
+  // âœ… PrÃ©paration des badges avec vÃ©rifications
   const badges: Record<string, number> = {};
   navSections.forEach((section) => {
-    // Sécurité : section ou items peuvent manquer
+    // SÃ©curitÃ© : section ou items peuvent manquer
     if (!section || !section.items) return;
     section.items.forEach((item) => {
       if (!item) return;

@@ -323,13 +323,7 @@ function ProCard({ pro, onPress }: { pro: DisplayPro; onPress: () => void }) {
    INSPIRATION CARD
    ════════════════════════════════════════════════════════════════════════════ */
 
-type InspirationItem = {
-  _id: string;
-  title: string;
-  style: string;
-  imageUrl: string;
-  likeCount: number;
-};
+type InspirationItem = Doc<"inspirations">;
 
 function InspirationCard({
   item,
@@ -898,17 +892,56 @@ function ProsTab({ onSelect }: { onSelect: (p: DisplayPro) => void }) {
 
 function InspirationTab() {
   const inspirations = useQuery(api.inspirations.list, {});
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const toggleLikeMutation = useMutation(api.inspirations.toggleLike);
 
-  const toggleLike = (id: string) =>
-    setLikedIds((prev) => {
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [likingIds, setLikingIds] = useState<Set<string>>(new Set());
+
+  const handleLike = async (id: string) => {
+    if (likingIds.has(id)) {
+      return;
+    }
+
+    setLikingIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      next.add(id);
       return next;
     });
 
+    try {
+      const result = await toggleLikeMutation({
+        inspirationId: id as Id<"inspirations">,
+      });
+
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+
+        if (result.liked) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+
+        return next;
+      });
+    } catch (error) {
+      if (error instanceof ConvexError) {
+        const data = error.data as { message?: string };
+
+        toast.error(data.message ?? "Impossible de modifier le favori.");
+      } else {
+        toast.error("Impossible de modifier le favori.");
+      }
+    } finally {
+      setLikingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   const isLoading = inspirations === undefined;
-  const items = (inspirations ?? []) as unknown as InspirationItem[];
 
   if (isLoading) {
     return (
@@ -920,7 +953,7 @@ function InspirationTab() {
     );
   }
 
-  if (items.length === 0) {
+  if (inspirations.length === 0) {
     return (
       <EmptyState
         icon={Camera}
@@ -932,12 +965,14 @@ function InspirationTab() {
 
   return (
     <View style={{ gap: 12 }}>
-      {items.map((item) => (
+      {inspirations.map((item) => (
         <InspirationCard
           key={item._id}
           item={item}
           liked={likedIds.has(item._id)}
-          onLike={() => toggleLike(item._id)}
+          onLike={() => {
+            void handleLike(item._id);
+          }}
         />
       ))}
     </View>
@@ -947,22 +982,6 @@ function InspirationTab() {
 /* ════════════════════════════════════════════════════════════════════════════
    TAB — PROJET
    ════════════════════════════════════════════════════════════════════════════ */
-
-type ProjectStep = {
-  _id: string;
-  label: string;
-  done: boolean;
-  dateLabel: string;
-};
-
-type ActiveProject = {
-  _id: string;
-  title: string;
-  budget: number;
-  durationLabel: string;
-  progress: number;
-  steps: ProjectStep[];
-};
 
 function ProjectTab({ isAuthenticated }: { isAuthenticated: boolean }) {
   const project = useQuery(
@@ -983,15 +1002,38 @@ function ProjectTab({ isAuthenticated }: { isAuthenticated: boolean }) {
   if (project === undefined) {
     return (
       <View style={{ gap: 12 }}>
-        <Skeleton style={{ height: 130, borderRadius: 22 }} />
-        <Skeleton style={{ height: 60, borderRadius: 18 }} />
-        <Skeleton style={{ height: 60, borderRadius: 18 }} />
-        <Skeleton style={{ height: 60, borderRadius: 18 }} />
+        <Skeleton
+          style={{
+            height: 130,
+            borderRadius: 22,
+          }}
+        />
+
+        <Skeleton
+          style={{
+            height: 60,
+            borderRadius: 18,
+          }}
+        />
+
+        <Skeleton
+          style={{
+            height: 60,
+            borderRadius: 18,
+          }}
+        />
+
+        <Skeleton
+          style={{
+            height: 60,
+            borderRadius: 18,
+          }}
+        />
       </View>
     );
   }
 
-  if (!project) {
+  if (project === null) {
     return (
       <View style={{ gap: 16 }}>
         <EmptyState
@@ -999,10 +1041,13 @@ function ProjectTab({ isAuthenticated }: { isAuthenticated: boolean }) {
           title="Aucun projet en cours"
           message="Crée ton premier projet d'aménagement et suis chaque étape."
         />
+
         <Pressable
           style={({ pressed }) => [
             styles.createProjectBtn,
-            { opacity: pressed ? 0.85 : 1 },
+            {
+              opacity: pressed ? 0.85 : 1,
+            },
           ]}
         >
           <Plus size={17} color="#fff" />
@@ -1012,21 +1057,27 @@ function ProjectTab({ isAuthenticated }: { isAuthenticated: boolean }) {
     );
   }
 
-  const p = project as unknown as ActiveProject;
-
   return (
     <View style={{ gap: 16 }}>
       {/* Carte projet */}
       <View style={styles.projectCard}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
           <View style={styles.projectIcon}>
             <Hammer size={17} color={T.amber} />
           </View>
-          <Text style={styles.projectTitle}>{p.title}</Text>
+
+          <Text style={styles.projectTitle}>{project.title}</Text>
         </View>
 
         <Text style={styles.projectMeta}>
-          Budget : {p.budget.toLocaleString()} FCFA · {p.durationLabel}
+          Budget : {project.budget.toLocaleString()} FCFA ·{" "}
+          {project.durationLabel}
         </Text>
 
         <View style={styles.progressWrap}>
@@ -1034,11 +1085,14 @@ function ProjectTab({ isAuthenticated }: { isAuthenticated: boolean }) {
             <View
               style={[
                 styles.progressFill,
-                { width: `${Math.min(100, Math.max(0, p.progress))}%` },
+                {
+                  width: `${Math.min(100, Math.max(0, project.progress))}%`,
+                },
               ]}
             />
           </View>
-          <Text style={styles.progressValue}>{p.progress}%</Text>
+
+          <Text style={styles.progressValue}>{project.progress}%</Text>
         </View>
       </View>
 
@@ -1046,7 +1100,7 @@ function ProjectTab({ isAuthenticated }: { isAuthenticated: boolean }) {
       <Text style={styles.sectionTitle}>Étapes du projet</Text>
 
       <View style={{ gap: 8 }}>
-        {p.steps.map((step, idx) => (
+        {project.steps.map((step, idx) => (
           <View key={step._id} style={styles.stepRow}>
             <View
               style={[
@@ -1104,16 +1158,18 @@ function ProjectTab({ isAuthenticated }: { isAuthenticated: boolean }) {
       <Pressable
         style={({ pressed }) => [
           styles.createProjectBtn,
-          { opacity: pressed ? 0.85 : 1 },
+          {
+            opacity: pressed ? 0.85 : 1,
+          },
         ]}
       >
         <Plus size={17} color="#fff" />
+
         <Text style={styles.createProjectBtnText}>Créer un nouveau projet</Text>
       </Pressable>
     </View>
   );
 }
-
 /* ════════════════════════════════════════════════════════════════════════════
    INNER PAGE
    ════════════════════════════════════════════════════════════════════════════ */

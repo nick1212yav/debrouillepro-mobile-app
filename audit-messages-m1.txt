@@ -1,0 +1,1439 @@
+########## M1 � REALITE MESSAGES � 2026-09-25 14:08:06 ##########
+
+==================================================================
+===== 1. convex/messages.ts � CONTENU INTEGRAL =====
+==================================================================
+Lignes totales : 987
+
+    1  // convex/messages.ts
+    2  
+    3  import { ConvexError, v } from "convex/values";
+    4  import { mutation, query } from "./_generated/server";
+    5  import type { Id } from "./_generated/dataModel";
+    6  import { buildUserSearchText } from "./lib/userSearch";
+    7  
+    8  // ── Helpers ────────────────────────────────────────────────────────────────────
+    9  
+   10  async function requireUser(ctx: {
+   11    auth: {
+   12      getUserIdentity: () => Promise<{ tokenIdentifier: string } | null>;
+   13    };
+   14    db: import("./_generated/server").DatabaseReader;
+   15  }) {
+   16    const identity = await ctx.auth.getUserIdentity();
+   17  
+   18    if (!identity) {
+   19      throw new ConvexError({
+   20        message: "Non authentifié",
+   21        code: "UNAUTHENTICATED",
+   22      });
+   23    }
+   24  
+   25    const user = await ctx.db
+   26      .query("users")
+   27      .withIndex("by_token", (q) =>
+   28        q.eq("tokenIdentifier", identity.tokenIdentifier),
+   29      )
+   30      .unique();
+   31  
+   32    if (!user) {
+   33      throw new ConvexError({
+   34        message: "Utilisateur introuvable",
+   35        code: "NOT_FOUND",
+   36      });
+   37    }
+   38  
+   39    return user;
+   40  }
+   41  
+   42  // ── Queries ───────────────────────────────────────────────────────────────────
+   43  
+   44  /** List all conversations for the current user, ordered by most recent */
+   45  export const listConversations = query({
+   46    args: {},
+   47  
+   48    handler: async (
+   49      ctx,
+   50    ): Promise<
+   51      Array<{
+   52        conversationId: Id<"conversations">;
+   53        isGroup: boolean;
+   54        groupName?: string;
+   55        groupAvatar?: string;
+   56        lastMessageText?: string;
+   57        lastMessageSenderId?: Id<"users">;
+   58        updatedAt: string;
+   59        unreadCount: number;
+   60        otherParticipant?: {
+   61          _id: Id<"users">;
+   62          name?: string;
+   63          avatar?: string;
+   64        };
+   65        participantIds: Id<"users">[];
+   66      }>
+   67    > => {
+   68      const user = await requireUser(ctx);
+   69  
+   70      const memberships = await ctx.db
+   71        .query("conversationMembers")
+   72        .withIndex("by_user", (q) => q.eq("userId", user._id))
+   73        .collect();
+   74  
+   75      const results = await Promise.all(
+   76        memberships.map(async (m) => {
+   77          const conv = await ctx.db.get(m.conversationId);
+   78  
+   79          if (!conv) return null;
+   80  
+   81          let otherParticipant:
+   82            | {
+   83                _id: Id<"users">;
+   84                name?: string;
+   85                avatar?: string;
+   86              }
+   87            | undefined;
+   88  
+   89          if (!conv.isGroup) {
+   90            const otherId = conv.participantIds.find((id) => id !== user._id);
+   91  
+   92            if (otherId) {
+   93              const other = await ctx.db.get(otherId);
+   94  
+   95              if (other) {
+   96                otherParticipant = {
+   97                  _id: other._id,
+   98                  name: other.name,
+   99                  avatar: other.avatar,
+  100                };
+  101              }
+  102            }
+  103          }
+  104  
+  105          return {
+  106            conversationId: conv._id,
+  107            isGroup: conv.isGroup,
+  108            groupName: conv.groupName,
+  109            groupAvatar: conv.groupAvatar,
+  110            lastMessageText: conv.lastMessageText,
+  111            lastMessageSenderId: conv.lastMessageSenderId,
+  112            updatedAt: conv.updatedAt,
+  113            unreadCount: m.unreadCount,
+  114            otherParticipant,
+  115            participantIds: conv.participantIds,
+  116          };
+  117        }),
+  118      );
+  119  
+  120      return results
+  121        .filter((r): r is NonNullable<typeof r> => r !== null)
+  122        .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  123    },
+  124  });
+  125  
+  126  /** Get messages for a conversation (last 100) */
+  127  export const getMessages = query({
+  128    args: {
+  129      conversationId: v.id("conversations"),
+  130    },
+  131  
+  132    handler: async (
+  133      ctx,
+  134      args,
+  135    ): Promise<
+  136      Array<{
+  137        _id: Id<"messages">;
+  138        _creationTime: number;
+  139        text: string;
+  140        senderId: Id<"users">;
+  141        senderName?: string;
+  142        status: "sent" | "delivered" | "read" | "failed";
+  143        reactions: Array<{
+  144          emoji: string;
+  145          count: number;
+  146        }>;
+  147        isMe: boolean;
+  148        replyToId?: Id<"messages">;
+  149        replyPreview?: {
+  150          text: string;
+  151          senderName?: string;
+  152        } | null;
+  153        sharedPublicationId?: Id<"publications">;
+  154        sharedPublication?: {
+  155          title: string;
+  156          type: string;
+  157          description: string;
+  158        } | null;
+  159      }>
+  160    > => {
+  161      const user = await requireUser(ctx);
+  162  
+  163      const msgs = await ctx.db
+  164        .query("messages")
+  165        .withIndex("by_conversation", (q) =>
+  166          q.eq("conversationId", args.conversationId),
+  167        )
+  168        .order("asc")
+  169        .take(100);
+  170  
+  171      return await Promise.all(
+  172        msgs.map(async (m) => {
+  173          const sender =
+  174            m.senderId !== user._id ? await ctx.db.get(m.senderId) : null;
+  175  
+  176          const senderName = sender?.name;
+  177  
+  178          let replyPreview: {
+  179            text: string;
+  180            senderName?: string;
+  181          } | null = null;
+  182  
+  183          if (m.replyToId) {
+  184            const replied = await ctx.db.get(m.replyToId);
+  185  
+  186            if (replied) {
+  187              const repliedSender = await ctx.db.get(replied.senderId);
+  188  
+  189              replyPreview = {
+  190                text: replied.text,
+  191                senderName: repliedSender?.name,
+  192              };
+  193            }
+  194          }
+  195  
+  196          let sharedPublication: {
+  197            title: string;
+  198            type: string;
+  199            description: string;
+  200          } | null = null;
+  201  
+  202          if (m.sharedPublicationId) {
+  203            const pub = await ctx.db.get(m.sharedPublicationId);
+  204  
+  205            if (pub) {
+  206              sharedPublication = {
+  207                title: pub.title,
+  208                type: pub.type,
+  209                description: pub.description,
+  210              };
+  211            }
+  212          }
+  213  
+  214          return {
+  215            _id: m._id,
+  216            _creationTime: m._creationTime,
+  217            text: m.text,
+  218            senderId: m.senderId,
+  219            senderName,
+  220            status: m.status,
+  221            reactions: m.reactions,
+  222            isMe: m.senderId === user._id,
+  223            replyToId: m.replyToId,
+  224            replyPreview,
+  225            sharedPublicationId: m.sharedPublicationId,
+  226            sharedPublication,
+  227          };
+  228        }),
+  229      );
+  230    },
+  231  });
+  232  
+  233  /** Total unread across all conversations */
+  234  export const totalUnread = query({
+  235    args: {},
+  236  
+  237    handler: async (ctx): Promise<number> => {
+  238      const user = await requireUser(ctx);
+  239  
+  240      const memberships = await ctx.db
+  241        .query("conversationMembers")
+  242        .withIndex("by_user", (q) => q.eq("userId", user._id))
+  243        .collect();
+  244  
+  245      return memberships.reduce((sum, member) => sum + member.unreadCount, 0);
+  246    },
+  247  });
+  248  
+  249  // ── Mutations ──────────────────────────────────────────────────────────────────
+  250  
+  251  /** Send a message in a conversation */
+  252  export const sendMessage = mutation({
+  253    args: {
+  254      conversationId: v.id("conversations"),
+  255      text: v.string(),
+  256      replyToId: v.optional(v.id("messages")),
+  257      sharedPublicationId: v.optional(v.id("publications")),
+  258    },
+  259  
+  260    handler: async (ctx, args): Promise<Id<"messages">> => {
+  261      const user = await requireUser(ctx);
+  262  
+  263      const text = args.text.trim();
+  264  
+  265      if (!text) {
+  266        throw new ConvexError({
+  267          message: "Le message ne peut pas être vide",
+  268          code: "INVALID_ARGUMENT",
+  269        });
+  270      }
+  271  
+  272      const msgId = await ctx.db.insert("messages", {
+  273        type: "text",
+  274        conversationId: args.conversationId,
+  275        senderId: user._id,
+  276        text,
+  277        status: "sent",
+  278        reactions: [],
+  279        replyToId: args.replyToId,
+  280        sharedPublicationId: args.sharedPublicationId,
+  281      });
+  282  
+  283      const now = new Date().toISOString();
+  284  
+  285      await ctx.db.patch(args.conversationId, {
+  286        lastMessageText: text,
+  287        lastMessageSenderId: user._id,
+  288        updatedAt: now,
+  289      });
+  290  
+  291      const members = await ctx.db
+  292        .query("conversationMembers")
+  293        .withIndex("by_conversation", (q) =>
+  294          q.eq("conversationId", args.conversationId),
+  295        )
+  296        .collect();
+  297  
+  298      await Promise.all(
+  299        members
+  300          .filter((m) => m.userId !== user._id)
+  301          .map((m) =>
+  302            ctx.db.patch(m._id, {
+  303              unreadCount: m.unreadCount + 1,
+  304            }),
+  305          ),
+  306      );
+  307  
+  308      const typingRow = await ctx.db
+  309        .query("typingStatus")
+  310        .withIndex("by_user_and_conversation", (q) =>
+  311          q.eq("userId", user._id).eq("conversationId", args.conversationId),
+  312        )
+  313        .unique();
+  314  
+  315      if (typingRow) {
+  316        await ctx.db.delete(typingRow._id);
+  317      }
+  318  
+  319      return msgId;
+  320    },
+  321  });
+  322  
+  323  /** Mark a conversation as read for the current user */
+  324  export const markMessageRead = mutation({
+  325    args: {
+  326      conversationId: v.id("conversations"),
+  327    },
+  328  
+  329    handler: async (ctx, args): Promise<void> => {
+  330      const user = await requireUser(ctx);
+  331  
+  332      const member = await ctx.db
+  333        .query("conversationMembers")
+  334        .withIndex("by_user_and_conversation", (q) =>
+  335          q.eq("userId", user._id).eq("conversationId", args.conversationId),
+  336        )
+  337        .unique();
+  338  
+  339      if (member && member.unreadCount > 0) {
+  340        await ctx.db.patch(member._id, {
+  341          unreadCount: 0,
+  342        });
+  343      }
+  344    },
+  345  });
+  346  
+  347  /** Add or increment a reaction on a message */
+  348  export const reactToMessage = mutation({
+  349    args: {
+  350      messageId: v.id("messages"),
+  351      emoji: v.string(),
+  352    },
+  353  
+  354    handler: async (ctx, args): Promise<void> => {
+  355      const msg = await ctx.db.get(args.messageId);
+  356  
+  357      if (!msg) {
+  358        throw new ConvexError({
+  359          message: "Message introuvable",
+  360          code: "NOT_FOUND",
+  361        });
+  362      }
+  363  
+  364      const existing = msg.reactions.find((r) => r.emoji === args.emoji);
+  365  
+  366      const reactions = existing
+  367        ? msg.reactions.map((r) =>
+  368            r.emoji === args.emoji
+  369              ? {
+  370                  ...r,
+  371                  count: r.count + 1,
+  372                }
+  373              : r,
+  374          )
+  375        : [
+  376            ...msg.reactions,
+  377            {
+  378              type: "text",
+  379              emoji: args.emoji,
+  380              count: 1,
+  381            },
+  382          ];
+  383  
+  384      await ctx.db.patch(args.messageId, {
+  385        reactions,
+  386      });
+  387    },
+  388  });
+  389  
+  390  /** Create or open a 1-on-1 conversation */
+  391  export const getOrCreateDirectConversation = mutation({
+  392    args: {
+  393      otherUserId: v.id("users"),
+  394    },
+  395  
+  396    handler: async (ctx, args): Promise<Id<"conversations">> => {
+  397      const user = await requireUser(ctx);
+  398  
+  399      if (user._id === args.otherUserId) {
+  400        throw new ConvexError({
+  401          message: "Vous ne pouvez pas créer une conversation avec vous-même",
+  402          code: "FORBIDDEN",
+  403        });
+  404      }
+  405  
+  406      const myMemberships = await ctx.db
+  407        .query("conversationMembers")
+  408        .withIndex("by_user", (q) => q.eq("userId", user._id))
+  409        .collect();
+  410  
+  411      for (const membership of myMemberships) {
+  412        const conv = await ctx.db.get(membership.conversationId);
+  413  
+  414        if (!conv || conv.isGroup) continue;
+  415  
+  416        if (conv.participantIds.includes(args.otherUserId)) {
+  417          return conv._id;
+  418        }
+  419      }
+  420  
+  421      const now = new Date().toISOString();
+  422  
+  423      const convId = await ctx.db.insert("conversations", {
+  424        participantIds: [user._id, args.otherUserId],
+  425        isGroup: false,
+  426        updatedAt: now,
+  427      });
+  428  
+  429      await ctx.db.insert("conversationMembers", {
+  430        role: "member",
+  431        isMuted: false,
+  432        conversationId: convId,
+  433        userId: user._id,
+  434        unreadCount: 0,
+  435      });
+  436  
+  437      await ctx.db.insert("conversationMembers", {
+  438        role: "member",
+  439        isMuted: false,
+  440        conversationId: convId,
+  441        userId: args.otherUserId,
+  442        unreadCount: 0,
+  443      });
+  444  
+  445      return convId;
+  446    },
+  447  });
+  448  
+  449  /**
+  450   * Create or retrieve a conversation with
+  451   * an initial message and optional shared publication.
+  452   */
+  453  export const getOrCreateConversation = mutation({
+  454    args: {
+  455      participantId: v.id("users"),
+  456      initialMessage: v.string(),
+  457      publicationId: v.optional(v.id("publications")),
+  458    },
+  459  
+  460    handler: async (ctx, args) => {
+  461      const user = await requireUser(ctx);
+  462  
+  463      if (user._id === args.participantId) {
+  464        throw new ConvexError({
+  465          message: "Vous ne pouvez pas vous envoyer un message à vous-même",
+  466          code: "FORBIDDEN",
+  467        });
+  468      }
+  469  
+  470      const initialMessage = args.initialMessage.trim();
+  471  
+  472      if (!initialMessage) {
+  473        throw new ConvexError({
+  474          message: "Le message initial ne peut pas être vide",
+  475          code: "INVALID_ARGUMENT",
+  476        });
+  477      }
+  478  
+  479      const existing = await ctx.db
+  480        .query("conversations")
+  481        .filter((q) =>
+  482          q.and(
+  483            q.eq(q.field("isGroup"), false),
+  484            q.eq(q.field("participantIds"), [user._id, args.participantId]),
+  485          ),
+  486        )
+  487        .first();
+  488  
+  489      if (existing) {
+  490        const messageId = await ctx.db.insert("messages", {
+  491          type: "text",
+  492          conversationId: existing._id,
+  493          senderId: user._id,
+  494          text: initialMessage,
+  495          status: "sent",
+  496          reactions: [],
+  497          sharedPublicationId: args.publicationId,
+  498        });
+  499  
+  500        await ctx.db.patch(existing._id, {
+  501          lastMessageText: initialMessage,
+  502          lastMessageSenderId: user._id,
+  503          updatedAt: new Date().toISOString(),
+  504        });
+  505  
+  506        const members = await ctx.db
+  507          .query("conversationMembers")
+  508          .withIndex("by_conversation", (q) =>
+  509            q.eq("conversationId", existing._id),
+  510          )
+  511          .collect();
+  512  
+  513        await Promise.all(
+  514          members
+  515            .filter((m) => m.userId !== user._id)
+  516            .map((m) =>
+  517              ctx.db.patch(m._id, {
+  518                unreadCount: m.unreadCount + 1,
+  519              }),
+  520            ),
+  521        );
+  522  
+  523        return {
+  524          conversationId: existing._id,
+  525          isNew: false,
+  526          messageId,
+  527        };
+  528      }
+  529  
+  530      const now = new Date().toISOString();
+  531  
+  532      const convId = await ctx.db.insert("conversations", {
+  533        participantIds: [user._id, args.participantId],
+  534        isGroup: false,
+  535        lastMessageText: initialMessage,
+  536        lastMessageSenderId: user._id,
+  537        updatedAt: now,
+  538      });
+  539  
+  540      await ctx.db.insert("conversationMembers", {
+  541        role: "member",
+  542        isMuted: false,
+  543        conversationId: convId,
+  544        userId: user._id,
+  545        unreadCount: 0,
+  546      });
+  547  
+  548      await ctx.db.insert("conversationMembers", {
+  549        role: "member",
+  550        isMuted: false,
+  551        conversationId: convId,
+  552        userId: args.participantId,
+  553        unreadCount: 1,
+  554      });
+  555  
+  556      const messageId = await ctx.db.insert("messages", {
+  557        type: "text",
+  558        conversationId: convId,
+  559        senderId: user._id,
+  560        text: initialMessage,
+  561        status: "sent",
+  562        reactions: [],
+  563        sharedPublicationId: args.publicationId,
+  564      });
+  565  
+  566      return {
+  567        conversationId: convId,
+  568        isNew: true,
+  569        messageId,
+  570      };
+  571    },
+  572  });
+  573  
+  574  /** Create a group conversation */
+  575  export const createGroup = mutation({
+  576    args: {
+  577      groupName: v.string(),
+  578      groupAvatar: v.optional(v.string()),
+  579      participantIds: v.array(v.id("users")),
+  580    },
+  581  
+  582    handler: async (ctx, args): Promise<Id<"conversations">> => {
+  583      const user = await requireUser(ctx);
+  584  
+  585      const groupName = args.groupName.trim();
+  586  
+  587      if (!groupName) {
+  588        throw new ConvexError({
+  589          message: "Le nom du groupe ne peut pas être vide",
+  590          code: "INVALID_ARGUMENT",
+  591        });
+  592      }
+  593  
+  594      const now = new Date().toISOString();
+  595  
+  596      const allParticipants = [
+  597        user._id,
+  598        ...args.participantIds.filter((id) => id !== user._id),
+  599      ];
+  600  
+  601      const uniqueParticipants = Array.from(new Set(allParticipants));
+  602  
+  603      if (uniqueParticipants.length < 2) {
+  604        throw new ConvexError({
+  605          message: "Un groupe doit avoir au moins deux participants",
+  606          code: "INVALID_ARGUMENT",
+  607        });
+  608      }
+  609  
+  610      const convId = await ctx.db.insert("conversations", {
+  611        participantIds: uniqueParticipants,
+  612        isGroup: true,
+  613        groupName,
+  614        groupAvatar: args.groupAvatar,
+  615        updatedAt: now,
+  616      });
+  617  
+  618      await Promise.all(
+  619        uniqueParticipants.map((uid) =>
+  620          ctx.db.insert("conversationMembers", {
+  621            role: "member",
+  622            isMuted: false,
+  623            conversationId: convId,
+  624            userId: uid,
+  625            unreadCount: 0,
+  626          }),
+  627        ),
+  628      );
+  629  
+  630      return convId;
+  631    },
+  632  });
+  633  
+  634  // ── Seed demo conversations ────────────────────────────────────────────────────
+  635  
+  636  export const seedDemoConversations = mutation({
+  637    args: {},
+  638  
+  639    handler: async (ctx): Promise<void> => {
+  640      const user = await requireUser(ctx);
+  641  
+  642      const existing = await ctx.db
+  643        .query("conversationMembers")
+  644        .withIndex("by_user", (q) => q.eq("userId", user._id))
+  645        .take(1);
+  646  
+  647      if (existing.length > 0) {
+  648        return;
+  649      }
+  650  
+  651      const now = Date.now();
+  652  
+  653      const demoUser1 = await ctx.db
+  654        .query("users")
+  655        .withIndex("by_token", (q) => q.eq("tokenIdentifier", "demo-user-1"))
+  656        .unique();
+  657  
+  658      let demoUserId1: Id<"users">;
+  659  
+  660      if (!demoUser1) {
+  661        const demoUserSearchText = buildUserSearchText({
+  662          name: "Démo",
+  663          roles: ["user"],
+  664        });
+  665  
+  666        demoUserId1 = await ctx.db.insert("users", {
+  667          uid: "demo-user-1",
+  668          tokenIdentifier: "demo-user-1",
+  669          name: "Démo",
+  670          email: "demo@debrouille.pro",
+  671          avatar: "/demo/avatar1.jpg",
+  672          roles: ["user"],
+  673          emailVerified: true,
+  674          onboardingCompleted: true,
+  675          reputationScore: 0,
+  676          searchText: demoUserSearchText,
+  677        });
+  678      } else {
+  679        demoUserId1 = demoUser1._id;
+  680      }
+  681  
+  682      const demoUser2 = await ctx.db
+  683        .query("users")
+  684        .withIndex("by_token", (q) => q.eq("tokenIdentifier", "demo-user-2"))
+  685        .unique();
+  686  
+  687      let demoUserId2: Id<"users">;
+  688  
+  689      if (!demoUser2) {
+  690        const marieSearchText = buildUserSearchText({
+  691          name: "Marie",
+  692          roles: ["user"],
+  693        });
+  694  
+  695        demoUserId2 = await ctx.db.insert("users", {
+  696          uid: "demo-user-2",
+  697          tokenIdentifier: "demo-user-2",
+  698          name: "Marie",
+  699          email: "marie@debrouille.pro",
+  700          avatar: "/demo/avatar2.jpg",
+  701          roles: ["user"],
+  702          emailVerified: true,
+  703          onboardingCompleted: true,
+  704          reputationScore: 0,
+  705          searchText: marieSearchText,
+  706        });
+  707      } else {
+  708        demoUserId2 = demoUser2._id;
+  709      }
+  710  
+  711      // ── Conversation privée avec Démo ──
+  712  
+  713      const dmId1 = await ctx.db.insert("conversations", {
+  714        participantIds: [user._id, demoUserId1],
+  715        isGroup: false,
+  716        updatedAt: new Date(now - 120_000).toISOString(),
+  717        lastMessageText: "Votre ordonnance est prête ✅",
+  718        lastMessageSenderId: demoUserId1,
+  719      });
+  720  
+  721      await ctx.db.insert("conversationMembers", {
+  722        role: "member",
+  723        isMuted: false,
+  724        conversationId: dmId1,
+  725        userId: user._id,
+  726        unreadCount: 2,
+  727      });
+  728  
+  729      await ctx.db.insert("conversationMembers", {
+  730        role: "member",
+  731        isMuted: false,
+  732        conversationId: dmId1,
+  733        userId: demoUserId1,
+  734        unreadCount: 0,
+  735      });
+  736  
+  737      await ctx.db.insert("messages", {
+  738        type: "text",
+  739        conversationId: dmId1,
+  740        senderId: user._id,
+  741        text: "Bonjour Docteur, j'ai eu les résultats d'analyse",
+  742        status: "read",
+  743        reactions: [],
+  744      });
+  745  
+  746      await ctx.db.insert("messages", {
+  747        type: "text",
+  748        conversationId: dmId1,
+  749        senderId: demoUserId1,
+  750        text: "Votre ordonnance est prête ✅",
+  751        status: "read",
+  752        reactions: [
+  753          {
+  754            emoji: "✅",
+  755            count: 1,
+  756          },
+  757        ],
+  758      });
+  759  
+  760      // ── Conversation privée avec Marie ──
+  761  
+  762      const dmId2 = await ctx.db.insert("conversations", {
+  763        participantIds: [user._id, demoUserId2],
+  764        isGroup: false,
+  765        updatedAt: new Date(now - 60_000).toISOString(),
+  766        lastMessageText: "On se voit à 14h ? 😊",
+  767        lastMessageSenderId: demoUserId2,
+  768      });
+  769  
+  770      await ctx.db.insert("conversationMembers", {
+  771        role: "member",
+  772        isMuted: false,
+  773        conversationId: dmId2,
+  774        userId: user._id,
+  775        unreadCount: 1,
+  776      });
+  777  
+  778      await ctx.db.insert("conversationMembers", {
+  779        role: "member",
+  780        isMuted: false,
+  781        conversationId: dmId2,
+  782        userId: demoUserId2,
+  783        unreadCount: 0,
+  784      });
+  785  
+  786      await ctx.db.insert("messages", {
+  787        type: "text",
+  788        conversationId: dmId2,
+  789        senderId: user._id,
+  790        text: "Salut Marie, tu passes à la réunion ?",
+  791        status: "read",
+  792        reactions: [],
+  793      });
+  794  
+  795      await ctx.db.insert("messages", {
+  796        type: "text",
+  797        conversationId: dmId2,
+  798        senderId: demoUserId2,
+  799        text: "Oui, j'arrive dans 10 min ! 👋",
+  800        status: "delivered",
+  801        reactions: [],
+  802      });
+  803  
+  804      // ── Groupe : Kolwezi Entraide ──
+  805  
+  806      const groupId = await ctx.db.insert("conversations", {
+  807        participantIds: [user._id, demoUserId1, demoUserId2],
+  808        isGroup: true,
+  809        groupName: "Kolwezi Entraide",
+  810        groupAvatar: "/demo/group1.jpg",
+  811        updatedAt: new Date(now).toISOString(),
+  812        lastMessageText: "Bienvenue dans le groupe Kolwezi Entraide ! 🎉",
+  813        lastMessageSenderId: user._id,
+  814      });
+  815  
+  816      await ctx.db.insert("conversationMembers", {
+  817        role: "member",
+  818        isMuted: false,
+  819        conversationId: groupId,
+  820        userId: user._id,
+  821        unreadCount: 0,
+  822      });
+  823  
+  824      await ctx.db.insert("conversationMembers", {
+  825        role: "member",
+  826        isMuted: false,
+  827        conversationId: groupId,
+  828        userId: demoUserId1,
+  829        unreadCount: 3,
+  830      });
+  831  
+  832      await ctx.db.insert("conversationMembers", {
+  833        role: "member",
+  834        isMuted: false,
+  835        conversationId: groupId,
+  836        userId: demoUserId2,
+  837        unreadCount: 2,
+  838      });
+  839  
+  840      await ctx.db.insert("messages", {
+  841        type: "text",
+  842        conversationId: groupId,
+  843        senderId: user._id,
+  844        text: "Bienvenue dans le groupe Kolwezi Entraide ! 🎉",
+  845        status: "read",
+  846        reactions: [
+  847          {
+  848            emoji: "🎉",
+  849            count: 5,
+  850          },
+  851        ],
+  852      });
+  853  
+  854      await ctx.db.insert("messages", {
+  855        type: "text",
+  856        conversationId: groupId,
+  857        senderId: demoUserId1,
+  858        text: "Merci ! Content d'être là 🙌",
+  859        status: "read",
+  860        reactions: [
+  861          {
+  862            emoji: "❤️",
+  863            count: 2,
+  864          },
+  865        ],
+  866      });
+  867  
+  868      await ctx.db.insert("messages", {
+  869        type: "text",
+  870        conversationId: groupId,
+  871        senderId: demoUserId2,
+  872        text: "Super initiative ! On va bien bosser ensemble 💪",
+  873        status: "delivered",
+  874        reactions: [],
+  875      });
+  876  
+  877      // ── Groupe : Famille ──
+  878  
+  879      const familyId = await ctx.db.insert("conversations", {
+  880        participantIds: [user._id, demoUserId1],
+  881        isGroup: true,
+  882        groupName: "Famille 🏠",
+  883        groupAvatar: "/demo/group2.jpg",
+  884        updatedAt: new Date(now - 30_000).toISOString(),
+  885        lastMessageText: "Bon anniversaire ! 🎂",
+  886        lastMessageSenderId: demoUserId1,
+  887      });
+  888  
+  889      await ctx.db.insert("conversationMembers", {
+  890        role: "member",
+  891        isMuted: false,
+  892        conversationId: familyId,
+  893        userId: user._id,
+  894        unreadCount: 2,
+  895      });
+  896  
+  897      await ctx.db.insert("conversationMembers", {
+  898        role: "member",
+  899        isMuted: false,
+  900        conversationId: familyId,
+  901        userId: demoUserId1,
+  902        unreadCount: 0,
+  903      });
+  904  
+  905      await ctx.db.insert("messages", {
+  906        type: "text",
+  907        conversationId: familyId,
+  908        senderId: demoUserId1,
+  909        text: "Bon anniversaire ! 🎂",
+  910        status: "delivered",
+  911        reactions: [],
+  912      });
+  913    },
+  914  });
+  915  
+  916  // ── Typing status ──────────────────────────────────────────────────────────────
+  917  
+  918  /** Set typing status for the current user in a conversation */
+  919  export const setTyping = mutation({
+  920    args: {
+  921      conversationId: v.id("conversations"),
+  922      isTyping: v.boolean(),
+  923    },
+  924  
+  925    handler: async (ctx, args): Promise<void> => {
+  926      const user = await requireUser(ctx);
+  927  
+  928      const existing = await ctx.db
+  929        .query("typingStatus")
+  930        .withIndex("by_user_and_conversation", (q) =>
+  931          q.eq("userId", user._id).eq("conversationId", args.conversationId),
+  932        )
+  933        .unique();
+  934  
+  935      if (args.isTyping) {
+  936        const now = new Date().toISOString();
+  937  
+  938        if (existing) {
+  939          await ctx.db.patch(existing._id, {
+  940            updatedAt: now,
+  941          });
+  942        } else {
+  943          await ctx.db.insert("typingStatus", {
+  944            conversationId: args.conversationId,
+  945            userId: user._id,
+  946            updatedAt: now,
+  947          });
+  948        }
+  949      } else if (existing) {
+  950        await ctx.db.delete(existing._id);
+  951      }
+  952    },
+  953  });
+  954  
+  955  /** Get names of users currently typing in a conversation (< 5s old) */
+  956  export const getTypingUsers = query({
+  957    args: {
+  958      conversationId: v.id("conversations"),
+  959    },
+  960  
+  961    handler: async (ctx, args): Promise<string[]> => {
+  962      const user = await requireUser(ctx);
+  963  
+  964      const cutoff = new Date(Date.now() - 5000).toISOString();
+  965  
+  966      const rows = await ctx.db
+  967        .query("typingStatus")
+  968        .withIndex("by_conversation", (q) =>
+  969          q.eq("conversationId", args.conversationId),
+  970        )
+  971        .collect();
+  972  
+  973      const active = rows.filter(
+  974        (r) => r.userId !== user._id && r.updatedAt > cutoff,
+  975      );
+  976  
+  977      const names = await Promise.all(
+  978        active.map(async (r) => {
+  979          const u = await ctx.db.get(r.userId);
+  980  
+  981          return u?.name ?? "Quelqu'un";
+  982        }),
+  983      );
+  984  
+  985      return names;
+  986    },
+  987  });
+
+
+==================================================================
+===== 2. convex/messages/index.ts � CONTENU INTEGRAL =====
+==================================================================
+    1  // convex/messages/index.ts
+    2  
+    3  // Barrel sécurisé : chaque module conserve son propre namespace.
+    4  // Cela évite les collisions entre fonctions portant le même nom
+    5  // (get, list, markAsRead, leave, count, etc.).
+    6  
+    7  export * as conversations from "./conversations";
+    8  export * as messages from "./messages";
+    9  export * as members from "./members";
+   10  export * as reactions from "./reactions";
+   11  export * as replies from "./replies";
+   12  export * as forwarding from "./forwarding";
+   13  export * as pins from "./pins";
+   14  export * as attachments from "./attachments";
+   15  export * as voice from "./voice";
+   16  export * as presence from "./presence";
+   17  export * as readReceipts from "./readReceipts";
+   18  export * as typing from "./typing";
+   19  export * as calls from "./calls";
+   20  export * as search from "./search";
+   21  export * as polls from "./polls";
+   22  export * as locations from "./locations";
+   23  export * as notifications from "./notifications";
+   24  export * as moderation from "./moderation";
+   25  export * as ai from "./ai";
+
+
+==================================================================
+===== 3. EXPORTS par module (convex/messages/*.ts) =====
+==================================================================
+
+--- ai.ts  (376 lignes) ---
+  IMPORTS :
+    L    3  import { ConvexError, v } from "convex/values";
+    L    4  import { mutation, query } from "../_generated/server";
+    L    5  import type { Doc, Id } from "../_generated/dataModel";
+  EXPORTS :
+    L   94  export const getConversationAIContext = query({
+    L  136  export const getMessageAIContext = query({
+    L  178  export const prepareMessageAI = mutation({
+    L  242  export const prepareAIReply = query({
+    L  292  export const prepareConversationSummary = query({
+    L  338  export const prepareTranslation = query({
+    L  393  export const prepareRewrite = query({
+    L  443  export const getAIConversationStats = query({
+
+--- attachments.ts  (159 lignes) ---
+  IMPORTS :
+    L    3  import { mutation, query } from "../_generated/server";
+    L    4  import { v } from "convex/values";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   11  export const generateUploadUrl = mutation({
+    L   24  export const addAttachment = mutation({
+    L   98  export const getAttachments = query({
+    L  146  export const deleteAttachment = mutation({
+
+--- calls.ts  (334 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { mutation, query } from "../_generated/server";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   65  export const startCall = mutation({
+    L  127  export const answerCall = mutation({
+    L  164  export const rejectCall = mutation({
+    L  193  export const endCall = mutation({
+    L  222  export const markAsMissed = mutation({
+    L  251  export const getCall = query({
+    L  267  export const getActiveCall = query({
+    L  305  export const listConversationCalls = query({
+    L  352  export const listMyCalls = query({
+    L  388  export const cleanupStaleCalls = mutation({
+
+--- conversations.ts  (618 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { mutation, query } from "../_generated/server";
+    L    5  import type { Doc, Id } from "../_generated/dataModel";
+  EXPORTS :
+    L  172  export const get = query({
+    L  200  export const list = query({
+    L  276  export const getDirect = query({
+    L  330  export const getOrCreateDirect = mutation({
+    L  428  export const createGroup = mutation({
+    L  516  export const updateGroup = mutation({
+    L  574  export const updateLastMessage = mutation({
+    L  614  export const markAsRead = mutation({
+    L  660  export const getUnreadCount = query({
+    L  682  export const getUnreadCountForConversation = query({
+    L  718  export const leave = mutation({
+
+--- forwarding.ts  (179 lignes) ---
+  IMPORTS :
+    L    1  import { mutation, query } from "../_generated/server";
+    L    2  import { v } from "convex/values";
+    L    3  import { requireAuthenticatedUser } from "../auth/helpers";
+    L    4  import type { Id } from "../_generated/dataModel";
+  EXPORTS :
+    L   10  export const forwardMessage = mutation({
+    L  145  export const getForwardTargets = query({
+
+--- locations.ts  (402 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { mutation, query } from "../_generated/server";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   46  export const shareLocation = mutation({
+    L  114  export const startLiveLocation = mutation({
+    L  219  export const updateLiveLocation = mutation({
+    L  298  export const stopLiveLocation = mutation({
+    L  331  export const getLocation = query({
+    L  363  export const listConversationLocations = query({
+    L  401  export const getActiveLiveLocations = query({
+    L  432  export const getMyActiveLiveLocation = query({
+    L  467  export const stopAllMyLiveLocations = mutation({
+    L  510  export const deleteLocation = mutation({
+
+--- members.ts  (782 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { mutation, query } from "../_generated/server";
+    L    5  import type { Doc, Id } from "../_generated/dataModel";
+  EXPORTS :
+    L  110  export const get = query({
+    L  148  export const getCurrent = query({
+    L  183  export const list = query({
+    L  260  export const count = query({
+    L  299  export const isMember = query({
+    L  345  export const add = mutation({
+    L  440  export const addMany = mutation({
+    L  548  export const remove = mutation({
+    L  609  export const leave = mutation({
+    L  663  export const ensure = mutation({
+    L  731  export const getUnreadCount = query({
+    L  759  export const incrementUnread = mutation({
+    L  809  export const setUnreadCount = mutation({
+    L  855  export const markAsRead = mutation({
+    L  909  export const sync = mutation({
+
+--- messages.ts  (666 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { mutation, query } from "../_generated/server";
+    L    5  import { paginationOptsValidator } from "convex/server";
+    L    6  import type { Doc, Id } from "../_generated/dataModel";
+  EXPORTS :
+    L  137  export const get = query({
+    L  180  export const list = query({
+    L  222  export const getRecent = query({
+    L  265  export const send = mutation({
+    L  438  export const sendToUser = mutation({
+    L  602  export const markAsRead = mutation({
+    L  658  export const markConversationAsRead = mutation({
+    L  729  export const markAsDelivered = mutation({
+    L  779  export const getLast = query({
+    L  812  export const count = query({
+
+--- moderation.ts  (352 lignes) ---
+  IMPORTS :
+    L    3  import { ConvexError, v } from "convex/values";
+    L    4  import { mutation, query } from "../_generated/server";
+    L    5  import type { Doc, Id } from "../_generated/dataModel";
+  EXPORTS :
+    L   49  export const reportMessage = mutation({
+    L  173  export const hasReportedMessage = query({
+    L  202  export const getMessageReports = query({
+    L  262  export const listPendingReports = query({
+    L  288  export const reviewReport = mutation({
+    L  338  export const resolveReport = mutation({
+    L  390  export const dismissReport = mutation({
+    L  433  export const getMyReports = query({
+
+--- notifications.ts  (354 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { internalMutation } from "../_generated/server";
+    L    5  import type { Id } from "../_generated/dataModel";
+  EXPORTS :
+    L   34  export const createMessageNotification = internalMutation({
+    L  168  export const notifyConversationMembers = internalMutation({
+    L  272  export const createVoiceNotification = internalMutation({
+    L  361  export const createSharedPublicationNotification = internalMutation({
+
+--- pins.ts  (77 lignes) ---
+  IMPORTS :
+    L    3  import { mutation, query } from "../_generated/server";
+    L    4  import { v } from "convex/values";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   11  export const togglePin = mutation({
+    L   63  export const getPinnedMessages = query({
+
+--- polls.ts  (397 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { mutation, query } from "../_generated/server";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   60  export const createPoll = mutation({
+    L  147  export const vote = mutation({
+    L  231  export const removeVote = mutation({
+    L  266  export const getPoll = query({
+    L  320  export const getPollResults = query({
+    L  368  export const getMyVote = query({
+    L  393  export const closePoll = mutation({
+    L  426  export const reopenPoll = mutation({
+    L  457  export const deletePoll = mutation({
+    L  492  export const listConversationPolls = query({
+
+--- presence.ts  (206 lignes) ---
+  IMPORTS :
+    L    3  import { mutation, query } from "../_generated/server";
+    L    4  import { v } from "convex/values";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   11  export const setPresence = mutation({
+    L   54  export const goOnline = mutation({
+    L   92  export const goAway = mutation({
+    L  130  export const goOffline = mutation({
+    L  159  export const heartbeat = mutation({
+    L  197  export const getPresence = query({
+    L  227  export const getUsersPresence = query({
+
+--- reactions.ts  (424 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { ConvexError } from "convex/values";
+    L    5  import { mutation, query } from "../_generated/server";
+    L    6  import type { Id } from "../_generated/dataModel";
+  EXPORTS :
+    L  128  export const reactToMessage = mutation({
+    L  203  export const removeReaction = mutation({
+    L  288  export const toggleReaction = mutation({
+    L  401  export const getReactions = query({
+    L  428  export const getReactionCount = query({
+    L  451  export const getReaction = query({
+    L  485  export const clearReactions = mutation({
+
+--- readReceipts.ts  (247 lignes) ---
+  IMPORTS :
+    L    3  import { mutation, query } from "../_generated/server";
+    L    4  import { v } from "convex/values";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   11  export const markAsRead = mutation({
+    L   97  export const markManyAsRead = mutation({
+    L  182  export const getMessageReadReceipts = query({
+    L  232  export const getConversationReadReceipts = query({
+    L  294  export const hasRead = query({
+
+--- replies.ts  (331 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { ConvexError } from "convex/values";
+    L    5  import {
+    L   11  import type { Doc, Id } from "../_generated/dataModel";
+  EXPORTS :
+    L  104  export const createReply = mutation({
+    L  241  export const getReplyTarget = query({
+    L  282  export const getReplyPreview = query({
+    L  321  export const getReplies = query({
+    L  368  export const isReply = query({
+    L  389  export const removeReplyLink = mutation({
+
+--- search.ts  (417 lignes) ---
+  IMPORTS :
+    L    3  import { v } from "convex/values";
+    L    4  import { query } from "../_generated/server";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   39  export const searchMessages = query({
+    L  158  export const searchConversation = query({
+    L  261  export const searchConversations = query({
+    L  377  export const globalSearch = query({
+
+--- typing.ts  (232 lignes) ---
+  IMPORTS :
+    L    3  import { mutation, query } from "../_generated/server";
+    L    4  import { v } from "convex/values";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   11  export const startTyping = mutation({
+    L   77  export const stopTyping = mutation({
+    L  124  export const getTypingUsers = query({
+    L  200  export const isTyping = query({
+    L  247  export const cleanupExpired = mutation({
+
+--- voice.ts  (123 lignes) ---
+  IMPORTS :
+    L    3  import { mutation, query } from "../_generated/server";
+    L    4  import { v } from "convex/values";
+    L    5  import { requireAuthenticatedUser } from "../auth/helpers";
+  EXPORTS :
+    L   11  export const sendVoiceMessage = mutation({
+    L  106  export const getVoiceMessage = query({
+
+
+==================================================================
+===== 4. FRONTEND � usages de api.messages.* =====
+==================================================================
+Recherche dans src/ (fichiers .ts/.tsx)
+
+--- src\features\messages\ai\hooks\useMessageAI.ts ---
+    L   31  api.messages.ai
+    L   41  api.messages.ai
+    L   50  api.messages.ai
+    L   61  api.messages.ai
+    L   71  api.messages.ai
+    L   81  api.messages.ai
+    L   91  api.messages.ai
+    L  105  api.messages.ai
+
+--- src\features\messages\calls\hooks\useCall.ts ---
+    L   28  api.messages.calls
+    L   30  api.messages.calls
+    L   32  api.messages.calls
+    L   34  api.messages.calls
+    L   36  api.messages.calls
+    L   38  api.messages.calls
+    L   45  api.messages.calls
+    L   50  api.messages.calls
+
+--- src\features\messages\chat\components\ReplyPreview.tsx ---
+    L   13  api.messages.messages
+
+--- src\features\messages\chat\hooks\useMessageActions.ts ---
+    L    9  api.messages.messages
+    L   11  api.messages.messages
+    L   13  api.messages.messages
+    L   16  api.messages.messages
+    L   19  api.messages.messages
+
+--- src\features\messages\chat\hooks\useMessages.ts ---
+    L   12  api.messages.messages
+
+--- src\features\messages\conversations\hooks\useConversation.ts ---
+    L   16  api.messages.conversations
+    L   25  api.messages.conversations
+
+--- src\features\messages\conversations\hooks\useConversationActions.ts ---
+    L    8  api.messages.conversations
+    L   11  api.messages.conversations
+    L   13  api.messages.conversations
+    L   16  api.messages.conversations
+    L   19  api.messages.conversations
+    L   21  api.messages.conversations
+
+--- src\features\messages\conversations\hooks\useConversations.ts ---
+    L   11  api.messages.conversations
+    L   13  api.messages.conversations
+
+--- src\features\messages\forwarding\hooks\useForwarding.ts ---
+    L   15  api.messages.forwarding
+    L   19  api.messages.forwarding
+
+--- src\features\messages\groups\hooks\useGroupActions.ts ---
+    L    7  api.messages.members
+    L    9  api.messages.members
+    L   11  api.messages.members
+    L   13  api.messages.members
+    L   15  api.messages.members
+    L   17  api.messages.members
+
+--- src\features\messages\groups\hooks\useGroupMembers.ts ---
+    L   12  api.messages.members
+
+--- src\features\messages\groups\hooks\useGroups.ts ---
+    L   12  api.messages.members
+    L   21  api.messages.members
+    L   30  api.messages.members
+
+--- src\features\messages\media\hooks\useAttachments.ts ---
+    L   12  api.messages.attachments
+    L   21  api.messages.attachments
+    L   25  api.messages.attachments
+
+--- src\features\messages\pins\hooks\usePinnedMessages.ts ---
+    L   12  api.messages.pins
+    L   20  api.messages.pins
+
+--- src\features\messages\polls\hooks\usePolls.ts ---
+    L   12  api.messages.polls
+    L   21  api.messages.polls
+    L   23  api.messages.polls
+    L   25  api.messages.polls
+    L   27  api.messages.polls
+    L   29  api.messages.polls
+    L   31  api.messages.polls
+    L   78  api.messages.polls
+    L   82  api.messages.polls
+    L   84  api.messages.polls
+    L   86  api.messages.polls
+    L   88  api.messages.polls
+    L   90  api.messages.polls
+
+--- src\features\messages\presence\hooks\usePresence.ts ---
+    L   27  api.messages.presence
+    L   29  api.messages.presence
+    L   31  api.messages.presence
+    L   33  api.messages.presence
+    L   35  api.messages.presence
+    L   38  api.messages.presence
+    L   47  api.messages.presence
+
+--- src\features\messages\readReceipts\hooks\useReadReceipts.ts ---
+    L   17  api.messages.readReceipts
+    L   20  api.messages.readReceipts
+    L   24  api.messages.readReceipts
+
+--- src\features\messages\search\hooks\useMessageSearch.ts ---
+    L   29  api.messages.search
+    L   40  api.messages.search
+    L   50  api.messages.search
+
+--- src\features\messages\typing\hooks\useTyping.ts ---
+    L   15  api.messages.typing
+    L   17  api.messages.typing
+    L   19  api.messages.typing
+    L   22  api.messages.typing
+
+--- src\features\messages\voice\components\VoiceMessage.tsx ---
+    L   15  api.messages.voice
+
+--- src\navigation\hooks\useNavigation.ts ---
+    L   20  api.messages.totalUnread
+
+--- src\pages\home\_components\HomeContextualHero.tsx ---
+    L   83  api.messages.conversations
+
+
+==================================================================
+===== 5. COMPTAGE =====
+==================================================================
+convex/messages.ts   : exports = 12
+convex/messages/*.ts : exports = 130 (sur 19 modules)
+Frontend api.messages.* usages = 83
+
+########## FIN M1 ##########

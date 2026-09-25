@@ -1,4 +1,5 @@
 // src/pages/home/_components/WeatherBar.tsx
+
 import {
   View,
   Pressable,
@@ -6,19 +7,21 @@ import {
   Animated,
   Easing,
   StyleSheet,
-  Platform,
   useWindowDimensions,
   type ViewStyle,
-  type ReactNode,
 } from "react-native";
+
 import { LinearGradient } from "expo-linear-gradient";
+
 import {
   useCallback,
   useEffect,
   useRef,
   useState,
   type ComponentType,
+  type ReactNode,
 } from "react";
+
 import {
   Cloud,
   CloudFog,
@@ -111,13 +114,6 @@ const REQUEST_TIMEOUT = 8_000;
 const CACHE_KEY = "debrouillepro:weather:v2";
 const CACHE_MAX_AGE = 15 * 60 * 1000;
 
-const DEFAULT_LOCATION = {
-  latitude: -10.7167,
-  longitude: 25.4667,
-  city: "Kolwezi",
-  country: "RDC",
-};
-
 const memoryStore: Record<string, string> = {};
 
 const store = {
@@ -129,8 +125,10 @@ const store = {
         return null;
       }
     }
+
     return memoryStore[key] ?? null;
   },
+
   set(key: string, value: string) {
     if (isBrowser) {
       try {
@@ -150,17 +148,66 @@ function getWeatherMeta(code: number): {
   description: string;
   icon: WeatherIconType;
 } {
-  if (code === 0) return { description: "Ensoleillé", icon: "sun" };
-  if (code === 1 || code === 2)
-    return { description: "Partiellement nuageux", icon: "cloud-sun" };
-  if (code === 3) return { description: "Couvert", icon: "cloud" };
-  if (code >= 45 && code <= 48)
-    return { description: "Brouillard", icon: "fog" };
-  if (code >= 51 && code <= 67) return { description: "Pluie", icon: "rain" };
-  if (code >= 71 && code <= 77) return { description: "Neige", icon: "snow" };
-  if (code >= 80 && code <= 82) return { description: "Averses", icon: "rain" };
-  if (code >= 95) return { description: "Orage", icon: "storm" };
-  return { description: "Variable", icon: "cloud-sun" };
+  if (code === 0) {
+    return {
+      description: "Ensoleillé",
+      icon: "sun",
+    };
+  }
+
+  if (code === 1 || code === 2) {
+    return {
+      description: "Partiellement nuageux",
+      icon: "cloud-sun",
+    };
+  }
+
+  if (code === 3) {
+    return {
+      description: "Couvert",
+      icon: "cloud",
+    };
+  }
+
+  if (code >= 45 && code <= 48) {
+    return {
+      description: "Brouillard",
+      icon: "fog",
+    };
+  }
+
+  if (code >= 51 && code <= 67) {
+    return {
+      description: "Pluie",
+      icon: "rain",
+    };
+  }
+
+  if (code >= 71 && code <= 77) {
+    return {
+      description: "Neige",
+      icon: "snow",
+    };
+  }
+
+  if (code >= 80 && code <= 82) {
+    return {
+      description: "Averses",
+      icon: "rain",
+    };
+  }
+
+  if (code >= 95) {
+    return {
+      description: "Orage",
+      icon: "storm",
+    };
+  }
+
+  return {
+    description: "Variable",
+    icon: "cloud-sun",
+  };
 }
 
 type IconProps = {
@@ -182,18 +229,25 @@ function getWeatherIcon(
   switch (icon) {
     case "sun":
       return <Sun {...props} color="#FCD34D" />;
+
     case "cloud-sun":
       return <CloudSun {...props} color="#7DD3FC" />;
+
     case "cloud":
       return <Cloud {...props} color="#CBD5E1" />;
+
     case "fog":
       return <CloudFog {...props} color="#94A3B8" />;
+
     case "rain":
       return <CloudRain {...props} color="#7DD3FC" />;
+
     case "snow":
       return <Snowflake {...props} color="#A5F3FC" />;
+
     case "storm":
       return <Zap {...props} color="#C4B5FD" />;
+
     default:
       return isDay ? (
         <Sun {...props} color="#FCD34D" />
@@ -207,18 +261,25 @@ function getWeatherAccent(icon: WeatherIconType): string {
   switch (icon) {
     case "sun":
       return "#FCD34D";
+
     case "cloud-sun":
       return "#7DD3FC";
+
     case "cloud":
       return "#CBD5E1";
+
     case "fog":
       return "#94A3B8";
+
     case "rain":
       return "#38BDF8";
+
     case "snow":
       return "#A5F3FC";
+
     case "storm":
       return "#C4B5FD";
+
     default:
       return "#7DD3FC";
   }
@@ -233,19 +294,30 @@ async function fetchWithTimeout(
   signal?: AbortSignal,
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
-  const abortHandler = () => controller.abort();
-  signal?.addEventListener("abort", abortHandler, { once: true });
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, REQUEST_TIMEOUT);
+
+  const abortHandler = () => {
+    controller.abort();
+  };
+
+  signal?.addEventListener("abort", abortHandler, {
+    once: true,
+  });
 
   try {
     return await fetch(url, {
       method: "GET",
       signal: controller.signal,
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+      },
     });
   } finally {
     clearTimeout(timeout);
+
     signal?.removeEventListener("abort", abortHandler);
   }
 }
@@ -257,9 +329,13 @@ async function fetchWithTimeout(
 function readCachedWeather(): WeatherData | null {
   try {
     const raw = store.get(CACHE_KEY);
-    if (!raw) return null;
+
+    if (!raw) {
+      return null;
+    }
 
     const parsed = JSON.parse(raw) as WeatherData;
+
     if (
       !parsed ||
       typeof parsed.updatedAt !== "number" ||
@@ -267,6 +343,7 @@ function readCachedWeather(): WeatherData | null {
     ) {
       return null;
     }
+
     return parsed;
   } catch {
     return null;
@@ -302,7 +379,9 @@ async function resolveCity(
       signal,
     );
 
-    if (!response.ok) throw new Error("Reverse geocoding failed");
+    if (!response.ok) {
+      throw new Error("Reverse geocoding failed");
+    }
 
     const data = (await response.json()) as ReverseGeocodeResponse;
     const address = data.address;
@@ -315,9 +394,14 @@ async function resolveCity(
       address?.state ??
       "Ma position";
 
-    return { city, country: address?.country };
+    return {
+      city,
+      country: address?.country,
+    };
   } catch {
-    return { city: "Ma position" };
+    return {
+      city: "Ma position",
+    };
   }
 }
 
@@ -357,6 +441,7 @@ async function fetchWeather(
   }
 
   const weatherData = (await weatherResponse.json()) as OpenMeteoResponse;
+
   const current = weatherData.current;
 
   if (
@@ -368,35 +453,46 @@ async function fetchWeather(
   }
 
   const weatherMeta = getWeatherMeta(current.weather_code);
+
   const location = await resolveCity(latitude, longitude, signal);
+
   const precipitationProbability =
     weatherData.hourly?.precipitation_probability?.[0];
 
   return {
     temperature: Math.round(current.temperature_2m),
+
     feelsLike:
       typeof current.apparent_temperature === "number"
         ? Math.round(current.apparent_temperature)
         : undefined,
+
     humidity:
       typeof current.relative_humidity_2m === "number"
         ? Math.round(current.relative_humidity_2m)
         : undefined,
+
     windSpeed:
       typeof current.wind_speed_10m === "number"
         ? Math.round(current.wind_speed_10m)
         : undefined,
+
     precipitationProbability:
       typeof precipitationProbability === "number"
         ? Math.round(precipitationProbability)
         : undefined,
+
     description: weatherMeta.description,
     icon: weatherMeta.icon,
+
     city: location.city,
     country: location.country,
+
     latitude,
     longitude,
+
     isDay: current.is_day !== 0,
+
     updatedAt: Date.now(),
   };
 }
@@ -469,8 +565,11 @@ function PulsingWeatherIcon({
   const spin = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (refreshing) return;
-    Animated.loop(
+    if (refreshing) {
+      return;
+    }
+
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
@@ -478,6 +577,7 @@ function PulsingWeatherIcon({
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
+
         Animated.timing(pulse, {
           toValue: 0,
           duration: 2400,
@@ -485,7 +585,13 @@ function PulsingWeatherIcon({
           useNativeDriver: true,
         }),
       ]),
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [refreshing, pulse]);
 
   useEffect(() => {
@@ -493,14 +599,21 @@ function PulsingWeatherIcon({
       spin.setValue(0);
       return;
     }
-    Animated.loop(
+
+    const animation = Animated.loop(
       Animated.timing(spin, {
         toValue: 1,
         duration: 900,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [refreshing, spin]);
 
   const scale = pulse.interpolate({
@@ -515,7 +628,6 @@ function PulsingWeatherIcon({
 
   return (
     <View style={styles.iconWrap}>
-      {/* Halo */}
       <Animated.View
         pointerEvents="none"
         style={[
@@ -527,6 +639,7 @@ function PulsingWeatherIcon({
           },
         ]}
       />
+
       <LinearGradient
         colors={[`${accent}22`, "rgba(255,255,255,0.02)"]}
         start={{ x: 0, y: 0 }}
@@ -534,11 +647,19 @@ function PulsingWeatherIcon({
         style={styles.iconGradient}
       >
         {refreshing ? (
-          <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+          <Animated.View
+            style={{
+              transform: [{ rotate: rotation }],
+            }}
+          >
             <RefreshCw size={15} color="#C4B5FD" strokeWidth={2.4} />
           </Animated.View>
         ) : (
-          <Animated.View style={{ transform: [{ scale }] }}>
+          <Animated.View
+            style={{
+              transform: [{ scale }],
+            }}
+          >
             {getWeatherIcon(icon, isDay, 17)}
           </Animated.View>
         )}
@@ -563,6 +684,7 @@ function MetricPill({
   return (
     <View style={styles.metricPill}>
       <Icon size={12} color={color} strokeWidth={2.2} />
+
       <Text style={styles.metricPillText}>{value}</Text>
     </View>
   );
@@ -574,26 +696,44 @@ function MetricPill({
 
 export default function WeatherBar() {
   const { width } = useWindowDimensions();
+
   const showMetrics = width >= 480;
 
   const [weather, setWeather] = useState<WeatherState>(() => {
     const cached = readCachedWeather();
-    if (cached) return { status: "ready", data: cached };
-    return { status: "loading", data: null };
+
+    if (cached) {
+      return {
+        status: "ready",
+        data: cached,
+      };
+    }
+
+    return {
+      status: "loading",
+      data: null,
+    };
   });
 
   const [refreshing, setRefreshing] = useState(false);
+
   const mountedRef = useRef(true);
 
   /* ───── load weather ───── */
+
   const loadWeather = useCallback(
     async (forceRefresh = false, signal?: AbortSignal) => {
       if (!forceRefresh) {
         const cached = readCachedWeather();
+
         if (cached) {
           if (mountedRef.current) {
-            setWeather({ status: "ready", data: cached });
+            setWeather({
+              status: "ready",
+              data: cached,
+            });
           }
+
           return;
         }
       }
@@ -610,21 +750,40 @@ export default function WeatherBar() {
         longitude: number,
       ) => {
         const data = await fetchWeather(latitude, longitude, signal);
+
         writeCachedWeather(data);
-        if (!mountedRef.current) return;
-        setWeather({ status: "ready", data });
+
+        if (!mountedRef.current) {
+          return;
+        }
+
+        setWeather({
+          status: "ready",
+          data,
+        });
       };
 
       try {
+        /*
+         * IMPORTANT:
+         * We never use an estimated or hardcoded location.
+         * If geolocation is unavailable, we fail honestly.
+         */
         if (
           !isBrowser ||
           typeof navigator === "undefined" ||
           !("geolocation" in navigator)
         ) {
-          await loadFromCoordinates(
-            DEFAULT_LOCATION.latitude,
-            DEFAULT_LOCATION.longitude,
-          );
+          if (!mountedRef.current) {
+            return;
+          }
+
+          setWeather({
+            status: "error",
+            data: null,
+            error: "Localisation indisponible",
+          });
+
           return;
         }
 
@@ -638,34 +797,41 @@ export default function WeatherBar() {
           },
         );
 
-        await loadFromCoordinates(
-          position.coords.latitude,
-          position.coords.longitude,
-        );
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          throw new Error("Invalid geolocation coordinates");
+        }
+
+        await loadFromCoordinates(latitude, longitude);
       } catch (error) {
-        // Abort
         if (error instanceof Error && error.name === "AbortError") {
           return;
         }
 
-        try {
-          await loadFromCoordinates(
-            DEFAULT_LOCATION.latitude,
-            DEFAULT_LOCATION.longitude,
-          );
-        } catch {
-          if (!mountedRef.current) return;
+        /*
+         * If fresh geolocation/weather fails, only use a
+         * previously cached weather value when it is still valid.
+         * No artificial location is ever introduced.
+         */
+        if (!mountedRef.current) {
+          return;
+        }
 
-          const cached = readCachedWeather();
-          if (cached) {
-            setWeather({ status: "ready", data: cached });
-          } else {
-            setWeather({
-              status: "error",
-              data: null,
-              error: "Météo indisponible",
-            });
-          }
+        const cached = readCachedWeather();
+
+        if (cached) {
+          setWeather({
+            status: "ready",
+            data: cached,
+          });
+        } else {
+          setWeather({
+            status: "error",
+            data: null,
+            error: "Météo indisponible",
+          });
         }
       }
     },
@@ -673,10 +839,14 @@ export default function WeatherBar() {
   );
 
   /* ───── initial load ───── */
+
   useEffect(() => {
     mountedRef.current = true;
+
     const controller = new AbortController();
+
     void loadWeather(false, controller.signal);
+
     return () => {
       mountedRef.current = false;
       controller.abort();
@@ -684,14 +854,23 @@ export default function WeatherBar() {
   }, [loadWeather]);
 
   /* ───── refresh ───── */
+
   const handleRefresh = useCallback(async () => {
-    if (refreshing) return;
+    if (refreshing) {
+      return;
+    }
+
     setRefreshing(true);
+
     const controller = new AbortController();
+
     try {
       await loadWeather(true, controller.signal);
     } finally {
-      if (mountedRef.current) setRefreshing(false);
+      if (mountedRef.current) {
+        setRefreshing(false);
+      }
+
       controller.abort();
     }
   }, [loadWeather, refreshing]);
@@ -710,8 +889,11 @@ export default function WeatherBar() {
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
+
           <View style={styles.loadingBorder} pointerEvents="none" />
+
           <LoadingSpinner />
+
           <Text style={styles.loadingText}>Localisation et météo…</Text>
         </View>
       </FadeUp>
@@ -739,9 +921,15 @@ export default function WeatherBar() {
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
+
           <View style={styles.errorBorder} pointerEvents="none" />
+
           <MapPin size={14} color="rgba(255,255,255,0.5)" strokeWidth={2.2} />
-          <Text style={styles.errorText}>Météo indisponible</Text>
+
+          <Text style={styles.errorText}>
+            {weather.error ?? "Météo indisponible"}
+          </Text>
+
           <RefreshCw
             size={13}
             color="rgba(255,255,255,0.5)"
@@ -753,7 +941,10 @@ export default function WeatherBar() {
   }
 
   const data = weather.data;
-  if (!data) return null;
+
+  if (!data) {
+    return null;
+  }
 
   const accent = getWeatherAccent(data.icon);
 
@@ -791,12 +982,22 @@ export default function WeatherBar() {
         {/* Ambient weather glow */}
         <View
           pointerEvents="none"
-          style={[styles.ambientGlow, { backgroundColor: accent }]}
+          style={[
+            styles.ambientGlow,
+            {
+              backgroundColor: accent,
+            },
+          ]}
         />
 
         {/* Border ring */}
         <View
-          style={[styles.cardBorder, { borderColor: `${accent}30` }]}
+          style={[
+            styles.cardBorder,
+            {
+              borderColor: `${accent}30`,
+            },
+          ]}
           pointerEvents="none"
         />
 
@@ -828,17 +1029,21 @@ export default function WeatherBar() {
           <View style={styles.infoCol}>
             <View style={styles.infoTopRow}>
               <Text style={styles.temperature}>{data.temperature}°C</Text>
+
               <View style={styles.dot} />
+
               <Text style={styles.description} numberOfLines={1}>
                 {data.description}
               </Text>
             </View>
+
             <View style={styles.locationRow}>
               <MapPin
                 size={10}
                 color="rgba(255,255,255,0.4)"
                 strokeWidth={2.2}
               />
+
               <Text style={styles.locationText} numberOfLines={1}>
                 {data.city}
                 {data.country ? ` · ${data.country}` : ""}
@@ -856,6 +1061,7 @@ export default function WeatherBar() {
                   color="rgba(255,255,255,0.5)"
                 />
               ) : null}
+
               {typeof data.humidity === "number" ? (
                 <MetricPill
                   Icon={Droplets}
@@ -863,6 +1069,7 @@ export default function WeatherBar() {
                   color="#7DD3FC"
                 />
               ) : null}
+
               {typeof data.windSpeed === "number" ? (
                 <MetricPill
                   Icon={Wind}
@@ -870,6 +1077,7 @@ export default function WeatherBar() {
                   color="rgba(255,255,255,0.5)"
                 />
               ) : null}
+
               {typeof data.precipitationProbability === "number" ? (
                 <MetricPill
                   Icon={Umbrella}
@@ -902,14 +1110,20 @@ function LoadingSpinner() {
   const rotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.timing(rotate, {
         toValue: 1,
         duration: 900,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
-    ).start();
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
   }, [rotate]);
 
   const rotation = rotate.interpolate({
@@ -918,7 +1132,11 @@ function LoadingSpinner() {
   });
 
   return (
-    <Animated.View style={{ transform: [{ rotate: rotation }] }}>
+    <Animated.View
+      style={{
+        transform: [{ rotate: rotation }],
+      }}
+    >
       <Loader2 size={14} color="#C4B5FD" strokeWidth={2.4} />
     </Animated.View>
   );
@@ -936,6 +1154,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Loading card ───────────────────────────────── */
+
   loadingCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -946,12 +1165,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "rgba(10,6,24,0.5)",
   },
+
   loadingBorder: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
   },
+
   loadingText: {
     fontSize: 11.5,
     fontWeight: "600",
@@ -960,6 +1181,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Error card ─────────────────────────────────── */
+
   errorCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -970,12 +1192,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "rgba(10,6,24,0.5)",
   },
+
   errorBorder: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(248,113,113,0.28)",
   },
+
   errorText: {
     flex: 1,
     fontSize: 11.5,
@@ -985,6 +1209,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Main card ──────────────────────────────────── */
+
   card: {
     position: "relative",
     borderRadius: 16,
@@ -993,18 +1218,24 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
     elevation: 6,
   },
+
   cardPressed: {
     opacity: 0.92,
     transform: [{ scale: 0.995 }],
   },
+
   cardBorder: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 16,
     borderWidth: 1,
   },
+
   ambientGlow: {
     position: "absolute",
     top: -30,
@@ -1014,6 +1245,7 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     opacity: 0.18,
   },
+
   topHighlight: {
     position: "absolute",
     top: 0,
@@ -1023,6 +1255,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Content ────────────────────────────────────── */
+
   content: {
     flexDirection: "row",
     alignItems: "center",
@@ -1032,6 +1265,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Icon ───────────────────────────────────────── */
+
   iconWrap: {
     width: 36,
     height: 36,
@@ -1039,12 +1273,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
+
   iconHalo: {
     position: "absolute",
     width: 36,
     height: 36,
     borderRadius: 12,
   },
+
   iconGradient: {
     width: 32,
     height: 32,
@@ -1056,27 +1292,32 @@ const styles = StyleSheet.create({
   },
 
   /* ── Info ───────────────────────────────────────── */
+
   infoCol: {
     flex: 1,
     minWidth: 0,
   },
+
   infoTopRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
+
   temperature: {
     fontSize: 13.5,
     fontWeight: "900",
     color: "rgba(255,255,255,0.92)",
     letterSpacing: -0.3,
   },
+
   dot: {
     width: 3,
     height: 3,
     borderRadius: 1.5,
     backgroundColor: "rgba(255,255,255,0.25)",
   },
+
   description: {
     flex: 1,
     fontSize: 11.5,
@@ -1084,12 +1325,14 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
     letterSpacing: 0.1,
   },
+
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     marginTop: 4,
   },
+
   locationText: {
     flex: 1,
     fontSize: 10.5,
@@ -1099,12 +1342,14 @@ const styles = StyleSheet.create({
   },
 
   /* ── Metrics ────────────────────────────────────── */
+
   metricsRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     flexShrink: 0,
   },
+
   metricPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -1116,6 +1361,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
   },
+
   metricPillText: {
     fontSize: 10,
     fontWeight: "700",
@@ -1124,6 +1370,7 @@ const styles = StyleSheet.create({
   },
 
   /* ── Refresh affordance ─────────────────────────── */
+
   refreshAffordance: {
     width: 28,
     height: 28,

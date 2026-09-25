@@ -1,4 +1,4 @@
-import { View, Pressable, Text, TextInput, Image, Share, NativeSyntheticEvent, TextInputKeyPressEventData } from "react-native";
+import { View, Pressable, Text, TextInput, Image } from "react-native";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import {
@@ -12,7 +12,7 @@ import {
 import L from "leaflet";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
 import {
   MapPin,
@@ -187,9 +187,6 @@ const ALL_TYPES = Object.keys(TYPE_CONFIG);
 
 /* ============================================================================
  * DEFAULT MAP
- *
- * Aucun pays imposé.
- * Le monde est le point de départ.
  * ========================================================================== */
 
 const WORLD_CENTER: [number, number] = [10, 0];
@@ -332,18 +329,46 @@ function MapInteraction({ onMapClick }: { onMapClick: () => void }) {
 export default function MapPage({ onClose }: MapPageProps) {
   const rawPublications = useQuery(api.map.listGeoPublications, {});
 
+  /**
+   * Adaptation explicite du contrat Convex vers le modèle UI.
+   *
+   * IMPORTANT : listGeoPublications ne retourne volontairement pas `images`.
+   * On ne fait donc aucun cast du résultat serveur vers GeoPublication.
+   */
   const pubs = useMemo<GeoPublication[]>(() => {
-    if (!Array.isArray(rawPublications)) return [];
+    if (!Array.isArray(rawPublications)) {
+      return [];
+    }
 
-    return rawPublications.filter((publication) => {
-      return (
-        publication &&
-        typeof publication.latitude === "number" &&
-        typeof publication.longitude === "number" &&
-        Number.isFinite(publication.latitude) &&
-        Number.isFinite(publication.longitude)
-      );
-    }) as GeoPublication[];
+    return rawPublications.flatMap((publication) => {
+      if (
+        !publication ||
+        typeof publication.latitude !== "number" ||
+        typeof publication.longitude !== "number" ||
+        !Number.isFinite(publication.latitude) ||
+        !Number.isFinite(publication.longitude)
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          _id: String(publication._id),
+          type: publication.type,
+          title: publication.title,
+          description: publication.description ?? "",
+          price: publication.price,
+          location: publication.location,
+          images: [],
+          likeCount: publication.likeCount,
+          commentCount: publication.commentCount,
+          latitude: publication.latitude,
+          longitude: publication.longitude,
+          authorName: publication.authorName,
+          authorAvatar: publication.authorAvatar,
+        },
+      ];
+    });
   }, [rawPublications]);
 
   const isLoading = rawPublications === undefined;
@@ -496,7 +521,7 @@ export default function MapPage({ onClose }: MapPageProps) {
    * ------------------------------------------------------------------------ */
 
   useEffect(() => {
-    const handler = (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+    const handler = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         if (selectedPub) {
           setSelectedPub(null);
@@ -527,14 +552,40 @@ export default function MapPage({ onClose }: MapPageProps) {
     activeTypes.size === ALL_TYPES.length ? 0 : activeTypes.size;
 
   return (
-    <View initial={{ opacity: 0, scale: 0.985 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.25 }} className="fixed inset-0 z-[70] overflow-hidden bg-slate-950">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.985 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.985 }}
+      transition={{ duration: 0.25 }}
+      className="fixed inset-0 z-[70] overflow-hidden bg-slate-950"
+    >
       {/* =====================================================================
           MAP
       ====================================================================== */}
 
-      <View className="absolute inset-0"><MapContainer center={WORLD_CENTER} zoom={WORLD_ZOOM} minZoom={2} maxZoom={19} className="h-full w-full" zoomControl={false} attributionControl><TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>' maxZoom={19} /><MapViewportController center={center} zoom={zoom} /><MapInteraction onMapClick={() => {
+      <View className="absolute inset-0">
+        <MapContainer
+          center={WORLD_CENTER}
+          zoom={WORLD_ZOOM}
+          minZoom={2}
+          maxZoom={19}
+          className="h-full w-full"
+          zoomControl={false}
+          attributionControl
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>'
+            maxZoom={19}
+          />
+          <MapViewportController center={center} zoom={zoom} />
+          <MapInteraction
+            onMapClick={() => {
               setSelectedPub(null);
-            }} />{}{userLocation && (
+            }}
+          />
+          {}
+          {userLocation && (
             <>
               <Circle
                 center={userLocation}
@@ -563,7 +614,9 @@ export default function MapPage({ onClose }: MapPageProps) {
                 icon={createColoredIcon("#6366f1", true, "Votre position")}
               />
             </>
-          )}{}{filtered.map((publication) => {
+          )}
+          {}
+          {filtered.map((publication) => {
             const config = TYPE_CONFIG[publication.type] ?? {
               label: publication.type || "Autre",
               color: "#64748b",
@@ -590,97 +643,259 @@ export default function MapPage({ onClose }: MapPageProps) {
                 }}
               />
             );
-          })}</MapContainer></View>
+          })}
+        </MapContainer>
+      </View>
 
       {/* =====================================================================
           GLOBAL GRADIENTS
       ====================================================================== */}
 
-      <View className="pointer-events-none absolute inset-x-0 top-0 z-10 h-44" style={{  }} />
+      <View
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 h-44"
+        style={{}}
+      />
 
-      <View className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-48" style={{  }} />
+      <View
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-48"
+        style={{}}
+      />
 
       {/* =====================================================================
           TOP HEADER
       ====================================================================== */}
 
-      <View className="pointer-events-none absolute left-0 right-0 top-0 z-30 p-3 sm:p-5"><View className="mx-auto flex max-w-7xl items-start gap-3">{}<Pressable whileTap={{ scale: 0.9 }} onPress={onClose} accessibilityLabel="Fermer la carte" className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/70 text-white shadow-2xl backdrop-blur-2xl transition"><X className="h-5 w-5" /></Pressable>{}<View className="pointer-events-auto min-w-0 flex-1"><View className="rounded-3xl border border-white/10 bg-slate-950/72 p-2 shadow-2xl backdrop-blur-2xl"><View className="flex items-center gap-3 px-2"><View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-300"><Globe2 className="h-5 w-5" /></View><View className="min-w-0 flex-1"><View className="flex items-center gap-2"><Text className="truncate text-sm font-bold text-white">Carte DébrouillePro
-                    </Text><Text className="hidden rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/50 sm:inline">Monde
-                    </Text></View><Text className="text-[11px] text-white/45">Explore les opportunités autour de toi
-                  </Text></View><View className="hidden items-center gap-2 sm:flex"><Text className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white/70">{isLoading
+      <View className="pointer-events-none absolute left-0 right-0 top-0 z-30 p-3 sm:p-5">
+        <View className="mx-auto flex max-w-7xl items-start gap-3">
+          {}
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.9 }}
+            onClick={onClose}
+            aria-label="Fermer la carte"
+            className="pointer-events-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/70 text-white shadow-2xl backdrop-blur-2xl transition"
+          >
+            <X className="h-5 w-5" />
+          </motion.button>
+          {}
+          <View className="pointer-events-auto min-w-0 flex-1">
+            <View className="rounded-3xl border border-white/10 bg-slate-950/72 p-2 shadow-2xl backdrop-blur-2xl">
+              <View className="flex items-center gap-3 px-2">
+                <View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-300">
+                  <Globe2 className="h-5 w-5" />
+                </View>
+                <View className="min-w-0 flex-1">
+                  <View className="flex items-center gap-2">
+                    <Text className="truncate text-sm font-bold text-white">
+                      Carte DébrouillePro
+                    </Text>
+                    <Text className="hidden rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/50 sm:inline">
+                      Monde
+                    </Text>
+                  </View>
+                  <Text className="text-[11px] text-white/45">
+                    Explore les opportunités autour de toi
+                  </Text>
+                </View>
+                <View className="hidden items-center gap-2 sm:flex">
+                  <Text className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-white/70">
+                    {isLoading
                       ? "Chargement…"
-                      : `${filtered.length} résultat${filtered.length > 1 ? "s" : ""}`}</Text></View></View>{}<View className="mt-2 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2"><Search className="h-4 w-4 shrink-0 text-white/35" /><TextInput value={search} onChangeText={(value) => setSearch(value)} placeholder="Rechercher un lieu, service, emploi…" className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/30" accessibilityLabel="Rechercher sur la carte" />{search && (
-                  <Pressable onPress={() => setSearch("")} className="rounded-full p-1 text-white/40 transition" accessibilityLabel="Effacer la recherche"><X className="h-3.5 w-3.5" /></Pressable>
-                )}</View></View></View></View></View>
+                      : `${filtered.length} résultat${filtered.length > 1 ? "s" : ""}`}
+                  </Text>
+                </View>
+              </View>
+              {}
+              <View className="mt-2 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                <Search className="h-4 w-4 shrink-0 text-white/35" />
+                <TextInput
+                  value={search}
+                  onChangeText={(value) => setSearch(value)}
+                  placeholder="Rechercher un lieu, service, emploi…"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+                  accessibilityLabel="Rechercher sur la carte"
+                />
+                {search && (
+                  <Pressable
+                    onPress={() => setSearch("")}
+                    className="rounded-full p-1 text-white/40 transition"
+                    accessibilityLabel="Effacer la recherche"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
 
       {/* =====================================================================
           RIGHT CONTROLS
       ====================================================================== */}
 
-      <View className="absolute right-3 top-36 z-30 flex flex-col gap-2 sm:right-5 sm:top-40"><Pressable whileTap={{ scale: 0.9 }} onPress={locateMe} disabled={locating} accessibilityLabel="Me localiser" className={cn(
+      <View className="absolute right-3 top-36 z-30 flex flex-col gap-2 sm:right-5 sm:top-40">
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.9 }}
+          onClick={locateMe}
+          disabled={locating}
+          aria-label="Me localiser"
+          className={cn(
             "flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/75 text-white shadow-2xl backdrop-blur-2xl transition",
             locating && "text-violet-300",
-          )}><Navigation className={cn("h-5 w-5", locating && "animate-pulse")} /></Pressable><Pressable whileTap={{ scale: 0.9 }} onPress={resetWorldView} accessibilityLabel="Vue mondiale" className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/75 text-white shadow-2xl backdrop-blur-2xl transition"><Globe2 className="h-5 w-5" /></Pressable><Pressable whileTap={{ scale: 0.9 }} onPress={() => setShowFilters((value) => !value)} accessibilityLabel="Filtres" className={cn(
+          )}
+        >
+          <Navigation className={cn("h-5 w-5", locating && "animate-pulse")} />
+        </motion.button>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.9 }}
+          onClick={resetWorldView}
+          aria-label="Vue mondiale"
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/75 text-white shadow-2xl backdrop-blur-2xl transition"
+        >
+          <Globe2 className="h-5 w-5" />
+        </motion.button>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowFilters((value) => !value)}
+          aria-label="Filtres"
+          className={cn(
             "relative flex h-12 w-12 items-center justify-center rounded-2xl border text-white shadow-2xl backdrop-blur-2xl transition",
             showFilters
               ? "border-violet-400/40 bg-violet-500/30"
               : "border-white/10 bg-slate-950/75",
-          )}><SlidersHorizontal className="h-5 w-5" />{activeFilterCount > 0 && (
-            <Text className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-500 px-1 text-[9px] font-black text-white shadow-lg">{activeFilterCount}</Text>
-          )}</Pressable></View>
+          )}
+        >
+          <SlidersHorizontal className="h-5 w-5" />
+          {activeFilterCount > 0 && (
+            <Text className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-500 px-1 text-[9px] font-black text-white shadow-lg">
+              {activeFilterCount}
+            </Text>
+          )}
+        </motion.button>
+      </View>
 
       {/* =====================================================================
           MODE SWITCH
       ====================================================================== */}
 
-      <View className="absolute left-1/2 top-36 z-30 -translate-x-1/2 sm:top-40"><View className="flex rounded-2xl border border-white/10 bg-slate-950/75 p-1 shadow-2xl backdrop-blur-2xl"><Pressable onPress={() => setMapMode("explore")} className={cn(
+      <View className="absolute left-1/2 top-36 z-30 -translate-x-1/2 sm:top-40">
+        <View className="flex rounded-2xl border border-white/10 bg-slate-950/75 p-1 shadow-2xl backdrop-blur-2xl">
+          <Pressable
+            onPress={() => setMapMode("explore")}
+            className={cn(
               "flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold transition",
               mapMode === "explore"
                 ? "bg-white text-slate-900 shadow-lg"
                 : "text-white/55 hover:text-white",
-            )}><MapIcon className="h-3.5 w-3.5" /><Text>Explorer</Text></Pressable><Pressable onPress={() => {
+            )}
+          >
+            <MapIcon className="h-3.5 w-3.5" />
+            <Text>Explorer</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
               setMapMode("nearby");
               locateMe();
-            }} className={cn(
+            }}
+            className={cn(
               "flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold transition",
               mapMode === "nearby"
                 ? "bg-violet-500 text-white shadow-lg"
                 : "text-white/55 hover:text-white",
-            )}><LocateFixed className="h-3.5 w-3.5" /><Text>Autour de moi</Text></Pressable></View></View>
+            )}
+          >
+            <LocateFixed className="h-3.5 w-3.5" />
+            <Text>Autour de moi</Text>
+          </Pressable>
+        </View>
+      </View>
 
       {/* =====================================================================
           FILTER PANEL
       ====================================================================== */}
 
-<View>
+      <View>
         {showFilters && (
-          <View initial={{ opacity: 0, y: -12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -12, scale: 0.98 }} transition={{ duration: 0.2 }} className="absolute left-3 right-3 top-[19rem] z-30 sm:left-1/2 sm:right-auto sm:w-[440px] sm:-translate-x-1/2">
-            <View className="rounded-3xl border border-white/10 bg-slate-950/90 p-4 shadow-2xl backdrop-blur-2xl"><View className="mb-3 flex items-center justify-between"><View><Text className="text-sm font-bold text-white">Explorer par catégorie
-                  </Text><Text className="text-[11px] text-white/40">Affiche uniquement ce qui t'intéresse
-                  </Text></View><View className="flex gap-1"><Pressable onPress={activateAll} className="rounded-xl px-2.5 py-1.5 text-[10px] font-semibold text-violet-300 transition"><Text>Tout</Text></Pressable><Pressable onPress={deactivateAll} className="rounded-xl px-2.5 py-1.5 text-[10px] font-semibold text-white/40 transition"><Text>Aucun</Text></Pressable></View></View><View className="gap-2">{Object.entries(TYPE_CONFIG).map(([key, config]) => {
+          <motion.div
+            initial={{ opacity: 0, y: -12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
+            className="absolute left-3 right-3 top-[19rem] z-30 sm:left-1/2 sm:right-auto sm:w-[440px] sm:-translate-x-1/2"
+          >
+            <View className="rounded-3xl border border-white/10 bg-slate-950/90 p-4 shadow-2xl backdrop-blur-2xl">
+              <View className="mb-3 flex items-center justify-between">
+                <View>
+                  <Text className="text-sm font-bold text-white">
+                    Explorer par catégorie
+                  </Text>
+                  <Text className="text-[11px] text-white/40">
+                    Affiche uniquement ce qui t'intéresse
+                  </Text>
+                </View>
+                <View className="flex gap-1">
+                  <Pressable
+                    onPress={activateAll}
+                    className="rounded-xl px-2.5 py-1.5 text-[10px] font-semibold text-violet-300 transition"
+                  >
+                    <Text>Tout</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={deactivateAll}
+                    className="rounded-xl px-2.5 py-1.5 text-[10px] font-semibold text-white/40 transition"
+                  >
+                    <Text>Aucun</Text>
+                  </Pressable>
+                </View>
+              </View>
+              <View className="gap-2">
+                {Object.entries(TYPE_CONFIG).map(([key, config]) => {
                   const active = activeTypes.has(key);
                   const count = categoryCounts[key] ?? 0;
 
                   return (
-                    <Pressable key={key} onPress={() => toggleType(key)} className={cn(
+                    <Pressable
+                      key={key}
+                      onPress={() => toggleType(key)}
+                      className={cn(
                         "flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-left transition",
                         active
                           ? "border-white/10 bg-white/10 text-white"
                           : "border-white/5 bg-white/[0.025] text-white/30",
-                      )}><Text className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl" style={{
+                      )}
+                    >
+                      <Text
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl"
+                        style={{
                           backgroundColor: active
                             ? `${config.color}30`
                             : "rgba(255,255,255,.04)",
                           color: active ? config.color : "rgba(255,255,255,.3)",
-                        }}>{config.icon}</Text><Text className="min-w-0 flex-1"><Text className="block truncate text-[10px] font-semibold">{config.label}</Text><Text className="block text-[9px] text-white/25">{count}</Text></Text>{active && (
-                        <Check
-                          className="h-3.5 w-3.5 shrink-0"
-                          style={{  }}
-                        />
-                      )}</Pressable>
+                        }}
+                      >
+                        {config.icon}
+                      </Text>
+                      <Text className="min-w-0 flex-1">
+                        <Text className="block truncate text-[10px] font-semibold">
+                          {config.label}
+                        </Text>
+                        <Text className="block text-[9px] text-white/25">
+                          {count}
+                        </Text>
+                      </Text>
+                      {active && (
+                        <Check className="h-3.5 w-3.5 shrink-0" style={{}} />
+                      )}
+                    </Pressable>
                   );
-                })}</View></View>
-          </View>
+                })}
+              </View>
+            </View>
+          </motion.div>
         )}
       </View>
 
@@ -688,13 +903,35 @@ export default function MapPage({ onClose }: MapPageProps) {
           LOCATION ERROR
       ====================================================================== */}
 
-<View>
+      <View>
         {locationError && (
-          <View initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute left-1/2 top-28 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2">
-            <View className="flex items-center gap-3 rounded-2xl border border-amber-400/20 bg-slate-950/90 p-3 shadow-2xl backdrop-blur-2xl"><View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400"><AlertCircle className="h-4 w-4" /></View><View className="min-w-0 flex-1"><Text className="text-xs font-semibold text-white">Localisation indisponible
-                </Text><Text className="text-[10px] text-white/40">Vérifie l'autorisation de localisation de ton navigateur.
-                </Text></View><Pressable onPress={() => setLocationError(false)} className="rounded-full p-1 text-white/30" accessibilityLabel="Fermer"><X className="h-4 w-4" /></Pressable></View>
-          </View>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute left-1/2 top-28 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2"
+          >
+            <View className="flex items-center gap-3 rounded-2xl border border-amber-400/20 bg-slate-950/90 p-3 shadow-2xl backdrop-blur-2xl">
+              <View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400">
+                <AlertCircle className="h-4 w-4" />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className="text-xs font-semibold text-white">
+                  Localisation indisponible
+                </Text>
+                <Text className="text-[10px] text-white/40">
+                  Vérifie l'autorisation de localisation de ton navigateur.
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setLocationError(false)}
+                className="rounded-full p-1 text-white/30"
+                accessibilityLabel="Fermer"
+              >
+                <X className="h-4 w-4" />
+              </Pressable>
+            </View>
+          </motion.div>
         )}
       </View>
 
@@ -703,50 +940,159 @@ export default function MapPage({ onClose }: MapPageProps) {
       ====================================================================== */}
 
       {!isLoading && filtered.length === 0 && (
-        <View className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-6"><View initial={{ opacity: 0, y: 15, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="pointer-events-auto w-full max-w-sm rounded-[2rem] border border-white/10 bg-slate-950/90 p-6 text-center shadow-2xl backdrop-blur-2xl"><View className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-500/10 text-violet-300"><Compass className="h-7 w-7" /></View><Text className="text-base font-bold text-white">Aucun résultat ici
-            </Text><Text className="mt-2 text-xs leading-5 text-white/40">Essaie une autre catégorie ou modifie ta recherche. Les contenus
+        <View className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-6">
+          <motion.div
+            initial={{ opacity: 0, y: 15, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="pointer-events-auto w-full max-w-sm rounded-[2rem] border border-white/10 bg-slate-950/90 p-6 text-center shadow-2xl backdrop-blur-2xl"
+          >
+            <View className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-500/10 text-violet-300">
+              <Compass className="h-7 w-7" />
+            </View>
+            <Text className="text-base font-bold text-white">
+              Aucun résultat ici
+            </Text>
+            <Text className="mt-2 text-xs leading-5 text-white/40">
+              Essaie une autre catégorie ou modifie ta recherche. Les contenus
               géolocalisés apparaîtront automatiquement sur la carte.
-            </Text><Pressable onPress={() => {
+            </Text>
+            <Pressable
+              onPress={() => {
                 setSearch("");
                 activateAll();
-              }} className="mt-5 rounded-2xl bg-white px-5 py-2.5 text-xs font-bold text-slate-900 transition"><Text>Réinitialiser</Text></Pressable></View></View>
+              }}
+              className="mt-5 rounded-2xl bg-white px-5 py-2.5 text-xs font-bold text-slate-900 transition"
+            >
+              <Text>Réinitialiser</Text>
+            </Pressable>
+          </motion.div>
+        </View>
       )}
 
       {/* =====================================================================
           SELECTED PUBLICATION
       ====================================================================== */}
 
-<View>
+      <View>
         {selectedPub && (
-          <View initial={{ opacity: 0, y: 120 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 120 }} transition={{
+          <motion.div
+            initial={{ opacity: 0, y: 120 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 120 }}
+            transition={{
               type: "spring",
               stiffness: 360,
               damping: 32,
-            }} className="absolute bottom-3 left-3 right-3 z-40 sm:bottom-5 sm:left-1/2 sm:right-auto sm:w-[560px] sm:-translate-x-1/2">
-            <View className="overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/92 shadow-[0_25px_80px_rgba(0,0,0,.5)] backdrop-blur-2xl">{}<Pressable onPress={() => setSheetExpanded((value) => !value)} className="flex w-full justify-center py-2 sm:hidden" accessibilityLabel={sheetExpanded ? "Réduire" : "Afficher plus"}><Text className="h-1 w-10 rounded-full bg-white/20" /></Pressable><View className="relative p-3 sm:p-4"><Pressable onPress={() => setSelectedPub(null)} className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white/70 backdrop-blur-xl transition" accessibilityLabel="Fermer"><X className="h-4 w-4" /></Pressable><View className="flex gap-3">{}<View className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-white/5 sm:h-28 sm:w-28">{selectedPub.images?.[0] ? (
-                      <Image className="h-full w-full object-cover" source={{ uri: selectedPub.images[0] }} accessibilityLabel={selectedPub.title} />
+            }}
+            className="absolute bottom-3 left-3 right-3 z-40 sm:bottom-5 sm:left-1/2 sm:right-auto sm:w-[560px] sm:-translate-x-1/2"
+          >
+            <View className="overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/92 shadow-[0_25px_80px_rgba(0,0,0,.5)] backdrop-blur-2xl">
+              {}
+              <Pressable
+                onPress={() => setSheetExpanded((value) => !value)}
+                className="flex w-full justify-center py-2 sm:hidden"
+                accessibilityLabel={sheetExpanded ? "Réduire" : "Afficher plus"}
+              >
+                <Text className="h-1 w-10 rounded-full bg-white/20" />
+              </Pressable>
+              <View className="relative p-3 sm:p-4">
+                <Pressable
+                  onPress={() => setSelectedPub(null)}
+                  className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white/70 backdrop-blur-xl transition"
+                  accessibilityLabel="Fermer"
+                >
+                  <X className="h-4 w-4" />
+                </Pressable>
+                <View className="flex gap-3">
+                  {}
+                  <View className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-white/5 sm:h-28 sm:w-28">
+                    {selectedPub.images?.[0] ? (
+                      <Image
+                        className="h-full w-full object-cover"
+                        source={{ uri: selectedPub.images[0] }}
+                        accessibilityLabel={selectedPub.title}
+                      />
                     ) : (
-                      <View className="flex h-full w-full items-center justify-center text-white/20"><MapPin className="h-7 w-7" /></View>
-                    )}<View className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/50 to-transparent" /></View>{}<View className="min-w-0 flex-1 pr-7"><View className="mb-1.5 flex items-center gap-2">{(() => {
+                      <View className="flex h-full w-full items-center justify-center text-white/20">
+                        <MapPin className="h-7 w-7" />
+                      </View>
+                    )}
+                    <View className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/50 to-transparent" />
+                  </View>
+                  {}
+                  <View className="min-w-0 flex-1 pr-7">
+                    <View className="mb-1.5 flex items-center gap-2">
+                      {(() => {
                         const config = TYPE_CONFIG[selectedPub.type];
 
                         if (!config) return null;
 
                         return (
-                          <Text className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-bold text-white" style={{
+                          <Text
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-bold text-white"
+                            style={{
                               backgroundColor: `${config.color}DD`,
-                            }}>{config.icon}{config.label}</Text>
+                            }}
+                          >
+                            {config.icon}
+                            {config.label}
+                          </Text>
                         );
-                      })()}{selectedPub.price && (
-                        <Text className="truncate text-[10px] font-bold text-violet-300">{selectedPub.price}</Text>
-                      )}</View><Text className="text-sm font-bold leading-5 text-white sm:text-base">{selectedPub.title}</Text>{selectedPub.location && (
-                      <View className="mt-1.5 flex items-center gap-1 text-[10px] text-white/40"><MapPin className="h-3 w-3 shrink-0" /><Text className="truncate">{selectedPub.location}</Text></View>
-                    )}<View className="mt-2 flex items-center gap-3 text-[10px] text-white/35"><Text className="inline-flex items-center gap-1"><HeartIcon className="h-3 w-3" />{selectedPub.likeCount}</Text><Text className="inline-flex items-center gap-1"><MessageCircle className="h-3 w-3" />{selectedPub.commentCount}</Text><Text className="ml-auto inline-flex items-center gap-1"><Users className="h-3 w-3" />{selectedPub.authorName}</Text></View></View></View>{}<AnimatePresence>{sheetExpanded && (
-                    <View initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                      <View className="mt-4 border-t border-white/5 pt-4"><Text className="text-xs leading-5 text-white/50">{selectedPub.description ||
-                            "Aucune description disponible."}</Text></View>
+                      })()}
+                      {selectedPub.price && (
+                        <Text className="truncate text-[10px] font-bold text-violet-300">
+                          {selectedPub.price}
+                        </Text>
+                      )}
                     </View>
-                  )}</AnimatePresence>{}<View className="mt-3 flex items-center gap-2"><Pressable className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-semibold text-white/70 transition" onPress={() => {
+                    <Text className="text-sm font-bold leading-5 text-white sm:text-base">
+                      {selectedPub.title}
+                    </Text>
+                    {selectedPub.location && (
+                      <View className="mt-1.5 flex items-center gap-1 text-[10px] text-white/40">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <Text className="truncate">{selectedPub.location}</Text>
+                      </View>
+                    )}
+                    <View className="mt-2 flex items-center gap-3 text-[10px] text-white/35">
+                      <Text className="inline-flex items-center gap-1">
+                        <HeartIcon className="h-3 w-3" />
+                        {selectedPub.likeCount}
+                      </Text>
+                      <Text className="inline-flex items-center gap-1">
+                        <MessageCircle className="h-3 w-3" />
+                        {selectedPub.commentCount}
+                      </Text>
+                      <Text className="ml-auto inline-flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {selectedPub.authorName}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                {}
+                <AnimatePresence>
+                  {sheetExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <View className="mt-4 border-t border-white/5 pt-4">
+                        <Text className="text-xs leading-5 text-white/50">
+                          {selectedPub.description ||
+                            "Aucune description disponible."}
+                        </Text>
+                      </View>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {}
+                <View className="mt-3 flex items-center gap-2">
+                  <Pressable
+                    className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-semibold text-white/70 transition"
+                    onPress={() => {
                       if (
                         Number.isFinite(selectedPub.latitude) &&
                         Number.isFinite(selectedPub.longitude)
@@ -757,12 +1103,39 @@ export default function MapPage({ onClose }: MapPageProps) {
                         ]);
                         setZoom(16);
                       }
-                    }}><Navigation className="h-3.5 w-3.5" /><Text>Voir sur la carte</Text></Pressable><Pressable className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/60 transition" accessibilityLabel="Partager" onPress={() => {
-                      if (navigator.share && selectedPub.title) {
-                        void Share.share({ message: String(selectedPub.description), title: selectedPub.title });
+                    }}
+                  >
+                    <Navigation className="h-3.5 w-3.5" />
+                    <Text>Voir sur la carte</Text>
+                  </Pressable>
+                  <Pressable
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/60 transition"
+                    aria-label="Partager"
+                    onPress={() => {
+                      if (
+                        typeof navigator !== "undefined" &&
+                        typeof navigator.share === "function" &&
+                        selectedPub.title
+                      ) {
+                        void navigator.share({
+                          title: selectedPub.title,
+                          text: selectedPub.description,
+                        });
                       }
-                    }}><Share2 className="h-4 w-4" /></Pressable><Pressable className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500 text-white shadow-lg shadow-violet-500/20 transition" accessibilityLabel="Ouvrir"><ExternalLink className="h-4 w-4" /></Pressable></View></View></View>
-          </View>
+                    }}
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Pressable>
+                  <Pressable
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500 text-white shadow-lg shadow-violet-500/20 transition"
+                    accessibilityLabel="Ouvrir"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </motion.div>
         )}
       </View>
 
@@ -771,13 +1144,24 @@ export default function MapPage({ onClose }: MapPageProps) {
       ====================================================================== */}
 
       {!selectedPub && (
-        <View className="absolute bottom-4 left-3 z-30 sm:bottom-5 sm:left-5"><View className="flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2 shadow-2xl backdrop-blur-2xl"><Text className="relative flex h-2 w-2"><Text className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" /><Text className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" /></Text><Text className="text-[10px] font-semibold text-white/60">{isLoading
+        <View className="absolute bottom-4 left-3 z-30 sm:bottom-5 sm:left-5">
+          <View className="flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2 shadow-2xl backdrop-blur-2xl">
+            <Text className="relative flex h-2 w-2">
+              <Text className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+              <Text className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            </Text>
+            <Text className="text-[10px] font-semibold text-white/60">
+              {isLoading
                 ? "Synchronisation…"
-                : `${filtered.length} point${filtered.length > 1 ? "s" : ""} visible${filtered.length > 1 ? "s" : ""}`}</Text>{userLocation && (
+                : `${filtered.length} point${filtered.length > 1 ? "s" : ""} visible${filtered.length > 1 ? "s" : ""}`}
+            </Text>
+            {userLocation && (
               <Text className="hidden text-[9px] text-violet-300 sm:inline">
                 • Position active
               </Text>
-            )}</View></View>
+            )}
+          </View>
+        </View>
       )}
 
       {/* =====================================================================
@@ -833,6 +1217,6 @@ export default function MapPage({ onClose }: MapPageProps) {
           filter: saturate(.78) contrast(1.02);
         }
       `}</style>
-    </View>
+    </motion.div>
   );
 }

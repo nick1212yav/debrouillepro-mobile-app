@@ -3,6 +3,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import type { QueryCtx, MutationCtx } from "../_generated/server";
 
 // ============================================================================
 // AUTHENTICATION
@@ -43,7 +44,10 @@ async function getCurrentUser(ctx: any): Promise<Doc<"users">> {
 /**
  * Récupère une conversation et vérifie qu'elle existe.
  */
-async function getConversation(ctx: any, conversationId: Id<"conversations">) {
+async function getConversation(
+  ctx: QueryCtx | MutationCtx,
+  conversationId: Id<"conversations">,
+): Promise<Doc<"conversations">> {
   const conversation = await ctx.db.get(conversationId);
 
   if (!conversation) {
@@ -60,10 +64,13 @@ async function getConversation(ctx: any, conversationId: Id<"conversations">) {
  * qui pourraient ne pas encore avoir de document conversationMembers.
  */
 async function requireMembership(
-  ctx: any,
+  ctx: QueryCtx | MutationCtx,
   conversationId: Id<"conversations">,
   userId: Id<"users">,
-) {
+): Promise<{
+  conversation: Doc<"conversations">;
+  member: Doc<"conversationMembers"> | null;
+}> {
   const conversation = await getConversation(ctx, conversationId);
 
   const member = await ctx.db
@@ -201,7 +208,14 @@ export const list = query({
       )
       .collect();
 
-    const result = [];
+    const result: Array<
+      Partial<Doc<"conversationMembers">> & {
+        conversationId: Id<"conversations">;
+        userId: Id<"users">;
+        unreadCount: number;
+        user: Doc<"users">;
+      }
+    > = [];
 
     for (const member of members) {
       const user = await ctx.db.get(member.userId);

@@ -12,7 +12,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import {
   Award,
   Bath,
@@ -39,7 +39,7 @@ import { PublicationHeader } from "./PublicationHeader";
 import { PublicationGallery } from "./PublicationGallery";
 import { PublicationActions } from "./PublicationActions";
 import { PublicationCTA } from "./PublicationCTA";
-import { PublicationPoll } from "./PublicationPoll";
+import { PublicationPoll, type PollOption } from "./PublicationPoll";
 import { formatTime, getModuleEmoji, parseMeta } from "../utils/format.utils";
 import type { Publication, PublicationType } from "../types";
 
@@ -52,13 +52,6 @@ interface Props {
   onAction: (actionId: string) => void;
   onCTA: () => void;
   actionsSlot?: React.ReactNode;
-}
-
-interface PollOption {
-  id?: string;
-  text?: string;
-  label?: string;
-  votes: number;
 }
 
 interface NetworkExperience {
@@ -170,7 +163,11 @@ function isPollOption(value: unknown): value is PollOption {
 
   const candidate = value as Record<string, unknown>;
 
-  return typeof candidate.votes === "number";
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.text === "string" &&
+    typeof candidate.votes === "number"
+  );
 }
 
 function getPollOptions(meta: PublicationMeta): PollOption[] {
@@ -323,7 +320,7 @@ export function PublicationCard({
     const route = getRouteForPublication(publication, meta);
 
     if (route) {
-      router.push(route as never);
+      router.push(route as Href);
       return;
     }
 
@@ -1017,10 +1014,7 @@ export function PublicationCard({
         {postType === "poll" && pollOptions.length > 0 ? (
           <View style={styles.pollContainer}>
             <PublicationPoll
-              // Le type `PollOption` local diverge du type exporté par
-              // PublicationPoll. Le contrat de données est identique
-              // (id/text/label/votes), le cast aligne les deux signatures.
-              options={pollOptions as never}
+              options={pollOptions}
               votedId={pollVoted}
               totalVotes={totalVotes}
               onVote={onVote}

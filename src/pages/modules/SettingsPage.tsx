@@ -49,6 +49,8 @@ import type {
 } from "@/hooks/use-appearance.ts";
 
 import { SignInButton } from "@/components/ui/signin.tsx";
+import { useLocation } from "@/hooks/use-location.ts";
+import GlobalContextBar from "../home/_components/GlobalContextBar.tsx";
 
 type ToggleKey =
   | "notifications"
@@ -337,11 +339,8 @@ function AppearancePreview({
 
       <View style={styles.previewParameters}>
         <PreviewParameter label="Accent" value={palette.label} />
-
         <PreviewParameter label="Mode" value={modeLabel} />
-
         <PreviewParameter label="Texte" value={textLabel} />
-
         <PreviewParameter label="Densité" value={densityLabel} />
       </View>
     </View>
@@ -368,11 +367,36 @@ function GeneralTabAuth({
   onNavigate?: (page: string) => void;
 }) {
   const settings = useQuery(api.settings.getMySettings);
+  const currentUser = useQuery(api.users.getCurrentUser);
+  const { coords: userCoords } = useLocation();
 
   const upsert = useMutation(api.settings.upsertSettings);
 
-  const [showLanguage, setShowLanguage] = useState(false);
+  /*
+   * Contexte régional réel.
+   *
+   * Priorité :
+   * 1. coordonnées GPS natives disponibles
+   * 2. coordonnées déjà enregistrées sur le profil
+   *
+   * Pour la ville et le pays :
+   * 1. location.city / location.country
+   * 2. city / country du profil
+   *
+   * Aucune coordonnée artificielle et aucun pays par défaut.
+   */
+  const globalContext = useMemo(
+    () => ({
+      city: currentUser?.location?.city ?? currentUser?.city,
+      country: currentUser?.location?.country ?? currentUser?.country,
+      language: currentUser?.language,
+      latitude: userCoords?.latitude ?? currentUser?.location?.latitude,
+      longitude: userCoords?.longitude ?? currentUser?.location?.longitude,
+    }),
+    [currentUser, userCoords],
+  );
 
+  const [showLanguage, setShowLanguage] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
   const toggleValue = useCallback(
@@ -532,6 +556,19 @@ function GeneralTabAuth({
         </SettingsCard>
       </View>
 
+      {/* ENVIRONNEMENT RÉGIONAL */}
+
+      <View>
+        <SectionLabel label="Environnement" />
+
+        <SettingsCard>
+          <GlobalContextBar
+            context={globalContext}
+            loading={currentUser === undefined}
+          />
+        </SettingsCard>
+      </View>
+
       {/* NOTIFICATIONS */}
 
       <View>
@@ -671,10 +708,6 @@ function GeneralTabAuth({
         </SettingsCard>
 
         <Text style={styles.version}>DébrouillePro · v2.8.0</Text>
-
-        <Text style={styles.location}>
-          Kolwezi · République Démocratique du Congo 🇨🇩
-        </Text>
       </View>
     </View>
   );
@@ -694,10 +727,7 @@ function AppearanceTab({
     density: Density;
   };
   accentHex: string;
-  update: <K extends keyof typeof prefs>(
-    key: K,
-    value: (typeof prefs)[K],
-  ) => void;
+  update: ReturnType<typeof useAppearance>["update"];
   reset: () => void;
   onNavigate?: (page: string) => void;
 }) {
@@ -1114,10 +1144,14 @@ export default function SettingsPage({
         {/* TABS */}
 
         <View style={styles.tabs}>
-          {[
-            ["general" as const, "⚙️ Général"],
-            ["apparence" as const, "🎨 Apparence"],
-          ].map(([section, label]) => {
+          {(
+            [
+              ["general", "⚙️ Général"],
+              ["apparence", "🎨 Apparence"],
+            ] as const satisfies ReadonlyArray<
+              readonly [SettingsSection, string]
+            >
+          ).map(([section, label]) => {
             const active = activeSection === section;
 
             return (
@@ -1325,7 +1359,7 @@ const styles = StyleSheet.create({
   rowTitle: {
     color: "rgba(255,255,255,0.78)",
     fontSize: 13,
-    fontWeight: "750",
+    fontWeight: "700",
   },
 
   rowTitleFlex: {
@@ -1661,49 +1695,42 @@ const styles = StyleSheet.create({
   },
 
   densityDescription: {
-    maxWidth: 125,
-    marginTop: 4,
-    color: "rgba(255,255,255,0.30)",
+    maxWidth: 120,
+    marginTop: 5,
+    color: "rgba(255,255,255,0.28)",
     fontSize: 9,
     lineHeight: 14,
     textAlign: "center",
   },
 
   resetButton: {
-    minHeight: 51,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.045)",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.035)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.09)",
+    borderColor: "rgba(255,255,255,0.07)",
   },
 
   resetButtonText: {
-    color: "rgba(255,255,255,0.64)",
-    fontSize: 12,
+    color: "rgba(255,255,255,0.50)",
+    fontSize: 11,
     fontWeight: "800",
   },
 
   version: {
     marginTop: 13,
-    color: "rgba(255,255,255,0.22)",
-    fontSize: 10,
-    textAlign: "center",
-  },
-
-  location: {
-    marginTop: 3,
-    color: "rgba(255,255,255,0.15)",
+    color: "rgba(255,255,255,0.20)",
     fontSize: 9,
     textAlign: "center",
   },
 
-  disabled: {
-    opacity: 0.45,
+  pressed: {
+    opacity: 0.72,
   },
 
-  pressed: {
-    opacity: 0.7,
+  disabled: {
+    opacity: 0.45,
   },
 });
