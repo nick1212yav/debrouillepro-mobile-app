@@ -1,4 +1,11 @@
-import { Pressable, Text, View, TextInput, NativeSyntheticEvent, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+import {
+  Pressable,
+  Text,
+  View,
+  TextInput,
+  type ViewStyle,
+  type TextStyle,
+} from "react-native";
 
 // src/features/messages/payments/components/PaymentComposer.tsx
 
@@ -6,10 +13,8 @@ import React, { useState } from "react";
 
 export interface PaymentComposerProps {
   currency?: string;
-
   disabled?: boolean;
   isLoading?: boolean;
-
   onSubmit: (amount: number, currency: string, description?: string) => void;
 }
 
@@ -22,8 +27,12 @@ export function PaymentComposer({
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
 
-  const handleSubmit = (event: NativeSyntheticEvent<any>) => {
-    event.preventDefault();
+  const isDisabled = disabled || isLoading;
+
+  const handleSubmit = () => {
+    if (isDisabled) {
+      return;
+    }
 
     const parsedAmount = Number.parseFloat(amount.replace(",", "."));
 
@@ -34,68 +43,124 @@ export function PaymentComposer({
     onSubmit(parsedAmount, currency, description.trim() || undefined);
   };
 
-  const isDisabled = disabled || isLoading;
+  const canSubmit = !isDisabled && amount.trim().length > 0;
 
   return (
-    <View style={containerStyle}><View style={headerStyle}><strong>Envoyer un paiement</strong></View><View style={amountRowStyle}><TextInput inputMode="decimal" value={amount} onChangeText={(value) => setAmount(value)} placeholder="0,00" style={amountInputStyle} accessibilityLabel="Montant" keyboardType="numeric" editable={!(isDisabled)} /><Text style={currencyStyle}>{currency.toUpperCase()}</Text></View><TextInput value={description} onChangeText={(value) => setDescription(value)} placeholder="Motif du paiement" maxLength={200} style={descriptionStyle} accessibilityLabel="Motif du paiement" editable={!(isDisabled)} /><Pressable disabled={isDisabled || !amount} style={buttonStyle}>{isLoading ? "Traitement…" : "Continuer"}</Pressable></View>
+    <View style={containerStyle}>
+      <View style={headerContainerStyle}>
+        <Text style={headerTextStyle}>Envoyer un paiement</Text>
+      </View>
+
+      <View style={amountRowStyle}>
+        <TextInput
+          value={amount}
+          onChangeText={setAmount}
+          placeholder="0,00"
+          style={amountInputStyle}
+          accessibilityLabel="Montant"
+          keyboardType="numeric"
+          editable={!isDisabled}
+        />
+        <Text style={currencyStyle}>{currency.toUpperCase()}</Text>
+      </View>
+
+      <TextInput
+        value={description}
+        onChangeText={setDescription}
+        placeholder="Motif du paiement"
+        maxLength={200}
+        style={descriptionInputStyle}
+        accessibilityLabel="Motif du paiement"
+        editable={!isDisabled}
+      />
+
+      <Pressable
+        disabled={!canSubmit}
+        onPress={handleSubmit}
+        style={[buttonStyle, !canSubmit && buttonDisabledStyle]}
+      >
+        <Text style={buttonTextStyle}>
+          {isLoading ? "Traitement..." : "Continuer"}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
-// ============================================================================
-// STYLES
-// ============================================================================
-
-const containerStyle: ViewStyle | TextStyle | ImageStyle = {
-  display: "flex",
+const containerStyle: ViewStyle = {
   flexDirection: "column",
   gap: 12,
   padding: 16,
   borderRadius: 16,
-  border: "1px solid #e5e7eb",
-  background: "#ffffff",
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+  backgroundColor: "#ffffff",
 };
 
-const headerStyle: ViewStyle | TextStyle | ImageStyle = {
+const headerContainerStyle: ViewStyle = {
+  marginBottom: 4,
+};
+
+const headerTextStyle: TextStyle = {
   fontSize: 15,
+  fontWeight: "600",
+  color: "#111827",
 };
 
-const amountRowStyle: ViewStyle | TextStyle | ImageStyle = {
-  display: "flex",
+const amountRowStyle: ViewStyle = {
+  flexDirection: "row",
   alignItems: "center",
   gap: 8,
 };
 
-const amountInputStyle: ViewStyle | TextStyle | ImageStyle = {
+const amountInputStyle: TextStyle = {
   flex: 1,
-  minWidth: 0,
-  padding: "12px 14px",
+  paddingVertical: 12,
+  paddingHorizontal: 14,
   borderRadius: 10,
-  border: "1px solid #d1d5db",
+  borderWidth: 1,
+  borderColor: "#d1d5db",
+  backgroundColor: "#ffffff",
   fontSize: 18,
+  color: "#111827",
 };
 
-const currencyStyle: ViewStyle | TextStyle | ImageStyle = {
-  fontWeight: 700,
+const currencyStyle: TextStyle = {
+  fontWeight: "700",
   fontSize: 14,
+  color: "#111827",
 };
 
-const descriptionStyle: ViewStyle | TextStyle | ImageStyle = {
+const descriptionInputStyle: TextStyle = {
   width: "100%",
-  boxSizing: "border-box",
-  padding: "10px 12px",
+  paddingVertical: 10,
+  paddingHorizontal: 12,
   borderRadius: 10,
-  border: "1px solid #d1d5db",
+  borderWidth: 1,
+  borderColor: "#d1d5db",
+  backgroundColor: "#ffffff",
+  fontSize: 14,
+  color: "#111827",
 };
 
-const buttonStyle: ViewStyle | TextStyle | ImageStyle = {
+const buttonStyle: ViewStyle = {
   width: "100%",
-  padding: "11px 14px",
-  border: "none",
+  paddingVertical: 11,
+  paddingHorizontal: 14,
   borderRadius: 10,
-  background: "#111827",
+  backgroundColor: "#111827",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const buttonDisabledStyle: ViewStyle = {
+  opacity: 0.4,
+};
+
+const buttonTextStyle: TextStyle = {
   color: "#fff",
-  fontWeight: 600,
-  cursor: "pointer",
+  fontWeight: "600",
+  fontSize: 14,
 };
 
 export default PaymentComposer;
