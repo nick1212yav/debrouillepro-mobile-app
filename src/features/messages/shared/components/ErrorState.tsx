@@ -1,18 +1,15 @@
-import { View, Pressable, PressableProps, ViewProps } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
+import type { ViewProps, PressableProps } from "react-native";
+import type { ReactNode } from "react";
 
 // src/features/messages/shared/components/ErrorState.tsx
 
-import type { ReactNode } from "react";
-
-export interface ErrorStateProps extends Omit<
-  ViewProps,
-  "title"
-> {
+export interface ErrorStateProps extends Omit<ViewProps, "title"> {
   title?: ReactNode;
   message?: ReactNode;
   icon?: ReactNode;
   retryLabel?: string;
-  onRetry?: PressableProps["onClick"];
+  onRetry?: PressableProps["onPress"];
 }
 
 export function ErrorState({
@@ -21,32 +18,76 @@ export function ErrorState({
   icon = "⚠️",
   retryLabel = "Réessayer",
   onRetry,
-  className = "",
+  style,
   ...props
 }: ErrorStateProps) {
   return (
-    <View {...props} className={className} accessibilityRole="alert" style={{ minHeight: 180, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 24, textAlign: "center" }}><View accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" style={{
-          fontSize: 30,
-          lineHeight: 1,
-          marginBottom: 4,
-        }}>{icon}</View><View style={{
-          fontSize: 16,
-          fontWeight: 600,
-        }}>{title}</View>{message && (
-        <View style={{
-            maxWidth: 480,
-            fontSize: 14,
-            lineHeight: 1.5,
-            opacity: 0.75,
-          }}>
-          {message}
-        </View>
-      )}{onRetry && (
-        <Pressable onPress={onRetry} style={{ marginTop: 6, borderWidth: 0, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 16, fontWeight: 600 }}>
-          {retryLabel}
+    <View
+      {...props}
+      accessibilityRole="alert"
+      style={[styles.container, style]}
+    >
+      <View
+        accessibilityElementsHidden={true}
+        importantForAccessibility="no-hide-descendants"
+        style={styles.iconWrapper}
+      >
+        <Text style={styles.iconText}>{icon}</Text>
+      </View>
+      {title && <Text style={styles.title}>{title}</Text>}
+      {message && <Text style={styles.message}>{message}</Text>}
+      {onRetry && (
+        <Pressable onPress={onRetry} style={styles.actionButton}>
+          <Text style={styles.actionText}>{retryLabel}</Text>
         </Pressable>
-      )}</View>
+      )}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    minHeight: 180,
+    width: "100%",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 24,
+  },
+  iconWrapper: {
+    marginBottom: 4,
+  },
+  iconText: {
+    fontSize: 30,
+    lineHeight: 34,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+    color: "#111827",
+  },
+  message: {
+    maxWidth: 480,
+    fontSize: 14,
+    lineHeight: 21,
+    opacity: 0.75,
+    textAlign: "center",
+    color: "#4b5563",
+  },
+  actionButton: {
+    marginTop: 6,
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    backgroundColor: "#111827",
+  },
+  actionText: {
+    fontWeight: "600",
+    fontSize: 14,
+    color: "#ffffff",
+  },
+});
 
 export default ErrorState;

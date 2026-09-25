@@ -1,10 +1,10 @@
-import { Text, View } from "react-native";
+import { ActivityIndicator, Text, View, StyleSheet } from "react-native";
+import type { ViewProps } from "react-native";
+import type { ReactNode } from "react";
 
 // src/features/messages/shared/components/LoadingState.tsx
 
-import type { HTMLAttributes, ReactNode } from "react";
-
-export interface LoadingStateProps extends HTMLAttributes<View> {
+export interface LoadingStateProps extends ViewProps {
   message?: ReactNode;
   size?: "sm" | "md" | "lg";
 }
@@ -18,40 +18,40 @@ const SIZES = {
 export function LoadingState({
   message = "Chargement...",
   size = "md",
-  className = "",
   style,
   ...props
 }: LoadingStateProps) {
   const spinnerSize = SIZES[size];
+  const indicatorSize = spinnerSize >= 30 ? "large" : "small";
 
   return (
-    <View {...props} className={className} style={{ minHeight: 120, width: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: 24, ...style }} accessibilityRole="status" accessibilityLiveRegion="polite">
-      <Text accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" style={{ width: spinnerSize, height: spinnerSize, borderRadius: 50, borderWidth: 3, borderColor: "rgba(128, 128, 128, 0.25)", borderStyle: "solid", borderTopColor: "currentColor", display: "flex" }} />
-
-      {message && (
-        <Text style={{
-            fontSize: 14,
-            opacity: 0.7,
-          }}>
-          {message}
-        </Text>
-      )}
-
-      <style>
-        {`
-          @keyframes messages-loading-spin {
-            from {
-              transform: rotate(0deg);
-            }
-
-            to {
-              transform: rotate(360deg);
-            }
-          }
-        `}
-      </style>
+    <View
+      {...props}
+      style={[styles.container, style]}
+      accessibilityRole="progressbar"
+      accessibilityLiveRegion="polite"
+    >
+      <ActivityIndicator size={indicatorSize} color="#6b7280" />
+      {message && <Text style={styles.message}>{message}</Text>}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    minHeight: 120,
+    width: "100%",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    padding: 24,
+  },
+  message: {
+    fontSize: 14,
+    opacity: 0.7,
+    color: "#4b5563",
+  },
+});
 
 export default LoadingState;

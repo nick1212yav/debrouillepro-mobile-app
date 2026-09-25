@@ -1,10 +1,9 @@
-import { Text, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import type { ViewProps } from "react-native";
 
 // src/features/messages/shared/components/OnlineIndicator.tsx
 
-import type { HTMLAttributes } from "react";
-
-export interface OnlineIndicatorProps extends HTMLAttributes<Text> {
+export interface OnlineIndicatorProps extends ViewProps {
   online?: boolean;
   size?: "sm" | "md" | "lg";
   showLabel?: boolean;
@@ -20,26 +19,52 @@ export function OnlineIndicator({
   online = false,
   size = "md",
   showLabel = false,
-  className = "",
   style,
   ...props
 }: OnlineIndicatorProps) {
   const indicatorSize = SIZES[size];
-
-  const indicatorStyle: ViewStyle | TextStyle | ImageStyle = {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    ...style,
-  };
+  const dotColor = online ? "#22c55e" : "#9ca3af";
 
   return (
-    <Text {...props} className={className} style={indicatorStyle} accessibilityLabel={online ? "En ligne" : "Hors ligne"}>
-      <Text accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants" style={{ width: indicatorSize, height: indicatorSize, minWidth: indicatorSize, borderRadius: 50, backgroundColor: online ? "#22c55e" : "#9ca3af", display: "inline-block" }} />
-
-      {showLabel && <Text>{online ? "En ligne" : "Hors ligne"}</Text>}
-    </Text>
+    <View
+      {...props}
+      style={[styles.container, style]}
+      accessibilityLabel={online ? "En ligne" : "Hors ligne"}
+    >
+      <View
+        accessibilityElementsHidden={true}
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.dot,
+          {
+            width: indicatorSize,
+            height: indicatorSize,
+            backgroundColor: dotColor,
+          },
+        ]}
+      />
+      {showLabel && (
+        <Text style={styles.label}>
+          {online ? "En ligne" : "Hors ligne"}
+        </Text>
+      )}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  dot: {
+    borderRadius: 999,
+  },
+  label: {
+    fontSize: 13,
+    color: "#4b5563",
+  },
+});
 
 export default OnlineIndicator;
