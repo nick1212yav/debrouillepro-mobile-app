@@ -133,7 +133,7 @@ export { JobMessage } from "./jobs/components/JobMessage";
 // IMMOBILIER
 // ============================================================================
 
-export { PropertyMessage } from "./immo/components/PropertyMessage";
+export { default as PropertyMessage } from "./immo/components/PropertyMessage";
 export { default as PropertyPreview } from "./immo/components/PropertyPreview";
 
 // ============================================================================
