@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View } from "react-native";
 
 // src/features/messages/jobs/components/JobMessage.tsx
 
@@ -14,10 +14,13 @@ export interface JobMessageProps {
     text?: string;
     type?: string;
   };
+
   jobId?: Id<"jobListings">;
+
   onOpenJob?: (
     job: NonNullable<ReturnType<typeof useJobMessages>["job"]>,
   ) => void;
+
   onApplied?: (jobId: Id<"jobListings">) => void;
 }
 
@@ -31,48 +34,25 @@ export function JobMessage({
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.infoContainer]}>
-        <Text style={styles.infoText}>Chargement de l'offre...</Text>
+      <View style={{ padding: 16, borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "solid", borderRadius: 16, fontSize: 14 }}>
+        Chargement de l'offre...
       </View>
     );
   }
 
   if (!job) {
     return (
-      <View style={[styles.container, styles.errorContainer]}>
-        <Text style={styles.infoText}>
-          Cette offre d'emploi n'est plus disponible.
-        </Text>
+      <View style={{ padding: 16, borderWidth: 1, borderColor: "#fecaca", borderStyle: "solid", borderRadius: 16, backgroundColor: "#fff", fontSize: 14 }}>
+        Cette offre d'emploi n'est plus disponible.
       </View>
     );
   }
 
   const handleApply = async () => {
     await apply();
+
     onApplied?.(job._id);
   };
 
   return <JobPreview job={job} onOpen={onOpenJob} onApply={handleApply} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    borderWidth: 1,
-    borderRadius: 16,
-  },
-  infoContainer: {
-    borderColor: "#e5e7eb",
-    backgroundColor: "#ffffff",
-  },
-  errorContainer: {
-    borderColor: "#fecaca",
-    backgroundColor: "#ffffff",
-  },
-  infoText: {
-    fontSize: 14,
-    color: "#4b5563",
-  },
-});
-
-export default JobMessage;

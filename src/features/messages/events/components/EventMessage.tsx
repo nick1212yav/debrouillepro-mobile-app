@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 
 // src/features/messages/events/components/EventMessage.tsx
 
@@ -18,17 +18,8 @@ export interface EventMessageProps {
     text?: string;
     type?: string;
   };
-
-  /**
-   * Peut être fourni directement si le contexte du chat
-   * connaît déjà l'ID de l'événement.
-   *
-   * Sinon, le hook le récupère depuis publication.meta.eventId.
-   */
   eventId?: EventId;
-
   onOpenEvent?: (eventId: EventId) => void;
-
   onError?: (error: unknown) => void;
 }
 
@@ -50,12 +41,8 @@ export function EventMessage({
   const [actionLoading, setActionLoading] = useState(false);
 
   const runAction = async (action: () => Promise<unknown>) => {
-    if (actionLoading) {
-      return;
-    }
-
+    if (actionLoading) return;
     setActionLoading(true);
-
     try {
       await action();
     } catch (error) {
@@ -67,22 +54,75 @@ export function EventMessage({
 
   if (isLoading) {
     return (
-      <View style={{ width: "100%", maxWidth: 540, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#e5e7eb", borderStyle: "solid", backgroundColor: "#ffffff", fontSize: 14 }}><Text>Chargement de l'événement...</Text></View>
+      <View style={[styles.container, styles.infoContainer]}>
+        <Text style={styles.infoText}>Chargement de l'événement...</Text>
+      </View>
     );
   }
 
   if (!event || !resolvedEventId) {
     return (
-      <View style={{ width: "100%", maxWidth: 540, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#fecaca", borderStyle: "solid", backgroundColor: "#ffffff", fontSize: 14 }}><Text>Cet événement n'est plus disponible.</Text></View>
+      <View style={[styles.container, styles.errorContainer]}>
+        <Text style={styles.infoText}>
+          Cet événement n'est plus disponible.
+        </Text>
+      </View>
     );
   }
 
   return (
-    <View style={{
-        width: "100%",
-        maxWidth: 540,
-      }}><EventPreview event={event} disabled={actionLoading} onOpen={() => onOpenEvent?.(resolvedEventId)} onRsvp={(status) => void runAction(() => setRsvp(status))} onLike={() => void runAction(() => toggleLike())} onBookmark={() => void runAction(() => toggleBookmark())} /><View style={{ marginTop: 10, paddingVertical: 0, paddingHorizontal: 2 }}><EventActions currentRsvp={event.myRsvp} liked={event.likedByMe} bookmarked={event.bookmarkedByMe} disabled={actionLoading} onRsvp={(status) => runAction(() => setRsvp(status))} onLike={() => runAction(() => toggleLike())} onBookmark={() => runAction(() => toggleBookmark())} /></View></View>
+    <View style={styles.wrapper}>
+      <EventPreview
+        event={event}
+        disabled={actionLoading}
+        onOpen={() => onOpenEvent?.(resolvedEventId)}
+        onRsvp={(status) => void runAction(() => setRsvp(status))}
+        onLike={() => void runAction(() => toggleLike())}
+        onBookmark={() => void runAction(() => toggleBookmark())}
+      />
+      <View style={styles.actionsWrapper}>
+        <EventActions
+          currentRsvp={event.myRsvp}
+          liked={event.likedByMe}
+          bookmarked={event.bookmarkedByMe}
+          disabled={actionLoading}
+          onRsvp={(status) => void runAction(() => setRsvp(status))}
+          onLike={() => void runAction(() => toggleLike())}
+          onBookmark={() => void runAction(() => toggleBookmark())}
+        />
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrapper: {
+    width: "100%",
+    maxWidth: 540,
+  },
+  container: {
+    width: "100%",
+    maxWidth: 540,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: "#ffffff",
+  },
+  infoContainer: {
+    borderColor: "#e5e7eb",
+  },
+  errorContainer: {
+    borderColor: "#fecaca",
+  },
+  infoText: {
+    fontSize: 14,
+    color: "#4b5563",
+  },
+  actionsWrapper: {
+    marginTop: 10,
+    paddingVertical: 0,
+    paddingHorizontal: 2,
+  },
+});
 
 export default EventMessage;
