@@ -4,9 +4,6 @@ import {
   Text,
   Image,
   StyleSheet,
-  BackHandler,
-  Platform,
-  useWindowDimensions,
 } from "react-native";
 import {
   ArrowLeft,
@@ -19,7 +16,7 @@ import {
   Video,
   X,
 } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -61,26 +58,8 @@ export function ChatHeader({
   onClearChat,
 }: ChatHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   void conversationId;
-
-  // Fermeture du menu au bouton retour Android
-  useEffect(() => {
-    if (!menuOpen || Platform.OS !== "android") {
-      return;
-    }
-
-    const subscription = BackHandler.addEventListener(
-      "hardwareBackPress",
-      () => {
-        setMenuOpen(false);
-        return true;
-      },
-    );
-
-    return () => subscription.remove();
-  }, [menuOpen]);
 
   const initials =
     title
@@ -104,200 +83,169 @@ export function ChatHeader({
   const handleInfo = () => { closeMenu(); onInfo?.(); };
 
   return (
-    <>
-      {menuOpen && (
-        <Pressable
-          style={[
-            styles.fullScreenBackdrop,
-            { width: screenWidth, height: screenHeight },
-          ]}
-          onPress={closeMenu}
-          accessibilityLabel="Fermer le menu"
-        />
+    <View style={styles.container}>
+      {callActive && (
+        <View style={styles.callIndicator}>
+          <View style={styles.callIndicatorLine} />
+        </View>
       )}
 
-      <View style={styles.container}>
-        {callActive && (
-          <View style={styles.callIndicator}>
-            <View style={styles.callIndicatorLine} />
-          </View>
+      {onBack && (
+        <Pressable
+          onPress={onBack}
+          style={styles.iconButton}
+          accessibilityLabel="Retour"
+        >
+          <ArrowLeft size={20} strokeWidth={2} color="rgba(255,255,255,0.55)" />
+        </Pressable>
+      )}
+
+      <Pressable
+        onPress={onInfo}
+        disabled={!onInfo}
+        accessibilityLabel={
+          onInfo ? "Informations de la conversation" : undefined
+        }
+        style={styles.avatarWrapper}
+      >
+        {avatar ? (
+          <Image
+            style={styles.avatarImage}
+            source={{ uri: avatar }}
+            accessibilityLabel={title}
+          />
+        ) : (
+          <Text style={styles.avatarInitials}>{initials}</Text>
         )}
 
-        {onBack && (
+        {!isGroup && (
+          <View style={styles.onlineDot} accessibilityLabel="En ligne" />
+        )}
+        {isGroup && (
+          <View style={styles.groupDot}>
+            <View style={styles.groupDotInner} />
+          </View>
+        )}
+      </Pressable>
+
+      <Pressable
+        onPress={onInfo}
+        disabled={!onInfo}
+        style={styles.titleWrapper}
+        accessibilityLabel={
+          onInfo ? "Informations de la conversation" : undefined
+        }
+      >
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+          {callActive && (
+            <View style={styles.callBadge}>
+              <View style={styles.callBadgeDot} />
+              <Text style={styles.callBadgeText}>En appel</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.subtitleRow}>
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {memberLabel}
+          </Text>
+          {!isGroup && (
+            <>
+              <View style={styles.subtitleDot} />
+              <Text style={styles.subtitleAvailable}>Disponible</Text>
+            </>
+          )}
+        </View>
+      </Pressable>
+
+      <View style={styles.actions}>
+        {onCall && (
           <Pressable
-            onPress={onBack}
-            style={styles.iconButton}
-            accessibilityLabel="Retour"
+            onPress={onCall}
+            style={[
+              styles.iconButton,
+              isCallActive && styles.iconButtonActiveGreen,
+            ]}
+            accessibilityLabel={
+              isCallActive ? "Revenir à l'appel audio" : "Appel audio"
+            }
           >
-            <ArrowLeft
-              size={20}
-              strokeWidth={2}
-              color="rgba(255,255,255,0.55)"
-            />
+            {isCallActive ? (
+              <PhoneCall size={19} strokeWidth={2} color="#6ee7b7" />
+            ) : (
+              <Phone size={19} strokeWidth={2} color="rgba(255,255,255,0.6)" />
+            )}
+            {hasIncomingCall && !isCallActive && (
+              <View style={styles.incomingBadge}>
+                <View style={styles.incomingBadgeInner} />
+              </View>
+            )}
           </Pressable>
         )}
 
-        <Pressable
-          onPress={onInfo}
-          disabled={!onInfo}
-          accessibilityLabel={
-            onInfo ? "Informations de la conversation" : undefined
-          }
-          style={styles.avatarWrapper}
-        >
-          {avatar ? (
-            <Image
-              style={styles.avatarImage}
-              source={{ uri: avatar }}
-              accessibilityLabel={title}
+        {onVideoCall && (
+          <Pressable
+            onPress={onVideoCall}
+            style={[
+              styles.iconButton,
+              isVideoCallActive && styles.iconButtonActiveViolet,
+            ]}
+            accessibilityLabel={
+              isVideoCallActive ? "Revenir à l'appel vidéo" : "Appel vidéo"
+            }
+          >
+            <Video
+              size={20}
+              strokeWidth={2}
+              color={isVideoCallActive ? "#c4b5fd" : "rgba(255,255,255,0.6)"}
             />
-          ) : (
-            <Text style={styles.avatarInitials}>{initials}</Text>
-          )}
-
-          {!isGroup && (
-            <View style={styles.onlineDot} accessibilityLabel="En ligne" />
-          )}
-          {isGroup && (
-            <View style={styles.groupDot}>
-              <View style={styles.groupDotInner} />
-            </View>
-          )}
-        </Pressable>
-
-        <Pressable
-          onPress={onInfo}
-          disabled={!onInfo}
-          style={styles.titleWrapper}
-          accessibilityLabel={
-            onInfo ? "Informations de la conversation" : undefined
-          }
-        >
-          <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={1}>
-              {title}
-            </Text>
-            {callActive && (
-              <View style={styles.callBadge}>
-                <View style={styles.callBadgeDot} />
-                <Text style={styles.callBadgeText}>En appel</Text>
+            {hasIncomingCall && !isVideoCallActive && (
+              <View style={styles.incomingBadge}>
+                <View style={styles.incomingBadgeInner} />
               </View>
             )}
-          </View>
-          <View style={styles.subtitleRow}>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {memberLabel}
-            </Text>
-            {!isGroup && (
-              <>
-                <View style={styles.subtitleDot} />
-                <Text style={styles.subtitleAvailable}>Disponible</Text>
-              </>
-            )}
-          </View>
-        </Pressable>
+          </Pressable>
+        )}
 
-        <View style={styles.actions}>
-          {onCall && (
-            <Pressable
-              onPress={onCall}
-              style={[
-                styles.iconButton,
-                isCallActive && styles.iconButtonActiveGreen,
-              ]}
-              accessibilityLabel={
-                isCallActive ? "Revenir à l'appel audio" : "Appel audio"
-              }
-            >
-              {isCallActive ? (
-                <PhoneCall size={19} strokeWidth={2} color="#6ee7b7" />
-              ) : (
-                <Phone
-                  size={19}
-                  strokeWidth={2}
-                  color="rgba(255,255,255,0.6)"
-                />
-              )}
-              {hasIncomingCall && !isCallActive && (
-                <View style={styles.incomingBadge}>
-                  <View style={styles.incomingBadgeInner} />
-                </View>
-              )}
-            </Pressable>
-          )}
+        {onInfo && (
+          <Pressable
+            onPress={onInfo}
+            style={styles.iconButton}
+            accessibilityLabel="Informations"
+          >
+            <Info size={19} strokeWidth={2} color="rgba(255,255,255,0.55)" />
+          </Pressable>
+        )}
 
-          {onVideoCall && (
-            <Pressable
-              onPress={onVideoCall}
-              style={[
-                styles.iconButton,
-                isVideoCallActive && styles.iconButtonActiveViolet,
-              ]}
-              accessibilityLabel={
-                isVideoCallActive
-                  ? "Revenir à l'appel vidéo"
-                  : "Appel vidéo"
-              }
-            >
-              <Video
-                size={20}
-                strokeWidth={2}
-                color={
-                  isVideoCallActive
-                    ? "#c4b5fd"
-                    : "rgba(255,255,255,0.6)"
-                }
-              />
-              {hasIncomingCall && !isVideoCallActive && (
-                <View style={styles.incomingBadge}>
-                  <View style={styles.incomingBadgeInner} />
-                </View>
-              )}
-            </Pressable>
-          )}
+        <View style={styles.menuWrapper}>
+          <Pressable
+            onPress={() => setMenuOpen((value) => !value)}
+            style={[
+              styles.iconButton,
+              menuOpen && styles.iconButtonMenuOpen,
+            ]}
+            accessibilityLabel="Plus d'options"
+            accessibilityState={{ expanded: menuOpen }}
+          >
+            <MoreVertical
+              size={19}
+              strokeWidth={2}
+              color={menuOpen ? "#ffffff" : "rgba(255,255,255,0.45)"}
+            />
+          </Pressable>
 
-          {onInfo && (
-            <Pressable
-              onPress={onInfo}
-              style={styles.iconButton}
-              accessibilityLabel="Informations"
-            >
-              <Info
-                size={19}
-                strokeWidth={2}
-                color="rgba(255,255,255,0.55)"
-              />
-            </Pressable>
-          )}
-
-          <View style={styles.menuWrapper}>
-            <Pressable
-              onPress={() => setMenuOpen((value) => !value)}
-              style={[
-                styles.iconButton,
-                menuOpen && styles.iconButtonMenuOpen,
-              ]}
-              accessibilityLabel="Plus d'options"
-              accessibilityState={{ expanded: menuOpen }}
-            >
-              <MoreVertical
-                size={19}
-                strokeWidth={2}
-                color={menuOpen ? "#ffffff" : "rgba(255,255,255,0.45)"}
-              />
-            </Pressable>
-
-            {menuOpen && (
+          {menuOpen && (
+            <>
+              <Pressable style={styles.backdrop} onPress={closeMenu} />
               <View style={styles.menu} accessibilityRole="menu">
                 <View style={styles.menuHeader}>
                   <Text style={styles.menuHeaderText}>Conversation</Text>
                 </View>
 
                 {onSearch && (
-                  <Pressable
-                    onPress={handleSearch}
-                    style={styles.menuItem}
-                  >
+                  <Pressable onPress={handleSearch} style={styles.menuItem}>
                     <View style={styles.menuIcon}>
                       <Text style={styles.menuIconText}>🔎</Text>
                     </View>
@@ -306,10 +254,7 @@ export function ChatHeader({
                 )}
 
                 {onMute && (
-                  <Pressable
-                    onPress={handleMute}
-                    style={styles.menuItem}
-                  >
+                  <Pressable onPress={handleMute} style={styles.menuItem}>
                     <View style={styles.menuIcon}>
                       <Text style={styles.menuIconText}>🔕</Text>
                     </View>
@@ -318,10 +263,7 @@ export function ChatHeader({
                 )}
 
                 {onInfo && (
-                  <Pressable
-                    onPress={handleInfo}
-                    style={styles.menuItem}
-                  >
+                  <Pressable onPress={handleInfo} style={styles.menuItem}>
                     <View style={styles.menuIcon}>
                       <Info size={15} color="rgba(255,255,255,0.7)" />
                     </View>
@@ -339,9 +281,7 @@ export function ChatHeader({
                     <Text style={styles.securedTitle}>
                       Conversation sécurisée
                     </Text>
-                    <Text style={styles.securedSubtitle}>
-                      DébrouillePro
-                    </Text>
+                    <Text style={styles.securedSubtitle}>DébrouillePro</Text>
                   </View>
                   <Check size={14} color="#34d399" />
                 </View>
@@ -363,21 +303,15 @@ export function ChatHeader({
                   </>
                 )}
               </View>
-            )}
-          </View>
+            </>
+          )}
         </View>
       </View>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  fullScreenBackdrop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    zIndex: 40,
-  },
   container: {
     flexDirection: "row",
     alignItems: "center",
@@ -387,7 +321,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(0,0,0,0.85)",
-    zIndex: 30,
   },
   callIndicator: {
     position: "absolute",
@@ -550,7 +483,14 @@ const styles = StyleSheet.create({
   },
   menuWrapper: {
     position: "relative",
-    zIndex: 50,
+  },
+  backdrop: {
+    position: "absolute",
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    zIndex: 40,
   },
   menu: {
     position: "absolute",
@@ -561,8 +501,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(17,17,22,0.98)",
+    backgroundColor: "rgba(17,17,22,0.95)",
     padding: 6,
+    zIndex: 50,
   },
   menuHeader: {
     paddingHorizontal: 12,
