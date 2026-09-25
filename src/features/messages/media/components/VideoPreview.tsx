@@ -1,26 +1,31 @@
+import { useVideoPlayer, VideoView } from "expo-video";
+import { StyleSheet } from "react-native";
+import type { StyleProp, ViewStyle } from "react-native";
+
+// src/features/messages/media/components/VideoPreview.tsx
+
 interface VideoPreviewProps {
   src: string;
-  poster?: string;
   controls?: boolean;
-  className?: string;
+  style?: StyleProp<ViewStyle>;
 }
 
-export function VideoPreview({
-  src,
-  poster,
-  controls = true,
-  className = "",
-}: VideoPreviewProps) {
+export function VideoPreview({ src, controls = true, style }: VideoPreviewProps) {
+  const player = useVideoPlayer(src);
+
   return (
-    <video
-      src={src}
-      poster={poster}
-      controls={controls}
-      preload="metadata"
-      playsInline
-      className={`max-h-[420px] max-w-full rounded-xl ${className}`}
+    <VideoView
+      player={player}
+      style={[styles.video, style]}
+      nativeControls={controls}
+      allowsFullscreen
+      contentFit="contain"
     />
   );
 }
+
+const styles = StyleSheet.create({
+  video: { maxHeight: 420, maxWidth: "100%", borderRadius: 12 },
+});
 
 export default VideoPreview;

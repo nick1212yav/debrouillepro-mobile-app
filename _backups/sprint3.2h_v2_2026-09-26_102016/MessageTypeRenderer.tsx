@@ -24,7 +24,7 @@ import EventMessage from "../../events/components/EventMessage";
  */
 import { JobMessage } from "../../jobs/components/JobMessage";
 
-import { PropertyMessage } from "../../immo/components/PropertyMessage";
+import PropertyMessage from "../../immo/components/PropertyMessage";
 
 /*
  * PollMessage doit exister dans :
