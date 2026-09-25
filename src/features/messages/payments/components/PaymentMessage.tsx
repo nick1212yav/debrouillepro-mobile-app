@@ -1,4 +1,10 @@
-import { View, Text, Pressable, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  type ViewStyle,
+  type TextStyle,
+} from "react-native";
 
 // src/features/messages/payments/components/PaymentMessage.tsx
 
@@ -37,79 +43,130 @@ export function PaymentMessage({
     payment.status === "pending" && !!payment.paymentIntentId && !!onConfirm;
 
   return (
-    <View style={{
-        ...containerStyle,
-        alignSelf: isOwn ? "flex-end" : "flex-start",
-      }}><View style={headerStyle}><Text style={iconStyle}>€</Text><View><strong><Text>Paiement</Text></strong><View style={statusStyle}>{STATUS_LABELS[payment.status]}</View></View></View><View style={amountStyle}>{payment.amount.toFixed(2)}{payment.currency.toUpperCase()}</View>{payment.description && (
+    <View style={[containerStyle, isOwn ? alignEndStyle : alignStartStyle]}>
+      <View style={headerStyle}>
+        <View style={iconContainerStyle}>
+          <Text style={iconTextStyle}>€</Text>
+        </View>
+        <View style={headerTextContainerStyle}>
+          <Text style={paymentTitleStyle}>Paiement</Text>
+          <Text style={statusStyle}>{STATUS_LABELS[payment.status]}</Text>
+        </View>
+      </View>
+
+      <Text style={amountStyle}>
+        {payment.amount.toFixed(2)} {payment.currency.toUpperCase()}
+      </Text>
+
+      {payment.description && (
         <Text style={descriptionStyle}>{payment.description}</Text>
-      )}{canConfirm && (
-        <Pressable disabled={isLoading} onPress={() => onConfirm?.(payment.paymentIntentId!)} style={confirmButtonStyle}>
-          {isLoading ? "Confirmation…" : "Confirmer le paiement"}
+      )}
+
+      {canConfirm && (
+        <Pressable
+          disabled={isLoading}
+          onPress={() => onConfirm?.(payment.paymentIntentId!)}
+          style={confirmButtonStyle}
+        >
+          <Text style={confirmButtonTextStyle}>
+            {isLoading ? "Confirmation…" : "Confirmer le paiement"}
+          </Text>
         </Pressable>
-      )}{payment.id && <small style={referenceStyle}>Réf. {payment.id}</small>}</View>
+      )}
+
+      {payment.id && <Text style={referenceStyle}>Réf. {payment.id}</Text>}
+    </View>
   );
 }
 
-const containerStyle: ViewStyle | TextStyle | ImageStyle = {
-  width: "min(320px, 100%)",
+const containerStyle: ViewStyle = {
+  width: "100%",
+  maxWidth: 320,
   padding: 16,
   borderRadius: 16,
-  border: "1px solid #e5e7eb",
-  background: "#fff",
-  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+  backgroundColor: "#fff",
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 8,
+  elevation: 2,
 };
 
-const headerStyle: ViewStyle | TextStyle | ImageStyle = {
-  display: "flex",
+const alignEndStyle: ViewStyle = { alignSelf: "flex-end" };
+const alignStartStyle: ViewStyle = { alignSelf: "flex-start" };
+
+const headerStyle: ViewStyle = {
+  flexDirection: "row",
   alignItems: "center",
   gap: 10,
 };
 
-const iconStyle: ViewStyle | TextStyle | ImageStyle = {
+const iconContainerStyle: ViewStyle = {
   width: 38,
   height: 38,
   borderRadius: 12,
-  display: "flex",
+  backgroundColor: "#111827",
   alignItems: "center",
   justifyContent: "center",
-  background: "#111827",
-  color: "#fff",
-  fontWeight: 700,
 };
 
-const statusStyle: ViewStyle | TextStyle | ImageStyle = {
+const iconTextStyle: TextStyle = {
+  color: "#fff",
+  fontSize: 18,
+  fontWeight: "700",
+};
+
+const headerTextContainerStyle: ViewStyle = {
+  flex: 1,
+};
+
+const paymentTitleStyle: TextStyle = {
+  fontSize: 14,
+  fontWeight: "700",
+  color: "#111827",
+};
+
+const statusStyle: TextStyle = {
   marginTop: 2,
   fontSize: 12,
-  opacity: 0.6,
+  color: "#6b7280",
 };
 
-const amountStyle: ViewStyle | TextStyle | ImageStyle = {
+const amountStyle: TextStyle = {
   marginTop: 16,
   fontSize: 24,
-  fontWeight: 800,
+  fontWeight: "800",
+  color: "#111827",
 };
 
-const descriptionStyle: ViewStyle | TextStyle | ImageStyle = {
-  margin: "8px 0 0",
-  opacity: 0.75,
+const descriptionStyle: TextStyle = {
+  marginTop: 8,
+  fontSize: 13,
+  color: "#4b5563",
 };
 
-const confirmButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+const confirmButtonStyle: ViewStyle = {
   width: "100%",
   marginTop: 14,
-  padding: "10px 12px",
-  border: "none",
+  paddingVertical: 10,
+  paddingHorizontal: 12,
   borderRadius: 10,
-  background: "#111827",
-  color: "#fff",
-  fontWeight: 600,
-  cursor: "pointer",
+  backgroundColor: "#111827",
+  alignItems: "center",
 };
 
-const referenceStyle: ViewStyle | TextStyle | ImageStyle = {
-  display: "block",
+const confirmButtonTextStyle: TextStyle = {
+  color: "#fff",
+  fontWeight: "600",
+  fontSize: 14,
+};
+
+const referenceStyle: TextStyle = {
   marginTop: 10,
-  opacity: 0.45,
+  fontSize: 11,
+  color: "#9ca3af",
 };
 
 export default PaymentMessage;
