@@ -1,10 +1,4 @@
 import { View, Pressable, Text } from "react-native";
-import {
-  ArrowLeft,
-  MessageCircle,
-  Plus,
-  X,
-} from "lucide-react-native";
 
 // src/features/messages/MessagesPage.tsx
 
@@ -288,7 +282,7 @@ export default function MessagesPage({
                     "focus:ring-2",
                     "focus:ring-primary",
                     "focus:ring-offset-2",
-                  ].join(" ")} accessibilityLabel="Retour"><ArrowLeft size={20} color="rgba(255,255,255,0.7)" /></Pressable>
+                  ].join(" ")} accessibilityLabel="Retour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg></Pressable>
               )}<View className="min-w-0"><View className="flex items-center gap-2"><Text className="truncate text-xl font-semibold tracking-tight text-white">Messages
                   </Text>{previews.length > 0 && (
                     <Text className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/50">{previews.length}</Text>
@@ -313,7 +307,7 @@ export default function MessagesPage({
                 "focus:ring-2",
                 "focus:ring-primary",
                 "focus:ring-offset-2",
-              ].join(" ")} accessibilityLabel="Nouvelle conversation"><Plus size={20} color="#ffffff" /></Pressable>{}<View className="px-3 pb-3"><ConversationSearch conversations={previews} onSelect={handleSearchSelect} /></View></View>{}<View className="min-h-0 flex-1 overflow-y-auto px-2 py-2">{previews.length > 0 ? (
+              ].join(" ")} accessibilityLabel="Nouvelle conversation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" d="M12 5v14" /><path strokeLinecap="round" d="M5 12h14" /></svg></Pressable>{}<View className="px-3 pb-3"><ConversationSearch conversations={previews} onSelect={handleSearchSelect} /></View></View>{}<View className="min-h-0 flex-1 overflow-y-auto px-2 py-2">{previews.length > 0 ? (
               <ConversationList
                 conversations={previews}
                 currentConversationId={selectedConversationId}
@@ -340,7 +334,7 @@ export default function MessagesPage({
               onInfo={handleCloseConversation}
             />
           ) : (
-            <View className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black p-6">{}<View className="pointer-events-none absolute inset-0 opacity-40" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><View className="absolute left-[15%] top-[20%] h-64 w-64 rounded-full bg-primary/10 blur-3xl" /><View className="absolute bottom-[10%] right-[15%] h-72 w-72 rounded-full bg-violet-500/10 blur-3xl" /></View>{}<View className="relative z-10 mx-auto max-w-lg text-center">{}<View className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.04] shadow-2xl backdrop-blur-xl"><View className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10"><MessageCircle size={32} color="#8b5cf6" /></View></View>{}<View className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/50 backdrop-blur"><Text className="h-1.5 w-1.5 rounded-full bg-primary" /><Text>Messagerie DébrouillePro</Text></View>{}<Text className="text-3xl font-semibold tracking-tight text-white md:text-4xl">Vos messages
+            <View className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black p-6">{}<View className="pointer-events-none absolute inset-0 opacity-40" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><View className="absolute left-[15%] top-[20%] h-64 w-64 rounded-full bg-primary/10 blur-3xl" /><View className="absolute bottom-[10%] right-[15%] h-72 w-72 rounded-full bg-violet-500/10 blur-3xl" /></View>{}<View className="relative z-10 mx-auto max-w-lg text-center">{}<View className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.04] shadow-2xl backdrop-blur-xl"><View className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-8 w-8 text-primary" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" strokeLinejoin="round" d="M21 11.5a8.38 8.38 0 0 1-1.1 4.15A8.5 8.5 0 0 1 12.5 20a8.38 8.38 0 0 1-4.15-1.1L3 21l2.1-5.35A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 1 1 21 11.5Z" /></svg></View></View>{}<View className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/50 backdrop-blur"><Text className="h-1.5 w-1.5 rounded-full bg-primary" /><Text>Messagerie DébrouillePro</Text></View>{}<Text className="text-3xl font-semibold tracking-tight text-white md:text-4xl">Vos messages
                 </Text>{}<Text className="mx-auto mt-4 max-w-md text-sm leading-6 text-white/40">Sélectionnez une conversation pour commencer à échanger.
                   <br />Texte, médias, vocaux, appels, réactions et bien plus encore.
                 </Text>{}<Pressable onPress={handleNewConversation} className={[
@@ -365,7 +359,7 @@ export default function MessagesPage({
                     "focus:ring-2",
                     "focus:ring-primary",
                     "focus:ring-offset-2",
-                  ].join(" ")}><Plus size={16} color="#ffffff" /><Text>Nouvelle conversation</Text></Pressable>{}<View className="mx-auto mt-10 flex max-w-md flex-wrap items-center justify-center gap-2">{["💬 Messages", "🎤 Vocaux", "📎 Médias", "📞 Appels"].map(
+                  ].join(" ")}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" d="M12 5v14" /><path strokeLinecap="round" d="M5 12h14" /></svg><Text>Nouvelle conversation</Text></Pressable>{}<View className="mx-auto mt-10 flex max-w-md flex-wrap items-center justify-center gap-2">{["💬 Messages", "🎤 Vocaux", "📎 Médias", "📞 Appels"].map(
                     (featureLabel) => (
                       <Text key={featureLabel} className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-white/30">{featureLabel}</Text>
                     ),
@@ -386,7 +380,7 @@ export default function MessagesPage({
               "border-white/10",
               "bg-background",
               "shadow-2xl",
-            ].join(" ")} accessibilityViewIsModal={true} accessibilityLabel="Nouvelle conversation">{}<View className="flex items-center justify-between border-b border-white/10 px-5 py-4"><View className="min-w-0"><Text className="text-lg font-semibold text-white">Nouvelle conversation
+            ].join(" ")} accessibilityRole="dialog" accessibilityViewIsModal={true} accessibilityLabel="Nouvelle conversation">{}<View className="flex items-center justify-between border-b border-white/10 px-5 py-4"><View className="min-w-0"><Text className="text-lg font-semibold text-white">Nouvelle conversation
                 </Text><Text className="mt-0.5 text-sm text-white/40">Choisissez une personne avec qui discuter.
                 </Text></View><Pressable onPress={handleCloseNewConversation} className={[
                   "inline-flex",
@@ -403,7 +397,7 @@ export default function MessagesPage({
                   "focus:outline-none",
                   "focus:ring-2",
                   "focus:ring-primary",
-                ].join(" ")} accessibilityLabel="Fermer"><X size={20} color="rgba(255,255,255,0.6)" /></Pressable></View>{}<View className="max-h-[70vh] overflow-y-auto p-5">{isLoadingUsers ? (
+                ].join(" ")} accessibilityLabel="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants"><path strokeLinecap="round" d="M6 6l12 12" /><path strokeLinecap="round" d="M18 6 6 18" /></svg></Pressable></View>{}<View className="max-h-[70vh] overflow-y-auto p-5">{isLoadingUsers ? (
                 <View className="flex min-h-40 items-center justify-center">
                   <LoadingState />
                 </View>
