@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable } from "react-native";
 
 // src/features/messages/locations/components/LiveLocation.tsx
 
@@ -12,6 +12,7 @@ import { useLocation, useLiveLocation } from "../hooks/useLocation";
 
 export interface LiveLocationProps {
   messageId: Id<"messages"> | undefined;
+
   onStopped?: () => void;
 }
 
@@ -27,35 +28,62 @@ export function LiveLocation({ messageId, onStopped }: LiveLocationProps) {
   } = useLocation();
 
   const [elapsed, setElapsed] = useState(0);
+
   const lastUpdateRef = useRef(0);
 
   useEffect(() => {
-    if (!messageId) return;
+    if (!messageId) {
+      return;
+    }
+
     startWatching();
+
     return () => {
       stopWatching();
     };
   }, [messageId, startWatching, stopWatching]);
 
+  /**
+   * Envoie les nouvelles coordonnées
+   * au backend au maximum toutes les 3 secondes.
+   */
   useEffect(() => {
-    if (!messageId || !currentPosition) return;
+    if (!messageId || !currentPosition) {
+      return;
+    }
+
     const now = Date.now();
-    if (now - lastUpdateRef.current < 3000) return;
+
+    if (now - lastUpdateRef.current < 3000) {
+      return;
+    }
+
     lastUpdateRef.current = now;
+
     void updateLiveLocation({
       messageId,
       coordinates: currentPosition,
     });
   }, [messageId, currentPosition, updateLiveLocation]);
 
+  /**
+   * Compteur local.
+   */
   useEffect(() => {
     const startedAt = liveMessage?.metadata?.startedAt;
-    if (!startedAt) return;
+
+    if (!startedAt) {
+      return;
+    }
+
     const update = () => {
       setElapsed(Math.max(0, (Date.now() - startedAt) / 1000));
     };
+
     update();
+
     const interval = setInterval(update, 1000);
+
     return () => clearInterval(interval);
   }, [liveMessage?.metadata?.startedAt]);
 
@@ -64,101 +92,50 @@ export function LiveLocation({ messageId, onStopped }: LiveLocationProps) {
   }
 
   const metadata = liveMessage?.metadata;
+
   const active = metadata?.isActive ?? false;
+
   const expiresAt = metadata?.expiresAt;
+
   const expired = expiresAt !== undefined && Date.now() >= expiresAt;
 
   const handleStop = async () => {
-    await stopLiveLocation({ messageId });
+    await stopLiveLocation({
+      messageId,
+    });
+
     onStopped?.();
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>📡 Position en direct</Text>
-          <Text style={styles.subtitle}>
-            {active && !expired
+    <View style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: "#bfdbfe", borderStyle: "solid", backgroundColor: "#eff6ff" }}><View style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+        }}><View><View style={{ fontWeight: 800, fontSize: 13 }}><Text>📡 Position en direct</Text></View><View style={{ marginTop: 3, fontSize: 11 }}>{active && !expired
               ? `Active depuis ${formatLiveDuration(elapsed)}`
-              : "Partage terminé"}
-          </Text>
-        </View>
-        {active && !expired && <View style={styles.liveDot} />}
-      </View>
-
-      {metadata && (
-        <Text style={styles.coords}>
+              : "Partage terminé"}</View></View>{active && !expired && (
+          <Text style={{ width: 9, height: 9, borderRadius: 50, backgroundColor: "#22c55e", boxShadow: "0 0 0 4px rgba(34,197,94,.15)" }} />
+        )}</View>{metadata && (
+        <View style={{ fontSize: 11 }}>
           {metadata.latitude.toFixed(6)}
           {" · "}
           {metadata.longitude.toFixed(6)}
-          {metadata.accuracy !== undefined && (
-            <>{" · précision ±"}{Math.round(metadata.accuracy)}m</>
-          )}
-        </Text>
-      )}
 
-      {active && !expired && (
-        <Pressable onPress={() => void handleStop()} style={styles.stopButton}>
-          <Text style={styles.stopButtonText}>🛑 Arrêter le partage</Text>
+          {metadata.accuracy !== undefined && (
+            <>
+              {" · précision ±"}
+              {Math.round(metadata.accuracy)}m
+            </>
+          )}
+        </View>
+      )}{active && !expired && (
+        <Pressable onPress={() => void handleStop()} style={{ width: "100%", paddingVertical: 9, paddingHorizontal: 12, borderWidth: 0, borderRadius: 10, backgroundColor: "#fff", fontWeight: 800, fontSize: 12 }}>
+          🛑 Arrêter le partage
         </Pressable>
-      )}
-    </View>
+      )}</View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "column",
-    gap: 10,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    backgroundColor: "#eff6ff",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontWeight: "800",
-    fontSize: 13,
-    color: "#111827",
-  },
-  subtitle: {
-    marginTop: 3,
-    fontSize: 11,
-    color: "#4b5563",
-  },
-  liveDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: "#22c55e",
-  },
-  coords: {
-    fontSize: 11,
-    color: "#4b5563",
-  },
-  stopButton: {
-    width: "100%",
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    alignItems: "center",
-  },
-  stopButtonText: {
-    fontWeight: "800",
-    fontSize: 12,
-    color: "#b91c1c",
-  },
-});
 
 export default LiveLocation;

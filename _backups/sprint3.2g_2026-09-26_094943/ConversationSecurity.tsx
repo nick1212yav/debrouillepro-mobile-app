@@ -1,22 +1,30 @@
-import { Pressable, View, Text, StyleSheet } from "react-native";
+import { Pressable, View, type ViewStyle, type TextStyle, type ImageStyle } from "react-native";
 
 // src/features/messages/security/components/ConversationSecurity.tsx
 
-import { useState } from "react";
+import React, { useState } from "react";
 
 import { BlockUserDialog } from "./BlockUserDialog";
+
 import { ReportMessageDialog } from "./ReportMessageDialog";
 
 import { useMessageSecurity } from "../hooks/useMessageSecurity";
 
 export interface ConversationSecurityProps {
   userId: string;
+
   userName?: string;
+
   conversationId?: string;
+
   messageId?: string;
+
   currentUserId?: string;
+
   onBlocked?: (userId: string) => void;
+
   onUnblocked?: (userId: string) => void;
+
   onReported?: (messageId: string) => void;
 }
 
@@ -34,9 +42,11 @@ export function ConversationSecurity({
     useMessageSecurity();
 
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
   const blocked = isBlocked(userId);
+
   const alreadyReported = messageId
     ? hasReported(messageId, currentUserId)
     : false;
@@ -49,12 +59,15 @@ export function ConversationSecurity({
       block(targetUserId, reason);
       onBlocked?.(targetUserId);
     }
+
     setBlockDialogOpen(false);
   };
 
   const handleReportConfirm = (input: Parameters<typeof report>[0]) => {
     report(input);
+
     setReportDialogOpen(false);
+
     if (messageId) {
       onReported?.(messageId);
     }
@@ -62,28 +75,17 @@ export function ConversationSecurity({
 
   return (
     <>
-      <View
-        style={styles.container}
-        accessibilityLabel="Sécurité de la conversation"
-      >
-        <Pressable
-          onPress={() => setBlockDialogOpen(true)}
-          style={styles.button}
-        >
-          <Text style={styles.buttonText}>
-            {blocked ? "Débloquer" : "Bloquer"}
-          </Text>
+      <View style={containerStyle} accessibilityLabel="Sécurité de la conversation">
+        <Pressable onPress={() => setBlockDialogOpen(true)} style={buttonStyle}>
+          {blocked ? "Débloquer" : "Bloquer"}
         </Pressable>
 
         {messageId && (
-          <Pressable
-            onPress={() => setReportDialogOpen(true)}
-            disabled={alreadyReported}
-            style={[styles.button, alreadyReported && styles.buttonDisabled]}
-          >
-            <Text style={styles.buttonText}>
-              {alreadyReported ? "Message signalé" : "Signaler"}
-            </Text>
+          <Pressable onPress={() => setReportDialogOpen(true)} disabled={alreadyReported} style={{
+              ...buttonStyle,
+              ...(alreadyReported ? disabledButtonStyle : {}),
+            }}>
+            {alreadyReported ? "Message signalé" : "Signaler"}
           </Pressable>
         )}
       </View>
@@ -112,28 +114,26 @@ export function ConversationSecurity({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  button: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    fontSize: 13,
-    color: "#111827",
-  },
-});
+const containerStyle: ViewStyle | TextStyle | ImageStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
+const buttonStyle: ViewStyle | TextStyle | ImageStyle = {
+  border: "1px solid #d1d5db",
+  background: "#fff",
+  color: "#111827",
+  borderRadius: 10,
+  padding: "8px 12px",
+  cursor: "pointer",
+  font: "inherit",
+};
+
+const disabledButtonStyle: ViewStyle | TextStyle | ImageStyle = {
+  cursor: "default",
+  opacity: 0.6,
+};
 
 export default ConversationSecurity;
