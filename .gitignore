@@ -27,3 +27,7 @@ web-build/
 Thumbs.db
 # Local env overrides (ne pas commiter)
 .env*.local
+
+# Audit files (temporaires)
+sprint*.txt
+audit-*.txt
