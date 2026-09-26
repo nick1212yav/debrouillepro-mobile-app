@@ -1,9 +1,8 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View } from "react-native";
 import type { Id } from "@/convex/_generated/dataModel";
 
-// src/features/messages/groups/components/GroupList.tsx
-
 import { GroupItem } from "./GroupItem";
+
 import type { GroupMember } from "../services/groups.service";
 
 interface GroupListProps {
@@ -20,39 +19,22 @@ export function GroupList({
 }: GroupListProps) {
   if (members.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Aucun membre.</Text>
-      </View>
+      <View className="p-4 text-center text-sm text-white/50">Aucun membre.</View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View className="space-y-1">
       {members.map((member) => (
         <GroupItem
           key={String(member.userId)}
           member={member}
           isCurrentUser={member.userId === currentUserId}
-          onClick={() => onMemberClick?.(member)}
+          onPress={() => onMemberClick?.(member)}
         />
       ))}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    gap: 4,
-  },
-  emptyContainer: {
-    padding: 16,
-    alignItems: "center",
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.50)",
-    textAlign: "center",
-  },
-});
 
 export default GroupList;

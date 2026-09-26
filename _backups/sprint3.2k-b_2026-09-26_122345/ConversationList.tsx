@@ -1,9 +1,8 @@
-import { View, StyleSheet } from "react-native";
+import { View } from "react-native";
 import type { Id } from "@/convex/_generated/dataModel";
 
-// src/features/messages/conversations/components/ConversationList.tsx
-
 import { ConversationItem } from "./ConversationItem";
+
 import type { ConversationPreview } from "../services/conversations.service";
 
 interface ConversationListProps {
@@ -17,26 +16,22 @@ export function ConversationList({
   currentConversationId,
   onSelect,
 }: ConversationListProps) {
-  if (conversations.length === 0) return null;
+  if (conversations.length === 0) {
+    return null;
+  }
 
   return (
-    <View style={styles.container}>
+    <View className="space-y-1">
       {conversations.map((conversation) => (
         <ConversationItem
           key={String(conversation.conversationId)}
           conversation={conversation}
           active={conversation.conversationId === currentConversationId}
-          onClick={() => onSelect(conversation.conversationId)}
+          onPress={() => onSelect(conversation.conversationId)}
         />
       ))}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    gap: 4,
-  },
-});
 
 export default ConversationList;
