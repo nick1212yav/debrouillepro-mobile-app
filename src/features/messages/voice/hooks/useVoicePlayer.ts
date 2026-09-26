@@ -1,133 +1,121 @@
+import { Audio } from "expo-av";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// src/features/messages/voice/hooks/useVoicePlayer.ts
+//
+// Migration Sprint 3.2-K-D : Web Audio API -> expo-av (natif).
+// Contrat public inchangé.
+
+type Sound = Audio.Sound;
+
 export function useVoicePlayer(source?: string | null) {
-  const audioRef = useRef<unknown | null>(null);
+  const soundRef = useRef<Sound | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
-
   const [currentTime, setCurrentTime] = useState(0);
-
   const [duration, setDuration] = useState(0);
-
   const [error, setError] = useState<string | null>(null);
 
-  const ensureAudio = useCallback(() => {
-    if (!source) {
+  const ensureSound = useCallback(async (): Promise<Sound | null> => {
+    if (!source) return null;
+    if (soundRef.current) return soundRef.current;
+
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: source },
+        { shouldPlay: false },
+        (status) => {
+          if (!status.isLoaded) return;
+
+          setIsPlaying(status.isPlaying);
+          setCurrentTime((status.positionMillis ?? 0) / 1000);
+          setDuration((status.durationMillis ?? 0) / 1000);
+
+          if (status.didJustFinish) {
+            setIsPlaying(false);
+            setCurrentTime(0);
+          }
+        },
+      );
+
+      soundRef.current = sound;
+      return sound;
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Impossible de charger ce message vocal.";
+      setError(message);
       return null;
     }
-
-    if (!audioRef.current || audioRef.current.src !== source) {
-      const audio = new Audio(source);
-
-      audio.preload = "metadata";
-
-      audio.onloadedmetadata = () => {
-        setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
-      };
-
-      audio.ontimeupdate = () => {
-        setCurrentTime(audio.currentTime);
-      };
-
-      audio.onplay = () => {
-        setIsPlaying(true);
-      };
-
-      audio.onpause = () => {
-        setIsPlaying(false);
-      };
-
-      audio.onended = () => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-      };
-
-      audio.onerror = () => {
-        setError("Impossible de lire ce message vocal.");
-        setIsPlaying(false);
-      };
-
-      audioRef.current = audio;
-    }
-
-    return audioRef.current;
   }, [source]);
 
   const play = useCallback(async () => {
-    const audio = ensureAudio();
-
-    if (!audio) {
-      return;
-    }
+    const sound = await ensureSound();
+    if (!sound) return;
 
     setError(null);
 
     try {
-      await audio.play();
+      await sound.playAsync();
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Impossible de démarrer la lecture.",
-      );
+          : "Impossible de démarrer la lecture.";
+      setError(message);
     }
-  }, [ensureAudio]);
+  }, [ensureSound]);
 
   const pause = useCallback(() => {
-    audioRef.current?.pause();
+    const sound = soundRef.current;
+    if (!sound) return;
+    void sound.pauseAsync();
   }, []);
 
   const toggle = useCallback(async () => {
-    const audio = ensureAudio();
+    const sound = await ensureSound();
+    if (!sound) return;
 
-    if (!audio) {
-      return;
-    }
+    const status = await sound.getStatusAsync();
 
-    if (audio.paused) {
-      await play();
-    } else {
+    if (status.isLoaded && status.isPlaying) {
       pause();
+    } else {
+      await play();
     }
-  }, [ensureAudio, pause, play]);
+  }, [ensureSound, pause, play]);
 
   const seek = useCallback((time: number) => {
-    const audio = audioRef.current;
+    const sound = soundRef.current;
+    if (!sound) return;
 
-    if (!audio) {
-      return;
-    }
-
-    const nextTime = Math.max(
-      0,
-      Math.min(time, Number.isFinite(audio.duration) ? audio.duration : time),
-    );
-
-    audio.currentTime = nextTime;
-    setCurrentTime(nextTime);
+    const ms = Math.max(0, Math.floor(time * 1000));
+    void sound.setPositionAsync(ms);
+    setCurrentTime(time);
   }, []);
 
   useEffect(() => {
     if (!source) {
-      audioRef.current = null;
+      const existing = soundRef.current;
+      if (existing) {
+        void existing.unloadAsync();
+        soundRef.current = null;
+      }
+      setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
-      setIsPlaying(false);
       return;
     }
 
-    const audio = ensureAudio();
-
     return () => {
-      audio?.pause();
-
-      if (audio) {
-        audio.src = "";
+      const sound = soundRef.current;
+      if (sound) {
+        void sound.unloadAsync();
       }
-
-      audioRef.current = null;
+      soundRef.current = null;
     };
-  }, [ensureAudio, source]);
+  }, [source]);
 
   return {
     isPlaying,
