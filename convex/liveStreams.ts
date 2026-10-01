@@ -1,14 +1,68 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { startStreamInternal, endStreamInternal } from "./liveStreamsHelpers";
 
-async function requireUser(ctx: QueryCtx | MutationCtx) {
+type AuthCtx = QueryCtx | MutationCtx;
+
+const LIVE_STATUSES = ["scheduled", "live", "ended", "cancelled"] as const;
+
+const GIFT_TYPES = ["star", "crown", "fire", "diamond", "rocket"] as const;
+
+const REPORT_REASONS = [
+  "spam",
+  "nudity",
+  "violence",
+  "harassment",
+  "misinformation",
+  "copyright",
+  "other",
+] as const;
+
+const COHOST_ROLES = ["cohost", "moderator", "guest"] as const;
+
+const COHOST_STATUSES = ["invited", "accepted", "declined", "removed"] as const;
+
+const BAN_TYPES = ["ban", "mute", "timeout"] as const;
+
+const REPORT_STATUSES = ["open", "reviewing", "resolved", "dismissed"] as const;
+
+const MESSAGE_TYPES = ["chat", "super_chat", "system", "gift"] as const;
+
+const MODERATION_STATUSES = ["pending", "approved", "rejected"] as const;
+
+const VISIBILITIES = ["public", "followers", "private"] as const;
+
+const PRESENCE_TIMEOUT_MS = 60_000;
+
+const MAX_MESSAGE_LENGTH = 300;
+const MAX_TITLE_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 5_000;
+const MAX_TAGS = 30;
+const MAX_TAG_LENGTH = 50;
+const MAX_GIFT_MESSAGE_LENGTH = 500;
+const MAX_REPORT_DETAILS_LENGTH = 2_000;
+
+const DEFAULT_GIFT_CURRENCY = "credits";
+
+/* ============================================================================
+ * TIMESTAMP HELPERS
+ * ========================================================================== */
+
+const toIso = (ms: number) => new Date(ms).toISOString();
+
+/* ============================================================================
+ * AUTHENTICATION
+ * ========================================================================== */
+
+async function requireUser(ctx: AuthCtx) {
   const identity = await ctx.auth.getUserIdentity();
 
   if (!identity) {
     throw new ConvexError({
-      message: "Non authentifié",
       code: "UNAUTHENTICATED",
+      message: "Connexion requise",
     });
   }
 
@@ -21,17 +75,310 @@ async function requireUser(ctx: QueryCtx | MutationCtx) {
 
   if (!user) {
     throw new ConvexError({
-      message: "Utilisateur introuvable",
       code: "NOT_FOUND",
+      message: "Utilisateur introuvable",
     });
   }
 
   return user;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LIST LIVE STREAMS
-// ─────────────────────────────────────────────────────────────────────────────
+async function getOptionalUser(ctx: QueryCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+
+  if (!identity) {
+    return null;
+  }
+
+  return ctx.db
+    .query("users")
+    .withIndex("by_token", (q) =>
+      q.eq("tokenIdentifier", identity.tokenIdentifier),
+    )
+    .unique();
+}
+
+/* ============================================================================
+ * VALIDATION HELPERS
+ * ========================================================================== */
+
+function normalizeTitle(title: string) {
+  const value = title.trim();
+
+  if (!value) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: "Le titre du live est obligatoire",
+    });
+  }
+
+  if (value.length > MAX_TITLE_LENGTH) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: `Le titre ne peut pas dépasser ${MAX_TITLE_LENGTH} caractères`,
+    });
+  }
+
+  return value;
+}
+
+function normalizeDescription(description?: string) {
+  if (description === undefined) {
+    return undefined;
+  }
+
+  const value = description.trim();
+
+  if (!value) {
+    return undefined;
+  }
+
+  if (value.length > MAX_DESCRIPTION_LENGTH) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: `La description ne peut pas dépasser ${MAX_DESCRIPTION_LENGTH} caractères`,
+    });
+  }
+
+  return value;
+}
+
+function normalizeTags(tags: string[]) {
+  if (tags.length > MAX_TAGS) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: `Maximum ${MAX_TAGS} tags`,
+    });
+  }
+
+  return Array.from(
+    new Set(
+      tags
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+        .map((tag) => tag.slice(0, MAX_TAG_LENGTH)),
+    ),
+  );
+}
+
+function parseLegacyTimestamp(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  const timestamp = Date.parse(value);
+
+  if (!Number.isFinite(timestamp)) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: "Date invalide",
+    });
+  }
+
+  return timestamp;
+}
+
+function assertFinitePositive(value: number, message = "Montant invalide") {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message,
+    });
+  }
+}
+
+function assertFiniteNonNegative(
+  value: number,
+  message = "Valeur numérique invalide",
+) {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message,
+    });
+  }
+}
+
+/* ============================================================================
+ * PERMISSIONS
+ * ========================================================================== */
+
+function isAdmin(user: { isAdmin?: boolean }) {
+  return user.isAdmin === true;
+}
+
+async function assertHost(ctx: MutationCtx, streamId: Id<"liveStreams">) {
+  const user = await requireUser(ctx);
+  const stream = await ctx.db.get(streamId);
+
+  if (!stream) {
+    throw new ConvexError({
+      code: "NOT_FOUND",
+      message: "Stream introuvable",
+    });
+  }
+
+  if (stream.hostId !== user._id && !isAdmin(user)) {
+    throw new ConvexError({
+      code: "FORBIDDEN",
+      message: "Accès refusé",
+    });
+  }
+
+  return { user, stream };
+}
+
+async function assertStreamExists(ctx: AuthCtx, streamId: Id<"liveStreams">) {
+  const stream = await ctx.db.get(streamId);
+
+  if (!stream) {
+    throw new ConvexError({
+      code: "NOT_FOUND",
+      message: "Stream introuvable",
+    });
+  }
+
+  return stream;
+}
+
+/* ============================================================================
+ * MODERATION / BAN HELPERS
+ * ========================================================================== */
+
+async function getActiveBan(
+  ctx: AuthCtx,
+  streamId: Id<"liveStreams">,
+  userId: Id<"users">,
+) {
+  const now = Date.now();
+
+  const bans = await ctx.db
+    .query("liveStreamBans")
+    .withIndex("by_stream_and_active", (q) =>
+      q.eq("streamId", streamId).eq("isActive", true),
+    )
+    .collect();
+
+  for (const ban of bans) {
+    if (ban.userId !== userId) {
+      continue;
+    }
+
+    if (
+      ban.type === "timeout" &&
+      ban.expiresAt !== undefined &&
+      ban.expiresAt <= now
+    ) {
+      continue;
+    }
+
+    return ban;
+  }
+
+  return null;
+}
+
+async function assertCanChat(
+  ctx: MutationCtx,
+  stream: { _id: Id<"liveStreams"> },
+  userId: Id<"users">,
+) {
+  const ban = await getActiveBan(ctx, stream._id, userId);
+
+  if (!ban) {
+    return;
+  }
+
+  if (ban.type === "ban") {
+    throw new ConvexError({
+      code: "FORBIDDEN",
+      message: "Vous êtes banni de ce live",
+    });
+  }
+
+  if (ban.type === "mute") {
+    throw new ConvexError({
+      code: "FORBIDDEN",
+      message: "Vous êtes réduit au silence sur ce live",
+    });
+  }
+
+  if (ban.type === "timeout") {
+    const remaining =
+      ban.expiresAt !== undefined ? Math.max(0, ban.expiresAt - Date.now()) : 0;
+
+    throw new ConvexError({
+      code: "FORBIDDEN",
+      message:
+        remaining > 0
+          ? "Vous êtes temporairement réduit au silence"
+          : "Vous pouvez à nouveau participer au chat",
+    });
+  }
+}
+
+async function assertCanModerate(
+  ctx: MutationCtx,
+  streamId: Id<"liveStreams">,
+) {
+  const user = await requireUser(ctx);
+  const stream = await ctx.db.get(streamId);
+
+  if (!stream) {
+    throw new ConvexError({
+      code: "NOT_FOUND",
+      message: "Stream introuvable",
+    });
+  }
+
+  if (stream.hostId === user._id || isAdmin(user)) {
+    return { user, stream };
+  }
+
+  const cohost = await ctx.db
+    .query("liveStreamCoHosts")
+    .withIndex("by_stream_and_user", (q) =>
+      q.eq("streamId", streamId).eq("userId", user._id),
+    )
+    .first();
+
+  if (
+    cohost &&
+    cohost.status === "accepted" &&
+    (cohost.role === "moderator" || cohost.role === "cohost")
+  ) {
+    return { user, stream };
+  }
+
+  throw new ConvexError({
+    code: "FORBIDDEN",
+    message: "Droits de modération insuffisants",
+  });
+}
+
+/* ============================================================================
+ * STREAM VISIBILITY
+ * ========================================================================== */
+
+function isPubliclyDiscoverable(stream: {
+  status: string;
+  moderationStatus?: string;
+  isActive?: boolean;
+  isDeleted?: boolean;
+  visibility?: string;
+}) {
+  return (
+    stream.status === "live" &&
+    stream.moderationStatus === "approved" &&
+    stream.isActive === true &&
+    stream.isDeleted !== true &&
+    stream.visibility === "public"
+  );
+}
+
+/* ============================================================================
+ * STREAMS — LIST
+ * ========================================================================== */
 
 export const listLiveStreams = query({
   args: {
@@ -49,23 +396,106 @@ export const listLiveStreams = query({
       .order("desc")
       .take(20);
 
-    return await Promise.all(
-      streams.map(async (stream) => {
+    const visibleStreams = streams.filter((stream) => {
+      if (status === "live") {
+        return isPubliclyDiscoverable(stream);
+      }
+
+      return (
+        stream.moderationStatus === "approved" &&
+        stream.isActive === true &&
+        stream.isDeleted !== true
+      );
+    });
+
+    return Promise.all(
+      visibleStreams.map(async (stream) => {
         const host = await ctx.db.get(stream.hostId);
+
+        const activeViewerCount =
+          status === "live"
+            ? await ctx.db
+                .query("liveStreamPresence")
+                .withIndex("by_stream_and_heartbeat", (q) =>
+                  q
+                    .eq("streamId", stream._id)
+                    .gt("lastHeartbeatAt", Date.now() - PRESENCE_TIMEOUT_MS),
+                )
+                .collect()
+                .then(
+                  (presence) =>
+                    presence.filter(
+                      (item) =>
+                        item.leftAt === undefined || item.leftAt > Date.now(),
+                    ).length,
+                )
+            : stream.viewerCount;
 
         return {
           ...stream,
           hostName: host?.name ?? "Inconnu",
           hostAvatar: host?.avatar ?? undefined,
+          liveViewerCount: activeViewerCount,
         };
       }),
     );
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET SINGLE STREAM
-// ─────────────────────────────────────────────────────────────────────────────
+export const listLiveStreamsPaginated = query({
+  args: {
+    status: v.optional(
+      v.union(v.literal("live"), v.literal("scheduled"), v.literal("ended")),
+    ),
+    paginationOpts: v.object({
+      numItems: v.number(),
+      cursor: v.union(v.string(), v.null()),
+    }),
+  },
+
+  handler: async (ctx, args) => {
+    const status = args.status ?? "live";
+
+    const result = await ctx.db
+      .query("liveStreams")
+      .withIndex("by_status", (q) => q.eq("status", status))
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    const page = await Promise.all(
+      result.page
+        .filter((stream) => {
+          if (status === "live") {
+            return isPubliclyDiscoverable(stream);
+          }
+
+          return (
+            stream.moderationStatus === "approved" &&
+            stream.isActive === true &&
+            stream.isDeleted !== true
+          );
+        })
+        .map(async (stream) => {
+          const host = await ctx.db.get(stream.hostId);
+
+          return {
+            ...stream,
+            hostName: host?.name ?? "Inconnu",
+            hostAvatar: host?.avatar ?? undefined,
+          };
+        }),
+    );
+
+    return {
+      ...result,
+      page,
+    };
+  },
+});
+
+/* ============================================================================
+ * STREAM — SINGLE
+ * ========================================================================== */
 
 export const getStream = query({
   args: {
@@ -75,59 +505,236 @@ export const getStream = query({
   handler: async (ctx, args) => {
     const stream = await ctx.db.get(args.streamId);
 
-    if (!stream) {
+    if (!stream || stream.isDeleted) {
       return null;
     }
 
     const host = await ctx.db.get(stream.hostId);
 
+    const activeViewerCount =
+      stream.status === "live"
+        ? await ctx.db
+            .query("liveStreamPresence")
+            .withIndex("by_stream_and_heartbeat", (q) =>
+              q
+                .eq("streamId", args.streamId)
+                .gt("lastHeartbeatAt", Date.now() - PRESENCE_TIMEOUT_MS),
+            )
+            .collect()
+            .then(
+              (presence) =>
+                presence.filter(
+                  (item) =>
+                    item.leftAt === undefined || item.leftAt > Date.now(),
+                ).length,
+            )
+        : stream.viewerCount;
+
+    const user = await getOptionalUser(ctx);
+
+    let likedByMe = false;
+
+    if (user) {
+      const like = await ctx.db
+        .query("liveStreamLikes")
+        .withIndex("by_user_and_stream", (q) =>
+          q.eq("userId", user._id).eq("streamId", args.streamId),
+        )
+        .first();
+
+      likedByMe = like !== null;
+    }
+
     return {
       ...stream,
       hostName: host?.name ?? "Inconnu",
       hostAvatar: host?.avatar ?? undefined,
+      liveViewerCount: activeViewerCount,
+      likedByMe,
     };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET STREAM MESSAGES
-//
-// NOTE:
-// The current mobile client consumes this function as an array.
-// Pagination is therefore intentionally NOT introduced here yet.
-// The legacy `livestream.ts` implementation is not copied blindly because
-// changing the return contract would break the current consumer.
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getStreamMessages = query({
+export const getLiveStream = query({
   args: {
     streamId: v.id("liveStreams"),
   },
 
   handler: async (ctx, args) => {
-    const messages = await ctx.db
-      .query("liveStreamMessages")
-      .withIndex("by_stream", (q) => q.eq("streamId", args.streamId))
-      .order("asc")
-      .take(100);
+    const stream = await ctx.db.get(args.streamId);
 
-    return await Promise.all(
-      messages.map(async (message) => {
-        const user = await ctx.db.get(message.userId);
+    if (!stream || stream.isDeleted) {
+      return null;
+    }
 
-        return {
-          ...message,
-          userName: user?.name ?? "Utilisateur",
-          userAvatar: user?.avatar ?? undefined,
-        };
-      }),
+    const host = await ctx.db.get(stream.hostId);
+
+    const activeViewerCount =
+      stream.status === "live"
+        ? await ctx.db
+            .query("liveStreamPresence")
+            .withIndex("by_stream_and_heartbeat", (q) =>
+              q
+                .eq("streamId", args.streamId)
+                .gt("lastHeartbeatAt", Date.now() - PRESENCE_TIMEOUT_MS),
+            )
+            .collect()
+            .then(
+              (presence) =>
+                presence.filter(
+                  (item) =>
+                    item.leftAt === undefined || item.leftAt > Date.now(),
+                ).length,
+            )
+        : stream.viewerCount;
+
+    return {
+      ...stream,
+      hostName: host?.name ?? "Inconnu",
+      hostAvatar: host?.avatar ?? undefined,
+      liveViewerCount: activeViewerCount,
+    };
+  },
+});
+
+/* ============================================================================
+ * MY STREAMS
+ * ========================================================================== */
+
+export const getMyStreams = query({
+  args: {},
+
+  handler: async (ctx) => {
+    const user = await getOptionalUser(ctx);
+
+    if (!user) {
+      return [];
+    }
+
+    return ctx.db
+      .query("liveStreams")
+      .withIndex("by_host", (q) => q.eq("hostId", user._id))
+      .order("desc")
+      .take(20);
+  },
+});
+
+export const getMyActiveStream = query({
+  args: {},
+
+  handler: async (ctx) => {
+    const user = await getOptionalUser(ctx);
+
+    if (!user) {
+      return null;
+    }
+
+    const streams = await ctx.db
+      .query("liveStreams")
+      .withIndex("by_host", (q) => q.eq("hostId", user._id))
+      .order("desc")
+      .take(20);
+
+    return (
+      streams.find(
+        (stream) =>
+          stream.status === "live" &&
+          stream.isActive === true &&
+          stream.isDeleted !== true,
+      ) ?? null
     );
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// START LIVE STREAM
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * CREATE STREAM — LEGACY COMPATIBILITY
+ * ========================================================================== */
+
+export const createStream = mutation({
+  args: {
+    title: v.string(),
+    description: v.optional(v.string()),
+    category: v.string(),
+    thumbnailUrl: v.optional(v.string()),
+    scheduledAt: v.optional(v.string()),
+    tags: v.array(v.string()),
+    isPublic: v.boolean(),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    if (user.isBanned === true) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Votre compte ne peut pas créer de live",
+      });
+    }
+
+    const now = Date.now();
+    const title = normalizeTitle(args.title);
+    const description = normalizeDescription(args.description);
+    const tags = normalizeTags(args.tags);
+
+    parseLegacyTimestamp(args.scheduledAt);
+    const scheduledAtIso = args.scheduledAt;
+    const isScheduled = scheduledAtIso !== undefined;
+
+    const visibility = args.isPublic ? "public" : "private";
+
+    const streamId = await ctx.db.insert("liveStreams", {
+      hostId: user._id,
+      schemaVersion: 1,
+
+      title,
+      description,
+      category: args.category.trim() || "general",
+      tags,
+
+      thumbnailUrl: args.thumbnailUrl,
+
+      playbackUrl: undefined,
+      ingestUrl: undefined,
+      replayStorageId: undefined,
+      replayUrl: undefined,
+      replayDurationMs: undefined,
+
+      status: isScheduled ? "scheduled" : "live",
+      moderationStatus: "approved",
+      visibility,
+
+      isActive: true,
+      isDeleted: false,
+      isPinned: false,
+
+      isPublic: args.isPublic,
+
+      createdAt: now,
+      updatedAt: now,
+
+      scheduledAt: scheduledAtIso,
+      startedAt: isScheduled ? undefined : toIso(now),
+      endedAt: undefined,
+
+      viewerCount: 0,
+      peakViewers: 0,
+      likeCount: 0,
+      chatCount: 0,
+      giftCount: 0,
+      shareCount: 0,
+      totalViewCount: 0,
+
+      city: undefined,
+      languageCode: undefined,
+    });
+
+    return streamId;
+  },
+});
+
+/* ============================================================================
+ * START LIVE STREAM — délègue au helper canonique
+ * ========================================================================== */
 
 export const startStream = mutation({
   args: {
@@ -142,57 +749,63 @@ export const startStream = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    /*
-     * A host should not have several active live streams simultaneously.
-     *
-     * The existing `by_host` index does not contain `status`, so we keep the
-     * status filter server-side but bound the result. We do NOT collect the
-     * complete stream history of the host.
-     */
-    const existingLiveStreams = await ctx.db
-      .query("liveStreams")
-      .withIndex("by_host", (q) => q.eq("hostId", user._id))
-      .filter((q) => q.eq(q.field("status"), "live"))
-      .take(5);
-
-    const now = new Date().toISOString();
-
-    for (const stream of existingLiveStreams) {
-      await ctx.db.patch(stream._id, {
-        status: "ended",
-        endedAt: now,
+    if (user.isBanned === true) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Votre compte ne peut pas lancer de live",
       });
     }
 
-    const streamId = await ctx.db.insert("liveStreams", {
-      hostId: user._id,
+    return startStreamInternal(ctx, user, {
       title: args.title,
       description: args.description,
       category: args.category,
       thumbnailUrl: args.thumbnailUrl,
-      viewerCount: 0,
-      peakViewers: 0,
-      likeCount: 0,
-      status: "live",
-      startedAt: now,
       tags: args.tags,
       isPublic: args.isPublic,
     });
-
-    await ctx.db.insert("liveStreamMessages", {
-      streamId,
-      userId: user._id,
-      text: `${user.name ?? "Quelqu'un"} a lancé le live !`,
-      type: "system",
-    });
-
-    return streamId;
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// END LIVE STREAM
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * GO LIVE — SCHEDULED STREAM
+ * ========================================================================== */
+
+export const goLive = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+    streamUrl: v.optional(v.string()),
+  },
+
+  handler: async (ctx, args) => {
+    const { stream } = await assertHost(ctx, args.streamId);
+
+    if (stream.status === "ended" || stream.status === "cancelled") {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Ce stream ne peut plus être démarré",
+      });
+    }
+
+    const now = Date.now();
+
+    await ctx.db.patch(args.streamId, {
+      status: "live",
+      isActive: true,
+      isDeleted: false,
+      startedAt: toIso(now),
+      updatedAt: now,
+      playbackUrl: args.streamUrl,
+      streamUrl: args.streamUrl,
+    });
+
+    return args.streamId;
+  },
+});
+
+/* ============================================================================
+ * END STREAM — délègue au helper canonique
+ * ========================================================================== */
 
 export const endStream = mutation({
   args: {
@@ -200,110 +813,295 @@ export const endStream = mutation({
   },
 
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    const stream = await ctx.db.get(args.streamId);
-
-    if (!stream) {
-      throw new ConvexError({
-        message: "Stream introuvable",
-        code: "NOT_FOUND",
-      });
-    }
-
-    if (stream.hostId !== user._id) {
-      throw new ConvexError({
-        message: "Non autorisé",
-        code: "FORBIDDEN",
-      });
-    }
-
-    await ctx.db.patch(args.streamId, {
-      status: "ended",
-      endedAt: new Date().toISOString(),
-    });
+    await assertHost(ctx, args.streamId);
+    await endStreamInternal(ctx, args.streamId);
+    return args.streamId;
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SEND CHAT MESSAGE
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * CANCEL STREAM
+ * ========================================================================== */
+
+export const cancelStream = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+  },
+
+  handler: async (ctx, args) => {
+    await assertHost(ctx, args.streamId);
+
+    const now = Date.now();
+
+    await ctx.db.patch(args.streamId, {
+      status: "cancelled",
+      isActive: false,
+      endedAt: toIso(now),
+      updatedAt: now,
+      viewerCount: 0,
+    });
+
+    return args.streamId;
+  },
+});
+
+/* ============================================================================
+ * CHAT — READ
+ * ========================================================================== */
+
+export const getStreamMessages = query({
+  args: {
+    streamId: v.id("liveStreams"),
+  },
+
+  handler: async (ctx, args) => {
+    const messages = await ctx.db
+      .query("liveStreamMessages")
+      .withIndex("by_stream_createdAt", (q) => q.eq("streamId", args.streamId))
+      .order("asc")
+      .take(100);
+
+    return Promise.all(
+      messages
+        .filter(
+          (message) =>
+            message.isDeleted !== true &&
+            message.moderationStatus !== "rejected",
+        )
+        .map(async (message) => {
+          const user = await ctx.db.get(message.userId);
+
+          return {
+            ...message,
+            userName: user?.name ?? "Utilisateur",
+            userAvatar: user?.avatar ?? undefined,
+          };
+        }),
+    );
+  },
+});
+
+export const getStreamMessagesPaginated = query({
+  args: {
+    streamId: v.id("liveStreams"),
+    paginationOpts: v.object({
+      numItems: v.number(),
+      cursor: v.union(v.string(), v.null()),
+    }),
+  },
+
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("liveStreamMessages")
+      .withIndex("by_stream_createdAt", (q) => q.eq("streamId", args.streamId))
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    const page = await Promise.all(
+      result.page
+        .filter(
+          (message) =>
+            message.isDeleted !== true &&
+            message.moderationStatus !== "rejected",
+        )
+        .map(async (message) => {
+          const user = await ctx.db.get(message.userId);
+
+          return {
+            ...message,
+            userName: user?.name ?? "Utilisateur",
+            userAvatar: user?.avatar ?? undefined,
+          };
+        }),
+    );
+
+    return {
+      ...result,
+      page,
+    };
+  },
+});
+
+/* ============================================================================
+ * CHAT — SEND
+ * ========================================================================== */
 
 export const sendMessage = mutation({
   args: {
     streamId: v.id("liveStreams"),
     text: v.string(),
-    type: v.union(
-      v.literal("chat"),
-      v.literal("super_chat"),
-      v.literal("system"),
+    type: v.optional(
+      v.union(v.literal("chat"), v.literal("super_chat"), v.literal("system")),
     ),
     amount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+    giftType: v.optional(v.string()),
+    giftQuantity: v.optional(v.number()),
+    replyToMessageId: v.optional(v.id("liveStreamMessages")),
   },
 
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const stream = await ctx.db.get(args.streamId);
+    const stream = await assertStreamExists(ctx, args.streamId);
 
-    if (!stream) {
+    if (
+      stream.status !== "live" ||
+      stream.isActive !== true ||
+      stream.isDeleted === true
+    ) {
       throw new ConvexError({
-        message: "Stream introuvable",
-        code: "NOT_FOUND",
-      });
-    }
-
-    if (stream.status !== "live") {
-      throw new ConvexError({
-        message: "Stream non actif",
         code: "BAD_REQUEST",
+        message: "Stream non actif",
       });
     }
+
+    await assertCanChat(ctx, stream, user._id);
 
     const text = args.text.trim();
 
     if (!text) {
       throw new ConvexError({
+        code: "BAD_REQUEST",
         message: "Message vide",
-        code: "BAD_REQUEST",
       });
     }
 
-    if (text.length > 300) {
+    if (text.length > MAX_MESSAGE_LENGTH) {
       throw new ConvexError({
-        message: "Message trop long (300 caractères maximum)",
         code: "BAD_REQUEST",
+        message: `Message trop long (${MAX_MESSAGE_LENGTH} caractères maximum)`,
       });
     }
 
-    if (
-      args.amount !== undefined &&
-      (!Number.isFinite(args.amount) || args.amount < 0)
-    ) {
-      throw new ConvexError({
-        message: "Montant invalide",
-        code: "BAD_REQUEST",
-      });
+    if (args.amount !== undefined) {
+      assertFiniteNonNegative(args.amount, "Montant invalide");
     }
 
-    await ctx.db.insert("liveStreamMessages", {
+    if (args.giftQuantity !== undefined) {
+      assertFinitePositive(
+        args.giftQuantity,
+        "La quantité du cadeau doit être supérieure à zéro",
+      );
+    }
+
+    if (args.replyToMessageId) {
+      const parent = await ctx.db.get(args.replyToMessageId);
+
+      if (!parent || parent.streamId !== args.streamId) {
+        throw new ConvexError({
+          code: "BAD_REQUEST",
+          message: "Message parent introuvable",
+        });
+      }
+    }
+
+    const now = Date.now();
+    const messageType = args.type ?? "chat";
+
+    const messageId = await ctx.db.insert("liveStreamMessages", {
       streamId: args.streamId,
       userId: user._id,
       text,
-      type: args.type,
+      type: messageType,
+
       amount: args.amount,
+      currency: args.currency,
+      giftType: args.giftType,
+      giftQuantity: args.giftQuantity,
+
+      replyToMessageId: args.replyToMessageId,
+
+      isDeleted: false,
+      isPinned: false,
+      moderationStatus: "approved",
+
+      createdAt: now,
+      updatedAt: now,
     });
+
+    await ctx.db.patch(args.streamId, {
+      chatCount: (stream.chatCount ?? 0) + 1,
+      updatedAt: now,
+    });
+
+    return messageId;
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LIKE STREAM
-//
-// Intentionally preserved.
-// There is currently no `liveStreamLikes` table/index in the provided schema,
-// so true per-user idempotency cannot be implemented safely without a schema
-// change. No fake deduplication is introduced here.
-// ─────────────────────────────────────────────────────────────────────────────
+export const sendStreamMessage = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+    text: v.string(),
+    type: v.optional(
+      v.union(v.literal("chat"), v.literal("super_chat"), v.literal("system")),
+    ),
+    amount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const stream = await assertStreamExists(ctx, args.streamId);
+
+    if (stream.status !== "live") {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Stream non actif",
+      });
+    }
+
+    await assertCanChat(ctx, stream, user._id);
+
+    const text = args.text.trim();
+
+    if (!text) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Message vide",
+      });
+    }
+
+    if (text.length > MAX_MESSAGE_LENGTH) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: `Message trop long (${MAX_MESSAGE_LENGTH} caractères maximum)`,
+      });
+    }
+
+    const now = Date.now();
+    const messageType = args.type ?? "chat";
+
+    const messageId = await ctx.db.insert("liveStreamMessages", {
+      streamId: args.streamId,
+      userId: user._id,
+      text,
+      type: messageType,
+
+      amount: args.amount,
+      currency: args.currency,
+
+      isDeleted: false,
+      isPinned: false,
+      moderationStatus: "approved",
+
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ctx.db.patch(args.streamId, {
+      chatCount: (stream.chatCount ?? 0) + 1,
+      updatedAt: now,
+    });
+
+    return messageId;
+  },
+});
+
+/* ============================================================================
+ * LIKES — REAL SOURCE OF TRUTH
+ * ========================================================================== */
 
 export const likeStream = mutation({
   args: {
@@ -311,93 +1109,252 @@ export const likeStream = mutation({
   },
 
   handler: async (ctx, args) => {
-    await requireUser(ctx);
+    const user = await requireUser(ctx);
 
-    const stream = await ctx.db.get(args.streamId);
+    const stream = await assertStreamExists(ctx, args.streamId);
 
-    if (!stream) {
+    if (stream.isDeleted === true) {
       throw new ConvexError({
-        message: "Stream introuvable",
         code: "NOT_FOUND",
+        message: "Stream introuvable",
       });
     }
 
-    await ctx.db.patch(args.streamId, {
-      likeCount: stream.likeCount + 1,
+    const existing = await ctx.db
+      .query("liveStreamLikes")
+      .withIndex("by_user_and_stream", (q) =>
+        q.eq("userId", user._id).eq("streamId", args.streamId),
+      )
+      .first();
+
+    const now = Date.now();
+    const currentLikes = stream.likeCount ?? 0;
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+
+      const newCount = Math.max(0, currentLikes - 1);
+
+      await ctx.db.patch(args.streamId, {
+        likeCount: newCount,
+        updatedAt: now,
+      });
+
+      return {
+        liked: false,
+        likeCount: newCount,
+      };
+    }
+
+    await ctx.db.insert("liveStreamLikes", {
+      streamId: args.streamId,
+      userId: user._id,
+      likedAt: now,
     });
+
+    const newCount = currentLikes + 1;
+
+    await ctx.db.patch(args.streamId, {
+      likeCount: newCount,
+      updatedAt: now,
+    });
+
+    return {
+      liked: true,
+      likeCount: newCount,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// JOIN STREAM
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const joinStream = mutation({
+export const getLikeStatus = query({
   args: {
     streamId: v.id("liveStreams"),
   },
 
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
+    const user = await getOptionalUser(ctx);
 
-    const stream = await ctx.db.get(args.streamId);
-
-    if (!stream) {
-      throw new ConvexError({
-        message: "Stream introuvable",
-        code: "NOT_FOUND",
-      });
+    if (!user) {
+      return {
+        liked: false,
+      };
     }
 
-    if (stream.status !== "live") {
-      throw new ConvexError({
-        message: "Ce stream n'est pas actif",
-        code: "BAD_REQUEST",
-      });
-    }
-
-    /*
-     * IMPORTANT:
-     * Check presence BEFORE modifying viewerCount.
-     *
-     * This prevents repeated join calls from incrementing the counter when
-     * the user is already registered for this stream.
-     */
-    const existing = await ctx.db
-      .query("liveStreamFollows")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) => q.eq(q.field("streamId"), args.streamId))
+    const like = await ctx.db
+      .query("liveStreamLikes")
+      .withIndex("by_user_and_stream", (q) =>
+        q.eq("userId", user._id).eq("streamId", args.streamId),
+      )
       .first();
 
-    if (existing) {
-      return;
-    }
-
-    await ctx.db.insert("liveStreamFollows", {
-      streamId: args.streamId,
-      userId: user._id,
-      joinedAt: new Date().toISOString(),
-    });
-
-    const newCount = stream.viewerCount + 1;
-
-    await ctx.db.patch(args.streamId, {
-      viewerCount: newCount,
-      peakViewers: Math.max(stream.peakViewers, newCount),
-    });
-
-    await ctx.db.insert("liveStreamMessages", {
-      streamId: args.streamId,
-      userId: user._id,
-      text: `${user.name ?? "Quelqu'un"} a rejoint le live`,
-      type: "system",
-    });
+    return {
+      liked: like !== null,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LEAVE STREAM
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * PRESENCE — JOIN
+ * ========================================================================== */
+
+export const joinStream = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+    sessionId: v.optional(v.string()),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const stream = await assertStreamExists(ctx, args.streamId);
+
+    if (
+      stream.status !== "live" ||
+      stream.isActive !== true ||
+      stream.isDeleted === true
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Ce stream n'est pas actif",
+      });
+    }
+
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("liveStreamPresence")
+      .withIndex("by_stream_and_user", (q) =>
+        q.eq("streamId", args.streamId).eq("userId", user._id),
+      )
+      .filter((q) => q.eq(q.field("leftAt"), undefined))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        lastHeartbeatAt: now,
+        leftAt: undefined,
+      });
+
+      return {
+        presenceId: existing._id,
+        viewerCount: stream.viewerCount,
+      };
+    }
+
+    const presenceId = await ctx.db.insert("liveStreamPresence", {
+      streamId: args.streamId,
+      userId: user._id,
+      sessionId: args.sessionId,
+      joinedAt: now,
+      lastHeartbeatAt: now,
+      leftAt: undefined,
+      counted: true,
+    });
+
+    const activePresence = await ctx.db
+      .query("liveStreamPresence")
+      .withIndex("by_stream_and_heartbeat", (q) =>
+        q
+          .eq("streamId", args.streamId)
+          .gt("lastHeartbeatAt", now - PRESENCE_TIMEOUT_MS),
+      )
+      .collect();
+
+    const viewerCount = activePresence.filter(
+      (item) => item.leftAt === undefined || item.leftAt > now,
+    ).length;
+
+    await ctx.db.patch(args.streamId, {
+      viewerCount,
+      peakViewers: Math.max(stream.peakViewers ?? 0, viewerCount),
+      totalViewCount: (stream.totalViewCount ?? 0) + 1,
+      updatedAt: now,
+    });
+
+    return {
+      presenceId,
+      viewerCount,
+    };
+  },
+});
+
+/* ============================================================================
+ * PRESENCE — HEARTBEAT
+ * ========================================================================== */
+
+export const heartbeatStream = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+    sessionId: v.optional(v.string()),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const stream = await assertStreamExists(ctx, args.streamId);
+
+    if (
+      stream.status !== "live" ||
+      stream.isActive !== true ||
+      stream.isDeleted === true
+    ) {
+      return {
+        active: false,
+        viewerCount: 0,
+      };
+    }
+
+    const now = Date.now();
+
+    const presence = await ctx.db
+      .query("liveStreamPresence")
+      .withIndex("by_stream_and_user", (q) =>
+        q.eq("streamId", args.streamId).eq("userId", user._id),
+      )
+      .filter((q) => q.eq(q.field("leftAt"), undefined))
+      .first();
+
+    if (!presence) {
+      return {
+        active: false,
+        viewerCount: stream.viewerCount,
+      };
+    }
+
+    await ctx.db.patch(presence._id, {
+      lastHeartbeatAt: now,
+      sessionId: args.sessionId ?? presence.sessionId,
+    });
+
+    const activePresence = await ctx.db
+      .query("liveStreamPresence")
+      .withIndex("by_stream_and_heartbeat", (q) =>
+        q
+          .eq("streamId", args.streamId)
+          .gt("lastHeartbeatAt", now - PRESENCE_TIMEOUT_MS),
+      )
+      .collect();
+
+    const viewerCount = activePresence.filter(
+      (item) => item.leftAt === undefined || item.leftAt > now,
+    ).length;
+
+    await ctx.db.patch(args.streamId, {
+      viewerCount,
+      peakViewers: Math.max(stream.peakViewers ?? 0, viewerCount),
+      updatedAt: now,
+    });
+
+    return {
+      active: true,
+      viewerCount,
+    };
+  },
+});
+
+/* ============================================================================
+ * PRESENCE — LEAVE
+ * ========================================================================== */
 
 export const leaveStream = mutation({
   args: {
@@ -407,21 +1364,24 @@ export const leaveStream = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const record = await ctx.db
-      .query("liveStreamFollows")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) => q.eq(q.field("streamId"), args.streamId))
+    const presence = await ctx.db
+      .query("liveStreamPresence")
+      .withIndex("by_stream_and_user", (q) =>
+        q.eq("streamId", args.streamId).eq("userId", user._id),
+      )
+      .filter((q) => q.eq(q.field("leftAt"), undefined))
       .first();
 
-    /*
-     * User is not registered as present.
-     * Do not decrement viewerCount.
-     */
-    if (!record) {
+    if (!presence) {
       return;
     }
 
-    await ctx.db.delete(record._id);
+    const now = Date.now();
+
+    await ctx.db.patch(presence._id, {
+      leftAt: now,
+      lastHeartbeatAt: now,
+    });
 
     const stream = await ctx.db.get(args.streamId);
 
@@ -429,26 +1389,29 @@ export const leaveStream = mutation({
       return;
     }
 
-    if (stream.viewerCount > 0) {
-      await ctx.db.patch(args.streamId, {
-        viewerCount: stream.viewerCount - 1,
-      });
-    }
+    const activePresence = await ctx.db
+      .query("liveStreamPresence")
+      .withIndex("by_stream_and_heartbeat", (q) =>
+        q
+          .eq("streamId", args.streamId)
+          .gt("lastHeartbeatAt", now - PRESENCE_TIMEOUT_MS),
+      )
+      .collect();
+
+    const viewerCount = activePresence.filter(
+      (item) => item.leftAt === undefined || item.leftAt > now,
+    ).length;
+
+    await ctx.db.patch(args.streamId, {
+      viewerCount,
+      updatedAt: now,
+    });
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SEND GIFT / SUPER CHAT
-//
-// IMPORTANT:
-// The existing business behavior is intentionally preserved.
-// This function currently records the gift as a super_chat and increases
-// likeCount according to the existing `amount * 10` rule.
-//
-// This is NOT treated as a real monetary payment.
-// A future DébrouillePay integration must introduce the real wallet/payment
-// transaction path before this can represent actual money.
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * GIFTS / SUPER CHAT
+ * ========================================================================== */
 
 export const sendGift = mutation({
   args: {
@@ -463,6 +1426,264 @@ export const sendGift = mutation({
     ),
 
     amount: v.number(),
+
+    quantity: v.optional(v.number()),
+    currency: v.optional(v.string()),
+    message: v.optional(v.string()),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const stream = await assertStreamExists(ctx, args.streamId);
+
+    if (
+      stream.status !== "live" ||
+      stream.isActive !== true ||
+      stream.isDeleted === true
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Stream non actif",
+      });
+    }
+
+    await assertCanChat(ctx, stream, user._id);
+
+    assertFinitePositive(
+      args.amount,
+      "Le montant du cadeau doit être supérieur à zéro",
+    );
+
+    const quantity = args.quantity ?? 1;
+
+    assertFinitePositive(
+      quantity,
+      "La quantité du cadeau doit être supérieure à zéro",
+    );
+
+    const giftMessage =
+      args.message?.trim().slice(0, MAX_GIFT_MESSAGE_LENGTH) || undefined;
+
+    const currency = args.currency?.trim() || DEFAULT_GIFT_CURRENCY;
+
+    const now = Date.now();
+
+    const LABELS: Record<(typeof GIFT_TYPES)[number], string> = {
+      star: "⭐ Étoile",
+      crown: "👑 Couronne",
+      fire: "🔥 Feu",
+      diamond: "💎 Diamant",
+      rocket: "🚀 Fusée",
+    };
+
+    const chatText =
+      giftMessage ??
+      `${user.name ?? "Quelqu'un"} a envoyé ${LABELS[args.giftType]} × ${quantity}`;
+
+    const messageId = await ctx.db.insert("liveStreamMessages", {
+      streamId: args.streamId,
+      userId: user._id,
+      text: chatText,
+      type: "gift",
+
+      amount: args.amount,
+      currency,
+      giftType: args.giftType,
+      giftQuantity: quantity,
+
+      isDeleted: false,
+      isPinned: false,
+      moderationStatus: "approved",
+
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const giftId = await ctx.db.insert("liveStreamGifts", {
+      streamId: args.streamId,
+      senderId: user._id,
+      recipientId: stream.hostId,
+
+      giftType: args.giftType,
+      quantity,
+      amount: args.amount,
+      currency,
+
+      message: giftMessage,
+      messageId,
+
+      createdAt: now,
+    });
+
+    await ctx.db.insert("creatorEarnings", {
+      creatorId: stream.hostId,
+      amount: args.amount,
+      currency,
+      type: "gift",
+      sourceId: String(giftId),
+      sourceType: "liveStream",
+      createdAt: new Date(now).toISOString(),
+    });
+
+    await ctx.db.patch(args.streamId, {
+      giftCount: (stream.giftCount ?? 0) + 1,
+      chatCount: (stream.chatCount ?? 0) + 1,
+      updatedAt: now,
+    });
+
+    return {
+      giftId,
+      messageId,
+      giftType: args.giftType,
+      quantity,
+      amount: args.amount,
+      currency,
+    };
+  },
+});
+
+/* ============================================================================
+ * BANS / MUTES / TIMEOUTS
+ * ========================================================================== */
+
+export const banUser = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+    userId: v.id("users"),
+    type: v.union(v.literal("ban"), v.literal("mute"), v.literal("timeout")),
+    reason: v.optional(v.string()),
+    durationMs: v.optional(v.number()),
+  },
+
+  handler: async (ctx, args) => {
+    const { user, stream } = await assertCanModerate(ctx, args.streamId);
+
+    if (args.userId === stream.hostId) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Le propriétaire du live ne peut pas être sanctionné ainsi",
+      });
+    }
+
+    if (
+      args.type === "timeout" &&
+      (!args.durationMs ||
+        !Number.isFinite(args.durationMs) ||
+        args.durationMs <= 0)
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Une durée est obligatoire pour un timeout",
+      });
+    }
+
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("liveStreamBans")
+      .withIndex("by_stream_and_user", (q) =>
+        q.eq("streamId", args.streamId).eq("userId", args.userId),
+      )
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        type: args.type,
+        reason: args.reason?.trim(),
+        expiresAt:
+          args.type === "timeout" ? now + (args.durationMs ?? 0) : undefined,
+        isActive: true,
+      });
+
+      return existing._id;
+    }
+
+    return ctx.db.insert("liveStreamBans", {
+      streamId: args.streamId,
+      userId: args.userId,
+      bannedBy: user._id,
+
+      type: args.type,
+
+      reason: args.reason?.trim(),
+
+      expiresAt:
+        args.type === "timeout" ? now + (args.durationMs ?? 0) : undefined,
+
+      isActive: true,
+      createdAt: now,
+    });
+  },
+});
+
+export const revokeBan = mutation({
+  args: {
+    banId: v.id("liveStreamBans"),
+  },
+
+  handler: async (ctx, args) => {
+    const ban = await ctx.db.get(args.banId);
+
+    if (!ban) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Sanction introuvable",
+      });
+    }
+
+    const { user } = await assertCanModerate(ctx, ban.streamId);
+
+    const now = Date.now();
+
+    await ctx.db.patch(args.banId, {
+      isActive: false,
+      revokedAt: now,
+      revokedBy: user._id,
+    });
+
+    return args.banId;
+  },
+});
+
+export const listStreamBans = query({
+  args: {
+    streamId: v.id("liveStreams"),
+  },
+
+  handler: async (ctx, args) => {
+    const bans = await ctx.db
+      .query("liveStreamBans")
+      .withIndex("by_stream", (q) => q.eq("streamId", args.streamId))
+      .order("desc")
+      .take(100);
+
+    return bans;
+  },
+});
+
+/* ============================================================================
+ * REPORTS
+ * ========================================================================== */
+
+export const reportStream = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+
+    reason: v.union(
+      v.literal("spam"),
+      v.literal("nudity"),
+      v.literal("violence"),
+      v.literal("harassment"),
+      v.literal("misinformation"),
+      v.literal("copyright"),
+      v.literal("other"),
+    ),
+
+    details: v.optional(v.string()),
+
+    messageId: v.optional(v.id("liveStreamMessages")),
   },
 
   handler: async (ctx, args) => {
@@ -472,90 +1693,560 @@ export const sendGift = mutation({
 
     if (!stream) {
       throw new ConvexError({
-        message: "Stream introuvable",
         code: "NOT_FOUND",
+        message: "Stream introuvable",
       });
     }
 
-    if (stream.status !== "live") {
-      throw new ConvexError({
-        message: "Stream non actif",
-        code: "BAD_REQUEST",
-      });
+    if (args.messageId) {
+      const message = await ctx.db.get(args.messageId);
+
+      if (!message || message.streamId !== args.streamId) {
+        throw new ConvexError({
+          code: "BAD_REQUEST",
+          message: "Message signalé introuvable",
+        });
+      }
     }
 
-    if (!Number.isFinite(args.amount) || args.amount <= 0) {
-      throw new ConvexError({
-        message: "Le montant du cadeau doit être supérieur à zéro",
-        code: "BAD_REQUEST",
-      });
-    }
+    const details =
+      args.details?.trim().slice(0, MAX_REPORT_DETAILS_LENGTH) || undefined;
 
-    const LABELS: Record<
-      "star" | "crown" | "fire" | "diamond" | "rocket",
-      string
-    > = {
-      star: "⭐ Étoile",
-      crown: "👑 Couronne",
-      fire: "🔥 Feu",
-      diamond: "💎 Diamant",
-      rocket: "🚀 Fusée",
-    };
+    const now = Date.now();
 
-    await ctx.db.insert("liveStreamMessages", {
+    const reportId = await ctx.db.insert("liveStreamReports", {
       streamId: args.streamId,
-      userId: user._id,
-      text: `${user.name ?? "Quelqu'un"} a envoyé ${LABELS[args.giftType]} × ${args.amount}`,
-      type: "super_chat",
-      amount: args.amount,
+      reporterId: user._id,
+
+      reason: args.reason,
+      details,
+
+      messageId: args.messageId,
+
+      status: "open",
+
+      createdAt: now,
     });
 
-    /*
-     * Existing product rule preserved.
-     *
-     * This does NOT debit a wallet and does NOT represent a real payment.
-     * A proper payment implementation belongs to DébrouillePay.
-     */
-    await ctx.db.patch(args.streamId, {
-      likeCount: stream.likeCount + args.amount * 10,
+    return reportId;
+  },
+});
+
+export const listStreamReports = query({
+  args: {
+    streamId: v.id("liveStreams"),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await getOptionalUser(ctx);
+
+    if (!user) {
+      throw new ConvexError({
+        code: "UNAUTHENTICATED",
+        message: "Connexion requise",
+      });
+    }
+
+    const stream = await ctx.db.get(args.streamId);
+
+    if (!stream) {
+      return [];
+    }
+
+    if (stream.hostId !== user._id && !isAdmin(user)) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Accès refusé",
+      });
+    }
+
+    return ctx.db
+      .query("liveStreamReports")
+      .withIndex("by_stream", (q) => q.eq("streamId", args.streamId))
+      .order("desc")
+      .take(100);
+  },
+});
+
+export const reviewReport = mutation({
+  args: {
+    reportId: v.id("liveStreamReports"),
+    status: v.union(
+      v.literal("reviewing"),
+      v.literal("resolved"),
+      v.literal("dismissed"),
+    ),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    if (!isAdmin(user)) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Droits administrateur requis",
+      });
+    }
+
+    const report = await ctx.db.get(args.reportId);
+
+    if (!report) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Signalement introuvable",
+      });
+    }
+
+    const now = Date.now();
+
+    await ctx.db.patch(args.reportId, {
+      status: args.status,
+      reviewedBy: user._id,
+      reviewedAt: now,
+    });
+
+    return args.reportId;
+  },
+});
+
+/* ============================================================================
+ * CO-HOSTS / MODERATORS / GUESTS
+ * ========================================================================== */
+
+export const inviteCoHost = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+    userId: v.id("users"),
+    role: v.union(
+      v.literal("cohost"),
+      v.literal("moderator"),
+      v.literal("guest"),
+    ),
+  },
+
+  handler: async (ctx, args) => {
+    const { user, stream } = await assertHost(ctx, args.streamId);
+
+    if (args.userId === stream.hostId) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Le propriétaire est déjà hôte",
+      });
+    }
+
+    const invitedUser = await ctx.db.get(args.userId);
+
+    if (!invitedUser) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Utilisateur invité introuvable",
+      });
+    }
+
+    const existing = await ctx.db
+      .query("liveStreamCoHosts")
+      .withIndex("by_stream_and_user", (q) =>
+        q.eq("streamId", args.streamId).eq("userId", args.userId),
+      )
+      .first();
+
+    const now = Date.now();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        role: args.role,
+        status: "invited",
+        invitedBy: user._id,
+        invitedAt: now,
+        respondedAt: undefined,
+      });
+
+      return existing._id;
+    }
+
+    return ctx.db.insert("liveStreamCoHosts", {
+      streamId: args.streamId,
+      userId: args.userId,
+
+      role: args.role,
+      status: "invited",
+
+      invitedBy: user._id,
+      invitedAt: now,
     });
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET MY ACTIVE STREAM
-// ─────────────────────────────────────────────────────────────────────────────
+export const respondToCoHostInvite = mutation({
+  args: {
+    coHostId: v.id("liveStreamCoHosts"),
+    status: v.union(v.literal("accepted"), v.literal("declined")),
+  },
 
-export const getMyActiveStream = query({
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const invitation = await ctx.db.get(args.coHostId);
+
+    if (!invitation) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Invitation introuvable",
+      });
+    }
+
+    if (invitation.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Cette invitation ne vous appartient pas",
+      });
+    }
+
+    if (invitation.status !== "invited") {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Cette invitation n'est plus disponible",
+      });
+    }
+
+    await ctx.db.patch(args.coHostId, {
+      status: args.status,
+      respondedAt: Date.now(),
+    });
+
+    return args.coHostId;
+  },
+});
+
+export const removeCoHost = mutation({
+  args: {
+    coHostId: v.id("liveStreamCoHosts"),
+  },
+
+  handler: async (ctx, args) => {
+    const invitation = await ctx.db.get(args.coHostId);
+
+    if (!invitation) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Co-hôte introuvable",
+      });
+    }
+
+    await assertHost(ctx, invitation.streamId);
+
+    await ctx.db.patch(args.coHostId, {
+      status: "removed",
+      respondedAt: Date.now(),
+    });
+
+    return args.coHostId;
+  },
+});
+
+export const listCoHosts = query({
+  args: {
+    streamId: v.id("liveStreams"),
+  },
+
+  handler: async (ctx, args) => {
+    const entries = await ctx.db
+      .query("liveStreamCoHosts")
+      .withIndex("by_stream", (q) => q.eq("streamId", args.streamId))
+      .collect();
+
+    return Promise.all(
+      entries.map(async (entry) => {
+        const user = await ctx.db.get(entry.userId);
+
+        return {
+          ...entry,
+          userName: user?.name ?? "Utilisateur",
+          userAvatar: user?.avatar ?? undefined,
+        };
+      }),
+    );
+  },
+});
+
+/* ============================================================================
+ * STREAM MANAGEMENT
+ * ========================================================================== */
+
+export const updateStream = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    category: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+
+    thumbnailUrl: v.optional(v.string()),
+    playbackUrl: v.optional(v.string()),
+
+    visibility: v.optional(
+      v.union(
+        v.literal("public"),
+        v.literal("followers"),
+        v.literal("private"),
+      ),
+    ),
+
+    isPublic: v.optional(v.boolean()),
+  },
+
+  handler: async (ctx, args) => {
+    await assertHost(ctx, args.streamId);
+
+    const patch: Record<string, unknown> = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.title !== undefined) {
+      patch.title = normalizeTitle(args.title);
+    }
+
+    if (args.description !== undefined) {
+      patch.description = normalizeDescription(args.description);
+    }
+
+    if (args.category !== undefined) {
+      patch.category = args.category.trim() || "general";
+    }
+
+    if (args.tags !== undefined) {
+      patch.tags = normalizeTags(args.tags);
+    }
+
+    if (args.thumbnailUrl !== undefined) {
+      patch.thumbnailUrl = args.thumbnailUrl;
+    }
+
+    if (args.playbackUrl !== undefined) {
+      patch.playbackUrl = args.playbackUrl;
+      patch.streamUrl = args.playbackUrl;
+    }
+
+    if (args.visibility !== undefined) {
+      patch.visibility = args.visibility;
+      patch.isPublic = args.visibility === "public";
+    }
+
+    if (args.isPublic !== undefined) {
+      patch.isPublic = args.isPublic;
+
+      if (args.visibility === undefined) {
+        patch.visibility = args.isPublic ? "public" : "private";
+      }
+    }
+
+    await ctx.db.patch(args.streamId, patch);
+
+    return args.streamId;
+  },
+});
+
+export const deleteStream = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+  },
+
+  handler: async (ctx, args) => {
+    await assertHost(ctx, args.streamId);
+
+    const now = Date.now();
+
+    await ctx.db.patch(args.streamId, {
+      isDeleted: true,
+      isActive: false,
+      status: "ended",
+      endedAt: toIso(now),
+      updatedAt: now,
+      viewerCount: 0,
+    });
+
+    return args.streamId;
+  },
+});
+
+/* ============================================================================
+ * MODERATION — STREAM
+ * ========================================================================== */
+
+export const updateModerationStatus = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+    moderationStatus: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    if (!isAdmin(user)) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Droits administrateur requis",
+      });
+    }
+
+    const stream = await ctx.db.get(args.streamId);
+
+    if (!stream) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Stream introuvable",
+      });
+    }
+
+    const now = Date.now();
+
+    await ctx.db.patch(args.streamId, {
+      moderationStatus: args.moderationStatus,
+      isActive:
+        args.moderationStatus !== "rejected" && stream.isDeleted !== true,
+      updatedAt: now,
+    });
+
+    return args.streamId;
+  },
+});
+
+export const getModerationQueue = query({
   args: {},
 
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const user = await getOptionalUser(ctx);
 
-    if (!identity) {
-      return null;
+    if (!user || !isAdmin(user)) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Droits administrateur requis",
+      });
     }
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier),
-      )
-      .unique();
-
-    if (!user) {
-      return null;
-    }
-
-    /*
-     * Keep the `by_host` index but avoid loading the complete stream history.
-     */
     const streams = await ctx.db
       .query("liveStreams")
-      .withIndex("by_host", (q) => q.eq("hostId", user._id))
-      .filter((q) => q.eq(q.field("status"), "live"))
-      .take(5);
+      .withIndex("by_moderationStatus", (q) =>
+        q.eq("moderationStatus", "pending"),
+      )
+      .order("desc")
+      .take(100);
 
-    return streams[0] ?? null;
+    return Promise.all(
+      streams.map(async (stream) => {
+        const host = await ctx.db.get(stream.hostId);
+
+        return {
+          ...stream,
+          hostName: host?.name ?? "Inconnu",
+          hostAvatar: host?.avatar ?? undefined,
+        };
+      }),
+    );
+  },
+});
+
+/* ============================================================================
+ * PIN
+ * ========================================================================== */
+
+export const togglePin = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+  },
+
+  handler: async (ctx, args) => {
+    const { stream } = await assertHost(ctx, args.streamId);
+
+    const now = Date.now();
+    const newPinned = stream.isPinned !== true;
+
+    await ctx.db.patch(args.streamId, {
+      isPinned: newPinned,
+      updatedAt: now,
+    });
+
+    return {
+      isPinned: newPinned,
+    };
+  },
+});
+
+/* ============================================================================
+ * SHARES
+ * ========================================================================== */
+
+export const recordShare = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+  },
+
+  handler: async (ctx, args) => {
+    const stream = await assertStreamExists(ctx, args.streamId);
+
+    const newCount = (stream.shareCount ?? 0) + 1;
+
+    await ctx.db.patch(args.streamId, {
+      shareCount: newCount,
+      updatedAt: Date.now(),
+    });
+
+    return {
+      shareCount: newCount,
+    };
+  },
+});
+
+/* ============================================================================
+ * VIEW COUNT RECONCILIATION
+ * ========================================================================== */
+
+export const refreshViewerCount = mutation({
+  args: {
+    streamId: v.id("liveStreams"),
+  },
+
+  handler: async (ctx, args) => {
+    const stream = await ctx.db.get(args.streamId);
+
+    if (!stream) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Stream introuvable",
+      });
+    }
+
+    const now = Date.now();
+
+    const activePresence = await ctx.db
+      .query("liveStreamPresence")
+      .withIndex("by_stream_and_heartbeat", (q) =>
+        q
+          .eq("streamId", args.streamId)
+          .gt("lastHeartbeatAt", now - PRESENCE_TIMEOUT_MS),
+      )
+      .collect();
+
+    const viewerCount = activePresence.filter(
+      (item) => item.leftAt === undefined || item.leftAt > now,
+    ).length;
+
+    const newPeak = Math.max(stream.peakViewers ?? 0, viewerCount);
+
+    await ctx.db.patch(args.streamId, {
+      viewerCount,
+      peakViewers: newPeak,
+      updatedAt: now,
+    });
+
+    return {
+      viewerCount,
+      peakViewers: newPeak,
+    };
   },
 });

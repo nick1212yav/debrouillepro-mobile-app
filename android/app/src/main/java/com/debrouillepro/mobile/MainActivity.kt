@@ -1,4 +1,4 @@
-package com.nick_12.apptemplate
+package com.debrouillepro.mobile
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

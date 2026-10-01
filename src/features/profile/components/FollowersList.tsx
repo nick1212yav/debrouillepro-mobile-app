@@ -1,13 +1,18 @@
-import { View, Text, Pressable } from "react-native";
-
-// src/features/profile/components/FollowersList.tsx
-
 import { useQuery } from "convex/react";
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { Users, X } from "lucide-react-native";
+
 import { api } from "@/convex/_generated/api.js";
-import { Users } from "lucide-react-native";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
+import type { Id } from "@/convex/_generated/dataModel.js";
+
 import { Avatar } from "./Avatar";
-import type { Id } from "@/convex/_generated/dataModel";
 
 interface FollowersListProps {
   userId: Id<"users">;
@@ -20,37 +25,157 @@ export function FollowersList({ userId, type, onClose }: FollowersListProps) {
     api.follows.getFollowers,
     type === "followers" ? { userId } : "skip",
   );
+
   const following = useQuery(
     api.follows.getFollowing,
     type === "following" ? { userId } : "skip",
   );
-  const list = (type === "followers" ? followers : following) ?? [];
+
+  const data = type === "followers" ? followers : following;
+  const isLoading = data === undefined;
+  const list = data ?? [];
+
+  const title = type === "followers" ? "Abonnés" : "Abonnements";
 
   return (
-    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} onPress={(e) => e.target === e.currentTarget && onClose()}>
-      <View initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="w-full rounded-t-3xl max-h-[70vh] flex flex-col overflow-hidden" style={{ backgroundColor: "rgba(10,10,20,0.98)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}>
-        <View className="flex items-center justify-between px-5 py-4 border-b border-white/8"><Text className="text-white font-bold flex items-center gap-2"><Users size={16} className="text-indigo-400" />{type === "followers" ? "Abonnés" : "Abonnements"}<Text className="text-white/40 font-normal text-sm">({list.length})
-            </Text></Text><Pressable onPress={onClose} className="text-white/40 transition-colors"><Text>✕</Text></Pressable></View>
-        <View className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{  }}>{!followers && !following ? (
-            <View className="space-y-3">{[0, 1, 2].map((i) => (
-                <View key={i} className="flex items-center gap-3 animate-pulse"><Skeleton className="w-10 h-10 rounded-full" /><Skeleton className="h-4 w-32 rounded-xl" /></View>
-              ))}</View>
-          ) : list.length === 0 ? (
-            <Text className="text-white/30 text-sm text-center py-8">Aucun utilisateur
-            </Text>
-          ) : (
-            list.filter(Boolean).map(
-              (user) =>
-                user && (
-                  <View key={user._id} className="flex items-center gap-3"><Avatar name={user.name} avatar={user.avatar} size={40} /><View className="flex-1 min-w-0"><Text className="text-white text-sm font-semibold truncate">{user.name ?? "Utilisateur"}</Text>{user.bio && (
-                        <Text className="text-white/35 text-xs truncate">
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View className="flex-1 justify-end bg-black/75">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
+          onPress={onClose}
+          className="absolute inset-0"
+        />
+
+        <View
+          className="w-full overflow-hidden rounded-t-3xl border border-white/10 bg-[#0A0A14]"
+          style={{
+            maxHeight: "72%",
+          }}
+        >
+          {/* Header */}
+          <View className="flex-row items-center justify-between border-b border-white/10 px-5 py-4">
+            <View className="flex-row items-center">
+              <View className="mr-3 h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/15">
+                <Users size={17} color="#818CF8" strokeWidth={2} />
+              </View>
+
+              <View>
+                <Text className="text-base font-bold text-white">{title}</Text>
+
+                {!isLoading && (
+                  <Text className="mt-0.5 text-xs text-white/40">
+                    {list.length}{" "}
+                    {list.length === 1 ? "utilisateur" : "utilisateurs"}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer la liste"
+              hitSlop={10}
+              className="h-9 w-9 items-center justify-center rounded-full bg-white/5 active:bg-white/10"
+            >
+              <X size={18} color="rgba(255,255,255,0.65)" strokeWidth={2} />
+            </Pressable>
+          </View>
+
+          {/* Content */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingTop: 16,
+              paddingBottom: 28,
+            }}
+          >
+            {isLoading ? (
+              <LoadingState />
+            ) : list.length === 0 ? (
+              <EmptyState type={type} />
+            ) : (
+              <View>
+                {list.map((user) => (
+                  <View
+                    key={user._id}
+                    className="mb-3 flex-row items-center rounded-2xl border border-white/5 bg-white/[0.025] px-3 py-3"
+                  >
+                    <Avatar name={user.name} avatar={user.avatar} size={44} />
+
+                    <View className="ml-3 flex-1">
+                      <Text
+                        className="text-sm font-semibold text-white"
+                        numberOfLines={1}
+                      >
+                        {user.name?.trim() || "Utilisateur"}
+                      </Text>
+
+                      {user.bio?.trim() ? (
+                        <Text
+                          className="mt-1 text-xs text-white/40"
+                          numberOfLines={2}
+                        >
                           {user.bio}
                         </Text>
-                      )}</View></View>
-                ),
-            )
-          )}</View>
+                      ) : user.city?.trim() || user.country?.trim() ? (
+                        <Text
+                          className="mt-1 text-xs text-white/35"
+                          numberOfLines={1}
+                        >
+                          {[user.city?.trim(), user.country?.trim()]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
       </View>
+    </Modal>
+  );
+}
+
+function LoadingState() {
+  return (
+    <View className="items-center justify-center py-12">
+      <ActivityIndicator size="small" color="#818CF8" />
+
+      <Text className="mt-3 text-xs text-white/40">Chargement…</Text>
+    </View>
+  );
+}
+
+function EmptyState({ type }: { type: "followers" | "following" }) {
+  const isFollowers = type === "followers";
+
+  return (
+    <View className="items-center justify-center px-6 py-12">
+      <View className="mb-4 h-14 w-14 items-center justify-center rounded-2xl bg-white/5">
+        <Users size={24} color="rgba(255,255,255,0.35)" strokeWidth={1.8} />
+      </View>
+
+      <Text className="text-center text-sm font-semibold text-white/80">
+        {isFollowers ? "Aucun abonné" : "Aucun abonnement"}
+      </Text>
+
+      <Text className="mt-2 text-center text-xs leading-5 text-white/35">
+        {isFollowers
+          ? "Les personnes qui suivront ce profil apparaîtront ici."
+          : "Les profils suivis par cet utilisateur apparaîtront ici."}
+      </Text>
     </View>
   );
 }

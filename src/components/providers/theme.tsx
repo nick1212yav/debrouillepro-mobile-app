@@ -1,4 +1,3 @@
-// src/components/providers/theme.tsx
 import React, {
   createContext,
   useCallback,
@@ -11,99 +10,111 @@ import React, {
 import { useColorScheme as useRNColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// ── Types (compat next-themes) ────────────────────────────────────────────
+import { darkTokens, lightTokens, type ThemeTokens } from "@/theme/tokens";
+
 export type Theme = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
 export interface ThemeProviderProps {
   children: ReactNode;
-  /** Thème initial (compat next-themes). */
   defaultTheme?: Theme;
-  /** Sur true, `system` suit le thème du système. */
   enableSystem?: boolean;
-  /** Clé de stockage AsyncStorage (par défaut "app-theme"). */
   storageKey?: string;
 }
 
 interface ThemeContextValue {
-  /** Préférence utilisateur : "light" | "dark" | "system". */
   theme: Theme;
-  /** Thème réellement appliqué : "light" | "dark". */
   resolvedTheme: ResolvedTheme;
-  /** Change la préférence. */
+  tokens: ThemeTokens;
   setTheme: (theme: Theme) => void;
-  /** true si l'utilisateur a choisi "system". */
   isSystem: boolean;
 }
 
-// ── Contexte ──────────────────────────────────────────────────────────────
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const DEFAULT_STORAGE_KEY = "app-theme";
 
-// ── Provider ──────────────────────────────────────────────────────────────
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "dark",
   enableSystem = true,
   storageKey = DEFAULT_STORAGE_KEY,
 }: ThemeProviderProps) {
-  const systemScheme = useRNColorScheme(); // "light" | "dark" | null
+  const systemScheme = useRNColorScheme();
+
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
   const [hydrated, setHydrated] = useState(false);
 
-  // Charge la préférence sauvegardée au premier rendu.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    let mounted = true;
+
+    const loadTheme = async () => {
       try {
-        const stored = (await AsyncStorage.getItem(storageKey)) as Theme | null;
-        if (!cancelled && stored) {
-          setThemeState(stored);
+        const storedTheme = await AsyncStorage.getItem(storageKey);
+
+        if (
+          mounted &&
+          storedTheme !== null &&
+          (storedTheme === "light" ||
+            storedTheme === "dark" ||
+            storedTheme === "system")
+        ) {
+          setThemeState(storedTheme);
         }
       } catch {
-        // ignore
+        // Keep the configured default theme if storage is unavailable.
       } finally {
-        if (!cancelled) setHydrated(true);
+        if (mounted) {
+          setHydrated(true);
+        }
       }
-    })();
+    };
+
+    void loadTheme();
+
     return () => {
-      cancelled = true;
+      mounted = false;
     };
   }, [storageKey]);
 
-  // setTheme : met à jour l'état + persiste.
   const setTheme = useCallback(
-    (next: Theme) => {
-      setThemeState(next);
-      AsyncStorage.setItem(storageKey, next).catch(() => {
-        // ignore
+    (nextTheme: Theme) => {
+      setThemeState(nextTheme);
+
+      void AsyncStorage.setItem(storageKey, nextTheme).catch(() => {
+        // Keep the in-memory theme even if persistence fails.
       });
     },
     [storageKey],
   );
 
-  // Résout le thème réel.
   const resolvedTheme: ResolvedTheme = useMemo(() => {
     if (theme === "system") {
-      if (!enableSystem) return "light";
+      if (!enableSystem) {
+        return "light";
+      }
+
       return systemScheme === "dark" ? "dark" : "light";
     }
+
     return theme;
   }, [theme, systemScheme, enableSystem]);
+
+  const tokens = useMemo<ThemeTokens>(() => {
+    return resolvedTheme === "dark" ? darkTokens : lightTokens;
+  }, [resolvedTheme]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme,
       resolvedTheme,
+      tokens,
       setTheme,
       isSystem: theme === "system",
     }),
-    [theme, resolvedTheme, setTheme],
+    [theme, resolvedTheme, tokens, setTheme],
   );
 
-  // ⚠️ Évite un flash de thème avant la lecture AsyncStorage.
-  //    Passe `null` ou un placeholder si tu veux gérer un splash.
   if (!hydrated) {
     return <>{children}</>;
   }
@@ -113,20 +124,20 @@ export function ThemeProvider({
   );
 }
 
-// ── Hook ──────────────────────────────────────────────────────────────────
 export function useTheme(): ThemeContextValue {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) {
-    // Fallback safe : renvoie un thème par défaut au lieu de crasher
-    // (utile si un composant est rendu hors du Provider pendant la transition).
+  const context = useContext(ThemeContext);
+
+  if (!context) {
     return {
-      theme: "system",
+      theme: "light",
       resolvedTheme: "light",
+      tokens: lightTokens,
       setTheme: () => undefined,
-      isSystem: true,
+      isSystem: false,
     };
   }
-  return ctx;
+
+  return context;
 }
 
 export default ThemeProvider;

@@ -1,8 +1,6 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
-import type { ViewProps, PressableProps } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { PressableProps, ViewProps } from "react-native";
 import type { ReactNode } from "react";
-
-// src/features/messages/shared/components/ErrorState.tsx
 
 export interface ErrorStateProps extends Omit<ViewProps, "title"> {
   title?: ReactNode;
@@ -24,68 +22,104 @@ export function ErrorState({
   return (
     <View
       {...props}
-      accessibilityRole="alert"
       style={[styles.container, style]}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
     >
-      <View
-        accessibilityElementsHidden={true}
-        importantForAccessibility="no-hide-descendants"
-        style={styles.iconWrapper}
-      >
-        <Text style={styles.iconText}>{icon}</Text>
-      </View>
-      {title && <Text style={styles.title}>{title}</Text>}
-      {message && <Text style={styles.message}>{message}</Text>}
-      {onRetry && (
-        <Pressable onPress={onRetry} style={styles.actionButton}>
+      {icon ? (
+        <View
+          style={styles.iconWrapper}
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <Text style={styles.iconText}>{icon}</Text>
+        </View>
+      ) : null}
+
+      {title ? <Text style={styles.title}>{title}</Text> : null}
+
+      {message ? <Text style={styles.message}>{message}</Text> : null}
+
+      {onRetry ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={retryLabel}
+          accessibilityHint="Réessayer le chargement"
+          onPress={onRetry}
+          style={({ pressed }) => [
+            styles.actionButton,
+            pressed && styles.actionButtonPressed,
+          ]}
+        >
           <Text style={styles.actionText}>{retryLabel}</Text>
         </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    minHeight: 180,
     width: "100%",
+    minHeight: 180,
+    padding: 24,
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    padding: 24,
   },
+
   iconWrapper: {
     marginBottom: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
+
   iconText: {
     fontSize: 30,
     lineHeight: 34,
+    textAlign: "center",
   },
+
   title: {
     fontSize: 16,
+    lineHeight: 22,
     fontWeight: "600",
     textAlign: "center",
-    color: "#111827",
+    color: "#f9fafb",
   },
+
   message: {
+    width: "100%",
     maxWidth: 480,
     fontSize: 14,
     lineHeight: 21,
-    opacity: 0.75,
+    fontWeight: "400",
     textAlign: "center",
-    color: "#4b5563",
+    color: "#9ca3af",
   },
+
   actionButton: {
     marginTop: 6,
-    borderRadius: 8,
-    paddingVertical: 9,
-    paddingHorizontal: 16,
-    backgroundColor: "#111827",
+    minHeight: 42,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2563eb",
   },
+
+  actionButtonPressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.98 }],
+  },
+
   actionText: {
-    fontWeight: "600",
     fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
     color: "#ffffff",
   },
 });

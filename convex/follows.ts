@@ -1,40 +1,158 @@
-import { v, ConvexError } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api.js";
+import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel.d.ts";
 
-// ─── Public profile data ──────────────────────────────────────────────────────
+// ============================================================================
+// Types publics
+// ============================================================================
 
-type PublicProfile = Doc<"users"> & {
+type PublicLocation = {
+  city?: string;
+  country?: string;
+  province?: string;
+};
+
+type PublicSocialLinks = {
+  facebook?: string;
+  twitter?: string;
+  linkedin?: string;
+  instagram?: string;
+  youtube?: string;
+  tiktok?: string;
+  whatsapp?: string;
+  telegram?: string;
+};
+
+type PublicProfileStats = {
   followerCount: number;
   followingCount: number;
   publicationCount: number;
+};
+
+type PublicProfile = {
+  _id: Id<"users">;
+  name: string;
+  slug?: string;
+  avatar?: string;
+  coverUrl?: string;
+  bio?: string;
+  roles: string[];
+  publicLocation?: PublicLocation;
+  website?: string;
+  headline?: string;
+  availability?: "available" | "limited" | "unavailable";
+  verified: boolean;
+  reputationScore: number;
+  socialLinks?: PublicSocialLinks;
+  stats: PublicProfileStats;
   isFollowedByMe: boolean;
 };
 
+type PublicUserCard = {
+  _id: Id<"users">;
+  name: string;
+  slug?: string;
+  avatar?: string;
+  bio?: string;
+  city?: string;
+  country?: string;
+  province?: string;
+};
+
+type FollowStats = {
+  followerCount: number;
+  followingCount: number;
+};
+
+// ============================================================================
+// Constantes
+// ============================================================================
+
+const MAX_LIST_LIMIT = 100;
+const DEFAULT_LIST_LIMIT = 50;
+
+const MAX_SUGGESTION_CANDIDATES = 50;
+const MAX_SUGGESTIONS = 10;
+
+const MAX_PUBLIC_PUBLICATIONS = 20;
+const MAX_COUNT_SCAN = 1000;
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function toPublicUserCard(user: Doc<"users">): PublicUserCard {
+  return {
+    _id: user._id,
+    name: user.name,
+    slug: user.slug,
+    avatar: user.avatar,
+    bio: user.bio,
+    city: user.city,
+    country: user.country,
+    province: user.location?.province,
+  };
+}
+
+async function resolveStorageUrl(
+  ctx: {
+    storage: {
+      getUrl: (storageId: Id<"_storage">) => Promise<string | null>;
+    };
+  },
+  storageId: Id<"_storage"> | undefined,
+): Promise<string | undefined> {
+  if (!storageId) {
+    return undefined;
+  }
+
+  return (await ctx.storage.getUrl(storageId)) ?? undefined;
+}
+
+// ============================================================================
+// PUBLIC PROFILE
+// ============================================================================
+
 export const getPublicProfile = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
+
   handler: async (ctx, args): Promise<PublicProfile | null> => {
     const user = await ctx.db.get(args.userId);
-    if (!user) return null;
 
-    const [followers, following, publications] = await Promise.all([
-      ctx.db
-        .query("follows")
-        .withIndex("by_following", (q) => q.eq("followingId", args.userId))
-        .collect(),
-      ctx.db
-        .query("follows")
-        .withIndex("by_follower", (q) => q.eq("followerId", args.userId))
-        .collect(),
-      ctx.db
-        .query("publications")
-        .withIndex("by_author", (q) => q.eq("authorId", args.userId))
-        .collect(),
-    ]);
+    if (!user || user.isBanned === true) {
+      return null;
+    }
+
+    const [networkProfile, followers, following, publications] =
+      await Promise.all([
+        ctx.db
+          .query("networkProfiles")
+          .withIndex("by_user", (q) => q.eq("userId", args.userId))
+          .unique(),
+
+        ctx.db
+          .query("follows")
+          .withIndex("by_following", (q) => q.eq("followingId", args.userId))
+          .take(MAX_COUNT_SCAN),
+
+        ctx.db
+          .query("follows")
+          .withIndex("by_follower", (q) => q.eq("followerId", args.userId))
+          .take(MAX_COUNT_SCAN),
+
+        ctx.db
+          .query("publications")
+          .withIndex("by_author", (q) => q.eq("authorId", args.userId))
+          .take(MAX_COUNT_SCAN),
+      ]);
+
+    const identity = await ctx.auth.getUserIdentity();
 
     let isFollowedByMe = false;
-    const identity = await ctx.auth.getUserIdentity();
+
     if (identity) {
       const currentUser = await ctx.db
         .query("users")
@@ -42,49 +160,112 @@ export const getPublicProfile = query({
           q.eq("tokenIdentifier", identity.tokenIdentifier),
         )
         .unique();
+
       if (currentUser && currentUser._id !== args.userId) {
-        const follow = await ctx.db
+        const existingFollow = await ctx.db
           .query("follows")
           .withIndex("by_follower_and_following", (q) =>
             q.eq("followerId", currentUser._id).eq("followingId", args.userId),
           )
           .unique();
-        isFollowedByMe = follow !== null;
+
+        isFollowedByMe = existingFollow !== null;
       }
     }
 
+    const coverUrl = await resolveStorageUrl(ctx, user.coverImage);
+
+    const publicLocation: PublicLocation | undefined =
+      user.location?.city || user.location?.country || user.location?.province
+        ? {
+            city: user.location?.city,
+            country: user.location?.country,
+            province: user.location?.province,
+          }
+        : user.city || user.country
+          ? {
+              city: user.city,
+              country: user.country,
+              province: user.location?.province,
+            }
+          : undefined;
+
+    const publicationCount =
+      publications.length === MAX_COUNT_SCAN
+        ? MAX_COUNT_SCAN
+        : publications.length;
+
     return {
-      ...user,
-      followerCount: followers.length,
-      followingCount: following.length,
-      publicationCount: publications.length,
+      _id: user._id,
+      name: user.name,
+      slug: user.slug,
+      avatar: user.avatar,
+      coverUrl,
+      bio: user.bio,
+      roles: user.roles,
+      publicLocation,
+      website: networkProfile?.website ?? user.website,
+      headline: networkProfile?.headline,
+      availability: networkProfile?.availability,
+      verified: networkProfile?.verified === true,
+      reputationScore: networkProfile?.reputationScore ?? user.reputationScore,
+      socialLinks: networkProfile?.socialLinks,
+      stats: {
+        followerCount: followers.length,
+        followingCount: following.length,
+        publicationCount,
+      },
       isFollowedByMe,
     };
   },
 });
 
-// Get public publications for a user
+// ============================================================================
+// PUBLICATIONS PUBLIQUES
+// ============================================================================
+
 export const getPublicPublications = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
+
   handler: async (ctx, args): Promise<Doc<"publications">[]> => {
+    const user = await ctx.db.get(args.userId);
+
+    if (!user || user.isBanned === true) {
+      return [];
+    }
+
     return ctx.db
       .query("publications")
       .withIndex("by_author", (q) => q.eq("authorId", args.userId))
       .order("desc")
-      .take(20);
+      .take(MAX_PUBLIC_PUBLICATIONS);
   },
 });
 
-// Toggle follow/unfollow – returns true if now following
+// ============================================================================
+// FOLLOW / UNFOLLOW
+// ============================================================================
+
 export const toggleFollow = mutation({
-  args: { targetUserId: v.id("users") },
+  args: {
+    targetUserId: v.id("users"),
+  },
+
   handler: async (ctx, args): Promise<boolean> => {
+    // ------------------------------------------------------------------------
+    // Authentification canonique Convex
+    // ------------------------------------------------------------------------
+
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity)
+
+    if (!identity) {
       throw new ConvexError({
         code: "UNAUTHENTICATED",
         message: "Connexion requise",
       });
+    }
 
     const currentUser = await ctx.db
       .query("users")
@@ -92,11 +273,17 @@ export const toggleFollow = mutation({
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (!currentUser)
+
+    if (!currentUser) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Utilisateur introuvable",
       });
+    }
+
+    // ------------------------------------------------------------------------
+    // Validation cible
+    // ------------------------------------------------------------------------
 
     if (currentUser._id === args.targetUserId) {
       throw new ConvexError({
@@ -105,7 +292,27 @@ export const toggleFollow = mutation({
       });
     }
 
-    const existing = await ctx.db
+    const targetUser = await ctx.db.get(args.targetUserId);
+
+    if (!targetUser) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Utilisateur cible introuvable",
+      });
+    }
+
+    if (targetUser.isBanned === true) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Ce profil n'est pas disponible",
+      });
+    }
+
+    // ------------------------------------------------------------------------
+    // Recherche relation existante
+    // ------------------------------------------------------------------------
+
+    const existingFollow = await ctx.db
       .query("follows")
       .withIndex("by_follower_and_following", (q) =>
         q
@@ -114,24 +321,35 @@ export const toggleFollow = mutation({
       )
       .unique();
 
-    if (existing) {
-      await ctx.db.delete(existing._id);
+    // ------------------------------------------------------------------------
+    // UNFOLLOW
+    // ------------------------------------------------------------------------
+
+    if (existingFollow) {
+      await ctx.db.delete(existingFollow._id);
       return false;
     }
+
+    // ------------------------------------------------------------------------
+    // FOLLOW
+    // ------------------------------------------------------------------------
 
     await ctx.db.insert("follows", {
       followerId: currentUser._id,
       followingId: args.targetUserId,
     });
 
-    // Notify the followed user
+    // ------------------------------------------------------------------------
+    // Notification
+    // ------------------------------------------------------------------------
+
     await ctx.scheduler.runAfter(0, internal.notifications.createSocial, {
       toUserId: args.targetUserId,
       fromUserId: currentUser._id,
       type: "follow",
       fromUserName: currentUser.name,
       fromUserAvatar: currentUser.avatar,
-      title: `${currentUser.name ?? "Quelqu'un"} vous suit`,
+      title: `${currentUser.name || "Quelqu'un"} vous suit`,
       body: "Un nouvel abonné a rejoint votre réseau.",
       actionPage: "profile",
     });
@@ -140,40 +358,103 @@ export const toggleFollow = mutation({
   },
 });
 
-// Get followers list
+// ============================================================================
+// FOLLOWERS
+// ============================================================================
+
 export const getFollowers = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args): Promise<(Doc<"users"> | null)[]> => {
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+
+  handler: async (ctx, args): Promise<PublicUserCard[]> => {
+    const requestedLimit = args.limit ?? DEFAULT_LIST_LIMIT;
+
+    const limit = Math.min(
+      Math.max(Math.floor(requestedLimit), 1),
+      MAX_LIST_LIMIT,
+    );
+
+    const targetUser = await ctx.db.get(args.userId);
+
+    if (!targetUser || targetUser.isBanned === true) {
+      return [];
+    }
+
     const follows = await ctx.db
       .query("follows")
       .withIndex("by_following", (q) => q.eq("followingId", args.userId))
-      .take(50);
-    return Promise.all(follows.map((f) => ctx.db.get(f.followerId)));
+      .order("desc")
+      .take(limit);
+
+    const users = await Promise.all(
+      follows.map((follow) => ctx.db.get(follow.followerId)),
+    );
+
+    return users
+      .filter(
+        (user): user is Doc<"users"> => user !== null && user.isBanned !== true,
+      )
+      .map(toPublicUserCard);
   },
 });
 
-// Get following list
+// ============================================================================
+// FOLLOWING
+// ============================================================================
+
 export const getFollowing = query({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args): Promise<(Doc<"users"> | null)[]> => {
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+
+  handler: async (ctx, args): Promise<PublicUserCard[]> => {
+    const requestedLimit = args.limit ?? DEFAULT_LIST_LIMIT;
+
+    const limit = Math.min(
+      Math.max(Math.floor(requestedLimit), 1),
+      MAX_LIST_LIMIT,
+    );
+
+    const targetUser = await ctx.db.get(args.userId);
+
+    if (!targetUser || targetUser.isBanned === true) {
+      return [];
+    }
+
     const follows = await ctx.db
       .query("follows")
       .withIndex("by_follower", (q) => q.eq("followerId", args.userId))
-      .take(50);
-    return Promise.all(follows.map((f) => ctx.db.get(f.followingId)));
+      .order("desc")
+      .take(limit);
+
+    const users = await Promise.all(
+      follows.map((follow) => ctx.db.get(follow.followingId)),
+    );
+
+    return users
+      .filter(
+        (user): user is Doc<"users"> => user !== null && user.isBanned !== true,
+      )
+      .map(toPublicUserCard);
   },
 });
 
-// Get suggested users to follow (users not yet followed by current user)
+// ============================================================================
+// SUGGESTIONS
+// ============================================================================
+
 export const getSuggestedUsers = query({
   args: {},
-  handler: async (
-    ctx,
-  ): Promise<
-    Array<{ _id: Id<"users">; name?: string; avatar?: string; bio?: string }>
-  > => {
+
+  handler: async (ctx): Promise<PublicUserCard[]> => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
+
+    if (!identity) {
+      return [];
+    }
 
     const currentUser = await ctx.db
       .query("users")
@@ -181,56 +462,84 @@ export const getSuggestedUsers = query({
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (!currentUser) return [];
 
-    // Get IDs of users already followed
-    const following = await ctx.db
-      .query("follows")
-      .withIndex("by_follower", (q) => q.eq("followerId", currentUser._id))
-      .collect();
-    const followedIds = new Set(following.map((f) => f.followingId));
+    if (!currentUser) {
+      return [];
+    }
 
-    // Get recent users not already followed (limit to 10 suggestions)
-    const allUsers = await ctx.db.query("users").order("desc").take(50);
-    const suggestions = allUsers
-      .filter((u) => u._id !== currentUser._id && !followedIds.has(u._id))
-      .slice(0, 10)
-      .map((u) => ({
-        _id: u._id,
-        name: u.name,
-        avatar: u.avatar,
-        bio: u.bio,
-      }));
+    const candidates = await ctx.db
+      .query("users")
+      .order("desc")
+      .take(MAX_SUGGESTION_CANDIDATES);
+
+    const suggestions: PublicUserCard[] = [];
+
+    for (const candidate of candidates) {
+      if (suggestions.length >= MAX_SUGGESTIONS) {
+        break;
+      }
+
+      if (candidate._id === currentUser._id) {
+        continue;
+      }
+
+      if (candidate.isBanned === true) {
+        continue;
+      }
+
+      const existingFollow = await ctx.db
+        .query("follows")
+        .withIndex("by_follower_and_following", (q) =>
+          q.eq("followerId", currentUser._id).eq("followingId", candidate._id),
+        )
+        .unique();
+
+      if (existingFollow) {
+        continue;
+      }
+
+      suggestions.push(toPublicUserCard(candidate));
+    }
 
     return suggestions;
   },
 });
 
-// Get current user's follower/following counts
+// ============================================================================
+// MES STATISTIQUES
+// ============================================================================
+
 export const getMyFollowStats = query({
-  args: {
-    email: v.string(),
-  },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ followerCount: number; followingCount: number } | null> => {
+  args: {},
+
+  handler: async (ctx): Promise<FollowStats | null> => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      return null;
+    }
+
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
       .unique();
 
-    if (!user) return null;
+    if (!user) {
+      return null;
+    }
 
     const [followers, following] = await Promise.all([
       ctx.db
         .query("follows")
         .withIndex("by_following", (q) => q.eq("followingId", user._id))
-        .collect(),
+        .take(MAX_COUNT_SCAN),
+
       ctx.db
         .query("follows")
         .withIndex("by_follower", (q) => q.eq("followerId", user._id))
-        .collect(),
+        .take(MAX_COUNT_SCAN),
     ]);
 
     return {

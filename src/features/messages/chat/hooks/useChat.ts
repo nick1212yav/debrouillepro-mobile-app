@@ -5,12 +5,10 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useConversation } from "@/features/messages/conversations/hooks/useConversation";
 
 import { useMessages } from "./useMessages";
-
 import { useMessageActions } from "./useMessageActions";
 
 export function useChat(
   conversationId: Id<"conversations"> | null | undefined,
-
   currentUserId?: Id<"users"> | null,
 ) {
   const conversation = useConversation(conversationId, currentUserId);

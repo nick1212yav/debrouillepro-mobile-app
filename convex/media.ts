@@ -1,6 +1,35 @@
-import { query, mutation } from "./_generated/server";
-import { v, ConvexError } from "convex/values";
-import type { QueryCtx, MutationCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MAX_ARTICLES = 30;
+const MAX_MY_ARTICLES = 20;
+const MAX_STORIES = 50;
+const MAX_MY_CAMPAIGNS = 20;
+const MAX_ACTIVE_CAMPAIGNS = 10;
+const MAX_OPEN_PROJECTS = 20;
+const MAX_CREATED_PROJECTS = 10;
+const MAX_PROJECT_CONTRIBUTIONS = 10;
+
+const MAX_TITLE_LENGTH = 160;
+const MAX_CONTENT_LENGTH = 100_000;
+const MAX_EXCERPT_LENGTH = 500;
+const MAX_DESCRIPTION_LENGTH = 5000;
+const MAX_URL_LENGTH = 4000;
+const MAX_CAPTION_LENGTH = 2000;
+const MAX_CATEGORY_LENGTH = 100;
+const MAX_ROLE_LENGTH = 120;
+const MAX_TARGET_AUDIENCE_LENGTH = 1000;
+const MAX_CURRENCY_LENGTH = 20;
+const MAX_TAGS = 20;
+const MAX_TAG_LENGTH = 80;
+
+const STORY_DURATION_MAX_SECONDS = 24 * 60 * 60;
+const MAX_CAMPAIGN_BUDGET = 1_000_000_000;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTHENTICATION
@@ -30,17 +59,24 @@ async function requireUser(ctx: QueryCtx | MutationCtx) {
     });
   }
 
+  if (user.isBanned === true) {
+    throw new ConvexError({
+      message: "Compte suspendu",
+      code: "FORBIDDEN",
+    });
+  }
+
   return user;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VALIDATION HELPERS
+// VALIDATION
 // ─────────────────────────────────────────────────────────────────────────────
 
 function requireNonEmptyString(
   value: string,
   field: string,
-  maxLength = 5000,
+  maxLength: number,
 ): string {
   const normalized = value.trim();
 
@@ -64,7 +100,7 @@ function requireNonEmptyString(
 function optionalString(
   value: string | undefined,
   field: string,
-  maxLength = 5000,
+  maxLength: number,
 ): string | undefined {
   if (value === undefined) {
     return undefined;
@@ -84,6 +120,37 @@ function optionalString(
   }
 
   return normalized;
+}
+
+function validateOptionalUrl(
+  value: string | undefined,
+  field: string,
+): string | undefined {
+  const normalized = optionalString(value, field, MAX_URL_LENGTH);
+
+  if (normalized === undefined) {
+    return undefined;
+  }
+
+  let parsed: URL;
+
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new ConvexError({
+      message: `${field} doit être une URL valide`,
+      code: "VALIDATION_ERROR",
+    });
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new ConvexError({
+      message: `${field} utilise un protocole non autorisé`,
+      code: "VALIDATION_ERROR",
+    });
+  }
+
+  return parsed.toString();
 }
 
 function requirePositiveNumber(
@@ -140,23 +207,40 @@ function validateDateRange(startDate: string, endDate: string) {
 }
 
 function normalizeTags(tags: string[]): string[] {
+  if (tags.length > MAX_TAGS) {
+    throw new ConvexError({
+      message: `Un maximum de ${MAX_TAGS} tags est autorisé`,
+      code: "VALIDATION_ERROR",
+    });
+  }
+
   const normalized = tags
     .map((tag) => tag.trim())
     .filter(Boolean)
-    .slice(0, 20);
+    .map((tag) => {
+      if (tag.length > MAX_TAG_LENGTH) {
+        throw new ConvexError({
+          message: `Un tag ne peut pas dépasser ${MAX_TAG_LENGTH} caractères`,
+          code: "VALIDATION_ERROR",
+        });
+      }
 
-  const unique = [...new Set(normalized)];
+      return tag;
+    });
 
-  for (const tag of unique) {
-    if (tag.length > 80) {
-      throw new ConvexError({
-        message: "Un tag est trop long",
-        code: "VALIDATION_ERROR",
-      });
-    }
+  return [...new Set(normalized)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARTICLE HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getSafeLikeCount(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return 0;
   }
 
-  return unique;
+  return Math.floor(value);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,19 +253,27 @@ export const listPublishedArticles = query({
   },
 
   handler: async (ctx, args) => {
-    const articles = await ctx.db
-      .query("mediaArticles")
-      .withIndex("by_status", (q) => q.eq("status", "published"))
-      .order("desc")
-      .take(30);
-
     const category = args.category?.trim();
 
-    if (category && category !== "Tout") {
-      return articles.filter((article) => article.category === category);
+    if (category !== undefined && category.length > MAX_CATEGORY_LENGTH) {
+      throw new ConvexError({
+        message: "La catégorie est trop longue",
+        code: "VALIDATION_ERROR",
+      });
     }
 
-    return articles;
+    const articlesQuery = ctx.db
+      .query("mediaArticles")
+      .withIndex("by_status", (q) => q.eq("status", "published"))
+      .order("desc");
+
+    if (!category || category === "Tout") {
+      return await articlesQuery.take(MAX_ARTICLES);
+    }
+
+    return await articlesQuery
+      .filter((q) => q.eq(q.field("category"), category))
+      .take(MAX_ARTICLES);
   },
 });
 
@@ -195,9 +287,76 @@ export const listMyArticles = query({
       .query("mediaArticles")
       .withIndex("by_author", (q) => q.eq("authorId", user._id))
       .order("desc")
-      .take(20);
+      .take(MAX_MY_ARTICLES);
   },
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARTICLES — CREATE PUBLISHED
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const createPublishedArticle = mutation({
+  args: {
+    title: v.string(),
+    content: v.string(),
+    excerpt: v.optional(v.string()),
+    coverImage: v.optional(v.string()),
+    category: v.string(),
+    tags: v.array(v.string()),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const title = requireNonEmptyString(
+      args.title,
+      "Le titre",
+      MAX_TITLE_LENGTH,
+    );
+
+    const content = requireNonEmptyString(
+      args.content,
+      "Le contenu",
+      MAX_CONTENT_LENGTH,
+    );
+
+    const excerpt = optionalString(
+      args.excerpt,
+      "L'extrait",
+      MAX_EXCERPT_LENGTH,
+    );
+
+    const coverImage = validateOptionalUrl(args.coverImage, "coverImage");
+
+    const category = requireNonEmptyString(
+      args.category,
+      "La catégorie",
+      MAX_CATEGORY_LENGTH,
+    );
+
+    const tags = normalizeTags(args.tags);
+
+    const publishedAt = new Date().toISOString();
+
+    return await ctx.db.insert("mediaArticles", {
+      authorId: user._id,
+      title,
+      content,
+      excerpt,
+      coverImage,
+      category,
+      tags,
+      viewCount: 0,
+      likeCount: 0,
+      status: "published",
+      publishedAt,
+    });
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARTICLES — LIKE
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const likeArticle = mutation({
   args: {
@@ -205,7 +364,7 @@ export const likeArticle = mutation({
   },
 
   handler: async (ctx, args) => {
-    await requireUser(ctx);
+    const user = await requireUser(ctx);
 
     const article = await ctx.db.get(args.articleId);
 
@@ -216,15 +375,155 @@ export const likeArticle = mutation({
       });
     }
 
-    const currentLikeCount =
-      typeof article.likeCount === "number" &&
-      Number.isFinite(article.likeCount)
-        ? article.likeCount
-        : 0;
+    if (article.status !== "published") {
+      throw new ConvexError({
+        message: "Cet article n'est pas disponible",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const existingLike = await ctx.db
+      .query("mediaArticleLikes")
+      .withIndex("by_user_and_article", (q) =>
+        q.eq("userId", user._id).eq("articleId", args.articleId),
+      )
+      .unique();
+
+    const currentLikeCount = getSafeLikeCount(article.likeCount);
+
+    // ───────────────────────────────────────────────────────────────────────
+    // IDEMPOTENCE
+    //
+    // Si la relation existe déjà, le deuxième Like ne doit absolument pas
+    // créer une nouvelle relation ni augmenter le compteur.
+    // ───────────────────────────────────────────────────────────────────────
+
+    if (existingLike) {
+      return {
+        liked: true,
+        likeCount: currentLikeCount,
+      };
+    }
+
+    await ctx.db.insert("mediaArticleLikes", {
+      articleId: args.articleId,
+      userId: user._id,
+    });
+
+    const nextLikeCount = currentLikeCount + 1;
 
     await ctx.db.patch(args.articleId, {
-      likeCount: currentLikeCount + 1,
+      likeCount: nextLikeCount,
     });
+
+    return {
+      liked: true,
+      likeCount: nextLikeCount,
+    };
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARTICLES — UNLIKE
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const unlikeArticle = mutation({
+  args: {
+    articleId: v.id("mediaArticles"),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    const article = await ctx.db.get(args.articleId);
+
+    if (!article) {
+      throw new ConvexError({
+        message: "Article introuvable",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const existingLike = await ctx.db
+      .query("mediaArticleLikes")
+      .withIndex("by_user_and_article", (q) =>
+        q.eq("userId", user._id).eq("articleId", args.articleId),
+      )
+      .unique();
+
+    const currentLikeCount = getSafeLikeCount(article.likeCount);
+
+    // ───────────────────────────────────────────────────────────────────────
+    // IDEMPOTENCE
+    //
+    // Si aucune relation n'existe, le deuxième Unlike ne doit rien supprimer
+    // et surtout ne doit pas diminuer le compteur.
+    // ───────────────────────────────────────────────────────────────────────
+
+    if (!existingLike) {
+      return {
+        liked: false,
+        likeCount: currentLikeCount,
+      };
+    }
+
+    await ctx.db.delete(existingLike._id);
+
+    const nextLikeCount = Math.max(0, currentLikeCount - 1);
+
+    await ctx.db.patch(args.articleId, {
+      likeCount: nextLikeCount,
+    });
+
+    return {
+      liked: false,
+      likeCount: nextLikeCount,
+    };
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARTICLES — LIKE STATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const getArticleLikeState = query({
+  args: {
+    articleId: v.id("mediaArticles"),
+  },
+
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    // Une personne non connectée ne peut pas avoir de Like personnel.
+    if (!identity) {
+      return {
+        liked: false,
+      };
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
+
+    if (!user || user.isBanned === true) {
+      return {
+        liked: false,
+      };
+    }
+
+    const like = await ctx.db
+      .query("mediaArticleLikes")
+      .withIndex("by_user_and_article", (q) =>
+        q.eq("userId", user._id).eq("articleId", args.articleId),
+      )
+      .unique();
+
+    return {
+      liked: like !== null,
+    };
   },
 });
 
@@ -238,9 +537,11 @@ export const listActiveStories = query({
   handler: async (ctx) => {
     const now = new Date().toISOString();
 
-    const stories = await ctx.db.query("stories").order("desc").take(50);
-
-    return stories.filter((story) => story.expiresAt > now);
+    return await ctx.db
+      .query("stories")
+      .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
+      .order("asc")
+      .take(MAX_STORIES);
   },
 });
 
@@ -255,18 +556,32 @@ export const createStory = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const mediaUrl = requireNonEmptyString(args.mediaUrl, "mediaUrl", 4000);
+    const mediaUrl = validateOptionalUrl(args.mediaUrl, "mediaUrl");
 
-    const caption = optionalString(args.caption, "caption", 2000);
-
-    if (
-      args.duration !== undefined &&
-      (!Number.isFinite(args.duration) || args.duration <= 0)
-    ) {
+    if (!mediaUrl) {
       throw new ConvexError({
-        message: "La durée de la story est invalide",
+        message: "mediaUrl est obligatoire",
         code: "VALIDATION_ERROR",
       });
+    }
+
+    const caption = optionalString(
+      args.caption,
+      "La légende",
+      MAX_CAPTION_LENGTH,
+    );
+
+    if (args.duration !== undefined) {
+      if (
+        !Number.isFinite(args.duration) ||
+        args.duration <= 0 ||
+        args.duration > STORY_DURATION_MAX_SECONDS
+      ) {
+        throw new ConvexError({
+          message: "La durée de la story est invalide",
+          code: "VALIDATION_ERROR",
+        });
+      }
     }
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -298,7 +613,7 @@ export const listMyAdCampaigns = query({
       .query("adCampaigns")
       .withIndex("by_advertiser", (q) => q.eq("advertiserId", user._id))
       .order("desc")
-      .take(20);
+      .take(MAX_MY_CAMPAIGNS);
   },
 });
 
@@ -309,7 +624,8 @@ export const listActiveAdCampaigns = query({
     return await ctx.db
       .query("adCampaigns")
       .withIndex("by_status", (q) => q.eq("status", "active"))
-      .take(10);
+      .order("desc")
+      .take(MAX_ACTIVE_CAMPAIGNS);
   },
 });
 
@@ -333,31 +649,38 @@ export const createAdCampaign = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const title = requireNonEmptyString(args.title, "Le titre", 160);
+    const title = requireNonEmptyString(
+      args.title,
+      "Le titre",
+      MAX_TITLE_LENGTH,
+    );
 
     const description = requireNonEmptyString(
       args.description,
       "La description",
-      5000,
+      MAX_DESCRIPTION_LENGTH,
     );
 
-    const mediaUrl = optionalString(args.mediaUrl, "mediaUrl", 4000);
-
-    const targetUrl = optionalString(args.targetUrl, "targetUrl", 4000);
+    const mediaUrl = validateOptionalUrl(args.mediaUrl, "mediaUrl");
+    const targetUrl = validateOptionalUrl(args.targetUrl, "targetUrl");
 
     const currency = requireNonEmptyString(
       args.currency,
       "La devise",
-      20,
+      MAX_CURRENCY_LENGTH,
     ).toUpperCase();
 
     const targetAudience = optionalString(
       args.targetAudience,
       "targetAudience",
-      1000,
+      MAX_TARGET_AUDIENCE_LENGTH,
     );
 
-    const budget = requirePositiveNumber(args.budget, "Le budget");
+    const budget = requirePositiveNumber(
+      args.budget,
+      "Le budget",
+      MAX_CAMPAIGN_BUDGET,
+    );
 
     const { start, end } = validateDateRange(args.startDate, args.endDate);
 
@@ -375,9 +698,6 @@ export const createAdCampaign = mutation({
       targetAudience,
       startDate: start,
       endDate: end,
-
-      // Une campagne nouvellement créée reste un brouillon.
-      // L'activation doit être une action explicite.
       status: "draft",
     });
   },
@@ -422,15 +742,13 @@ export const updateCampaignStatus = mutation({
       return;
     }
 
-    // Une campagne terminée ne doit pas être réactivée.
-    if (campaign.status === "completed" && args.status !== "completed") {
+    if (campaign.status === "completed") {
       throw new ConvexError({
-        message: "Une campagne terminée ne peut plus être réactivée",
+        message: "Une campagne terminée ne peut plus être modifiée",
         code: "INVALID_STATUS_TRANSITION",
       });
     }
 
-    // Vérification des dates avant activation.
     if (args.status === "active") {
       const now = Date.now();
       const start = new Date(campaign.startDate).getTime();
@@ -470,35 +788,45 @@ export const getAdStats = query({
     const campaigns = await ctx.db
       .query("adCampaigns")
       .withIndex("by_advertiser", (q) => q.eq("advertiserId", user._id))
-      .collect();
+      .take(MAX_MY_CAMPAIGNS);
 
-    const totalCampaigns = campaigns.length;
+    let totalImpressions = 0;
+    let totalClicks = 0;
+    let totalSpent = 0;
+    let activeCampaigns = 0;
 
-    const activeCampaigns = campaigns.filter(
-      (campaign) => campaign.status === "active",
-    ).length;
+    for (const campaign of campaigns) {
+      if (campaign.status === "active") {
+        activeCampaigns += 1;
+      }
 
-    const totalImpressions = campaigns.reduce(
-      (sum, campaign) =>
-        sum +
-        (typeof campaign.impressions === "number" ? campaign.impressions : 0),
-      0,
-    );
+      if (
+        typeof campaign.impressions === "number" &&
+        Number.isFinite(campaign.impressions) &&
+        campaign.impressions >= 0
+      ) {
+        totalImpressions += campaign.impressions;
+      }
 
-    const totalClicks = campaigns.reduce(
-      (sum, campaign) =>
-        sum + (typeof campaign.clicks === "number" ? campaign.clicks : 0),
-      0,
-    );
+      if (
+        typeof campaign.clicks === "number" &&
+        Number.isFinite(campaign.clicks) &&
+        campaign.clicks >= 0
+      ) {
+        totalClicks += campaign.clicks;
+      }
 
-    const totalSpent = campaigns.reduce(
-      (sum, campaign) =>
-        sum + (typeof campaign.spent === "number" ? campaign.spent : 0),
-      0,
-    );
+      if (
+        typeof campaign.spent === "number" &&
+        Number.isFinite(campaign.spent) &&
+        campaign.spent >= 0
+      ) {
+        totalSpent += campaign.spent;
+      }
+    }
 
     return {
-      totalCampaigns,
+      totalCampaigns: campaigns.length,
       activeCampaigns,
       totalImpressions,
       totalClicks,
@@ -519,7 +847,7 @@ export const listOpenProjects = query({
       .query("collaborativeProjects")
       .withIndex("by_status", (q) => q.eq("status", "open"))
       .order("desc")
-      .take(20);
+      .take(MAX_OPEN_PROJECTS);
   },
 });
 
@@ -529,18 +857,17 @@ export const listMyProjects = query({
   handler: async (ctx) => {
     const user = await requireUser(ctx);
 
-    // Projets créés par l'utilisateur.
     const created = await ctx.db
       .query("collaborativeProjects")
       .withIndex("by_creator", (q) => q.eq("creatorId", user._id))
-      .take(10);
+      .order("desc")
+      .take(MAX_CREATED_PROJECTS);
 
-    // Projets auxquels l'utilisateur contribue.
     const contributions = await ctx.db
       .query("projectContributors")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .filter((q) => q.eq(q.field("status"), "active"))
-      .take(10);
+      .take(MAX_PROJECT_CONTRIBUTIONS);
 
     const contributedProjects = await Promise.all(
       contributions.map((contribution) => ctx.db.get(contribution.projectId)),
@@ -553,15 +880,16 @@ export const listMyProjects = query({
       ),
     ];
 
-    // Déduplication.
     const seen = new Set<string>();
 
     return all.filter((project) => {
-      if (seen.has(project._id)) {
+      const projectId = String(project._id);
+
+      if (seen.has(projectId)) {
         return false;
       }
 
-      seen.add(project._id);
+      seen.add(projectId);
       return true;
     });
   },
@@ -584,28 +912,40 @@ export const createCollaborativeProject = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const title = requireNonEmptyString(args.title, "Le titre", 160);
+    const title = requireNonEmptyString(
+      args.title,
+      "Le titre",
+      MAX_TITLE_LENGTH,
+    );
 
     const description = requireNonEmptyString(
       args.description,
       "La description",
-      5000,
+      MAX_DESCRIPTION_LENGTH,
     );
 
-    const category = requireNonEmptyString(args.category, "La catégorie", 100);
+    const category = requireNonEmptyString(
+      args.category,
+      "La catégorie",
+      MAX_CATEGORY_LENGTH,
+    );
 
-    const coverImage = optionalString(args.coverImage, "coverImage", 4000);
+    const coverImage = validateOptionalUrl(args.coverImage, "coverImage");
 
     const tags = normalizeTags(args.tags);
 
-    if (
-      args.maxContributors !== undefined &&
-      (!Number.isInteger(args.maxContributors) || args.maxContributors < 1)
-    ) {
-      throw new ConvexError({
-        message: "maxContributors doit être un entier positif",
-        code: "VALIDATION_ERROR",
-      });
+    if (args.maxContributors !== undefined) {
+      if (
+        !Number.isInteger(args.maxContributors) ||
+        args.maxContributors < 1 ||
+        args.maxContributors > 1000
+      ) {
+        throw new ConvexError({
+          message:
+            "maxContributors doit être un entier compris entre 1 et 1000",
+          code: "VALIDATION_ERROR",
+        });
+      }
     }
 
     const projectId = await ctx.db.insert("collaborativeProjects", {
@@ -620,7 +960,6 @@ export const createCollaborativeProject = mutation({
       status: "open",
     });
 
-    // Le créateur devient automatiquement le premier contributeur.
     await ctx.db.insert("projectContributors", {
       projectId,
       userId: user._id,
@@ -646,7 +985,7 @@ export const joinProject = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const role = requireNonEmptyString(args.role, "Le rôle", 120);
+    const role = requireNonEmptyString(args.role, "Le rôle", MAX_ROLE_LENGTH);
 
     const project = await ctx.db.get(args.projectId);
 
@@ -664,7 +1003,6 @@ export const joinProject = mutation({
       });
     }
 
-    // Vérifier si l'utilisateur participe déjà.
     const existing = await ctx.db
       .query("projectContributors")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -678,7 +1016,6 @@ export const joinProject = mutation({
       });
     }
 
-    // Respect de la capacité maximale lorsqu'elle existe.
     if (
       project.maxContributors !== undefined &&
       project.contributorCount >= project.maxContributors

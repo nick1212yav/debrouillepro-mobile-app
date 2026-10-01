@@ -1,19 +1,36 @@
 // src/hooks/useFirebaseAuth.ts
+
 import { useCallback, useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 
 import { auth } from "@/lib/firebase";
 
-export function useFirebaseAuth() {
+interface FetchAccessTokenOptions {
+  forceRefreshToken: boolean;
+}
+
+interface FirebaseAuthState {
+  user: User | null;
+  loading: boolean;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  fetchAccessToken: (
+    options: FetchAccessTokenOptions,
+  ) => Promise<string | null>;
+}
+
+export function useFirebaseAuth(): FirebaseAuthState {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Guard : évite un crash si `auth` est null (Firebase non initialisé)
     if (!auth) {
+      setUser(null);
       setLoading(false);
       return;
     }
+
+    setLoading(true);
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -24,9 +41,40 @@ export function useFirebaseAuth() {
   }, []);
 
   const fetchAccessToken = useCallback(
-    async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-      if (!user) return null;
-      return await user.getIdToken(forceRefreshToken);
+    async ({
+      forceRefreshToken,
+    }: FetchAccessTokenOptions): Promise<string | null> => {
+      /**
+       * Convex peut appeler fetchAccessToken depuis son cycle
+       * d'authentification. On utilise auth.currentUser comme
+       * source de vérité plutôt que seulement le state React `user`.
+       *
+       * Cela évite une fenêtre de course entre :
+       *
+       * Firebase Auth
+       *      ↓
+       * onAuthStateChanged
+       *      ↓
+       * setUser(...)
+       *      ↓
+       * Convex
+       */
+      const currentUser = auth?.currentUser ?? user;
+
+      if (!currentUser) {
+        return null;
+      }
+
+      try {
+        return await currentUser.getIdToken(forceRefreshToken);
+      } catch (error) {
+        console.error(
+          "[firebase-auth] Impossible de récupérer le token Firebase.",
+          error,
+        );
+
+        return null;
+      }
     },
     [user],
   );
@@ -35,7 +83,7 @@ export function useFirebaseAuth() {
     user,
     loading,
     isLoading: loading,
-    isAuthenticated: !!user,
+    isAuthenticated: user !== null,
     fetchAccessToken,
   };
 }

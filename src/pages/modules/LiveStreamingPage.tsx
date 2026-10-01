@@ -8,6 +8,7 @@ import React, {
 
 import {
   Alert,
+  AppState,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -125,6 +126,12 @@ const BORDER = "rgba(255,255,255,0.08)";
 const LIVE_RED = "#EF4444";
 
 const PRIMARY = "#6366F1";
+
+/* Fréquence du heartbeat de présence.
+ * Doit rester <= PRESENCE_TIMEOUT_MS / 2 côté backend.
+ * Backend = 60 000 ms → heartbeat = 30 000 ms.
+ */
+const HEARTBEAT_INTERVAL_MS = 30_000;
 
 const CATEGORIES = [
   "Tout",
@@ -437,6 +444,8 @@ function WatchView({
 
   const leaveStream = useMutation(api.liveStreams.leaveStream);
 
+  const heartbeatStream = useMutation(api.liveStreams.heartbeatStream);
+
   const sendGift = useMutation(api.liveStreams.sendGift);
 
   const [chatText, setChatText] = useState("");
@@ -456,7 +465,16 @@ function WatchView({
   const chatScrollRef = useRef<ScrollView>(null);
 
   /* --------------------------------------------------------------------------
-   * JOIN / LEAVE
+   * LIVE PRESENCE — JOIN / HEARTBEAT / RESUME / LEAVE
+   *
+   * Cycle production :
+   *   - join + heartbeat à l'ouverture
+   *   - heartbeat toutes les 30 s (2× sous PRESENCE_TIMEOUT_MS = 60 s)
+   *   - interval explicitement stoppé en arrière-plan
+   *   - au retour au premier plan : re-join + heartbeat immédiat
+   *   - si backend retourne active=false : re-join + heartbeat
+   *   - lock anti-chevauchement heartbeatInFlight
+   *   - leave au démontage
    * ------------------------------------------------------------------------ */
 
   useEffect(() => {
@@ -465,24 +483,124 @@ function WatchView({
     }
 
     let mounted = true;
+    let heartbeatInFlight = false;
+    let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
-    void joinStream({
-      streamId,
-    }).catch(() => {
-      if (mounted) {
-        // L'accès au live reste disponible même
-        // si l'enregistrement de présence échoue.
+    const stopHeartbeatInterval = () => {
+      if (heartbeatInterval !== null) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
       }
-    });
+    };
+
+    const sendHeartbeat = async () => {
+      if (!mounted || heartbeatInFlight) {
+        return;
+      }
+
+      heartbeatInFlight = true;
+
+      try {
+        const result = await heartbeatStream({
+          streamId,
+        });
+
+        if (!mounted) {
+          return;
+        }
+
+        // Le backend signale que la présence n'existe plus
+        // (expirée, consommée, ou stream plus live).
+        // On re-join avant le prochain heartbeat.
+        if (result && result.active === false) {
+          try {
+            await joinStream({
+              streamId,
+            });
+
+            if (!mounted) {
+              return;
+            }
+
+            await heartbeatStream({
+              streamId,
+            });
+          } catch {
+            // La prochaine pulsation réessaiera.
+          }
+        }
+      } catch {
+        // Télémétrie de session : l'échec du heartbeat ne ferme pas le live.
+      } finally {
+        heartbeatInFlight = false;
+      }
+    };
+
+    const startHeartbeatInterval = () => {
+      if (heartbeatInterval !== null) {
+        return;
+      }
+
+      heartbeatInterval = setInterval(() => {
+        void sendHeartbeat();
+      }, HEARTBEAT_INTERVAL_MS);
+    };
+
+    const joinAndResume = async () => {
+      if (!mounted) {
+        return;
+      }
+
+      try {
+        await joinStream({
+          streamId,
+        });
+
+        if (!mounted) {
+          return;
+        }
+
+        await heartbeatStream({
+          streamId,
+        });
+      } catch {
+        // Idem : télémétrie silencieuse.
+      }
+    };
+
+    // Bootstrap
+    void joinAndResume();
+    startHeartbeatInterval();
+
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (nextState) => {
+        if (!mounted) {
+          return;
+        }
+
+        if (nextState === "active") {
+          // Retour au premier plan : la présence a pu expirer côté backend.
+          // On re-join explicitement puis on redémarre l'interval.
+          void joinAndResume();
+          startHeartbeatInterval();
+        } else {
+          // Passage en arrière-plan : on ne fait pas confiance à la
+          // suspension automatique des timers par Android/iOS.
+          stopHeartbeatInterval();
+        }
+      },
+    );
 
     return () => {
       mounted = false;
-
+      stopHeartbeatInterval();
+      appStateSubscription.remove();
       void leaveStream({
         streamId,
       }).catch(() => null);
     };
-  }, [isAuthenticated, joinStream, leaveStream, streamId]);
+  }, [heartbeatStream, isAuthenticated, joinStream, leaveStream, streamId]);
 
   /* --------------------------------------------------------------------------
    * CHAT AUTO SCROLL

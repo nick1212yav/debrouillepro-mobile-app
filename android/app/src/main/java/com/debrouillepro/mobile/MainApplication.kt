@@ -1,4 +1,4 @@
-package com.nick_12.apptemplate
+package com.debrouillepro.mobile
 
 import android.app.Application
 import android.content.res.Configuration

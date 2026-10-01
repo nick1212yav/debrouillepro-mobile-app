@@ -7,11 +7,17 @@
 // ✅ Batch 2.5 : listStories (sémantique + borne), createStory (durée),
 //    viewStory (.first() + expiration), deleteStory (check remaining)
 // ✅ Fix TS : postsQuery typé explicitement (Doc<"publications">[])
+// ✅ Phase 6 : LIVE branché sur les helpers canoniques liveStreamsHelpers
 
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import {
+  startStreamInternal,
+  endStreamInternal,
+  getActiveStreamForHost,
+} from "./liveStreamsHelpers";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -280,8 +286,6 @@ export const listFeed = query({
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
     const currentUserId = currentUser?._id;
-    // Annotation explicite : sans elle, TS infère `any` et la résolution
-    // de `ctx.db.get(p.authorId)` retourne l'union de tous les documents.
     let postsQuery: Doc<"publications">[];
     if (args.search) {
       postsQuery = await ctx.db
@@ -888,8 +892,6 @@ export const listStories = query({
   args: {},
   handler: async (ctx) => {
     const currentUser = await getCurrentUser(ctx);
-    // Une story active est une story dont expiresAt est strictement postérieur
-    // à maintenant. `now - 24h` réintroduirait des stories déjà expirées.
     const now = new Date().toISOString();
     const stories = await ctx.db
       .query("stories")
@@ -949,7 +951,7 @@ export const createStory = mutation({
       mediaUrl: args.mediaUrl,
       mediaType: args.mediaType,
       caption: args.caption,
-      duration: args.duration, // champ optionnel — aucune valeur inventée
+      duration: args.duration,
       viewCount: 0,
       expiresAt,
       isHighlight: false,
@@ -969,11 +971,9 @@ export const viewStory = mutation({
         message: "Story introuvable",
       });
 
-    // Refuser une vue sur une story expirée.
     const now = new Date().toISOString();
     if (story.expiresAt <= now) return;
 
-    // .first() : ne crash pas si deux vues existent (double-tap rapide avant insert).
     const existing = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
@@ -988,7 +988,6 @@ export const viewStory = mutation({
       viewedAt: now,
     });
 
-    // viewCount est v.number() non-optionnel : aucun fallback `|| 0`.
     await ctx.db.patch(args.storyId, {
       viewCount: story.viewCount + 1,
     });
@@ -1019,8 +1018,6 @@ export const deleteStory = mutation({
       });
     }
 
-    // Suppression bornée : une mutation ne doit jamais collecter
-    // toutes les vues d'une Story sans limite.
     const views = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
@@ -1030,9 +1027,6 @@ export const deleteStory = mutation({
       await ctx.db.delete(view._id);
     }
 
-    // Après suppression du batch, on vérifie qu'il ne reste PLUS aucune vue.
-    // Sans ce check, une story avec exactement 500 vues retournerait
-    // pendingCleanup: true alors que tout est supprimé → boucle infinie client.
     if (views.length === 500) {
       const remaining = await ctx.db
         .query("storyViews")
@@ -1059,18 +1053,35 @@ export const deleteStory = mutation({
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// LIVE
+// LIVE — délégué au backend canonique liveStreamsHelpers
 // ══════════════════════════════════════════════════════════════════════════════
 
 export const getLiveStatus = query({
   args: {},
   handler: async (ctx) => {
-    const live = await ctx.db
-      .query("liveStreams")
-      .withIndex("by_status", (q) => q.eq("status", "live"))
+    // Host-only : on ne retourne que le live de l'utilisateur courant.
+    // Corrige le `.unique()` global qui crashait avec 2+ lives simultanés.
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return { isLive: false, streamUrl: null };
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
       .unique();
+
+    if (!user) return { isLive: false, streamUrl: null };
+
+    const live = await getActiveStreamForHost(ctx, user._id);
     if (!live) return { isLive: false, streamUrl: null };
-    return { isLive: true, streamUrl: live.streamUrl };
+
+    // Compat : l'ancien contrat expose `streamUrl`, le modèle canonique
+    // utilise `playbackUrl`. Aucune URL n'est fabriquée.
+    return {
+      isLive: true,
+      streamUrl: live.playbackUrl ?? null,
+    };
   },
 });
 
@@ -1078,34 +1089,25 @@ export const startLive = mutation({
   args: { title: v.string(), description: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const existing = await ctx.db
-      .query("liveStreams")
-      .withIndex("by_host", (q) => q.eq("hostId", user._id))
-      .filter((q) => q.eq(q.field("status"), "live"))
-      .unique();
-    if (existing)
+
+    if (user.isBanned === true) {
       throw new ConvexError({
-        code: "CONFLICT",
-        message: "Vous avez déjà un live en cours",
+        code: "FORBIDDEN",
+        message: "Votre compte ne peut pas lancer de live",
       });
-    // streamUrl est v.optional(v.string()) dans le schéma.
-    // Aucune URL de flux n'est générée : la vraie URL RTMP/HLS dépend
-    // d'un pipeline CDN qui n'existe pas encore (décision produit).
-    // CommunityLive.tsx affiche un placeholder quand streamUrl est absent.
-    await ctx.db.insert("liveStreams", {
-      hostId: user._id,
+    }
+
+    // 1) Logique Live canonique
+    const streamId = await startStreamInternal(ctx, user, {
       title: args.title,
       description: args.description,
-      // streamUrl: volontairement non renseigné
-      status: "live",
-      startedAt: new Date().toISOString(),
-      viewerCount: 0,
-      likeCount: 0,
-      peakViewers: 0,
       category: "general",
-      isPublic: true,
       tags: [],
+      isPublic: true,
     });
+
+    // 2) Effet de bord spécifique Community : publication dans le feed.
+    //    Le helper ne connaît pas `publications`.
     await ctx.db.insert("publications", {
       authorId: user._id,
       type: "community",
@@ -1120,11 +1122,12 @@ export const startLive = mutation({
       meta: JSON.stringify({
         postType: "live",
         emoji: "🔴",
+        streamId,
       }),
     });
-    // useCommunityLive.ts lit `result.streamUrl` puis appelle
-    // setStreamUrl(string | null). On retourne `null` — la forme du contrat
-    // client est préservée, aucune URL fabriquée n'est exposée.
+
+    // 3) Contrat frontend conservé : `{ streamUrl: string | null }`
+    //    Aucune URL fabriquée (pas de pipeline CDN branché).
     return { streamUrl: null };
   },
 });
@@ -1133,20 +1136,17 @@ export const endLive = mutation({
   args: {},
   handler: async (ctx) => {
     const user = await requireUser(ctx);
-    const live = await ctx.db
-      .query("liveStreams")
-      .withIndex("by_host", (q) => q.eq("hostId", user._id))
-      .filter((q) => q.eq(q.field("status"), "live"))
-      .unique();
-    if (!live)
+
+    const live = await getActiveStreamForHost(ctx, user._id);
+
+    if (!live) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Aucun live en cours",
       });
-    await ctx.db.patch(live._id, {
-      status: "ended",
-      endedAt: new Date().toISOString(),
-    });
+    }
+
+    await endStreamInternal(ctx, live._id);
   },
 });
 

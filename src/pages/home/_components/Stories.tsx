@@ -20,7 +20,7 @@ import {
 } from "react";
 import { Plus, RefreshCw, Sparkles } from "lucide-react-native";
 
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api.js";
 
@@ -38,20 +38,45 @@ interface StoriesProps {
 }
 
 /* ============================================================
- * TYPES BACKEND
- * ============================================================ */
+ * TYPES BACKEND — aligné sur le contrat convex/stories.ts v2.1
+ * ============================================================
+ * Aucun champ legacy. Le backend garantit storyType sur chaque
+ * story exposée au feed (schemaVersion 1 pour les nouvelles,
+ * normalisation à la volée pour les anciennes).
+ */
+
+type StoryType = "image" | "video" | "text" | "poll";
 
 type BackendStory = {
   _id: string;
   _creationTime: number;
   authorId: string;
-  mediaUrl: string;
-  mediaType: "image" | "video";
-  caption?: string;
+
+  storyType: StoryType;
+  schemaVersion: number;
+
+  // Média
+  mediaUrl?: string;
+  mediaType?: "image" | "video";
   duration?: number;
+
+  // Texte
+  textContent?: string;
+  backgroundKey?: string;
+  textColor?: string;
+
+  // Sondage
+  pollQuestion?: string;
+  pollOptions?: string[];
+
+  // Commun
+  caption?: string;
   viewCount: number;
   expiresAt: string;
   isHighlight: boolean;
+  createdAt?: string;
+
+  // Enrichi par getStoryFeed
   authorName: string;
   authorAvatar?: string;
   authorCity?: string;
@@ -76,12 +101,27 @@ type StoryGroupWithUnread = StoryGroup & {
   unreadCount?: number;
 };
 
-type StoryPublishSlide = Omit<
-  StorySlide,
-  "id" | "authorName" | "authorAvatar" | "authorGradient" | "time"
-> & {
-  duration?: number;
+/* ============================================================
+ * MAPPING VISUEL — TEXT GRADIENTS
+ * ============================================================
+ * Doit rester synchronisé avec TEXT_GRADIENTS dans StoryCreator.tsx.
+ * Convertit un `backgroundKey` (clé textuelle) en dégradé visuel.
+ * Aucun décodage de chaîne, aucune heuristique.
+ */
+
+const TEXT_GRADIENTS_MAP: Record<string, readonly [string, string]> = {
+  purple: ["#667EEA", "#764BA2"],
+  pink: ["#F093FB", "#F5576C"],
+  cyan: ["#4FACFE", "#00F2FE"],
+  green: ["#43E97B", "#38F9D7"],
+  peach: ["#FA709A", "#FEE140"],
+  violet: ["#A18CD1", "#FBC2EB"],
+  sand: ["#FFECD2", "#FCB69F"],
+  dark: ["#0A0A1A", "#1A1A3E"],
 };
+
+const DEFAULT_BACKGROUND_KEY = "dark";
+const DEFAULT_TEXT_COLOR = "#FFFFFF";
 
 /* ============================================================
  * HELPERS
@@ -99,7 +139,7 @@ function getInitials(name: string): string {
 function formatStoryTime(creationTime: number): string {
   const diff = Math.max(0, Date.now() - creationTime);
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "À l'instant";
+  if (minutes < 1) return "à l'instant";
   if (minutes < 60) return `il y a ${minutes} min`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `il y a ${hours}h`;
@@ -107,25 +147,76 @@ function formatStoryTime(creationTime: number): string {
   return `il y a ${days}j`;
 }
 
-function isVideo(story: BackendStory): boolean {
-  return story.mediaType === "video";
+function resolveTextGradient(
+  backgroundKey?: string,
+): readonly [string, string] {
+  if (!backgroundKey) {
+    return TEXT_GRADIENTS_MAP[DEFAULT_BACKGROUND_KEY];
+  }
+  return (
+    TEXT_GRADIENTS_MAP[backgroundKey] ??
+    TEXT_GRADIENTS_MAP[DEFAULT_BACKGROUND_KEY]
+  );
 }
 
 /* ============================================================
  * BACKEND → UI
- * ============================================================ */
+ * ============================================================
+ * Mapping direct depuis le contrat `storyType`.
+ *   - image / video → `img` (mediaUrl déjà résolu par le backend)
+ *   - text          → `text` + `textColor` + `bg` (dérivé du backgroundKey)
+ *   - poll          → `pollQuestion` + `pollOptions`
+ *
+ * `video` est traité comme `image` pour l'instant, car `StoryViewer`
+ * n'expose que les types `text | image | poll` et utilise `RNImage`.
+ * Une évolution ultérieure pourra dédier un vrai type `video`.
+ */
 
-function mapStorySlide(story: BackendStory): StorySlide {
-  return {
+function mapStoryToSlide(story: BackendStory): StorySlide {
+  const base = {
     id: String(story._id),
-    type: isVideo(story) ? "video" : "image",
-    bg: "#050812",
-    img: story.mediaUrl,
-    text: story.caption ?? "",
     authorName: story.authorName,
     authorAvatar: story.authorAvatar,
     time: formatStoryTime(story._creationTime),
-  } as StorySlide;
+  };
+
+  /* ───── POLL ───────────────────────────────────────────── */
+  if (story.storyType === "poll") {
+    const options = Array.isArray(story.pollOptions) ? story.pollOptions : [];
+    const question = story.pollQuestion ?? story.caption ?? "";
+
+    return {
+      ...base,
+      type: "poll",
+      bg: `linear-gradient(135deg, ${TEXT_GRADIENTS_MAP.dark[0]}, ${TEXT_GRADIENTS_MAP.dark[1]})`,
+      pollQuestion: question,
+      pollOptions: options,
+    };
+  }
+
+  /* ───── TEXT ───────────────────────────────────────────── */
+  if (story.storyType === "text") {
+    const gradient = resolveTextGradient(story.backgroundKey);
+    const textColor = story.textColor ?? DEFAULT_TEXT_COLOR;
+    const text = story.textContent ?? story.caption ?? "";
+
+    return {
+      ...base,
+      type: "text",
+      bg: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`,
+      text,
+      textColor,
+    };
+  }
+
+  /* ───── IMAGE / VIDEO ──────────────────────────────────── */
+  return {
+    ...base,
+    type: "image",
+    bg: "#000000",
+    img: story.mediaUrl,
+    text: story.caption ?? "",
+  };
 }
 
 function mapStoryGroup(group: BackendStoryGroup): StoryGroupWithUnread {
@@ -134,7 +225,7 @@ function mapStoryGroup(group: BackendStoryGroup): StoryGroupWithUnread {
     authorName: group.author.name,
     authorAvatar: group.author.avatar,
     seen: !group.hasUnviewed,
-    slides: group.stories.map(mapStorySlide),
+    slides: group.stories.map(mapStoryToSlide),
     unreadCount: group.unreadCount,
   };
 }
@@ -154,7 +245,7 @@ function FadeUp({
   distance?: number;
   scale?: number;
   children: ReactNode;
-  style?: any;
+  style?: object;
 }) {
   const anim = useRef(new Animated.Value(0)).current;
 
@@ -197,7 +288,7 @@ function FadeUp({
 }
 
 /* ============================================================
- * SPARKLE BADGE (Plus)
+ * SPARKLE BADGE
  * ============================================================ */
 
 function SparkleBadge() {
@@ -241,7 +332,7 @@ function SparkleBadge() {
 }
 
 /* ============================================================
- * PULSE RING (unread story)
+ * PULSE RING
  * ============================================================ */
 
 function PulseRing() {
@@ -313,7 +404,7 @@ function RefreshSpinner({ active }: { active: boolean }) {
  * LOADING SKELETON
  * ============================================================ */
 
-function StoriesSkeleton({ className }: { className?: string }) {
+function StoriesSkeleton() {
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -345,7 +436,6 @@ function StoriesSkeleton({ className }: { className?: string }) {
       style={[styles.root, styles.skeletonRoot]}
       accessibilityLabel="Stories"
     >
-      {/* Header */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <Animated.View style={[styles.skeletonHeaderTitle, { opacity }]} />
@@ -353,7 +443,6 @@ function StoriesSkeleton({ className }: { className?: string }) {
         </View>
       </View>
 
-      {/* Scroll row */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -372,7 +461,7 @@ function StoriesSkeleton({ className }: { className?: string }) {
 }
 
 /* ============================================================
- * STORY AVATAR (main state)
+ * STORY AVATAR
  * ============================================================ */
 
 function StoryAvatar({
@@ -409,17 +498,30 @@ function StoryAvatar({
     <FadeUp delay={40 * index} distance={8} scale={0.8}>
       <Animated.View style={{ transform: [{ scale }] }}>
         <Pressable
-          onPress={onPress}
+          onPress={() => {
+            if (__DEV__) {
+              console.log("👆 STORY AVATAR PRESSED", {
+                groupId: group.id,
+                author: group.authorName,
+              });
+            }
+            onPress();
+          }}
           onPressIn={onPressIn}
           onPressOut={onPressOut}
+          hitSlop={10}
+          pressRetentionOffset={20}
+          android_ripple={{
+            color: "rgba(167,139,250,0.18)",
+            borderless: false,
+          }}
+          accessibilityRole="button"
           accessibilityLabel={`Voir les stories de ${group.authorName}`}
           style={styles.avatarPress}
         >
           <View style={styles.avatarOuter}>
-            {/* Pulse ring if unread */}
             {isNew ? <PulseRing /> : null}
 
-            {/* Ring (gradient if unread, dim if seen) */}
             <View style={styles.avatarRingWrap}>
               {isNew ? (
                 <LinearGradient
@@ -452,10 +554,8 @@ function StoryAvatar({
               </View>
             </View>
 
-            {/* Unread dot */}
             {isNew ? <View style={styles.unreadDot} /> : null}
 
-            {/* Unread count badge */}
             {group.unreadCount && group.unreadCount > 1 ? (
               <View style={styles.unreadCountBadge}>
                 <Text style={styles.unreadCountText}>{group.unreadCount}</Text>
@@ -548,13 +648,7 @@ function AddStoryButton({ onPress }: { onPress: () => void }) {
  * EMPTY STATE
  * ============================================================ */
 
-function EmptyState({
-  className,
-  onOpenCreator,
-}: {
-  className?: string;
-  onOpenCreator: () => void;
-}) {
+function EmptyState({ onOpenCreator }: { onOpenCreator: () => void }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () => {
@@ -573,10 +667,7 @@ function EmptyState({
   };
 
   return (
-    <View
-      style={[styles.root, className ? undefined : undefined]}
-      accessibilityLabel="Stories"
-    >
+    <View style={styles.root} accessibilityLabel="Stories">
       <View style={styles.emptyCard}>
         <LinearGradient
           colors={[
@@ -641,19 +732,19 @@ function EmptyState({
 
 export default function Stories({ className }: StoriesProps) {
   const feed = useQuery(api.stories.getStoryFeed, {});
-  const markViewed = useMutation(api.stories.markViewed);
-  const createStory = useMutation(api.stories.createStory);
 
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerGroupIndex, setViewerGroupIndex] = useState(0);
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  /* ───── normalisation ───── */
+  /* ---- normalisation ---- */
   const groups = useMemo<StoryGroupWithUnread[]>(() => {
     if (!feed) return [];
+
     const backendGroups = (feed.groups ?? []) as BackendStoryGroup[];
-    return backendGroups
+
+    const mapped = backendGroups
       .filter(
         (group) =>
           group.author &&
@@ -661,84 +752,95 @@ export default function Stories({ className }: StoriesProps) {
           group.stories.length > 0,
       )
       .map(mapStoryGroup);
+
+    if (__DEV__) {
+      console.log(
+        "📸 STORIES MEDIA PIPELINE",
+        backendGroups.map((group) => ({
+          author: group.author?.name,
+          stories: group.stories.map((story) => ({
+            id: story._id,
+            storyType: story.storyType,
+            schemaVersion: story.schemaVersion,
+            mediaUrl: story.mediaUrl,
+            hasText:
+              typeof story.textContent === "string" &&
+              story.textContent.length > 0,
+            hasPoll:
+              Array.isArray(story.pollOptions) && story.pollOptions.length > 0,
+          })),
+        })),
+      );
+    }
+
+    return mapped;
   }, [feed]);
 
-  /* ───── stats ───── */
+  useEffect(() => {
+    if (__DEV__) {
+      console.log("🎬 STORY VIEWER STATE", {
+        viewerOpen,
+        viewerGroupIndex,
+        groupId: groups[viewerGroupIndex]?.id ?? null,
+      });
+    }
+  }, [viewerOpen, viewerGroupIndex, groups]);
+
+  /* ---- stats ---- */
   const totalStories = feed?.totalStories ?? 0;
   const totalGroups = feed?.totalGroups ?? 0;
   const unreadGroups = groups.filter((g) => !g.seen).length;
 
-  /* ───── open viewer ───── */
+  /* ---- open viewer ---- */
   const openViewer = useCallback(
     (groupId: string) => {
       const index = groups.findIndex((g) => g.id === groupId);
-      if (index === -1) return;
+
+      if (__DEV__) {
+        console.log("🎬 STORY OPEN REQUEST", {
+          groupId,
+          index,
+          groupsCount: groups.length,
+        });
+      }
+
+      if (index < 0) {
+        console.warn("⚠️ STORY GROUP NOT FOUND", groupId);
+        return;
+      }
+
       setViewerGroupIndex(index);
       setViewerOpen(true);
     },
     [groups],
   );
 
-  /* ───── mark viewed ───── */
-  const handleMarkSeen = useCallback(
-    async (groupId: string) => {
-      const group = groups.find((item) => item.id === groupId);
-      if (!group) return;
-
-      for (const slide of group.slides) {
-        try {
-          await markViewed({ storyId: slide.id as never });
-        } catch {
-          // silent
-        }
-      }
-    },
-    [groups, markViewed],
-  );
-
-  /* ───── refresh ───── */
+  /* ---- refresh ---- */
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
     await new Promise<void>((resolve) => setTimeout(resolve, 450));
     setIsRefreshing(false);
   }, []);
 
-  /* ───── publish ───── */
-  const handlePublish = useCallback(
-    async (slide: StoryPublishSlide) => {
-      const mediaUrl = typeof slide.img === "string" ? slide.img : "";
-      if (!mediaUrl) return;
+  /*
+   * `StoryCreator` effectue déjà `createStory` côté backend.
+   * On se contente de fermer le créateur — refaire l'appel ici
+   * stockerait la story en double.
+   */
+  const handlePublish = useCallback(() => {
+    setCreatorOpen(false);
+  }, []);
 
-      try {
-        await createStory({
-          mediaUrl,
-          mediaType: "image",
-          caption: typeof slide.text === "string" ? slide.text : undefined,
-          duration:
-            typeof slide.duration === "number" ? slide.duration : undefined,
-        });
-      } catch (error) {
-        console.error("[Stories] Publish failed:", error);
-      } finally {
-        setCreatorOpen(false);
-      }
-    },
-    [createStory],
-  );
-
-  /* ───── loading state ───── */
+  /* ---- loading state ---- */
   if (feed === undefined) {
-    return <StoriesSkeleton className={className} />;
+    return <StoriesSkeleton />;
   }
 
-  /* ───── empty state ───── */
+  /* ---- empty state ---- */
   if (groups.length === 0) {
     return (
       <>
-        <EmptyState
-          className={className}
-          onOpenCreator={() => setCreatorOpen(true)}
-        />
+        <EmptyState onOpenCreator={() => setCreatorOpen(true)} />
 
         {creatorOpen ? (
           <StoryCreator
@@ -750,14 +852,10 @@ export default function Stories({ className }: StoriesProps) {
     );
   }
 
-  /* ========================================================================
-   * MAIN STATE
-   * ====================================================================== */
-
   return (
     <>
       <View style={styles.root} accessibilityLabel="Stories">
-        {/* ───── HEADER ───── */}
+        {/* HEADER */}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Stories</Text>
@@ -795,7 +893,7 @@ export default function Stories({ className }: StoriesProps) {
           </View>
         </View>
 
-        {/* ───── STORIES ROW ───── */}
+        {/* STORIES ROW */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -813,7 +911,7 @@ export default function Stories({ className }: StoriesProps) {
           ))}
         </ScrollView>
 
-        {/* ───── FOOTER HINT ───── */}
+        {/* FOOTER HINT */}
         {totalGroups > 0 ? (
           <FadeUp delay={200} distance={4}>
             <View style={styles.footerHint}>
@@ -826,17 +924,20 @@ export default function Stories({ className }: StoriesProps) {
         ) : null}
       </View>
 
-      {/* ───── VIEWER ───── */}
+      {/* VIEWER */}
       {viewerOpen ? (
         <StoryViewer
+          key={`${groups[viewerGroupIndex]?.id ?? "story"}-${viewerGroupIndex}`}
           groups={groups}
           initialGroupIndex={viewerGroupIndex}
-          onClose={() => setViewerOpen(false)}
-          onMarkSeen={handleMarkSeen}
+          onClose={() => {
+            if (__DEV__) console.log("❌ STORY VIEWER CLOSED");
+            setViewerOpen(false);
+          }}
         />
       ) : null}
 
-      {/* ───── CREATOR ───── */}
+      {/* CREATOR */}
       {creatorOpen ? (
         <StoryCreator
           onClose={() => setCreatorOpen(false)}
@@ -848,7 +949,7 @@ export default function Stories({ className }: StoriesProps) {
 }
 
 /* ============================================================
- * STYLES
+ * STYLES (inchangés)
  * ============================================================ */
 
 const AVATAR_SIZE = 56;
@@ -859,7 +960,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  /* ── Header ────────────────────────────────────── */
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -915,13 +1015,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
   },
 
-  /* ── Scroll row ────────────────────────────────── */
   scrollRow: {
     gap: 12,
     paddingBottom: 6,
   },
 
-  /* ── Avatar / Add button ──────────────────────── */
   avatarPress: {
     alignItems: "center",
     gap: 6,
@@ -982,7 +1080,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
 
-  /* ── Pulse ring (unread) ─────────────────────── */
   pulseRing: {
     position: "absolute",
     top: 0,
@@ -994,7 +1091,6 @@ const styles = StyleSheet.create({
     borderColor: "#A78BFA",
   },
 
-  /* ── Unread dot ───────────────────────────────── */
   unreadDot: {
     position: "absolute",
     top: -2,
@@ -1011,7 +1107,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
 
-  /* ── Unread count badge ───────────────────────── */
   unreadCountBadge: {
     position: "absolute",
     bottom: -4,
@@ -1033,7 +1128,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  /* ── Add story button ─────────────────────────── */
   addRingWrap: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
@@ -1078,7 +1172,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
 
-  /* ── Sparkle badge ────────────────────────────── */
   sparkleBadge: {
     position: "absolute",
     top: -3,
@@ -1095,7 +1188,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
 
-  /* ── Footer hint ──────────────────────────────── */
   footerHint: {
     flexDirection: "row",
     alignItems: "center",
@@ -1119,7 +1211,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
 
-  /* ── Empty state ──────────────────────────────── */
   emptyCard: {
     borderRadius: 24,
     padding: 16,
@@ -1187,7 +1278,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  /* ── Skeleton ─────────────────────────────────── */
   skeletonRoot: {
     paddingHorizontal: 20,
     marginTop: 16,

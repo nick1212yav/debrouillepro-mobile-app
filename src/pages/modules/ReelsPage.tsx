@@ -1,3 +1,5 @@
+// src/pages/modules/ReelsPage.tsx — VERSION FINALE
+
 import React, {
   useCallback,
   useEffect,
@@ -5,32 +7,40 @@ import React, {
   useRef,
   useState,
 } from "react";
+
 import {
   ActivityIndicator,
   Image,
+  Modal,
+  Platform,
   Pressable,
   Share,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
+
+import * as ImagePicker from "expo-image-picker";
+import { useVideoPlayer, VideoView } from "expo-video";
+
 import {
   ArrowLeft,
+  BarChart3,
   Bookmark,
   Check,
-  ChevronDown,
-  ChevronUp,
+  Flag,
   Gauge,
   Heart,
   Hash,
   MessageCircle,
-  Pause,
   Play,
   Plus,
   Send,
   Share2,
+  ShieldCheck,
   Trash2,
   Upload,
   UserCheck,
@@ -39,81 +49,173 @@ import {
   VolumeX,
   X,
 } from "lucide-react-native";
+
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
+
 import type { Id } from "@/convex/_generated/dataModel.js";
 import { api } from "@/convex/_generated/api.js";
+
 import {
   Authenticated,
   Unauthenticated,
   useConvexAuth,
 } from "@/lib/convex-auth-compat";
+
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
+
+type Visibility = "public" | "followers" | "private";
+
+type ModerationStatus = "pending" | "approved" | "rejected";
+
+type ReportReason =
+  | "spam"
+  | "nudity"
+  | "violence"
+  | "harassment"
+  | "misinformation"
+  | "copyright"
+  | "other";
+
+type Speed = 0.5 | 0.75 | 1 | 1.25 | 1.5 | 2;
+
+type ReelsMode = "public" | "mine";
 
 type VideoItem = {
   _id: Id<"shortVideos">;
-  videoUrl: string;
-  thumbnailUrl?: string;
+
+  videoStorageId?: Id<"_storage">;
+  thumbnailStorageId?: Id<"_storage">;
+
+  videoUrlResolved?: string | null;
+  thumbnailUrlResolved?: string | null;
+
+  videoUrl?: string | null;
+  thumbnailUrl?: string | null;
+
+  duration?: number;
+
   caption: string;
   hashtags: string[];
+  soundName?: string;
+
   likeCount: number;
   commentCount: number;
   shareCount: number;
   viewCount: number;
+  saveCount: number;
+
+  isActive: boolean;
+  isDeleted: boolean;
+  isPinned: boolean;
+
+  visibility: Visibility;
+  moderationStatus: ModerationStatus;
+
+  city?: string;
+
+  schemaVersion: number;
+  createdAt: number;
+  updatedAt: number;
+
   authorId?: Id<"users">;
   authorName?: string;
   authorAvatar?: string;
+
+  likedByMe: boolean;
+  savedByMe: boolean;
+};
+
+type CommentItem = {
+  _id: Id<"shortVideoComments">;
+  videoId: Id<"shortVideos">;
+  userId: Id<"users">;
+
+  text: string;
+
+  parentCommentId?: Id<"shortVideoComments">;
+
+  likeCount: number;
+  replyCount: number;
+
+  isDeleted: boolean;
+
+  moderationStatus: "pending" | "approved" | "rejected";
+
+  createdAt: number;
+  updatedAt: number;
+
+  userName: string;
+  userAvatar?: string;
+
   likedByMe: boolean;
 };
 
-type Speed = 0.5 | 0.75 | 1 | 1.25 | 1.5 | 2;
-
-type ReelPlayerHandle = {
-  play?: () => Promise<void> | void;
-  pause?: () => void;
-  seekTo?: (seconds: number) => void;
-  setMuted?: (muted: boolean) => void;
-  setPlaybackRate?: (rate: number) => void;
-  getCurrentTime?: () => number;
-  getDuration?: () => number;
+type AnalyticsData = {
+  videoId: Id<"shortVideos">;
+  likeCount: number;
+  commentCount: number;
+  shareCount: number;
+  viewCount: number;
+  saveCount: number;
+  completedViews: number;
+  countedViews: number;
+  totalWatchedMs: number;
+  shareEvents: number;
+  saveEvents: number;
+  averageWatchMs: number;
+  completionRate: number;
 };
 
-interface ReelsPageProps {
+type ReelsPageProps = {
   onBack: () => void;
-}
+  mode?: ReelsMode;
+};
 
 const SPEED_OPTIONS: readonly Speed[] = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Design system
-// ─────────────────────────────────────────────────────────────────────────────
+const TOP_INSET: number =
+  Platform.OS === "android" ? (StatusBar.currentHeight ?? 28) : 44;
+
+/* ============================================================================
+ * DESIGN SYSTEM
+ * ========================================================================== */
 
 const COLORS = {
   black: "#000000",
   background: "#020412",
+  surface: "#080D1D",
+  surface2: "#0C1226",
+
   white: "#FFFFFF",
-  muted: "rgba(255,255,255,0.62)",
-  subtle: "rgba(255,255,255,0.38)",
+  muted: "rgba(255,255,255,0.64)",
+  subtle: "rgba(255,255,255,0.42)",
   faint: "rgba(255,255,255,0.20)",
+
   border: "rgba(255,255,255,0.12)",
-  surface: "rgba(8,12,28,0.94)",
-  surfaceSoft: "rgba(255,255,255,0.065)",
+  borderStrong: "rgba(255,255,255,0.18)",
+
   purple: "#8B5CF6",
   purpleBright: "#A78BFA",
+
   red: "#FB7185",
   green: "#34D399",
+  yellow: "#FACC15",
+  orange: "#FB923C",
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
 
 function formatCount(value: number): string {
-  if (!Number.isFinite(value)) return "0";
+  if (!Number.isFinite(value)) {
+    return "0";
+  }
 
   if (value >= 1_000_000) {
     return `${(value / 1_000_000).toFixed(1)}M`;
@@ -131,26 +233,86 @@ function safeNumber(value: unknown): number {
 }
 
 function normalizeHashtags(value: string): string[] {
-  return value
-    .split(/\s+/)
-    .map((tag) => tag.trim().replace(/^#/, ""))
-    .filter(Boolean)
-    .slice(0, 20);
+  return [
+    ...new Set(
+      value
+        .split(/\s+/)
+        .map((tag) => tag.trim().replace(/^#/, ""))
+        .filter(Boolean),
+    ),
+  ].slice(0, 30);
 }
 
-function isValidVideoUrl(value: string): boolean {
-  try {
-    const url = new URL(value.trim());
+function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000));
 
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+function createSessionId(): string {
+  return `reels-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
   }
+
+  return "Une erreur inattendue est survenue.";
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Avatar
-// ─────────────────────────────────────────────────────────────────────────────
+function resolveVideoSource(video: VideoItem): string | null {
+  if (
+    typeof video.videoUrlResolved === "string" &&
+    video.videoUrlResolved.trim().length > 0
+  ) {
+    return video.videoUrlResolved;
+  }
+
+  if (typeof video.videoUrl === "string" && video.videoUrl.trim().length > 0) {
+    return video.videoUrl;
+  }
+
+  return null;
+}
+
+function resolveThumbnailSource(video: VideoItem): string | null {
+  if (
+    typeof video.thumbnailUrlResolved === "string" &&
+    video.thumbnailUrlResolved.trim().length > 0
+  ) {
+    return video.thumbnailUrlResolved;
+  }
+
+  if (
+    typeof video.thumbnailUrl === "string" &&
+    video.thumbnailUrl.trim().length > 0
+  ) {
+    return video.thumbnailUrl;
+  }
+
+  return null;
+}
+
+function getModerationBadge(status: ModerationStatus): {
+  label: string;
+  tone: "pending" | "approved" | "rejected";
+} {
+  if (status === "approved") {
+    return { label: "🟢 Publié", tone: "approved" };
+  }
+  if (status === "rejected") {
+    return { label: "🔴 Rejeté", tone: "rejected" };
+  }
+  return { label: "🟡 En attente de validation", tone: "pending" };
+}
+
+/* ============================================================================
+ * AVATAR
+ * ========================================================================== */
 
 function Avatar({
   name,
@@ -204,12 +366,13 @@ function Avatar({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Follow
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * FOLLOW
+ * ========================================================================== */
 
 function FollowButton({ authorId }: { authorId?: Id<"users"> }) {
   const { isAuthenticated } = useConvexAuth();
+
   const toggleFollow = useMutation(api.follows.toggleFollow);
 
   const [following, setFollowing] = useState(false);
@@ -234,8 +397,10 @@ function FollowButton({ authorId }: { authorId?: Id<"users"> }) {
           ? "Vous suivez maintenant ce créateur."
           : "Abonnement retiré.",
       );
-    } catch {
-      toast.error("Impossible de modifier l’abonnement.");
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error) || "Impossible de modifier l’abonnement.",
+      );
     } finally {
       setLoading(false);
     }
@@ -270,9 +435,9 @@ function FollowButton({ authorId }: { authorId?: Id<"users"> }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Speed picker
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * SPEED PICKER
+ * ========================================================================== */
 
 function SpeedPicker({
   speed,
@@ -290,7 +455,7 @@ function SpeedPicker({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Fermer le sélecteur de vitesse"
+          accessibilityLabel="Fermer"
           onPress={onClose}
           style={styles.smallCloseButton}
         >
@@ -333,9 +498,141 @@ function SpeedPicker({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Comments
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * REPORT
+ * ========================================================================== */
+
+function ReportSheet({
+  videoId,
+  onClose,
+}: {
+  videoId: Id<"shortVideos">;
+  onClose: () => void;
+}) {
+  const report = useMutation(api.shortVideos.report);
+
+  const [reason, setReason] = useState<ReportReason>("spam");
+  const [details, setDetails] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const reasons: Array<{ value: ReportReason; label: string }> = [
+    { value: "spam", label: "Spam" },
+    { value: "nudity", label: "Nudité" },
+    { value: "violence", label: "Violence" },
+    { value: "harassment", label: "Harcèlement" },
+    { value: "misinformation", label: "Désinformation" },
+    { value: "copyright", label: "Droits d’auteur" },
+    { value: "other", label: "Autre" },
+  ];
+
+  const submit = useCallback(async () => {
+    if (sending) {
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      await report({
+        videoId,
+        reason,
+        details: details.trim() || undefined,
+      });
+
+      toast.success("Signalement enregistré.");
+
+      onClose();
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error) || "Impossible d’envoyer le signalement.",
+      );
+    } finally {
+      setSending(false);
+    }
+  }, [details, onClose, reason, report, sending, videoId]);
+
+  return (
+    <View style={styles.modalOverlay}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+      <View style={styles.reportSheet}>
+        <View style={styles.sheetHeader}>
+          <View style={styles.sheetTitleRow}>
+            <Flag size={17} color={COLORS.red} />
+
+            <Text style={styles.sheetTitle}>Signaler ce Reel</Text>
+          </View>
+
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <X size={17} color={COLORS.white} />
+          </Pressable>
+        </View>
+
+        <Text style={styles.fieldLabel}>Motif</Text>
+
+        <View style={styles.reportReasons}>
+          {reasons.map((item) => {
+            const selected = reason === item.value;
+
+            return (
+              <Pressable
+                key={item.value}
+                onPress={() => setReason(item.value)}
+                style={[
+                  styles.reportReason,
+                  selected && styles.reportReasonSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.reportReasonText,
+                    selected && styles.reportReasonTextSelected,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.fieldLabel}>Détails facultatifs</Text>
+
+        <TextInput
+          value={details}
+          onChangeText={setDetails}
+          multiline
+          maxLength={2000}
+          placeholder="Ajoutez un contexte utile…"
+          placeholderTextColor={COLORS.subtle}
+          style={[styles.input, styles.multilineInput]}
+        />
+
+        <Pressable
+          disabled={sending}
+          onPress={() => {
+            void submit();
+          }}
+          style={[styles.publishButton, sending && styles.disabled]}
+        >
+          {sending ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <Flag size={16} color={COLORS.white} />
+          )}
+
+          <Text style={styles.publishButtonText}>
+            {sending ? "Envoi…" : "Envoyer le signalement"}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * COMMENTS
+ * ========================================================================== */
 
 function CommentsSheet({
   videoId,
@@ -348,13 +645,20 @@ function CommentsSheet({
 }) {
   const { isAuthenticated } = useConvexAuth();
 
-  const comments = useQuery(api.shortVideos.getComments, { videoId });
+  const comments = useQuery(api.shortVideos.getComments, { videoId }) as
+    | CommentItem[]
+    | undefined;
 
   const addComment = useMutation(api.shortVideos.addComment);
-
+  const replyToComment = useMutation(api.shortVideos.replyToComment);
   const deleteComment = useMutation(api.shortVideos.deleteComment);
+  const toggleCommentLike = useMutation(api.shortVideos.toggleCommentLike);
 
   const [text, setText] = useState("");
+  const [replyText, setReplyText] = useState("");
+  const [replyingTo, setReplyingTo] = useState<Id<"shortVideoComments"> | null>(
+    null,
+  );
   const [sending, setSending] = useState(false);
 
   const handleSend = useCallback(async () => {
@@ -364,49 +668,109 @@ function CommentsSheet({
       return;
     }
 
-    if (value.length > 2000) {
-      toast.error("Votre commentaire est trop long.");
-      return;
-    }
-
     setSending(true);
 
     try {
-      await addComment({
-        videoId,
-        text: value,
-      });
+      await addComment({ videoId, text: value });
 
       setText("");
       onCommentAdded?.();
-    } catch {
-      toast.error("Impossible de publier le commentaire.");
+      toast.success("Commentaire publié.");
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error) || "Impossible de publier le commentaire.",
+      );
     } finally {
       setSending(false);
     }
   }, [addComment, onCommentAdded, sending, text, videoId]);
 
+  const handleReply = useCallback(
+    async (parentCommentId: Id<"shortVideoComments">) => {
+      const value = replyText.trim();
+
+      if (!value || sending) {
+        return;
+      }
+
+      setSending(true);
+
+      try {
+        await replyToComment({ videoId, parentCommentId, text: value });
+
+        setReplyText("");
+        setReplyingTo(null);
+        onCommentAdded?.();
+        toast.success("Réponse publiée.");
+      } catch (error) {
+        toast.error(
+          getErrorMessage(error) || "Impossible de publier la réponse.",
+        );
+      } finally {
+        setSending(false);
+      }
+    },
+    [onCommentAdded, replyText, replyToComment, sending, videoId],
+  );
+
   const handleDelete = useCallback(
     async (commentId: Id<"shortVideoComments">) => {
       try {
-        await deleteComment({
-          commentId,
-        });
-      } catch {
-        toast.error("Impossible de supprimer ce commentaire.");
+        await deleteComment({ commentId });
+        toast.success("Commentaire supprimé.");
+      } catch (error) {
+        toast.error(
+          getErrorMessage(error) || "Impossible de supprimer le commentaire.",
+        );
       }
     },
     [deleteComment],
   );
 
+  const handleLikeComment = useCallback(
+    async (commentId: Id<"shortVideoComments">) => {
+      if (!isAuthenticated) {
+        toast("Connectez-vous pour aimer un commentaire.");
+        return;
+      }
+
+      try {
+        await toggleCommentLike({ commentId });
+      } catch (error) {
+        toast.error(
+          getErrorMessage(error) || "Impossible de modifier le like.",
+        );
+      }
+    },
+    [isAuthenticated, toggleCommentLike],
+  );
+
+  const roots = useMemo(
+    () => (comments ?? []).filter((comment) => !comment.parentCommentId),
+    [comments],
+  );
+
+  const repliesByParent = useMemo(() => {
+    const map = new Map<string, CommentItem[]>();
+
+    for (const comment of comments ?? []) {
+      if (!comment.parentCommentId) {
+        continue;
+      }
+
+      const key = String(comment.parentCommentId);
+      const existing = map.get(key) ?? [];
+
+      existing.push(comment);
+      map.set(key, existing);
+    }
+
+    return map;
+  }, [comments]);
+
   return (
-    <View style={styles.sheetOverlay}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Fermer les commentaires"
-        onPress={onClose}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={styles.modalOverlay}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
       <View style={styles.commentsSheet}>
         <View style={styles.sheetHandle} />
@@ -417,19 +781,14 @@ function CommentsSheet({
 
             <Text style={styles.sheetTitle}>Commentaires</Text>
 
-            {comments !== undefined ? (
+            {comments ? (
               <View style={styles.countPill}>
                 <Text style={styles.countPillText}>{comments.length}</Text>
               </View>
             ) : null}
           </View>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Fermer"
-            onPress={onClose}
-            style={styles.closeButton}
-          >
+          <Pressable onPress={onClose} style={styles.closeButton}>
             <X size={17} color={COLORS.white} />
           </Pressable>
         </View>
@@ -437,13 +796,11 @@ function CommentsSheet({
         <View style={styles.commentsBody}>
           {comments === undefined ? (
             <View style={styles.commentsLoading}>
-              <ActivityIndicator size="small" color={COLORS.purpleBright} />
+              <ActivityIndicator color={COLORS.purpleBright} />
 
-              <Text style={styles.commentsLoadingText}>
-                Chargement des commentaires…
-              </Text>
+              <Text style={styles.commentsLoadingText}>Chargement…</Text>
             </View>
-          ) : comments.length === 0 ? (
+          ) : roots.length === 0 ? (
             <View style={styles.commentsEmpty}>
               <MessageCircle size={30} color={COLORS.faint} />
 
@@ -454,32 +811,150 @@ function CommentsSheet({
               </Text>
             </View>
           ) : (
-            comments.map((comment) => (
-              <View key={comment._id} style={styles.commentItem}>
-                <Avatar name={comment.userName} size={35} />
+            <View style={styles.commentList}>
+              {roots.map((comment) => {
+                const replies = repliesByParent.get(String(comment._id)) ?? [];
 
-                <View style={styles.commentContent}>
-                  <Text style={styles.commentAuthor}>{comment.userName}</Text>
+                return (
+                  <View key={comment._id}>
+                    <View style={styles.commentItem}>
+                      <Avatar
+                        name={comment.userName}
+                        avatar={comment.userAvatar}
+                        size={35}
+                      />
 
-                  <Text style={styles.commentText}>{comment.text}</Text>
-                </View>
+                      <View style={styles.commentContent}>
+                        <Text style={styles.commentAuthor}>
+                          {comment.userName}
+                        </Text>
 
-                {isAuthenticated ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Supprimer le commentaire"
-                    onPress={() => {
-                      void handleDelete(
-                        comment._id as Id<"shortVideoComments">,
-                      );
-                    }}
-                    style={styles.commentDelete}
-                  >
-                    <Trash2 size={14} color={COLORS.subtle} />
-                  </Pressable>
-                ) : null}
-              </View>
-            ))
+                        <Text style={styles.commentText}>
+                          {comment.isDeleted
+                            ? "Commentaire supprimé"
+                            : comment.text}
+                        </Text>
+
+                        <View style={styles.commentMeta}>
+                          <Pressable
+                            onPress={() => {
+                              void handleLikeComment(comment._id);
+                            }}
+                            style={styles.commentMetaButton}
+                          >
+                            <Heart
+                              size={13}
+                              color={
+                                comment.likedByMe ? COLORS.red : COLORS.subtle
+                              }
+                              fill={
+                                comment.likedByMe ? COLORS.red : "transparent"
+                              }
+                            />
+
+                            <Text style={styles.commentMetaText}>
+                              {formatCount(comment.likeCount)}
+                            </Text>
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() => {
+                              setReplyingTo(comment._id);
+                            }}
+                            style={styles.commentMetaButton}
+                          >
+                            <Text style={styles.commentMetaText}>Répondre</Text>
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() => {
+                              void handleDelete(comment._id);
+                            }}
+                            style={styles.commentMetaButton}
+                          >
+                            <Trash2 size={12} color={COLORS.subtle} />
+                          </Pressable>
+                        </View>
+                      </View>
+                    </View>
+
+                    {replies.length > 0 ? (
+                      <View style={styles.replyList}>
+                        {replies.map((reply) => (
+                          <View key={reply._id} style={styles.replyItem}>
+                            <Avatar
+                              name={reply.userName}
+                              avatar={reply.userAvatar}
+                              size={28}
+                            />
+
+                            <View style={styles.commentContent}>
+                              <Text style={styles.commentAuthor}>
+                                {reply.userName}
+                              </Text>
+
+                              <Text style={styles.commentText}>
+                                {reply.isDeleted
+                                  ? "Réponse supprimée"
+                                  : reply.text}
+                              </Text>
+
+                              <Pressable
+                                onPress={() => {
+                                  void handleLikeComment(reply._id);
+                                }}
+                                style={styles.commentMetaButton}
+                              >
+                                <Heart
+                                  size={12}
+                                  color={
+                                    reply.likedByMe ? COLORS.red : COLORS.subtle
+                                  }
+                                  fill={
+                                    reply.likedByMe ? COLORS.red : "transparent"
+                                  }
+                                />
+
+                                <Text style={styles.commentMetaText}>
+                                  {formatCount(reply.likeCount)}
+                                </Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {replyingTo === comment._id ? (
+                      <View style={styles.replyComposer}>
+                        <TextInput
+                          value={replyText}
+                          onChangeText={setReplyText}
+                          maxLength={1000}
+                          placeholder="Votre réponse…"
+                          placeholderTextColor={COLORS.subtle}
+                          style={styles.replyInput}
+                        />
+
+                        <Pressable
+                          disabled={sending || !replyText.trim()}
+                          onPress={() => {
+                            void handleReply(comment._id);
+                          }}
+                          style={[
+                            styles.sendButton,
+                            (!replyText.trim() || sending) &&
+                              styles.sendButtonDisabled,
+                          ]}
+                        >
+                          <Send size={14} color={COLORS.white} />
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
           )}
         </View>
 
@@ -490,25 +965,21 @@ function CommentsSheet({
                 value={text}
                 onChangeText={setText}
                 editable={!sending}
-                maxLength={2000}
+                maxLength={1000}
                 multiline
                 placeholder="Ajouter un commentaire…"
                 placeholderTextColor={COLORS.subtle}
                 style={styles.commentInput}
-                textAlignVertical="center"
               />
 
               <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Publier le commentaire"
                 disabled={sending || !text.trim()}
                 onPress={() => {
                   void handleSend();
                 }}
-                style={({ pressed }) => [
+                style={[
                   styles.sendButton,
                   (!text.trim() || sending) && styles.sendButtonDisabled,
-                  pressed && styles.pressed,
                 ]}
               >
                 {sending ? (
@@ -533,151 +1004,772 @@ function CommentsSheet({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Native video surface
-//
-// Cette couche ne fabrique aucune vidéo.
-// Elle attend un lecteur natif branché par l'application.
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * VIDEO PLAYER
+ * ========================================================================== */
 
-function NativeVideoSurface({
+function ReelVideoPlayer({
   video,
   active,
   muted,
   paused,
   speed,
-  onStateChange,
+  onProgress,
+  onEnded,
+  onError,
 }: {
   video: VideoItem;
   active: boolean;
   muted: boolean;
   paused: boolean;
   speed: Speed;
-  onStateChange: (playing: boolean) => void;
+  onProgress: (currentTime: number, duration: number) => void;
+  onEnded: () => void;
+  onError: (message: string) => void;
 }) {
-  const [playerReady, setPlayerReady] = useState(false);
+  const source = resolveVideoSource(video);
+
+  const player = useVideoPlayer(source ?? "", (instance) => {
+    instance.loop = false;
+    instance.muted = true;
+    instance.playbackRate = 1;
+    instance.timeUpdateEventInterval = 0.5;
+
+    if (active) {
+      instance.play();
+    }
+  });
 
   useEffect(() => {
-    if (!active) {
-      onStateChange(false);
+    player.muted = muted;
+  }, [muted, player]);
+
+  useEffect(() => {
+    player.playbackRate = speed;
+  }, [player, speed]);
+
+  useEffect(() => {
+    if (!active || paused) {
+      player.pause();
       return;
     }
 
-    // La source vidéo vient de Convex.
-    // Le composant lecteur natif de production doit consommer video.videoUrl.
-    setPlayerReady(true);
-  }, [active, onStateChange, video.videoUrl]);
+    player.play();
+  }, [active, paused, player]);
+
+  useEffect(() => {
+    const timeSubscription = player.addListener(
+      "timeUpdate",
+      ({ currentTime }) => {
+        onProgress(currentTime, safeNumber(player.duration));
+      },
+    );
+
+    const endSubscription = player.addListener("playToEnd", () => {
+      onEnded();
+    });
+
+    const statusSubscription = player.addListener(
+      "statusChange",
+      ({ status, error }) => {
+        if (status === "error") {
+          onError(error?.message ?? "Impossible de lire cette vidéo.");
+        }
+      },
+    );
+
+    return () => {
+      timeSubscription.remove();
+      endSubscription.remove();
+      statusSubscription.remove();
+    };
+  }, [onEnded, onError, onProgress, player]);
+
+  if (!source) {
+    return (
+      <View style={styles.videoUnavailable}>
+        <Play size={32} color={COLORS.subtle} />
+
+        <Text style={styles.videoUnavailableText}>
+          Média vidéo indisponible
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.videoSurface}>
-      {video.thumbnailUrl ? (
-        <Image
-          source={{ uri: video.thumbnailUrl }}
-          resizeMode="cover"
-          style={StyleSheet.absoluteFill}
-          accessibilityLabel="Aperçu vidéo"
-        />
-      ) : null}
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+      surfaceType="textureView"
+      allowsFullscreen
+      allowsPictureInPicture
+    />
+  );
+}
 
-      {!playerReady ? (
-        <View style={styles.videoUnavailable}>
-          <ActivityIndicator size="small" color={COLORS.white} />
+/* ============================================================================
+ * ANALYTICS
+ * ========================================================================== */
 
-          <Text style={styles.videoUnavailableText}>
-            Préparation de la lecture…
-          </Text>
+function AnalyticsSheet({
+  videoId,
+  onClose,
+}: {
+  videoId: Id<"shortVideos">;
+  onClose: () => void;
+}) {
+  const analytics = useQuery(api.shortVideos.getAnalytics, { videoId }) as
+    | AnalyticsData
+    | undefined;
+
+  return (
+    <View style={styles.modalOverlay}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+      <View style={styles.analyticsSheet}>
+        <View style={styles.sheetHeader}>
+          <View style={styles.sheetTitleRow}>
+            <BarChart3 size={17} color={COLORS.purpleBright} />
+
+            <Text style={styles.sheetTitle}>Analytics</Text>
+          </View>
+
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <X size={17} color={COLORS.white} />
+          </Pressable>
         </View>
-      ) : (
-        <View style={styles.videoRuntimeNotice}>
-          <Play size={25} color="rgba(255,255,255,0.78)" />
 
-          <Text style={styles.videoRuntimeTitle}>Lecteur vidéo natif</Text>
+        {analytics === undefined ? (
+          <View style={styles.analyticsLoading}>
+            <ActivityIndicator color={COLORS.purpleBright} />
 
-          <Text style={styles.videoRuntimeText}>Source réelle disponible</Text>
+            <Text style={styles.commentsLoadingText}>
+              Chargement des analytics…
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.analyticsGrid}>
+            <AnalyticsCard
+              label="Vues"
+              value={formatCount(analytics.viewCount)}
+            />
 
-          <Text style={styles.videoRuntimeUrl} numberOfLines={1}>
-            {video.videoUrl}
-          </Text>
-        </View>
-      )}
+            <AnalyticsCard
+              label="Vues comptées"
+              value={formatCount(analytics.countedViews)}
+            />
 
-      {paused ? (
-        <View style={styles.pauseIndicator}>
-          <Pause size={28} color={COLORS.white} fill={COLORS.white} />
-        </View>
-      ) : null}
+            <AnalyticsCard
+              label="Likes"
+              value={formatCount(analytics.likeCount)}
+            />
 
-      <View style={styles.videoMetaOverlay}>
-        <Text style={styles.videoMetaText}>
-          {muted ? "Muet" : "Son activé"} · {speed}x
-        </Text>
+            <AnalyticsCard
+              label="Commentaires"
+              value={formatCount(analytics.commentCount)}
+            />
+
+            <AnalyticsCard
+              label="Partages"
+              value={formatCount(analytics.shareCount)}
+            />
+
+            <AnalyticsCard
+              label="Sauvegardes"
+              value={formatCount(analytics.saveCount)}
+            />
+
+            <AnalyticsCard
+              label="Watch time"
+              value={formatDuration(analytics.totalWatchedMs)}
+            />
+
+            <AnalyticsCard
+              label="Moyenne / vue"
+              value={formatDuration(analytics.averageWatchMs)}
+            />
+
+            <AnalyticsCard
+              label="Complétion"
+              value={`${Math.round(analytics.completionRate * 100)}%`}
+            />
+          </View>
+        )}
       </View>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Reel
-// ─────────────────────────────────────────────────────────────────────────────
+function AnalyticsCard({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.analyticsCard}>
+      <Text style={styles.analyticsLabel}>{label}</Text>
+
+      <Text style={styles.analyticsValue}>{value}</Text>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * UPLOAD
+ * ========================================================================== */
+
+function UploadSheet({
+  onClose,
+  onPublished,
+}: {
+  onClose: () => void;
+  onPublished?: (videoId: Id<"shortVideos">) => void;
+}) {
+  const generateUploadUrl = useMutation(api.shortVideos.generateUploadUrl);
+
+  const createVideo = useMutation(api.shortVideos.create);
+
+  const [asset, setAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [caption, setCaption] = useState("");
+  const [hashtags, setHashtags] = useState("");
+  const [soundName, setSoundName] = useState("");
+  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [uploading, setUploading] = useState(false);
+
+  const pickVideo = useCallback(async () => {
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        toast.error("L’accès à la galerie est nécessaire.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["videos"],
+        allowsMultipleSelection: false,
+        selectionLimit: 1,
+        quality: 1,
+        videoMaxDuration: 600,
+        allowsEditing: false,
+      });
+
+      if (result.canceled || !result.assets?.length) {
+        return;
+      }
+
+      const selected = result.assets[0];
+
+      if (selected.type !== "video") {
+        toast.error("Sélectionnez une vidéo.");
+        return;
+      }
+
+      if (selected.fileSize && selected.fileSize > 250 * 1024 * 1024) {
+        toast.error("La vidéo dépasse la limite de 250 MB.");
+        return;
+      }
+
+      setAsset(selected);
+    } catch (error) {
+      toast.error(getErrorMessage(error) || "Impossible d’ouvrir la galerie.");
+    }
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
+    const text = caption.trim();
+
+    if (!asset) {
+      toast.error("Sélectionnez une vidéo.");
+      return;
+    }
+
+    if (!text) {
+      toast.error("La légende est obligatoire.");
+      return;
+    }
+
+    if (text.length > 2200) {
+      toast.error("La légende dépasse 2200 caractères.");
+      return;
+    }
+
+    if (uploading) {
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const uploadUrl = await generateUploadUrl({});
+
+      const response = await fetch(asset.uri);
+
+      if (!response.ok) {
+        throw new Error("Impossible de lire le fichier vidéo local.");
+      }
+
+      const blob = await response.blob();
+
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": asset.mimeType ?? "video/mp4",
+        },
+        body: blob,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("L’upload Convex Storage a échoué.");
+      }
+
+      const uploadJson = (await uploadResponse.json()) as {
+        storageId?: Id<"_storage">;
+      };
+
+      if (!uploadJson.storageId) {
+        throw new Error("Convex n’a pas retourné de storageId.");
+      }
+
+      const duration =
+        typeof asset.duration === "number" && Number.isFinite(asset.duration)
+          ? asset.duration / 1000
+          : undefined;
+
+      const videoId = await createVideo({
+        videoStorageId: uploadJson.storageId,
+        caption: text,
+        hashtags: normalizeHashtags(hashtags),
+        duration,
+        soundName: soundName.trim() || undefined,
+        visibility,
+      });
+
+      toast.success("Reel envoyé pour modération.");
+
+      onPublished?.(videoId);
+
+      onClose();
+    } catch (error) {
+      toast.error(getErrorMessage(error) || "La publication du Reel a échoué.");
+    } finally {
+      setUploading(false);
+    }
+  }, [
+    asset,
+    caption,
+    createVideo,
+    generateUploadUrl,
+    hashtags,
+    onClose,
+    onPublished,
+    soundName,
+    uploading,
+    visibility,
+  ]);
+
+  return (
+    <View style={styles.modalOverlay}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+      <View style={styles.uploadSheet}>
+        <View style={styles.sheetHandle} />
+
+        <View style={styles.sheetHeader}>
+          <View style={styles.sheetTitleRow}>
+            <Upload size={18} color={COLORS.purpleBright} />
+
+            <Text style={styles.sheetTitle}>Publier un Reel</Text>
+          </View>
+
+          <Pressable onPress={onClose} style={styles.closeButton}>
+            <X size={17} color={COLORS.white} />
+          </Pressable>
+        </View>
+
+        <Pressable
+          disabled={uploading}
+          onPress={() => {
+            void pickVideo();
+          }}
+          style={styles.videoPicker}
+        >
+          {asset ? (
+            <>
+              <View style={styles.videoPickerIcon}>
+                <Check size={20} color={COLORS.green} />
+              </View>
+
+              <View style={styles.videoPickerCopy}>
+                <Text style={styles.videoPickerTitle}>Vidéo sélectionnée</Text>
+
+                <Text style={styles.videoPickerSubtitle} numberOfLines={2}>
+                  {asset.fileName ?? asset.uri}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.videoPickerIcon}>
+                <Upload size={20} color={COLORS.purpleBright} />
+              </View>
+
+              <View style={styles.videoPickerCopy}>
+                <Text style={styles.videoPickerTitle}>Choisir une vidéo</Text>
+
+                <Text style={styles.videoPickerSubtitle}>
+                  Convex Storage · jusqu’à 250 MB
+                </Text>
+              </View>
+            </>
+          )}
+        </Pressable>
+
+        <Text style={styles.fieldLabel}>Légende *</Text>
+
+        <TextInput
+          value={caption}
+          onChangeText={setCaption}
+          editable={!uploading}
+          multiline
+          maxLength={2200}
+          placeholder="Racontez votre vidéo…"
+          placeholderTextColor={COLORS.subtle}
+          style={[styles.input, styles.multilineInput]}
+        />
+
+        <Text style={styles.fieldLabel}>Hashtags</Text>
+
+        <TextInput
+          value={hashtags}
+          onChangeText={setHashtags}
+          editable={!uploading}
+          autoCapitalize="none"
+          placeholder="#business #afrique #tech"
+          placeholderTextColor={COLORS.subtle}
+          style={styles.input}
+        />
+
+        <Text style={styles.fieldLabel}>Son</Text>
+
+        <TextInput
+          value={soundName}
+          onChangeText={setSoundName}
+          editable={!uploading}
+          placeholder="Nom du son / musique original"
+          placeholderTextColor={COLORS.subtle}
+          style={styles.input}
+        />
+
+        <Text style={styles.fieldLabel}>Visibilité</Text>
+
+        <View style={styles.visibilityRow}>
+          {(
+            [
+              ["public", "Public"],
+              ["followers", "Abonnés"],
+              ["private", "Privé"],
+            ] as const
+          ).map(([value, label]) => {
+            const selected = visibility === value;
+
+            return (
+              <Pressable
+                key={value}
+                onPress={() => setVisibility(value)}
+                style={[
+                  styles.visibilityOption,
+                  selected && styles.visibilityOptionSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.visibilityText,
+                    selected && styles.visibilityTextSelected,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Pressable
+          disabled={uploading || !asset}
+          onPress={() => {
+            void handleSubmit();
+          }}
+          style={[
+            styles.publishButton,
+            (uploading || !asset) && styles.disabled,
+          ]}
+        >
+          {uploading ? (
+            <ActivityIndicator size="small" color={COLORS.white} />
+          ) : (
+            <Upload size={17} color={COLORS.white} />
+          )}
+
+          <Text style={styles.publishButtonText}>
+            {uploading ? "Upload + publication…" : "Publier le Reel"}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * REEL
+ * ============================================================================
+ * Règle : un Reel n'est interactif que s'il est `approved` ET `active`.
+ *
+ *   VIEWABLE (visible dans Mes Reels même pending/rejected)
+ *      ≠
+ *   INTERACTIVE (like / comment / save / share uniquement après approbation)
+ *
+ * Le backend `assertVideoInteractive` applique déjà cette règle côté
+ * serveur. Le frontend la reflète pour :
+ *   - éviter les erreurs VIDEO_NOT_FOUND / VIDEO_NOT_AVAILABLE
+ *   - clarifier l'UX (boutons grisés sur les Reels en attente)
+ *
+ * La sécurité réelle reste au backend : même si on contourne le bouton,
+ * la mutation Convex refusera l'action.
+ * ========================================================================== */
 
 function Reel({
   video,
   active,
+  mode,
   onSwipeUp,
   onSwipeDown,
 }: {
   video: VideoItem;
   active: boolean;
+  mode: ReelsMode;
   onSwipeUp: () => void;
   onSwipeDown: () => void;
+  onPublished?: () => void;
 }) {
-  const { height } = useWindowDimensions();
-
-  const toggleLike = useMutation(api.shortVideos.toggleLike);
-
+  const { width, height } = useWindowDimensions();
   const { isAuthenticated } = useConvexAuth();
 
-  const [liked, setLiked] = useState(video.likedByMe);
-  const [likeCount, setLikeCount] = useState(safeNumber(video.likeCount));
+  /**
+   * Verrou d'interaction aligné sur le backend.
+   *
+   * Utilisé pour désactiver like / comment / save / share sur les
+   * Reels pending ou rejected. Le Reel reste jouable et visible
+   * dans Mes Reels (VIEWABLE), mais aucune action sociale n'est
+   * possible tant qu'il n'est pas approuvé (NON-INTERACTIVE).
+   */
+  const canInteract =
+    video.isActive === true && video.moderationStatus === "approved";
 
-  const [saved, setSaved] = useState(false);
+  const toggleLike = useMutation(api.shortVideos.toggleLike);
+  const toggleSave = useMutation(api.shortVideos.toggleSave);
+  const recordShare = useMutation(api.shortVideos.recordShare);
+  const recordView = useMutation(api.shortVideos.recordView);
+
+  const [liked, setLiked] = useState(Boolean(video.likedByMe));
+  const [likeCount, setLikeCount] = useState(safeNumber(video.likeCount));
+  const [saved, setSaved] = useState(Boolean(video.savedByMe));
+  const [saveCount, setSaveCount] = useState(safeNumber(video.saveCount));
+  const [shareCount, setShareCount] = useState(safeNumber(video.shareCount));
+
   const [muted, setMuted] = useState(true);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState<Speed>(1);
-
   const [showSpeed, setShowSpeed] = useState(false);
+
   const [showComments, setShowComments] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
+
+  const [progress, setProgress] = useState(0);
+  const [playerError, setPlayerError] = useState<string | null>(null);
 
   const lastTap = useRef(0);
   const startY = useRef<number | null>(null);
 
+  const watchedMsRef = useRef(0);
+  const lastPlayerTime = useRef(0);
+  const lastReportedMs = useRef(0);
+  const sessionIdRef = useRef(createSessionId());
+
+  const sendView = useCallback(
+    async (force = false, completed = false) => {
+      const watchedMs = Math.max(0, Math.round(watchedMsRef.current));
+
+      if (
+        watchedMs <= 0 ||
+        (!force && watchedMs - lastReportedMs.current < 2000)
+      ) {
+        return;
+      }
+
+      lastReportedMs.current = watchedMs;
+
+      try {
+        await recordView({
+          videoId: video._id,
+          sessionId: sessionIdRef.current,
+          watchedMs,
+          completed,
+        });
+      } catch {
+        // Le suivi analytique ne doit pas
+        // interrompre la lecture.
+      }
+    },
+    [recordView, video._id],
+  );
+
+  const handleProgress = useCallback(
+    (currentTime: number, duration: number) => {
+      if (!Number.isFinite(currentTime)) {
+        return;
+      }
+
+      if (!paused && currentTime >= lastPlayerTime.current) {
+        const delta = currentTime - lastPlayerTime.current;
+
+        if (delta > 0 && delta < 3) {
+          watchedMsRef.current += delta * 1000;
+        }
+      }
+
+      lastPlayerTime.current = currentTime;
+
+      if (duration > 0) {
+        setProgress(Math.min(1, Math.max(0, currentTime / duration)));
+      }
+
+      if (watchedMsRef.current - lastReportedMs.current >= 5000) {
+        void sendView();
+      }
+    },
+    [paused, sendView],
+  );
+
+  useEffect(() => {
+    return () => {
+      void sendView(true, false);
+    };
+  }, [sendView]);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    setPaused(false);
+    setProgress(0);
+    setPlayerError(null);
+
+    watchedMsRef.current = 0;
+    lastPlayerTime.current = 0;
+    lastReportedMs.current = 0;
+  }, [active, video._id]);
+
+  const handleEnded = useCallback(() => {
+    setProgress(1);
+    void sendView(true, true);
+  }, [sendView]);
+
   const handleLike = useCallback(async () => {
+    if (!canInteract) {
+      toast("Ce Reel sera interactif après validation.");
+      return;
+    }
+
     if (!isAuthenticated) {
       toast("Connectez-vous pour aimer cette vidéo.");
       return;
     }
 
     try {
-      const nextLiked = await toggleLike({
-        videoId: video._id,
-      });
+      const result = await toggleLike({ videoId: video._id });
 
-      setLiked(nextLiked);
+      setLiked(result.liked);
+      setLikeCount(safeNumber(result.likeCount));
 
-      setLikeCount((current) => Math.max(0, current + (nextLiked ? 1 : -1)));
-
-      if (nextLiked) {
+      if (result.liked) {
         setShowHeart(true);
 
         setTimeout(() => {
           setShowHeart(false);
         }, 650);
       }
-    } catch {
-      toast.error("Impossible de modifier votre réaction.");
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error) || "Impossible de modifier votre réaction.",
+      );
     }
-  }, [isAuthenticated, toggleLike, video._id]);
+  }, [canInteract, isAuthenticated, toggleLike, video._id]);
+
+  const handleSave = useCallback(async () => {
+    if (!canInteract) {
+      toast("Ce Reel sera sauvegardable après validation.");
+      return;
+    }
+
+    if (!isAuthenticated) {
+      toast("Connectez-vous pour sauvegarder ce Reel.");
+      return;
+    }
+
+    try {
+      const result = await toggleSave({ videoId: video._id });
+
+      setSaved(result.saved);
+      setSaveCount(safeNumber(result.saveCount));
+
+      toast.success(
+        result.saved ? "Reel sauvegardé." : "Reel retiré des sauvegardes.",
+      );
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error) || "Impossible de modifier la sauvegarde.",
+      );
+    }
+  }, [canInteract, isAuthenticated, toggleSave, video._id]);
+
+  const handleShare = useCallback(async () => {
+    if (!canInteract) {
+      toast("Le partage sera disponible après validation du Reel.");
+      return;
+    }
+
+    try {
+      const shareUrl = resolveVideoSource(video) ?? video.videoUrl ?? undefined;
+
+      const result = await Share.share({
+        message: video.caption,
+        url: shareUrl,
+      });
+
+      if (result.action === Share.sharedAction) {
+        const shareResult = await recordShare({
+          videoId: video._id,
+          channel: "native",
+        });
+
+        setShareCount(safeNumber(shareResult.shareCount));
+      }
+    } catch {
+      // Annulation native du partage :
+      // aucune erreur produit.
+    }
+  }, [
+    canInteract,
+    recordShare,
+    video._id,
+    video.caption,
+    video.videoUrl,
+    video.videoUrlResolved,
+  ]);
 
   const handleTap = useCallback(() => {
     const now = Date.now();
@@ -685,7 +1777,10 @@ function Reel({
     if (now - lastTap.current < 280) {
       lastTap.current = 0;
 
-      if (!liked) {
+      // Le double-tap déclenche un like UNIQUEMENT si le Reel est
+      // interactif. Sinon, on ignore silencieusement : c'est un
+      // simple tap de pause/reprise qui a été doublé.
+      if (canInteract && !liked) {
         void handleLike();
       }
 
@@ -699,35 +1794,17 @@ function Reel({
         setPaused((current) => !current);
       }
     }, 290);
-  }, [handleLike, liked]);
-
-  const handleShare = useCallback(async () => {
-    try {
-      await Share.share({
-        message: video.caption,
-      });
-    } catch {
-      // L'annulation native du partage ne constitue pas une erreur produit.
-    }
-  }, [video.caption]);
+  }, [canInteract, handleLike, liked]);
 
   const handleTouchStart = useCallback(
-    (event: {
-      nativeEvent: {
-        pageY: number;
-      };
-    }) => {
+    (event: { nativeEvent: { pageY: number } }) => {
       startY.current = event.nativeEvent.pageY;
     },
     [],
   );
 
   const handleTouchEnd = useCallback(
-    (event: {
-      nativeEvent: {
-        pageY: number;
-      };
-    }) => {
+    (event: { nativeEvent: { pageY: number } }) => {
       if (startY.current === null) {
         return;
       }
@@ -749,17 +1826,25 @@ function Reel({
     [onSwipeDown, onSwipeUp],
   );
 
+  const moderationBadge =
+    mode === "mine" ? getModerationBadge(video.moderationStatus) : null;
+
+  const thumbnailSource = resolveThumbnailSource(video);
+
   return (
     <View
-      style={[
-        styles.reel,
-        {
-          height,
-        },
-      ]}
+      style={[styles.reel, { width, height }]}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      {thumbnailSource ? (
+        <Image
+          source={{ uri: thumbnailSource }}
+          resizeMode="cover"
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
@@ -768,23 +1853,46 @@ function Reel({
         onPress={handleTap}
         style={StyleSheet.absoluteFill}
       >
-        <NativeVideoSurface
-          video={video}
-          active={active}
-          muted={muted}
-          paused={paused}
-          speed={speed}
-          onStateChange={setPaused}
-        />
+        {active ? (
+          <ReelVideoPlayer
+            video={video}
+            active={active}
+            muted={muted}
+            paused={paused}
+            speed={speed}
+            onProgress={handleProgress}
+            onEnded={handleEnded}
+            onError={setPlayerError}
+          />
+        ) : null}
       </Pressable>
 
       <View pointerEvents="none" style={styles.reelGradientTop} />
 
       <View pointerEvents="none" style={styles.reelGradientBottom} />
 
+      <View pointerEvents="none" style={styles.progressTrack}>
+        <View
+          style={[
+            styles.progressFill,
+            {
+              width: `${Math.round(progress * 100)}%`,
+            },
+          ]}
+        />
+      </View>
+
+      {playerError ? (
+        <View pointerEvents="none" style={styles.videoErrorOverlay}>
+          <Text style={styles.videoErrorTitle}>Lecture impossible</Text>
+
+          <Text style={styles.videoErrorText}>{playerError}</Text>
+        </View>
+      ) : null}
+
       {showHeart ? (
         <View pointerEvents="none" style={styles.heartOverlay}>
-          <Heart size={86} color={COLORS.red} fill={COLORS.red} />
+          <Heart size={88} color={COLORS.red} fill={COLORS.red} />
         </View>
       ) : null}
 
@@ -812,7 +1920,7 @@ function Reel({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Modifier la vitesse"
+          accessibilityLabel="Vitesse de lecture"
           onPress={() => setShowSpeed((current) => !current)}
           style={[
             styles.controlButton,
@@ -834,11 +1942,18 @@ function Reel({
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={liked ? "Retirer le j'aime" : "Aimer"}
+          accessibilityLabel={
+            canInteract
+              ? liked
+                ? "Retirer le j'aime"
+                : "Aimer"
+              : "Réactions disponibles après validation"
+          }
+          disabled={!canInteract}
           onPress={() => {
             void handleLike();
           }}
-          style={styles.action}
+          style={[styles.action, !canInteract && styles.actionDisabled]}
         >
           <Heart
             size={31}
@@ -851,52 +1966,90 @@ function Reel({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Ouvrir les commentaires"
-          onPress={() => setShowComments(true)}
-          style={styles.action}
+          accessibilityLabel={
+            canInteract
+              ? "Commentaires"
+              : "Commentaires disponibles après validation"
+          }
+          disabled={!canInteract}
+          onPress={() => {
+            if (!canInteract) {
+              toast(
+                "Les commentaires seront disponibles après validation du Reel.",
+              );
+              return;
+            }
+
+            setShowComments(true);
+          }}
+          style={[styles.action, !canInteract && styles.actionDisabled]}
         >
           <MessageCircle size={29} color={COLORS.white} />
 
           <Text style={styles.actionCount}>
-            {formatCount(safeNumber(video.commentCount))}
+            {formatCount(video.commentCount)}
           </Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Partager"
+          accessibilityLabel={
+            canInteract ? "Partager" : "Partage disponible après validation"
+          }
+          disabled={!canInteract}
           onPress={() => {
             void handleShare();
           }}
-          style={styles.action}
+          style={[styles.action, !canInteract && styles.actionDisabled]}
         >
           <Share2 size={28} color={COLORS.white} />
 
-          <Text style={styles.actionCount}>
-            {formatCount(safeNumber(video.shareCount))}
-          </Text>
+          <Text style={styles.actionCount}>{formatCount(shareCount)}</Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={saved ? "Retirer des sauvegardes" : "Sauvegarder"}
+          accessibilityLabel={
+            canInteract
+              ? saved
+                ? "Retirer des sauvegardes"
+                : "Sauvegarder"
+              : "Sauvegarde disponible après validation"
+          }
+          disabled={!canInteract}
           onPress={() => {
-            setSaved((current) => !current);
-
-            toast(
-              saved
-                ? "Retiré des sauvegardes."
-                : "Sauvegardé sur cet appareil.",
-            );
+            void handleSave();
           }}
-          style={styles.action}
+          style={[styles.action, !canInteract && styles.actionDisabled]}
         >
           <Bookmark
             size={27}
-            color={saved ? "#FACC15" : COLORS.white}
-            fill={saved ? "#FACC15" : "transparent"}
+            color={saved ? COLORS.yellow : COLORS.white}
+            fill={saved ? COLORS.yellow : "transparent"}
           />
+
+          <Text style={styles.actionCount}>{formatCount(saveCount)}</Text>
         </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Signaler"
+          onPress={() => setShowReport(true)}
+          style={styles.action}
+        >
+          <Flag size={24} color={COLORS.white} />
+        </Pressable>
+
+        {video.authorId ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Analytics du Reel"
+            onPress={() => setShowAnalytics(true)}
+            style={styles.action}
+          >
+            <BarChart3 size={24} color={COLORS.white} />
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.creatorBlock}>
@@ -908,12 +2061,23 @@ function Reel({
           />
 
           <View style={styles.creatorInfo}>
-            <Text style={styles.creatorName} numberOfLines={1}>
-              {video.authorName || "Utilisateur"}
-            </Text>
+            <View style={styles.creatorNameRow}>
+              <Text style={styles.creatorName} numberOfLines={1}>
+                {video.authorName ?? "Utilisateur"}
+              </Text>
+
+              {video.isPinned ? (
+                <ShieldCheck size={13} color={COLORS.purpleBright} />
+              ) : null}
+            </View>
 
             <Text style={styles.creatorViews}>
-              {formatCount(safeNumber(video.viewCount))} vues
+              {formatCount(video.viewCount)} vues ·{" "}
+              {video.visibility === "followers"
+                ? "Abonnés"
+                : video.visibility === "private"
+                  ? "Privé"
+                  : "Public"}
             </Text>
           </View>
 
@@ -924,13 +2088,43 @@ function Reel({
           {video.caption}
         </Text>
 
+        {video.soundName ? (
+          <Text style={styles.soundName} numberOfLines={1}>
+            ♪ {video.soundName}
+          </Text>
+        ) : null}
+
         {video.hashtags.length > 0 ? (
           <View style={styles.hashtagRow}>
-            {video.hashtags.slice(0, 6).map((tag) => (
+            {video.hashtags.slice(0, 8).map((tag) => (
               <Text key={tag} style={styles.hashtag}>
                 #{tag}
               </Text>
             ))}
+          </View>
+        ) : null}
+
+        {moderationBadge ? (
+          <View
+            style={[
+              styles.moderationBadge,
+              moderationBadge.tone === "approved" &&
+                styles.moderationBadgeApproved,
+              moderationBadge.tone === "rejected" &&
+                styles.moderationBadgeRejected,
+            ]}
+          >
+            <Text
+              style={[
+                styles.moderationBadgeText,
+                moderationBadge.tone === "approved" &&
+                  styles.moderationBadgeTextApproved,
+                moderationBadge.tone === "rejected" &&
+                  styles.moderationBadgeTextRejected,
+              ]}
+            >
+              {moderationBadge.label}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -941,235 +2135,38 @@ function Reel({
           onClose={() => setShowComments(false)}
         />
       ) : null}
+
+      {showReport ? (
+        <ReportSheet videoId={video._id} onClose={() => setShowReport(false)} />
+      ) : null}
+
+      {showAnalytics ? (
+        <AnalyticsSheet
+          videoId={video._id}
+          onClose={() => setShowAnalytics(false)}
+        />
+      ) : null}
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Upload
-// ─────────────────────────────────────────────────────────────────────────────
-
-function UploadSheet({
-  onClose,
-  onPublished,
-}: {
-  onClose: () => void;
-  onPublished?: () => void;
-}) {
-  const createVideo = useMutation(api.shortVideos.create);
-
-  const [videoUrl, setVideoUrl] = useState("");
-  const [caption, setCaption] = useState("");
-  const [hashtags, setHashtags] = useState("");
-  const [publishing, setPublishing] = useState(false);
-
-  const handleSubmit = useCallback(async () => {
-    const url = videoUrl.trim();
-    const text = caption.trim();
-
-    if (!url) {
-      toast.error("La source vidéo est obligatoire.");
-      return;
-    }
-
-    if (!isValidVideoUrl(url)) {
-      toast.error("Veuillez fournir une URL vidéo valide.");
-      return;
-    }
-
-    if (!text) {
-      toast.error("La légende est obligatoire.");
-      return;
-    }
-
-    if (text.length > 5000) {
-      toast.error("La légende est trop longue.");
-      return;
-    }
-
-    setPublishing(true);
-
-    try {
-      await createVideo({
-        videoUrl: url,
-        caption: text,
-        hashtags: normalizeHashtags(hashtags),
-      });
-
-      toast.success("Reel publié avec succès.");
-      onPublished?.();
-      onClose();
-    } catch {
-      toast.error("La publication du Reel a échoué.");
-    } finally {
-      setPublishing(false);
-    }
-  }, [caption, createVideo, hashtags, onClose, onPublished, videoUrl]);
-
-  return (
-    <View style={styles.sheetOverlay}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Fermer la publication"
-        onPress={onClose}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <View style={styles.uploadSheet}>
-        <View style={styles.sheetHandle} />
-
-        <View style={styles.sheetHeader}>
-          <View style={styles.sheetTitleRow}>
-            <Upload size={18} color={COLORS.purpleBright} />
-
-            <Text style={styles.sheetTitle}>Publier un Reel</Text>
-          </View>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Fermer"
-            onPress={onClose}
-            style={styles.closeButton}
-          >
-            <X size={17} color={COLORS.white} />
-          </Pressable>
-        </View>
-
-        <Text style={styles.uploadIntro}>
-          Publiez une vidéo réelle. Aucun contenu de démonstration n’est ajouté
-          automatiquement.
-        </Text>
-
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Source vidéo *</Text>
-
-          <TextInput
-            value={videoUrl}
-            onChangeText={setVideoUrl}
-            editable={!publishing}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            placeholder="https://…"
-            placeholderTextColor={COLORS.subtle}
-            style={styles.input}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Légende *</Text>
-
-          <TextInput
-            value={caption}
-            onChangeText={setCaption}
-            editable={!publishing}
-            multiline
-            maxLength={5000}
-            placeholder="Racontez votre vidéo…"
-            placeholderTextColor={COLORS.subtle}
-            style={[styles.input, styles.multilineInput]}
-            textAlignVertical="top"
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Hashtags</Text>
-
-          <TextInput
-            value={hashtags}
-            onChangeText={setHashtags}
-            editable={!publishing}
-            autoCapitalize="none"
-            placeholder="#business #afrique #tech"
-            placeholderTextColor={COLORS.subtle}
-            style={styles.input}
-          />
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Publier le Reel"
-          disabled={publishing}
-          onPress={() => {
-            void handleSubmit();
-          }}
-          style={({ pressed }) => [
-            styles.publishButton,
-            publishing && styles.disabled,
-            pressed && styles.pressed,
-          ]}
-        >
-          {publishing ? (
-            <ActivityIndicator size="small" color={COLORS.white} />
-          ) : (
-            <Upload size={17} color={COLORS.white} />
-          )}
-
-          <Text style={styles.publishButtonText}>
-            {publishing ? "Publication en cours…" : "Publier le Reel"}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Trending
-//
-// IMPORTANT : aucun hashtag fictif.
-// Sans query backend dédiée, on ne prétend pas connaître les tendances.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function TrendingPanel({ onClose }: { onClose: () => void }) {
-  return (
-    <View style={styles.trendingPanel}>
-      <View style={styles.trendingHeader}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Fermer les tendances"
-          onPress={onClose}
-          style={styles.backButton}
-        >
-          <X size={18} color={COLORS.white} />
-        </Pressable>
-
-        <View style={styles.trendingHeaderCopy}>
-          <Text style={styles.trendingTitle}>Tendances</Text>
-
-          <Text style={styles.trendingSubtitle}>Données vérifiées</Text>
-        </View>
-      </View>
-
-      <View style={styles.trendingEmpty}>
-        <View style={styles.trendingEmptyIcon}>
-          <Hash size={25} color={COLORS.purpleBright} />
-        </View>
-
-        <Text style={styles.trendingEmptyTitle}>Tendances en préparation</Text>
-
-        <Text style={styles.trendingEmptyText}>
-          Aucun classement de hashtags n’est affiché tant qu’une source de
-          données réelle n’est pas connectée à ce module.
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Empty state
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * EMPTY
+ * ========================================================================== */
 
 function EmptyReelsState({
   authenticated,
   onBack,
   onCreate,
+  mode = "public",
 }: {
   authenticated: boolean;
   onBack: () => void;
   onCreate: () => void;
+  mode?: ReelsMode;
 }) {
+  const isMine = mode === "mine";
+
   return (
     <View style={styles.emptyScreen}>
       <Pressable
@@ -1185,23 +2182,30 @@ function EmptyReelsState({
         <Play size={30} color={COLORS.purpleBright} />
       </View>
 
-      <Text style={styles.emptyReelsTitle}>Aucun Reel disponible</Text>
+      <Text style={styles.emptyReelsTitle}>
+        {isMine ? "Vous n’avez publié aucun Reel" : "Aucun Reel disponible"}
+      </Text>
 
       <Text style={styles.emptyReelsText}>
-        Le fil est actuellement vide. Débrouille Pro n’affiche aucun contenu
-        fictif pour remplir cet espace.
+        {isMine
+          ? "Publiez votre premier Reel pour le retrouver ici avec son statut de modération."
+          : "Le fil ne contient actuellement aucun contenu publié et approuvé."}
       </Text>
 
       {authenticated ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Publier le premier Reel"
+          accessibilityLabel={
+            isMine ? "Publier un Reel" : "Publier le premier Reel"
+          }
           onPress={onCreate}
           style={styles.emptyCreateButton}
         >
           <Plus size={17} color={COLORS.white} />
 
-          <Text style={styles.emptyCreateText}>Publier le premier Reel</Text>
+          <Text style={styles.emptyCreateText}>
+            {isMine ? "Publier un Reel" : "Publier le premier Reel"}
+          </Text>
         </Pressable>
       ) : (
         <SignInButton />
@@ -1210,36 +2214,41 @@ function EmptyReelsState({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * FEED VIEW
+ * ========================================================================== */
 
-export default function ReelsPage({ onBack }: ReelsPageProps) {
-  const { results, status, loadMore } = usePaginatedQuery(
-    api.shortVideos.list,
-    {},
-    {
-      initialNumItems: 5,
-    },
-  );
-
+function ReelsFeedView({
+  onBack,
+  mode,
+  results,
+  status,
+  loadMore,
+}: {
+  onBack: () => void;
+  mode: ReelsMode;
+  results: VideoItem[];
+  status: "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted";
+  loadMore: (numItems: number) => void;
+}) {
   const { isAuthenticated } = useConvexAuth();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
-  const [showTrending, setShowTrending] = useState(false);
 
-  const videos = useMemo(() => (results ?? []) as VideoItem[], [results]);
+  const videos = useMemo(() => results ?? [], [results]);
 
-  const handleLoadMore = useCallback(() => {
+  useEffect(() => {
     if (status === "CanLoadMore" && currentIndex >= videos.length - 2) {
       loadMore(5);
     }
   }, [currentIndex, loadMore, status, videos.length]);
 
   useEffect(() => {
-    handleLoadMore();
-  }, [handleLoadMore]);
+    if (currentIndex >= videos.length && videos.length > 0) {
+      setCurrentIndex(videos.length - 1);
+    }
+  }, [currentIndex, videos.length]);
 
   const goTo = useCallback(
     (index: number) => {
@@ -1258,25 +2267,28 @@ export default function ReelsPage({ onBack }: ReelsPageProps) {
     return (
       <View style={styles.loadingScreen}>
         <View style={styles.loadingHeader}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Retour"
-            onPress={onBack}
-            style={styles.backButton}
-          >
+          <Pressable onPress={onBack} style={styles.headerButton}>
             <ArrowLeft size={19} color={COLORS.white} />
           </Pressable>
 
-          <Text style={styles.loadingHeaderTitle}>Reels</Text>
+          <Text style={styles.loadingHeaderTitle}>
+            {mode === "mine" ? "Mes Reels" : "Reels"}
+          </Text>
         </View>
 
         <View style={styles.loadingCenter}>
           <ActivityIndicator size="large" color={COLORS.purpleBright} />
 
-          <Text style={styles.loadingTitle}>Chargement du contenu réel</Text>
+          <Text style={styles.loadingTitle}>
+            {mode === "mine"
+              ? "Chargement de vos Reels"
+              : "Chargement des Reels"}
+          </Text>
 
           <Text style={styles.loadingText}>
-            Débrouille Pro vérifie les Reels disponibles.
+            {mode === "mine"
+              ? "Récupération de votre bibliothèque…"
+              : "Récupération du contenu réel depuis Convex…"}
           </Text>
         </View>
       </View>
@@ -1285,13 +2297,22 @@ export default function ReelsPage({ onBack }: ReelsPageProps) {
 
   if (videos.length === 0) {
     return (
-      <EmptyReelsState
-        authenticated={isAuthenticated}
-        onBack={onBack}
-        onCreate={() => setShowUpload(true)}
-      />
+      <>
+        <EmptyReelsState
+          authenticated={isAuthenticated}
+          onBack={onBack}
+          onCreate={() => setShowUpload(true)}
+          mode={mode}
+        />
+
+        {showUpload ? (
+          <UploadSheet onClose={() => setShowUpload(false)} />
+        ) : null}
+      </>
     );
   }
+
+  const currentVideo = videos[currentIndex];
 
   return (
     <View style={styles.screen}>
@@ -1306,43 +2327,42 @@ export default function ReelsPage({ onBack }: ReelsPageProps) {
         </Pressable>
 
         <View style={styles.reelsHeaderCenter}>
-          <Text style={styles.reelsTitle}>Reels</Text>
+          <Text style={styles.reelsTitle}>
+            {mode === "mine" ? "Mes Reels" : "Reels"}
+          </Text>
 
           <Text style={styles.reelsCounter}>
             {currentIndex + 1} / {videos.length}
           </Text>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Voir les tendances"
-          onPress={() => setShowTrending(true)}
-          style={styles.headerButton}
-        >
-          <TrendingIcon />
-        </Pressable>
+        <View style={styles.headerActions}>
+          {mode === "public" ? (
+            <View style={styles.headerStatus}>
+              <View style={styles.liveDot} />
+
+              <Text style={styles.headerStatusText}>LIVE</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.headerButton}>
+            <Hash size={18} color={COLORS.purpleBright} />
+          </View>
+        </View>
       </View>
 
-      <View style={styles.reelList}>
-        {videos.map((video, index) => (
-          <View key={video._id} style={styles.reelContainer}>
-            <Reel
-              video={video}
-              active={currentIndex === index}
-              onSwipeUp={() => {
-                goTo(index + 1);
-              }}
-              onSwipeDown={() => {
-                goTo(index - 1);
-              }}
-            />
-          </View>
-        ))}
-      </View>
+      <Reel
+        key={`${mode}-${String(currentVideo._id)}`}
+        video={currentVideo}
+        active
+        mode={mode}
+        onSwipeUp={() => goTo(currentIndex + 1)}
+        onSwipeDown={() => goTo(currentIndex - 1)}
+      />
 
       {videos.length > 1 ? (
         <View pointerEvents="none" style={styles.pageIndicator}>
-          {videos.slice(0, 8).map((video, index) => (
+          {videos.slice(0, 10).map((video, index) => (
             <View
               key={video._id}
               style={[
@@ -1355,19 +2375,21 @@ export default function ReelsPage({ onBack }: ReelsPageProps) {
       ) : null}
 
       <Authenticated>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Publier un Reel"
-          onPress={() => setShowUpload(true)}
-          style={({ pressed }) => [
-            styles.floatingPublish,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Plus size={17} color={COLORS.white} />
+        <View pointerEvents="box-none" style={styles.floatingPublishWrap}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Publier un Reel"
+            onPress={() => setShowUpload(true)}
+            style={({ pressed }) => [
+              styles.floatingPublish,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Plus size={17} color={COLORS.white} />
 
-          <Text style={styles.floatingPublishText}>Publier</Text>
-        </Pressable>
+            <Text style={styles.floatingPublishText}>Publier</Text>
+          </Pressable>
+        </View>
       </Authenticated>
 
       <Unauthenticated>
@@ -1378,71 +2400,160 @@ export default function ReelsPage({ onBack }: ReelsPageProps) {
 
       {showUpload ? <UploadSheet onClose={() => setShowUpload(false)} /> : null}
 
-      {showTrending ? (
-        <TrendingPanel onClose={() => setShowTrending(false)} />
-      ) : null}
-
       {status === "LoadingMore" ? (
-        <View style={styles.loadingMore}>
-          <ActivityIndicator size="small" color={COLORS.white} />
+        <View pointerEvents="none" style={styles.loadingMoreWrap}>
+          <View style={styles.loadingMore}>
+            <ActivityIndicator size="small" color={COLORS.white} />
+          </View>
         </View>
       ) : null}
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Small icon component
-// ─────────────────────────────────────────────────────────────────────────────
+/* ============================================================================
+ * DATA SOURCES
+ * ========================================================================== */
 
-function TrendingIcon() {
+function PublicReelsData({ onBack }: { onBack: () => void }) {
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.shortVideos.list,
+    {},
+    { initialNumItems: 5 },
+  );
+
   return (
-    <View style={styles.trendingIcon}>
-      <ChevronUp size={12} color={COLORS.white} />
-      <ChevronDown size={12} color={COLORS.purpleBright} />
-    </View>
+    <ReelsFeedView
+      onBack={onBack}
+      mode="public"
+      results={(results ?? []) as unknown as VideoItem[]}
+      status={status}
+      loadMore={loadMore}
+    />
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────────────────────────────────────
+function MyReelsData({ onBack }: { onBack: () => void }) {
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.shortVideos.listMine,
+    {},
+    { initialNumItems: 5 },
+  );
+
+  return (
+    <ReelsFeedView
+      onBack={onBack}
+      mode="mine"
+      results={(results ?? []) as unknown as VideoItem[]}
+      status={status}
+      loadMore={loadMore}
+    />
+  );
+}
+
+/* ============================================================================
+ * ROUTER
+ * ========================================================================== */
+
+export default function ReelsPage({ onBack, mode = "public" }: ReelsPageProps) {
+  const { width, height } = useWindowDimensions();
+
+  const content =
+    mode === "mine" ? (
+      <MyReelsData onBack={onBack} />
+    ) : (
+      <PublicReelsData onBack={onBack} />
+    );
+
+  if (Platform.OS === "web") {
+    return content;
+  }
+
+  return (
+    <Modal
+      visible
+      animationType="slide"
+      onRequestClose={onBack}
+      statusBarTranslucent
+      presentationStyle="overFullScreen"
+      hardwareAccelerated
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
+
+      <View style={[styles.modalRoot, { width, height }]}>{content}</View>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
 
 const styles = StyleSheet.create({
+  modalRoot: {
+    backgroundColor: COLORS.black,
+    overflow: "hidden",
+  },
+
   screen: {
     flex: 1,
+    width: "100%",
+    height: "100%",
     backgroundColor: COLORS.black,
   },
 
-  reelList: {
-    flex: 1,
-  },
-
-  reelContainer: {
-    flex: 1,
-  },
-
   reel: {
-    width: "100%",
-    position: "relative",
     overflow: "hidden",
     backgroundColor: COLORS.black,
   },
 
-  // Header
-
   reelsHeader: {
     position: "absolute",
-    zIndex: 30,
+    zIndex: 50,
     top: 0,
     left: 0,
     right: 0,
+    paddingTop: TOP_INSET + 8,
+    paddingHorizontal: 15,
+    paddingBottom: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 15,
-    paddingTop: 18,
-    paddingBottom: 12,
+  },
+
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  headerStatus: {
+    height: 32,
+    paddingHorizontal: 9,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(0,0,0,0.46)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.green,
+  },
+
+  headerStatusText: {
+    color: COLORS.green,
+    fontSize: 8,
+    fontWeight: "900",
   },
 
   headerButton: {
@@ -1451,20 +2562,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.46)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
-  },
-
-  backButton: {
-    width: 41,
-    height: 41,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
 
   reelsHeaderCenter: {
@@ -1475,7 +2575,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 18,
     fontWeight: "900",
-    letterSpacing: 0.2,
   },
 
   reelsCounter: {
@@ -1485,142 +2584,84 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  trendingIcon: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  // Video
-
-  videoSurface: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.black,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  videoUnavailable: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-
-  videoUnavailableText: {
-    color: COLORS.muted,
-    fontSize: 11,
-  },
-
-  videoRuntimeNotice: {
-    width: "76%",
-    alignItems: "center",
-    padding: 22,
-    borderRadius: 24,
-    backgroundColor: "rgba(0,0,0,0.56)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-
-  videoRuntimeTitle: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: "800",
-    marginTop: 10,
-  },
-
-  videoRuntimeText: {
-    color: COLORS.green,
-    fontSize: 10,
-    fontWeight: "700",
-    marginTop: 4,
-  },
-
-  videoRuntimeUrl: {
-    width: "100%",
-    color: COLORS.subtle,
-    fontSize: 8,
-    textAlign: "center",
-    marginTop: 8,
-  },
-
-  videoMetaOverlay: {
-    position: "absolute",
-    top: 75,
-    left: 15,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 9,
-    backgroundColor: "rgba(0,0,0,0.40)",
-  },
-
-  videoMetaText: {
-    color: COLORS.muted,
-    fontSize: 9,
-    fontWeight: "700",
-  },
-
   reelGradientTop: {
     position: "absolute",
+    zIndex: 3,
     top: 0,
     left: 0,
     right: 0,
-    height: 150,
-    backgroundColor: "rgba(0,0,0,0.20)",
+    height: 180,
+    backgroundColor: "rgba(0,0,0,0.22)",
   },
 
   reelGradientBottom: {
     position: "absolute",
+    zIndex: 3,
     bottom: 0,
     left: 0,
     right: 0,
-    height: 260,
-    backgroundColor: "rgba(0,0,0,0.42)",
+    height: 330,
+    backgroundColor: "rgba(0,0,0,0.50)",
   },
 
-  // Controls
+  progressTrack: {
+    position: "absolute",
+    zIndex: 40,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+
+  progressFill: {
+    height: 2,
+    backgroundColor: COLORS.purpleBright,
+  },
 
   videoControls: {
     position: "absolute",
-    top: 73,
+    zIndex: 20,
+    top: TOP_INSET + 67,
     right: 15,
-    zIndex: 15,
     gap: 8,
   },
 
   controlButton: {
-    width: 38,
-    height: 38,
+    width: 39,
+    height: 39,
     borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.52)",
+    backgroundColor: "rgba(0,0,0,0.54)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.11)",
+    borderColor: "rgba(255,255,255,0.12)",
   },
 
   controlButtonActive: {
-    backgroundColor: "rgba(139,92,246,0.52)",
+    backgroundColor: "rgba(139,92,246,0.54)",
     borderColor: "rgba(167,139,250,0.45)",
   },
 
   speedPicker: {
     position: "absolute",
-    zIndex: 50,
-    top: 121,
+    zIndex: 70,
+    top: TOP_INSET + 113,
     right: 15,
-    width: 125,
+    width: 130,
     overflow: "hidden",
     borderRadius: 18,
-    backgroundColor: "rgba(5,8,18,0.97)",
+    backgroundColor: "rgba(5,8,18,0.98)",
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.borderStrong,
   },
 
   speedHeader: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 9,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
@@ -1641,7 +2682,7 @@ const styles = StyleSheet.create({
   },
 
   speedOption: {
-    minHeight: 37,
+    minHeight: 38,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
@@ -1663,21 +2704,31 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  // Action rail
-
   actions: {
     position: "absolute",
-    zIndex: 15,
-    right: 12,
-    bottom: 105,
+    zIndex: 20,
+    right: 11,
+    bottom: 118,
     alignItems: "center",
-    gap: 21,
+    gap: 18,
   },
 
   action: {
+    minWidth: 45,
     alignItems: "center",
     gap: 4,
-    minWidth: 44,
+  },
+
+  /**
+   * Ajouté : état visuel des actions d'interaction désactivées
+   * lorsque le Reel n'est pas encore approuvé (pending ou rejected).
+   *
+   * Le backend refuse déjà ces actions. Cet état reflète la même
+   * règle côté UI pour éviter l'erreur VIDEO_NOT_FOUND et clarifier
+   * le retour utilisateur.
+   */
+  actionDisabled: {
+    opacity: 0.35,
   },
 
   actionCount: {
@@ -1686,14 +2737,12 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  // Creator
-
   creatorBlock: {
     position: "absolute",
-    zIndex: 15,
+    zIndex: 20,
     left: 15,
-    right: 74,
-    bottom: 25,
+    right: 75,
+    bottom: 27,
   },
 
   creatorRow: {
@@ -1707,10 +2756,17 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
 
+  creatorNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+
   creatorName: {
     color: COLORS.white,
     fontSize: 13,
     fontWeight: "900",
+    flexShrink: 1,
   },
 
   creatorViews: {
@@ -1722,14 +2778,14 @@ const styles = StyleSheet.create({
   followButton: {
     minHeight: 31,
     paddingHorizontal: 10,
+    borderRadius: 11,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 5,
-    borderRadius: 11,
-    backgroundColor: "rgba(139,92,246,0.34)",
+    backgroundColor: "rgba(139,92,246,0.36)",
     borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.38)",
+    borderColor: "rgba(167,139,250,0.40)",
   },
 
   followText: {
@@ -1745,11 +2801,18 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
+  soundName: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 7,
+  },
+
   hashtagRow: {
+    marginTop: 7,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    marginTop: 7,
   },
 
   hashtag: {
@@ -1758,11 +2821,44 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  // Heart
+  moderationBadge: {
+    alignSelf: "flex-start",
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "rgba(251,146,60,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(251,146,60,0.28)",
+  },
+
+  moderationBadgeApproved: {
+    backgroundColor: "rgba(52,211,153,0.16)",
+    borderColor: "rgba(52,211,153,0.32)",
+  },
+
+  moderationBadgeRejected: {
+    backgroundColor: "rgba(251,113,133,0.16)",
+    borderColor: "rgba(251,113,133,0.32)",
+  },
+
+  moderationBadgeText: {
+    color: COLORS.orange,
+    fontSize: 8,
+    fontWeight: "900",
+  },
+
+  moderationBadgeTextApproved: {
+    color: COLORS.green,
+  },
+
+  moderationBadgeTextRejected: {
+    color: COLORS.red,
+  },
 
   heartOverlay: {
     position: "absolute",
-    zIndex: 25,
+    zIndex: 30,
     left: 0,
     right: 0,
     top: 0,
@@ -1773,7 +2869,7 @@ const styles = StyleSheet.create({
 
   centerPlay: {
     position: "absolute",
-    zIndex: 24,
+    zIndex: 25,
     left: 0,
     right: 0,
     top: 0,
@@ -1794,35 +2890,122 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.16)",
   },
 
-  pauseIndicator: {
-    position: "absolute",
-    zIndex: 20,
+  videoUnavailable: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: "rgba(0,0,0,0.48)",
+    gap: 10,
+    backgroundColor: COLORS.black,
   },
 
-  // Comments
+  videoUnavailableText: {
+    color: COLORS.muted,
+    fontSize: 11,
+  },
 
-  sheetOverlay: {
+  videoErrorOverlay: {
+    position: "absolute",
+    zIndex: 18,
+    left: 25,
+    right: 25,
+    top: "42%",
+    padding: 18,
+    borderRadius: 20,
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(251,113,133,0.25)",
+  },
+
+  videoErrorTitle: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  videoErrorText: {
+    color: COLORS.muted,
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 5,
+  },
+
+  avatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.30)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.20)",
+  },
+
+  avatarInitial: {
+    color: COLORS.white,
+    fontWeight: "900",
+  },
+
+  pageIndicator: {
+    position: "absolute",
+    zIndex: 30,
+    left: 9,
+    top: "50%",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  pageDot: {
+    width: 3,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+
+  pageDotActive: {
+    height: 18,
+    backgroundColor: COLORS.purpleBright,
+  },
+
+  floatingPublishWrap: {
+    position: "absolute",
+    zIndex: 60,
+    left: 0,
+    right: 0,
+    bottom: 28,
+    alignItems: "center",
+  },
+
+  floatingPublish: {
+    minHeight: 43,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: COLORS.purple,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+
+  floatingPublishText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  signInFloating: {
+    position: "absolute",
+    zIndex: 60,
+    left: 0,
+    right: 0,
+    bottom: 28,
+    alignItems: "center",
+  },
+
+  modalOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 100,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.64)",
-  },
-
-  commentsSheet: {
-    maxHeight: "76%",
-    minHeight: "46%",
-    backgroundColor: "#080D1D",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    overflow: "hidden",
+    backgroundColor: "rgba(0,0,0,0.68)",
   },
 
   sheetHandle: {
@@ -1856,6 +3039,113 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+
+  commentsSheet: {
+    maxHeight: "82%",
+    minHeight: "48%",
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+  },
+
+  commentsBody: {
+    flex: 1,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+
+  commentList: {
+    gap: 4,
+  },
+
+  commentItem: {
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+  },
+
+  replyList: {
+    marginLeft: 44,
+    borderLeftWidth: 1,
+    borderLeftColor: "rgba(255,255,255,0.10)",
+    paddingLeft: 10,
+  },
+
+  replyItem: {
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+
+  commentContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  commentAuthor: {
+    color: COLORS.purpleBright,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+
+  commentText: {
+    color: "rgba(255,255,255,0.86)",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+
+  commentMeta: {
+    marginTop: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  commentMetaButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  commentMetaText: {
+    color: COLORS.subtle,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  replyComposer: {
+    marginLeft: 44,
+    paddingVertical: 5,
+    flexDirection: "row",
+    gap: 7,
+  },
+
+  replyInput: {
+    flex: 1,
+    minHeight: 38,
+    paddingHorizontal: 11,
+    color: COLORS.white,
+    fontSize: 11,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
   countPill: {
     minWidth: 24,
     paddingHorizontal: 7,
@@ -1869,21 +3159,6 @@ const styles = StyleSheet.create({
     color: COLORS.purpleBright,
     fontSize: 9,
     fontWeight: "900",
-  },
-
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.07)",
-  },
-
-  commentsBody: {
-    flex: 1,
-    paddingHorizontal: 15,
-    paddingVertical: 11,
   },
 
   commentsLoading: {
@@ -1918,52 +3193,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 15,
     marginTop: 5,
-  },
-
-  commentItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 9,
-    paddingVertical: 8,
-  },
-
-  avatarFallback: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(139,92,246,0.30)",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.20)",
-  },
-
-  avatarInitial: {
-    color: COLORS.white,
-    fontWeight: "900",
-  },
-
-  commentContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-
-  commentAuthor: {
-    color: COLORS.purpleBright,
-    fontSize: 10,
-    fontWeight: "900",
-  },
-
-  commentText: {
-    color: "rgba(255,255,255,0.84)",
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 2,
-  },
-
-  commentDelete: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
   },
 
   commentComposer: {
@@ -2015,29 +3244,95 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
 
-  // Upload
-
-  uploadSheet: {
-    maxHeight: "88%",
-    paddingHorizontal: 17,
-    paddingBottom: 24,
-    backgroundColor: "#080D1D",
+  reportSheet: {
+    paddingBottom: 25,
+    backgroundColor: COLORS.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
 
-  uploadIntro: {
-    color: COLORS.muted,
-    fontSize: 10,
-    lineHeight: 16,
-    marginHorizontal: 2,
-    marginBottom: 15,
+  reportReasons: {
+    paddingHorizontal: 17,
+    paddingVertical: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
   },
 
-  field: {
-    marginBottom: 13,
+  reportReason: {
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  reportReasonSelected: {
+    backgroundColor: "rgba(251,113,133,0.13)",
+    borderColor: "rgba(251,113,133,0.32)",
+  },
+
+  reportReasonText: {
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  reportReasonTextSelected: {
+    color: COLORS.red,
+  },
+
+  uploadSheet: {
+    maxHeight: "94%",
+    paddingHorizontal: 17,
+    paddingBottom: 24,
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  videoPicker: {
+    marginTop: 15,
+    marginBottom: 15,
+    minHeight: 78,
+    paddingHorizontal: 14,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  videoPickerIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.14)",
+  },
+
+  videoPickerCopy: {
+    flex: 1,
+  },
+
+  videoPickerTitle: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  videoPickerSubtitle: {
+    color: COLORS.subtle,
+    fontSize: 9,
+    marginTop: 3,
   },
 
   fieldLabel: {
@@ -2045,6 +3340,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     marginBottom: 6,
+    marginTop: 8,
   },
 
   input: {
@@ -2060,17 +3356,50 @@ const styles = StyleSheet.create({
   },
 
   multilineInput: {
-    minHeight: 105,
+    minHeight: 90,
+    textAlignVertical: "top",
+  },
+
+  visibilityRow: {
+    flexDirection: "row",
+    gap: 7,
+    marginBottom: 8,
+  },
+
+  visibilityOption: {
+    flex: 1,
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  visibilityOptionSelected: {
+    backgroundColor: "rgba(139,92,246,0.18)",
+    borderColor: "rgba(167,139,250,0.38)",
+  },
+
+  visibilityText: {
+    color: COLORS.subtle,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+
+  visibilityTextSelected: {
+    color: COLORS.purpleBright,
   },
 
   publishButton: {
     minHeight: 50,
+    marginTop: 12,
     borderRadius: 15,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginTop: 4,
     backgroundColor: COLORS.purple,
   },
 
@@ -2080,77 +3409,57 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  // Trending
-
-  trendingPanel: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 90,
-    backgroundColor: "#020611",
-  },
-
-  trendingHeader: {
-    paddingHorizontal: 17,
-    paddingTop: 18,
-    paddingBottom: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-
-  trendingHeaderCopy: {
-    flex: 1,
-  },
-
-  trendingTitle: {
-    color: COLORS.white,
-    fontSize: 19,
-    fontWeight: "900",
-  },
-
-  trendingSubtitle: {
-    color: COLORS.green,
-    fontSize: 9,
-    fontWeight: "800",
-    marginTop: 3,
-  },
-
-  trendingEmpty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 35,
-  },
-
-  trendingEmptyIcon: {
-    width: 62,
-    height: 62,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-    backgroundColor: "rgba(139,92,246,0.11)",
+  analyticsSheet: {
+    maxHeight: "75%",
+    paddingBottom: 25,
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.23)",
+    borderColor: COLORS.border,
   },
 
-  trendingEmptyTitle: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: "900",
+  analyticsLoading: {
+    minHeight: 260,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
   },
 
-  trendingEmptyText: {
+  analyticsGrid: {
+    padding: 17,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+  },
+
+  analyticsCard: {
+    width: "31%",
+    minHeight: 82,
+    padding: 11,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.055)",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  analyticsLabel: {
     color: COLORS.subtle,
-    fontSize: 11,
-    lineHeight: 17,
-    textAlign: "center",
-    marginTop: 7,
+    fontSize: 8,
+    fontWeight: "800",
   },
 
-  // Empty
+  analyticsValue: {
+    color: COLORS.white,
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 8,
+  },
 
   emptyScreen: {
     flex: 1,
+    width: "100%",
+    height: "100%",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 32,
@@ -2159,7 +3468,7 @@ const styles = StyleSheet.create({
 
   emptyBack: {
     position: "absolute",
-    top: 18,
+    top: TOP_INSET + 8,
     left: 17,
     width: 41,
     height: 41,
@@ -2187,6 +3496,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 20,
     fontWeight: "900",
+    textAlign: "center",
   },
 
   emptyReelsText: {
@@ -2214,19 +3524,19 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  // Loading
-
   loadingScreen: {
     flex: 1,
+    width: "100%",
+    height: "100%",
     backgroundColor: COLORS.background,
   },
 
   loadingHeader: {
+    paddingHorizontal: 17,
+    paddingTop: TOP_INSET + 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 17,
-    paddingTop: 18,
   },
 
   loadingHeaderTitle: {
@@ -2256,78 +3566,23 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
-  loadingMore: {
+  loadingMoreWrap: {
     position: "absolute",
-    left: "50%",
-    bottom: 18,
+    zIndex: 80,
+    left: 0,
+    right: 0,
+    bottom: 28,
+    alignItems: "center",
+  },
+
+  loadingMore: {
     width: 36,
     height: 36,
-    marginLeft: -18,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.65)",
   },
-
-  // Page indicator
-
-  pageIndicator: {
-    position: "absolute",
-    zIndex: 25,
-    left: 9,
-    top: "50%",
-    alignItems: "center",
-    gap: 4,
-  },
-
-  pageDot: {
-    width: 3,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.25)",
-  },
-
-  pageDotActive: {
-    height: 18,
-    backgroundColor: COLORS.purpleBright,
-  },
-
-  // Floating action
-
-  floatingPublish: {
-    position: "absolute",
-    zIndex: 35,
-    left: "50%",
-    bottom: 18,
-    minHeight: 43,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    backgroundColor: COLORS.purple,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    transform: [{ translateX: -50 }],
-  },
-
-  floatingPublishText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-
-  signInFloating: {
-    position: "absolute",
-    zIndex: 35,
-    left: 0,
-    right: 0,
-    bottom: 18,
-    alignItems: "center",
-  },
-
-  // Generic
 
   pressed: {
     opacity: 0.68,

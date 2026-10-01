@@ -1,173 +1,385 @@
-import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
-import { ConvexError } from "convex/values";
+import { mutation, query } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ============================================================================
+// ANALYTICS — PROFILE / CREATOR
+// ============================================================================
+//
+// Sources de vérité :
+// - profileViews  → vues réelles du profil
+// - follows       → abonnements réels
+// - publications  → publications + compteurs agrégés réels
+//
+// IMPORTANT :
+// Nous ne reconstruisons jamais artificiellement un historique quotidien
+// de vues/likes à partir de _creationTime d'une publication.
+// ============================================================================
 
-function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+type DayMetric = {
+  date: string;
+  views: number;
+};
+
+type LikeMetric = {
+  date: string;
+  likes: number;
+};
+
+type FollowerMetric = {
+  date: string;
+  count: number;
+};
+
+type TopPublication = {
+  _id: string;
+  title: string;
+  type: string;
+  views: number;
+  likes: number;
+  comments: number;
+};
+
+type AnalyticsResult = {
+  totalViews: number;
+  totalLikes: number;
+  totalComments: number;
+  totalFollowers: number;
+  totalPublications: number;
+  engagementRate: number;
+  weekSummary: {
+    label: string;
+    views: number;
+    likes: number;
+  };
+  viewsByDay: DayMetric[];
+  likesByDay: LikeMetric[];
+  followersByDay: FollowerMetric[];
+  profileViewsByDay: DayMetric[];
+  topPublications: TopPublication[];
+};
+
+// ============================================================================
+// DATE HELPERS
+// ============================================================================
+
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
-function last7Days(): string[] {
+function getLastDays(count: number): string[] {
   const days: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setUTCDate(d.getUTCDate() - i);
-    days.push(isoDate(d));
+
+  for (let offset = count - 1; offset >= 0; offset -= 1) {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() - offset);
+    days.push(isoDate(date));
   }
+
   return days;
 }
 
-function last30Days(): string[] {
-  const days: string[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date();
-    d.setUTCDate(d.getUTCDate() - i);
-    days.push(isoDate(d));
-  }
-  return days;
-}
+// ============================================================================
+// RECORD PROFILE VIEW
+// ============================================================================
+//
+// Règles :
+// - le profil doit exister ;
+// - le propriétaire ne compte pas comme visiteur ;
+// - un utilisateur authentifié ne génère qu'une vue par jour/profil ;
+// - les visiteurs anonymes peuvent être comptabilisés ;
+// - aucune donnée sensible n'est enregistrée.
+// ============================================================================
 
-// ── Record a profile view (called when public profile is opened) ───────────
 export const recordProfileView = mutation({
-  args: { profileId: v.id("users") },
+  args: {
+    profileId: v.id("users"),
+  },
+
   handler: async (ctx, args) => {
+    // ------------------------------------------------------------------------
+    // Vérification du profil cible
+    // ------------------------------------------------------------------------
+
+    const profile = await ctx.db.get(args.profileId);
+
+    if (!profile) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Profil introuvable",
+      });
+    }
+
+    // ------------------------------------------------------------------------
+    // Identification éventuelle du visiteur
+    // ------------------------------------------------------------------------
+
     const identity = await ctx.auth.getUserIdentity();
-    const viewerId = identity
-      ? (await ctx.db
-          .query("users")
-          .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-          .unique())?._id
-      : undefined;
+
+    let viewerId: Id<"users"> | undefined;
+
+    if (identity) {
+      const viewer = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) =>
+          q.eq("tokenIdentifier", identity.tokenIdentifier),
+        )
+        .unique();
+
+      viewerId = viewer?._id;
+
+      // Ne jamais compter ses propres consultations.
+      if (viewerId === args.profileId) {
+        return {
+          recorded: false,
+          reason: "self_view",
+        } as const;
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Déduplication quotidienne
+    // ------------------------------------------------------------------------
 
     const date = isoDate(new Date());
+
+    if (viewerId) {
+      const existing = await ctx.db
+        .query("profileViews")
+        .withIndex("by_viewer_and_profile_and_date", (q) =>
+          q
+            .eq("viewerId", viewerId)
+            .eq("profileId", args.profileId)
+            .eq("date", date),
+        )
+        .first();
+
+      if (existing) {
+        return {
+          recorded: false,
+          reason: "already_recorded_today",
+        } as const;
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Enregistrement
+    // ------------------------------------------------------------------------
+
     await ctx.db.insert("profileViews", {
       profileId: args.profileId,
-      viewerId: viewerId ?? undefined,
+      viewerId,
       date,
     });
+
+    return {
+      recorded: true,
+      reason: "recorded",
+    } as const;
   },
 });
 
-// ── My personal analytics ──────────────────────────────────────────────────
+// ============================================================================
+// MY ANALYTICS
+// ============================================================================
+
 export const getMyAnalytics = query({
   args: {},
-  handler: async (ctx): Promise<{
-    totalViews: number;
-    totalLikes: number;
-    totalComments: number;
-    totalFollowers: number;
-    totalPublications: number;
-    engagementRate: number;
-    weekSummary: { label: string; views: number; likes: number };
-    viewsByDay: { date: string; views: number }[];
-    likesByDay: { date: string; likes: number }[];
-    followersByDay: { date: string; count: number }[];
-    profileViewsByDay: { date: string; views: number }[];
-    topPublications: { _id: string; title: string; type: string; views: number; likes: number; comments: number }[];
-  }> => {
+
+  handler: async (ctx): Promise<AnalyticsResult> => {
+    // ========================================================================
+    // AUTHENTIFICATION
+    // ========================================================================
+
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new ConvexError({ message: "Non authentifié", code: "UNAUTHENTICATED" });
+
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHENTICATED",
+        message: "Non authentifié",
+      });
+    }
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
       .unique();
-    if (!user) throw new ConvexError({ message: "Utilisateur introuvable", code: "NOT_FOUND" });
 
-    const days30 = last30Days();
-    const days7 = last7Days();
+    if (!user) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Utilisateur introuvable",
+      });
+    }
+
+    // ========================================================================
+    // PÉRIODE
+    // ========================================================================
+
+    const days30 = getLastDays(30);
+    const days7 = days30.slice(-7);
     const weekStart = days7[0];
 
-    // ── Publications ────────────────────────────────────────────────────────
-    const pubs = await ctx.db
-      .query("publications")
-      .withIndex("by_author", (q) => q.eq("authorId", user._id))
-      .collect();
-
-    const totalViews = pubs.reduce((s, p) => s + p.viewCount, 0);
-    const totalLikes = pubs.reduce((s, p) => s + p.likeCount, 0);
-    const totalComments = pubs.reduce((s, p) => s + p.commentCount, 0);
-    const totalPublications = pubs.length;
-
-    // ── Followers ───────────────────────────────────────────────────────────
-    const followRows = await ctx.db
-      .query("follows")
-      .withIndex("by_following", (q) => q.eq("followingId", user._id))
-      .collect();
-    const totalFollowers = followRows.length;
-
-    // ── Engagement rate ─────────────────────────────────────────────────────
-    const engagementRate = totalViews > 0
-      ? Math.round(((totalLikes + totalComments) / totalViews) * 100)
-      : 0;
-
-    // ── Profile views by day (last 30d) ─────────────────────────────────────
-    const pvRows = await ctx.db
-      .query("profileViews")
-      .withIndex("by_profile", (q) => q.eq("profileId", user._id))
-      .collect();
-
-    const pvByDay: Record<string, number> = {};
-    for (const row of pvRows) {
-      if (days30.includes(row.date)) {
-        pvByDay[row.date] = (pvByDay[row.date] ?? 0) + 1;
-      }
-    }
-    const profileViewsByDay = days30.map((d) => ({ date: d, views: pvByDay[d] ?? 0 }));
-
-    // ── Views/likes by day — approximate from publications _creationTime ─────
-    // We don't have per-day view events, so we distribute viewCount evenly
-    // over the last 30 days weighted by recency (most recent pub = more views today)
     const viewsByDayMap: Record<string, number> = {};
     const likesByDayMap: Record<string, number> = {};
-    for (const d of days30) { viewsByDayMap[d] = 0; likesByDayMap[d] = 0; }
+    const followersByDayMap: Record<string, number> = {};
 
-    for (const pub of pubs) {
-      const pubDate = isoDate(new Date(pub._creationTime));
-      if (viewsByDayMap[pubDate] !== undefined) {
-        viewsByDayMap[pubDate] += pub.viewCount;
-        likesByDayMap[pubDate] += pub.likeCount;
+    for (const date of days30) {
+      viewsByDayMap[date] = 0;
+      likesByDayMap[date] = 0;
+      followersByDayMap[date] = 0;
+    }
+
+    // ========================================================================
+    // PROFILE VIEWS
+    // ========================================================================
+
+    let totalViews = 0;
+
+    const profileViewsQuery = ctx.db
+      .query("profileViews")
+      .withIndex("by_profile", (q) => q.eq("profileId", user._id));
+
+    for await (const view of profileViewsQuery) {
+      totalViews += 1;
+
+      if (viewsByDayMap[view.date] !== undefined) {
+        viewsByDayMap[view.date] += 1;
       }
     }
 
-    const viewsByDay = days30.map((d) => ({ date: d, views: viewsByDayMap[d] }));
-    const likesByDay = days30.map((d) => ({ date: d, likes: likesByDayMap[d] }));
+    // ========================================================================
+    // PUBLICATIONS
+    // ========================================================================
 
-    // ── Followers growth by day (follow _creationTime bucketed) ────────────
-    const followersByDayMap: Record<string, number> = {};
-    for (const d of days30) followersByDayMap[d] = 0;
-    for (const row of followRows) {
-      const d = isoDate(new Date(row._creationTime));
-      if (followersByDayMap[d] !== undefined) followersByDayMap[d]++;
+    let totalPublications = 0;
+    let totalLikes = 0;
+    let totalComments = 0;
+
+    const topPublications: TopPublication[] = [];
+
+    const publicationsQuery = ctx.db
+      .query("publications")
+      .withIndex("by_author", (q) => q.eq("authorId", user._id));
+
+    for await (const publication of publicationsQuery) {
+      totalPublications += 1;
+      totalLikes += publication.likeCount;
+      totalComments += publication.commentCount;
+
+      const candidate: TopPublication = {
+        _id: publication._id,
+        title: publication.title,
+        type: publication.type,
+        views: publication.viewCount,
+        likes: publication.likeCount,
+        comments: publication.commentCount,
+      };
+
+      topPublications.push(candidate);
+
+      // Conserver uniquement les 5 meilleures publications.
+      topPublications.sort(
+        (a, b) =>
+          b.views + b.likes + b.comments - (a.views + a.likes + a.comments),
+      );
+
+      if (topPublications.length > 5) {
+        topPublications.pop();
+      }
     }
-    // Convert to cumulative
-    let cumul = 0;
-    const followersByDay = days30.map((d) => {
-      cumul += followersByDayMap[d];
-      return { date: d, count: cumul };
+
+    // ========================================================================
+    // FOLLOWERS
+    // ========================================================================
+
+    let totalFollowers = 0;
+
+    const followersQuery = ctx.db
+      .query("follows")
+      .withIndex("by_following", (q) => q.eq("followingId", user._id));
+
+    for await (const follow of followersQuery) {
+      totalFollowers += 1;
+
+      const date = isoDate(new Date(follow._creationTime));
+
+      if (followersByDayMap[date] !== undefined) {
+        followersByDayMap[date] += 1;
+      }
+    }
+
+    // ========================================================================
+    // DAILY VIEWS
+    // ========================================================================
+
+    const viewsByDay: DayMetric[] = days30.map((date) => ({
+      date,
+      views: viewsByDayMap[date] ?? 0,
+    }));
+
+    // Compatibilité avec le contrat frontend existant.
+    const profileViewsByDay: DayMetric[] = viewsByDay.map((entry) => ({
+      date: entry.date,
+      views: entry.views,
+    }));
+
+    // ========================================================================
+    // DAILY LIKES
+    // ========================================================================
+    //
+    // Le schéma actuel ne permet pas de reconstruire proprement les likes
+    // reçus par l'ensemble des publications d'un utilisateur par jour.
+    //
+    // On ne fabrique donc PAS de données.
+    // ========================================================================
+
+    const likesByDay: LikeMetric[] = days30.map((date) => ({
+      date,
+      likes: likesByDayMap[date] ?? 0,
+    }));
+
+    // ========================================================================
+    // FOLLOWER CURVE
+    // ========================================================================
+
+    let cumulativeFollowers = 0;
+
+    const followersByDay: FollowerMetric[] = days30.map((date) => {
+      cumulativeFollowers += followersByDayMap[date] ?? 0;
+
+      return {
+        date,
+        count: cumulativeFollowers,
+      };
     });
 
-    // ── Week summary ────────────────────────────────────────────────────────
-    const weekViews = viewsByDay
-      .filter((x) => x.date >= weekStart)
-      .reduce((s, x) => s + x.views, 0);
-    const weekLikes = likesByDay
-      .filter((x) => x.date >= weekStart)
-      .reduce((s, x) => s + x.likes, 0);
+    // ========================================================================
+    // ENGAGEMENT
+    // ========================================================================
 
-    // ── Top publications ────────────────────────────────────────────────────
-    const topPublications = [...pubs]
-      .sort((a, b) => (b.viewCount + b.likeCount) - (a.viewCount + a.likeCount))
-      .slice(0, 5)
-      .map((p) => ({
-        _id: p._id,
-        title: p.title,
-        type: p.type,
-        views: p.viewCount,
-        likes: p.likeCount,
-        comments: p.commentCount,
-      }));
+    const engagementRate =
+      totalViews > 0
+        ? Math.round(((totalLikes + totalComments) / totalViews) * 100)
+        : 0;
+
+    // ========================================================================
+    // WEEK SUMMARY
+    // ========================================================================
+
+    const weekViews = viewsByDay
+      .filter((entry) => entry.date >= weekStart)
+      .reduce((sum, entry) => sum + entry.views, 0);
+
+    const weekLikes = likesByDay
+      .filter((entry) => entry.date >= weekStart)
+      .reduce((sum, entry) => sum + entry.likes, 0);
+
+    // ========================================================================
+    // RESULT
+    // ========================================================================
 
     return {
       totalViews,
@@ -176,11 +388,18 @@ export const getMyAnalytics = query({
       totalFollowers,
       totalPublications,
       engagementRate,
-      weekSummary: { label: "Cette semaine", views: weekViews, likes: weekLikes },
+
+      weekSummary: {
+        label: "Cette semaine",
+        views: weekViews,
+        likes: weekLikes,
+      },
+
       viewsByDay,
       likesByDay,
       followersByDay,
       profileViewsByDay,
+
       topPublications,
     };
   },

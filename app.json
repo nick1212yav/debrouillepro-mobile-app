@@ -4,10 +4,16 @@
     "slug": "debrouillepro-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+
+    "icon": "./assets/branding/debrouillepro-icon.png",
+
     "scheme": "debrouillepro",
+
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
+    "backgroundColor": "#050812",
+    "primaryColor": "#7C3AED",
 
     "ios": {
       "supportsTablet": true,
@@ -15,37 +21,42 @@
     },
 
     "android": {
+      "package": "com.debrouillepro.mobile",
+      "googleServicesFile": "./google-services.json",
+
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#0B041F",
+        "foregroundImage": "./assets/branding/debrouillepro-mark.png"
       },
+
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.debrouillepro.mobile"
+      "predictiveBackGestureEnabled": false
     },
 
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/branding/debrouillepro-icon.png",
       "bundler": "metro"
     },
 
     "plugins": [
       "expo-router",
+
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/branding/debrouillepro-mark.png",
+          "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#050812",
+
           "dark": {
-            "backgroundColor": "#000000"
+            "image": "./assets/branding/debrouillepro-mark.png",
+            "backgroundColor": "#050812"
           }
         }
       ],
+
       "expo-video",
       "expo-web-browser",
       "@react-native-google-signin/google-signin"

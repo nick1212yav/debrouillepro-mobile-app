@@ -8,11 +8,19 @@ import conversationsService, {
 } from "../services/conversations.service";
 
 export function useConversations(currentUserId?: Id<"users"> | null) {
-  const conversations = useQuery(api.messages.conversations.list);
+  const skip = !currentUserId;
 
-  const unreadCount = useQuery(api.messages.conversations.getUnreadCount);
+  const conversations = useQuery(
+    api.messages.conversations.list,
+    skip ? "skip" : {},
+  );
 
-  const normalized = conversations
+  const unreadCount = useQuery(
+    api.messages.conversations.getUnreadCount,
+    skip ? "skip" : {},
+  );
+
+  const normalized: Conversation[] = conversations
     ? conversationsService.sort(conversations as Conversation[])
     : [];
 
@@ -22,12 +30,10 @@ export function useConversations(currentUserId?: Id<"users"> | null) {
 
   return {
     conversations: normalized,
-
     previews,
-
     unreadCount: unreadCount ?? 0,
-
-    isLoading: conversations === undefined || unreadCount === undefined,
+    isLoading:
+      !skip && (conversations === undefined || unreadCount === undefined),
   };
 }
 

@@ -1,9 +1,11 @@
-import { Text, StyleSheet } from "react-native";
+import { Text } from "react-native";
 
 // src/features/messages/chat/components/MessageStatus.tsx
 
+type MessageStatusValue = "sent" | "delivered" | "read";
+
 interface MessageStatusProps {
-  status?: string;
+  status?: MessageStatusValue | string;
 }
 
 export function MessageStatus({ status }: MessageStatusProps) {
@@ -11,8 +13,9 @@ export function MessageStatus({ status }: MessageStatusProps) {
     case "read":
       return (
         <Text
+          className="text-[12px] font-semibold leading-4 text-emerald-400"
+          accessibilityRole="text"
           accessibilityLabel="Lu"
-          style={styles.read}
         >
           ✓✓
         </Text>
@@ -21,8 +24,9 @@ export function MessageStatus({ status }: MessageStatusProps) {
     case "delivered":
       return (
         <Text
+          className="text-[12px] font-semibold leading-4 text-white/45"
+          accessibilityRole="text"
           accessibilityLabel="Distribué"
-          style={styles.delivered}
         >
           ✓✓
         </Text>
@@ -31,8 +35,9 @@ export function MessageStatus({ status }: MessageStatusProps) {
     case "sent":
       return (
         <Text
+          className="text-[12px] font-semibold leading-4 text-white/45"
+          accessibilityRole="text"
           accessibilityLabel="Envoyé"
-          style={styles.sent}
         >
           ✓
         </Text>
@@ -42,23 +47,5 @@ export function MessageStatus({ status }: MessageStatusProps) {
       return null;
   }
 }
-
-const styles = StyleSheet.create({
-  read: {
-    fontWeight: "600",
-    color: "#22c55e",
-    fontSize: 12,
-  },
-  delivered: {
-    fontWeight: "600",
-    color: "#9ca3af",
-    fontSize: 12,
-  },
-  sent: {
-    fontWeight: "600",
-    color: "#9ca3af",
-    fontSize: 12,
-  },
-});
 
 export default MessageStatus;

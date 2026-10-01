@@ -1,8 +1,7 @@
-import { View, Text } from "react-native";
+import { Text, View } from "react-native";
+import type { Id } from "@/convex/_generated/dataModel";
 
 // src/features/messages/chat/components/MessageReactions.tsx
-
-import type { Id } from "@/convex/_generated/dataModel";
 
 export interface MessageReaction {
   emoji: string;
@@ -24,15 +23,57 @@ export function MessageReactions({
   }
 
   return (
-    <View className={`mt-1 flex flex-wrap gap-1 ${
-        own ? "justify-end" : "justify-start"
-      }`} accessibilityLabel="Réactions au message">{reactions.map((reaction) => (
-        <Text key={`${reaction.emoji}-${reaction.count}`} className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] ${
-            own ? "bg-black/10 text-black/80" : "bg-white/10 text-white/80"
-          }`}><Text accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants">{reaction.emoji}</Text>{reaction.count > 1 && (
-            <Text className="font-medium">{reaction.count}</Text>
-          )}</Text>
-      ))}</View>
+    <View
+      className={[
+        "mt-1 w-full flex-row flex-wrap gap-1",
+        own ? "justify-end" : "justify-start",
+      ].join(" ")}
+      accessibilityRole="text"
+      accessibilityLabel="Réactions au message"
+    >
+      {reactions.map((reaction, index) => {
+        const count = Math.max(0, Math.floor(reaction.count));
+
+        return (
+          <View
+            key={`${reaction.emoji}-${index}`}
+            className={[
+              "min-h-[22px] flex-row items-center rounded-full px-2 py-0.5",
+              own ? "bg-black/10" : "border border-white/[0.06] bg-white/10",
+            ].join(" ")}
+            accessibilityLabel={
+              count > 1
+                ? `${reaction.emoji}, ${count} réactions`
+                : `${reaction.emoji}, 1 réaction`
+            }
+          >
+            <Text
+              className={[
+                "text-[12px] leading-4",
+                own ? "text-black/85" : "text-white/90",
+              ].join(" ")}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              {reaction.emoji}
+            </Text>
+
+            {count > 1 && (
+              <Text
+                className={[
+                  "ml-1 text-[10px] font-semibold leading-4",
+                  own ? "text-black/60" : "text-white/55",
+                ].join(" ")}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                {count}
+              </Text>
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 

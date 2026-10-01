@@ -31,3 +31,9 @@ Thumbs.db
 # Audit files (temporaires)
 sprint*.txt
 audit-*.txt
+
+scripts/theme/backups/
+
+google-services.json
+
+android/app/google-services.json

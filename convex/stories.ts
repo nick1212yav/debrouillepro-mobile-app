@@ -1,40 +1,41 @@
 // convex/stories.ts
 
 import { query, mutation, internalMutation } from "./_generated/server";
-import { v } from "convex/values";
-import { ConvexError } from "convex/values";
+import { v, ConvexError } from "convex/values";
 
 import type { QueryCtx, MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Id, Doc } from "./_generated/dataModel";
 
 /**
  * ============================================================
- * DÉBROUILLEPRO
- * STORIES ENGINE
+ * DÉBROUILLEPRO — STORIES ENGINE v2.1
  * ============================================================
  *
- * Responsabilités :
- * - Upload sécurisé
- * - Création de stories
- * - Feed personnalisé
- * - Ranking
- * - Détection des stories vues
- * - Stories suivies
- * - Stories personnelles
- * - Highlights
- * - Analytics
- * - Suppression sécurisée
- * - Expiration automatique
+ * Contrat Story explicite :
  *
- * Sources de vérité utilisées :
- * - users
- * - stories
- * - storyViews
- * - follows
+ *   IMAGE → storyType "image", mediaUrl <storageId>, mediaType "image"
+ *   VIDEO → storyType "video", mediaUrl <storageId>, mediaType "video"
+ *   TEXT  → storyType "text",  textContent, backgroundKey, textColor
+ *   POLL  → storyType "poll",  pollQuestion, pollOptions
  *
- * Aucun mock.
- * Aucun compteur synthétique.
- * Aucun fallback temporel artificiel.
+ * Règles de migration (déterministes) :
+ *
+ *   1. storyType fourni explicitement → utilisé strictement.
+ *      Si mediaUrl contient un legacy (data:text/ ou poll:),
+ *      on rejette avec INVALID_ARGUMENT (incohérence client).
+ *
+ *   2. storyType absent + mediaUrl legacy (data:text/ ou poll:)
+ *      → auto-migration (ancien client).
+ *
+ *   3. storyType absent + mediaUrl "classique" (URL/storageId)
+ *      → on prend args.mediaType ?? "image".
+ *
+ * Sondages legacy :
+ *
+ *   Un sondage legacy (`poll:Question`) n'a jamais stocké ses options.
+ *   Il est accepté en écriture avec `pollOptions: []` + `schemaVersion: 0`,
+ *   et exposé en lecture avec `legacyIncomplete: true` pour que le
+ *   frontend puisse afficher un fallback correct au lieu d'un poll vide.
  * ============================================================
  */
 
@@ -49,33 +50,64 @@ const MAX_ANALYTICS_VIEWS = 5000;
 const DELETE_VIEW_BATCH = 500;
 const CLEANUP_STORY_BATCH = 100;
 
+const MAX_CAPTION_LENGTH = 500;
+const MAX_TEXT_CONTENT_LENGTH = 500;
+const MAX_POLL_QUESTION_LENGTH = 200;
+const MIN_POLL_OPTIONS = 2;
+const MAX_POLL_OPTIONS = 6;
+const MAX_MEDIA_URL_LENGTH = 2048;
+const MAX_VIDEO_DURATION_SECONDS = 60;
+
+const DEFAULT_BACKGROUND_KEY = "purple";
+const DEFAULT_TEXT_COLOR = "#FFFFFF";
+
+const LEGACY_TEXT_PREFIX = "data:text/";
+const LEGACY_POLL_PREFIX = "poll:";
+
 /* ============================================================
  * TYPES
  * ============================================================ */
 
-type StoryWithAuthor = {
-  _id: Id<"stories">;
-  _creationTime: number;
+type StoryType = "image" | "video" | "text" | "poll";
 
-  authorId: Id<"users">;
+type StoryDoc = Doc<"stories">;
 
-  mediaUrl: string;
-  mediaType: "image" | "video";
+type NormalizedStory = Omit<StoryDoc, "storyType"> & {
+  storyType: StoryType;
+  schemaVersion: number;
+  /**
+   * Marqueur runtime (jamais persisté) qui signale qu'un objet
+   * est incomplet pour l'UI :
+   *   - sondage legacy dont les options n'ont jamais été stockées
+   *   - sondage dont les options ont été perdues
+   */
+  legacyIncomplete?: boolean;
+};
 
-  caption?: string;
-  duration?: number;
-
-  viewCount: number;
-
-  expiresAt: string;
-
-  isHighlight: boolean;
-
+type StoryWithAuthor = NormalizedStory & {
   authorName: string;
   authorAvatar?: string;
   authorCity?: string;
-
   viewed: boolean;
+};
+
+type StoryInsert = {
+  authorId: Id<"users">;
+  viewCount: number;
+  expiresAt: string;
+  isHighlight: boolean;
+  storyType: StoryType;
+  mediaUrl?: string;
+  mediaType?: "image" | "video";
+  caption?: string;
+  duration?: number;
+  textContent?: string;
+  backgroundKey?: string;
+  textColor?: string;
+  pollQuestion?: string;
+  pollOptions?: string[];
+  createdAt?: string;
+  schemaVersion?: number;
 };
 
 /* ============================================================
@@ -110,7 +142,7 @@ async function requireUser(ctx: QueryCtx | MutationCtx) {
 }
 
 /* ============================================================
- * HELPERS
+ * HELPERS TEMPS
  * ============================================================ */
 
 function nowIso(): string {
@@ -125,12 +157,6 @@ function getStoryAgeHours(creationTime: number): number {
   return Math.max(0, (Date.now() - creationTime) / (1000 * 60 * 60));
 }
 
-/**
- * Score de fraîcheur.
- *
- * Ce score est uniquement utilisé pour le ranking interne.
- * Il ne représente pas une métrique utilisateur.
- */
 function freshnessScore(creationTime: number): number {
   const age = getStoryAgeHours(creationTime);
 
@@ -144,10 +170,6 @@ function freshnessScore(creationTime: number): number {
   return 0;
 }
 
-/**
- * Score d'engagement basé uniquement sur viewCount,
- * actuellement disponible dans le schéma Stories.
- */
 function engagementScore(viewCount: number): number {
   if (viewCount <= 0) return 0;
 
@@ -162,13 +184,6 @@ function engagementScore(viewCount: number): number {
   return 5;
 }
 
-/**
- * Score relationnel.
- *
- * Owner > followed > autres.
- *
- * Ceci sert uniquement au classement interne.
- */
 function relationScore(isFollowed: boolean, isOwner: boolean): number {
   if (isOwner) return 110;
   if (isFollowed) return 100;
@@ -176,9 +191,6 @@ function relationScore(isFollowed: boolean, isOwner: boolean): number {
   return 20;
 }
 
-/**
- * Les stories non vues sont privilégiées.
- */
 function viewedScore(viewed: boolean): number {
   return viewed ? 0 : 90;
 }
@@ -204,9 +216,10 @@ function calculateStoryScore({
   );
 }
 
-/**
- * Récupère les auteurs uniques sans requête répétée par story.
- */
+/* ============================================================
+ * AUTHORS
+ * ============================================================ */
+
 async function getAuthorsMap(ctx: QueryCtx, authorIds: Id<"users">[]) {
   const uniqueIds = Array.from(
     new Set(authorIds.map((id) => String(id))),
@@ -224,131 +237,534 @@ async function getAuthorsMap(ctx: QueryCtx, authorIds: Id<"users">[]) {
 }
 
 /* ============================================================
+ * MEDIA — helpers
+ * ============================================================ */
+
+/**
+ * Vraie URL média exploitable directement par RNImage :
+ *   - http(s)://...
+ *   - data:image/... (data URL image encodée en base)
+ *
+ * N'inclut NI data:text/ NI poll: — ces formats sont du legacy
+ * "story encodée" et sont détectés séparément.
+ */
+function isDirectMediaUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value) || /^data:image\//i.test(value);
+}
+
+/**
+ * Détecte un encodage legacy de story (avant l'introduction du
+ * contrat storyType) :
+ *   - data:text/<bg>|<text>|<color>  → story texte
+ *   - poll:<question>                → story sondage
+ *
+ * Ces valeurs ne doivent JAMAIS arriver à resolveMediaUrl() :
+ * normalizeStoryForUI() les convertit en amont.
+ */
+function isLegacyStoryEncoding(value: string): boolean {
+  return (
+    value.startsWith(LEGACY_TEXT_PREFIX) || value.startsWith(LEGACY_POLL_PREFIX)
+  );
+}
+
+/**
+ * Détermine si la valeur est un Storage ID Convex — donc si elle
+ * doit être résolue via ctx.storage.getUrl() et éventuellement
+ * supprimée lors du cleanup.
+ */
+function isStorageId(value: string): boolean {
+  return !isDirectMediaUrl(value) && !isLegacyStoryEncoding(value);
+}
+
+/* ============================================================
+ * MEDIA — résolution
+ * ============================================================ */
+
+/**
+ * Résout un média image/vidéo en URL publique exploitable.
+ *
+ * Entrées acceptées :
+ *   - https://...        (URL publique existante)
+ *   - http://...
+ *   - data:image/...     (data URL image — toléré pour compat)
+ *   - <storageId>        (Convex Storage ID)
+ *
+ * ⚠️ N'est appelé QUE pour storyType "image" | "video".
+ * Les legacy data:text/ et poll: sont convertis en amont et ne
+ * passent JAMAIS ici.
+ */
+async function resolveMediaUrl(
+  ctx: QueryCtx | MutationCtx,
+  mediaUrl: string,
+): Promise<string> {
+  const value = mediaUrl.trim();
+
+  if (!value) {
+    throw new ConvexError({
+      code: "INVALID_MEDIA",
+      message: "mediaUrl est vide",
+    });
+  }
+
+  // Sécurité : un legacy ne doit jamais arriver ici.
+  if (isLegacyStoryEncoding(value)) {
+    throw new ConvexError({
+      code: "INVALID_MEDIA",
+      message:
+        "mediaUrl contient un encodage legacy (data:text/ ou poll:) inattendu sur une story image/video",
+    });
+  }
+
+  if (isDirectMediaUrl(value)) {
+    return value;
+  }
+
+  try {
+    const resolvedUrl = await ctx.storage.getUrl(value as Id<"_storage">);
+
+    if (!resolvedUrl) {
+      throw new ConvexError({
+        code: "MEDIA_NOT_FOUND",
+        message: "Média introuvable dans Convex Storage",
+      });
+    }
+
+    return resolvedUrl;
+  } catch (error) {
+    if (error instanceof ConvexError) throw error;
+
+    throw new ConvexError({
+      code: "MEDIA_RESOLUTION_FAILED",
+      message: "Impossible de résoudre le média depuis Convex Storage",
+    });
+  }
+}
+
+/**
+ * Valide qu'un média image/vidéo est exploitable avant insertion.
+ * Retourne la valeur à stocker en base (storageId ou URL).
+ */
+async function validateStoryMedia(
+  ctx: MutationCtx,
+  mediaUrl: string,
+  mediaType: "image" | "video",
+): Promise<string> {
+  const value = mediaUrl.trim();
+
+  if (!value) {
+    throw new ConvexError({
+      code: "INVALID_MEDIA",
+      message: "Le média de la story est vide",
+    });
+  }
+
+  if (value.length > MAX_MEDIA_URL_LENGTH) {
+    throw new ConvexError({
+      code: "INVALID_MEDIA",
+      message: "Le média dépasse la taille maximale autorisée",
+    });
+  }
+
+  // Sécurité : on n'accepte pas un legacy même sur la branche image/video.
+  if (isLegacyStoryEncoding(value)) {
+    throw new ConvexError({
+      code: "INVALID_MEDIA",
+      message:
+        "Un média image/video ne peut pas être un encodage legacy (data:text/ ou poll:)",
+    });
+  }
+
+  if (isDirectMediaUrl(value)) {
+    return value;
+  }
+
+  try {
+    const resolvedUrl = await ctx.storage.getUrl(value as Id<"_storage">);
+
+    if (!resolvedUrl) {
+      throw new ConvexError({
+        code: "MEDIA_NOT_FOUND",
+        message: "Le fichier n'existe pas dans Convex Storage",
+      });
+    }
+
+    return value;
+  } catch (error) {
+    if (error instanceof ConvexError) throw error;
+
+    throw new ConvexError({
+      code: "INVALID_STORAGE_ID",
+      message: "Le média fourni n'est pas un Storage ID Convex valide",
+    });
+  }
+}
+
+/* ============================================================
+ * NORMALISATION (lecture)
+ * ============================================================ */
+
+/**
+ * Convertit une story DB (ancien ou nouveau contrat) en objet
+ * normalisé avec un storyType explicite.
+ *
+ * Ne résout PAS le média — voir resolveStoryForUI.
+ */
+function normalizeStoryForUI(story: StoryDoc): NormalizedStory {
+  // ─── Nouveau contrat ───────────────────────────────────────
+  if (story.storyType) {
+    const type = story.storyType as StoryType;
+
+    const result: NormalizedStory = {
+      ...story,
+      storyType: type,
+      schemaVersion: story.schemaVersion ?? 1,
+    };
+
+    // Sondage dont les options sont manquantes ou incomplètes :
+    // signalé au frontend pour afficher un fallback propre.
+    if (
+      type === "poll" &&
+      (!story.pollOptions || story.pollOptions.length < MIN_POLL_OPTIONS)
+    ) {
+      result.legacyIncomplete = true;
+    }
+
+    return result;
+  }
+
+  // ─── Legacy : décodage depuis mediaUrl ─────────────────────
+  const mediaUrl = (story.mediaUrl ?? "").trim();
+
+  if (mediaUrl.startsWith(LEGACY_POLL_PREFIX)) {
+    return {
+      ...story,
+      storyType: "poll",
+      pollQuestion: mediaUrl.slice(LEGACY_POLL_PREFIX.length),
+      pollOptions: undefined,
+      schemaVersion: 0,
+      legacyIncomplete: true,
+    };
+  }
+
+  if (mediaUrl.startsWith(LEGACY_TEXT_PREFIX)) {
+    const payload = mediaUrl.slice(LEGACY_TEXT_PREFIX.length);
+    const parts = payload.split("|");
+
+    return {
+      ...story,
+      storyType: "text",
+      textContent: parts[1] ?? "",
+      backgroundKey: parts[0] ?? DEFAULT_BACKGROUND_KEY,
+      textColor: parts[2] ?? DEFAULT_TEXT_COLOR,
+      schemaVersion: 0,
+    };
+  }
+
+  // ─── Legacy image / video ──────────────────────────────────
+  return {
+    ...story,
+    storyType: (story.mediaType ?? "image") as StoryType,
+    schemaVersion: 0,
+  };
+}
+
+/**
+ * Normalise puis résout le média si nécessaire.
+ *
+ * Un échec de résolution média ne casse PAS la query : la story
+ * est renvoyée avec mediaUrl indéfini, et le frontend peut
+ * afficher un fallback.
+ */
+async function resolveStoryForUI(
+  ctx: QueryCtx | MutationCtx,
+  story: StoryDoc,
+): Promise<NormalizedStory> {
+  const normalized = normalizeStoryForUI(story);
+
+  if (
+    (normalized.storyType === "image" || normalized.storyType === "video") &&
+    normalized.mediaUrl
+  ) {
+    try {
+      return {
+        ...normalized,
+        mediaUrl: await resolveMediaUrl(ctx, normalized.mediaUrl),
+      };
+    } catch (error) {
+      // Un média cassé ne doit pas casser tout le feed.
+      console.error("[stories] resolveMediaUrl failed", {
+        storyId: story._id,
+        mediaUrl: normalized.mediaUrl,
+        error,
+      });
+
+      return {
+        ...normalized,
+        mediaUrl: undefined,
+        legacyIncomplete: true,
+      };
+    }
+  }
+
+  return normalized;
+}
+
+/* ============================================================
  * UPLOAD
  * ============================================================ */
 
 export const generateStoryUploadUrl = mutation({
   args: {},
-
   handler: async (ctx) => {
     await requireUser(ctx);
-
     return await ctx.storage.generateUploadUrl();
   },
 });
 
 /* ============================================================
- * CREATE
+ * CREATE STORY
  * ============================================================ */
 
 export const createStory = mutation({
   args: {
-    mediaUrl: v.string(),
+    // Nouveau contrat — discriminateur explicite
+    storyType: v.optional(
+      v.union(
+        v.literal("image"),
+        v.literal("video"),
+        v.literal("text"),
+        v.literal("poll"),
+      ),
+    ),
 
-    mediaType: v.union(v.literal("image"), v.literal("video")),
-
-    caption: v.optional(v.string()),
-
+    // Média (image / video)
+    mediaUrl: v.optional(v.string()),
+    mediaType: v.optional(v.union(v.literal("image"), v.literal("video"))),
     duration: v.optional(v.number()),
+
+    // Texte
+    textContent: v.optional(v.string()),
+    backgroundKey: v.optional(v.string()),
+    textColor: v.optional(v.string()),
+
+    // Sondage
+    pollQuestion: v.optional(v.string()),
+    pollOptions: v.optional(v.array(v.string())),
+
+    // Commun
+    caption: v.optional(v.string()),
   },
 
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    /**
-     * Validation serveur.
-     *
-     * Le client ne peut pas imposer des payloads
-     * disproportionnés ou des durées invalides.
-     */
-    if (args.mediaUrl.length === 0 || args.mediaUrl.length > 2048) {
-      throw new ConvexError({
-        code: "INVALID_ARGUMENT",
-        message: "mediaUrl invalide",
-      });
-    }
-
-    if (args.caption !== undefined && args.caption.length > 500) {
+    if (
+      args.caption !== undefined &&
+      args.caption.length > MAX_CAPTION_LENGTH
+    ) {
       throw new ConvexError({
         code: "INVALID_ARGUMENT",
         message: "caption trop long",
       });
     }
 
-    if (
-      args.duration !== undefined &&
-      (!Number.isFinite(args.duration) ||
-        args.duration < 0 ||
-        args.duration > 60)
-    ) {
+    const rawMediaUrl = (args.mediaUrl ?? "").trim();
+    const hasExplicitType = args.storyType !== undefined;
+    const hasLegacyEncoding = isLegacyStoryEncoding(rawMediaUrl);
+
+    // ─── Résolution du type (déterministe) ───────────────────
+    let resolvedType: StoryType;
+
+    if (hasExplicitType) {
+      // Client moderne : on lui fait confiance, mais on refuse
+      // toute incohérence legacy qu'il aurait envoyée par erreur.
+      if (hasLegacyEncoding) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message:
+            "mediaUrl legacy (data:text/ ou poll:) incompatible avec un storyType explicite",
+        });
+      }
+
+      resolvedType = args.storyType!;
+    } else if (hasLegacyEncoding) {
+      // Client legacy : on déduit le type depuis l'encodage.
+      resolvedType = rawMediaUrl.startsWith(LEGACY_POLL_PREFIX)
+        ? "poll"
+        : "text";
+    } else if (rawMediaUrl.length > 0) {
+      // Client minimal : mediaUrl présent sans storyType.
+      resolvedType = args.mediaType ?? "image";
+    } else {
       throw new ConvexError({
         code: "INVALID_ARGUMENT",
-        message: "duration invalide",
+        message: "storyType ou mediaUrl requis",
       });
     }
 
-    /**
-     * Une story expire 24h après sa création.
-     */
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const createdAt = nowIso();
 
-    const storyId = await ctx.db.insert("stories", {
-      mediaUrl: args.mediaUrl,
-      mediaType: args.mediaType,
-      caption: args.caption,
-      duration: args.duration,
-
+    const payload: StoryInsert = {
       authorId: user._id,
-
       viewCount: 0,
-
       expiresAt,
-
       isHighlight: false,
-    });
+      storyType: resolvedType,
+      createdAt,
+      schemaVersion: 1,
+    };
 
-    return storyId;
+    if (args.caption !== undefined) payload.caption = args.caption;
+
+    /* ─── IMAGE / VIDEO ──────────────────────────────────── */
+    if (resolvedType === "image" || resolvedType === "video") {
+      if (!rawMediaUrl) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message: "mediaUrl requis pour une story image/video",
+        });
+      }
+
+      if (args.duration !== undefined) {
+        if (
+          !Number.isFinite(args.duration) ||
+          args.duration < 0 ||
+          args.duration > MAX_VIDEO_DURATION_SECONDS
+        ) {
+          throw new ConvexError({
+            code: "INVALID_ARGUMENT",
+            message: "duration invalide",
+          });
+        }
+        payload.duration = args.duration;
+      }
+
+      const validated = await validateStoryMedia(
+        ctx,
+        rawMediaUrl,
+        resolvedType,
+      );
+      payload.mediaUrl = validated;
+      payload.mediaType = resolvedType;
+    } else if (resolvedType === "text") {
+      /* ─── TEXT ───────────────────────────────────────────── */
+      let textContent = args.textContent?.trim();
+      let backgroundKey = args.backgroundKey?.trim();
+      let textColor = args.textColor?.trim();
+
+      // Compat ascendante : ancien client → décoder data:text/...
+      if (
+        !textContent &&
+        hasLegacyEncoding &&
+        rawMediaUrl.startsWith(LEGACY_TEXT_PREFIX)
+      ) {
+        const parts = rawMediaUrl.slice(LEGACY_TEXT_PREFIX.length).split("|");
+        backgroundKey = backgroundKey ?? parts[0] ?? DEFAULT_BACKGROUND_KEY;
+        textContent = (parts[1] ?? "").trim();
+        textColor = textColor ?? parts[2] ?? DEFAULT_TEXT_COLOR;
+        payload.schemaVersion = 0; // marqueur legacy
+      }
+
+      if (!textContent) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message: "textContent requis pour une story texte",
+        });
+      }
+
+      if (textContent.length > MAX_TEXT_CONTENT_LENGTH) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message: "textContent trop long",
+        });
+      }
+
+      payload.textContent = textContent;
+      payload.backgroundKey = backgroundKey || DEFAULT_BACKGROUND_KEY;
+      payload.textColor = textColor || DEFAULT_TEXT_COLOR;
+    } else if (resolvedType === "poll") {
+      /* ─── POLL ───────────────────────────────────────────── */
+      let question = args.pollQuestion?.trim();
+
+      // Compat ascendante : ancien client → décoder poll:...
+      if (
+        !question &&
+        hasLegacyEncoding &&
+        rawMediaUrl.startsWith(LEGACY_POLL_PREFIX)
+      ) {
+        question = rawMediaUrl.slice(LEGACY_POLL_PREFIX.length).trim();
+      }
+
+      if (!question) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message: "pollQuestion requis pour un sondage",
+        });
+      }
+
+      if (question.length > MAX_POLL_QUESTION_LENGTH) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message: "pollQuestion trop longue",
+        });
+      }
+
+      const rawOptions = args.pollOptions ?? [];
+      const cleaned = rawOptions
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0);
+
+      if (cleaned.length === 0 && hasLegacyEncoding) {
+        // Cas particulier : ancien client qui n'a jamais envoyé d'options.
+        // On accepte pour compat, on marque la story schemaVersion 0
+        // → normalizeStoryForUI l'exposera avec legacyIncomplete: true.
+        payload.pollQuestion = question;
+        payload.pollOptions = [];
+        payload.schemaVersion = 0;
+      } else if (cleaned.length < MIN_POLL_OPTIONS) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message: `pollOptions doit contenir au moins ${MIN_POLL_OPTIONS} options`,
+        });
+      } else if (cleaned.length > MAX_POLL_OPTIONS) {
+        throw new ConvexError({
+          code: "INVALID_ARGUMENT",
+          message: `pollOptions ne peut pas contenir plus de ${MAX_POLL_OPTIONS} options`,
+        });
+      } else {
+        payload.pollQuestion = question;
+        payload.pollOptions = cleaned;
+      }
+    }
+
+    return await ctx.db.insert("stories", payload);
   },
 });
 
 /* ============================================================
- * ACTIVE STORIES
+ * ACTIVE STORIES (groupées par auteur)
  * ============================================================ */
 
 export const listActiveStories = query({
   args: {},
-
   handler: async (ctx) => {
     const user = await requireUser(ctx);
-
     const now = nowIso();
 
-    /**
-     * Filtrage directement via l'index.
-     *
-     * Cela évite de charger toutes les stories historiques.
-     */
     const active = await ctx.db
       .query("stories")
       .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
       .order("desc")
       .take(MAX_ACTIVE_STORIES);
 
-    if (active.length === 0) {
-      return [];
-    }
+    if (active.length === 0) return [];
 
-    /**
-     * Auteurs uniques.
-     */
-    const authorIds = active.map((story) => story.authorId);
+    const authorById = await getAuthorsMap(
+      ctx,
+      active.map((story) => story.authorId),
+    );
 
-    const authorById = await getAuthorsMap(ctx, authorIds);
-
-    /**
-     * Les vues du viewer sont récupérées une seule fois
-     * par utilisateur au lieu d'une requête par story.
-     */
     const views = await ctx.db
       .query("storyViews")
       .withIndex("by_viewer", (q) => q.eq("viewerId", user._id))
@@ -357,40 +773,32 @@ export const listActiveStories = query({
 
     const viewedStoryIds = new Set(views.map((view) => String(view.storyId)));
 
-    const enriched = active.map((story) => {
-      const author = authorById.get(String(story.authorId));
+    const enriched: StoryWithAuthor[] = await Promise.all(
+      active.map(async (story) => {
+        const author = authorById.get(String(story.authorId));
+        const normalized = await resolveStoryForUI(ctx, story);
 
-      return {
-        ...story,
+        return {
+          ...normalized,
+          authorName: author?.name ?? "Anonyme",
+          authorAvatar: author?.avatar,
+          authorCity: author?.city,
+          viewed: viewedStoryIds.has(String(story._id)),
+        };
+      }),
+    );
 
-        authorName: author?.name ?? "Anonyme",
-        authorAvatar: author?.avatar,
-        authorCity: author?.city,
-
-        viewed: viewedStoryIds.has(String(story._id)),
-      };
-    });
-
-    /**
-     * Groupement par auteur.
-     */
-    const grouped = new Map<string, typeof enriched>();
+    const grouped = new Map<string, StoryWithAuthor[]>();
 
     for (const story of enriched) {
       const key = String(story.authorId);
-
       const existing = grouped.get(key);
-
-      if (existing) {
-        existing.push(story);
-      } else {
-        grouped.set(key, [story]);
-      }
+      if (existing) existing.push(story);
+      else grouped.set(key, [story]);
     }
 
     return Array.from(grouped.values()).map((group) => {
       const first = group[0];
-
       return {
         author: {
           id: first.authorId,
@@ -398,11 +806,8 @@ export const listActiveStories = query({
           avatar: first.authorAvatar,
           city: first.authorCity,
         },
-
         stories: group,
-
         hasUnviewed: group.some((story) => !story.viewed),
-
         unreadCount: group.filter((story) => !story.viewed).length,
       };
     });
@@ -410,20 +815,14 @@ export const listActiveStories = query({
 });
 
 /* ============================================================
- * STORY FEED 2.0
+ * STORY FEED
  * ============================================================ */
 
 export const getStoryFeed = query({
   args: {},
-
   handler: async (ctx) => {
     const user = await requireUser(ctx);
-
     const now = nowIso();
-
-    /* --------------------------------------------------------
-     * FOLLOWING
-     * -------------------------------------------------------- */
 
     const follows = await ctx.db
       .query("follows")
@@ -434,10 +833,6 @@ export const getStoryFeed = query({
       follows.map((follow) => String(follow.followingId)),
     );
 
-    /* --------------------------------------------------------
-     * STORIES ACTIVES
-     * -------------------------------------------------------- */
-
     const activeStories = await ctx.db
       .query("stories")
       .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
@@ -445,16 +840,8 @@ export const getStoryFeed = query({
       .take(MAX_ACTIVE_STORIES);
 
     if (activeStories.length === 0) {
-      return {
-        groups: [],
-        totalGroups: 0,
-        totalStories: 0,
-      };
+      return { groups: [], totalGroups: 0, totalStories: 0 };
     }
-
-    /* --------------------------------------------------------
-     * VUES DE L'UTILISATEUR
-     * -------------------------------------------------------- */
 
     const myViews = await ctx.db
       .query("storyViews")
@@ -464,18 +851,10 @@ export const getStoryFeed = query({
 
     const viewedStoryIds = new Set(myViews.map((view) => String(view.storyId)));
 
-    /* --------------------------------------------------------
-     * AUTEURS
-     * -------------------------------------------------------- */
-
     const authorById = await getAuthorsMap(
       ctx,
       activeStories.map((story) => story.authorId),
     );
-
-    /* --------------------------------------------------------
-     * ENRICHISSEMENT + RANKING
-     * -------------------------------------------------------- */
 
     const enriched: Array<
       StoryWithAuthor & {
@@ -487,15 +866,10 @@ export const getStoryFeed = query({
 
     for (const story of activeStories) {
       const author = authorById.get(String(story.authorId));
-
-      if (!author) {
-        continue;
-      }
+      if (!author) continue;
 
       const viewed = viewedStoryIds.has(String(story._id));
-
       const isOwner = story.authorId === user._id;
-
       const isFollowed = followedIds.has(String(story.authorId));
 
       const score = calculateStoryScore({
@@ -506,76 +880,47 @@ export const getStoryFeed = query({
         isOwner,
       });
 
-      enriched.push({
-        ...story,
+      const normalized = await resolveStoryForUI(ctx, story);
 
+      enriched.push({
+        ...normalized,
         authorName: author.name ?? "Anonyme",
         authorAvatar: author.avatar,
         authorCity: author.city,
-
         viewed,
-
         score,
-
         isFollowed,
-
         isOwner,
       });
     }
 
-    /* --------------------------------------------------------
-     * RANK STORIES
-     * -------------------------------------------------------- */
-
     enriched.sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-
+      if (b.score !== a.score) return b.score - a.score;
       return b._creationTime - a._creationTime;
     });
-
-    /* --------------------------------------------------------
-     * GROUP BY AUTHOR
-     * -------------------------------------------------------- */
 
     const grouped = new Map<string, typeof enriched>();
 
     for (const story of enriched) {
       const key = String(story.authorId);
-
       const existing = grouped.get(key);
-
-      if (existing) {
-        existing.push(story);
-      } else {
-        grouped.set(key, [story]);
-      }
+      if (existing) existing.push(story);
+      else grouped.set(key, [story]);
     }
-
-    /* --------------------------------------------------------
-     * BUILD GROUPS
-     * -------------------------------------------------------- */
 
     const groups = Array.from(grouped.values())
       .map((stories) => {
         stories.sort((a, b) => {
-          if (a.viewed !== b.viewed) {
-            return a.viewed ? 1 : -1;
-          }
-
+          if (a.viewed !== b.viewed) return a.viewed ? 1 : -1;
           return b._creationTime - a._creationTime;
         });
 
         const first = stories[0];
-
         const unreadCount = stories.filter((story) => !story.viewed).length;
-
         const latestAt = stories.reduce(
           (latest, story) => Math.max(latest, story._creationTime),
           0,
         );
-
         const groupScore = Math.max(...stories.map((story) => story.score));
 
         return {
@@ -585,31 +930,21 @@ export const getStoryFeed = query({
             avatar: first.authorAvatar,
             city: first.authorCity,
           },
-
           stories,
-
           hasUnviewed: unreadCount > 0,
-
           unreadCount,
-
           latestAt,
-
           score: groupScore,
         };
       })
       .sort((a, b) => {
-        if (b.score !== a.score) {
-          return b.score - a.score;
-        }
-
+        if (b.score !== a.score) return b.score - a.score;
         return b.latestAt - a.latestAt;
       });
 
     return {
       groups,
-
       totalGroups: groups.length,
-
       totalStories: enriched.length,
     };
   },
@@ -623,22 +958,21 @@ export const listStoriesByAuthor = query({
   args: {
     authorId: v.id("users"),
   },
-
   handler: async (ctx, args) => {
     const now = nowIso();
 
-    /**
-     * Fonction publique :
-     * stories actives + highlights.
-     */
     const stories = await ctx.db
       .query("stories")
       .withIndex("by_author", (q) => q.eq("authorId", args.authorId))
       .order("desc")
       .take(MAX_AUTHOR_STORIES);
 
-    return stories.filter(
+    const filtered = stories.filter(
       (story) => story.expiresAt > now || story.isHighlight,
+    );
+
+    return await Promise.all(
+      filtered.map((story) => resolveStoryForUI(ctx, story)),
     );
   },
 });
@@ -649,10 +983,8 @@ export const listStoriesByAuthor = query({
 
 export const getMyStories = query({
   args: {},
-
   handler: async (ctx) => {
     const user = await requireUser(ctx);
-
     const now = nowIso();
 
     const stories = await ctx.db
@@ -661,8 +993,12 @@ export const getMyStories = query({
       .order("desc")
       .take(MAX_MY_STORIES);
 
-    return stories.filter(
+    const filtered = stories.filter(
       (story) => story.expiresAt > now || story.isHighlight,
+    );
+
+    return await Promise.all(
+      filtered.map((story) => resolveStoryForUI(ctx, story)),
     );
   },
 });
@@ -673,7 +1009,6 @@ export const getMyStories = query({
 
 export const getFollowedStories = query({
   args: {},
-
   handler: async (ctx) => {
     const user = await requireUser(ctx);
 
@@ -686,9 +1021,7 @@ export const getFollowedStories = query({
       follows.map((follow) => String(follow.followingId)),
     );
 
-    if (followedIds.size === 0) {
-      return [];
-    }
+    if (followedIds.size === 0) return [];
 
     const now = nowIso();
 
@@ -702,9 +1035,7 @@ export const getFollowedStories = query({
       followedIds.has(String(story.authorId)),
     );
 
-    if (followedStories.length === 0) {
-      return [];
-    }
+    if (followedStories.length === 0) return [];
 
     const authorById = await getAuthorsMap(
       ctx,
@@ -719,39 +1050,32 @@ export const getFollowedStories = query({
 
     const viewedStoryIds = new Set(myViews.map((view) => String(view.storyId)));
 
-    const enriched = followedStories.map((story) => {
-      const author = authorById.get(String(story.authorId));
+    const enriched: StoryWithAuthor[] = await Promise.all(
+      followedStories.map(async (story) => {
+        const author = authorById.get(String(story.authorId));
+        const normalized = await resolveStoryForUI(ctx, story);
 
-      return {
-        ...story,
+        return {
+          ...normalized,
+          authorName: author?.name ?? "Anonyme",
+          authorAvatar: author?.avatar,
+          authorCity: author?.city,
+          viewed: viewedStoryIds.has(String(story._id)),
+        };
+      }),
+    );
 
-        authorName: author?.name ?? "Anonyme",
-
-        authorAvatar: author?.avatar,
-
-        authorCity: author?.city,
-
-        viewed: viewedStoryIds.has(String(story._id)),
-      };
-    });
-
-    const grouped = new Map<string, typeof enriched>();
+    const grouped = new Map<string, StoryWithAuthor[]>();
 
     for (const story of enriched) {
       const key = String(story.authorId);
-
       const existing = grouped.get(key);
-
-      if (existing) {
-        existing.push(story);
-      } else {
-        grouped.set(key, [story]);
-      }
+      if (existing) existing.push(story);
+      else grouped.set(key, [story]);
     }
 
     return Array.from(grouped.values()).map((group) => {
       const first = group[0];
-
       return {
         author: {
           id: first.authorId,
@@ -759,11 +1083,8 @@ export const getFollowedStories = query({
           avatar: first.authorAvatar,
           city: first.authorCity,
         },
-
         stories: group,
-
         hasUnviewed: group.some((story) => !story.viewed),
-
         unreadCount: group.filter((story) => !story.viewed).length,
       };
     });
@@ -778,18 +1099,11 @@ export const getStory = query({
   args: {
     id: v.id("stories"),
   },
-
   handler: async (ctx, args) => {
     const story = await ctx.db.get(args.id);
 
-    if (!story) {
-      return null;
-    }
+    if (!story) return null;
 
-    /**
-     * Les stories expirées ne sont plus exposées
-     * par cette route, sauf si elles sont en highlight.
-     */
     const now = nowIso();
 
     if (!isStoryActive(story.expiresAt, now) && !story.isHighlight) {
@@ -797,14 +1111,12 @@ export const getStory = query({
     }
 
     const author = await ctx.db.get(story.authorId);
+    const normalized = await resolveStoryForUI(ctx, story);
 
     return {
-      ...story,
-
+      ...normalized,
       authorName: author?.name ?? "Anonyme",
-
       authorAvatar: author?.avatar,
-
       authorCity: author?.city,
     };
   },
@@ -818,7 +1130,6 @@ export const markViewed = mutation({
   args: {
     storyId: v.id("stories"),
   },
-
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
@@ -831,38 +1142,16 @@ export const markViewed = mutation({
       });
     }
 
-    /**
-     * Une story expirée ne doit pas recevoir
-     * de nouvelle vue.
-     */
     const now = nowIso();
 
     if (!isStoryActive(story.expiresAt, now)) {
-      return {
-        alreadyViewed: false,
-        counted: false,
-        expired: true,
-      };
+      return { alreadyViewed: false, counted: false, expired: true };
     }
 
-    /**
-     * L'auteur ne compte pas sa propre vue.
-     */
     if (story.authorId === user._id) {
-      return {
-        alreadyViewed: false,
-        counted: false,
-        expired: false,
-      };
+      return { alreadyViewed: false, counted: false, expired: false };
     }
 
-    /**
-     * Le schéma actuel ne possède pas encore
-     * by_story_viewer.
-     *
-     * On utilise donc by_story + filtre viewerId.
-     * Cette opération reste bornée par first().
-     */
     const existing = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
@@ -870,37 +1159,20 @@ export const markViewed = mutation({
       .first();
 
     if (existing) {
-      return {
-        alreadyViewed: true,
-        counted: false,
-        expired: false,
-      };
+      return { alreadyViewed: true, counted: false, expired: false };
     }
 
     await ctx.db.insert("storyViews", {
       storyId: args.storyId,
-
       viewerId: user._id,
-
       viewedAt: nowIso(),
     });
 
-    /**
-     * Mutation atomique dans le même contexte.
-     *
-     * La story a déjà été lue avant l'insertion,
-     * donc le compteur ne peut être incrémenté
-     * qu'une seule fois par viewer dans le flux normal.
-     */
     await ctx.db.patch(args.storyId, {
       viewCount: story.viewCount + 1,
     });
 
-    return {
-      alreadyViewed: false,
-      counted: true,
-      expired: false,
-    };
+    return { alreadyViewed: false, counted: true, expired: false };
   },
 });
 
@@ -912,7 +1184,6 @@ export const getStoryViewers = query({
   args: {
     storyId: v.id("stories"),
   },
-
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
@@ -925,9 +1196,6 @@ export const getStoryViewers = query({
       });
     }
 
-    /**
-     * Seul l'auteur peut voir les spectateurs.
-     */
     if (story.authorId !== user._id) {
       throw new ConvexError({
         code: "FORBIDDEN",
@@ -941,20 +1209,17 @@ export const getStoryViewers = query({
       .order("desc")
       .take(MAX_VIEWERS);
 
-    const viewerIds = views.map((view) => view.viewerId);
-
-    const viewerById = await getAuthorsMap(ctx, viewerIds);
+    const viewerById = await getAuthorsMap(
+      ctx,
+      views.map((view) => view.viewerId),
+    );
 
     return views.map((view) => {
       const viewer = viewerById.get(String(view.viewerId));
-
       return {
         ...view,
-
         viewerName: viewer?.name ?? "Anonyme",
-
         viewerAvatar: viewer?.avatar,
-
         viewerCity: viewer?.city,
       };
     });
@@ -969,7 +1234,6 @@ export const getStoryAnalytics = query({
   args: {
     storyId: v.id("stories"),
   },
-
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
@@ -989,12 +1253,6 @@ export const getStoryAnalytics = query({
       });
     }
 
-    /**
-     * Payload borné.
-     *
-     * Le schéma actuel ne possède pas d'agrégation
-     * native des vues par story.
-     */
     const views = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", story._id))
@@ -1002,31 +1260,18 @@ export const getStoryAnalytics = query({
       .take(MAX_ANALYTICS_VIEWS);
 
     const uniqueViewers = new Set(views.map((view) => String(view.viewerId)));
-
     const viewedAt = views.map((view) => view.viewedAt).sort();
 
     return {
       storyId: story._id,
-
-      /**
-       * Si le nombre réel de vues dépasse
-       * la fenêtre analytique, viewCount reste
-       * la source de vérité du compteur.
-       */
       viewCount: story.viewCount,
-
       uniqueViewers: uniqueViewers.size,
-
       firstViewAt: viewedAt[0] ?? null,
-
       lastViewAt: viewedAt[viewedAt.length - 1] ?? null,
-
       isHighlight: story.isHighlight,
-
       expiresAt: story.expiresAt,
-
-      mediaType: story.mediaType,
-
+      storyType: story.storyType ?? story.mediaType ?? "image",
+      mediaType: story.mediaType ?? null,
       analyticsSampled: views.length >= MAX_ANALYTICS_VIEWS,
     };
   },
@@ -1040,7 +1285,6 @@ export const toggleHighlight = mutation({
   args: {
     storyId: v.id("stories"),
   },
-
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
@@ -1062,13 +1306,9 @@ export const toggleHighlight = mutation({
 
     const nextValue = !story.isHighlight;
 
-    await ctx.db.patch(args.storyId, {
-      isHighlight: nextValue,
-    });
+    await ctx.db.patch(args.storyId, { isHighlight: nextValue });
 
-    return {
-      isHighlight: nextValue,
-    };
+    return { isHighlight: nextValue };
   },
 });
 
@@ -1080,7 +1320,6 @@ export const getHighlights = query({
   args: {
     authorId: v.id("users"),
   },
-
   handler: async (ctx, args) => {
     const stories = await ctx.db
       .query("stories")
@@ -1091,20 +1330,20 @@ export const getHighlights = query({
 
     const author = await ctx.db.get(args.authorId);
 
+    const resolvedStories = await Promise.all(
+      stories.map((story) => resolveStoryForUI(ctx, story)),
+    );
+
     return {
       author: author
         ? {
             id: author._id,
-
             name: author.name ?? "Anonyme",
-
             avatar: author.avatar,
-
             city: author.city,
           }
         : null,
-
-      stories,
+      stories: resolvedStories,
     };
   },
 });
@@ -1117,7 +1356,6 @@ export const deleteStory = mutation({
   args: {
     storyId: v.id("stories"),
   },
-
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
@@ -1137,16 +1375,6 @@ export const deleteStory = mutation({
       });
     }
 
-    /**
-     * Suppression bornée.
-     *
-     * Une story avec un très grand nombre de vues
-     * ne doit pas provoquer un .collect() illimité.
-     *
-     * IMPORTANT :
-     * le document story n'est supprimé que lorsque
-     * toutes ses vues ont été supprimées.
-     */
     const views = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
@@ -1155,11 +1383,6 @@ export const deleteStory = mutation({
     if (views.length > 0) {
       await Promise.all(views.map((view) => ctx.db.delete(view._id)));
 
-      /**
-       * Si le batch est plein, on ne détruit pas encore
-       * la story : les vues restantes doivent être
-       * nettoyées lors d'une opération suivante.
-       */
       if (views.length >= DELETE_VIEW_BATCH) {
         return {
           success: false,
@@ -1170,10 +1393,6 @@ export const deleteStory = mutation({
       }
     }
 
-    /**
-     * À ce stade, aucune vue restante n'est visible
-     * dans la requête bornée.
-     */
     const remaining = await ctx.db
       .query("storyViews")
       .withIndex("by_story", (q) => q.eq("storyId", args.storyId))
@@ -1186,6 +1405,16 @@ export const deleteStory = mutation({
         deletedViews: views.length,
         storyId: args.storyId,
       };
+    }
+
+    // Nettoyage du fichier média — uniquement si mediaUrl est un
+    // vrai Storage ID (pas une URL directe, pas un legacy).
+    if (story.mediaUrl && isStorageId(story.mediaUrl)) {
+      try {
+        await ctx.storage.delete(story.mediaUrl as Id<"_storage">);
+      } catch {
+        // Le fichier peut déjà avoir été supprimé.
+      }
     }
 
     await ctx.db.delete(args.storyId);
@@ -1203,23 +1432,8 @@ export const deleteStory = mutation({
  * CLEANUP EXPIRED STORIES
  * ============================================================ */
 
-/**
- * Internal uniquement.
- *
- * Cette fonction ne doit jamais être exposée directement
- * au client.
- *
- * Elle supprime uniquement :
- * - stories expirées
- * - non-highlight
- *
- * et nettoie leurs vues.
- *
- * Le batch de stories est volontairement borné.
- */
 export const cleanupExpiredStories = internalMutation({
   args: {},
-
   handler: async (ctx) => {
     const now = nowIso();
 
@@ -1234,9 +1448,6 @@ export const cleanupExpiredStories = internalMutation({
     let deferredStories = 0;
 
     for (const story of expired) {
-      /**
-       * Nettoyage borné des vues.
-       */
       const views = await ctx.db
         .query("storyViews")
         .withIndex("by_story", (q) => q.eq("storyId", story._id))
@@ -1244,14 +1455,9 @@ export const cleanupExpiredStories = internalMutation({
 
       if (views.length > 0) {
         await Promise.all(views.map((view) => ctx.db.delete(view._id)));
-
         deletedViews += views.length;
       }
 
-      /**
-       * Si le batch est plein, il peut rester des vues.
-       * On ne supprime donc pas encore la story.
-       */
       if (views.length >= DELETE_VIEW_BATCH) {
         deferredStories++;
         continue;
@@ -1267,21 +1473,25 @@ export const cleanupExpiredStories = internalMutation({
         continue;
       }
 
-      await ctx.db.delete(story._id);
+      // Nettoyage du fichier média — uniquement si vrai Storage ID.
+      if (story.mediaUrl && isStorageId(story.mediaUrl)) {
+        try {
+          await ctx.storage.delete(story.mediaUrl as Id<"_storage">);
+        } catch {
+          // Le fichier peut déjà avoir été supprimé.
+        }
+      }
 
+      await ctx.db.delete(story._id);
       deletedStories++;
     }
 
-    return {
-      deletedStories,
-      deletedViews,
-      deferredStories,
-    };
+    return { deletedStories, deletedViews, deferredStories };
   },
 });
 
 /* ============================================================
- * EXPORT
+ * EXPORT PAR DÉFAUT
  * ============================================================ */
 
 export default {

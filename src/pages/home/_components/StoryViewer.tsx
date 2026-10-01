@@ -3,18 +3,25 @@ import {
   View,
   Text,
   Pressable,
+  Modal,
   Image as RNImage,
   Animated,
   Easing,
   StyleSheet,
-  Modal,
   Platform,
   Dimensions,
   PanResponder,
-  type GestureResponderEvent,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type ReactPortal,
+} from "react";
 import {
   Check,
   ChevronLeft,
@@ -26,8 +33,33 @@ import {
   VolumeX,
   X,
 } from "lucide-react-native";
-import { useMutation } from "convex/react";
+import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
+import type { Id } from "@/convex/_generated/dataModel";
+
+/* ============================================================
+ * WEB PORTAL — chargement robuste de react-dom.createPortal
+ * ============================================================
+ * Sur le web, React Native Web rend la <Modal> dans un portail
+ * DOM, mais elle peut être piégée sous un stacking context créé
+ * par un ancêtre (transform, filter, will-change, z-index...).
+ * On contourne en créant notre propre <div> dans document.body.
+ */
+
+type CreatePortalFn = (node: ReactNode, container: Element) => ReactPortal;
+
+function loadCreatePortal(): CreatePortalFn | null {
+  if (Platform.OS !== "web") return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require("react-dom");
+    const fn: CreatePortalFn | undefined =
+      mod?.createPortal ?? mod?.default?.createPortal ?? undefined;
+    return typeof fn === "function" ? fn : null;
+  } catch {
+    return null;
+  }
+}
 
 /* ============================================================
  * TYPES
@@ -76,10 +108,16 @@ interface StoryViewerProps {
 
 const STORY_DURATION = 5000;
 const REACTION_EMOJIS = ["❤️", "😍", "🔥", "😂", "😮", "👏"] as const;
-const isBrowser = typeof window !== "undefined";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const IS_DESKTOP_WEB = Platform.OS === "web" && SCREEN_WIDTH >= 768;
+const IS_NATIVE = Platform.OS !== "web";
+
+const IS_BROWSER =
+  Platform.OS === "web" &&
+  typeof window !== "undefined" &&
+  typeof window.addEventListener === "function" &&
+  typeof window.removeEventListener === "function";
 
 /* ============================================================
  * HELPERS
@@ -100,13 +138,16 @@ function getInitials(name: string): string {
     .join("");
 }
 
-function getDefaultGradient(): string {
-  return "linear-gradient(135deg,#8B5CF6,#6366F1)";
-}
+const DEFAULT_AUTHOR_COLORS: readonly [string, string] = ["#8B5CF6", "#6366F1"];
+const DEFAULT_BG_COLORS: readonly [string, string] = ["#020617", "#09091B"];
+const BLACK_COLORS: readonly [string, string] = ["#000", "#000"];
 
 /**
- * Parse CSS linear-gradient string → colors array for expo LinearGradient.
- * Returns null if invalid.
+ * Parse une chaîne CSS `linear-gradient(...)` en tableau de couleurs
+ * exploitable par `expo-linear-gradient`.
+ *
+ * Accepte : `linear-gradient(135deg, #667EEA, #764BA2)`
+ * Retourne `["#667EEA", "#764BA2"]` ou `null` si invalide.
  */
 function parseGradient(
   input?: string,
@@ -117,19 +158,9 @@ function parseGradient(
   const parts = match[1].split(",").map((s) => s.trim());
   const colors = parts.filter((p) => /^#|^rgb/i.test(p));
   if (colors.length < 2) return null;
-  return [colors[0], colors[1], ...colors.slice(2)] as unknown as [
-    string,
-    string,
-    ...string[],
-  ];
+  const [first, second, ...rest] = colors;
+  return [first, second, ...rest];
 }
-
-/* ============================================================
- * BACKGROUND GRADIENT FALLBACK
- * ============================================================ */
-
-const DEFAULT_BG_COLORS = ["#020617", "#09091B"] as const;
-const DEFAULT_TEXT_BG_COLORS = ["#0A0A1A", "#1A1A3E"] as const;
 
 /* ============================================================
  * PROGRESS BAR
@@ -160,7 +191,7 @@ function ProgressBars({
 }
 
 /* ============================================================
- * REACTION FLOAT (burst)
+ * REACTION FLOAT
  * ============================================================ */
 
 function ReactionFloat({ emoji }: { emoji: string }) {
@@ -203,7 +234,7 @@ function ReactionFloat({ emoji }: { emoji: string }) {
 }
 
 /* ============================================================
- * PULSING PLAY BUTTON (paused overlay)
+ * PAUSED OVERLAY
  * ============================================================ */
 
 function PausedOverlay({ visible }: { visible: boolean }) {
@@ -364,6 +395,7 @@ export default function StoryViewer({
   const elapsedRef = useRef(0);
 
   const markViewed = useMutation(api.stories.markViewed);
+  const { isAuthenticated: isConvexAuthenticated } = useConvexAuth();
 
   const group = groups[groupIdx];
   const slide = group?.slides[slideIdx];
@@ -377,10 +409,59 @@ export default function StoryViewer({
   const isLastSlide =
     groupIdx === groups.length - 1 && slideIdx === totalSlides - 1;
 
-  /* ───── slide entry animation ───── */
+  /* ───── animations ───── */
   const slideAnim = useRef(new Animated.Value(0)).current;
   const imageZoom = useRef(new Animated.Value(1.04)).current;
   const reactionPanelAnim = useRef(new Animated.Value(0)).current;
+
+  /* ───── WEB PORTAL ───── */
+  const createPortalFn = useMemo<CreatePortalFn | null>(
+    () => loadCreatePortal(),
+    [],
+  );
+
+  const [portalEl, setPortalEl] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    if (typeof document === "undefined" || !document.body) return;
+
+    const el = document.createElement("div");
+    el.setAttribute("data-story-viewer-root", "true");
+    Object.assign(el.style, {
+      position: "fixed",
+      top: "0",
+      left: "0",
+      right: "0",
+      bottom: "0",
+      width: "100%",
+      height: "100%",
+      zIndex: "2147483647",
+      pointerEvents: "auto",
+    });
+    document.body.appendChild(el);
+    setPortalEl(el);
+
+    return () => {
+      el.parentNode?.removeChild(el);
+      setPortalEl(null);
+    };
+  }, []);
+
+  /* ───── debug : log le slide courant ───── */
+  useEffect(() => {
+    if (!__DEV__ || !slide) return;
+    console.log("[StoryViewer] slide courant", {
+      id: slide.id,
+      type: slide.type,
+      hasImg: Boolean(slide.img),
+      imgHead: slide.img?.slice(0, 80),
+      hasText: Boolean(slide.text),
+      textHead: slide.text?.slice(0, 60),
+      pollOptions: slide.pollOptions?.length ?? 0,
+      bg: slide.bg,
+    });
+  }, [slide?.id]);
 
   /* ───── timer ───── */
   const clearTimer = useCallback(() => {
@@ -401,16 +482,16 @@ export default function StoryViewer({
 
   /* ───── markViewed ───── */
   useEffect(() => {
-    if (!slide?.id) return;
+    if (!slide?.id || !group?.id) return;
 
-    void markViewed({
-      storyId: slide.id as never,
-    }).catch((error) => {
+    onMarkSeen?.(group.id);
+    if (!isConvexAuthenticated) return;
+
+    const storyId = slide.id as Id<"stories">;
+    void markViewed({ storyId }).catch((error) => {
       console.error("[StoryViewer] markViewed failed", error);
     });
-
-    onMarkSeen?.(group?.id ?? "");
-  }, [slide?.id, group?.id, markViewed, onMarkSeen]);
+  }, [slide?.id, group?.id, markViewed, onMarkSeen, isConvexAuthenticated]);
 
   /* ───── navigation ───── */
   const goNextSlide = useCallback(() => {
@@ -474,7 +555,7 @@ export default function StoryViewer({
     setShowReactions(false);
   }, [groupIdx, slideIdx]);
 
-  /* ───── entry animation on slide change ───── */
+  /* ───── entry animation + ken-burns léger ───── */
   useEffect(() => {
     slideAnim.setValue(0);
     Animated.timing(slideAnim, {
@@ -493,7 +574,7 @@ export default function StoryViewer({
     }).start();
   }, [groupIdx, slideIdx, slideAnim, imageZoom]);
 
-  /* ───── reaction panel animation ───── */
+  /* ───── reaction panel ───── */
   useEffect(() => {
     Animated.spring(reactionPanelAnim, {
       toValue: showReactions ? 1 : 0,
@@ -563,7 +644,13 @@ export default function StoryViewer({
     [slide, hasPollVote, onPollVote],
   );
 
-  /* ───── touch handling (tap + swipe) ───── */
+  /* ───── touch handling ───── */
+  const touchStartRef = useRef<{
+    x: number;
+    y: number;
+    time: number;
+  } | null>(null);
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -578,7 +665,7 @@ export default function StoryViewer({
           };
           setPaused(true);
         },
-        onPanResponderRelease: (evt, gestureState) => {
+        onPanResponderRelease: (_evt, gestureState) => {
           const start = touchStartRef.current;
           if (!start) {
             setPaused(false);
@@ -623,15 +710,9 @@ export default function StoryViewer({
     [goNextSlide, goPrevSlide, togglePause],
   );
 
-  const touchStartRef = useRef<{
-    x: number;
-    y: number;
-    time: number;
-  } | null>(null);
-
-  /* ───── keyboard shortcuts (web only) ───── */
+  /* ───── keyboard shortcuts (web) ───── */
   useEffect(() => {
-    if (!isBrowser) return;
+    if (!IS_BROWSER) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       switch (event.key) {
@@ -662,19 +743,27 @@ export default function StoryViewer({
   }, [onClose, goNextSlide, goPrevSlide, togglePause]);
 
   /* ───── render guard ───── */
-  if (!group || !slide) return null;
+  if (!group || !slide) {
+    if (__DEV__) {
+      console.warn("[StoryViewer] guard hit — no group/slide", {
+        groupsLength: groups.length,
+        groupIdx,
+        slideIdx,
+      });
+    }
+    return null;
+  }
 
-  /* ───── derived ───── */
-  const authorGradientColors =
-    parseGradient(group.authorGradient ?? getDefaultGradient()) ??
-    (["#8B5CF6", "#6366F1"] as const);
+  /* ───── derived colors ───── */
+  const authorGradientColors: readonly [string, string, ...string[]] =
+    parseGradient(group.authorGradient) ?? DEFAULT_AUTHOR_COLORS;
 
-  const slideBgColors =
+  const slideBgColors: readonly [string, string, ...string[]] =
     slide.type === "image"
-      ? (["#000", "#000"] as const)
+      ? BLACK_COLORS
       : (parseGradient(slide.bg) ?? DEFAULT_BG_COLORS);
 
-  const slideEntryOpacity = slideAnim;
+  /* ───── derived animations ───── */
   const slideEntryScale = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.985, 1],
@@ -691,370 +780,427 @@ export default function StoryViewer({
   const panelOpacity = reactionPanelAnim;
 
   /* ========================================================================
-   * RENDER
+   * CONTENT
    * ====================================================================== */
 
-  return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent
+  const content = (
+    <View
+      style={[styles.modalRoot, Platform.OS === "web" && styles.modalRootWeb]}
+      pointerEvents="auto"
     >
-      <View style={styles.root}>
-        {/* Full-screen dark backdrop */}
-        <View style={styles.backdrop} />
+      <View style={styles.backdrop} />
 
-        {/* Container (mobile fullscreen / desktop card) */}
-        <View style={IS_DESKTOP_WEB ? styles.cardDesktop : styles.cardMobile}>
-          {/* PanResponder wrapper — captures taps & swipes */}
-          <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers} />
+      <View style={IS_DESKTOP_WEB ? styles.cardDesktop : styles.cardMobile}>
+        {/* Touch layer */}
+        <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers} />
 
-          {/* Main visual (below interactive controls) */}
-          <Animated.View
-            key={`${group.id}-${slide.id}`}
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                opacity: slideEntryOpacity,
-                transform: [{ scale: slideEntryScale }],
-              },
-            ]}
-          >
-            {/* Background gradient */}
-            <LinearGradient
-              colors={slideBgColors as unknown as [string, string, ...string[]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+        {/* Slide content */}
+        <Animated.View
+          key={`${group.id}-${slide.id}`}
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              opacity: slideAnim,
+              transform: [{ scale: slideEntryScale }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={slideBgColors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
 
-            {/* Image slide */}
-            {slide.type === "image" && slide.img ? (
-              <>
-                <Animated.View
-                  style={[
-                    StyleSheet.absoluteFill,
-                    { transform: [{ scale: imageZoom }] },
-                  ]}
-                >
-                  <RNImage
-                    source={{ uri: slide.img }}
-                    style={StyleSheet.absoluteFill}
-                    resizeMode="cover"
-                    accessibilityLabel={slide.text || "Story"}
-                  />
-                </Animated.View>
-                <LinearGradient
-                  colors={[
-                    "rgba(0,0,0,0.5)",
-                    "rgba(0,0,0,0)",
-                    "rgba(0,0,0,0)",
-                    "rgba(0,0,0,0.55)",
-                  ]}
-                  locations={[0, 0.3, 0.7, 1]}
-                  start={{ x: 0.5, y: 0 }}
-                  end={{ x: 0.5, y: 1 }}
+          {/* ───── IMAGE ───── */}
+          {slide.type === "image" && slide.img ? (
+            <>
+              <Animated.View
+                style={[
+                  StyleSheet.absoluteFill,
+                  { transform: [{ scale: imageZoom }] },
+                ]}
+              >
+                <RNImage
+                  source={{ uri: slide.img }}
                   style={StyleSheet.absoluteFill}
+                  resizeMode="cover"
+                  fadeDuration={0}
+                  onLoad={() =>
+                    __DEV__ &&
+                    console.log(
+                      "[StoryViewer] image OK",
+                      slide.img?.slice(0, 60),
+                    )
+                  }
+                  onError={(e) =>
+                    console.warn(
+                      "[StoryViewer] image ERROR",
+                      slide.id,
+                      slide.img?.slice(0, 80),
+                      e.nativeEvent,
+                    )
+                  }
+                  accessibilityLabel={slide.text || "Story"}
                 />
-              </>
-            ) : null}
-
-            {/* Text slide */}
-            {slide.type === "text" ? (
-              <View style={styles.textSlideWrap}>
-                <Text
-                  style={[
-                    styles.textSlideText,
-                    { color: slide.textColor ?? "#fff" },
-                  ]}
-                >
-                  {slide.text}
-                </Text>
-              </View>
-            ) : null}
-          </Animated.View>
-
-          {/* Poll slide — interactive, so above the tap layer */}
-          {slide.type === "poll" ? (
-            <View style={styles.pollWrap} pointerEvents="box-none">
-              <Animated.View style={[styles.pollInner, { opacity: slideAnim }]}>
-                <LinearGradient
-                  colors={["rgba(255,255,255,0.14)", "rgba(255,255,255,0.06)"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.pollIconWrap}
-                >
-                  <Text style={styles.pollIconText}>📊</Text>
-                </LinearGradient>
-
-                <Text style={styles.pollQuestion}>{slide.pollQuestion}</Text>
-
-                <View style={styles.pollOptionsList}>
-                  {(slide.pollOptions ?? []).map((option, index) => (
-                    <PollOption
-                      key={`${slide.id}-${index}`}
-                      option={option}
-                      voted={selectedPollOption === index}
-                      disabled={hasPollVote}
-                      onPress={() => handlePollVote(index)}
-                    />
-                  ))}
-                </View>
-
-                {hasPollVote ? (
-                  <Animated.View
-                    style={[styles.pollVoteHint, { opacity: slideAnim }]}
-                  >
-                    <Text style={styles.pollVoteHintText}>
-                      Ton vote a été enregistré.
-                    </Text>
-                  </Animated.View>
-                ) : null}
               </Animated.View>
+              <LinearGradient
+                colors={[
+                  "rgba(0,0,0,0.5)",
+                  "rgba(0,0,0,0)",
+                  "rgba(0,0,0,0)",
+                  "rgba(0,0,0,0.55)",
+                ]}
+                locations={[0, 0.3, 0.7, 1]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </>
+          ) : null}
+
+          {/* ───── IMAGE MANQUANTE (dev uniquement) ───── */}
+          {slide.type === "image" && !slide.img && __DEV__ ? (
+            <View style={styles.devMissing}>
+              <Text style={styles.devMissingText}>
+                ⚠️ Slide image sans URL{"\n"}
+                {slide.id}
+              </Text>
             </View>
           ) : null}
 
-          {/* ═══════════ PROGRESS BARS ═══════════ */}
-          <View style={styles.progressWrap} pointerEvents="none">
-            <ProgressBars
-              slides={group.slides}
-              slideIdx={slideIdx}
-              progress={progress}
-            />
-          </View>
-
-          {/* ═══════════ HEADER ═══════════ */}
-          <View style={styles.header} pointerEvents="box-none">
-            <View style={styles.headerRow}>
-              <View style={styles.headerLeft}>
-                <LinearGradient
-                  colors={
-                    authorGradientColors as unknown as [
-                      string,
-                      string,
-                      ...string[],
-                    ]
-                  }
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.avatarRing}
-                >
-                  <View style={styles.avatarInner}>
-                    {group.authorAvatar ? (
-                      <RNImage
-                        source={{ uri: group.authorAvatar }}
-                        style={styles.avatarImage}
-                        accessibilityLabel={group.authorName}
-                      />
-                    ) : (
-                      <LinearGradient
-                        colors={
-                          authorGradientColors as unknown as [
-                            string,
-                            string,
-                            ...string[],
-                          ]
-                        }
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.avatarInitialsWrap}
-                      >
-                        <Text style={styles.avatarInitialsText}>
-                          {getInitials(group.authorName)}
-                        </Text>
-                      </LinearGradient>
-                    )}
-                  </View>
-                </LinearGradient>
-
-                <View style={styles.headerInfo}>
-                  <View style={styles.headerNameRow}>
-                    <Text style={styles.headerName} numberOfLines={1}>
-                      {group.authorName}
-                    </Text>
-                    {group.isLive ? (
-                      <View style={styles.liveBadge}>
-                        <Text style={styles.liveBadgeText}>LIVE</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.headerTime}>{slide.time}</Text>
-                </View>
-              </View>
-
-              <View style={styles.headerActions}>
-                <Pressable
-                  onPress={() => setMuted((c) => !c)}
-                  accessibilityLabel={
-                    muted ? "Activer le son" : "Couper le son"
-                  }
-                  hitSlop={6}
-                  style={({ pressed }) => [
-                    styles.headerIconBtn,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  {muted ? (
-                    <VolumeX size={16} color="rgba(255,255,255,0.85)" />
-                  ) : (
-                    <Volume2 size={16} color="rgba(255,255,255,0.85)" />
-                  )}
-                </Pressable>
-                <Pressable
-                  onPress={onClose}
-                  accessibilityLabel="Fermer la story"
-                  hitSlop={6}
-                  style={({ pressed }) => [
-                    styles.headerIconBtn,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <X size={18} color="#fff" />
-                </Pressable>
-              </View>
+          {/* ───── TEXT ───── */}
+          {slide.type === "text" ? (
+            <View style={styles.textSlideWrap}>
+              <Text
+                style={[
+                  styles.textSlideText,
+                  { color: slide.textColor ?? "#fff" },
+                ]}
+              >
+                {slide.text}
+              </Text>
             </View>
-          </View>
-
-          {/* ═══════════ PAUSED OVERLAY ═══════════ */}
-          <PausedOverlay visible={paused && !showReactions} />
-
-          {/* ═══════════ DESKTOP NAV ═══════════ */}
-          {IS_DESKTOP_WEB && !isFirstSlide ? (
-            <Pressable
-              onPress={goPrevSlide}
-              accessibilityLabel="Story précédente"
-              style={({ pressed }) => [
-                styles.navBtnLeft,
-                pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
-              ]}
-            >
-              <ChevronLeft size={20} color="#fff" strokeWidth={2.4} />
-            </Pressable>
           ) : null}
 
-          {IS_DESKTOP_WEB && !isLastSlide ? (
-            <Pressable
-              onPress={goNextSlide}
-              accessibilityLabel="Story suivante"
-              style={({ pressed }) => [
-                styles.navBtnRight,
-                pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
-              ]}
-            >
-              <ChevronRight size={20} color="#fff" strokeWidth={2.4} />
-            </Pressable>
+          {/* ───── TEXT VIDE (dev uniquement) ───── */}
+          {slide.type === "text" &&
+          (!slide.text || slide.text.trim().length === 0) &&
+          __DEV__ ? (
+            <View style={styles.devMissing}>
+              <Text style={styles.devMissingText}>
+                ⚠️ Slide texte vide{"\n"}
+                {slide.id}
+              </Text>
+            </View>
           ) : null}
+        </Animated.View>
 
-          {/* ═══════════ REACTION FLOAT ═══════════ */}
-          {reactionEmoji ? (
-            <ReactionFloat
-              key={`${reactionEmoji}-${slide.id}`}
-              emoji={reactionEmoji}
-            />
-          ) : null}
-
-          {/* ═══════════ REACTION PANEL ═══════════ */}
-          <Animated.View
-            pointerEvents={showReactions ? "auto" : "none"}
-            style={[
-              styles.reactionPanel,
-              {
-                opacity: panelOpacity,
-                transform: [
-                  { translateY: panelTranslateY },
-                  { scale: panelScale },
-                ],
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={["rgba(10,10,20,0.85)", "rgba(20,10,40,0.85)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.reactionPanelBorder} pointerEvents="none" />
-            {REACTION_EMOJIS.map((emoji) => (
-              <Pressable
-                key={emoji}
-                onPress={() => handleReaction(emoji)}
-                accessibilityLabel={`Réagir ${emoji}`}
-                style={({ pressed }) => [
-                  styles.reactionBtn,
-                  pressed && { transform: [{ scale: 0.85 }] },
-                ]}
+        {/* ───── POLL ───── */}
+        {slide.type === "poll" ? (
+          <View style={styles.pollWrap} pointerEvents="box-none">
+            <Animated.View style={[styles.pollInner, { opacity: slideAnim }]}>
+              <LinearGradient
+                colors={["rgba(255,255,255,0.14)", "rgba(255,255,255,0.06)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.pollIconWrap}
               >
-                <Text style={styles.reactionBtnText}>{emoji}</Text>
-              </Pressable>
-            ))}
-          </Animated.View>
+                <Text style={styles.pollIconText}>📊</Text>
+              </LinearGradient>
 
-          {/* ═══════════ BOTTOM ACTIONS ═══════════ */}
-          <View style={styles.bottomActions} pointerEvents="box-none">
-            <View style={styles.bottomRow}>
-              <Pressable
-                onPress={() => {
-                  setPaused(true);
-                  setShowReactions((c) => !c);
-                }}
-                accessibilityLabel="Réagir"
-                style={({ pressed }) => [
-                  styles.reactBtn,
-                  pressed && { opacity: 0.85 },
-                ]}
-              >
-                <Heart
-                  size={15}
-                  color={currentReaction ? "#F472B6" : "rgba(255,255,255,0.85)"}
-                  fill={currentReaction ? "#F472B6" : "transparent"}
-                  strokeWidth={2.4}
-                />
-                <Text style={styles.reactBtnText}>Réagir</Text>
-              </Pressable>
+              <Text style={styles.pollQuestion}>{slide.pollQuestion}</Text>
 
-              {currentReaction ? (
-                <View style={styles.currentReactionPill}>
-                  <Text style={styles.currentReactionText}>
-                    {currentReaction}
+              <View style={styles.pollOptionsList}>
+                {(slide.pollOptions ?? []).map((option, index) => (
+                  <PollOption
+                    key={`${slide.id}-${index}`}
+                    option={option}
+                    voted={selectedPollOption === index}
+                    disabled={hasPollVote}
+                    onPress={() => handlePollVote(index)}
+                  />
+                ))}
+              </View>
+
+              {hasPollVote ? (
+                <Animated.View
+                  style={[styles.pollVoteHint, { opacity: slideAnim }]}
+                >
+                  <Text style={styles.pollVoteHintText}>
+                    Ton vote a été enregistré.
                   </Text>
-                </View>
+                </Animated.View>
               ) : null}
+            </Animated.View>
+          </View>
+        ) : null}
 
+        {/* ───── PROGRESS ───── */}
+        <View style={styles.progressWrap} pointerEvents="none">
+          <ProgressBars
+            slides={group.slides}
+            slideIdx={slideIdx}
+            progress={progress}
+          />
+        </View>
+
+        {/* ───── HEADER ───── */}
+        <View style={styles.header} pointerEvents="box-none">
+          <View style={styles.headerRow}>
+            <View style={styles.headerLeft}>
+              <LinearGradient
+                colors={authorGradientColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarRing}
+              >
+                <View style={styles.avatarInner}>
+                  {group.authorAvatar ? (
+                    <RNImage
+                      source={{ uri: group.authorAvatar }}
+                      style={styles.avatarImage}
+                      accessibilityLabel={group.authorName}
+                    />
+                  ) : (
+                    <LinearGradient
+                      colors={authorGradientColors}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.avatarInitialsWrap}
+                    >
+                      <Text style={styles.avatarInitialsText}>
+                        {getInitials(group.authorName)}
+                      </Text>
+                    </LinearGradient>
+                  )}
+                </View>
+              </LinearGradient>
+
+              <View style={styles.headerInfo}>
+                <View style={styles.headerNameRow}>
+                  <Text style={styles.headerName} numberOfLines={1}>
+                    {group.authorName}
+                  </Text>
+                  {group.isLive ? (
+                    <View style={styles.liveBadge}>
+                      <Text style={styles.liveBadgeText}>LIVE</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.headerTime}>{slide.time}</Text>
+              </View>
+            </View>
+
+            <View style={styles.headerActions}>
               <Pressable
-                onPress={togglePause}
-                accessibilityLabel={
-                  paused ? "Reprendre la story" : "Mettre la story en pause"
-                }
+                onPress={() => setMuted((c) => !c)}
+                accessibilityLabel={muted ? "Activer le son" : "Couper le son"}
+                hitSlop={6}
                 style={({ pressed }) => [
-                  styles.playPauseBtn,
-                  pressed && { opacity: 0.75 },
+                  styles.headerIconBtn,
+                  pressed && { opacity: 0.7 },
                 ]}
               >
-                {paused ? (
-                  <Play
-                    size={15}
-                    color="rgba(255,255,255,0.9)"
-                    fill="rgba(255,255,255,0.9)"
-                    strokeWidth={0}
-                  />
+                {muted ? (
+                  <VolumeX size={16} color="rgba(255,255,255,0.85)" />
                 ) : (
-                  <Pause
-                    size={15}
-                    color="rgba(255,255,255,0.9)"
-                    fill="rgba(255,255,255,0.9)"
-                    strokeWidth={0}
-                  />
+                  <Volume2 size={16} color="rgba(255,255,255,0.85)" />
                 )}
+              </Pressable>
+              <Pressable
+                onPress={onClose}
+                accessibilityLabel="Fermer la story"
+                hitSlop={6}
+                style={({ pressed }) => [
+                  styles.headerIconBtn,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <X size={18} color="#fff" />
               </Pressable>
             </View>
           </View>
         </View>
+
+        <PausedOverlay visible={paused && !showReactions} />
+
+        {/* ───── DESKTOP NAV ───── */}
+        {IS_DESKTOP_WEB && !isFirstSlide ? (
+          <Pressable
+            onPress={goPrevSlide}
+            accessibilityLabel="Story précédente"
+            style={({ pressed }) => [
+              styles.navBtnLeft,
+              pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
+            ]}
+          >
+            <ChevronLeft size={20} color="#fff" strokeWidth={2.4} />
+          </Pressable>
+        ) : null}
+
+        {IS_DESKTOP_WEB && !isLastSlide ? (
+          <Pressable
+            onPress={goNextSlide}
+            accessibilityLabel="Story suivante"
+            style={({ pressed }) => [
+              styles.navBtnRight,
+              pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
+            ]}
+          >
+            <ChevronRight size={20} color="#fff" strokeWidth={2.4} />
+          </Pressable>
+        ) : null}
+
+        {/* ───── REACTION FLOAT ───── */}
+        {reactionEmoji ? (
+          <ReactionFloat
+            key={`${reactionEmoji}-${slide.id}`}
+            emoji={reactionEmoji}
+          />
+        ) : null}
+
+        {/* ───── REACTION PANEL ───── */}
+        <Animated.View
+          pointerEvents={showReactions ? "auto" : "none"}
+          style={[
+            styles.reactionPanel,
+            {
+              opacity: panelOpacity,
+              transform: [
+                { translateY: panelTranslateY },
+                { scale: panelScale },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={["rgba(10,10,20,0.85)", "rgba(20,10,40,0.85)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.reactionPanelBorder} pointerEvents="none" />
+          {REACTION_EMOJIS.map((emoji) => (
+            <Pressable
+              key={emoji}
+              onPress={() => handleReaction(emoji)}
+              accessibilityLabel={`Réagir ${emoji}`}
+              style={({ pressed }) => [
+                styles.reactionBtn,
+                pressed && { transform: [{ scale: 0.85 }] },
+              ]}
+            >
+              <Text style={styles.reactionBtnText}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </Animated.View>
+
+        {/* ───── BOTTOM ACTIONS ───── */}
+        <View style={styles.bottomActions} pointerEvents="box-none">
+          <View style={styles.bottomRow}>
+            <Pressable
+              onPress={() => {
+                setPaused(true);
+                setShowReactions((c) => !c);
+              }}
+              accessibilityLabel="Réagir"
+              style={({ pressed }) => [
+                styles.reactBtn,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Heart
+                size={15}
+                color={currentReaction ? "#F472B6" : "rgba(255,255,255,0.85)"}
+                fill={currentReaction ? "#F472B6" : "transparent"}
+                strokeWidth={2.4}
+              />
+              <Text style={styles.reactBtnText}>Réagir</Text>
+            </Pressable>
+
+            {currentReaction ? (
+              <View style={styles.currentReactionPill}>
+                <Text style={styles.currentReactionText}>
+                  {currentReaction}
+                </Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={togglePause}
+              accessibilityLabel={
+                paused ? "Reprendre la story" : "Mettre la story en pause"
+              }
+              style={({ pressed }) => [
+                styles.playPauseBtn,
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              {paused ? (
+                <Play
+                  size={15}
+                  color="rgba(255,255,255,0.9)"
+                  fill="rgba(255,255,255,0.9)"
+                  strokeWidth={0}
+                />
+              ) : (
+                <Pause
+                  size={15}
+                  color="rgba(255,255,255,0.9)"
+                  fill="rgba(255,255,255,0.9)"
+                  strokeWidth={0}
+                />
+              )}
+            </Pressable>
+          </View>
+        </View>
       </View>
-    </Modal>
+    </View>
   );
+
+  /* ========================================================================
+   * NATIF : <Modal>
+   * --------------------------------------------------------------------
+   * C'est LE SEUL moyen de rendre au-dessus de la TabBar native.
+   * Un overlay en position:absolute reste piégé dans l'arbre de
+   * l'écran courant ; la TabBar (frère du navigateur) reste au-dessus.
+   * La <Modal> native sort de cette hiérarchie.
+   * ====================================================================== */
+
+  if (IS_NATIVE) {
+    return (
+      <Modal
+        visible
+        transparent
+        animationType="none"
+        presentationStyle="overFullScreen"
+        onRequestClose={onClose}
+        statusBarTranslucent
+        navigationBarTranslucent
+        hardwareAccelerated
+        onShow={() => {
+          if (__DEV__) {
+            console.log("[StoryViewer] NATIVE MODAL SHOWN");
+          }
+        }}
+      >
+        <View style={styles.nativeModalContainer}>{content}</View>
+      </Modal>
+    );
+  }
+
+  /* ========================================================================
+   * WEB : portal direct dans un <div> créé dans document.body
+   * ====================================================================== */
+
+  if (createPortalFn && portalEl) {
+    return createPortalFn(content, portalEl);
+  }
+
+  /* Fallback web : rendu direct (modalRootWeb porte déjà le position:fixed) */
+  return content;
 }
 
 /* ============================================================
@@ -1062,11 +1208,31 @@ export default function StoryViewer({
  * ============================================================ */
 
 const styles = StyleSheet.create({
-  root: {
+  modalRoot: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    width: "100%",
+    height: "100%",
     backgroundColor: "#000",
+  },
+  nativeModalContainer: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
+  },
+  /**
+   * Sur web : force un overlay plein écran fixe, au-dessus de tout.
+   */
+  modalRootWeb: {
+    // @ts-expect-error RNW accepte "fixed" côté DOM
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: "100%",
+    zIndex: 2147483647,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -1075,6 +1241,7 @@ const styles = StyleSheet.create({
   cardMobile: {
     flex: 1,
     width: "100%",
+    height: "100%",
     backgroundColor: "#000",
     overflow: "hidden",
   },
@@ -1093,6 +1260,24 @@ const styles = StyleSheet.create({
     shadowRadius: 40,
     shadowOffset: { width: 0, height: 20 },
     elevation: 24,
+    alignSelf: "center",
+    marginTop: "auto",
+    marginBottom: "auto",
+  },
+
+  /* ── Dev-only empty states ── */
+  devMissing: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  devMissingText: {
+    color: "#F59E0B",
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
+    lineHeight: 20,
   },
 
   /* ── Progress ───────────────────────────────────── */
@@ -1351,7 +1536,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(167,139,250,0.4)",
   },
 
-  /* ── Nav buttons (desktop) ─────────────────────── */
+  /* ── Nav buttons (desktop web) ─────────────────── */
   navBtnLeft: {
     position: "absolute",
     left: 12,

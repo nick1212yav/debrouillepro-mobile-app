@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   useWindowDimensions,
   type NativeSyntheticEvent,
+  type NativeScrollEvent,
   type TextInputKeyPressEventData,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -36,7 +37,6 @@ import {
   ChevronUp,
   Copy,
   Check,
-  Brain,
   Wand2,
   Globe2,
 } from "lucide-react-native";
@@ -44,6 +44,7 @@ import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { toast } from "sonner";
 import { Clipboard } from "@react-native-clipboard/clipboard";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /* ============================================================================
  * TYPES
@@ -63,12 +64,24 @@ type Props = {
   onNavigate: (page: string) => void;
   moduleContext?: string;
 };
+type SpeechRecognitionResultLike = {
+  readonly [index: number]: { readonly transcript: string };
+  readonly length: number;
+};
+
+type SpeechRecognitionEventLike = {
+  readonly results: {
+    readonly [index: number]: SpeechRecognitionResultLike;
+    readonly length: number;
+  };
+};
+
 type SpeechRecognitionLike = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
-  onresult: ((event: any) => void) | null;
-  onerror: ((event: any) => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
   onend: (() => void) | null;
   start(): void;
   stop(): void;
@@ -82,7 +95,7 @@ const STORAGE_KEY = "debrouille_ai_history";
 const MAX_HISTORY_MESSAGES = 50;
 const MAX_CONTEXT_MESSAGES = 10;
 const MAX_ACTION_CARDS = 3;
-const isBrowser = typeof window !== "undefined";
+const isBrowser = Platform.OS === "web";
 
 const SUGGESTIONS_MAP: Record<string, string[]> = {
   home: [
@@ -295,13 +308,20 @@ function createWelcomeMessage(moduleContext: string): Message {
   };
 }
 
-function loadHistory(moduleContext: string): Message[] {
-  if (!isBrowser) return [createWelcomeMessage(moduleContext)];
+async function loadHistory(moduleContext: string): Promise<Message[]> {
   try {
-    const raw = window.localStorage.getItem(getStorageKey(moduleContext));
+    const raw = isBrowser
+      ? window.localStorage.getItem(getStorageKey(moduleContext))
+      : await AsyncStorage.getItem(getStorageKey(moduleContext));
+
     if (!raw) return [createWelcomeMessage(moduleContext)];
+
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [createWelcomeMessage(moduleContext)];
+
+    if (!Array.isArray(parsed)) {
+      return [createWelcomeMessage(moduleContext)];
+    }
+
     const valid = parsed.filter((item): item is Message =>
       Boolean(
         item &&
@@ -312,20 +332,28 @@ function loadHistory(moduleContext: string): Message[] {
         "timestamp" in item,
       ),
     );
+
     return valid.length > 0 ? valid : [createWelcomeMessage(moduleContext)];
   } catch {
     return [createWelcomeMessage(moduleContext)];
   }
 }
 
-function saveHistory(messages: Message[], moduleContext: string): void {
-  if (!isBrowser) return;
+async function saveHistory(
+  messages: Message[],
+  moduleContext: string,
+): Promise<void> {
   try {
-    window.localStorage.setItem(
-      getStorageKey(moduleContext),
-      JSON.stringify(messages.slice(-MAX_HISTORY_MESSAGES)),
-    );
-  } catch {}
+    const serialized = JSON.stringify(messages.slice(-MAX_HISTORY_MESSAGES));
+
+    if (isBrowser) {
+      window.localStorage.setItem(getStorageKey(moduleContext), serialized);
+    } else {
+      await AsyncStorage.setItem(getStorageKey(moduleContext), serialized);
+    }
+  } catch {
+    // Storage can be unavailable or temporarily inaccessible.
+  }
 }
 
 function extractActionCards(text: string): ActionCard[] {
@@ -657,9 +685,33 @@ function HistoryModal({
   onLoad: (module: string) => void;
 }) {
   const modules = getHistoryModules();
+  const [histories, setHistories] = useState<Record<string, Message[]>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      const entries = await Promise.all(
+        modules.map(
+          async (module) =>
+            [module.key, await loadHistory(module.key)] as const,
+        ),
+      );
+
+      if (!cancelled) {
+        setHistories(Object.fromEntries(entries));
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
-    <View style={StyleSheet.absoluteFill as any}>
+    <View style={StyleSheet.absoluteFill}>
       <LinearGradient
         colors={["#0A0620", "#150A33", "#0C051E"]}
         style={StyleSheet.absoluteFill}
@@ -690,21 +742,7 @@ function HistoryModal({
       >
         <View style={{ gap: 10 }}>
           {modules.map((module) => {
-            let messages: Message[] = [];
-            if (isBrowser) {
-              try {
-                const raw = window.localStorage.getItem(
-                  getStorageKey(module.key),
-                );
-                if (raw) {
-                  const parsed = JSON.parse(raw);
-                  if (Array.isArray(parsed)) messages = parsed;
-                }
-              } catch {
-                messages = [];
-              }
-            }
-
+            const messages = histories[module.key] ?? [];
             const userMessages = messages.filter((m) => m.role === "user");
             const lastMessage = messages[messages.length - 1];
             if (userMessages.length === 0) return null;
@@ -817,9 +855,7 @@ function MessageBubble({
           ]}
         >
           {isUser ? (
-            <View
-              style={[styles.bubbleUserGlow, StyleSheet.absoluteFill as any]}
-            />
+            <View style={[styles.bubbleUserGlow, StyleSheet.absoluteFill]} />
           ) : null}
           <View style={styles.bubbleContent}>
             <Text style={styles.bubbleText}>
@@ -888,9 +924,9 @@ export default function AIAssistant({
   onNavigate,
   moduleContext = "home",
 }: Props) {
-  const [messages, setMessages] = useState<Message[]>(() =>
-    loadHistory(moduleContext),
-  );
+  const [messages, setMessages] = useState<Message[]>(() => [
+    createWelcomeMessage(moduleContext),
+  ]);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -913,6 +949,23 @@ export default function AIAssistant({
   const contextLabel = MODULE_LABELS[moduleContext] ?? moduleContext;
   const hasContextBadge = moduleContext !== "home";
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateHistory = async () => {
+      const history = await loadHistory(moduleContext);
+      if (!cancelled) {
+        setMessages(history);
+      }
+    };
+
+    void hydrateHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [moduleContext]);
+
   /* ──────── scroll ──────── */
   const scrollToBottom = useCallback((animated = true) => {
     scrollRef.current?.scrollToEnd({ animated });
@@ -923,12 +976,15 @@ export default function AIAssistant({
     return () => clearTimeout(t);
   }, [messages, isThinking, scrollToBottom]);
 
-  const handleScroll = useCallback((e: NativeSyntheticEvent<any>) => {
-    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    const distanceFromBottom =
-      contentSize.height - contentOffset.y - layoutMeasurement.height;
-    setShowScrollButton(distanceFromBottom > 140);
-  }, []);
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+      const distanceFromBottom =
+        contentSize.height - contentOffset.y - layoutMeasurement.height;
+      setShowScrollButton(distanceFromBottom > 140);
+    },
+    [],
+  );
 
   /* ──────── web keyboard shortcuts ──────── */
   useEffect(() => {
@@ -959,7 +1015,7 @@ export default function AIAssistant({
       setInputHeight(40);
       setIsThinking(true);
       setShowSuggestions(false);
-      saveHistory(updatedMessages, moduleContext);
+      void saveHistory(updatedMessages, moduleContext);
 
       try {
         const contextMessages = updatedMessages
@@ -1000,7 +1056,7 @@ export default function AIAssistant({
 
         const finalMessages = [...updatedMessages, assistantMessage];
         setMessages(finalMessages);
-        saveHistory(finalMessages, moduleContext);
+        void saveHistory(finalMessages, moduleContext);
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -1048,7 +1104,7 @@ export default function AIAssistant({
     recognition.continuous = false;
     recognition.interimResults = false;
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       const transcript = event.results[0]?.[0]?.transcript ?? "";
       if (transcript.trim()) setInput(transcript.trim());
       setIsListening(false);
@@ -1084,7 +1140,7 @@ export default function AIAssistant({
   const clearHistory = useCallback(() => {
     const fresh = [createWelcomeMessage(moduleContext)];
     setMessages(fresh);
-    saveHistory(fresh, moduleContext);
+    void saveHistory(fresh, moduleContext);
     setShowSuggestions(true);
     toast.success("Nouvelle conversation.");
   }, [moduleContext]);
@@ -1389,9 +1445,11 @@ export default function AIAssistant({
         <HistoryModal
           onClose={() => setShowHistory(false)}
           onLoad={(module) => {
-            setMessages(loadHistory(module));
-            setShowHistory(false);
-            setShowSuggestions(true);
+            void loadHistory(module).then((history) => {
+              setMessages(history);
+              setShowHistory(false);
+              setShowSuggestions(true);
+            });
           }}
         />
       ) : null}

@@ -336,6 +336,7 @@ type PageKey =
   | "help"
   | "terms"
   | "reels"
+  | "reels-mine"
   | "creator-dashboard"
   | "ai-studio"
   | "series-playlist"
@@ -436,6 +437,7 @@ const IMPLEMENTED: readonly PageKey[] = [
   "help",
   "terms",
   "reels",
+  "reels-mine",
   "creator-dashboard",
   "ai-studio",
   "series-playlist",
@@ -947,7 +949,43 @@ export default function HomePage() {
 
   if (currentPage === "terms") return lazy$(<TermsPage onBack={goHome} />);
 
-  if (currentPage === "reels") return lazy$(<ReelsPage onBack={goHome} />);
+  /*
+   * ─────────────────────────────────────────────────────────────────
+   * REELS — deux routes distinctes
+   * ─────────────────────────────────────────────────────────────────
+   *
+   *  • "reels"       → flux PUBLIC
+   *                    alimenté par api.shortVideos.list
+   *                    (approved + active + visibility public/followers)
+   *                    Utilisé depuis Home / HomeReels / découvrir.
+   *
+   *  • "reels-mine"  → bibliothèque PERSONNELLE
+   *                    alimentée par api.shortVideos.listMine
+   *                    (tous les statuts : pending, approved, rejected)
+   *                    Utilisé depuis Profil → Mes Reels.
+   *
+   * Les deux routes utilisent le MÊME composant ReelsPage, mais avec
+   * un `mode` différent, ce qui garantit :
+   *   1. un seul lecteur à maintenir
+   *   2. aucun Hook conditionnel côté ReelsPage
+   *   3. une séparation stricte des sources de données
+   */
+  /*
+   * REELS — surface plein écran
+   *
+   * Reels est un viewer vidéo immersif et ne doit pas être
+   * encapsulé dans PageTransition/Suspense.
+   *
+   * Cela permet à ses surfaces natives (Modal, vidéo, viewer)
+   * de conserver leur propre géométrie plein écran sur Android.
+   */
+  if (currentPage === "reels") {
+    return <ReelsPage onBack={goHome} mode="public" />;
+  }
+
+  if (currentPage === "reels-mine") {
+    return <ReelsPage onBack={goHome} mode="mine" />;
+  }
 
   if (currentPage === "creator-dashboard")
     return lazy$(<CreatorDashboardPage onBack={goHome} />);

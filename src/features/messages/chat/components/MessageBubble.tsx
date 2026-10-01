@@ -24,28 +24,91 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const own = chatService.isOwnMessage(message, currentUserId);
 
-  const senderName = message.sender?.name ?? "Utilisateur";
+  const senderName = message.sender?.name?.trim() || "Utilisateur";
+  const edited = chatService.isEdited(message);
+  const formattedTime = chatService.formatTime(message);
 
   const bubbleClass = own
-    ? "rounded-br-md bg-white text-black"
-    : "rounded-bl-md bg-white/10 text-white";
+    ? "rounded-2xl rounded-br-md bg-white"
+    : "rounded-2xl rounded-bl-md bg-white/[0.08] border border-white/[0.06]";
 
-  const metaClass = own ? "text-black/40" : "text-white/30";
+  const textClass = own ? "text-black" : "text-white";
+
+  const metaClass = own ? "text-black/45" : "text-white/35";
 
   return (
-    <View className={["flex w-full", own ? "justify-end" : "justify-start"].join(
-        " ",
-      )}><MessageContextMenu message={message} currentUserId={currentUserId} onReply={onReply} onForward={onForward}><View className={[
-            "min-w-0 max-w-[82%] rounded-2xl px-3 py-2",
+    <View
+      className={["w-full px-1", own ? "items-end" : "items-start"].join(" ")}
+    >
+      <MessageContextMenu
+        message={message}
+        currentUserId={currentUserId}
+        onReply={onReply}
+        onForward={onForward}
+      >
+        <View
+          className={[
+            "min-w-0 max-w-[86%] overflow-hidden px-3.5 py-2.5",
             bubbleClass,
-          ].join(" ")}>{}{}{}{!own && (
-            <Text className="mb-1 truncate text-xs font-semibold opacity-60">{senderName}</Text>
-          )}{}{}{}{message.replyToId && (
-            <ReplyPreview replyToId={message.replyToId} own={own} />
-          )}{}{}{}{}<MessageTypeRenderer message={message} own={own} />{}{}{}<View className={[
-              "mt-1 flex items-center justify-end gap-1 text-[10px]",
+            textClass,
+          ].join(" ")}
+        >
+          {/* Expéditeur — uniquement pour les messages reçus */}
+          {!own && (
+            <Text
+              className="mb-1.5 text-[12px] font-semibold text-white/65"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {senderName}
+            </Text>
+          )}
+
+          {/* Réponse au message précédent */}
+          {message.replyToId && (
+            <View className="mb-1.5">
+              <ReplyPreview replyToId={message.replyToId} own={own} />
+            </View>
+          )}
+
+          {/* Contenu principal du message */}
+          <View className="min-w-0">
+            <MessageTypeRenderer message={message} own={own} />
+          </View>
+
+          {/* Métadonnées : édition + heure + statut */}
+          <View
+            className={[
+              "mt-1.5 flex-row items-center justify-end",
               metaClass,
-            ].join(" ")}>{chatService.isEdited(message) && <Text>modifié</Text>}<Text>{chatService.formatTime(message)}</Text>{own && <MessageStatus status={message.status} />}</View>{}{}{}<MessageReactions messageId={message._id} reactions={message.reactions} own={own} /></View></MessageContextMenu></View>
+            ].join(" ")}
+          >
+            {edited && (
+              <Text className="mr-1 text-[10px] leading-3">modifié</Text>
+            )}
+
+            <Text className="text-[10px] leading-3">{formattedTime}</Text>
+
+            {own && (
+              <View className="ml-1">
+                <MessageStatus status={message.status} />
+              </View>
+            )}
+          </View>
+
+          {/* Réactions */}
+          {message.reactions && (
+            <View className="mt-1">
+              <MessageReactions
+                messageId={message._id}
+                reactions={message.reactions}
+                own={own}
+              />
+            </View>
+          )}
+        </View>
+      </MessageContextMenu>
+    </View>
   );
 }
 

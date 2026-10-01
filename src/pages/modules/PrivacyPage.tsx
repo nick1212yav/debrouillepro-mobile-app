@@ -1,12 +1,5 @@
-import React, { useMemo, useState } from "react";
-import {
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, { useState, type ComponentType } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   ArrowLeft,
   ChevronDown,
@@ -24,7 +17,7 @@ import { useRouter } from "expo-router";
 type Section = {
   id: string;
   title: string;
-  icon: React.ComponentType<{
+  icon: ComponentType<{
     size?: number;
     color?: string;
     strokeWidth?: number;
@@ -222,7 +215,7 @@ function SectionCard({
         )}
       </Pressable>
 
-      {expanded && (
+      {expanded ? (
         <View style={styles.cardContent}>
           {section.content.map((paragraph, index) => (
             <Text key={`${section.id}-${index}`} style={styles.paragraph}>
@@ -230,7 +223,7 @@ function SectionCard({
             </Text>
           ))}
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -239,32 +232,44 @@ function PrivacyContent() {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const updatedLabel = useMemo(() => {
-    const date = new Date();
-    return date.toLocaleDateString("fr-FR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  }, []);
+  const handleBack = () => {
+    /*
+     * PrivacyPage peut être ouverte directement par URL/deep-link
+     * ou être la première route de la pile.
+     *
+     * Dans ce cas, router.back() déclencherait :
+     * "The action 'GO_BACK' was not handled by any navigator."
+     *
+     * On vérifie donc la présence d'une route précédente avant
+     * de demander un retour arrière.
+     */
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
 
-  const openContact = async () => {
-    // Aucun e-mail fictif n'est injecté ici.
-    // Branchez le canal officiel de support lorsqu'il est défini.
-    await Linking.openURL("mailto:");
+    // Fallback sûr lorsque PrivacyPage est la route racine.
+    router.replace("/");
   };
+
+  const updatedLabel = new Intl.DateTimeFormat("fr-FR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
 
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           style={({ pressed }) => [
             styles.backButton,
             pressed && styles.pressed,
           ]}
           accessibilityRole="button"
           accessibilityLabel="Retour"
+          accessibilityHint="Retourner à l'écran précédent"
         >
           <ArrowLeft size={22} color="#ffffff" />
         </Pressable>
@@ -281,6 +286,7 @@ function PrivacyContent() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
@@ -298,6 +304,7 @@ function PrivacyContent() {
 
           <View style={styles.metaRow}>
             <View style={styles.statusDot} />
+
             <Text style={styles.metaText}>
               Dernière mise à jour : {updatedLabel}
             </Text>
@@ -306,8 +313,10 @@ function PrivacyContent() {
 
         <View style={styles.notice}>
           <Lock size={18} color="#8ab4ff" />
+
           <View style={styles.noticeBody}>
             <Text style={styles.noticeTitle}>Principe essentiel</Text>
+
             <Text style={styles.noticeText}>
               Les données doivent être collectées et utilisées uniquement pour
               des finalités légitimes, nécessaires et compatibles avec les
@@ -342,17 +351,6 @@ function PrivacyContent() {
             Utilisez le canal officiel de confidentialité indiqué par
             DébrouillePro lorsque celui-ci est configuré.
           </Text>
-
-          <Pressable
-            onPress={openContact}
-            style={({ pressed }) => [
-              styles.contactButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Mail size={18} color="#ffffff" />
-            <Text style={styles.contactButtonText}>Contacter</Text>
-          </Pressable>
         </View>
 
         <Text style={styles.footer}>
@@ -588,24 +586,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     marginTop: 7,
-  },
-
-  contactButton: {
-    marginTop: 16,
-    minHeight: 46,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#2563eb",
-  },
-
-  contactButtonText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "800",
   },
 
   footer: {

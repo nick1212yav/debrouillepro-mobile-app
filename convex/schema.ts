@@ -12,6 +12,8 @@ export default defineSchema({
     phone: v.optional(v.string()),
     name: v.string(),
     avatar: v.optional(v.string()),
+    coverImage: v.optional(v.id("_storage")),
+    slug: v.optional(v.string()),
     bio: v.optional(v.string()),
     roles: v.array(v.string()),
     permissions: v.optional(v.array(v.string())),
@@ -28,6 +30,7 @@ export default defineSchema({
       v.object({
         city: v.optional(v.string()),
         country: v.optional(v.string()),
+        province: v.optional(v.string()),
         latitude: v.optional(v.number()),
         longitude: v.optional(v.number()),
         area: v.optional(v.string()),
@@ -59,6 +62,7 @@ export default defineSchema({
     .index("by_token", ["tokenIdentifier"])
     .index("by_email", ["email"])
     .index("by_phone", ["phone"])
+    .index("by_slug", ["slug"])
     .searchIndex("search_users", {
       searchField: "searchText",
       filterFields: ["city", "country"],
@@ -768,7 +772,8 @@ export default defineSchema({
     date: v.string(),
   })
     .index("by_profile", ["profileId"])
-    .index("by_profile_and_date", ["profileId", "date"]),
+    .index("by_profile_and_date", ["profileId", "date"])
+    .index("by_viewer_and_profile_and_date", ["viewerId", "profileId", "date"]),
 
   conversationMembers: defineTable({
     conversationId: v.id("conversations"),
@@ -2057,6 +2062,9 @@ export default defineSchema({
         linkedin: v.optional(v.string()),
         instagram: v.optional(v.string()),
         youtube: v.optional(v.string()),
+        tiktok: v.optional(v.string()),
+        whatsapp: v.optional(v.string()),
+        telegram: v.optional(v.string()),
       }),
     ),
     updatedAt: v.string(),
@@ -3103,18 +3111,91 @@ export default defineSchema({
       filterFields: ["category", "status"],
     }),
 
+  mediaArticleLikes: defineTable({
+    articleId: v.id("mediaArticles"),
+    userId: v.id("users"),
+  })
+    .index("by_article", ["articleId"])
+    .index("by_user_and_article", ["userId", "articleId"]),
+
   stories: defineTable({
     authorId: v.id("users"),
-    mediaUrl: v.string(), // image or video CDN URL
-    mediaType: v.union(v.literal("image"), v.literal("video")),
+
+    // ─────────────────────────────────────────────────────────
+    // TYPE EXPLICITE DE LA STORY
+    // ─────────────────────────────────────────────────────────
+    // image → média image stocké dans Convex Storage
+    // video → média vidéo stocké dans Convex Storage
+    // text  → texte pur
+    // poll  → sondage
+    //
+    // Optionnel pour préserver les anciennes stories.
+    storyType: v.optional(
+      v.union(
+        v.literal("image"),
+        v.literal("video"),
+        v.literal("text"),
+        v.literal("poll"),
+      ),
+    ),
+
+    // ─────────────────────────────────────────────────────────
+    // MÉDIA
+    // ─────────────────────────────────────────────────────────
+    // Présent pour image / video.
+    // Peut être absent pour text / poll.
+    mediaUrl: v.optional(v.string()),
+
+    // Conservé pour compatibilité avec les anciennes données.
+    mediaType: v.optional(v.union(v.literal("image"), v.literal("video"))),
+
+    // Durée en secondes — principalement pour les vidéos.
+    duration: v.optional(v.number()),
+
+    // ─────────────────────────────────────────────────────────
+    // STORY TEXTE
+    // ─────────────────────────────────────────────────────────
+    textContent: v.optional(v.string()),
+
+    // Clé du thème utilisée par l'interface.
+    // Exemples : purple, pink, cyan, sunset...
+    backgroundKey: v.optional(v.string()),
+
+    // Couleur du texte.
+    // Exemple : "#FFFFFF"
+    textColor: v.optional(v.string()),
+
+    // ─────────────────────────────────────────────────────────
+    // STORY SONDAGE
+    // ─────────────────────────────────────────────────────────
+    pollQuestion: v.optional(v.string()),
+    pollOptions: v.optional(v.array(v.string())),
+
+    // ─────────────────────────────────────────────────────────
+    // CHAMPS COMMUNS
+    // ─────────────────────────────────────────────────────────
     caption: v.optional(v.string()),
-    duration: v.optional(v.number()), // seconds for video
+
     viewCount: v.number(),
-    expiresAt: v.string(), // ISO 8601 (24h after creation)
+
+    expiresAt: v.string(),
+
     isHighlight: v.boolean(),
+
+    // Date explicite pour les traitements applicatifs.
+    // _creationTime reste disponible comme timestamp Convex.
+    createdAt: v.optional(v.string()),
+
+    // ─────────────────────────────────────────────────────────
+    // VERSION DU CONTRAT
+    // ─────────────────────────────────────────────────────────
+    // absent / 0 = ancien format
+    // 1 = nouveau contrat explicite
+    schemaVersion: v.optional(v.number()),
   })
     .index("by_author", ["authorId"])
-    .index("by_expiresAt", ["expiresAt"]),
+    .index("by_expiresAt", ["expiresAt"])
+    .index("by_author_expiresAt", ["authorId", "expiresAt"]),
 
   storyViews: defineTable({
     storyId: v.id("stories"),
@@ -4118,54 +4199,401 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE — STREAMING
+  // CONTRAT PRODUCTION v1 — PHASE 1
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // Architecture :
+  //   PUBLIC      → lives approuvés et actifs
+  //   MINE        → lives du propriétaire, quel que soit leur statut
+  //   ADMIN       → modération / gestion
+  //   REPLAY      → replayStorageId / replayUrl
+  //
+  // Phase 1 :
+  //   - compatibilité totale avec les anciens backends
+  //   - nouveaux champs introduits progressivement
+  //   - anciennes tables conservées temporairement
+  //
+  // Phase 2 :
+  //   - backfill complet
+  //   - migration livestream.ts / liveStreams.ts / community.ts
+  //   - présence heartbeat
+  //   - likes idempotents
+  //   - gifts / super chats
+  //   - modération
+  //
+  // Phase 3 :
+  //   - suppression des champs legacy
+  //   - passage des champs v1 définitifs en required
+  // ═══════════════════════════════════════════════════════════════
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // LIVE STREAMING
-  // ─────────────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE — STREAMS
+  // ═══════════════════════════════════════════════════════════════
+
   liveStreams: defineTable({
+    // ─── IDENTITÉ ────────────────────────────────────────────────
     hostId: v.id("users"),
+
+    // ─── VERSION DU CONTRAT ─────────────────────────────────────
+    // Optionnel pendant la migration.
+    schemaVersion: v.optional(v.number()),
+
+    // ─── CONTENU ────────────────────────────────────────────────
     title: v.string(),
     description: v.optional(v.string()),
     category: v.string(),
+    tags: v.array(v.string()),
+
+    // ─── MÉDIA LEGACY ──────────────────────────────────────────
+    // Conservés temporairement pour compatibilité.
     thumbnailUrl: v.optional(v.string()),
-    streamUrl: v.optional(v.string()), // CDN/RTMP URL once live
-    viewerCount: v.number(),
-    peakViewers: v.number(),
-    likeCount: v.number(),
+    streamUrl: v.optional(v.string()),
+
+    // ─── MÉDIA CANONIQUE ───────────────────────────────────────
+    // Convex Storage = source privilégiée pour les médias internes.
+    thumbnailStorageId: v.optional(v.id("_storage")),
+
+    // URL de lecture publique HLS/MP4.
+    playbackUrl: v.optional(v.string()),
+
+    // URL d'ingestion RTMP/SRT pour le pipeline broadcaster.
+    ingestUrl: v.optional(v.string()),
+
+    // ─── REPLAY / VOD ──────────────────────────────────────────
+    replayStorageId: v.optional(v.id("_storage")),
+    replayUrl: v.optional(v.string()),
+    replayDurationMs: v.optional(v.number()),
+
+    // ─── ÉTAT DU STREAM ────────────────────────────────────────
     status: v.union(
       v.literal("scheduled"),
       v.literal("live"),
       v.literal("ended"),
+      v.literal("cancelled"),
     ),
+
+    // ─── MODÉRATION ────────────────────────────────────────────
+    moderationStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+    ),
+
+    // ─── VISIBILITÉ ────────────────────────────────────────────
+    // `isPublic` reste présent pendant la migration.
+    visibility: v.optional(
+      v.union(
+        v.literal("public"),
+        v.literal("followers"),
+        v.literal("private"),
+      ),
+    ),
+
+    // ─── ÉTAT LOGIQUE ──────────────────────────────────────────
+    isActive: v.optional(v.boolean()),
+    isDeleted: v.optional(v.boolean()),
+    isPinned: v.optional(v.boolean()),
+
+    // Legacy — conservé pendant migration.
+    isPublic: v.boolean(),
+
+    // ─── TIMESTAMPS LEGACY ─────────────────────────────────────
+    // Conservés en string jusqu'au backfill.
     scheduledAt: v.optional(v.string()),
     startedAt: v.optional(v.string()),
     endedAt: v.optional(v.string()),
-    tags: v.array(v.string()),
-    isPublic: v.boolean(),
+
+    // ─── TIMESTAMPS CANONIQUES ─────────────────────────────────
+    // Unix milliseconds.
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+
+    // ─── COMPTEURS EXISTANTS ───────────────────────────────────
+    viewerCount: v.number(),
+    peakViewers: v.number(),
+    likeCount: v.number(),
+
+    // ─── COMPTEURS V1 ──────────────────────────────────────────
+    chatCount: v.optional(v.number()),
+    giftCount: v.optional(v.number()),
+    shareCount: v.optional(v.number()),
+    totalViewCount: v.optional(v.number()),
+
+    // ─── DÉCOUVERTE ────────────────────────────────────────────
+    city: v.optional(v.string()),
+    languageCode: v.optional(v.string()),
   })
+    // ─── REQUÊTES DE BASE ──────────────────────────────────────
     .index("by_host", ["hostId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+
+    // ─── FEED / MODÉRATION ────────────────────────────────────
+    .index("by_moderationStatus", ["moderationStatus"])
+
+    .index("by_moderation_active_createdAt", [
+      "moderationStatus",
+      "isActive",
+      "createdAt",
+    ])
+
+    .index("by_category_moderation_active_createdAt", [
+      "category",
+      "moderationStatus",
+      "isActive",
+      "createdAt",
+    ])
+
+    .index("by_city_moderation_active_createdAt", [
+      "city",
+      "moderationStatus",
+      "isActive",
+      "createdAt",
+    ]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE — MESSAGES / CHAT
+  // ═══════════════════════════════════════════════════════════════
 
   liveStreamMessages: defineTable({
     streamId: v.id("liveStreams"),
     userId: v.id("users"),
+
     text: v.string(),
+
+    // ─── TYPE ───────────────────────────────────────────────────
     type: v.union(
       v.literal("chat"),
       v.literal("super_chat"),
       v.literal("system"),
+      v.literal("gift"),
     ),
-    amount: v.optional(v.number()), // for super_chat
-    currency: v.optional(v.string()),
-  }).index("by_stream", ["streamId"]),
 
-  liveStreamFollows: defineTable({
-    streamId: v.id("liveStreams"),
-    userId: v.id("users"),
-    joinedAt: v.string(),
+    // ─── MONÉTISATION ──────────────────────────────────────────
+    amount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+
+    giftType: v.optional(v.string()),
+    giftQuantity: v.optional(v.number()),
+
+    // ─── THREADING ─────────────────────────────────────────────
+    replyToMessageId: v.optional(v.id("liveStreamMessages")),
+
+    // ─── MODÉRATION / ÉTAT ────────────────────────────────────
+    isDeleted: v.optional(v.boolean()),
+    isPinned: v.optional(v.boolean()),
+
+    moderationStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+    ),
+
+    // ─── TIMESTAMPS CANONIQUES ─────────────────────────────────
+    createdAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_stream", ["streamId"])
-    .index("by_user", ["userId"]),
+    .index("by_stream_createdAt", ["streamId", "createdAt"])
+    .index("by_user", ["userId"])
+    .index("by_stream_and_user", ["streamId", "userId"])
+    .index("by_replyTo", ["replyToMessageId"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE — LIKES
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // Une ligne = un like utilisateur sur un live.
+  // Permet une opération idempotente contrairement au simple
+  // compteur likeCount.
+  // ═══════════════════════════════════════════════════════════════
+
+  liveStreamLikes: defineTable({
+    streamId: v.id("liveStreams"),
+    userId: v.id("users"),
+    likedAt: v.number(),
+  })
+    .index("by_stream", ["streamId"])
+    .index("by_user", ["userId"])
+    .index("by_user_and_stream", ["userId", "streamId"]),
+
+  // Source canonique de présence et de comptabilisation des viewers Live.
+  //
+  // Un viewer authentifié utilise userId.
+  // Une session anonyme peut utiliser sessionId.
+  //
+  // Heartbeat recommandé : ~30 secondes.
+  // Présence considérée active : dernière activité < 60 secondes.
+
+  liveStreamPresence: defineTable({
+    streamId: v.id("liveStreams"),
+
+    // Viewer authentifié.
+    userId: v.optional(v.id("users")),
+
+    // Viewer/session anonyme.
+    sessionId: v.optional(v.string()),
+
+    joinedAt: v.number(),
+    lastHeartbeatAt: v.number(),
+
+    leftAt: v.optional(v.number()),
+
+    // Permet de distinguer présence brute et vue comptabilisée.
+    counted: v.boolean(),
+  })
+    .index("by_stream", ["streamId"])
+    .index("by_stream_and_heartbeat", ["streamId", "lastHeartbeatAt"])
+    .index("by_stream_and_user", ["streamId", "userId"])
+    .index("by_user", ["userId"])
+    .index("by_session", ["sessionId"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE — GIFTS / SUPER CHATS
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // Source détaillée des transactions de soutien au créateur.
+  //
+  // Lorsqu'un gift est confirmé :
+  //
+  //   liveStreamGifts
+  //          +
+  //   creatorEarnings
+  //
+  // `creatorEarnings.sourceType` pourra référencer le type
+  // `liveStream` lors de la migration backend.
+  // ═══════════════════════════════════════════════════════════════
+
+  liveStreamGifts: defineTable({
+    streamId: v.id("liveStreams"),
+
+    senderId: v.id("users"),
+    recipientId: v.id("users"),
+
+    giftType: v.string(),
+    quantity: v.number(),
+
+    amount: v.number(),
+    currency: v.string(),
+
+    message: v.optional(v.string()),
+
+    // Message chat associé au gift/super chat.
+    messageId: v.optional(v.id("liveStreamMessages")),
+
+    createdAt: v.number(),
+  })
+    .index("by_stream", ["streamId"])
+    .index("by_stream_createdAt", ["streamId", "createdAt"])
+    .index("by_sender", ["senderId"])
+    .index("by_recipient", ["recipientId"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE — BANS / MUTES / TIMEOUTS
+  // ═══════════════════════════════════════════════════════════════
+
+  liveStreamBans: defineTable({
+    streamId: v.id("liveStreams"),
+
+    userId: v.id("users"),
+    bannedBy: v.id("users"),
+
+    type: v.union(v.literal("ban"), v.literal("mute"), v.literal("timeout")),
+
+    reason: v.optional(v.string()),
+
+    // Pour timeout / sanction temporaire.
+    expiresAt: v.optional(v.number()),
+
+    isActive: v.boolean(),
+
+    createdAt: v.number(),
+
+    revokedAt: v.optional(v.number()),
+    revokedBy: v.optional(v.id("users")),
+  })
+    .index("by_stream", ["streamId"])
+    .index("by_user", ["userId"])
+    .index("by_stream_and_user", ["streamId", "userId"])
+    .index("by_stream_and_active", ["streamId", "isActive"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE — REPORTS / SIGNALEMENTS
+  // ═══════════════════════════════════════════════════════════════
+
+  liveStreamReports: defineTable({
+    streamId: v.id("liveStreams"),
+
+    reporterId: v.id("users"),
+
+    reason: v.union(
+      v.literal("spam"),
+      v.literal("nudity"),
+      v.literal("violence"),
+      v.literal("harassment"),
+      v.literal("misinformation"),
+      v.literal("copyright"),
+      v.literal("other"),
+    ),
+
+    details: v.optional(v.string()),
+
+    // Un signalement peut viser le live entier ou un message.
+    messageId: v.optional(v.id("liveStreamMessages")),
+
+    status: v.union(
+      v.literal("open"),
+      v.literal("reviewing"),
+      v.literal("resolved"),
+      v.literal("dismissed"),
+    ),
+
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+
+    createdAt: v.number(),
+  })
+    .index("by_stream", ["streamId"])
+    .index("by_reporter", ["reporterId"])
+    .index("by_status", ["status"])
+    .index("by_status_createdAt", ["status", "createdAt"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE — CO-HOSTS / MODERATORS / GUESTS
+  // ═══════════════════════════════════════════════════════════════
+
+  liveStreamCoHosts: defineTable({
+    streamId: v.id("liveStreams"),
+
+    userId: v.id("users"),
+
+    role: v.union(
+      v.literal("cohost"),
+      v.literal("moderator"),
+      v.literal("guest"),
+    ),
+
+    status: v.union(
+      v.literal("invited"),
+      v.literal("accepted"),
+      v.literal("declined"),
+      v.literal("removed"),
+    ),
+
+    invitedBy: v.id("users"),
+
+    invitedAt: v.number(),
+    respondedAt: v.optional(v.number()),
+  })
+    .index("by_stream", ["streamId"])
+    .index("by_user", ["userId"])
+    .index("by_stream_and_user", ["streamId", "userId"])
+    .index("by_user_and_status", ["userId", "status"]),
 
   // ─────────────────────────────────────────────────────────────────────────
   // HÉBERGEMENT RÉSERVATIONS (enrichi)
@@ -4344,40 +4772,303 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_type", ["type"]),
 
-  // ─── Short Videos (Reels) ────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════
+  // REELS — VIDÉOS COURTES (CONTRAT PRODUCTION v1.0)
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // Contrat média :
+  //   videoStorageId / thumbnailStorageId → Convex Storage (source de vérité)
+  //   videoUrl / thumbnailUrl → conservés en fallback legacy
+  //
+  // Interactions :
+  //   shortVideoLikes         → likes vidéo (source de vérité)
+  //   shortVideoComments      → commentaires (avec reply + soft delete)
+  //   shortVideoCommentLikes  → likes sur commentaires
+  //   shortVideoSaves         → sauvegardes / favoris
+  //   shortVideoShares        → partages (multi-événements autorisés)
+  //   shortVideoViews         → vues avec seuil de lecture (watchedMs)
+  //   shortVideoReports       → signalements / modération
+  //
+  // Tous les compteurs sur `shortVideos` sont maintenus en cohérence
+  // avec les tables d'interactions dans les mutations correspondantes.
+  // ═══════════════════════════════════════════════════════════════
+
   shortVideos: defineTable({
+    // ─── IDENTITÉ ──────────────────────────────────────────────
     authorId: v.id("users"),
-    videoUrl: v.string(),
+
+    // ─── MÉDIA ─────────────────────────────────────────────────
+    // Source de vérité : Convex Storage.
+    videoStorageId: v.optional(v.id("_storage")),
+    thumbnailStorageId: v.optional(v.id("_storage")),
+
+    // Fallback legacy : anciennes vidéos déjà en base / URLs externes.
+    videoUrl: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
+
+    duration: v.optional(v.number()), // secondes
+
+    // ─── CONTENU ───────────────────────────────────────────────
     caption: v.string(),
     hashtags: v.array(v.string()),
+    soundName: v.optional(v.string()),
+
+    // ─── COMPTEURS ──────────────────────────────────────────────
+    // Dénormalisés.
+    // Source de vérité = tables d'interactions correspondantes.
     likeCount: v.number(),
     commentCount: v.number(),
     shareCount: v.number(),
     viewCount: v.number(),
-    duration: v.optional(v.number()),
-    isActive: v.boolean(),
+    saveCount: v.number(),
+
+    // ─── ÉTAT ──────────────────────────────────────────────────
+    isActive: v.boolean(), // visible dans le feed
+    isDeleted: v.boolean(), // soft delete, audit + restauration possible
+    isPinned: v.boolean(), // épinglé sur le profil créateur
+
+    visibility: v.union(
+      v.literal("public"),
+      v.literal("followers"),
+      v.literal("private"),
+    ),
+
+    moderationStatus: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+
+    // ─── DÉCOUVERTE ────────────────────────────────────────────
     city: v.optional(v.string()),
+
+    // ─── VERSIONING ────────────────────────────────────────────
+    schemaVersion: v.number(),
+    createdAt: v.number(), // timestamp ms
+    updatedAt: v.number(), // timestamp ms
   })
     .index("by_author", ["authorId"])
     .index("by_active", ["isActive"])
-    .index("by_city_active", ["city", "isActive"]),
+    .index("by_city_active", ["city", "isActive"])
+    .index("by_active_createdAt", ["isActive", "createdAt"])
+    .index("by_author_active_createdAt", ["authorId", "isActive", "createdAt"])
+    .index("by_city_active_createdAt", ["city", "isActive", "createdAt"])
+    .index("by_moderationStatus", ["moderationStatus"])
+
+    // ─── INDEX FEED PRODUCTION ────────────────────────────────
+    //
+    // Permet de paginer directement les vidéos :
+    //   moderationStatus = approved
+    //   isActive = true
+    //
+    // Cela évite de récupérer des vidéos pending/rejected puis
+    // de les supprimer après pagination.
+    //
+    // C'est important pour garantir une pagination Convex correcte
+    // lorsque le feed contient beaucoup de contenus en attente
+    // de modération.
+    .index("by_moderation_active_createdAt", [
+      "moderationStatus",
+      "isActive",
+      "createdAt",
+    ])
+
+    // ─── INDEX FEED LOCAL PRODUCTION ──────────────────────────
+    //
+    // Même principe que l'index précédent, avec filtrage par ville.
+    //
+    // Utilisation :
+    //   city = ville du feed
+    //   moderationStatus = approved
+    //   isActive = true
+    //
+    // Permet au Home/Reels de récupérer directement les contenus
+    // approuvés et actifs de la ville demandée.
+    .index("by_city_moderation_active_createdAt", [
+      "city",
+      "moderationStatus",
+      "isActive",
+      "createdAt",
+    ]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // REELS — LIKES VIDÉO
+  // ═══════════════════════════════════════════════════════════════
 
   shortVideoLikes: defineTable({
     videoId: v.id("shortVideos"),
     userId: v.id("users"),
+    likedAt: v.number(),
   })
     .index("by_video", ["videoId"])
+    .index("by_user", ["userId"])
     .index("by_user_and_video", ["userId", "videoId"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // REELS — COMMENTAIRES
+  // ═══════════════════════════════════════════════════════════════
 
   shortVideoComments: defineTable({
     videoId: v.id("shortVideos"),
     userId: v.id("users"),
     text: v.string(),
+
+    // ─── Threading ─────────────────────────────────────────────
+    // absent → commentaire racine
+    // présent → réponse à un commentaire parent
+    parentCommentId: v.optional(v.id("shortVideoComments")),
+
+    // ─── COMPTEURS ─────────────────────────────────────────────
     likeCount: v.number(),
+    replyCount: v.number(),
+
+    // ─── ÉTAT ──────────────────────────────────────────────────
+    isDeleted: v.boolean(),
+
+    moderationStatus: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+
+    // ─── TIMESTAMPS ────────────────────────────────────────────
+    createdAt: v.number(),
+    updatedAt: v.number(),
   })
     .index("by_video", ["videoId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_video_createdAt", ["videoId", "createdAt"])
+    .index("by_parent", ["parentCommentId"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // REELS — LIKES DES COMMENTAIRES
+  // ═══════════════════════════════════════════════════════════════
+
+  shortVideoCommentLikes: defineTable({
+    commentId: v.id("shortVideoComments"),
+    videoId: v.id("shortVideos"),
+    userId: v.id("users"),
+    likedAt: v.number(),
+  })
+    .index("by_comment", ["commentId"])
+    .index("by_user", ["userId"])
+    .index("by_user_and_comment", ["userId", "commentId"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // REELS — SAUVEGARDES / FAVORIS
+  // ═══════════════════════════════════════════════════════════════
+
+  shortVideoSaves: defineTable({
+    videoId: v.id("shortVideos"),
+    userId: v.id("users"),
+    savedAt: v.number(),
+  })
+    .index("by_video", ["videoId"])
+    .index("by_user", ["userId"])
+    .index("by_user_and_video", ["userId", "videoId"])
+    .index("by_user_savedAt", ["userId", "savedAt"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // REELS — PARTAGES
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // Plusieurs événements de partage sont autorisés pour une même
+  // combinaison user + vidéo.
+  //
+  // Exemples de channel :
+  //   copy_link
+  //   whatsapp
+  //   instagram
+  //   native
+  //   sms
+  //   etc.
+  // ═══════════════════════════════════════════════════════════════
+
+  shortVideoShares: defineTable({
+    videoId: v.id("shortVideos"),
+
+    // Optionnel : partage hors application.
+    userId: v.optional(v.id("users")),
+
+    // Canal utilisé.
+    channel: v.optional(v.string()),
+
+    sharedAt: v.number(),
+  })
+    .index("by_video", ["videoId"])
+    .index("by_user", ["userId"])
+    .index("by_video_sharedAt", ["videoId", "sharedAt"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // REELS — VUES / WATCH TIME
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // Les utilisateurs anonymes peuvent générer des vues via sessionId.
+  // watchedMs permet au backend de déterminer si le seuil de vue est
+  // atteint. counted indique si cette vue a déjà été comptabilisée.
+  // ═══════════════════════════════════════════════════════════════
+
+  shortVideoViews: defineTable({
+    videoId: v.id("shortVideos"),
+
+    // Optionnel : utilisateur authentifié.
+    userId: v.optional(v.id("users")),
+
+    // Identifiant de session pour utilisateur anonyme.
+    sessionId: v.optional(v.string()),
+
+    // Durée de visionnage cumulée en millisecondes.
+    watchedMs: v.number(),
+
+    // Vidéo regardée jusqu'au bout.
+    completed: v.boolean(),
+
+    // Vue ayant atteint le seuil de comptabilisation.
+    counted: v.boolean(),
+
+    viewedAt: v.number(),
+  })
+    .index("by_video", ["videoId"])
+    .index("by_user", ["userId"])
+    .index("by_video_and_user", ["videoId", "userId"])
+    .index("by_session", ["sessionId"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // REELS — SIGNALEMENTS / MODÉRATION
+  // ═══════════════════════════════════════════════════════════════
+
+  shortVideoReports: defineTable({
+    videoId: v.id("shortVideos"),
+    reporterId: v.id("users"),
+
+    reason: v.union(
+      v.literal("spam"),
+      v.literal("nudity"),
+      v.literal("violence"),
+      v.literal("harassment"),
+      v.literal("misinformation"),
+      v.literal("copyright"),
+      v.literal("other"),
+    ),
+
+    details: v.optional(v.string()),
+
+    status: v.union(
+      v.literal("open"),
+      v.literal("reviewing"),
+      v.literal("resolved"),
+      v.literal("dismissed"),
+    ),
+
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+
+    createdAt: v.number(),
+  })
+    .index("by_video", ["videoId"])
+    .index("by_reporter", ["reporterId"])
+    .index("by_status", ["status"])
+    .index("by_status_createdAt", ["status", "createdAt"]),
 
   userDocuments: defineTable({
     userId: v.id("users"),

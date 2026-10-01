@@ -1,79 +1,120 @@
-import { View } from "react-native";
-import type { ReactNode } from "react";
+import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import { useEffect, type ReactNode } from "react";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+
 type TransitionVariant = "slide-up" | "slide-left" | "fade" | "scale";
 
 interface PageTransitionProps {
   children: ReactNode;
   variant?: TransitionVariant;
+}
+
+interface StaggerContainerProps {
+  children: ReactNode;
   className?: string;
 }
 
-const VARIANTS: Record<
-  TransitionVariant,
-  { initial: Record<string, unknown>; animate: Record<string, unknown>; exit: Record<string, unknown> }
-> = {
-  "slide-up": {
-    initial: { opacity: 0, y: 32 },
-    animate: { opacity: 1, y: 0 },
-    exit:    { opacity: 0, y: -16 },
-  },
-  "slide-left": {
-    initial: { opacity: 0, x: 40 },
-    animate: { opacity: 1, x: 0 },
-    exit:    { opacity: 0, x: -24 },
-  },
-  "fade": {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit:    { opacity: 0 },
-  },
-  "scale": {
-    initial: { opacity: 0, scale: 0.96 },
-    animate: { opacity: 1, scale: 1 },
-    exit:    { opacity: 0, scale: 0.98 },
-  },
-};
+interface StaggerItemProps {
+  children: ReactNode;
+  className?: string;
+  index?: number;
+}
 
-const TRANSITION = {
-  duration: 0.32,
-  ease: [0.22, 1, 0.36, 1] as const,
-};
+interface PressMotionProps {
+  children: ReactNode;
+  className?: string;
+  onClick?: () => void;
+}
 
-// Spring transition for scale variant
-const SPRING_TRANSITION = {
-  type: "spring" as const,
-  stiffness: 380,
-  damping: 30,
-};
+const ENTER_DURATION = 320;
+const STAGGER_DELAY = 60;
+const INITIAL_CHILD_DELAY = 50;
+const ENTER_EASING = Easing.bezier(0.22, 1, 0.36, 1);
+const PAGE_SPRING = { damping: 30, stiffness: 380, mass: 0.8 };
+const PRESS_SPRING = { damping: 18, stiffness: 420, mass: 0.55 };
 
+function getInitialState(variant: TransitionVariant) {
+  switch (variant) {
+    case "slide-up":
+      return { opacity: 0, translateX: 0, translateY: 32, scale: 1 };
+    case "slide-left":
+      return { opacity: 0, translateX: 40, translateY: 0, scale: 1 };
+    case "fade":
+      return { opacity: 0, translateX: 0, translateY: 0, scale: 1 };
+    case "scale":
+      return { opacity: 0, translateX: 0, translateY: 0, scale: 0.96 };
+  }
+}
+
+/**
+ * IMPORTANT : pas de `className` ici.
+ * NativeWind injecte `height: 100%` via `h-full`, qui écrase `flex: 1`
+ * quand le parent n'a pas de hauteur explicite → composant invisible.
+ */
 export default function PageTransition({
   children,
   variant = "slide-left",
-  className = "h-full w-full",
 }: PageTransitionProps) {
-  const v = VARIANTS[variant];
-  const transition = variant === "scale" ? SPRING_TRANSITION : TRANSITION;
+  const initial = getInitialState(variant);
+
+  const opacity = useSharedValue(initial.opacity);
+  const translateX = useSharedValue(initial.translateX);
+  const translateY = useSharedValue(initial.translateY);
+  const scale = useSharedValue(initial.scale);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  useEffect(() => {
+    opacity.value = withTiming(1, {
+      duration: ENTER_DURATION,
+      easing: ENTER_EASING,
+    });
+
+    if (variant === "scale") {
+      scale.value = withSpring(1, PAGE_SPRING);
+      return;
+    }
+
+    translateX.value = withTiming(0, {
+      duration: ENTER_DURATION,
+      easing: ENTER_EASING,
+    });
+
+    translateY.value = withTiming(0, {
+      duration: ENTER_DURATION,
+      easing: ENTER_EASING,
+    });
+  }, [opacity, scale, translateX, translateY, variant]);
+
   return (
-    <View className={className} initial={v.initial} animate={v.animate} exit={v.exit} transition={transition}>
-      {children}
+    <View style={styles.fill}>
+      <Animated.View style={[styles.fill, animatedStyle]}>
+        {children}
+      </Animated.View>
     </View>
   );
 }
 
-// ── Staggered list container ──────────────────────────────────────────────────
-
 export function StaggerContainer({
   children,
   className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+}: StaggerContainerProps) {
   return (
-    <View className={className} initial="hidden" animate="visible" variants={{
-        hidden: {},
-        visible: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
-      }}>
+    <View className={className} style={styles.staggerContainer}>
       {children}
     </View>
   );
@@ -82,38 +123,78 @@ export function StaggerContainer({
 export function StaggerItem({
   children,
   className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+  index = 0,
+}: StaggerItemProps) {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(18);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  useEffect(() => {
+    const delay = INITIAL_CHILD_DELAY + Math.max(0, index) * STAGGER_DELAY;
+
+    opacity.value = withDelay(
+      delay,
+      withTiming(1, { duration: ENTER_DURATION, easing: ENTER_EASING }),
+    );
+
+    translateY.value = withDelay(
+      delay,
+      withTiming(0, { duration: ENTER_DURATION, easing: ENTER_EASING }),
+    );
+  }, [index, opacity, translateY]);
+
   return (
-    <View className={className} variants={{
-        hidden: { opacity: 0, y: 18 },
-        visible: {
-          opacity: 1,
-          y: 0,
-          transition: { duration: 0.32, ease: [0.25, 0.46, 0.45, 0.94] as const },
-        },
-      }}>
+    <Animated.View className={className} style={animatedStyle}>
       {children}
-    </View>
+    </Animated.View>
   );
 }
-
-// ── Micro-interaction button wrapper ─────────────────────────────────────────
 
 export function PressMotion({
   children,
   className = "",
   onClick,
-}: {
-  children: ReactNode;
-  className?: string;
-  onClick?: () => void;
-}) {
+}: PressMotionProps) {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.97, PRESS_SPRING);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, PRESS_SPRING);
+  };
+
   return (
-    <View className={className} whileTap={{ scale: 0.93 }} whileHover={{ scale: 1.03 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} onPress={onClick}>
-      {children}
-    </View>
+    <Pressable
+      className={className}
+      onPress={onClick}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      accessibilityRole="button"
+    >
+      <Animated.View style={animatedStyle}>{children}</Animated.View>
+    </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: {
+    flex: 1,
+    width: "100%",
+    minHeight: 0,
+  } satisfies ViewStyle,
+
+  staggerContainer: {
+    width: "100%",
+    minHeight: 0,
+  },
+});

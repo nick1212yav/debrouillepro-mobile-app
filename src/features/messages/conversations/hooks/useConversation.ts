@@ -9,20 +9,10 @@ import conversationsService, {
 
 export function useConversation(
   conversationId: Id<"conversations"> | null | undefined,
-
   currentUserId?: Id<"users"> | null,
 ) {
   const conversation = useQuery(
     api.messages.conversations.get,
-    conversationId
-      ? {
-          conversationId,
-        }
-      : "skip",
-  );
-
-  const unreadCount = useQuery(
-    api.messages.conversations.getUnreadCountForConversation,
     conversationId
       ? {
           conversationId,
@@ -38,12 +28,17 @@ export function useConversation(
     ? conversationsService.toPreview(normalizedConversation, currentUserId)
     : null;
 
+  const unreadCount =
+    normalizedConversation?.members?.find(
+      (member) => member.userId === currentUserId,
+    )?.unreadCount ?? 0;
+
   return {
     conversation: normalizedConversation,
 
     preview,
 
-    unreadCount: unreadCount ?? 0,
+    unreadCount,
 
     title: normalizedConversation
       ? conversationsService.getTitle(normalizedConversation, currentUserId)
@@ -53,7 +48,7 @@ export function useConversation(
       ? conversationsService.getAvatar(normalizedConversation, currentUserId)
       : null,
 
-    isLoading: conversation === undefined || unreadCount === undefined,
+    isLoading: conversation === undefined,
   };
 }
 

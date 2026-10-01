@@ -22,32 +22,55 @@ export interface HomeReelsProps {
 
 const PAGE_SIZE = 8;
 
+/**
+ * Contrat backend `shortVideos.list` (v1.0).
+ *
+ * Le backend résout le Storage ID en URL HTTP publique avant
+ * d'exposer la donnée. Deux clés sont disponibles :
+ *
+ *   thumbnailUrlResolved → URL HTTP publique (Storage ou legacy)
+ *   thumbnailUrl         → champ legacy conservé du schéma (fallback)
+ *
+ * On privilégie `thumbnailUrlResolved`, puis on retombe sur
+ * `thumbnailUrl` si le backend expose encore l'ancienne clé.
+ */
 type ReelItem = {
   _id: string;
-  title?: string;
-  description?: string;
-  thumbnailUrl?: string;
-  videoUrl?: string;
+  caption: string;
+  thumbnailUrl: string | null;
+  viewCount: number;
+};
+
+type BackendReel = {
+  _id: string;
+  caption?: string;
+  thumbnailUrlResolved?: string | null;
+  thumbnailUrl?: string | null;
   viewCount?: number;
 };
 
-function getDisplayTitle(
-  title: string | undefined,
-  description: string | undefined,
-): string {
-  const normalizedTitle = title?.trim();
-
-  if (normalizedTitle) {
-    return normalizedTitle;
+function resolveThumbnail(item: BackendReel): string | null {
+  if (
+    typeof item.thumbnailUrlResolved === "string" &&
+    item.thumbnailUrlResolved.trim().length > 0
+  ) {
+    return item.thumbnailUrlResolved;
   }
 
-  const normalizedDescription = description?.trim();
-
-  if (normalizedDescription) {
-    return normalizedDescription;
+  if (
+    typeof item.thumbnailUrl === "string" &&
+    item.thumbnailUrl.trim().length > 0
+  ) {
+    return item.thumbnailUrl;
   }
 
-  return "Découvrir ce Reel";
+  return null;
+}
+
+function getDisplayTitle(caption: string | undefined): string {
+  const normalized = caption?.trim();
+
+  return normalized && normalized.length > 0 ? normalized : "Découvrir ce Reel";
 }
 
 function formatViews(value: number | undefined): string {
@@ -80,13 +103,12 @@ interface ReelCardProps {
 }
 
 const ReelCard = memo(function ReelCard({ item, onPress }: ReelCardProps) {
-  const title = getDisplayTitle(item.title, item.description);
   const views = formatViews(item.viewCount);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={item.caption}
       accessibilityHint="Ouvre ce Reel"
       onPress={onPress}
       style={({ pressed }) =>
@@ -97,7 +119,7 @@ const ReelCard = memo(function ReelCard({ item, onPress }: ReelCardProps) {
         {item.thumbnailUrl ? (
           <Image
             source={{ uri: item.thumbnailUrl }}
-            accessibilityLabel={title}
+            accessibilityLabel={item.caption}
             resizeMode="cover"
             style={styles.thumbnail}
           />
@@ -127,7 +149,7 @@ const ReelCard = memo(function ReelCard({ item, onPress }: ReelCardProps) {
 
         <View style={styles.caption}>
           <Text numberOfLines={2} style={styles.captionText}>
-            {title}
+            {item.caption}
           </Text>
         </View>
       </View>
@@ -215,11 +237,11 @@ function HomeReelsComponent({ onNavigate, city }: HomeReelsProps) {
    *
    * Si elle existe :
    *   → shortVideos.list({ city })
-   *   → backend filtré sur city + isActive
+   *   → backend filtré sur city + moderationStatus approved + isActive
    *
    * Si elle n'existe pas :
    *   → shortVideos.list({})
-   *   → feed global honnête
+   *   → feed global
    */
   const normalizedCity = useMemo(() => {
     const value = city?.trim();
@@ -303,13 +325,28 @@ function HomeReelsComponent({ onNavigate, city }: HomeReelsProps) {
         decelerationRate="fast"
         contentContainerStyle={styles.row}
       >
-        {results.map((item) => (
-          <ReelCard
-            key={item._id}
-            item={item as ReelItem}
-            onPress={() => handleOpenReel(item._id)}
-          />
-        ))}
+        {results.map((raw) => {
+          const item = raw as unknown as BackendReel;
+
+          const reel: ReelItem = {
+            _id: String(item._id),
+            caption: getDisplayTitle(item.caption),
+            thumbnailUrl: resolveThumbnail(item),
+            viewCount:
+              typeof item.viewCount === "number" &&
+              Number.isFinite(item.viewCount)
+                ? item.viewCount
+                : 0,
+          };
+
+          return (
+            <ReelCard
+              key={reel._id}
+              item={reel}
+              onPress={() => handleOpenReel(reel._id)}
+            />
+          );
+        })}
 
         {isLoadingMore ? (
           <View

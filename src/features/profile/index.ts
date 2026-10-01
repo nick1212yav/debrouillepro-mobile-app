@@ -11,8 +11,8 @@ export { EditProfileSheet } from "./components/EditProfileSheet";
 export { CompletionBar } from "./components/CompletionBar";
 export { ActivityTimeline } from "./components/ActivityTimeline";
 export { RecentsTab } from "./components/RecentsTab";
+export { SocialLinksSheet } from "./components/SocialLinksSheet"; // ⬅️ AJOUT
 
-// Sous-composants pour les profils publics et abonnements
 export { Avatar } from "./components/Avatar";
 export { FollowButton } from "./components/FollowButton";
 export { MiniPubCard } from "./components/MiniPubCard";

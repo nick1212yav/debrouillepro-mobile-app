@@ -1,6 +1,4 @@
-import { View, Text } from "react-native";
-
-// src/features/messages/chat/components/ChatView.tsx
+import { Text, View } from "react-native";
 
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -17,7 +15,6 @@ interface ChatViewProps {
   onBack?: () => void;
   onInfo?: () => void;
 
-  // Appels
   onCall?: () => void;
   onVideoCall?: () => void;
 }
@@ -32,27 +29,82 @@ export function ChatView({
 }: ChatViewProps) {
   const chat = useChat(conversationId, currentUserId);
 
-  // ==========================================================================
-  // LOADING
-  // ==========================================================================
-
   if (chat.isLoading) {
     return (
-      <View className="flex h-full min-h-0 flex-col overflow-hidden bg-black text-white" accessibilityLabel="Conversation">{}<View className="flex shrink-0 items-center gap-3 border-b border-white/[0.08] bg-black/80 px-4 py-3 backdrop-blur-xl"><View className="h-9 w-9 animate-pulse rounded-full bg-white/[0.06]" /><View className="flex min-w-0 flex-1 items-center gap-3"><View className="h-11 w-11 animate-pulse rounded-full bg-white/[0.06]" /><View className="space-y-2"><View className="h-3 w-28 animate-pulse rounded-full bg-white/[0.08]" /><View className="h-2 w-20 animate-pulse rounded-full bg-white/[0.05]" /></View></View><View className="flex gap-1"><View className="h-9 w-9 animate-pulse rounded-full bg-white/[0.05]" /><View className="h-9 w-9 animate-pulse rounded-full bg-white/[0.05]" /><View className="h-9 w-9 animate-pulse rounded-full bg-white/[0.05]" /></View></View>{}<View className="flex min-h-0 flex-1 flex-col justify-end gap-3 overflow-hidden px-4 py-5"><View className="flex justify-start"><View className="h-12 w-44 animate-pulse rounded-2xl bg-white/[0.05]" /></View><View className="flex justify-end"><View className="h-16 w-56 animate-pulse rounded-2xl bg-white/[0.07]" /></View><View className="flex justify-start"><View className="h-20 w-64 animate-pulse rounded-2xl bg-white/[0.05]" /></View><View className="flex justify-end"><View className="h-12 w-36 animate-pulse rounded-2xl bg-white/[0.07]" /></View></View>{}<View className="shrink-0 border-t border-white/[0.08] bg-black px-3 pb-3 pt-2"><View className="h-14 animate-pulse rounded-[22px] border border-white/[0.06] bg-white/[0.03]" /></View><View className="pointer-events-none absolute inset-0 flex items-center justify-center"><View className="rounded-2xl border border-white/[0.08] bg-black/80 px-5 py-3 text-sm text-white/40 shadow-2xl backdrop-blur-xl"><Text>Chargement de la conversation...</Text></View></View></View>
+      <View
+        className="flex-1 min-h-0 h-full overflow-hidden bg-black"
+        accessibilityLabel="Chargement de la conversation"
+        accessibilityState={{ busy: true }}
+      >
+        {/* HEADER SKELETON */}
+        <View className="shrink-0 border-b border-white/[0.08] bg-black/95 px-3 py-3">
+          <View className="flex-row items-center gap-3">
+            <View className="h-10 w-10 rounded-full bg-white/[0.06]" />
+
+            <View className="flex-1 flex-row items-center gap-3">
+              <View className="h-11 w-11 rounded-full bg-white/[0.07]" />
+
+              <View className="min-w-0 flex-1 gap-2">
+                <View className="h-4 w-32 rounded-full bg-white/[0.08]" />
+                <View className="h-3 w-20 rounded-full bg-white/[0.05]" />
+              </View>
+            </View>
+
+            <View className="flex-row items-center gap-1">
+              <View className="h-10 w-10 rounded-full bg-white/[0.05]" />
+              <View className="h-10 w-10 rounded-full bg-white/[0.05]" />
+              <View className="h-10 w-10 rounded-full bg-white/[0.05]" />
+            </View>
+          </View>
+        </View>
+
+        {/* MESSAGE SKELETON */}
+        <View className="min-h-0 flex-1 justify-end px-4 py-5">
+          <View className="gap-3">
+            <View className="self-start rounded-2xl rounded-bl-md bg-white/[0.05] px-5 py-4">
+              <View className="h-3 w-36 rounded-full bg-white/[0.06]" />
+            </View>
+
+            <View className="self-end rounded-2xl rounded-br-md bg-white/[0.07] px-5 py-4">
+              <View className="h-3 w-48 rounded-full bg-white/[0.08]" />
+              <View className="mt-2 h-3 w-24 rounded-full bg-white/[0.05]" />
+            </View>
+
+            <View className="self-start rounded-2xl rounded-bl-md bg-white/[0.05] px-5 py-4">
+              <View className="h-3 w-56 rounded-full bg-white/[0.06]" />
+              <View className="mt-2 h-3 w-32 rounded-full bg-white/[0.05]" />
+            </View>
+
+            <View className="self-end rounded-2xl rounded-br-md bg-white/[0.07] px-5 py-4">
+              <View className="h-3 w-40 rounded-full bg-white/[0.08]" />
+            </View>
+          </View>
+        </View>
+
+        {/* COMPOSER SKELETON */}
+        <View className="shrink-0 border-t border-white/[0.08] bg-black px-3 pb-3 pt-2">
+          <View className="h-14 rounded-[22px] border border-white/[0.06] bg-white/[0.03]" />
+        </View>
+
+        <View className="pointer-events-none absolute inset-0 items-center justify-center">
+          <View className="rounded-2xl border border-white/[0.08] bg-black/90 px-5 py-3">
+            <Text className="text-sm font-medium text-white/50">
+              Chargement de la conversation…
+            </Text>
+          </View>
+        </View>
+      </View>
     );
   }
 
-  // ==========================================================================
-  // CHAT
-  // ==========================================================================
-
   return (
-    <View className="relative flex h-full min-h-0 flex-col overflow-hidden bg-black text-white" accessibilityLabel={chat.title || "Conversation"}>
-      {/* ================================================================== */}
-      {/* HEADER                                                             */}
-      {/* ================================================================== */}
-
-      <View className="relative z-20 shrink-0">
+    <View
+      className="flex-1 min-h-0 h-full overflow-hidden bg-black"
+      style={{ height: "100%" }}
+      accessibilityLabel={chat.title?.trim() || "Conversation"}
+    >
+      {/* HEADER */}
+      <View className="z-20 shrink-0 border-b border-white/[0.08] bg-black/95">
         <ChatHeader
           conversationId={conversationId}
           title={chat.title}
@@ -66,11 +118,8 @@ export function ChatView({
         />
       </View>
 
-      {/* ================================================================== */}
-      {/* MESSAGES                                                           */}
-      {/* ================================================================== */}
-
-      <View className="relative min-h-0 flex-1 overflow-hidden">
+      {/* MESSAGES */}
+      <View className="min-h-0 flex-1 bg-black">
         <MessagesArea
           messages={chat.messages}
           currentUserId={currentUserId}
@@ -80,36 +129,10 @@ export function ChatView({
         />
       </View>
 
-      {/* ================================================================== */}
-      {/* COMPOSER                                                           */}
-      {/* ================================================================== */}
-
-      <View className="relative z-20 shrink-0">
+      {/* COMPOSER */}
+      <View className="z-20 shrink-0 border-t border-white/[0.08] bg-black">
         <MessageComposer conversationId={conversationId} />
       </View>
-
-      {/* ================================================================== */}
-      {/* CALL / MEDIA / FORWARD OVERLAYS                                    */}
-      {/* ================================================================== */}
-      {/*
-       * Les overlays seront montés ici lorsqu'ils seront raccordés
-       * à leurs hooks respectifs :
-       *
-       * - IncomingCall
-       * - OutgoingCall
-       * - ActiveCall
-       * - MinimizedCall
-       * - AttachmentPreview
-       * - VoiceRecorder
-       * - MediaViewer
-       * - ForwardDialog
-       *
-       * On ne les instancie pas artificiellement ici tant que leurs
-       * contrats de props ne sont pas définis dans le projet.
-       *
-       * ChatView reste ainsi le point central d'orchestration sans
-       * casser le typage ou créer de fausses dépendances.
-       */}
     </View>
   );
 }

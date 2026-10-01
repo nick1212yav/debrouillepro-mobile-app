@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   Share,
@@ -13,18 +13,21 @@ import {
 import {
   ArrowLeft,
   BadgeCheck,
-  CheckCircle2,
-  ChevronRight,
   FileText,
   Globe2,
   Grid3X3,
+  Instagram,
+  Link2,
+  Linkedin,
   Lock,
   MapPin,
+  Play,
+  Send,
   Share2,
   ShieldCheck,
   Sparkles,
-  UserPlus,
-  Users,
+  Twitter,
+  Youtube,
 } from "lucide-react-native";
 
 import { useQuery } from "convex/react";
@@ -48,20 +51,55 @@ interface PublicProfilePageProps {
   onBack: () => void;
 }
 
+type IconComponent = React.ComponentType<{
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}>;
+
+type SocialLink = {
+  key: string;
+  label: string;
+  url: string;
+  icon: IconComponent;
+};
+
+type PublicLocation = {
+  city?: string | null;
+  province?: string | null;
+  country?: string | null;
+};
+
+type PublicSocialLinks = {
+  facebook?: string;
+  twitter?: string;
+  linkedin?: string;
+  instagram?: string;
+  youtube?: string;
+  tiktok?: string;
+  whatsapp?: string;
+  telegram?: string;
+};
+
 type PublicProfile = {
   _id?: Id<"users">;
+  _creationTime?: number;
   name?: string | null;
+  slug?: string | null;
   avatar?: string | null;
   bio?: string | null;
+  headline?: string | null;
   city?: string | null;
   country?: string | null;
+  publicLocation?: PublicLocation | null;
+  website?: string | null;
   interests?: string[];
   roles?: string[];
+  socialLinks?: PublicSocialLinks | null;
   followerCount?: number;
   followingCount?: number;
   publicationCount?: number;
   isFollowedByMe?: boolean;
-  coverImage?: string | null;
   coverUrl?: string | null;
 };
 
@@ -79,6 +117,88 @@ function formatCompact(value: number | undefined): string {
   }
 
   return String(value);
+}
+
+function normalizeSocialLinks(
+  socialLinks: PublicSocialLinks | null | undefined,
+): SocialLink[] {
+  if (!socialLinks) {
+    return [];
+  }
+
+  const candidates: Array<{
+    key: string;
+    label: string;
+    url: string | undefined;
+    icon: IconComponent;
+  }> = [
+    {
+      key: "instagram",
+      label: "Instagram",
+      url: socialLinks.instagram,
+      icon: Instagram,
+    },
+    {
+      key: "linkedin",
+      label: "LinkedIn",
+      url: socialLinks.linkedin,
+      icon: Linkedin,
+    },
+    {
+      key: "twitter",
+      label: "X / Twitter",
+      url: socialLinks.twitter,
+      icon: Twitter,
+    },
+    {
+      key: "youtube",
+      label: "YouTube",
+      url: socialLinks.youtube,
+      icon: Youtube,
+    },
+    {
+      key: "facebook",
+      label: "Facebook",
+      url: socialLinks.facebook,
+      icon: Send,
+    },
+    {
+      key: "tiktok",
+      label: "TikTok",
+      url: socialLinks.tiktok,
+      icon: Play,
+    },
+    {
+      key: "whatsapp",
+      label: "WhatsApp",
+      url: socialLinks.whatsapp,
+      icon: Send,
+    },
+    {
+      key: "telegram",
+      label: "Telegram",
+      url: socialLinks.telegram,
+      icon: Send,
+    },
+  ];
+
+  return candidates
+    .filter(
+      (
+        item,
+      ): item is {
+        key: string;
+        label: string;
+        url: string;
+        icon: IconComponent;
+      } => typeof item.url === "string" && item.url.trim().length > 0,
+    )
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      url: item.url.trim(),
+      icon: item.icon,
+    }));
 }
 
 function StatChip({
@@ -175,12 +295,31 @@ function PublicProfileInner({ userId, onBack }: PublicProfilePageProps) {
 
   const bio = profile?.bio?.trim() || null;
 
-  const location = [profile?.city, profile?.country]
-    .filter(
-      (value): value is string =>
-        typeof value === "string" && value.trim().length > 0,
-    )
-    .join(", ");
+  const headline = profile?.headline?.trim() || null;
+
+  const slug = profile?.slug?.trim() || null;
+
+  /*
+   * Localisation canonique :
+   *  1. publicLocation (contrat profil public)
+   *  2. fallback city / country plats (compat historique)
+   * On ne fabrique aucune coordonnée. On n'expose rien de privé.
+   */
+  const location = useMemo(() => {
+    const source: PublicLocation | undefined = profile?.publicLocation ?? {
+      city: profile?.city ?? undefined,
+      country: profile?.country ?? undefined,
+    };
+
+    return [source?.city, source?.province, source?.country]
+      .filter(
+        (value): value is string =>
+          typeof value === "string" && value.trim().length > 0,
+      )
+      .map((value) => value.trim())
+      .filter((value, index, values) => values.indexOf(value) === index)
+      .join(", ");
+  }, [profile?.publicLocation, profile?.city, profile?.country]);
 
   const interests = useMemo(
     () =>
@@ -193,25 +332,53 @@ function PublicProfileInner({ userId, onBack }: PublicProfilePageProps) {
     [profile?.interests],
   );
 
-  const coverUri = profile?.coverImage || profile?.coverUrl || null;
+  const socialLinks = useMemo(
+    () => normalizeSocialLinks(profile?.socialLinks),
+    [profile?.socialLinks],
+  );
+
+  /*
+   * `coverUrl` est la SEULE source canonique d'affichage.
+   * `coverImage` (storage ID) n'est jamais rendu directement.
+   */
+  const coverUri =
+    typeof profile?.coverUrl === "string" && profile.coverUrl.trim().length > 0
+      ? profile.coverUrl
+      : null;
+
+  const websiteUrl =
+    typeof profile?.website === "string" && profile.website.trim().length > 0
+      ? profile.website.trim()
+      : null;
 
   const handleShare = async () => {
     if (!profile) {
       return;
     }
 
+    const reference = slug ? `@${slug}` : displayName;
+
     try {
-      /*
-       * On ne fabrique pas d'URL publique.
-       * Le partage utilise uniquement les informations
-       * réellement disponibles.
-       */
       await Share.share({
         title: displayName,
-        message: `Découvrez le profil de ${displayName} sur DébrouillePro.`,
+        message: `Découvrez le profil de ${displayName} sur DébrouillePro : ${reference}`,
       });
     } catch (error) {
       console.error("PublicProfile.share:", error);
+    }
+  };
+
+  const openLink = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+
+      if (!supported) {
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error("PublicProfile.openLink:", error);
     }
   };
 
@@ -228,6 +395,7 @@ function PublicProfileInner({ userId, onBack }: PublicProfilePageProps) {
 
         <Pressable
           onPress={onBack}
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.primaryButton,
             pressed && styles.pressed,
@@ -255,9 +423,7 @@ function PublicProfileInner({ userId, onBack }: PublicProfilePageProps) {
         <View style={styles.cover}>
           {coverUri ? (
             <Image
-              source={{
-                uri: coverUri,
-              }}
+              source={{ uri: coverUri }}
               style={styles.coverImage}
               resizeMode="cover"
               accessibilityLabel="Couverture du profil"
@@ -357,10 +523,15 @@ function PublicProfileInner({ userId, onBack }: PublicProfilePageProps) {
                 <RoleBadge role={role} />
               </View>
 
+              {/* HEADLINE */}
+              {headline ? (
+                <Text style={styles.headline}>{headline}</Text>
+              ) : null}
+
               {/* BIO */}
               {bio ? <Text style={styles.bio}>{bio}</Text> : null}
 
-              {/* LOCATION */}
+              {/* LOCATION + WEBSITE */}
               <View style={styles.metaRow}>
                 {location ? (
                   <View style={styles.metaItem}>
@@ -370,6 +541,29 @@ function PublicProfileInner({ userId, onBack }: PublicProfilePageProps) {
                       {location}
                     </Text>
                   </View>
+                ) : null}
+
+                {websiteUrl ? (
+                  <Pressable
+                    onPress={() => {
+                      void openLink(websiteUrl);
+                    }}
+                    accessibilityRole="link"
+                    accessibilityLabel="Ouvrir le site web"
+                    style={({ pressed }) => [
+                      styles.metaItem,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Link2 size={13} color="#60a5fa" />
+
+                    <Text
+                      style={[styles.metaText, styles.metaLink]}
+                      numberOfLines={1}
+                    >
+                      {websiteUrl}
+                    </Text>
+                  </Pressable>
                 ) : null}
 
                 <View style={styles.metaItem}>
@@ -405,6 +599,41 @@ function PublicProfileInner({ userId, onBack }: PublicProfilePageProps) {
                   label="Publications"
                 />
               </View>
+
+              {/* =================================================
+                  SOCIAL LINKS
+              ================================================== */}
+
+              {socialLinks.length > 0 ? (
+                <View style={styles.socialSection}>
+                  <View style={styles.sectionHeading}>
+                    <Link2 size={14} color="#a78bfa" />
+
+                    <Text style={styles.sectionHeadingText}>Liens publics</Text>
+                  </View>
+
+                  <View style={styles.socialRow}>
+                    {socialLinks.map(({ key, label, url, icon: Icon }) => (
+                      <Pressable
+                        key={key}
+                        onPress={() => {
+                          void openLink(url);
+                        }}
+                        accessibilityRole="link"
+                        accessibilityLabel={`Ouvrir ${label}`}
+                        style={({ pressed }) => [
+                          styles.socialChip,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Icon size={14} color="#cbd5e1" />
+
+                        <Text style={styles.socialChipText}>{label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
 
               {/* =================================================
                   INTERESTS
@@ -671,6 +900,14 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
 
+  headline: {
+    color: "#cbd5e1",
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+
   roleBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -744,6 +981,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
 
+  metaLink: {
+    color: "#60a5fa",
+    textDecorationLine: "underline",
+  },
+
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -773,6 +1015,34 @@ const styles = StyleSheet.create({
     height: 28,
     backgroundColor: "rgba(255,255,255,0.08)",
     marginHorizontal: 6,
+  },
+
+  socialSection: {
+    marginBottom: 18,
+  },
+
+  socialRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+
+  socialChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 11,
+    backgroundColor: "rgba(139,92,246,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(139,92,246,0.20)",
+  },
+
+  socialChipText: {
+    color: "#cbd5e1",
+    fontSize: 11,
+    fontWeight: "700",
   },
 
   interestsSection: {

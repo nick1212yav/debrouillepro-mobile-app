@@ -1,28 +1,27 @@
 // src/pages/home/_components/OnboardingScreen.tsx
+
 import {
-  Pressable,
-  View,
-  Text,
-  TextInput,
-  ScrollView,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  StyleSheet,
-  Animated,
-  Easing,
-  useWindowDimensions,
+  Pressable,
+  ScrollView,
   StatusBar,
-  type ViewStyle,
-  type TextStyle,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
   type ImageStyle,
+  type TextStyle,
+  type ViewStyle,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ComponentType,
   type ReactNode,
@@ -52,12 +51,39 @@ import {
   WalletCards,
   Zap,
 } from "lucide-react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+
+/* ============================================================================
+ * CONSTANTS
+ * ========================================================================== */
 
 const ONBOARDING_KEY = "debrouille_onboarding_done";
 const ONBOARDING_PROFILE_KEY = "debrouille_onboarding_profile";
 
-// ── TYPES ────────────────────────────────────────────────────────────────
-interface OnboardingProfile {
+const TOTAL_STEPS = 3;
+
+const COUNTRY_CODES = `
+AF AX AL DZ AS AD AO AI AQ AG AR AM AW AU AT AZ
+BS BH BD BB BY BE BZ BJ BM BT BO BQ BA BW BV BR IO BN BG BF BI CV KH CM CA KY CF TD CL CN CX CC CO KM CG CD CK CR CI HR CU CW CY CZ DK DJ DM DO EC EG SV GQ ER EE SZ ET FK FO FJ FI FR GF PF TF GA GM GE DE GH GI GR GL GD GP GU GT GG GN GW GY HT HM VA HN HK HU IS IN ID IR IQ IE IM IL IT JM JP JE JO KZ KE KI KP KR KW KG LA LV LB LS LR LY LI LT LU MO MG MW MY MV ML MT MH MQ MR MU YT MX FM MD MC MN ME MS MA MZ MM NA NR NP NL NC NZ NI NE NG NU NF MK MP NO OM PK PW PS PA PG PY PE PH PN PL PT PR QA RE RO RU RW
+BL SH KN LC MF PM VC WS SM ST SA SN RS SC SL SG SX SK SI SB SO ZA GS SS ES LK SD SR SJ SE CH SY TW TJ TZ TH TL TG TK TO TT TN TR TM TC TV UG UA AE GB US UM UY UZ VU VE VN VG VI WF EH YE ZM ZW
+`
+  .trim()
+  .split(/\s+/)
+  .filter((code) => /^[A-Z]{2}$/.test(code));
+
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
+
+export interface OnboardingProfile {
   countryCode: string;
   countryName: string;
   city: string;
@@ -88,6 +114,7 @@ interface ModuleDefinition {
     size?: number;
     color?: string;
     style?: ViewStyle | TextStyle | ImageStyle;
+    strokeWidth?: number;
   }>;
   accent: string;
   accentSoft: string;
@@ -98,7 +125,15 @@ interface OnboardingScreenProps {
   onSaveProfile?: (profile: OnboardingProfile) => Promise<void>;
 }
 
-// ── DATA ─────────────────────────────────────────────────────────────────
+interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+/* ============================================================================
+ * MODULE DATA
+ * ========================================================================== */
+
 const MODULES: ModuleDefinition[] = [
   {
     id: "immo",
@@ -201,37 +236,54 @@ const MODULES: ModuleDefinition[] = [
 const DEFAULT_MODULES = ["immo", "jobs", "paiement", "sante"];
 
 const WELCOME_CHIPS = [
-  { icon: Building2, label: "Habitat", color: "#FB923C" },
-  { icon: BriefcaseBusiness, label: "Travail", color: "#A78BFA" },
-  { icon: HeartPulse, label: "Santé", color: "#F87171" },
-  { icon: WalletCards, label: "Finance", color: "#34D399" },
-  { icon: Plane, label: "Voyage", color: "#818CF8" },
-  { icon: MessageCircle, label: "Communauté", color: "#C084FC" },
+  { icon: Building2, label: "Habitat", color: "#FB923C", module: "immo" },
+  {
+    icon: BriefcaseBusiness,
+    label: "Travail",
+    color: "#A78BFA",
+    module: "jobs",
+  },
+  { icon: HeartPulse, label: "Santé", color: "#F87171", module: "sante" },
+  {
+    icon: WalletCards,
+    label: "Finance",
+    color: "#34D399",
+    module: "paiement",
+  },
+  { icon: Plane, label: "Voyage", color: "#818CF8", module: "voyages" },
+  {
+    icon: MessageCircle,
+    label: "Communauté",
+    color: "#C084FC",
+    module: "community",
+  },
 ];
 
-/* ============================================================
- * STORAGE HELPERS — 100% safe, cross-platform (RN + web)
- * ============================================================ */
+/* ============================================================================
+ * STORAGE
+ * ========================================================================== */
 
-/**
- * Récupère un objet storage compatible (`localStorage`) depuis `globalThis`.
- * Renvoie `null` si :
- *   - `globalThis` n'existe pas
- *   - `localStorage` n'est pas défini
- *   - `localStorage` n'a pas de méthode `getItem` (polyfill incomplet)
- *   - l'accès throw (permissions, sandbox, etc.)
- *
- * Aucun accès direct à `window` ou `localStorage` : tout passe par
- * `globalThis` + try/catch, ce qui évite le crash
- * `ReferenceError: Property 'localStorage' doesn't exist` sur RN.
- */
-function getStorage(): Storage | null {
+function getStorage(): StorageLike | null {
   try {
-    if (typeof globalThis === "undefined") return null;
-    const s = (globalThis as { localStorage?: Storage }).localStorage;
-    if (!s) return null;
-    if (typeof s.getItem !== "function") return null;
-    return s;
+    if (Platform.OS !== "web") {
+      return null;
+    }
+
+    const runtime = globalThis as typeof globalThis & {
+      localStorage?: StorageLike;
+    };
+
+    const storage = runtime.localStorage;
+
+    if (
+      !storage ||
+      typeof storage.getItem !== "function" ||
+      typeof storage.setItem !== "function"
+    ) {
+      return null;
+    }
+
+    return storage;
   } catch {
     return null;
   }
@@ -239,7 +291,11 @@ function getStorage(): Storage | null {
 
 export function hasCompletedOnboarding(): boolean {
   const storage = getStorage();
-  if (!storage) return false;
+
+  if (!storage) {
+    return false;
+  }
+
   try {
     return storage.getItem(ONBOARDING_KEY) === "true";
   } catch {
@@ -249,25 +305,35 @@ export function hasCompletedOnboarding(): boolean {
 
 export function markOnboardingDone(): void {
   const storage = getStorage();
-  if (!storage) return;
+
+  if (!storage) {
+    return;
+  }
+
   try {
     storage.setItem(ONBOARDING_KEY, "true");
   } catch {
-    /* noop */
+    // Le backend reste la source de vérité.
   }
 }
 
 function saveLocalProfile(profile: OnboardingProfile): void {
   const storage = getStorage();
-  if (!storage) return;
+
+  if (!storage) {
+    return;
+  }
+
   try {
     storage.setItem(ONBOARDING_PROFILE_KEY, JSON.stringify(profile));
   } catch {
-    /* noop */
+    // Cache UX uniquement.
   }
 }
 
-/* ─────────── Autres helpers (inchangés) ─────────── */
+/* ============================================================================
+ * TEXT / COUNTRY HELPERS
+ * ========================================================================== */
 
 function normalizeText(value: string): string {
   return value
@@ -279,17 +345,29 @@ function normalizeText(value: string): string {
 
 function countryFlag(code: string): string {
   const normalized = code.toUpperCase();
-  if (!/^[A-Z]{2}$/.test(normalized)) return "🌍";
+
+  if (!/^[A-Z]{2}$/.test(normalized)) {
+    return "🌍";
+  }
+
   return String.fromCodePoint(
-    ...normalized.split("").map((c) => 127397 + c.charCodeAt(0)),
+    ...normalized
+      .split("")
+      .map((character) => 127397 + character.charCodeAt(0)),
   );
 }
 
 function detectLanguage(): string {
   try {
-    if (typeof globalThis === "undefined") return "fr";
-    const nav = (globalThis as { navigator?: { language?: string } }).navigator;
-    return nav?.language?.split("-")[0]?.toLowerCase() || "fr";
+    const runtime = globalThis as typeof globalThis & {
+      navigator?: {
+        language?: string;
+      };
+    };
+
+    const language = runtime.navigator?.language;
+
+    return language?.split("-")[0]?.toLowerCase() || "fr";
   } catch {
     return "fr";
   }
@@ -297,268 +375,375 @@ function detectLanguage(): string {
 
 function getCountryDisplayName(code: string, language: string): string {
   try {
-    const dn = new Intl.DisplayNames([language], { type: "region" });
-    return dn.of(code) ?? code;
+    const displayNames = new Intl.DisplayNames([language], {
+      type: "region",
+    });
+
+    return displayNames.of(code) ?? code;
   } catch {
-    return code;
+    try {
+      const displayNames = new Intl.DisplayNames(["en"], {
+        type: "region",
+      });
+
+      return displayNames.of(code) ?? code;
+    } catch {
+      return code;
+    }
   }
 }
 
-function getAvailableCountryCodes(): string[] {
+function getCountries(language: string): CountryOption[] {
+  return COUNTRY_CODES.map((code) => ({
+    code,
+    name: getCountryDisplayName(code, language),
+    flag: countryFlag(code),
+  })).sort((a, b) => a.name.localeCompare(b.name, language));
+}
+
+/* ============================================================================
+ * LOCATION
+ * ========================================================================== */
+
+interface LocationResult {
+  countryCode?: string;
+  countryName?: string;
+  city?: string;
+}
+
+async function reverseGeocode(
+  latitude: number,
+  longitude: number,
+): Promise<LocationResult | null> {
   try {
-    if (
-      typeof Intl !== "undefined" &&
-      typeof Intl.supportedValuesOf === "function"
-    ) {
-      const values = (
-        Intl.supportedValuesOf as unknown as (k: string) => string[]
-      )("region");
-      return values.filter((v) => /^[A-Z]{2}$/.test(v)).sort();
+    const addresses = await Location.reverseGeocodeAsync({
+      latitude,
+      longitude,
+    });
+
+    const address = addresses[0];
+
+    if (!address) {
+      return null;
     }
-  } catch {}
-  return [];
-}
 
-// ── LOCATION API (inchangé) ──────────────────────────────────────────────
-async function reverseGeocode(latitude: number, longitude: number) {
-  const url =
-    "https://nominatim.openstreetmap.org/reverse" +
-    `?format=json&lat=${encodeURIComponent(latitude)}` +
-    `&lon=${encodeURIComponent(longitude)}` +
-    "&zoom=10&addressdetails=1";
-  const res = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "Accept-Language": detectLanguage(),
-    },
-  });
-  if (!res.ok) throw new Error("Reverse geocoding unavailable");
-  const data = (await res.json()) as {
-    address?: {
-      country_code?: string;
-      country?: string;
-      city?: string;
-      town?: string;
-      municipality?: string;
-      village?: string;
-      state?: string;
+    return {
+      countryCode: address.isoCountryCode?.toUpperCase() || undefined,
+      countryName: address.country || undefined,
+      city:
+        address.city ||
+        address.district ||
+        address.subregion ||
+        address.region ||
+        undefined,
     };
-  };
-  const a = data.address;
-  return {
-    countryCode: a?.country_code?.toUpperCase(),
-    countryName: a?.country,
-    city: a?.city ?? a?.town ?? a?.municipality ?? a?.village ?? a?.state,
-  };
+  } catch {
+    return null;
+  }
 }
 
-async function searchCities(
+async function searchCityWithDeviceGeocoder(
   query: string,
   countryCode: string,
 ): Promise<CityOption[]> {
-  if (query.trim().length < 2) return [];
-  const url =
-    "https://nominatim.openstreetmap.org/search" +
-    `?format=json&addressdetails=1&limit=8` +
-    `&q=${encodeURIComponent(query)}` +
-    `&countrycodes=${encodeURIComponent(countryCode.toLowerCase())}`;
-  const res = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "Accept-Language": detectLanguage(),
-    },
-  });
-  if (!res.ok) throw new Error("City search unavailable");
-  const data = (await res.json()) as Array<{
-    lat: string;
-    lon: string;
-    display_name: string;
-    address?: {
-      city?: string;
-      town?: string;
-      municipality?: string;
-      village?: string;
-      state?: string;
-      country?: string;
-      country_code?: string;
-    };
-  }>;
-  return data
-    .map((item) => {
-      const a = item.address;
-      return {
-        name:
-          a?.city ??
-          a?.town ??
-          a?.municipality ??
-          a?.village ??
-          a?.state ??
-          item.display_name.split(",")[0],
-        countryCode: a?.country_code?.toUpperCase() ?? countryCode,
-        countryName: a?.country ?? "",
-        latitude: Number(item.lat),
-        longitude: Number(item.lon),
-      };
-    })
-    .filter(
-      (item, i, arr) =>
-        arr.findIndex(
-          (c) => normalizeText(c.name) === normalizeText(item.name),
-        ) === i,
+  const normalizedQuery = query.trim();
+
+  if (normalizedQuery.length < 3) {
+    return [];
+  }
+
+  try {
+    if (Platform.OS === "android") {
+      const permission = await Location.getForegroundPermissionsAsync();
+
+      if (!permission.granted) {
+        return [];
+      }
+    }
+
+    const countryName = getCountryDisplayName(countryCode, detectLanguage());
+
+    const results = await Location.geocodeAsync(
+      `${normalizedQuery}, ${countryName}`,
     );
+
+    const candidates: CityOption[] = [];
+
+    for (const result of results.slice(0, 3)) {
+      const address = await reverseGeocode(result.latitude, result.longitude);
+
+      const name = address?.city || address?.countryName || normalizedQuery;
+
+      const resolvedCountryCode = address?.countryCode || countryCode;
+
+      if (resolvedCountryCode.toUpperCase() !== countryCode.toUpperCase()) {
+        continue;
+      }
+
+      candidates.push({
+        name,
+        countryCode: resolvedCountryCode,
+        countryName: address?.countryName || countryName,
+        latitude: result.latitude,
+        longitude: result.longitude,
+      });
+    }
+
+    const unique = candidates.filter(
+      (candidate, index, array) =>
+        array.findIndex(
+          (item) => normalizeText(item.name) === normalizeText(candidate.name),
+        ) === index,
+    );
+
+    return unique;
+  } catch {
+    return [];
+  }
 }
 
-// ── LOCATION HOOK ────────────────────────────────────────────────────────
 function useDeviceLocation() {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  const locate = useCallback(async () => {
+  const locate = useCallback(async (): Promise<LocationResult | null> => {
+    if (locating) {
+      return null;
+    }
+
+    setLocating(true);
+    setLocationError(null);
+
     try {
-      if (typeof globalThis === "undefined") {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (!permission.granted) {
         setLocationError(
-          "La géolocalisation n'est pas disponible sur cet appareil.",
+          "La permission de localisation a été refusée. Vous pouvez choisir votre pays et votre ville manuellement.",
         );
+
         return null;
       }
-      const nav = (
-        globalThis as {
-          navigator?: { geolocation?: Geolocation };
-        }
-      ).navigator;
-      if (!nav?.geolocation) {
+
+      const providerEnabled = await Location.hasServicesEnabledAsync();
+
+      if (!providerEnabled) {
         setLocationError(
-          "La géolocalisation n'est pas disponible sur cet appareil.",
+          "Les services de localisation sont désactivés sur cet appareil.",
         );
+
         return null;
       }
-      setLocating(true);
-      setLocationError(null);
-      try {
-        const position = await new Promise<GeolocationPosition>(
-          (resolve, reject) => {
-            nav.geolocation!.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: false,
-              timeout: 10000,
-              maximumAge: 300000,
-            });
-          },
-        );
-        return await reverseGeocode(
-          position.coords.latitude,
-          position.coords.longitude,
-        );
-      } catch {
-        setLocationError(
-          "Impossible de déterminer votre position. Vous pouvez la choisir manuellement.",
-        );
-        return null;
-      } finally {
-        setLocating(false);
-      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        mayShowUserSettingsDialog: true,
+      });
+
+      return await reverseGeocode(
+        position.coords.latitude,
+        position.coords.longitude,
+      );
     } catch {
       setLocationError(
         "Impossible de déterminer votre position. Vous pouvez la choisir manuellement.",
       );
-      return null;
-    }
-  }, []);
 
-  return { locate, locating, locationError };
+      return null;
+    } finally {
+      setLocating(false);
+    }
+  }, [locating]);
+
+  const hydrateFromExistingPermission =
+    useCallback(async (): Promise<LocationResult | null> => {
+      try {
+        const permission = await Location.getForegroundPermissionsAsync();
+
+        if (!permission.granted) {
+          return null;
+        }
+
+        const lastKnown = await Location.getLastKnownPositionAsync({
+          maxAge: 300000,
+          requiredAccuracy: 1000,
+        });
+
+        if (!lastKnown) {
+          return null;
+        }
+
+        return await reverseGeocode(
+          lastKnown.coords.latitude,
+          lastKnown.coords.longitude,
+        );
+      } catch {
+        return null;
+      }
+    }, []);
+
+  return {
+    locate,
+    hydrateFromExistingPermission,
+    locating,
+    locationError,
+  };
 }
 
-// ── BACKGROUND — dégradé plein écran + orbes animées ─────────────────────
-function AnimatedBackground() {
-  const { height: H, width: W } = useWindowDimensions();
+/* ============================================================================
+ * BACKGROUND
+ * ========================================================================== */
 
-  const orb1 = useRef(new Animated.Value(0)).current;
-  const orb2 = useRef(new Animated.Value(0)).current;
-  const orb3 = useRef(new Animated.Value(0)).current;
-  const orb4 = useRef(new Animated.Value(0)).current;
+function AnimatedBackground() {
+  const { height: heightValue, width } = useWindowDimensions();
+
+  const orb1 = useSharedValue(0);
+  const orb2 = useSharedValue(0);
+  const orb3 = useSharedValue(0);
+  const orb4 = useSharedValue(0);
 
   useEffect(() => {
-    const loop = (v: Animated.Value, to: number, dur: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(v, {
-            toValue: to,
-            duration: dur,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(v, {
-            toValue: 0,
-            duration: dur,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ]),
-      ).start();
-    loop(orb1, -60, 7000);
-    loop(orb2, 70, 9000);
-    loop(orb3, -50, 8000);
-    loop(orb4, 55, 10000);
+    orb1.value = withRepeat(
+      withSequence(
+        withTiming(-60, {
+          duration: 7000,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        withTiming(0, {
+          duration: 7000,
+          easing: Easing.inOut(Easing.sin),
+        }),
+      ),
+      -1,
+      false,
+    );
+
+    orb2.value = withRepeat(
+      withSequence(
+        withTiming(70, {
+          duration: 9000,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        withTiming(0, {
+          duration: 9000,
+          easing: Easing.inOut(Easing.sin),
+        }),
+      ),
+      -1,
+      false,
+    );
+
+    orb3.value = withRepeat(
+      withSequence(
+        withTiming(-50, {
+          duration: 8000,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        withTiming(0, {
+          duration: 8000,
+          easing: Easing.inOut(Easing.sin),
+        }),
+      ),
+      -1,
+      false,
+    );
+
+    orb4.value = withRepeat(
+      withSequence(
+        withTiming(55, {
+          duration: 10000,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        withTiming(0, {
+          duration: 10000,
+          easing: Easing.inOut(Easing.sin),
+        }),
+      ),
+      -1,
+      false,
+    );
   }, [orb1, orb2, orb3, orb4]);
 
+  const orb1Style = useAnimatedStyle(
+    () => ({
+      transform: [{ translateY: orb1.value }],
+    }),
+    [orb1],
+  );
+
+  const orb2Style = useAnimatedStyle(
+    () => ({
+      transform: [{ translateY: orb2.value }],
+    }),
+    [orb2],
+  );
+
+  const orb3Style = useAnimatedStyle(
+    () => ({
+      transform: [{ translateY: orb3.value }],
+    }),
+    [orb3],
+  );
+
+  const orb4Style = useAnimatedStyle(
+    () => ({
+      transform: [{ translateY: orb4.value }],
+    }),
+    [orb4],
+  );
+
   return (
-    <View
-      pointerEvents="none"
-      collapsable={false}
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-      }}
-    >
+    <View pointerEvents="none" collapsable={false} style={styles.background}>
       <LinearGradient
         colors={["#0B0620", "#1A0B3D", "#0F0525", "#17093A"]}
         locations={[0, 0.35, 0.7, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={{ flex: 1, width: "100%", height: "100%" }}
+        style={styles.backgroundGradient}
       />
 
       <Animated.View
         style={[
           styles.orb,
           {
-            width: Math.max(320, W * 0.9),
-            height: Math.max(320, W * 0.9),
+            width: Math.max(320, width * 0.9),
+            height: Math.max(320, width * 0.9),
             top: -120,
             left: -100,
             backgroundColor: "rgba(139,92,246,0.5)",
-            transform: [{ translateY: orb1 }],
           },
+          orb1Style,
         ]}
       />
+
       <Animated.View
         style={[
           styles.orb,
           {
             width: 300,
             height: 300,
-            top: H * 0.28,
+            top: heightValue * 0.28,
             right: -120,
             backgroundColor: "rgba(99,102,241,0.42)",
-            transform: [{ translateY: orb2 }],
           },
+          orb2Style,
         ]}
       />
+
       <Animated.View
         style={[
           styles.orb,
           {
             width: 340,
             height: 340,
-            bottom: H * 0.05,
+            bottom: heightValue * 0.05,
             left: -120,
             backgroundColor: "rgba(168,85,247,0.4)",
-            transform: [{ translateY: orb3 }],
           },
+          orb3Style,
         ]}
       />
+
       <Animated.View
         style={[
           styles.orb,
@@ -568,15 +753,18 @@ function AnimatedBackground() {
             bottom: -120,
             right: -100,
             backgroundColor: "rgba(124,58,237,0.45)",
-            transform: [{ translateY: orb4 }],
           },
+          orb4Style,
         ]}
       />
     </View>
   );
 }
 
-// ── UI PRIMITIVES (inchangé) ─────────────────────────────────────────────
+/* ============================================================================
+ * UI PRIMITIVES
+ * ========================================================================== */
+
 function GlassIconButton({
   children,
   onPress,
@@ -594,7 +782,10 @@ function GlassIconButton({
       hitSlop={10}
       style={({ pressed }) => [
         styles.glassIconButton,
-        pressed && { opacity: 0.7, transform: [{ scale: 0.94 }] },
+        pressed && {
+          opacity: 0.7,
+          transform: [{ scale: 0.94 }],
+        },
       ]}
     >
       {children}
@@ -605,8 +796,8 @@ function GlassIconButton({
 function GradientButton({
   children,
   onPress,
-  disabled,
-  loading,
+  disabled = false,
+  loading = false,
   accessibilityLabel,
 }: {
   children: ReactNode;
@@ -615,35 +806,51 @@ function GradientButton({
   loading?: boolean;
   accessibilityLabel?: string;
 }) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useSharedValue(1);
 
-  const onPressIn = () => {
-    Animated.spring(scale, {
-      toValue: 0.97,
-      useNativeDriver: true,
-      speed: 40,
-    }).start();
-  };
-  const onPressOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 40,
-    }).start();
-  };
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ scale: scale.value }],
+    }),
+    [scale],
+  );
 
   const isDisabled = disabled || loading;
 
+  const handlePressIn = useCallback(() => {
+    scale.value = withSpring(0.97, {
+      damping: 18,
+      stiffness: 320,
+    });
+  }, [scale]);
+
+  const handlePressOut = useCallback(() => {
+    scale.value = withSpring(1, {
+      damping: 18,
+      stiffness: 320,
+    });
+  }, [scale]);
+
   return (
-    <Animated.View style={{ transform: [{ scale }], width: "100%" }}>
+    <Animated.View
+      style={[
+        {
+          width: "100%",
+        },
+        animatedStyle,
+      ]}
+    >
       <Pressable
         onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         disabled={isDisabled}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ disabled: isDisabled }}
+        accessibilityState={{
+          disabled: isDisabled,
+          busy: loading,
+        }}
         style={styles.gradientButtonOuter}
       >
         <LinearGradient
@@ -665,10 +872,11 @@ function GradientButton({
 
 function StepIndicator({ current, total }: { current: number; total: number }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-      {Array.from({ length: total }, (_, i) => i + 1).map((item) => {
+    <View style={styles.stepIndicator}>
+      {Array.from({ length: total }, (_, index) => index + 1).map((item) => {
         const active = current === item;
         const complete = current > item;
+
         return (
           <View
             key={item}
@@ -700,47 +908,18 @@ function SectionTitle({
   accent: string;
 }) {
   return (
-    <View style={{ paddingTop: 20, paddingBottom: 18 }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 8,
-          marginBottom: 6,
-        }}
-      >
+    <View style={styles.sectionTitle}>
+      <View style={styles.sectionEyebrow}>
         {icon}
-        <Text
-          style={{
-            fontSize: 11,
-            fontWeight: "800",
-            letterSpacing: 1.6,
-            color: accent,
-          }}
-        >
+
+        <Text style={[styles.sectionEyebrowText, { color: accent }]}>
           {eyebrow.toUpperCase()}
         </Text>
       </View>
-      <Text
-        style={{
-          fontSize: 26,
-          fontWeight: "900",
-          color: "#fff",
-          letterSpacing: -0.5,
-        }}
-      >
-        {title}
-      </Text>
-      <Text
-        style={{
-          marginTop: 6,
-          fontSize: 14,
-          lineHeight: 20,
-          color: "rgba(255,255,255,0.5)",
-        }}
-      >
-        {subtitle}
-      </Text>
+
+      <Text style={styles.sectionTitleText}>{title}</Text>
+
+      <Text style={styles.sectionSubtitle}>{subtitle}</Text>
     </View>
   );
 }
@@ -755,34 +934,13 @@ function SummaryRow({
   value: string;
 }) {
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-        marginBottom: 12,
-      }}
-    >
+    <View style={styles.summaryRow}>
       <View style={styles.summaryIcon}>{icon}</View>
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            fontSize: 10,
-            letterSpacing: 1,
-            color: "rgba(255,255,255,0.35)",
-            textTransform: "uppercase",
-          }}
-        >
-          {label}
-        </Text>
-        <Text
-          style={{
-            fontSize: 14,
-            fontWeight: "700",
-            color: "rgba(255,255,255,0.9)",
-          }}
-          numberOfLines={1}
-        >
+
+      <View style={styles.summaryRowContent}>
+        <Text style={styles.summaryLabel}>{label}</Text>
+
+        <Text style={styles.summaryValue} numberOfLines={1}>
           {value}
         </Text>
       </View>
@@ -790,113 +948,191 @@ function SummaryRow({
   );
 }
 
-// ── MAIN COMPONENT (inchangé sauf helpers) ───────────────────────────────
+/* ============================================================================
+ * MAIN COMPONENT
+ * ========================================================================== */
+
 export default function OnboardingScreen({
   onComplete,
   onSaveProfile,
 }: OnboardingScreenProps) {
   const [step, setStep] = useState(0);
+
   const [countryCode, setCountryCode] = useState("");
   const [countryName, setCountryName] = useState("");
+
   const [city, setCity] = useState("");
   const [countrySearch, setCountrySearch] = useState("");
   const [citySearch, setCitySearch] = useState("");
+
   const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
+
   const [selectedModules, setSelectedModules] =
     useState<string[]>(DEFAULT_MODULES);
+
   const [firstName, setFirstName] = useState("");
+
   const [saving, setSaving] = useState(false);
   const [cityLoading, setCityLoading] = useState(false);
+
   const [locationNotice, setLocationNotice] = useState<string | null>(null);
 
-  const { locate, locating, locationError } = useDeviceLocation();
+  const { locate, hydrateFromExistingPermission, locating, locationError } =
+    useDeviceLocation();
+
   const language = detectLanguage();
 
-  const heroAnim = useRef(new Animated.Value(0)).current;
-  const contentAnim = useRef(new Animated.Value(0)).current;
+  /* --------------------------------------------------------------------------
+   * PAGE ANIMATION
+   * ------------------------------------------------------------------------ */
+
+  const heroOpacity = useSharedValue(0);
+  const heroScale = useSharedValue(0.86);
+
+  const contentOpacity = useSharedValue(0);
+  const contentTranslateY = useSharedValue(24);
 
   useEffect(() => {
-    heroAnim.setValue(0);
-    contentAnim.setValue(0);
-    Animated.sequence([
-      Animated.timing(heroAnim, {
-        toValue: 1,
-        duration: 600,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(contentAnim, {
-        toValue: 1,
-        duration: 500,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [step, heroAnim, contentAnim]);
+    heroOpacity.value = 0;
+    heroScale.value = 0.86;
 
-  const countries = useMemo<CountryOption[]>(() => {
-    const codes = getAvailableCountryCodes();
-    return codes
-      .map((code) => ({
-        code,
-        name: getCountryDisplayName(code, language),
-        flag: countryFlag(code),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name, language));
-  }, [language]);
+    contentOpacity.value = 0;
+    contentTranslateY.value = 24;
+
+    heroOpacity.value = withTiming(1, {
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+    });
+
+    heroScale.value = withSpring(1, {
+      damping: 18,
+      stiffness: 180,
+    });
+
+    contentOpacity.value = withTiming(1, {
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+    });
+
+    contentTranslateY.value = withTiming(0, {
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [contentOpacity, contentTranslateY, heroOpacity, heroScale, step]);
+
+  const heroAnimatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: heroOpacity.value,
+      transform: [{ scale: heroScale.value }],
+    }),
+    [heroOpacity, heroScale],
+  );
+
+  const contentAnimatedStyle = useAnimatedStyle(
+    () => ({
+      opacity: contentOpacity.value,
+      transform: [{ translateY: contentTranslateY.value }],
+    }),
+    [contentOpacity, contentTranslateY],
+  );
+
+  /* --------------------------------------------------------------------------
+   * COUNTRIES
+   * ------------------------------------------------------------------------ */
+
+  const countries = useMemo(() => getCountries(language), [language]);
 
   const filteredCountries = useMemo(() => {
-    const q = normalizeText(countrySearch);
-    if (!q) return countries;
-    return countries.filter((c) => normalizeText(c.name).includes(q));
+    const query = normalizeText(countrySearch);
+
+    if (!query) {
+      return countries;
+    }
+
+    return countries.filter((country) =>
+      normalizeText(country.name).includes(query),
+    );
   }, [countries, countrySearch]);
+
+  /* --------------------------------------------------------------------------
+   * LOCATION — NEVER AUTO-PROMPT
+   * ------------------------------------------------------------------------ */
 
   useEffect(() => {
     let cancelled = false;
-    void locate().then((result) => {
-      if (cancelled || !result?.countryCode) return;
+
+    void hydrateFromExistingPermission().then((result) => {
+      if (cancelled || !result?.countryCode) {
+        return;
+      }
+
       setCountryCode(result.countryCode);
+
       setCountryName(
         result.countryName ??
           getCountryDisplayName(result.countryCode, language),
       );
-      if (result.city) setCity(result.city);
+
+      if (result.city) {
+        setCity(result.city);
+      }
+
       setLocationNotice(
-        "Votre position a été détectée. Vous pouvez la modifier.",
+        "Votre dernière position autorisée a été utilisée. Vous pouvez la modifier.",
       );
     });
+
     return () => {
       cancelled = true;
     };
-  }, [language, locate]);
+  }, [hydrateFromExistingPermission, language]);
+
+  /* --------------------------------------------------------------------------
+   * CITY SEARCH
+   * ------------------------------------------------------------------------ */
 
   useEffect(() => {
-    if (!countryCode || citySearch.trim().length < 2) {
+    let cancelled = false;
+
+    if (!countryCode || citySearch.trim().length < 3) {
       setCityOptions([]);
+      setCityLoading(false);
       return;
     }
-    const controller = new AbortController();
+
     const timer = setTimeout(() => {
       setCityLoading(true);
-      void searchCities(citySearch, countryCode)
-        .then((r) => {
-          if (!controller.signal.aborted) setCityOptions(r);
+
+      void searchCityWithDeviceGeocoder(citySearch, countryCode)
+        .then((results) => {
+          if (!cancelled) {
+            setCityOptions(results);
+          }
         })
         .catch(() => {
-          if (!controller.signal.aborted) setCityOptions([]);
+          if (!cancelled) {
+            setCityOptions([]);
+          }
         })
         .finally(() => {
-          if (!controller.signal.aborted) setCityLoading(false);
+          if (!cancelled) {
+            setCityLoading(false);
+          }
         });
-    }, 350);
+    }, 700);
+
     return () => {
-      controller.abort();
+      cancelled = true;
       clearTimeout(timer);
     };
   }, [citySearch, countryCode]);
 
-  const totalSteps = 3;
-  const progress = step === 0 ? 0 : Math.round((step / totalSteps) * 100);
+  /* --------------------------------------------------------------------------
+   * NAVIGATION
+   * ------------------------------------------------------------------------ */
+
+  const progress = step === 0 ? 0 : Math.round((step / TOTAL_STEPS) * 100);
+
   const canContinue =
     step === 1
       ? Boolean(countryCode)
@@ -905,49 +1141,102 @@ export default function OnboardingScreen({
         : true;
 
   const goNext = useCallback(() => {
-    if (!canContinue || step >= totalSteps) return;
-    setStep((v) => v + 1);
+    if (!canContinue || step >= TOTAL_STEPS) {
+      return;
+    }
+
+    setStep((current) => current + 1);
   }, [canContinue, step]);
 
   const goBack = useCallback(() => {
-    if (step <= 0) return;
-    setStep((v) => v - 1);
-  }, [step]);
+    if (step <= 0 || saving) {
+      return;
+    }
+
+    setStep((current) => current - 1);
+  }, [saving, step]);
+
+  /* --------------------------------------------------------------------------
+   * SKIP
+   * ------------------------------------------------------------------------ */
 
   const handleSkip = useCallback(() => {
+    if (saving) {
+      return;
+    }
+
     markOnboardingDone();
     onComplete();
-  }, [onComplete]);
+  }, [onComplete, saving]);
+
+  /* --------------------------------------------------------------------------
+   * MODULES
+   * ------------------------------------------------------------------------ */
 
   const toggleModule = useCallback((id: string) => {
-    setSelectedModules((cur) =>
-      cur.includes(id) ? cur.filter((m) => m !== id) : [...cur, id],
+    setSelectedModules((current) =>
+      current.includes(id)
+        ? current.filter((moduleId) => moduleId !== id)
+        : [...current, id],
     );
   }, []);
 
-  const handleCountrySelect = useCallback((c: CountryOption) => {
-    setCountryCode(c.code);
-    setCountryName(c.name);
+  /* --------------------------------------------------------------------------
+   * COUNTRY
+   * ------------------------------------------------------------------------ */
+
+  const handleCountrySelect = useCallback((country: CountryOption) => {
+    setCountryCode(country.code);
+    setCountryName(country.name);
+
     setCity("");
     setCitySearch("");
     setCityOptions([]);
   }, []);
 
+  /* --------------------------------------------------------------------------
+   * DEVICE LOCATION
+   * ------------------------------------------------------------------------ */
+
   const handleUseLocation = useCallback(() => {
+    if (locating || saving) {
+      return;
+    }
+
     void locate().then((result) => {
-      if (!result?.countryCode) return;
+      if (!result?.countryCode) {
+        return;
+      }
+
       setCountryCode(result.countryCode);
+
       setCountryName(
         result.countryName ??
           getCountryDisplayName(result.countryCode, language),
       );
-      if (result.city) setCity(result.city);
-      setLocationNotice("Position détectée avec succès.");
+
+      if (result.city) {
+        setCity(result.city);
+        setCitySearch(result.city);
+      }
+
+      setCityOptions([]);
+
+      setLocationNotice(
+        "Position détectée avec succès. Vous pouvez encore modifier votre localisation.",
+      );
     });
-  }, [language, locate]);
+  }, [language, locate, locating, saving]);
+
+  /* --------------------------------------------------------------------------
+   * COMPLETE
+   * ------------------------------------------------------------------------ */
 
   const handleComplete = useCallback(async () => {
-    if (saving) return;
+    if (saving) {
+      return;
+    }
+
     const profile: OnboardingProfile = {
       countryCode,
       countryName,
@@ -956,14 +1245,34 @@ export default function OnboardingScreen({
       firstName: firstName.trim(),
       completedAt: Date.now(),
     };
+
     setSaving(true);
+
     try {
-      if (onSaveProfile) await onSaveProfile(profile);
+      /*
+       * Le parent conserve la responsabilité de brancher
+       * le contrat Convex existant.
+       *
+       * Le backend actuel attend notamment :
+       * city / country / roles / interests.
+       *
+       * On ne crée aucune mutation parallèle ici.
+       */
+      if (onSaveProfile) {
+        await onSaveProfile(profile);
+      }
+
+      /*
+       * Cache UX uniquement.
+       * La source de vérité applicative reste le backend.
+       */
       saveLocalProfile(profile);
       markOnboardingDone();
+
       onComplete();
     } catch (error) {
       console.error("Impossible d'enregistrer l'onboarding :", error);
+
       setLocationNotice(
         "Vos préférences n'ont pas pu être enregistrées. Vérifiez votre connexion et réessayez.",
       );
@@ -981,6 +1290,10 @@ export default function OnboardingScreen({
     selectedModules,
   ]);
 
+  /* ==========================================================================
+   * RENDER
+   * ======================================================================== */
+
   return (
     <View style={styles.root}>
       <StatusBar
@@ -988,15 +1301,22 @@ export default function OnboardingScreen({
         translucent
         backgroundColor="transparent"
       />
+
       <AnimatedBackground />
+
+      {/* ----------------------------------------------------------------------
+       * HEADER
+       * -------------------------------------------------------------------- */}
 
       <View
         style={[
           styles.header,
-          { paddingTop: Platform.OS === "android" ? 48 : 56 },
+          {
+            paddingTop: Platform.OS === "android" ? 48 : 56,
+          },
         ]}
       >
-        <View style={{ width: 44 }}>
+        <View style={styles.headerSide}>
           {step > 0 ? (
             <GlassIconButton
               onPress={goBack}
@@ -1008,31 +1328,24 @@ export default function OnboardingScreen({
         </View>
 
         {step > 0 ? (
-          <StepIndicator current={step} total={totalSteps} />
+          <StepIndicator current={step} total={TOTAL_STEPS} />
         ) : (
           <View />
         )}
 
         <Pressable
           onPress={handleSkip}
+          disabled={saving}
           accessibilityRole="button"
           accessibilityLabel="Passer l'onboarding"
           hitSlop={10}
           style={({ pressed }) => [
             styles.skipButton,
             pressed && { opacity: 0.6 },
+            saving && { opacity: 0.35 },
           ]}
         >
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "700",
-              color: "rgba(255,255,255,0.55)",
-              letterSpacing: 0.4,
-            }}
-          >
-            Passer
-          </Text>
+          <Text style={styles.skipButtonText}>Passer</Text>
         </Pressable>
       </View>
 
@@ -1042,29 +1355,25 @@ export default function OnboardingScreen({
         </View>
       ) : null}
 
+      {/* ----------------------------------------------------------------------
+       * CONTENT
+       * -------------------------------------------------------------------- */}
+
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={styles.keyboardContainer}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
+        {/* ====================================================================
+         * STEP 0 — WELCOME
+         * ================================================================== */}
+
         {step === 0 ? (
           <ScrollView
-            style={{ flex: 1 }}
+            style={styles.flex}
             contentContainerStyle={styles.welcomeScroll}
             showsVerticalScrollIndicator={false}
           >
-            <Animated.View
-              style={{
-                opacity: heroAnim,
-                transform: [
-                  {
-                    scale: heroAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.7, 1],
-                    }),
-                  },
-                ],
-              }}
-            >
+            <Animated.View style={heroAnimatedStyle}>
               <LinearGradient
                 colors={["#A855F7", "#7C3AED", "#6366F1"]}
                 start={{ x: 0, y: 0 }}
@@ -1076,11 +1385,11 @@ export default function OnboardingScreen({
             </Animated.View>
 
             <Animated.View
-              style={{ opacity: contentAnim, alignItems: "center" }}
+              style={[styles.welcomeContent, contentAnimatedStyle]}
             >
               <Text style={styles.heroTitle}>
                 Bienvenue sur{"\n"}
-                <Text style={{ color: "#C4B5FD" }}>DébrouillePro</Text>
+                <Text style={styles.heroTitleAccent}>DébrouillePro</Text>
               </Text>
 
               <Text style={styles.heroSubtitle}>
@@ -1090,25 +1399,21 @@ export default function OnboardingScreen({
               </Text>
             </Animated.View>
 
-            <Animated.View style={[styles.chipsRow, { opacity: contentAnim }]}>
+            <Animated.View style={[styles.chipsRow, contentAnimatedStyle]}>
               {WELCOME_CHIPS.map((chip) => {
                 const Icon = chip.icon;
+
                 return (
                   <Pressable
                     key={chip.label}
                     onPress={() => {
-                      const moduleMap: Record<string, string> = {
-                        Habitat: "immo",
-                        Travail: "jobs",
-                        Santé: "sante",
-                        Finance: "paiement",
-                        Voyage: "voyages",
-                        Communauté: "community",
-                      };
-                      const mod = moduleMap[chip.label];
-                      if (mod && !selectedModules.includes(mod)) {
-                        setSelectedModules((cur) => [...cur, mod]);
+                      if (!selectedModules.includes(chip.module)) {
+                        setSelectedModules((current) => [
+                          ...current,
+                          chip.module,
+                        ]);
                       }
+
                       goNext();
                     }}
                     accessibilityRole="button"
@@ -1127,6 +1432,7 @@ export default function OnboardingScreen({
                     ]}
                   >
                     <Icon size={14} color={chip.color} />
+
                     <Text style={[styles.chipText, { color: chip.color }]}>
                       {chip.label}
                     </Text>
@@ -1136,23 +1442,20 @@ export default function OnboardingScreen({
             </Animated.View>
 
             <Animated.View
-              style={{
-                opacity: contentAnim,
-                width: "100%",
-                maxWidth: 400,
-                marginTop: 36,
-              }}
+              style={[styles.welcomeButtonContainer, contentAnimatedStyle]}
             >
               <GradientButton
                 onPress={goNext}
                 accessibilityLabel="Personnaliser mon expérience"
               >
                 <Text style={styles.ctaText}>Personnaliser mon expérience</Text>
+
                 <ArrowRight size={20} color="#fff" strokeWidth={2.5} />
               </GradientButton>
 
               <Pressable
                 onPress={handleSkip}
+                disabled={saving}
                 accessibilityRole="button"
                 accessibilityLabel="Découvrir d'abord"
                 hitSlop={10}
@@ -1161,13 +1464,7 @@ export default function OnboardingScreen({
                   pressed && { opacity: 0.6 },
                 ]}
               >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: "rgba(255,255,255,0.4)",
-                    letterSpacing: 0.3,
-                  }}
-                >
+                <Text style={styles.skipLinkText}>
                   Je préfère découvrir d'abord
                 </Text>
               </Pressable>
@@ -1175,9 +1472,13 @@ export default function OnboardingScreen({
           </ScrollView>
         ) : null}
 
+        {/* ====================================================================
+         * STEP 1 — LOCATION
+         * ================================================================== */}
+
         {step === 1 ? (
-          <View style={{ flex: 1 }}>
-            <View style={{ paddingHorizontal: 20 }}>
+          <View style={styles.flex}>
+            <View style={styles.horizontalPadding}>
               <SectionTitle
                 icon={<MapPin size={16} color="#A78BFA" />}
                 eyebrow="Étape 1 · Localisation"
@@ -1187,16 +1488,24 @@ export default function OnboardingScreen({
               />
             </View>
 
-            <View style={{ paddingHorizontal: 20 }}>
+            <View style={styles.horizontalPadding}>
               <Pressable
                 onPress={handleUseLocation}
-                disabled={locating}
+                disabled={locating || saving}
                 accessibilityRole="button"
                 accessibilityLabel="Utiliser ma position actuelle"
+                accessibilityState={{
+                  disabled: locating || saving,
+                }}
                 style={({ pressed }) => [
                   styles.locationButton,
-                  pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
-                  locating && { opacity: 0.6 },
+                  pressed && {
+                    transform: [{ scale: 0.98 }],
+                    opacity: 0.9,
+                  },
+                  (locating || saving) && {
+                    opacity: 0.6,
+                  },
                 ]}
               >
                 <View style={styles.locationIcon}>
@@ -1206,37 +1515,32 @@ export default function OnboardingScreen({
                     <Zap size={18} color="#A78BFA" strokeWidth={2.4} />
                   )}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}
-                  >
+
+                <View style={styles.locationText}>
+                  <Text style={styles.locationTitle}>
                     {locating
                       ? "Localisation en cours…"
                       : "Utiliser ma position"}
                   </Text>
-                  <Text
-                    style={{
-                      marginTop: 2,
-                      fontSize: 11,
-                      color: "rgba(255,255,255,0.45)",
-                    }}
-                  >
-                    Aucun déplacement automatique sans votre permission
+
+                  <Text style={styles.locationDescription}>
+                    Votre position n'est utilisée qu'après votre autorisation
                   </Text>
                 </View>
+
                 <ArrowRight size={16} color="rgba(255,255,255,0.35)" />
               </Pressable>
 
               {locationNotice || locationError ? (
                 <Text
-                  style={{
-                    fontSize: 11,
-                    marginBottom: 12,
-                    paddingHorizontal: 4,
-                    color: locationError
-                      ? "rgba(251,191,36,0.9)"
-                      : "rgba(52,211,153,0.9)",
-                  }}
+                  style={[
+                    styles.locationNotice,
+                    {
+                      color: locationError
+                        ? "rgba(251,191,36,0.9)"
+                        : "rgba(52,211,153,0.9)",
+                    },
+                  ]}
                 >
                   {locationError ?? locationNotice}
                 </Text>
@@ -1248,32 +1552,38 @@ export default function OnboardingScreen({
                   color="rgba(255,255,255,0.4)"
                   style={styles.searchIcon}
                 />
+
                 <TextInput
                   value={countrySearch}
                   onChangeText={setCountrySearch}
                   placeholder="Rechercher votre pays…"
                   placeholderTextColor="rgba(255,255,255,0.35)"
-                  style={[styles.input, { paddingLeft: 44 }]}
+                  style={[styles.input, styles.inputWithLeftIcon]}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  returnKeyType="search"
                 />
               </View>
             </View>
 
             <ScrollView
-              style={{ flex: 1 }}
+              style={styles.flex}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
               {filteredCountries.map((country) => {
                 const selected = country.code === countryCode;
+
                 return (
                   <Pressable
                     key={country.code}
                     onPress={() => handleCountrySelect(country)}
                     accessibilityRole="button"
                     accessibilityLabel={`Sélectionner ${country.name}`}
+                    accessibilityState={{
+                      selected,
+                    }}
                     style={({ pressed }) => [
                       styles.countryRow,
                       selected && styles.countryRowSelected,
@@ -1283,18 +1593,12 @@ export default function OnboardingScreen({
                       },
                     ]}
                   >
-                    <Text style={{ fontSize: 20 }}>{country.flag}</Text>
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 14,
-                        fontWeight: "700",
-                        color: "rgba(255,255,255,0.92)",
-                      }}
-                      numberOfLines={1}
-                    >
+                    <Text style={styles.countryFlag}>{country.flag}</Text>
+
+                    <Text style={styles.countryName} numberOfLines={1}>
                       {country.name}
                     </Text>
+
                     {selected ? (
                       <CheckCircle2 size={18} color="#A78BFA" />
                     ) : null}
@@ -1303,77 +1607,38 @@ export default function OnboardingScreen({
               })}
 
               {filteredCountries.length === 0 ? (
-                <View style={{ alignItems: "center", paddingVertical: 48 }}>
+                <View style={styles.emptyState}>
                   <Globe2 size={30} color="rgba(255,255,255,0.2)" />
-                  <Text
-                    style={{
-                      marginTop: 12,
-                      fontSize: 14,
-                      fontWeight: "700",
-                      color: "rgba(255,255,255,0.55)",
-                    }}
-                  >
-                    Pays introuvable
-                  </Text>
-                  <Text
-                    style={{
-                      marginTop: 4,
-                      fontSize: 12,
-                      color: "rgba(255,255,255,0.35)",
-                    }}
-                  >
+
+                  <Text style={styles.emptyStateTitle}>Pays introuvable</Text>
+
+                  <Text style={styles.emptyStateDescription}>
                     Essayez une autre recherche.
                   </Text>
                 </View>
               ) : null}
 
               {countryCode ? (
-                <View style={{ marginTop: 20 }}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: 10,
-                    }}
-                  >
+                <View style={styles.citySection}>
+                  <View style={styles.cityHeader}>
                     <View>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: "800",
-                          letterSpacing: 1,
-                          color: "rgba(255,255,255,0.45)",
-                        }}
-                      >
-                        VILLE
-                      </Text>
-                      <Text
-                        style={{
-                          marginTop: 2,
-                          fontSize: 11,
-                          color: "rgba(255,255,255,0.35)",
-                        }}
-                      >
-                        Facultatif
-                      </Text>
+                      <Text style={styles.cityEyebrow}>VILLE</Text>
+
+                      <Text style={styles.cityOptional}>Facultatif</Text>
                     </View>
+
                     {city ? (
                       <Pressable
                         onPress={() => {
                           setCity("");
                           setCitySearch("");
+                          setCityOptions([]);
                         }}
                         hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Modifier la ville"
                       >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            color: "rgba(255,255,255,0.5)",
-                          }}
-                        >
-                          Modifier
-                        </Text>
+                        <Text style={styles.modifyText}>Modifier</Text>
                       </Pressable>
                     ) : null}
                   </View>
@@ -1384,23 +1649,26 @@ export default function OnboardingScreen({
                       color="rgba(255,255,255,0.35)"
                       style={styles.searchIcon}
                     />
+
                     <TextInput
                       value={citySearch || city}
-                      onChangeText={(v) => {
-                        setCity(v);
-                        setCitySearch(v);
+                      onChangeText={(value) => {
+                        setCity(value);
+                        setCitySearch(value);
                       }}
                       placeholder={`Rechercher une ville en ${countryName}`}
                       placeholderTextColor="rgba(255,255,255,0.35)"
-                      style={[styles.input, { paddingLeft: 44 }]}
+                      style={[styles.input, styles.inputWithLeftIcon]}
                       autoCapitalize="words"
                       autoCorrect={false}
+                      returnKeyType="done"
                     />
+
                     {cityLoading ? (
                       <ActivityIndicator
                         size="small"
                         color="#A78BFA"
-                        style={{ position: "absolute", right: 16, top: 16 }}
+                        style={styles.cityLoader}
                       />
                     ) : null}
                   </View>
@@ -1409,7 +1677,7 @@ export default function OnboardingScreen({
                     <View style={styles.cityDropdown}>
                       {cityOptions.map((option) => (
                         <Pressable
-                          key={`${option.name}-${option.latitude}-${option.longitude}`}
+                          key={`${option.name}-${option.latitude ?? 0}-${option.longitude ?? 0}`}
                           onPress={() => {
                             setCity(option.name);
                             setCitySearch(option.name);
@@ -1425,18 +1693,17 @@ export default function OnboardingScreen({
                           ]}
                         >
                           <MapPin size={15} color="#A78BFA" />
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: "rgba(255,255,255,0.9)",
-                            }}
-                          >
-                            {option.name}
-                          </Text>
+
+                          <Text style={styles.cityRowText}>{option.name}</Text>
                         </Pressable>
                       ))}
                     </View>
                   ) : null}
+
+                  <Text style={styles.cityHint}>
+                    Vous pouvez aussi saisir directement votre ville sans
+                    sélectionner une suggestion.
+                  </Text>
                 </View>
               ) : null}
             </ScrollView>
@@ -1444,19 +1711,24 @@ export default function OnboardingScreen({
             <View style={styles.footer}>
               <GradientButton
                 onPress={goNext}
-                disabled={!countryCode}
+                disabled={!countryCode || saving}
                 accessibilityLabel="Continuer vers la personnalisation"
               >
                 <Text style={styles.ctaText}>Continuer</Text>
+
                 <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
               </GradientButton>
             </View>
           </View>
         ) : null}
 
+        {/* ====================================================================
+         * STEP 2 — MODULES
+         * ================================================================== */}
+
         {step === 2 ? (
-          <View style={{ flex: 1 }}>
-            <View style={{ paddingHorizontal: 20 }}>
+          <View style={styles.flex}>
+            <View style={styles.horizontalPadding}>
               <SectionTitle
                 icon={<Sparkles size={16} color="#A5B4FC" />}
                 eyebrow="Étape 2 · Personnalisation"
@@ -1464,27 +1736,16 @@ export default function OnboardingScreen({
                 subtitle="DébrouillePro adaptera votre accueil à vos priorités."
                 accent="#A5B4FC"
               />
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 12,
-                }}
-              >
-                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
+
+              <View style={styles.selectionHeader}>
+                <Text style={styles.selectionText}>
                   {selectedModules.length} module
                   {selectedModules.length > 1 ? "s" : ""} sélectionné
                   {selectedModules.length > 1 ? "s" : ""}
                 </Text>
+
                 <View style={styles.countBadge}>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: "800",
-                      color: "#C4B5FD",
-                    }}
-                  >
+                  <Text style={styles.countBadgeText}>
                     {selectedModules.length}/{MODULES.length}
                   </Text>
                 </View>
@@ -1492,19 +1753,22 @@ export default function OnboardingScreen({
             </View>
 
             <ScrollView
-              style={{ flex: 1 }}
+              style={styles.flex}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
             >
               {MODULES.map((module) => {
                 const Icon = module.icon;
                 const selected = selectedModules.includes(module.id);
+
                 return (
                   <Pressable
                     key={module.id}
                     onPress={() => toggleModule(module.id)}
                     accessibilityRole="checkbox"
-                    accessibilityState={{ checked: selected }}
+                    accessibilityState={{
+                      checked: selected,
+                    }}
                     accessibilityLabel={module.label}
                     style={({ pressed }) => [
                       styles.moduleCard,
@@ -1518,17 +1782,25 @@ export default function OnboardingScreen({
                         shadowColor: selected ? module.accent : "transparent",
                         shadowOpacity: selected ? 0.35 : 0,
                         shadowRadius: 16,
-                        shadowOffset: { width: 0, height: 8 },
+                        shadowOffset: {
+                          width: 0,
+                          height: 8,
+                        },
                         elevation: selected ? 6 : 0,
                       },
-                      pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+                      pressed && {
+                        transform: [{ scale: 0.98 }],
+                        opacity: 0.9,
+                      },
                     ]}
                   >
                     {selected ? (
                       <View
                         style={[
                           styles.moduleCheck,
-                          { backgroundColor: module.accent },
+                          {
+                            backgroundColor: module.accent,
+                          },
                         ]}
                       >
                         <Check size={12} color="#fff" strokeWidth={3} />
@@ -1555,22 +1827,17 @@ export default function OnboardingScreen({
                     </View>
 
                     <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: "800",
-                        color: selected ? "#fff" : "rgba(255,255,255,0.8)",
-                      }}
+                      style={[
+                        styles.moduleLabel,
+                        {
+                          color: selected ? "#fff" : "rgba(255,255,255,0.8)",
+                        },
+                      ]}
                     >
                       {module.label}
                     </Text>
-                    <Text
-                      style={{
-                        marginTop: 4,
-                        fontSize: 11,
-                        lineHeight: 15,
-                        color: "rgba(255,255,255,0.45)",
-                      }}
-                    >
+
+                    <Text style={styles.moduleDescription}>
                       {module.description}
                     </Text>
                   </Pressable>
@@ -1581,19 +1848,24 @@ export default function OnboardingScreen({
             <View style={styles.footer}>
               <GradientButton
                 onPress={goNext}
-                disabled={selectedModules.length === 0}
+                disabled={selectedModules.length === 0 || saving}
                 accessibilityLabel="Continuer vers le profil"
               >
                 <Text style={styles.ctaText}>Continuer</Text>
+
                 <ArrowRight size={18} color="#fff" strokeWidth={2.5} />
               </GradientButton>
             </View>
           </View>
         ) : null}
 
+        {/* ====================================================================
+         * STEP 3 — PROFILE
+         * ================================================================== */}
+
         {step === 3 ? (
           <ScrollView
-            style={{ flex: 1 }}
+            style={styles.flex}
             contentContainerStyle={styles.profileScroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -1606,75 +1878,49 @@ export default function OnboardingScreen({
               accent="#34D399"
             />
 
-            <View style={{ alignItems: "center", marginBottom: 28 }}>
+            <View style={styles.avatarContainer}>
               <LinearGradient
                 colors={["#8B5CF6", "#6366F1"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.avatarWrapper}
               >
-                <Text
-                  style={{ fontSize: 38, fontWeight: "900", color: "#fff" }}
-                >
+                <Text style={styles.avatarLetter}>
                   {firstName ? firstName.trim().charAt(0).toUpperCase() : "?"}
                 </Text>
               </LinearGradient>
+
               <View style={styles.avatarCamera}>
                 <Camera size={15} color="#fff" strokeWidth={2.4} />
               </View>
-              <Text
-                style={{
-                  marginTop: 14,
-                  fontSize: 11,
-                  color: "rgba(255,255,255,0.4)",
-                }}
-              >
+
+              <Text style={styles.avatarHint}>
                 Votre photo pourra être ajoutée depuis votre profil.
               </Text>
             </View>
 
-            <View style={{ marginBottom: 24 }}>
-              <Text
-                style={{
-                  marginBottom: 8,
-                  fontSize: 11,
-                  fontWeight: "800",
-                  letterSpacing: 1,
-                  color: "rgba(255,255,255,0.55)",
-                }}
-              >
-                PRÉNOM
-              </Text>
+            <View style={styles.firstNameContainer}>
+              <Text style={styles.fieldLabel}>PRÉNOM</Text>
+
               <TextInput
                 value={firstName}
-                onChangeText={(v) => setFirstName(v.slice(0, 60))}
+                onChangeText={(value) => setFirstName(value.slice(0, 60))}
                 placeholder="Comment devons-nous vous appeler ?"
                 placeholderTextColor="rgba(255,255,255,0.35)"
                 style={styles.input}
                 autoCapitalize="words"
                 autoCorrect={false}
+                maxLength={60}
+                returnKeyType="done"
               />
             </View>
 
             <View style={styles.summaryCard}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 16,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: "800",
-                    letterSpacing: 1,
-                    color: "rgba(255,255,255,0.5)",
-                  }}
-                >
+              <View style={styles.summaryHeader}>
+                <Text style={styles.summaryHeaderText}>
                   VOTRE CONFIGURATION
                 </Text>
+
                 <Sparkles size={15} color="#A78BFA" />
               </View>
 
@@ -1685,11 +1931,15 @@ export default function OnboardingScreen({
                   value={city ? `${city}, ${countryName}` : countryName}
                 />
               ) : null}
+
               <SummaryRow
                 icon={<Sparkles size={15} color="#A78BFA" />}
                 label="Centres d'intérêt"
-                value={`${selectedModules.length} module${selectedModules.length > 1 ? "s" : ""}`}
+                value={`${selectedModules.length} module${
+                  selectedModules.length > 1 ? "s" : ""
+                }`}
               />
+
               <SummaryRow
                 icon={<Globe2 size={15} color="#A78BFA" />}
                 label="Expérience"
@@ -1704,27 +1954,13 @@ export default function OnboardingScreen({
               accessibilityLabel="Entrer dans DébrouillePro"
             >
               <CheckCircle2 size={19} color="#fff" strokeWidth={2.4} />
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: "900",
-                  color: "#fff",
-                  letterSpacing: 0.3,
-                }}
-              >
+
+              <Text style={styles.finalButtonText}>
                 Entrer dans DébrouillePro
               </Text>
             </GradientButton>
 
-            <Text
-              style={{
-                marginTop: 14,
-                textAlign: "center",
-                fontSize: 10,
-                lineHeight: 15,
-                color: "rgba(255,255,255,0.3)",
-              }}
-            >
+            <Text style={styles.disclaimer}>
               Vous pourrez modifier ces préférences à tout moment dans votre
               profil.
             </Text>
@@ -1735,11 +1971,32 @@ export default function OnboardingScreen({
   );
 }
 
-// ── STYLES (inchangés) ───────────────────────────────────────────────────
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: "#0B0620",
+  },
+
+  flex: {
+    flex: 1,
+  },
+
+  background: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+
+  backgroundGradient: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
   },
 
   orb: {
@@ -1755,6 +2012,11 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     zIndex: 10,
   },
+
+  headerSide: {
+    width: 60,
+  },
+
   glassIconButton: {
     width: 42,
     height: 42,
@@ -1765,12 +2027,26 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.14)",
     backgroundColor: "rgba(255,255,255,0.08)",
   },
+
+  stepIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
   skipButton: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
     minWidth: 60,
     alignItems: "center",
+  },
+
+  skipButtonText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: 0.4,
   },
 
   progressTrack: {
@@ -1781,10 +2057,15 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     zIndex: 10,
   },
+
   progressFill: {
     height: "100%",
     borderRadius: 999,
     backgroundColor: "#A78BFA",
+  },
+
+  keyboardContainer: {
+    flex: 1,
   },
 
   welcomeScroll: {
@@ -1793,8 +2074,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 24,
     paddingVertical: 40,
-    minHeight: "100%",
   },
+
+  welcomeContent: {
+    alignItems: "center",
+  },
+
   globeWrapper: {
     width: 108,
     height: 108,
@@ -1805,9 +2090,13 @@ const styles = StyleSheet.create({
     shadowColor: "#8B5CF6",
     shadowOpacity: 0.55,
     shadowRadius: 40,
-    shadowOffset: { width: 0, height: 22 },
+    shadowOffset: {
+      width: 0,
+      height: 22,
+    },
     elevation: 14,
   },
+
   heroTitle: {
     fontSize: 38,
     fontWeight: "900",
@@ -1816,6 +2105,11 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
     lineHeight: 44,
   },
+
+  heroTitleAccent: {
+    color: "#C4B5FD",
+  },
+
   heroSubtitle: {
     marginTop: 16,
     maxWidth: 380,
@@ -1833,6 +2127,7 @@ const styles = StyleSheet.create({
     marginTop: 32,
     paddingHorizontal: 8,
   },
+
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -1842,10 +2137,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
+
   chipText: {
     fontSize: 12.5,
     fontWeight: "800",
     letterSpacing: 0.2,
+  },
+
+  welcomeButtonContainer: {
+    width: "100%",
+    maxWidth: 400,
+    marginTop: 36,
   },
 
   gradientButtonOuter: {
@@ -1854,9 +2156,13 @@ const styles = StyleSheet.create({
     shadowColor: "#7C3AED",
     shadowOpacity: 0.55,
     shadowRadius: 24,
-    shadowOffset: { width: 0, height: 16 },
+    shadowOffset: {
+      width: 0,
+      height: 16,
+    },
     elevation: 12,
   },
+
   gradientButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1867,16 +2173,60 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 18,
   },
+
   ctaText: {
     fontSize: 16,
     fontWeight: "900",
     color: "#fff",
     letterSpacing: 0.3,
   },
+
   skipLink: {
     marginTop: 18,
     paddingVertical: 10,
     alignItems: "center",
+  },
+
+  skipLinkText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.4)",
+    letterSpacing: 0.3,
+  },
+
+  horizontalPadding: {
+    paddingHorizontal: 20,
+  },
+
+  sectionTitle: {
+    paddingTop: 20,
+    paddingBottom: 18,
+  },
+
+  sectionEyebrow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+
+  sectionEyebrowText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.6,
+  },
+
+  sectionTitleText: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.5,
+  },
+
+  sectionSubtitle: {
+    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.5)",
   },
 
   locationButton: {
@@ -1891,6 +2241,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(139,92,246,0.12)",
     marginBottom: 16,
   },
+
   locationIcon: {
     width: 42,
     height: 42,
@@ -1899,16 +2250,41 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(139,92,246,0.22)",
   },
+
+  locationText: {
+    flex: 1,
+  },
+
+  locationTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#fff",
+  },
+
+  locationDescription: {
+    marginTop: 2,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.45)",
+  },
+
+  locationNotice: {
+    fontSize: 11,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+
   searchWrapper: {
     position: "relative",
     marginBottom: 12,
   },
+
   searchIcon: {
     position: "absolute",
     left: 16,
     top: 17,
     zIndex: 2,
   },
+
   input: {
     width: "100%",
     paddingHorizontal: 16,
@@ -1921,12 +2297,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
+  inputWithLeftIcon: {
+    paddingLeft: 44,
+  },
+
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 20,
     paddingTop: 4,
     gap: 8,
   },
+
   countryRow: {
     minHeight: 58,
     flexDirection: "row",
@@ -1938,10 +2319,76 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(255,255,255,0.05)",
   },
+
   countryRowSelected: {
     backgroundColor: "rgba(139,92,246,0.22)",
     borderColor: "rgba(167,139,250,0.6)",
   },
+
+  countryFlag: {
+    fontSize: 20,
+  },
+
+  countryName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.92)",
+  },
+
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 48,
+  },
+
+  emptyStateTitle: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.55)",
+  },
+
+  emptyStateDescription: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.35)",
+  },
+
+  citySection: {
+    marginTop: 20,
+  },
+
+  cityHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  cityEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+    color: "rgba(255,255,255,0.45)",
+  },
+
+  cityOptional: {
+    marginTop: 2,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.35)",
+  },
+
+  modifyText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.5)",
+  },
+
+  cityLoader: {
+    position: "absolute",
+    right: 16,
+    top: 16,
+  },
+
   cityDropdown: {
     marginTop: 8,
     borderRadius: 16,
@@ -1950,6 +2397,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(20,10,44,0.98)",
     overflow: "hidden",
   },
+
   cityRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1958,11 +2406,57 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
 
+  cityRowText: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.9)",
+  },
+
+  cityHint: {
+    marginTop: 6,
+    fontSize: 10,
+    lineHeight: 15,
+    color: "rgba(255,255,255,0.3)",
+  },
+
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 22,
+  },
+
+  selectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+
+  selectionText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.5)",
+  },
+
+  countBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(167,139,250,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.3)",
+  },
+
+  countBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#C4B5FD",
+  },
+
   moduleCard: {
     padding: 16,
     borderRadius: 22,
     borderWidth: 1,
   },
+
   moduleCheck: {
     position: "absolute",
     top: 14,
@@ -1973,6 +2467,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   moduleIcon: {
     width: 44,
     height: 44,
@@ -1981,19 +2476,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 14,
   },
-  countBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(167,139,250,0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(167,139,250,0.3)",
+
+  moduleLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  moduleDescription: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 15,
+    color: "rgba(255,255,255,0.45)",
   },
 
   profileScroll: {
     paddingHorizontal: 20,
     paddingBottom: 28,
   },
+
+  avatarContainer: {
+    alignItems: "center",
+    marginBottom: 28,
+  },
+
   avatarWrapper: {
     width: 104,
     height: 104,
@@ -2003,14 +2508,22 @@ const styles = StyleSheet.create({
     shadowColor: "#8B5CF6",
     shadowOpacity: 0.45,
     shadowRadius: 32,
-    shadowOffset: { width: 0, height: 20 },
+    shadowOffset: {
+      width: 0,
+      height: 20,
+    },
     elevation: 12,
   },
+
+  avatarLetter: {
+    fontSize: 38,
+    fontWeight: "900",
+    color: "#fff",
+  },
+
   avatarCamera: {
     position: "absolute",
-    bottom: 0,
-    alignSelf: "center",
-    marginTop: -19,
+    bottom: 28,
     width: 38,
     height: 38,
     borderRadius: 14,
@@ -2020,6 +2533,26 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "#0B0620",
   },
+
+  avatarHint: {
+    marginTop: 14,
+    fontSize: 11,
+    color: "rgba(255,255,255,0.4)",
+    textAlign: "center",
+  },
+
+  firstNameContainer: {
+    marginBottom: 24,
+  },
+
+  fieldLabel: {
+    marginBottom: 8,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+    color: "rgba(255,255,255,0.55)",
+  },
+
   summaryCard: {
     marginBottom: 24,
     padding: 18,
@@ -2028,6 +2561,28 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.1)",
     backgroundColor: "rgba(255,255,255,0.045)",
   },
+
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+
+  summaryHeaderText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+    color: "rgba(255,255,255,0.5)",
+  },
+
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+
   summaryIcon: {
     width: 38,
     height: 38,
@@ -2037,9 +2592,35 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(167,139,250,0.15)",
   },
 
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 22,
+  summaryRowContent: {
+    flex: 1,
+  },
+
+  summaryLabel: {
+    fontSize: 10,
+    letterSpacing: 1,
+    color: "rgba(255,255,255,0.35)",
+    textTransform: "uppercase",
+  },
+
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.9)",
+  },
+
+  finalButtonText: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: 0.3,
+  },
+
+  disclaimer: {
+    marginTop: 14,
+    textAlign: "center",
+    fontSize: 10,
+    lineHeight: 15,
+    color: "rgba(255,255,255,0.3)",
   },
 });

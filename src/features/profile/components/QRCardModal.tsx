@@ -1,25 +1,11 @@
-import { View, Pressable, Text, Share } from "react-native";
-
 // src/features/profile/components/QRCardModal.tsx
 
-import { useState, useEffect, useRef } from "react";
-import { X, CheckCircle2, Check, Copy, Share2 } from "lucide-react-native";
-import QRCode from "qrcode";
+import { useEffect, useState } from "react";
+import { Modal, Pressable, Share, Text, View } from "react-native";
+import { Check, CheckCircle2, Copy, Share2, X } from "lucide-react-native";
+import QRCode from "react-native-qrcode-svg";
+import Clipboard from "@react-native-clipboard/clipboard";
 import { toast } from "sonner";
-import { Clipboard } from "@react-native-clipboard/clipboard";
-
-const BADGES = [
-  { icon: "✅", label: "Identité vérifiée", color: "#10B981" },
-  { icon: "⚡", label: "Réponse rapide", color: "#F97316" },
-  { icon: "🏆", label: "Top Vendeur", color: "#F59E0B" },
-  { icon: "🛡️", label: "Compte sécurisé", color: "#3B82F6" },
-];
-
-const MODULE_STATS = [
-  { label: "Annonces", value: "12", color: "#F97316" },
-  { label: "Followers", value: "1.4K", color: "#8B5CF6" },
-  { label: "Avis", value: "4.9★", color: "#F59E0B" },
-];
 
 interface QRCardModalProps {
   onClose: () => void;
@@ -28,65 +14,249 @@ interface QRCardModalProps {
   slug: string;
 }
 
+const FALLBACK_ACCENT = "#6366F1";
+
+function normalizeAccent(value: string): string {
+  const trimmed = value.trim();
+
+  if (/^#[0-9A-Fa-f]{6}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^#[0-9A-Fa-f]{3}$/.test(trimmed)) {
+    const [, r, g, b] = trimmed;
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+
+  return FALLBACK_ACCENT;
+}
+
+function normalizeSlug(value: string): string {
+  return value.trim().replace(/^\/+|\/+$/g, "");
+}
+
+function buildProfileUrl(slug: string): string {
+  const normalizedSlug = normalizeSlug(slug);
+
+  return `https://debrouille.app/profil/${encodeURIComponent(normalizedSlug)}`;
+}
+
 export function QRCardModal({
   onClose,
   accentHex,
   displayName,
   slug,
 }: QRCardModalProps) {
-  const canvasRef = useRef<View>(null);
   const [copied, setCopied] = useState(false);
-  const profileUrl = `https://debrouille.app/profil/${slug}`;
+
+  const accent = normalizeAccent(accentHex);
+  const profileUrl = buildProfileUrl(slug);
 
   useEffect(() => {
-    if (canvasRef.current) {
-      QRCode.toCanvas(canvasRef.current, profileUrl, {
-        width: 160,
-        margin: 1,
-        color: { dark: "#ffffff", light: "#00000000" },
-      }).catch(() => {
-        /* ignore */
-      });
+    if (!copied) {
+      return;
     }
-  }, [profileUrl]);
+
+    const timeout = setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [copied]);
 
   const handleCopy = () => {
-    void Clipboard.setString(profileUrl);
+    Clipboard.setString(profileUrl);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
     toast.success("Lien copié !");
   };
 
-  const handleShare = () => {
-    if (navigator.share) {
-      void Share.share({ message: String(profileUrl), title: `${displayName} – Débrouille Pro` });
-    } else {
-      handleCopy();
+  const handleShare = async () => {
+    try {
+      const result = await Share.share({
+        title: `${displayName} – DébrouillePro`,
+        message: profileUrl,
+      });
+
+      if (result.action === Share.sharedAction) {
+        toast.success("Profil partagé");
+      }
+    } catch (error) {
+      console.error("Failed to share profile:", error);
+
+      toast.error("Impossible de partager le profil");
     }
   };
 
   return (
-    <View initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-5" style={{ backgroundColor: "rgba(0,0,0,0.85)" }} onPress={(e) => e.target === e.currentTarget && onClose()}>
-      <View initial={{ scale: 0.85, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.85, opacity: 0 }} transition={{ type: "spring", damping: 22, stiffness: 280 }} className="w-full max-w-sm rounded-3xl overflow-hidden" style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-        <View className="relative px-6 pt-6 pb-4" style={{  }}><Pressable onPress={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.1)" }}><X size={15} className="text-white" /></Pressable><View className="flex items-center gap-4 mb-4"><View><View className="flex items-center gap-1.5 mb-0.5"><Text className="text-white font-black text-lg">{displayName}</Text><CheckCircle2 size={15} className="text-blue-400" /></View><View className="text-white/50 text-xs mb-1"><Text>Pro Vérifié</Text></View><View className="flex gap-1.5">{BADGES.slice(0, 2).map((b) => (
-                  <Text key={b.label} className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${b.color}20`, color: b.color }}>{b.icon}</Text>
-                ))}</View></View></View><View className="flex gap-3 mb-2">{MODULE_STATS.map((s) => (
-              <View key={s.label} className="flex-1 text-center rounded-xl py-2" style={{ backgroundColor: `${s.color}15`, borderStyle: "solid" }}><View className="font-black text-sm text-white">{s.value}</View><View className="text-[10px] text-white/40">{s.label}</View></View>
-            ))}</View></View>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View className="flex-1 items-center justify-center bg-black/85 px-5">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
+          onPress={onClose}
+          className="absolute inset-0"
+        />
 
-        <View className="px-6 py-4 flex flex-col items-center"><View className="rounded-2xl p-4 mb-3" style={{ backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", borderStyle: "solid" }}><canvas ref={canvasRef} className="rounded-xl" /></View><Text className="text-white/40 text-xs text-center mb-1">Scannez pour voir mon profil
-          </Text><Text className="text-white/25 text-[10px] text-center font-mono truncate max-w-full px-2">{profileUrl}</Text></View>
+        <View
+          className="w-full max-w-[390px] overflow-hidden rounded-3xl border border-white/10 bg-[#0A0A14]"
+          style={{
+            shadowColor: "#000000",
+            shadowOffset: {
+              width: 0,
+              height: 16,
+            },
+            shadowOpacity: 0.45,
+            shadowRadius: 30,
+            elevation: 20,
+          }}
+        >
+          {/* Header */}
+          <View className="px-6 pb-5 pt-6">
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer la carte QR"
+              hitSlop={10}
+              className="absolute right-4 top-4 z-10 h-9 w-9 items-center justify-center rounded-full bg-white/10 active:bg-white/15"
+            >
+              <X size={17} color="rgba(255,255,255,0.75)" strokeWidth={2} />
+            </Pressable>
 
-        <View className="px-6 pb-6 flex gap-3">
-          <Pressable onPress={handleCopy} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-transform" style={{ backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-            {copied ? <Check size={15} /> : <Copy size={15} />}
-            {copied ? "Copié !" : "Copier le lien"}
-          </Pressable>
-          <Pressable onPress={handleShare} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold active:scale-95 transition-transform" style={{  }}>
-            <Share2 size={15} /> Partager
-          </Pressable>
+            <View className="items-center pt-2">
+              <View
+                className="mb-4 h-14 w-14 items-center justify-center rounded-2xl"
+                style={{
+                  backgroundColor: `${accent}20`,
+                  borderWidth: 1,
+                  borderColor: `${accent}45`,
+                }}
+              >
+                <Share2 size={24} color={accent} strokeWidth={2} />
+              </View>
+
+              <View className="max-w-full flex-row items-center">
+                <Text
+                  className="max-w-[280px] text-center text-xl font-black text-white"
+                  numberOfLines={2}
+                >
+                  {displayName.trim() || "Profil"}
+                </Text>
+
+                <CheckCircle2
+                  size={16}
+                  color={accent}
+                  strokeWidth={2.4}
+                  style={{
+                    marginLeft: 7,
+                  }}
+                />
+              </View>
+
+              <Text className="mt-1 text-xs font-medium text-white/40">
+                Profil public DébrouillePro
+              </Text>
+            </View>
+          </View>
+
+          {/* QR Code */}
+          <View className="items-center px-6 pb-5">
+            <View
+              className="rounded-3xl p-5"
+              style={{
+                backgroundColor: "#11121D",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.08)",
+              }}
+            >
+              <View
+                className="rounded-2xl bg-black p-4"
+                accessible
+                accessibilityRole="image"
+                accessibilityLabel={`QR code du profil de ${
+                  displayName.trim() || "cet utilisateur"
+                }`}
+              >
+                <QRCode
+                  value={profileUrl}
+                  size={180}
+                  color="#FFFFFF"
+                  backgroundColor="#000000"
+                  quietZone={4}
+                />
+              </View>
+            </View>
+
+            <Text className="mt-4 text-center text-sm font-semibold text-white/75">
+              Scannez pour voir ce profil
+            </Text>
+
+            <Text
+              className="mt-1 max-w-full px-3 text-center text-[10px] text-white/30"
+              numberOfLines={2}
+            >
+              {profileUrl}
+            </Text>
+          </View>
+
+          {/* Actions */}
+          <View className="px-6 pb-6">
+            <View className="flex-row">
+              <Pressable
+                onPress={handleCopy}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  copied ? "Lien copié" : "Copier le lien du profil"
+                }
+                className="mr-2 flex-1 flex-row items-center justify-center rounded-2xl border border-white/10 bg-white/5 py-3.5 active:bg-white/10"
+              >
+                {copied ? (
+                  <Check size={16} color="#10B981" strokeWidth={2.5} />
+                ) : (
+                  <Copy
+                    size={16}
+                    color="rgba(255,255,255,0.75)"
+                    strokeWidth={2}
+                  />
+                )}
+
+                <Text
+                  className={`ml-2 text-xs font-bold ${
+                    copied ? "text-emerald-400" : "text-white/80"
+                  }`}
+                >
+                  {copied ? "Copié !" : "Copier le lien"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  void handleShare();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Partager le profil"
+                className="ml-2 flex-1 flex-row items-center justify-center rounded-2xl py-3.5 active:opacity-80"
+                style={{
+                  backgroundColor: accent,
+                }}
+              >
+                <Share2 size={16} color="#FFFFFF" strokeWidth={2.2} />
+
+                <Text className="ml-2 text-xs font-bold text-white">
+                  Partager
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       </View>
-    </View>
+    </Modal>
   );
 }

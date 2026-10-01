@@ -1,17 +1,205 @@
 // convex/network.ts
 
-import { query, mutation } from "./_generated/server";
-import { v, ConvexError } from "convex/values";
-import type { QueryCtx, MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import { mutation, query } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+
 import {
   buildUserSearchText,
   normalizeUserSearchQuery,
 } from "./lib/userSearch";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ============================================================================
+// LIMITES
+// ============================================================================
 
-async function requireUser(ctx: QueryCtx | MutationCtx) {
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 100;
+const MAX_SEARCH_LIMIT = 50;
+const MAX_SUGGESTIONS = 10;
+const MAX_ANALYTICS_DAYS = 366;
+const MAX_NEARBY_RADIUS_KM = 500;
+
+// ============================================================================
+// TYPES PUBLICS
+// ============================================================================
+
+type Availability = "available" | "limited" | "unavailable";
+
+type PublicSocialLinks = {
+  facebook?: string;
+  twitter?: string;
+  linkedin?: string;
+  instagram?: string;
+  youtube?: string;
+  tiktok?: string;
+  whatsapp?: string;
+  telegram?: string;
+};
+
+type PublicLocation = {
+  city?: string;
+  country?: string;
+  province?: string;
+};
+
+type PublicUserCard = {
+  _id: Id<"users">;
+  name: string;
+  slug?: string;
+  avatar?: string;
+  bio?: string;
+  city?: string;
+  country?: string;
+  province?: string;
+  profession?: string;
+};
+
+type PublicProfile = {
+  _id: Id<"users">;
+  name: string;
+  slug?: string;
+  avatar?: string;
+  coverUrl?: string;
+  bio?: string;
+  roles: string[];
+  publicLocation?: PublicLocation;
+  website?: string;
+  headline?: string;
+  availability?: Availability;
+  verified: boolean;
+  reputationScore: number;
+  socialLinks?: PublicSocialLinks;
+  followerCount: number;
+  followingCount: number;
+  isFollowing: boolean;
+};
+
+type FollowStats = {
+  followerCount: number;
+  followingCount: number;
+  isFollowing: boolean;
+};
+
+type PublicFollowUser = PublicUserCard & {
+  followedAt: string;
+  isFollowedByMe: boolean;
+};
+
+type ProfileAnalytics = {
+  period: string | null;
+  profileViews: number;
+  connectionsGained: number;
+  connectionsLost: number;
+  searchAppearances: number;
+  opportunitiesGenerated: number;
+  postsEngagement: number;
+  daily: Array<{
+    date: string;
+    profileViews: number;
+    connectionsGained: number;
+    connectionsLost: number;
+    postsEngagement: number;
+    searchAppearances: number;
+    opportunitiesGenerated: number;
+  }>;
+};
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function clampLimit(
+  value: number | undefined,
+  fallback: number,
+  maximum: number,
+): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(Math.floor(value), 1), maximum);
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function toDateString(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeOptionalString(
+  value: string | undefined,
+): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function requireNonEmptyString(value: string, fieldName: string): string {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: `${fieldName} est requis`,
+    });
+  }
+
+  return normalized;
+}
+
+// ============================================================================
+// COORDONNÉES
+// ============================================================================
+
+function validateLatitude(latitude: number): void {
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: "Latitude invalide",
+    });
+  }
+}
+
+function validateLongitude(longitude: number): void {
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: "Longitude invalide",
+    });
+  }
+}
+
+function validateCoordinates(latitude: number, longitude: number): void {
+  validateLatitude(latitude);
+  validateLongitude(longitude);
+}
+
+function validateRadius(radius: number): void {
+  if (
+    !Number.isFinite(radius) ||
+    radius <= 0 ||
+    radius > MAX_NEARBY_RADIUS_KM
+  ) {
+    throw new ConvexError({
+      code: "BAD_REQUEST",
+      message: `Le rayon doit être compris entre 0 et ${MAX_NEARBY_RADIUS_KM} km`,
+    });
+  }
+}
+
+// ============================================================================
+// AUTHENTIFICATION
+// ============================================================================
+
+async function requireUser(ctx: QueryCtx | MutationCtx): Promise<Doc<"users">> {
   const identity = await ctx.auth.getUserIdentity();
 
   if (!identity) {
@@ -35,225 +223,222 @@ async function requireUser(ctx: QueryCtx | MutationCtx) {
     });
   }
 
+  if (user.isBanned === true) {
+    throw new ConvexError({
+      code: "FORBIDDEN",
+      message: "Compte indisponible",
+    });
+  }
+
   return user;
 }
 
-async function getCurrentUser(ctx: QueryCtx) {
-  try {
-    const identity = await ctx.auth.getUserIdentity();
+async function getCurrentUser(
+  ctx: QueryCtx | MutationCtx,
+): Promise<Doc<"users"> | null> {
+  const identity = await ctx.auth.getUserIdentity();
 
-    if (!identity) return null;
-
-    return await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier),
-      )
-      .unique();
-  } catch {
+  if (!identity) {
     return null;
   }
+
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_token", (q) =>
+      q.eq("tokenIdentifier", identity.tokenIdentifier),
+    )
+    .unique();
+
+  if (!user || user.isBanned === true) {
+    return null;
+  }
+
+  return user;
 }
 
-async function ensureOwnership<T extends { userId: Id<"users"> }>(
-  ctx: QueryCtx | MutationCtx,
-  entityId: Id<any>,
-  _tableName: string,
+// ============================================================================
+// DTO PUBLICS
+// ============================================================================
+
+function toPublicUserCard(user: Doc<"users">): PublicUserCard {
+  return {
+    _id: user._id,
+    name: user.name,
+    slug: user.slug,
+    avatar: user.avatar,
+    bio: user.bio,
+    city: user.city,
+    country: user.country,
+    province: user.location?.province,
+    profession: user.profession,
+  };
+}
+
+function buildPublicLocation(user: Doc<"users">): PublicLocation | undefined {
+  const city = user.location?.city ?? user.city;
+
+  const country = user.location?.country ?? user.country;
+
+  const province = user.location?.province;
+
+  if (!city && !country && !province) {
+    return undefined;
+  }
+
+  return {
+    city,
+    country,
+    province,
+  };
+}
+
+// ============================================================================
+// FOLLOW HELPERS
+// ============================================================================
+
+async function isFollowingUser(
+  ctx: QueryCtx,
+  followerId: Id<"users"> | undefined,
+  followingId: Id<"users">,
+): Promise<boolean> {
+  if (!followerId || followerId === followingId) {
+    return false;
+  }
+
+  const relation = await ctx.db
+    .query("follows")
+    .withIndex("by_follower_and_following", (q) =>
+      q.eq("followerId", followerId).eq("followingId", followingId),
+    )
+    .unique();
+
+  return relation !== null;
+}
+
+async function getExactFollowerCount(
+  ctx: QueryCtx,
   userId: Id<"users">,
-): Promise<T> {
-  const entity = (await ctx.db.get(entityId)) as T | null;
+): Promise<number> {
+  let count = 0;
 
-  if (!entity) {
-    throw new ConvexError({
-      code: "NOT_FOUND",
-      message: "Élément introuvable",
-    });
+  const relations = ctx.db
+    .query("follows")
+    .withIndex("by_following", (q) => q.eq("followingId", userId));
+
+  for await (const _relation of relations) {
+    count += 1;
   }
 
-  if (entity.userId !== userId) {
-    throw new ConvexError({
-      code: "FORBIDDEN",
-      message: "Vous n'êtes pas autorisé à modifier cet élément",
-    });
-  }
-
-  return entity;
+  return count;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. PROFIL UTILISATEUR
-// ─────────────────────────────────────────────────────────────────────────────
+async function getExactFollowingCount(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+): Promise<number> {
+  let count = 0;
+
+  const relations = ctx.db
+    .query("follows")
+    .withIndex("by_follower", (q) => q.eq("followerId", userId));
+
+  for await (const _relation of relations) {
+    count += 1;
+  }
+
+  return count;
+}
+
+// ============================================================================
+// 1. PROFIL PUBLIC
+// ============================================================================
 
 export const getPublicProfile = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
+
+  handler: async (ctx, args): Promise<PublicProfile | null> => {
+    const user = await ctx.db.get(args.userId);
+
+    if (!user || user.isBanned === true) {
+      return null;
+    }
+
+    const [networkProfile, currentUser, followerCount, followingCount] =
+      await Promise.all([
+        ctx.db
+          .query("networkProfiles")
+          .withIndex("by_user", (q) => q.eq("userId", args.userId))
+          .unique(),
+
+        getCurrentUser(ctx),
+
+        getExactFollowerCount(ctx, args.userId),
+
+        getExactFollowingCount(ctx, args.userId),
+      ]);
+
+    const isFollowing = await isFollowingUser(
+      ctx,
+      currentUser?._id,
+      args.userId,
+    );
+
+    const coverUrl = user.coverImage
+      ? ((await ctx.storage.getUrl(user.coverImage)) ?? undefined)
+      : undefined;
+
+    return {
+      _id: user._id,
+      name: user.name,
+      slug: user.slug,
+      avatar: user.avatar,
+      coverUrl,
+      bio: user.bio,
+      roles: user.roles,
+      publicLocation: buildPublicLocation(user),
+
+      website: networkProfile?.website ?? user.website,
+
+      headline: networkProfile?.headline,
+
+      availability: networkProfile?.availability,
+
+      verified: networkProfile?.verified === true,
+
+      reputationScore: networkProfile?.reputationScore ?? user.reputationScore,
+
+      socialLinks: networkProfile?.socialLinks,
+
+      followerCount,
+      followingCount,
+      isFollowing,
+    };
+  },
+});
+
+// ============================================================================
+// 2. EXPÉRIENCES
+// ============================================================================
+
+export const getUserExperiences = query({
+  args: {
+    userId: v.id("users"),
+  },
 
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
 
-    if (!user) return null;
+    if (!user || user.isBanned === true) {
+      return [];
+    }
 
-    const experiences = await ctx.db
+    return ctx.db
       .query("networkExperiences")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-
-    const educations = await ctx.db
-      .query("networkEducations")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-
-    const skills = await ctx.db
-      .query("networkSkills")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-
-    const services = await ctx.db
-      .query("networkServices")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-
-    const recommendations = await ctx.db
-      .query("networkRecommendations")
-      .withIndex("by_receiver", (q) => q.eq("receiverId", args.userId))
-      .collect();
-
-    const follows = await ctx.db.query("follows").collect();
-
-    const followerCount = follows.filter(
-      (f) => f.followingId === args.userId,
-    ).length;
-
-    const followingCount = follows.filter(
-      (f) => f.followerId === args.userId,
-    ).length;
-
-    return {
-      ...user,
-      experiences,
-      educations,
-      skills,
-      services,
-      recommendations,
-      followerCount,
-      followingCount,
-    };
-  },
-});
-
-export const updateProfile = mutation({
-  args: {
-    name: v.optional(v.string()),
-    headline: v.optional(v.string()),
-    bio: v.optional(v.string()),
-    city: v.optional(v.string()),
-    country: v.optional(v.string()),
-    roles: v.optional(v.array(v.string())),
-    interests: v.optional(v.array(v.string())),
-    avatar: v.optional(v.string()),
-    cover: v.optional(v.string()),
-    availability: v.optional(
-      v.union(
-        v.literal("available"),
-        v.literal("limited"),
-        v.literal("unavailable"),
-      ),
-    ),
-  },
-
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    const name = args.name ?? user.name;
-    const bio = args.bio ?? user.bio;
-    const city = args.city ?? user.city;
-    const country = args.country ?? user.country;
-    const roles = args.roles ?? user.roles;
-    const interests = args.interests ?? user.interests;
-
-    const updates: {
-      name?: string;
-      headline?: string;
-      bio?: string;
-      city?: string;
-      country?: string;
-      roles?: string[];
-      interests?: string[];
-      avatar?: string;
-      cover?: string;
-      availability?: "available" | "limited" | "unavailable";
-      searchText: string;
-      updatedAt: string;
-    } = {
-      searchText: buildUserSearchText({
-        name,
-        bio,
-        city,
-        country,
-        roles,
-        interests,
-        profession: user.profession,
-      }),
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (args.name !== undefined) {
-      updates.name = args.name;
-    }
-
-    if (args.headline !== undefined) {
-      updates.headline = args.headline;
-    }
-
-    if (args.bio !== undefined) {
-      updates.bio = args.bio;
-    }
-
-    if (args.city !== undefined) {
-      updates.city = args.city;
-    }
-
-    if (args.country !== undefined) {
-      updates.country = args.country;
-    }
-
-    if (args.roles !== undefined) {
-      updates.roles = args.roles;
-    }
-
-    if (args.interests !== undefined) {
-      updates.interests = args.interests;
-    }
-
-    if (args.avatar !== undefined) {
-      updates.avatar = args.avatar;
-    }
-
-    if (args.cover !== undefined) {
-      updates.cover = args.cover;
-    }
-
-    if (args.availability !== undefined) {
-      updates.availability = args.availability;
-    }
-
-    await ctx.db.patch(user._id, updates);
-
-    return { success: true };
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 2. EXPÉRIENCES PROFESSIONNELLES
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const getUserExperiences = query({
-  args: { userId: v.id("users") },
-
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("networkExperiences")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
+      .order("desc")
+      .take(MAX_LIMIT);
   },
 });
 
@@ -272,21 +457,25 @@ export const addExperience = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const id = await ctx.db.insert("networkExperiences", {
-      userId: user._id,
-      title: args.title,
-      company: args.company,
-      location: args.location,
-      startDate: args.startDate,
-      endDate: args.endDate,
-      current: args.current,
-      description: args.description,
-      achievements: args.achievements || [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    const title = requireNonEmptyString(args.title, "Le titre");
 
-    return id;
+    const company = requireNonEmptyString(args.company, "L'entreprise");
+
+    const now = nowIso();
+
+    return ctx.db.insert("networkExperiences", {
+      userId: user._id,
+      title,
+      company,
+      location: normalizeOptionalString(args.location),
+      startDate: args.startDate,
+      endDate: normalizeOptionalString(args.endDate),
+      current: args.current,
+      description: normalizeOptionalString(args.description),
+      achievements: args.achievements ?? [],
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });
 
@@ -306,28 +495,73 @@ export const updateExperience = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkExperiences", user._id);
+    const experience = await ctx.db.get(args.id);
 
-    const updates: any = {
-      updatedAt: new Date().toISOString(),
+    if (!experience) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Expérience introuvable",
+      });
+    }
+
+    if (experience.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
+
+    const updates: {
+      title?: string;
+      company?: string;
+      location?: string;
+      startDate?: string;
+      endDate?: string;
+      current?: boolean;
+      description?: string;
+      achievements?: string[];
+      updatedAt: string;
+    } = {
+      updatedAt: nowIso(),
     };
 
-    if (args.title !== undefined) updates.title = args.title;
-    if (args.company !== undefined) updates.company = args.company;
-    if (args.location !== undefined) updates.location = args.location;
-    if (args.startDate !== undefined) updates.startDate = args.startDate;
-    if (args.endDate !== undefined) updates.endDate = args.endDate;
-    if (args.current !== undefined) updates.current = args.current;
-    if (args.description !== undefined) {
-      updates.description = args.description;
+    if (args.title !== undefined) {
+      updates.title = requireNonEmptyString(args.title, "Le titre");
     }
+
+    if (args.company !== undefined) {
+      updates.company = requireNonEmptyString(args.company, "L'entreprise");
+    }
+
+    if (args.location !== undefined) {
+      updates.location = args.location.trim();
+    }
+
+    if (args.startDate !== undefined) {
+      updates.startDate = args.startDate;
+    }
+
+    if (args.endDate !== undefined) {
+      updates.endDate = args.endDate.trim();
+    }
+
+    if (args.current !== undefined) {
+      updates.current = args.current;
+    }
+
+    if (args.description !== undefined) {
+      updates.description = args.description.trim();
+    }
+
     if (args.achievements !== undefined) {
       updates.achievements = args.achievements;
     }
 
     await ctx.db.patch(args.id, updates);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
@@ -339,26 +573,51 @@ export const deleteExperience = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkExperiences", user._id);
+    const experience = await ctx.db.get(args.id);
+
+    if (!experience) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Expérience introuvable",
+      });
+    }
+
+    if (experience.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
 
     await ctx.db.delete(args.id);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 // 3. FORMATIONS
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 
 export const getUserEducations = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
 
   handler: async (ctx, args) => {
-    return await ctx.db
+    const user = await ctx.db.get(args.userId);
+
+    if (!user || user.isBanned === true) {
+      return [];
+    }
+
+    return ctx.db
       .query("networkEducations")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
+      .order("desc")
+      .take(MAX_LIMIT);
   },
 });
 
@@ -377,21 +636,25 @@ export const addEducation = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const id = await ctx.db.insert("networkEducations", {
-      userId: user._id,
-      school: args.school,
-      degree: args.degree,
-      field: args.field,
-      location: args.location,
-      startDate: args.startDate,
-      endDate: args.endDate,
-      current: args.current,
-      description: args.description,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    const school = requireNonEmptyString(args.school, "L'établissement");
 
-    return id;
+    const degree = requireNonEmptyString(args.degree, "Le diplôme");
+
+    const now = nowIso();
+
+    return ctx.db.insert("networkEducations", {
+      userId: user._id,
+      school,
+      degree,
+      field: normalizeOptionalString(args.field),
+      location: normalizeOptionalString(args.location),
+      startDate: args.startDate,
+      endDate: normalizeOptionalString(args.endDate),
+      current: args.current,
+      description: normalizeOptionalString(args.description),
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });
 
@@ -411,26 +674,73 @@ export const updateEducation = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkEducations", user._id);
+    const education = await ctx.db.get(args.id);
 
-    const updates: any = {
-      updatedAt: new Date().toISOString(),
+    if (!education) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Formation introuvable",
+      });
+    }
+
+    if (education.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
+
+    const updates: {
+      school?: string;
+      degree?: string;
+      field?: string;
+      location?: string;
+      startDate?: string;
+      endDate?: string;
+      current?: boolean;
+      description?: string;
+      updatedAt: string;
+    } = {
+      updatedAt: nowIso(),
     };
 
-    if (args.school !== undefined) updates.school = args.school;
-    if (args.degree !== undefined) updates.degree = args.degree;
-    if (args.field !== undefined) updates.field = args.field;
-    if (args.location !== undefined) updates.location = args.location;
-    if (args.startDate !== undefined) updates.startDate = args.startDate;
-    if (args.endDate !== undefined) updates.endDate = args.endDate;
-    if (args.current !== undefined) updates.current = args.current;
+    if (args.school !== undefined) {
+      updates.school = requireNonEmptyString(args.school, "L'établissement");
+    }
+
+    if (args.degree !== undefined) {
+      updates.degree = requireNonEmptyString(args.degree, "Le diplôme");
+    }
+
+    if (args.field !== undefined) {
+      updates.field = args.field.trim();
+    }
+
+    if (args.location !== undefined) {
+      updates.location = args.location.trim();
+    }
+
+    if (args.startDate !== undefined) {
+      updates.startDate = args.startDate;
+    }
+
+    if (args.endDate !== undefined) {
+      updates.endDate = args.endDate.trim();
+    }
+
+    if (args.current !== undefined) {
+      updates.current = args.current;
+    }
+
     if (args.description !== undefined) {
-      updates.description = args.description;
+      updates.description = args.description.trim();
     }
 
     await ctx.db.patch(args.id, updates);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
@@ -442,26 +752,51 @@ export const deleteEducation = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkEducations", user._id);
+    const education = await ctx.db.get(args.id);
+
+    if (!education) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Formation introuvable",
+      });
+    }
+
+    if (education.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
 
     await ctx.db.delete(args.id);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 // 4. COMPÉTENCES
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 
 export const getUserSkills = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
 
   handler: async (ctx, args) => {
-    return await ctx.db
+    const user = await ctx.db.get(args.userId);
+
+    if (!user || user.isBanned === true) {
+      return [];
+    }
+
+    return ctx.db
       .query("networkSkills")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
+      .order("desc")
+      .take(MAX_LIMIT);
   },
 });
 
@@ -473,11 +808,14 @@ export const addSkill = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
+    const name = requireNonEmptyString(args.name, "Le nom de la compétence");
+
     const existing = await ctx.db
       .query("networkSkills")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) => q.eq(q.field("name"), args.name))
-      .first();
+      .withIndex("by_user_and_name", (q) =>
+        q.eq("userId", user._id).eq("name", name),
+      )
+      .unique();
 
     if (existing) {
       throw new ConvexError({
@@ -486,16 +824,16 @@ export const addSkill = mutation({
       });
     }
 
-    const id = await ctx.db.insert("networkSkills", {
+    const now = nowIso();
+
+    return ctx.db.insert("networkSkills", {
       userId: user._id,
-      name: args.name,
+      name,
       endorsements: 0,
       endorsedBy: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     });
-
-    return id;
   },
 });
 
@@ -507,11 +845,27 @@ export const deleteSkill = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkSkills", user._id);
+    const skill = await ctx.db.get(args.id);
+
+    if (!skill) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Compétence introuvable",
+      });
+    }
+
+    if (skill.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
 
     await ctx.db.delete(args.id);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
@@ -539,39 +893,46 @@ export const endorseSkill = mutation({
       });
     }
 
-    const endorsedBy = skill.endorsedBy || [];
-
-    if (endorsedBy.includes(user._id)) {
+    if (skill.endorsedBy.includes(user._id)) {
       throw new ConvexError({
         code: "CONFLICT",
         message: "Vous avez déjà endorsé cette compétence",
       });
     }
 
-    endorsedBy.push(user._id);
-
     await ctx.db.patch(args.skillId, {
-      endorsements: (skill.endorsements || 0) + 1,
-      endorsedBy,
-      updatedAt: new Date().toISOString(),
+      endorsements: skill.endorsements + 1,
+      endorsedBy: [...skill.endorsedBy, user._id],
+      updatedAt: nowIso(),
     });
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 // 5. CERTIFICATIONS
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 
 export const getUserCertifications = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
 
   handler: async (ctx, args) => {
-    return await ctx.db
+    const user = await ctx.db.get(args.userId);
+
+    if (!user || user.isBanned === true) {
+      return [];
+    }
+
+    return ctx.db
       .query("networkCertifications")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
+      .order("desc")
+      .take(MAX_LIMIT);
   },
 });
 
@@ -588,19 +949,23 @@ export const addCertification = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const id = await ctx.db.insert("networkCertifications", {
-      userId: user._id,
-      name: args.name,
-      issuer: args.issuer,
-      issueDate: args.issueDate,
-      expiryDate: args.expiryDate,
-      credentialId: args.credentialId,
-      credentialUrl: args.credentialUrl,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    const name = requireNonEmptyString(args.name, "Le nom de la certification");
 
-    return id;
+    const issuer = requireNonEmptyString(args.issuer, "L'organisme émetteur");
+
+    const now = nowIso();
+
+    return ctx.db.insert("networkCertifications", {
+      userId: user._id,
+      name,
+      issuer,
+      issueDate: args.issueDate,
+      expiryDate: normalizeOptionalString(args.expiryDate),
+      credentialId: normalizeOptionalString(args.credentialId),
+      credentialUrl: normalizeOptionalString(args.credentialUrl),
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });
 
@@ -618,28 +983,69 @@ export const updateCertification = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkCertifications", user._id);
+    const certification = await ctx.db.get(args.id);
 
-    const updates: any = {
-      updatedAt: new Date().toISOString(),
+    if (!certification) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Certification introuvable",
+      });
+    }
+
+    if (certification.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
+
+    const updates: {
+      name?: string;
+      issuer?: string;
+      issueDate?: string;
+      expiryDate?: string;
+      credentialId?: string;
+      credentialUrl?: string;
+      updatedAt: string;
+    } = {
+      updatedAt: nowIso(),
     };
 
-    if (args.name !== undefined) updates.name = args.name;
-    if (args.issuer !== undefined) updates.issuer = args.issuer;
-    if (args.issueDate !== undefined) updates.issueDate = args.issueDate;
-    if (args.expiryDate !== undefined) updates.expiryDate = args.expiryDate;
+    if (args.name !== undefined) {
+      updates.name = requireNonEmptyString(
+        args.name,
+        "Le nom de la certification",
+      );
+    }
+
+    if (args.issuer !== undefined) {
+      updates.issuer = requireNonEmptyString(
+        args.issuer,
+        "L'organisme émetteur",
+      );
+    }
+
+    if (args.issueDate !== undefined) {
+      updates.issueDate = args.issueDate;
+    }
+
+    if (args.expiryDate !== undefined) {
+      updates.expiryDate = args.expiryDate.trim();
+    }
 
     if (args.credentialId !== undefined) {
-      updates.credentialId = args.credentialId;
+      updates.credentialId = args.credentialId.trim();
     }
 
     if (args.credentialUrl !== undefined) {
-      updates.credentialUrl = args.credentialUrl;
+      updates.credentialUrl = args.credentialUrl.trim();
     }
 
     await ctx.db.patch(args.id, updates);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
@@ -651,26 +1057,51 @@ export const deleteCertification = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkCertifications", user._id);
+    const certification = await ctx.db.get(args.id);
+
+    if (!certification) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Certification introuvable",
+      });
+    }
+
+    if (certification.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
 
     await ctx.db.delete(args.id);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 // 6. SERVICES
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 
 export const getUserServices = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
 
   handler: async (ctx, args) => {
-    return await ctx.db
+    const user = await ctx.db.get(args.userId);
+
+    if (!user || user.isBanned === true) {
+      return [];
+    }
+
+    return ctx.db
       .query("networkServices")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
+      .order("desc")
+      .take(MAX_LIMIT);
   },
 });
 
@@ -687,19 +1118,23 @@ export const addService = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const id = await ctx.db.insert("networkServices", {
-      userId: user._id,
-      title: args.title,
-      description: args.description,
-      price: args.price,
-      category: args.category,
-      location: args.location,
-      deliveryTime: args.deliveryTime,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    const title = requireNonEmptyString(args.title, "Le titre du service");
 
-    return id;
+    const category = requireNonEmptyString(args.category, "La catégorie");
+
+    const now = nowIso();
+
+    return ctx.db.insert("networkServices", {
+      userId: user._id,
+      title,
+      description: normalizeOptionalString(args.description),
+      price: normalizeOptionalString(args.price),
+      category,
+      location: normalizeOptionalString(args.location),
+      deliveryTime: normalizeOptionalString(args.deliveryTime),
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });
 
@@ -717,26 +1152,63 @@ export const updateService = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkServices", user._id);
+    const service = await ctx.db.get(args.id);
 
-    const updates: any = {
-      updatedAt: new Date().toISOString(),
+    if (!service) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Service introuvable",
+      });
+    }
+
+    if (service.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
+
+    const updates: {
+      title?: string;
+      description?: string;
+      price?: string;
+      category?: string;
+      location?: string;
+      deliveryTime?: string;
+      updatedAt: string;
+    } = {
+      updatedAt: nowIso(),
     };
 
-    if (args.title !== undefined) updates.title = args.title;
-    if (args.description !== undefined) {
-      updates.description = args.description;
+    if (args.title !== undefined) {
+      updates.title = requireNonEmptyString(args.title, "Le titre du service");
     }
-    if (args.price !== undefined) updates.price = args.price;
-    if (args.category !== undefined) updates.category = args.category;
-    if (args.location !== undefined) updates.location = args.location;
+
+    if (args.description !== undefined) {
+      updates.description = args.description.trim();
+    }
+
+    if (args.price !== undefined) {
+      updates.price = args.price.trim();
+    }
+
+    if (args.category !== undefined) {
+      updates.category = requireNonEmptyString(args.category, "La catégorie");
+    }
+
+    if (args.location !== undefined) {
+      updates.location = args.location.trim();
+    }
+
     if (args.deliveryTime !== undefined) {
-      updates.deliveryTime = args.deliveryTime;
+      updates.deliveryTime = args.deliveryTime.trim();
     }
 
     await ctx.db.patch(args.id, updates);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
@@ -748,26 +1220,51 @@ export const deleteService = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkServices", user._id);
+    const service = await ctx.db.get(args.id);
+
+    if (!service) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Service introuvable",
+      });
+    }
+
+    if (service.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
 
     await ctx.db.delete(args.id);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 // 7. PORTFOLIO
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 
 export const getUserPortfolio = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
 
   handler: async (ctx, args) => {
-    return await ctx.db
+    const user = await ctx.db.get(args.userId);
+
+    if (!user || user.isBanned === true) {
+      return [];
+    }
+
+    return ctx.db
       .query("networkPortfolio")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
+      .order("desc")
+      .take(MAX_LIMIT);
   },
 });
 
@@ -788,18 +1285,22 @@ export const addPortfolioItem = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const id = await ctx.db.insert("networkPortfolio", {
-      userId: user._id,
-      title: args.title,
-      description: args.description,
-      type: args.type,
-      url: args.url,
-      thumbnail: args.thumbnail,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    const title = requireNonEmptyString(args.title, "Le titre");
 
-    return id;
+    const url = requireNonEmptyString(args.url, "L'URL");
+
+    const now = nowIso();
+
+    return ctx.db.insert("networkPortfolio", {
+      userId: user._id,
+      title,
+      description: normalizeOptionalString(args.description),
+      type: args.type,
+      url,
+      thumbnail: normalizeOptionalString(args.thumbnail),
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });
 
@@ -811,26 +1312,51 @@ export const deletePortfolioItem = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    await ensureOwnership<any>(ctx, args.id, "networkPortfolio", user._id);
+    const item = await ctx.db.get(args.id);
+
+    if (!item) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Élément du portfolio introuvable",
+      });
+    }
+
+    if (item.userId !== user._id) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Action non autorisée",
+      });
+    }
 
     await ctx.db.delete(args.id);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 // 8. RECOMMANDATIONS
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 
 export const getUserRecommendations = query({
-  args: { userId: v.id("users") },
+  args: {
+    userId: v.id("users"),
+  },
 
   handler: async (ctx, args) => {
-    return await ctx.db
+    const user = await ctx.db.get(args.userId);
+
+    if (!user || user.isBanned === true) {
+      return [];
+    }
+
+    return ctx.db
       .query("networkRecommendations")
       .withIndex("by_receiver", (q) => q.eq("receiverId", args.userId))
-      .collect();
+      .order("desc")
+      .take(MAX_LIMIT);
   },
 });
 
@@ -851,17 +1377,33 @@ export const addRecommendation = mutation({
       });
     }
 
-    const id = await ctx.db.insert("networkRecommendations", {
-      fromUserId: user._id,
-      fromName: user.name || "Utilisateur",
-      fromAvatar: user.avatar,
-      receiverId: args.receiverId,
-      rating: args.rating,
-      comment: args.comment,
-      createdAt: new Date().toISOString(),
-    });
+    if (!Number.isFinite(args.rating) || args.rating < 1 || args.rating > 5) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "La note doit être comprise entre 1 et 5",
+      });
+    }
 
-    return id;
+    const receiver = await ctx.db.get(args.receiverId);
+
+    if (!receiver || receiver.isBanned === true) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Utilisateur destinataire introuvable",
+      });
+    }
+
+    const comment = requireNonEmptyString(args.comment, "Le commentaire");
+
+    return ctx.db.insert("networkRecommendations", {
+      fromUserId: user._id,
+      fromName: user.name,
+      fromAvatar: user.avatar,
+      receiverId: receiver._id,
+      rating: args.rating,
+      comment,
+      createdAt: nowIso(),
+    });
   },
 });
 
@@ -873,16 +1415,19 @@ export const deleteRecommendation = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const rec = await ctx.db.get(args.id);
+    const recommendation = await ctx.db.get(args.id);
 
-    if (!rec) {
+    if (!recommendation) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Recommandation introuvable",
       });
     }
 
-    if (rec.fromUserId !== user._id && rec.receiverId !== user._id) {
+    if (
+      recommendation.fromUserId !== user._id &&
+      recommendation.receiverId !== user._id
+    ) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Action non autorisée",
@@ -891,13 +1436,15 @@ export const deleteRecommendation = mutation({
 
     await ctx.db.delete(args.id);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 9. ABONNEMENTS (FOLLOWS)
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
+// 9. FOLLOWS
+// ============================================================================
 
 export const toggleFollow = mutation({
   args: {
@@ -909,8 +1456,17 @@ export const toggleFollow = mutation({
 
     if (user._id === args.targetUserId) {
       throw new ConvexError({
-        code: "FORBIDDEN",
+        code: "BAD_REQUEST",
         message: "Vous ne pouvez pas vous suivre vous-même",
+      });
+    }
+
+    const target = await ctx.db.get(args.targetUserId);
+
+    if (!target || target.isBanned === true) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Utilisateur cible introuvable",
       });
     }
 
@@ -919,10 +1475,11 @@ export const toggleFollow = mutation({
       .withIndex("by_follower_and_following", (q) =>
         q.eq("followerId", user._id).eq("followingId", args.targetUserId),
       )
-      .first();
+      .unique();
 
     if (existing) {
       await ctx.db.delete(existing._id);
+
       return false;
     }
 
@@ -940,24 +1497,32 @@ export const getFollowStats = query({
     userId: v.id("users"),
   },
 
-  handler: async (ctx, args) => {
-    const currentUser = await getCurrentUser(ctx);
-    const follows = await ctx.db.query("follows").collect();
+  handler: async (ctx, args): Promise<FollowStats> => {
+    const target = await ctx.db.get(args.userId);
 
-    const followers = follows.filter((f) => f.followingId === args.userId);
+    if (!target || target.isBanned === true) {
+      return {
+        followerCount: 0,
+        followingCount: 0,
+        isFollowing: false,
+      };
+    }
 
-    const following = follows.filter((f) => f.followerId === args.userId);
+    const [currentUser, followerCount, followingCount] = await Promise.all([
+      getCurrentUser(ctx),
+      getExactFollowerCount(ctx, args.userId),
+      getExactFollowingCount(ctx, args.userId),
+    ]);
 
-    const isFollowing = currentUser
-      ? follows.some(
-          (f) =>
-            f.followerId === currentUser._id && f.followingId === args.userId,
-        )
-      : false;
+    const isFollowing = await isFollowingUser(
+      ctx,
+      currentUser?._id,
+      args.userId,
+    );
 
     return {
-      followerCount: followers.length,
-      followingCount: following.length,
+      followerCount,
+      followingCount,
       isFollowing,
     };
   },
@@ -969,38 +1534,44 @@ export const getFollowers = query({
     limit: v.optional(v.number()),
   },
 
-  handler: async (ctx, args) => {
-    const currentUser = await getCurrentUser(ctx);
-    const follows = await ctx.db.query("follows").collect();
+  handler: async (ctx, args): Promise<PublicFollowUser[]> => {
+    const target = await ctx.db.get(args.userId);
 
-    const followerRelations = follows.filter(
-      (f) => f.followingId === args.userId,
-    );
-
-    const limit = args.limit || 20;
-
-    const followers = [];
-
-    for (const rel of followerRelations.slice(0, limit)) {
-      const user = await ctx.db.get(rel.followerId);
-
-      if (user) {
-        const isFollowedByMe = currentUser
-          ? follows.some(
-              (f) =>
-                f.followerId === currentUser._id && f.followingId === user._id,
-            )
-          : false;
-
-        followers.push({
-          ...user,
-          isFollowedByMe,
-          followedAt: new Date(rel._creationTime).toISOString(),
-        });
-      }
+    if (!target || target.isBanned === true) {
+      return [];
     }
 
-    return followers;
+    const currentUser = await getCurrentUser(ctx);
+
+    const limit = clampLimit(args.limit, DEFAULT_LIMIT, MAX_LIMIT);
+
+    const relations = await ctx.db
+      .query("follows")
+      .withIndex("by_following", (q) => q.eq("followingId", args.userId))
+      .order("desc")
+      .take(limit);
+
+    const result: PublicFollowUser[] = [];
+
+    for (const relation of relations) {
+      const follower = await ctx.db.get(relation.followerId);
+
+      if (!follower || follower.isBanned === true) {
+        continue;
+      }
+
+      result.push({
+        ...toPublicUserCard(follower),
+        followedAt: new Date(relation._creationTime).toISOString(),
+        isFollowedByMe: await isFollowingUser(
+          ctx,
+          currentUser?._id,
+          follower._id,
+        ),
+      });
+    }
+
+    return result;
   },
 });
 
@@ -1010,38 +1581,44 @@ export const getFollowing = query({
     limit: v.optional(v.number()),
   },
 
-  handler: async (ctx, args) => {
-    const currentUser = await getCurrentUser(ctx);
-    const follows = await ctx.db.query("follows").collect();
+  handler: async (ctx, args): Promise<PublicFollowUser[]> => {
+    const target = await ctx.db.get(args.userId);
 
-    const followingRelations = follows.filter(
-      (f) => f.followerId === args.userId,
-    );
-
-    const limit = args.limit || 20;
-
-    const following = [];
-
-    for (const rel of followingRelations.slice(0, limit)) {
-      const user = await ctx.db.get(rel.followingId);
-
-      if (user) {
-        const isFollowedByMe = currentUser
-          ? follows.some(
-              (f) =>
-                f.followerId === currentUser._id && f.followingId === user._id,
-            )
-          : false;
-
-        following.push({
-          ...user,
-          isFollowedByMe,
-          followedAt: new Date(rel._creationTime).toISOString(),
-        });
-      }
+    if (!target || target.isBanned === true) {
+      return [];
     }
 
-    return following;
+    const currentUser = await getCurrentUser(ctx);
+
+    const limit = clampLimit(args.limit, DEFAULT_LIMIT, MAX_LIMIT);
+
+    const relations = await ctx.db
+      .query("follows")
+      .withIndex("by_follower", (q) => q.eq("followerId", args.userId))
+      .order("desc")
+      .take(limit);
+
+    const result: PublicFollowUser[] = [];
+
+    for (const relation of relations) {
+      const followedUser = await ctx.db.get(relation.followingId);
+
+      if (!followedUser || followedUser.isBanned === true) {
+        continue;
+      }
+
+      result.push({
+        ...toPublicUserCard(followedUser),
+        followedAt: new Date(relation._creationTime).toISOString(),
+        isFollowedByMe: await isFollowingUser(
+          ctx,
+          currentUser?._id,
+          followedUser._id,
+        ),
+      });
+    }
+
+    return result;
   },
 });
 
@@ -1066,7 +1643,7 @@ export const removeFollower = mutation({
       .withIndex("by_follower_and_following", (q) =>
         q.eq("followerId", args.followerId).eq("followingId", args.userId),
       )
-      .first();
+      .unique();
 
     if (!relation) {
       throw new ConvexError({
@@ -1077,7 +1654,9 @@ export const removeFollower = mutation({
 
     await ctx.db.delete(relation._id);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
@@ -1094,7 +1673,7 @@ export const unfollow = mutation({
       .withIndex("by_follower_and_following", (q) =>
         q.eq("followerId", user._id).eq("followingId", args.targetUserId),
       )
-      .first();
+      .unique();
 
     if (!relation) {
       throw new ConvexError({
@@ -1105,13 +1684,15 @@ export const unfollow = mutation({
 
     await ctx.db.delete(relation._id);
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 // 10. DEMANDES DE CONNEXION
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
 
 export const sendConnectionRequest = mutation({
   args: {
@@ -1124,34 +1705,44 @@ export const sendConnectionRequest = mutation({
 
     if (user._id === args.targetUserId) {
       throw new ConvexError({
-        code: "FORBIDDEN",
+        code: "BAD_REQUEST",
         message: "Vous ne pouvez pas vous envoyer une demande à vous-même",
+      });
+    }
+
+    const target = await ctx.db.get(args.targetUserId);
+
+    if (!target || target.isBanned === true) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Utilisateur cible introuvable",
       });
     }
 
     const existing = await ctx.db
       .query("networkConnectionRequests")
-      .withIndex("by_sender", (q) => q.eq("senderId", user._id))
-      .filter((q) => q.eq(q.field("receiverId"), args.targetUserId))
-      .first();
+      .withIndex("by_pair", (q) =>
+        q.eq("senderId", user._id).eq("receiverId", args.targetUserId),
+      )
+      .unique();
 
-    if (existing) {
+    if (existing && existing.status === "pending") {
       throw new ConvexError({
         code: "CONFLICT",
         message: "Une demande est déjà en cours",
       });
     }
 
-    const id = await ctx.db.insert("networkConnectionRequests", {
-      senderId: user._id,
-      receiverId: args.targetUserId,
-      message: args.message,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    const now = nowIso();
 
-    return id;
+    return ctx.db.insert("networkConnectionRequests", {
+      senderId: user._id,
+      receiverId: target._id,
+      message: normalizeOptionalString(args.message),
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });
 
@@ -1179,22 +1770,60 @@ export const acceptConnectionRequest = mutation({
       });
     }
 
+    if (request.status !== "pending") {
+      throw new ConvexError({
+        code: "CONFLICT",
+        message: "Cette demande n'est plus en attente",
+      });
+    }
+
+    const sender = await ctx.db.get(request.senderId);
+
+    if (!sender || sender.isBanned === true) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Expéditeur introuvable",
+      });
+    }
+
+    const now = nowIso();
+
     await ctx.db.patch(args.requestId, {
       status: "accepted",
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     });
 
-    await ctx.db.insert("follows", {
-      followerId: request.senderId,
-      followingId: user._id,
-    });
+    const forward = await ctx.db
+      .query("follows")
+      .withIndex("by_follower_and_following", (q) =>
+        q.eq("followerId", request.senderId).eq("followingId", user._id),
+      )
+      .unique();
 
-    await ctx.db.insert("follows", {
-      followerId: user._id,
-      followingId: request.senderId,
-    });
+    if (!forward) {
+      await ctx.db.insert("follows", {
+        followerId: request.senderId,
+        followingId: user._id,
+      });
+    }
 
-    return { success: true };
+    const reverse = await ctx.db
+      .query("follows")
+      .withIndex("by_follower_and_following", (q) =>
+        q.eq("followerId", user._id).eq("followingId", request.senderId),
+      )
+      .unique();
+
+    if (!reverse) {
+      await ctx.db.insert("follows", {
+        followerId: user._id,
+        followingId: request.senderId,
+      });
+    }
+
+    return {
+      success: true,
+    };
   },
 });
 
@@ -1222,65 +1851,73 @@ export const declineConnectionRequest = mutation({
       });
     }
 
+    if (request.status !== "pending") {
+      throw new ConvexError({
+        code: "CONFLICT",
+        message: "Cette demande n'est plus en attente",
+      });
+    }
+
     await ctx.db.patch(args.requestId, {
       status: "declined",
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso(),
     });
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
 export const getConnectionRequests = query({
   args: {
     userId: v.id("users"),
+    limit: v.optional(v.number()),
   },
 
   handler: async (ctx, args) => {
     const currentUser = await getCurrentUser(ctx);
 
-    if (!currentUser) return [];
+    if (!currentUser || currentUser._id !== args.userId) {
+      return [];
+    }
+
+    const limit = clampLimit(args.limit, DEFAULT_LIMIT, MAX_LIMIT);
 
     const requests = await ctx.db
       .query("networkConnectionRequests")
-      .filter((q) =>
-        q.or(
-          q.eq(q.field("receiverId"), currentUser._id),
-          q.eq(q.field("senderId"), currentUser._id),
-        ),
-      )
-      .collect();
+      .withIndex("by_receiver", (q) => q.eq("receiverId", currentUser._id))
+      .order("desc")
+      .take(limit);
 
-    const enriched = [];
+    return Promise.all(
+      requests.map(async (request) => {
+        const sender = await ctx.db.get(request.senderId);
 
-    for (const req of requests) {
-      const sender = await ctx.db.get(req.senderId);
-      const receiver = await ctx.db.get(req.receiverId);
-
-      enriched.push({
-        ...req,
-        sender: sender
-          ? {
-              name: sender.name,
-              avatar: sender.avatar,
-            }
-          : null,
-        receiver: receiver
-          ? {
-              name: receiver.name,
-              avatar: receiver.avatar,
-            }
-          : null,
-      });
-    }
-
-    return enriched;
+        return {
+          _id: request._id,
+          senderId: request.senderId,
+          receiverId: request.receiverId,
+          message: request.message,
+          status: request.status,
+          createdAt: request.createdAt,
+          updatedAt: request.updatedAt,
+          sender: sender
+            ? {
+                _id: sender._id,
+                name: sender.name,
+                avatar: sender.avatar,
+              }
+            : null,
+        };
+      }),
+    );
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 11. RECHERCHE & SUGGESTIONS
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
+// 11. RECHERCHE
+// ============================================================================
 
 export const searchProfiles = query({
   args: {
@@ -1290,103 +1927,139 @@ export const searchProfiles = query({
     location: v.optional(v.string()),
   },
 
-  handler: async (ctx, args) => {
-    const query = normalizeUserSearchQuery(args.query);
+  handler: async (ctx, args): Promise<PublicUserCard[]> => {
+    const searchQuery = normalizeUserSearchQuery(args.query);
 
-    if (!query) {
+    if (!searchQuery) {
       return [];
     }
 
-    const limit = Math.min(Math.max(args.limit ?? 20, 1), 50);
+    const limit = clampLimit(args.limit, DEFAULT_LIMIT, MAX_SEARCH_LIMIT);
+
+    const fetchLimit = args.type ? MAX_SEARCH_LIMIT : limit;
 
     const results = await ctx.db
       .query("users")
       .withSearchIndex("search_users", (search) => {
-        let builder = search.search("searchText", query);
+        let builder = search.search("searchText", searchQuery);
 
         if (args.location) {
-          builder = builder.eq("city", args.location);
+          builder = builder.eq("city", args.location.trim());
         }
 
         return builder;
       })
-      .take(limit);
+      .take(fetchLimit);
 
-    const filtered = args.type
-      ? results.filter((user) => user.roles.includes(args.type!))
-      : results;
+    return results
+      .filter((user) => {
+        if (user.isBanned === true) {
+          return false;
+        }
 
-    return filtered.slice(0, limit).map((user) => ({
-      _id: user._id,
-      name: user.name,
-      bio: user.bio,
-      avatar: user.avatar,
-      city: user.city,
-      country: user.country,
-      profession: user.profession,
-      interests: user.interests,
-      roles: user.roles,
-    }));
+        if (args.type && !user.roles.includes(args.type)) {
+          return false;
+        }
+
+        return true;
+      })
+      .slice(0, limit)
+      .map(toPublicUserCard);
   },
 });
+
+// ============================================================================
+// 12. SUGGESTIONS
+// ============================================================================
 
 export const getNetworkSuggestions = query({
   args: {
     limit: v.optional(v.number()),
   },
 
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<PublicUserCard[]> => {
     const currentUser = await getCurrentUser(ctx);
-    const limit = args.limit || 10;
-    const allUsers = await ctx.db.query("users").collect();
 
     if (!currentUser) {
-      return allUsers.slice(0, limit);
+      return [];
     }
 
-    const follows = await ctx.db.query("follows").collect();
+    const limit = clampLimit(args.limit, MAX_SUGGESTIONS, MAX_SUGGESTIONS);
 
-    const followedIds = follows
-      .filter((f) => f.followerId === currentUser._id)
-      .map((f) => f.followingId);
+    const followedRelations = await ctx.db
+      .query("follows")
+      .withIndex("by_follower", (q) => q.eq("followerId", currentUser._id))
+      .take(MAX_LIMIT);
 
-    const candidates = allUsers.filter(
-      (u) => u._id !== currentUser._id && !followedIds.includes(u._id),
+    const followedIds = new Set(
+      followedRelations.map((relation) => relation.followingId),
     );
 
-    const scored = candidates.map((u) => {
-      let score = 0;
+    const candidates = await ctx.db
+      .query("users")
+      .order("desc")
+      .take(MAX_LIMIT);
 
-      if (u.city && currentUser.city && u.city === currentUser.city) {
-        score += 10;
-      }
+    const scored = candidates
+      .filter(
+        (candidate) =>
+          candidate._id !== currentUser._id &&
+          candidate.isBanned !== true &&
+          !followedIds.has(candidate._id),
+      )
+      .map((candidate) => {
+        let score = 0;
 
-      if (u.interests && currentUser.interests) {
-        const common = u.interests.filter((i) =>
-          currentUser.interests?.includes(i),
-        );
+        if (
+          candidate.city &&
+          currentUser.city &&
+          candidate.city.toLowerCase() === currentUser.city.toLowerCase()
+        ) {
+          score += 10;
+        }
 
-        score += common.length * 5;
-      }
+        if (candidate.interests && currentUser.interests) {
+          const commonInterests = candidate.interests.filter((interest) =>
+            currentUser.interests?.includes(interest),
+          );
 
-      if (
-        u.roles?.includes("verified_seller") ||
-        u.roles?.includes("professionnel")
-      ) {
-        score += 3;
-      }
+          score += commonInterests.length * 5;
+        }
 
-      return {
-        user: u,
-        score,
-      };
-    });
+        if (candidate.roles.includes("professionnel")) {
+          score += 3;
+        }
 
-    scored.sort((a, b) => b.score - a.score);
+        return {
+          candidate,
+          score,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
 
-    return scored.map((s) => s.user).slice(0, limit);
+    return scored
+      .slice(0, limit)
+      .map(({ candidate }) => toPublicUserCard(candidate));
   },
 });
+
+// ============================================================================
+// 13. PROXIMITÉ GÉOGRAPHIQUE
+// ============================================================================
+//
+// Les coordonnées sont stockées dans :
+//
+//   users.location.latitude
+//   users.location.longitude
+//
+// IMPORTANT :
+// La base actuelle ne possède pas encore d'index géospatial dédié.
+//
+// Nous ne fabriquons donc aucun résultat.
+//
+// Dès qu'une véritable stratégie géospatiale sera présente dans le schéma,
+// cette query pourra utiliser les coordonnées réelles des utilisateurs.
+// ============================================================================
 
 export const getNearbyUsers = query({
   args: {
@@ -1395,16 +2068,20 @@ export const getNearbyUsers = query({
     radius: v.optional(v.number()),
   },
 
-  handler: async (ctx, args) => {
-    const users = await ctx.db.query("users").collect();
+  handler: async (_ctx, args): Promise<PublicUserCard[]> => {
+    validateCoordinates(args.lat, args.lng);
 
-    return users.slice(0, 10);
+    const radius = args.radius ?? 10;
+
+    validateRadius(radius);
+
+    return [];
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 12. ANALYTICS
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
+// 14. ANALYTICS PROFIL
+// ============================================================================
 
 export const getProfileAnalytics = query({
   args: {
@@ -1412,7 +2089,7 @@ export const getProfileAnalytics = query({
     period: v.optional(v.string()),
   },
 
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<ProfileAnalytics> => {
     const currentUser = await getCurrentUser(ctx);
 
     if (!currentUser || currentUser._id !== args.userId) {
@@ -1422,35 +2099,71 @@ export const getProfileAnalytics = query({
       });
     }
 
-    const follows = await ctx.db.query("follows").collect();
+    const analytics = ctx.db
+      .query("networkAnalytics")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .order("desc");
 
-    const followers = follows.filter((f) => f.followingId === args.userId);
+    const daily: ProfileAnalytics["daily"] = [];
 
-    const posts = await ctx.db
-      .query("publications")
-      .withIndex("by_author", (q) => q.eq("authorId", args.userId))
-      .collect();
+    for await (const item of analytics) {
+      if (args.period && item.date < args.period.trim()) {
+        continue;
+      }
 
-    const totalLikes = posts.reduce((acc, p) => acc + (p.likeCount || 0), 0);
+      daily.push({
+        date: item.date,
+        profileViews: item.profileViews,
+        connectionsGained: item.connectionsGained,
+        connectionsLost: item.connectionsLost,
+        postsEngagement: item.postsEngagement,
+        searchAppearances: item.searchAppearances,
+        opportunitiesGenerated: item.opportunitiesGenerated,
+      });
 
-    const totalComments = posts.reduce(
-      (acc, p) => acc + (p.commentCount || 0),
-      0,
-    );
-
-    const engagement =
-      posts.length > 0 ? (totalLikes + totalComments) / posts.length : 0;
+      if (daily.length >= MAX_ANALYTICS_DAYS) {
+        break;
+      }
+    }
 
     return {
-      profileViews: 0,
-      connectionsGained: followers.length,
-      postsEngagement: engagement,
-      searchAppearances: 0,
-      opportunitiesGenerated: 0,
-      recentFollowers: followers.slice(0, 5).map((f) => f.followerId),
+      period: args.period ?? null,
+
+      profileViews: daily.reduce((total, item) => total + item.profileViews, 0),
+
+      connectionsGained: daily.reduce(
+        (total, item) => total + item.connectionsGained,
+        0,
+      ),
+
+      connectionsLost: daily.reduce(
+        (total, item) => total + item.connectionsLost,
+        0,
+      ),
+
+      searchAppearances: daily.reduce(
+        (total, item) => total + item.searchAppearances,
+        0,
+      ),
+
+      opportunitiesGenerated: daily.reduce(
+        (total, item) => total + item.opportunitiesGenerated,
+        0,
+      ),
+
+      postsEngagement: daily.reduce(
+        (total, item) => total + item.postsEngagement,
+        0,
+      ),
+
+      daily,
     };
   },
 });
+
+// ============================================================================
+// 15. TRACKING DES VUES
+// ============================================================================
 
 export const trackProfileView = mutation({
   args: {
@@ -1458,18 +2171,91 @@ export const trackProfileView = mutation({
   },
 
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+    const viewer = await getCurrentUser(ctx);
 
-    if (!user) return;
-    if (user._id === args.viewedUserId) return;
+    if (!viewer) {
+      return {
+        recorded: false,
+        reason: "unauthenticated" as const,
+      };
+    }
 
-    // Pourrait stocker dans une table profileViews
+    if (viewer._id === args.viewedUserId) {
+      return {
+        recorded: false,
+        reason: "self_view" as const,
+      };
+    }
+
+    const viewedUser = await ctx.db.get(args.viewedUserId);
+
+    if (!viewedUser || viewedUser.isBanned === true) {
+      return {
+        recorded: false,
+        reason: "target_not_found" as const,
+      };
+    }
+
+    const date = toDateString(new Date());
+
+    const existing = await ctx.db
+      .query("profileViews")
+      .withIndex("by_viewer_and_profile_and_date", (q) =>
+        q
+          .eq("viewerId", viewer._id)
+          .eq("profileId", args.viewedUserId)
+          .eq("date", date),
+      )
+      .unique();
+
+    if (existing) {
+      return {
+        recorded: false,
+        reason: "already_recorded_today" as const,
+      };
+    }
+
+    await ctx.db.insert("profileViews", {
+      profileId: args.viewedUserId,
+      viewerId: viewer._id,
+      date,
+    });
+
+    const analytics = await ctx.db
+      .query("networkAnalytics")
+      .withIndex("by_user_and_date", (q) =>
+        q.eq("userId", args.viewedUserId).eq("date", date),
+      )
+      .unique();
+
+    if (analytics) {
+      await ctx.db.patch(analytics._id, {
+        profileViews: analytics.profileViews + 1,
+      });
+    } else {
+      await ctx.db.insert("networkAnalytics", {
+        userId: args.viewedUserId,
+        date,
+        profileViews: 1,
+        connectionsGained: 0,
+        connectionsLost: 0,
+        postsEngagement: 0,
+        searchAppearances: 0,
+        opportunitiesGenerated: 0,
+        createdAt: nowIso(),
+      });
+    }
+
+    return {
+      recorded: true,
+      reason: "recorded" as const,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 13. NOTIFICATIONS
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
+// 16. NOTIFICATIONS NETWORK
+// ============================================================================
 
 export const getUserNotifications = query({
   args: {
@@ -1478,15 +2264,19 @@ export const getUserNotifications = query({
   },
 
   handler: async (ctx, args) => {
-    const limit = args.limit || 20;
+    const currentUser = await getCurrentUser(ctx);
 
-    const notifications = await ctx.db
+    if (!currentUser || currentUser._id !== args.userId) {
+      return [];
+    }
+
+    const limit = clampLimit(args.limit, DEFAULT_LIMIT, MAX_LIMIT);
+
+    return ctx.db
       .query("networkNotifications")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", currentUser._id))
       .order("desc")
       .take(limit);
-
-    return notifications;
   },
 });
 
@@ -1498,27 +2288,35 @@ export const markNotificationRead = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
 
-    const notif = await ctx.db.get(args.id);
+    const notification = await ctx.db.get(args.id);
 
-    if (!notif) {
+    if (!notification) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Notification introuvable",
       });
     }
 
-    if (notif.userId !== user._id) {
+    if (notification.userId !== user._id) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Action non autorisée",
       });
     }
 
+    if (notification.read) {
+      return {
+        success: true,
+      };
+    }
+
     await ctx.db.patch(args.id, {
       read: true,
     });
 
-    return { success: true };
+    return {
+      success: true,
+    };
   },
 });
 
@@ -1530,23 +2328,29 @@ export const markAllNotificationsRead = mutation({
 
     const notifications = await ctx.db
       .query("networkNotifications")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) => q.eq(q.field("read"), false))
-      .collect();
+      .withIndex("by_user_and_read", (q) =>
+        q.eq("userId", user._id).eq("read", false),
+      )
+      .take(MAX_LIMIT);
 
-    for (const n of notifications) {
-      await ctx.db.patch(n._id, {
-        read: true,
-      });
-    }
+    await Promise.all(
+      notifications.map((notification) =>
+        ctx.db.patch(notification._id, {
+          read: true,
+        }),
+      ),
+    );
 
-    return { success: true };
+    return {
+      success: true,
+      updated: notifications.length,
+    };
   },
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 14. NOUVEAU : Récupération d'une publication réseau (type "network")
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================================
+// 17. PUBLICATION NETWORK
+// ============================================================================
 
 export const getPost = query({
   args: {
@@ -1556,17 +2360,12 @@ export const getPost = query({
   handler: async (ctx, args) => {
     const publication = await ctx.db.get(args.publicationId);
 
-    if (!publication) return null;
-
-    // Seules les publications de type "network" sont gérées ici
-    if (publication.type !== "network") {
+    if (!publication || publication.type !== "network") {
       return null;
     }
 
-    // Récupérer l'utilisateur courant pour savoir s'il a liké
     const currentUser = await getCurrentUser(ctx);
 
-    // Vérifier si l'utilisateur courant a liké cette publication
     let likedByMe = false;
 
     if (currentUser) {
@@ -1582,57 +2381,216 @@ export const getPost = query({
       likedByMe = like !== null;
     }
 
-    // Récupérer l'auteur
     const author = await ctx.db.get(publication.authorId);
 
-    // Résoudre les images (storage IDs → URLs)
+    if (!author || author.isBanned === true) {
+      return null;
+    }
+
     const imageSources = publication.images ?? [];
 
     const images = (
       await Promise.all(
-        imageSources.map(async (imgId) => {
-          if (!imgId) return null;
-
-          // Déjà une URL publique
-          if (
-            imgId.startsWith("http://") ||
-            imgId.startsWith("https://") ||
-            imgId.startsWith("data:")
-          ) {
-            return imgId;
+        imageSources.map(async (source) => {
+          if (!source) {
+            return null;
           }
 
-          // Blob URL : inutilisable côté serveur
-          if (imgId.startsWith("blob:")) {
+          if (source.startsWith("http://") || source.startsWith("https://")) {
+            return source;
+          }
+
+          if (source.startsWith("data:") || source.startsWith("blob:")) {
             return null;
           }
 
           try {
-            return await ctx.storage.getUrl(imgId as Id<"_storage">);
+            return await ctx.storage.getUrl(source as Id<"_storage">);
           } catch {
             return null;
           }
         }),
       )
-    ).filter((url): url is string => Boolean(url));
+    ).filter((url): url is string => url !== null);
 
-    // Construire l'objet retour
+    const networkProfile = await ctx.db
+      .query("networkProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", author._id))
+      .unique();
+
     return {
-      ...publication,
+      _id: publication._id,
+      authorId: publication.authorId,
+      type: publication.type,
+      title: publication.title,
+      description: publication.description,
+      price: publication.price,
+      location: publication.location,
+      category: publication.category,
       images,
+      tags: publication.tags,
+      likeCount: publication.likeCount,
+      viewCount: publication.viewCount,
+      commentCount: publication.commentCount,
+      status: publication.status,
+      meta: publication.meta,
+      latitude: publication.latitude,
+      longitude: publication.longitude,
       likedByMe,
-      author: author
-        ? {
-            _id: author._id,
-            name: author.name ?? "Utilisateur",
-            avatar: author.avatar ?? null,
-            bio: author.bio ?? null,
-            city: author.city ?? null,
-            country: author.country ?? null,
-            headline: (author as any).headline ?? null,
-            roles: author.roles ?? [],
-          }
-        : null,
+
+      author: {
+        _id: author._id,
+        name: author.name,
+        avatar: author.avatar,
+        bio: author.bio,
+        city: author.city,
+        country: author.country,
+        headline: networkProfile?.headline,
+        roles: author.roles,
+      },
+    };
+  },
+});
+
+// ============================================================================
+// 18. COMPATIBILITÉ updateProfile
+// ============================================================================
+//
+// users.ts reste la source canonique pour :
+//
+// - avatar
+// - cover
+// - rôles
+// - identité utilisateur
+// - coordonnées personnelles
+//
+// network.ts ne doit pas créer de doublons.
+//
+
+export const updateProfile = mutation({
+  args: {
+    name: v.optional(v.string()),
+    headline: v.optional(v.string()),
+    bio: v.optional(v.string()),
+    city: v.optional(v.string()),
+    country: v.optional(v.string()),
+    roles: v.optional(v.array(v.string())),
+    interests: v.optional(v.array(v.string())),
+    avatar: v.optional(v.string()),
+    cover: v.optional(v.string()),
+    availability: v.optional(
+      v.union(
+        v.literal("available"),
+        v.literal("limited"),
+        v.literal("unavailable"),
+      ),
+    ),
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Compatibilité avec les anciens clients.
+    // users.ts reste la source canonique
+    // pour ces champs.
+    void args.roles;
+    void args.avatar;
+    void args.cover;
+
+    const nextName =
+      args.name !== undefined
+        ? requireNonEmptyString(args.name, "Le nom")
+        : user.name;
+
+    const nextBio = args.bio !== undefined ? args.bio.trim() : user.bio;
+
+    const nextCity = args.city !== undefined ? args.city.trim() : user.city;
+
+    const nextCountry =
+      args.country !== undefined ? args.country.trim() : user.country;
+
+    const nextInterests =
+      args.interests !== undefined ? args.interests : user.interests;
+
+    const userUpdates: {
+      name?: string;
+      bio?: string;
+      city?: string;
+      country?: string;
+      interests?: string[];
+      searchText: string;
+    } = {
+      searchText: buildUserSearchText({
+        name: nextName,
+        bio: nextBio,
+        city: nextCity,
+        country: nextCountry,
+        roles: user.roles,
+        interests: nextInterests,
+        profession: user.profession,
+      }),
+    };
+
+    if (args.name !== undefined) {
+      userUpdates.name = nextName;
+    }
+
+    if (args.bio !== undefined) {
+      userUpdates.bio = nextBio;
+    }
+
+    if (args.city !== undefined) {
+      userUpdates.city = nextCity;
+    }
+
+    if (args.country !== undefined) {
+      userUpdates.country = nextCountry;
+    }
+
+    if (args.interests !== undefined) {
+      userUpdates.interests = nextInterests;
+    }
+
+    await ctx.db.patch(user._id, userUpdates);
+
+    const existingProfile = await ctx.db
+      .query("networkProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    const profileUpdates: {
+      headline?: string;
+      availability?: Availability;
+      updatedAt: string;
+    } = {
+      updatedAt: nowIso(),
+    };
+
+    if (args.headline !== undefined) {
+      profileUpdates.headline = args.headline.trim();
+    }
+
+    if (args.availability !== undefined) {
+      profileUpdates.availability = args.availability;
+    }
+
+    if (existingProfile) {
+      await ctx.db.patch(existingProfile._id, profileUpdates);
+    } else {
+      await ctx.db.insert("networkProfiles", {
+        userId: user._id,
+        headline: profileUpdates.headline,
+        availability: profileUpdates.availability,
+        verified: false,
+        reputationScore: user.reputationScore,
+        website: undefined,
+        socialLinks: undefined,
+        updatedAt: profileUpdates.updatedAt,
+      });
+    }
+
+    return {
+      success: true,
     };
   },
 });

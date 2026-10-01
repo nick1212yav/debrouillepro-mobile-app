@@ -3,10 +3,16 @@
  *
  * Feuille de style globale utilisée par NativeWind v4.
  *
+ * Architecture :
+ *  - Les tokens de thème sont exposés via les variables --color-*
+ *  - ThemeProvider injecte dynamiquement ces variables avec vars()
+ *  - Le thème clair est la valeur par défaut
+ *  - Le thème sombre reste disponible via ThemeProvider
+ *
  * ⚠️ IMPORTANT :
  *  - Les 3 directives @tailwind DOIVENT rester en haut du fichier.
- *  - Ce fichier est importé dans le point d'entrée (app/_layout.tsx
- *    ou App.tsx) : `import "./global.css";`
+ *  - Ce fichier est importé dans app/_layout.tsx :
+ *      import "../global.css";
  * ========================================================================== */
 
 @tailwind base;
@@ -14,44 +20,97 @@
 @tailwind utilities;
 
 /* ============================================================================
- * 1. VARIABLES CSS GLOBALES
+ * 1. VARIABLES CSS GLOBALES — THÈME CLAIR PAR DÉFAUT
  *
- *    Utilisables côté web via var(--color-…).
- *    Sur natif, ces variables ne sont PAS résolues par React Native :
- *    utilise plutôt les tokens dans `tailwind.config.js` / `theme.ts`.
+ * Ces valeurs constituent le fallback Web.
+ *
+ * Sur React Native, ThemeProvider injecte les mêmes variables dynamiquement
+ * avec NativeWind vars().
  * ========================================================================== */
 
 :root {
-  /* Backgrounds */
-  --color-bg-base: #050714;
-  --color-bg-elevated: #0a0f1f;
-  --color-bg-overlay: rgba(5, 7, 20, 0.85);
+  /* --------------------------------------------------------------------------
+   * Backgrounds
+   * ------------------------------------------------------------------------ */
+  --color-background: #f8fafc;
+  --color-background-elevated: #ffffff;
 
-  /* Surfaces / glass */
-  --color-surface-1: rgba(255, 255, 255, 0.035);
-  --color-surface-2: rgba(255, 255, 255, 0.055);
-  --color-surface-3: rgba(255, 255, 255, 0.075);
+  /* --------------------------------------------------------------------------
+   * Surfaces
+   * ------------------------------------------------------------------------ */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-surface-strong: #e2e8f0;
 
-  /* Bordures */
-  --color-border-soft: rgba(255, 255, 255, 0.06);
-  --color-border: rgba(255, 255, 255, 0.09);
-  --color-border-strong: rgba(255, 255, 255, 0.14);
+  /* --------------------------------------------------------------------------
+   * Borders
+   * ------------------------------------------------------------------------ */
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-border-soft: #f1f5f9;
 
-  /* Texte */
-  --color-text-primary: #ffffff;
-  --color-text-secondary: rgba(255, 255, 255, 0.72);
-  --color-text-muted: rgba(255, 255, 255, 0.5);
-  --color-text-faint: rgba(255, 255, 255, 0.32);
+  /* --------------------------------------------------------------------------
+   * Text
+   * ------------------------------------------------------------------------ */
+  --color-foreground: #0f172a;
+  --color-foreground-secondary: #334155;
+  --color-foreground-muted: #64748b;
+  --color-foreground-faint: #94a3b8;
 
-  /* Accents */
-  --color-accent-primary: #a78bfa;
-  --color-accent-secondary: #6366f1;
-  --color-accent-tertiary: #c4b5fd;
-  --color-accent-success: #34d399;
-  --color-accent-warning: #fbbf24;
-  --color-accent-danger: #f87171;
+  /* --------------------------------------------------------------------------
+   * Primary
+   * ------------------------------------------------------------------------ */
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-primary-soft: #eff6ff;
 
-  /* Radius */
+  /* --------------------------------------------------------------------------
+   * Semantic states
+   * ------------------------------------------------------------------------ */
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  /* --------------------------------------------------------------------------
+   * Inputs
+   * ------------------------------------------------------------------------ */
+  --color-input: #ffffff;
+  --color-input-border: #cbd5e1;
+
+  /* --------------------------------------------------------------------------
+   * Overlay
+   * ------------------------------------------------------------------------ */
+  --color-overlay: rgba(15, 23, 42, 0.45);
+
+  /* --------------------------------------------------------------------------
+   * Legacy aliases
+   *
+   * Conservés temporairement pour éviter de casser les composants existants.
+   * Ils pourront être supprimés progressivement après migration.
+   * ------------------------------------------------------------------------ */
+  --color-bg-base: var(--color-background);
+  --color-bg-elevated: var(--color-background-elevated);
+  --color-bg-overlay: var(--color-overlay);
+
+  --color-surface-1: var(--color-surface);
+  --color-surface-2: var(--color-surface-muted);
+  --color-surface-3: var(--color-surface-strong);
+
+  --color-text-primary: var(--color-foreground);
+  --color-text-secondary: var(--color-foreground-secondary);
+  --color-text-muted: var(--color-foreground-muted);
+  --color-text-faint: var(--color-foreground-faint);
+
+  --color-accent-primary: var(--color-primary);
+  --color-accent-secondary: #1d4ed8;
+  --color-accent-tertiary: #60a5fa;
+  --color-accent-success: var(--color-success);
+  --color-accent-warning: var(--color-warning);
+  --color-accent-danger: var(--color-danger);
+
+  /* --------------------------------------------------------------------------
+   * Radius
+   * ------------------------------------------------------------------------ */
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 20px;
@@ -59,17 +118,17 @@
   --radius-2xl: 32px;
   --radius-full: 9999px;
 
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.16);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.22);
-  --shadow-lg: 0 18px 55px rgba(0, 0, 0, 0.28);
-  --shadow-accent: 0 12px 40px rgba(124, 58, 237, 0.32);
+  /* --------------------------------------------------------------------------
+   * Shadows
+   * ------------------------------------------------------------------------ */
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 18px 55px rgba(15, 23, 42, 0.12);
+  --shadow-accent: 0 12px 40px rgba(37, 99, 235, 0.18);
 }
 
 /* ============================================================================
  * 2. RESET DE BASE
- *
- *    Léger : on ne casse pas le comportement de React Native Web.
  * ========================================================================== */
 
 * {
@@ -80,24 +139,27 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--color-bg-base);
-  color: var(--color-text-primary);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overscroll-behavior-y: none;
+  overscroll-behavior: none;
 }
 
-/* Évite les scrollbars disgracieuses sur web */
+/* ============================================================================
+ * 3. SCROLLBAR — WEB
+ * ========================================================================== */
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(100, 116, 139, 0.35);
   border-radius: 999px;
 }
 
@@ -106,38 +168,38 @@ body {
 }
 
 /* ============================================================================
- * 3. COMPOSANTS UTILITAIRES (globaux)
- *
- *    Classes utilisables directement dans le JSX avec `className`.
+ * 4. COMPOSANTS UTILITAIRES
  * ========================================================================== */
 
 @layer components {
   /* --------------------------------------------------------------------------
-   * Glass surface — la carte glass standard
+   * Surface standard
    * ------------------------------------------------------------------------ */
   .glass-surface {
-    background-color: var(--color-surface-1);
+    background-color: var(--color-surface);
     border-width: 1px;
     border-color: var(--color-border);
     border-radius: var(--radius-lg);
   }
 
+  /* --------------------------------------------------------------------------
+   * Surface renforcée
+   * ------------------------------------------------------------------------ */
   .glass-surface-strong {
-    background-color: var(--color-surface-2);
+    background-color: var(--color-surface-muted);
     border-width: 1px;
     border-color: var(--color-border-strong);
     border-radius: var(--radius-lg);
   }
 
   /* --------------------------------------------------------------------------
-   * CTA gradient text
+   * Texte gradient — conservé pour compatibilité
    * ------------------------------------------------------------------------ */
   .text-gradient-violet {
     background-image: linear-gradient(
       135deg,
-      #c4b5fd 0%,
-      #a78bfa 35%,
-      #8b5cf6 70%,
+      #2563eb 0%,
+      #3b82f6 50%,
       #6366f1 100%
     );
     -webkit-background-clip: text;
@@ -146,7 +208,7 @@ body {
   }
 
   /* --------------------------------------------------------------------------
-   * Safe area helpers
+   * Safe area
    * ------------------------------------------------------------------------ */
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);
@@ -157,7 +219,7 @@ body {
   }
 
   /* --------------------------------------------------------------------------
-   * No-scrollbar — masque la scrollbar sur web
+   * Masquage scrollbar
    * ------------------------------------------------------------------------ */
   .no-scrollbar {
     scrollbar-width: none;
@@ -170,11 +232,13 @@ body {
 }
 
 /* ============================================================================
- * 4. UTILITAIRES PROPRIÉTAIRES
+ * 5. UTILITAIRES PROPRIÉTAIRES
  * ========================================================================== */
 
 @layer utilities {
-  /* Blur/glow helpers (utilisent filter CSS sur web) */
+  /* --------------------------------------------------------------------------
+   * Blur
+   * ------------------------------------------------------------------------ */
   .blur-soft {
     filter: blur(24px);
   }
@@ -183,34 +247,30 @@ body {
     filter: blur(60px);
   }
 
-  /* Ring inset propre */
+  /* --------------------------------------------------------------------------
+   * Ring inset
+   * ------------------------------------------------------------------------ */
   .ring-inset-white {
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
   }
 }
 
 /* ============================================================================
- * 5. WEB-SPECIFIC
- *
- *    Ces règles s'appliquent uniquement sur web.
- *    Elles sont ignorées sur natif (RN ignore les sélecteurs DOM).
+ * 6. WEB-SPECIFIC
  * ========================================================================== */
 
 @media (min-width: 768px) {
   html {
-    /* Empêche le layout shift quand la barre de scroll apparaît */
     scrollbar-gutter: stable;
   }
 }
 
-/* Focus visible accessible */
+/* --------------------------------------------------------------------------
+ * Focus visible accessible
+ * ------------------------------------------------------------------------ */
+
 :focus-visible {
-  outline: 2px solid var(--color-accent-primary);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
   border-radius: 4px;
-}
-
-/* Empêche le bounce d'overscroll sur iOS/Android Web */
-body {
-  overscroll-behavior: none;
 }

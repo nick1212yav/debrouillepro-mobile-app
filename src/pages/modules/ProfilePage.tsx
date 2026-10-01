@@ -2,8 +2,10 @@ import React, { useMemo, useState } from "react";
 import {
   Alert,
   Image,
+  Linking,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -11,21 +13,24 @@ import {
 import {
   ArrowLeft,
   BarChart2,
-  Building2,
+  Camera,
   ChevronRight,
   Clock,
   Edit3,
   Eye,
   Flame,
+  Instagram,
   Link2,
+  Linkedin,
   Lock,
   MapPin,
   Play,
-  Share2,
+  Send,
   Shield,
   Star,
   TrendingUp,
-  UserX,
+  Twitter,
+  Youtube,
   Zap,
 } from "lucide-react-native";
 
@@ -48,6 +53,7 @@ import {
   CompletionBar,
   RecentsTab,
   ActivityTimeline,
+  SocialLinksSheet,
 } from "@/features/profile";
 
 interface ProfilePageProps {
@@ -60,6 +66,24 @@ type IconComponent = React.ComponentType<{
   color?: string;
   strokeWidth?: number;
 }>;
+
+type SocialLink = {
+  key: string;
+  label: string;
+  url: string;
+  icon: IconComponent;
+};
+
+type SocialLinksSource = {
+  facebook?: string;
+  twitter?: string;
+  linkedin?: string;
+  instagram?: string;
+  youtube?: string;
+  tiktok?: string;
+  whatsapp?: string;
+  telegram?: string;
+};
 
 function formatCompactNumber(value: number | undefined): string {
   if (value === undefined || !Number.isFinite(value)) {
@@ -77,12 +101,14 @@ function formatCompactNumber(value: number | undefined): string {
   return String(value);
 }
 
-function formatMemberSince(value: string | number | undefined): string | null {
+function formatMemberSince(
+  value: string | number | undefined | null,
+): string | null {
   if (value === undefined || value === null) {
     return null;
   }
 
-  const date = typeof value === "number" ? new Date(value) : new Date(value);
+  const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return null;
@@ -107,7 +133,91 @@ function getInitials(name: string): string {
     return parts[0].slice(0, 2).toUpperCase();
   }
 
-  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+  return `${parts[0][0] ?? ""}${
+    parts[parts.length - 1][0] ?? ""
+  }`.toUpperCase();
+}
+
+function normalizeSocialLinks(
+  socialLinks: SocialLinksSource | undefined,
+): SocialLink[] {
+  if (!socialLinks) {
+    return [];
+  }
+
+  const candidates: Array<{
+    key: string;
+    label: string;
+    url: string | undefined;
+    icon: IconComponent;
+  }> = [
+    {
+      key: "instagram",
+      label: "Instagram",
+      url: socialLinks.instagram,
+      icon: Instagram,
+    },
+    {
+      key: "linkedin",
+      label: "LinkedIn",
+      url: socialLinks.linkedin,
+      icon: Linkedin,
+    },
+    {
+      key: "twitter",
+      label: "X / Twitter",
+      url: socialLinks.twitter,
+      icon: Twitter,
+    },
+    {
+      key: "youtube",
+      label: "YouTube",
+      url: socialLinks.youtube,
+      icon: Youtube,
+    },
+    {
+      key: "facebook",
+      label: "Facebook",
+      url: socialLinks.facebook,
+      icon: Send,
+    },
+    {
+      key: "tiktok",
+      label: "TikTok",
+      url: socialLinks.tiktok,
+      icon: Play,
+    },
+    {
+      key: "whatsapp",
+      label: "WhatsApp",
+      url: socialLinks.whatsapp,
+      icon: Send,
+    },
+    {
+      key: "telegram",
+      label: "Telegram",
+      url: socialLinks.telegram,
+      icon: Send,
+    },
+  ];
+
+  return candidates
+    .filter(
+      (
+        item,
+      ): item is {
+        key: string;
+        label: string;
+        url: string;
+        icon: IconComponent;
+      } => typeof item.url === "string" && item.url.trim().length > 0,
+    )
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      url: item.url.trim(),
+      icon: item.icon,
+    }));
 }
 
 function StatCard({
@@ -144,117 +254,105 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
   const [tab, setTab] = useState<ProfileTab>("apercu");
   const [showQR, setShowQR] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showSocialLinks, setShowSocialLinks] = useState(false);
+
+  const accentHex = "#8B5CF6";
 
   const { total } = usePoints();
   const { level } = getLevelProgress(total);
 
   const user = useCurrentUser();
-
-  const { user: firebaseUser, isAuthenticated } = useFirebaseAuth();
-
+  const { isAuthenticated } = useFirebaseAuth();
   const { prefs } = usePreferences();
   const { entries } = useActivity();
 
   /*
-   * Données réelles de suivi.
-   * On ne fournit aucun fallback chiffré.
+   * Contract backend réel :
+   * getMyFollowStats ne reçoit plus d'email côté client.
+   * L'utilisateur courant est résolu côté Convex depuis l'identité.
    */
   const followStats = useQuery(
     api.follows.getMyFollowStats,
-    firebaseUser?.email
+    isAuthenticated ? {} : "skip",
+  );
+
+  /*
+   * Profil public réel.
+   * Aucun profil n'est reconstruit artificiellement côté frontend.
+   */
+  const publicProfile = useQuery(
+    api.network.getPublicProfile,
+    isAuthenticated && user?._id
       ? {
-          email: firebaseUser.email,
+          userId: user._id,
         }
       : "skip",
   );
 
-  /*
-   * Streak réel.
-   */
   const myStreak = useQuery(
     api.streaks.getMyStreak,
     isAuthenticated ? {} : "skip",
   );
 
-  /*
-   * Classement réel.
-   */
   const leaderboard = useQuery(
     api.utility.getLeaderboard,
     isAuthenticated ? {} : "skip",
   );
 
-  /*
-   * Activité récente réelle.
-   */
-  const hasRecentActivity = entries.some(
-    (entry) => entry.type === "view_module",
-  );
-
-  /*
-   * L'apparence vient de la configuration utilisateur.
-   * Aucun accès DOM/document.
-   */
-  const accentHex = "#8B5CF6";
-
   const displayName = getDisplayName(user);
 
   const safeDisplayName =
-    displayName?.trim() || user?.email?.split("@")[0] || "Utilisateur";
-
-  const slug = useMemo(
-    () =>
-      safeDisplayName
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9À-ÿ]+/gi, "-")
-        .replace(/^-+|-+$/g, ""),
-    [safeDisplayName],
-  );
+    displayName?.trim() ||
+    user?.name?.trim() ||
+    user?.email?.split("@")[0]?.trim() ||
+    "Utilisateur";
 
   /*
-   * IMPORTANT :
-   * aucune bio fictive.
+   * Le slug doit rester canonique.
+   * Aucun slug n'est généré localement.
    */
+  const slug = publicProfile?.slug?.trim() || user?.slug?.trim() || "";
+
   const bio =
-    typeof user?.bio === "string" && user.bio.trim().length > 0
-      ? user.bio.trim()
-      : null;
+    typeof publicProfile?.bio === "string" &&
+    publicProfile.bio.trim().length > 0
+      ? publicProfile.bio.trim()
+      : typeof user?.bio === "string" && user.bio.trim().length > 0
+        ? user.bio.trim()
+        : null;
 
-  /*
-   * Utilise uniquement les données réellement disponibles.
-   *
-   * Le type utilisateur peut évoluer selon le schema Convex.
-   * On ne force donc pas de champs qui ne sont pas garantis.
-   */
-  const userRecord = user as
-    | (typeof user & {
-        image?: string | null;
-        avatar?: string | null;
-        coverImage?: string | null;
-        coverUrl?: string | null;
-        city?: string | null;
-        country?: string | null;
-        createdAt?: string | number | null;
-        _creationTime?: number;
-      })
-    | null
-    | undefined;
+  const avatarUri =
+    typeof user?.avatar === "string" && user.avatar.trim().length > 0
+      ? user.avatar.trim()
+      : undefined;
 
-  const avatarUri = userRecord?.image || userRecord?.avatar || undefined;
+  const coverUri =
+    typeof publicProfile?.coverUrl === "string" &&
+    publicProfile.coverUrl.trim().length > 0
+      ? publicProfile.coverUrl.trim()
+      : undefined;
 
-  const coverUri = userRecord?.coverImage || userRecord?.coverUrl || undefined;
+  const publicLocation = publicProfile?.publicLocation;
 
-  const locationLabel = [userRecord?.city, userRecord?.country]
+  const locationLabel = [
+    publicLocation?.city,
+    publicLocation?.province,
+    publicLocation?.country,
+  ]
     .filter(
       (value): value is string =>
         typeof value === "string" && value.trim().length > 0,
     )
+    .map((value) => value.trim())
+    .filter((value, index, values) => values.indexOf(value) === index)
     .join(", ");
 
-  const memberSince = formatMemberSince(
-    userRecord?.createdAt ?? userRecord?._creationTime,
-  );
+  /*
+   * _creationTime vient de l'utilisateur réel.
+   * On ne dépend pas d'un champ que le DTO public n'est pas
+   * obligé d'exposer.
+   */
+  const memberSince = formatMemberSince(user?._creationTime);
 
   const favoriteModules = Array.isArray(prefs.favoriteModules)
     ? prefs.favoriteModules.filter(
@@ -263,31 +361,72 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
       )
     : [];
 
-  const enabledProfileData = [
-    Boolean(user?.name),
-    Boolean(user?.bio),
-    Boolean(locationLabel),
-    Boolean(user?.email),
-  ].filter(Boolean).length;
+  const socialLinks = useMemo(
+    () => normalizeSocialLinks(publicProfile?.socialLinks),
+    [publicProfile?.socialLinks],
+  );
 
-  const completionPercent = Math.round((enabledProfileData / 4) * 100);
+  /*
+   * Progression réellement dérivée des informations
+   * disponibles ici.
+   *
+   * Aucun "verified", "photo", "skills" ou autre état
+   * n'est inventé.
+   */
+  const completionFields = [
+    Boolean(user?.name?.trim()),
+    Boolean(bio),
+    Boolean(locationLabel),
+    Boolean(socialLinks.length > 0),
+  ];
+
+  const completionPercent = Math.round(
+    (completionFields.filter(Boolean).length / completionFields.length) * 100,
+  );
+
+  const followerCount =
+    publicProfile?.followerCount ?? followStats?.followerCount;
+
+  const followingCount =
+    publicProfile?.followingCount ?? followStats?.followingCount;
 
   const shareProfile = async () => {
-    /*
-     * Le vrai partage peut être branché à ShareProfile/Expo Share.
-     * On ne fabrique pas une URL publique si le backend ne l'a pas fournie.
-     */
-    Alert.alert(
-      "Partager mon profil",
-      "Le partage public du profil doit utiliser l'identifiant ou l'URL officielle générée par le backend.",
-    );
+    const profileReference = slug ? `@${slug}` : safeDisplayName;
+
+    try {
+      await Share.share({
+        title: `Profil de ${safeDisplayName}`,
+        message: `Découvrez le profil de ${safeDisplayName} sur DébrouillePro : ${profileReference}`,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.trim().length > 0) {
+        Alert.alert("Partage indisponible", error.message);
+        return;
+      }
+
+      Alert.alert("Partage indisponible", "Le partage n'a pas pu être ouvert.");
+    }
+  };
+
+  const openSocialLink = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+
+      if (!supported) {
+        Alert.alert("Lien indisponible", "Ce lien ne peut pas être ouvert.");
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error("Profile.openSocialLink:", error);
+
+      Alert.alert("Lien indisponible", "Impossible d'ouvrir ce lien.");
+    }
   };
 
   const openAddLink = () => {
-    Alert.alert(
-      "Liens du profil",
-      "La gestion des liens externes doit être connectée au modèle de profil avant d'être activée.",
-    );
+    setShowSocialLinks(true);
   };
 
   const tabs: Array<[ProfileTab, string]> = [
@@ -303,10 +442,9 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* =========================================================
-            COVER / HEADER
-        ========================================================== */}
+        {/* ───────────────── COVER ───────────────── */}
 
         <View style={styles.coverContainer}>
           {coverUri ? (
@@ -323,15 +461,32 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 color="rgba(255,255,255,0.16)"
                 strokeWidth={1.5}
               />
+
+              <Text style={styles.coverEmptyText}>Ajoutez une couverture</Text>
             </View>
           )}
 
           <View style={styles.coverOverlay} />
 
           <Pressable
+            onPress={() => setShowEdit(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Modifier la photo de couverture"
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.coverEditButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Camera size={15} color="#ffffff" strokeWidth={2.2} />
+            <Text style={styles.coverEditButtonText}>Modifier</Text>
+          </Pressable>
+
+          <Pressable
             onPress={onBack}
             accessibilityRole="button"
             accessibilityLabel="Retour"
+            hitSlop={8}
             style={({ pressed }) => [
               styles.headerButton,
               pressed && styles.pressed,
@@ -344,6 +499,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
             onPress={() => setShowEdit(true)}
             accessibilityRole="button"
             accessibilityLabel="Modifier le profil"
+            hitSlop={8}
             style={({ pressed }) => [
               styles.headerButton,
               styles.headerButtonRight,
@@ -354,25 +510,49 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
           </Pressable>
         </View>
 
-        {/* =========================================================
-            IDENTITY
-        ========================================================== */}
+        {/* ───────────────── IDENTITY ───────────────── */}
 
         <View style={styles.profileContainer}>
           <View style={styles.identityRow}>
             <View style={styles.avatarWrapper}>
-              <UserAvatar user={user} size="w-20 h-20" className="border-4" />
+              <Pressable
+                onPress={() => setShowEdit(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Modifier la photo de profil"
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.avatarPressable,
+                  pressed && styles.pressed,
+                ]}
+              >
+                {avatarUri ? (
+                  <Image
+                    source={{ uri: avatarUri }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                    accessibilityLabel={`Photo de profil de ${safeDisplayName}`}
+                  />
+                ) : (
+                  <UserAvatar
+                    user={user}
+                    size="w-20 h-20"
+                    className="border-4"
+                  />
+                )}
+              </Pressable>
 
-              {hasRecentActivity && (
-                <View
-                  style={[
-                    styles.activityDot,
-                    {
-                      borderColor: "#050812",
-                    },
-                  ]}
-                />
-              )}
+              <Pressable
+                onPress={() => setShowEdit(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Modifier la photo de profil"
+                hitSlop={6}
+                style={({ pressed }) => [
+                  styles.avatarEditButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Camera size={13} color="#ffffff" strokeWidth={2.3} />
+              </Pressable>
 
               <View style={styles.levelBadge}>
                 <Text style={styles.levelBadgeText}>{level}</Text>
@@ -382,6 +562,8 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
             <View style={styles.profileActions}>
               <Pressable
                 onPress={() => setShowQR(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Afficher ma carte QR"
                 style={({ pressed }) => [
                   styles.secondaryAction,
                   {
@@ -391,59 +573,85 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                   pressed && styles.pressed,
                 ]}
               >
-                <Share2 size={14} color={accentHex} />
-                <Text style={[styles.actionText, { color: accentHex }]}>
+                <Link2 size={14} color={accentHex} />
+
+                <Text
+                  style={[
+                    styles.actionText,
+                    {
+                      color: accentHex,
+                    },
+                  ]}
+                >
                   Carte
                 </Text>
               </Pressable>
 
               <Pressable
-                onPress={shareProfile}
+                onPress={() => {
+                  void shareProfile();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Partager mon profil"
                 style={({ pressed }) => [
                   styles.secondaryAction,
                   pressed && styles.pressed,
                 ]}
               >
-                <Share2 size={14} color="#cbd5e1" />
+                <Send size={14} color="#cbd5e1" />
+
                 <Text style={styles.actionText}>Partager</Text>
               </Pressable>
             </View>
           </View>
 
-          {/* Name */}
           <View style={styles.nameRow}>
-            <Text style={styles.name}>{safeDisplayName}</Text>
+            <Text style={styles.name} accessibilityRole="header">
+              {safeDisplayName}
+            </Text>
 
-            {user?.email ? (
-              <View style={styles.accountIndicator}>
+            {isAuthenticated ? (
+              <View
+                style={styles.accountIndicator}
+                accessibilityLabel="Compte authentifié"
+              >
                 <Shield size={12} color="#60a5fa" strokeWidth={2} />
               </View>
             ) : null}
           </View>
 
-          {/* Bio */}
           {bio ? (
             <Text style={styles.bio}>{bio}</Text>
           ) : (
             <Pressable
               onPress={() => setShowEdit(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Ajouter une bio"
               style={({ pressed }) => [
                 styles.completePrompt,
                 pressed && styles.pressed,
               ]}
             >
               <Edit3 size={13} color={accentHex} />
-              <Text style={[styles.completePromptText, { color: accentHex }]}>
+
+              <Text
+                style={[
+                  styles.completePromptText,
+                  {
+                    color: accentHex,
+                  },
+                ]}
+              >
                 Ajouter une bio
               </Text>
             </Pressable>
           )}
 
-          {/* Metadata */}
           <View style={styles.metadataRow}>
             {locationLabel ? (
               <View style={styles.metadataItem}>
                 <MapPin size={12} color="#64748b" />
+
                 <Text style={styles.metadataText}>{locationLabel}</Text>
               </View>
             ) : null}
@@ -451,27 +659,28 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
             {memberSince ? (
               <View style={styles.metadataItem}>
                 <Clock size={12} color="#64748b" />
+
                 <Text style={styles.metadataText}>{memberSince}</Text>
               </View>
             ) : null}
 
-            {user?.email ? (
+            {isAuthenticated ? (
               <View style={styles.metadataItem}>
                 <Lock size={12} color="#64748b" />
+
                 <Text style={styles.metadataText}>Compte protégé</Text>
               </View>
             ) : null}
           </View>
 
-          {/* =======================================================
-              REAL FOLLOW STATS
-          ======================================================== */}
+          {/* ───────────────── FOLLOW STATS ───────────────── */}
 
           <View style={styles.followStats}>
             <View style={styles.followStat}>
               <Text style={styles.followValue}>
-                {formatCompactNumber(followStats?.followerCount)}
+                {formatCompactNumber(followerCount)}
               </Text>
+
               <Text style={styles.followLabel}>Abonnés</Text>
             </View>
 
@@ -479,10 +688,9 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
 
             <View style={styles.followStat}>
               <Text style={styles.followValue}>
-                {followStats
-                  ? formatCompactNumber(followStats.followingCount)
-                  : "—"}
+                {formatCompactNumber(followingCount)}
               </Text>
+
               <Text style={styles.followLabel}>Abonnements</Text>
             </View>
 
@@ -492,6 +700,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
 
                 <View style={styles.streakBadge}>
                   <Flame size={15} color="#fb923c" />
+
                   <Text style={styles.streakText}>
                     {myStreak.currentStreak} j
                   </Text>
@@ -500,11 +709,13 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
             ) : null}
           </View>
 
-          {/* =======================================================
-              NAVIGATION
-          ======================================================== */}
+          {/* ───────────────── TABS ───────────────── */}
 
-          <View style={styles.tabs}>
+          <View
+            style={styles.tabs}
+            accessibilityRole="tablist"
+            accessibilityLabel="Navigation du profil"
+          >
             {tabs.map(([tabId, label]) => {
               const selected = tab === tabId;
 
@@ -513,6 +724,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                   key={tabId}
                   onPress={() => setTab(tabId)}
                   accessibilityRole="tab"
+                  accessibilityLabel={label}
                   accessibilityState={{
                     selected,
                   }}
@@ -540,35 +752,35 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
           </View>
         </View>
 
-        {/* =========================================================
-            CONTENT
-        ========================================================== */}
+        {/* ───────────────── CONTENT ───────────────── */}
 
         <View style={styles.content}>
-          {tab === "apercu" && (
+          {/* ═════════════════ APERÇU ═════════════════ */}
+
+          {tab === "apercu" ? (
             <View>
-              {/* Completion */}
               <View style={styles.sectionSpacing}>
                 <CompletionBar
                   accentHex={accentHex}
-                  hasName={Boolean(user?.name)}
-                  hasBio={Boolean(user?.bio)}
+                  hasName={Boolean(user?.name?.trim())}
+                  hasBio={Boolean(bio)}
                 />
               </View>
 
-              {/* Real profile stats */}
+              {/* ───────── STATS ───────── */}
+
               <View style={styles.statsGrid}>
                 <StatCard
                   icon={Star}
                   label="Abonnés"
-                  value={formatCompactNumber(followStats?.followerCount)}
+                  value={formatCompactNumber(followerCount)}
                   color="#8B5CF6"
                 />
 
                 <StatCard
                   icon={TrendingUp}
                   label="Abonnements"
-                  value={formatCompactNumber(followStats?.followingCount)}
+                  value={formatCompactNumber(followingCount)}
                   color="#10B981"
                 />
 
@@ -587,14 +799,13 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 />
               </View>
 
-              {/* ===================================================
-                  FAVORITE MODULES
-              ==================================================== */}
+              {/* ───────── MODULES ───────── */}
 
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
                   <View>
                     <Text style={styles.cardTitle}>Modules préférés</Text>
+
                     <Text style={styles.cardSubtitle}>
                       Tes préférences enregistrées
                     </Text>
@@ -614,16 +825,9 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                           },
                         ]}
                       >
-                        <Text style={styles.moduleEmoji}>📱</Text>
+                        <Text style={styles.moduleEmoji}>◈</Text>
 
-                        <Text
-                          style={[
-                            styles.moduleText,
-                            {
-                              color: "#dbeafe",
-                            },
-                          ]}
-                        >
+                        <Text style={styles.moduleText}>
                           {module.charAt(0).toUpperCase() + module.slice(1)}
                         </Text>
                       </View>
@@ -632,6 +836,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 ) : (
                   <View style={styles.emptyState}>
                     <Eye size={18} color="#64748b" />
+
                     <Text style={styles.emptyText}>
                       Aucun module favori enregistré.
                     </Text>
@@ -639,9 +844,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 )}
               </View>
 
-              {/* ===================================================
-                  XP / LEVEL
-              ==================================================== */}
+              {/* ───────── XP ───────── */}
 
               <View style={styles.card}>
                 <View style={styles.xpHeader}>
@@ -663,14 +866,17 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 <View style={styles.xpActions}>
                   <Pressable
                     onPress={() => onNavigate("recompenses")}
+                    accessibilityRole="button"
                     style={styles.linkButton}
                   >
                     <Text style={styles.linkText}>Récompenses</Text>
+
                     <ChevronRight size={14} color={accentHex} />
                   </Pressable>
 
                   <Pressable
                     onPress={() => onNavigate("badges")}
+                    accessibilityRole="button"
                     style={styles.linkButton}
                   >
                     <Text
@@ -683,11 +889,13 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                     >
                       Badges
                     </Text>
+
                     <ChevronRight size={14} color="#818cf8" />
                   </Pressable>
 
                   <Pressable
                     onPress={() => onNavigate("analytics")}
+                    accessibilityRole="button"
                     style={styles.linkButton}
                   >
                     <Text
@@ -700,14 +908,13 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                     >
                       Analytics
                     </Text>
+
                     <ChevronRight size={14} color="#34d399" />
                   </Pressable>
                 </View>
               </View>
 
-              {/* ===================================================
-                  PRIVACY / SECURITY
-              ==================================================== */}
+              {/* ───────── SECURITY ───────── */}
 
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
@@ -726,6 +933,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
 
                 <Pressable
                   onPress={() => onNavigate("privacy")}
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.rowAction,
                     pressed && styles.pressed,
@@ -733,6 +941,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 >
                   <View>
                     <Text style={styles.rowTitle}>Confidentialité</Text>
+
                     <Text style={styles.rowDescription}>
                       Gérer la visibilité et les données du compte.
                     </Text>
@@ -743,6 +952,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
 
                 <Pressable
                   onPress={() => onNavigate("documents")}
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.rowAction,
                     pressed && styles.pressed,
@@ -750,6 +960,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 >
                   <View>
                     <Text style={styles.rowTitle}>Coffre documentaire</Text>
+
                     <Text style={styles.rowDescription}>
                       Accéder à tes documents enregistrés.
                     </Text>
@@ -759,9 +970,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 </Pressable>
               </View>
 
-              {/* ===================================================
-                  PROFILE TOOLS
-              ==================================================== */}
+              {/* ───────── TOOLS ───────── */}
 
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
@@ -770,6 +979,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
 
                 <Pressable
                   onPress={() => onNavigate("dashboard")}
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.toolRow,
                     pressed && styles.pressed,
@@ -784,20 +994,32 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
 
                 <Pressable
                   onPress={() => onNavigate("export")}
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.toolRow,
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Share2 size={18} color="#f59e0b" />
+                  <Send size={18} color="#f59e0b" />
 
                   <Text style={styles.toolText}>Exporter mes données</Text>
 
                   <ChevronRight size={17} color="#64748b" />
                 </Pressable>
 
+                {/*
+                 * Mes Reels — route distincte du flux public de Reels.
+                 *
+                 *   Home   → "reels"       → api.shortVideos.list
+                 *   Profil → "reels-mine"  → api.shortVideos.listMine
+                 *
+                 * Cette séparation permet au créateur de voir ses Reels
+                 * dans tous leurs états de modération (pending, approved,
+                 * rejected) sans exposer ces contenus au feed public.
+                 */}
                 <Pressable
-                  onPress={() => onNavigate("reels")}
+                  onPress={() => onNavigate("reels-mine")}
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.toolRow,
                     pressed && styles.pressed,
@@ -812,6 +1034,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
 
                 <Pressable
                   onPress={() => onNavigate("creator-dashboard")}
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.toolRow,
                     pressed && styles.pressed,
@@ -825,24 +1048,22 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 </Pressable>
               </View>
 
-              {/* ===================================================
-                  LINKS
-              ==================================================== */}
+              {/* ───────── SOCIAL LINKS ───────── */}
 
               <View style={styles.card}>
                 <View style={styles.linksHeader}>
-                  <View>
+                  <View style={styles.linksTitleBlock}>
                     <Text style={styles.cardTitle}>Liens publics</Text>
 
                     <Text style={styles.cardSubtitle}>
-                      Réseaux et liens associés au profil
+                      Tes réseaux et liens associés au profil
                     </Text>
                   </View>
 
                   <Pressable
                     onPress={openAddLink}
                     accessibilityRole="button"
-                    accessibilityLabel="Ajouter un lien"
+                    accessibilityLabel="Gérer les liens publics"
                     style={({ pressed }) => [
                       styles.addButton,
                       pressed && styles.pressed,
@@ -856,27 +1077,62 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                         },
                       ]}
                     >
-                      Ajouter
+                      {socialLinks.length > 0 ? "Gérer" : "Ajouter"}
                     </Text>
                   </Pressable>
                 </View>
 
-                <View style={styles.emptyState}>
-                  <Link2 size={19} color="#64748b" />
+                {socialLinks.length > 0 ? (
+                  <View style={styles.socialLinks}>
+                    {socialLinks.map(({ key, label, url, icon: Icon }) => (
+                      <Pressable
+                        key={key}
+                        onPress={() => {
+                          void openSocialLink(url);
+                        }}
+                        accessibilityRole="link"
+                        accessibilityLabel={`Ouvrir ${label}`}
+                        style={({ pressed }) => [
+                          styles.socialLinkRow,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <View style={styles.socialLinkIcon}>
+                          <Icon size={16} color="#cbd5e1" />
+                        </View>
 
-                  <Text style={styles.emptyText}>
-                    Aucun lien public enregistré.
-                  </Text>
-                </View>
+                        <View style={styles.socialLinkBody}>
+                          <Text style={styles.socialLinkLabel}>{label}</Text>
+
+                          <Text numberOfLines={1} style={styles.socialLinkUrl}>
+                            {url}
+                          </Text>
+                        </View>
+
+                        <ChevronRight size={16} color="#64748b" />
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyState}>
+                    <Link2 size={19} color="#64748b" />
+
+                    <Text style={styles.emptyText}>
+                      Aucun lien public enregistré.
+                    </Text>
+
+                    <Text style={styles.emptyHint}>
+                      Ajoute tes réseaux depuis la modification du profil.
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
-          )}
+          ) : null}
 
-          {/* =======================================================
-              ACTIVITY
-          ======================================================== */}
+          {/* ═════════════════ ACTIVITÉ ═════════════════ */}
 
-          {tab === "activite" && (
+          {tab === "activite" ? (
             <View>
               <View style={styles.activitySummary}>
                 <View style={styles.activityIcon}>
@@ -904,25 +1160,21 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
 
               <ActivityTimeline accentHex={accentHex} />
             </View>
-          )}
+          ) : null}
 
-          {/* =======================================================
-              RECENTS
-          ======================================================== */}
+          {/* ═════════════════ RÉCENTS ═════════════════ */}
 
-          {tab === "recents" && (
+          {tab === "recents" ? (
             <RecentsTab onNavigate={onNavigate} accentHex={accentHex} />
-          )}
+          ) : null}
 
-          {/* =======================================================
-              LEADERBOARD
-          ======================================================== */}
+          {/* ═════════════════ CLASSEMENT ═════════════════ */}
 
-          {tab === "classement" && (
+          {tab === "classement" ? (
             <View>
               <Text style={styles.sectionEyebrow}>CLASSEMENT XP</Text>
 
-              {!leaderboard ? (
+              {leaderboard === undefined ? (
                 <View style={styles.loadingCard}>
                   <Text style={styles.loadingText}>
                     Chargement du classement…
@@ -941,7 +1193,8 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
               ) : (
                 <View style={styles.leaderboard}>
                   {leaderboard.map((entry, index) => {
-                    const isMe = entry.name === safeDisplayName;
+                    const isMe =
+                      user?._id !== undefined && entry.userId === user._id;
 
                     const rank =
                       index === 0
@@ -988,6 +1241,7 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                         <View style={styles.leaderInfo}>
                           <Text numberOfLines={1} style={styles.leaderName}>
                             {entry.name}
+
                             {isMe ? (
                               <Text
                                 style={[
@@ -997,7 +1251,8 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                                   },
                                 ]}
                               >
-                                {"  "}VOUS
+                                {"  "}
+                                VOUS
                               </Text>
                             ) : null}
                           </Text>
@@ -1038,13 +1293,11 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
                 </View>
               ) : null}
             </View>
-          )}
+          ) : null}
         </View>
       </ScrollView>
 
-      {/* ===========================================================
-          MODALS / FEATURE COMPONENTS
-      ============================================================ */}
+      {/* ───────────────── MODALS / SHEETS ───────────────── */}
 
       {showQR ? (
         <QRCardModal
@@ -1058,6 +1311,14 @@ function ProfilePageInner({ onBack, onNavigate }: ProfilePageProps) {
       {showEdit ? (
         <EditProfileSheet
           onClose={() => setShowEdit(false)}
+          accentHex={accentHex}
+        />
+      ) : null}
+
+      {showSocialLinks ? (
+        <SocialLinksSheet
+          visible
+          onClose={() => setShowSocialLinks(false)}
           accentHex={accentHex}
         />
       ) : null}
@@ -1075,6 +1336,7 @@ export default function ProfilePage(props: ProfilePageProps) {
           onPress={props.onBack}
           accessibilityRole="button"
           accessibilityLabel="Retour"
+          hitSlop={8}
           style={({ pressed }) => [
             styles.authBackButton,
             pressed && styles.pressed,
@@ -1116,6 +1378,8 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
+  /* ───────────────── COVER ───────────────── */
+
   coverContainer: {
     height: 190,
     position: "relative",
@@ -1134,9 +1398,38 @@ const styles = StyleSheet.create({
     backgroundColor: "#0c1022",
   },
 
+  coverEmptyText: {
+    color: "#475569",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 8,
+  },
+
   coverOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(2,4,12,0.55)",
+  },
+
+  coverEditButton: {
+    position: "absolute",
+    right: 16,
+    bottom: 16,
+    minHeight: 38,
+    paddingHorizontal: 13,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: "rgba(2,6,23,0.78)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+
+  coverEditButtonText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "800",
   },
 
   headerButton: {
@@ -1158,6 +1451,8 @@ const styles = StyleSheet.create({
     right: 16,
   },
 
+  /* ───────────────── PROFILE ───────────────── */
+
   profileContainer: {
     paddingHorizontal: 18,
     marginTop: -38,
@@ -1176,15 +1471,38 @@ const styles = StyleSheet.create({
     position: "relative",
   },
 
-  activityDot: {
+  avatarPressable: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+
+  avatarEditButton: {
     position: "absolute",
-    right: 4,
+    right: 3,
     bottom: 4,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#22c55e",
-    borderWidth: 3,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#7c3aed",
+    borderWidth: 2,
+    borderColor: "#050812",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 4,
+    borderColor: "#050812",
+    backgroundColor: "#0c1022",
   },
 
   levelBadge: {
@@ -1341,8 +1659,12 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
+  /* ───────────────── TABS ───────────────── */
+
   tabs: {
+    width: "100%",
     flexDirection: "row",
+    alignItems: "stretch",
     marginTop: 18,
     padding: 4,
     borderRadius: 15,
@@ -1353,18 +1675,22 @@ const styles = StyleSheet.create({
 
   tab: {
     flex: 1,
-    minHeight: 39,
+    minWidth: 0,
+    minHeight: 42,
+    paddingHorizontal: 4,
     borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 5,
   },
 
   tabText: {
     color: "#64748b",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
+    textAlign: "center",
   },
+
+  /* ───────────────── CONTENT ───────────────── */
 
   content: {
     paddingHorizontal: 18,
@@ -1455,6 +1781,8 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
+  /* ───────────────── MODULES ───────────────── */
+
   modulesWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1472,16 +1800,18 @@ const styles = StyleSheet.create({
   },
 
   moduleEmoji: {
+    color: "#a78bfa",
     fontSize: 11,
   },
 
   moduleText: {
+    color: "#dbeafe",
     fontSize: 11,
     fontWeight: "700",
   },
 
   emptyState: {
-    minHeight: 65,
+    minHeight: 82,
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
@@ -1493,6 +1823,15 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textAlign: "center",
   },
+
+  emptyHint: {
+    color: "#475569",
+    fontSize: 9,
+    lineHeight: 14,
+    textAlign: "center",
+  },
+
+  /* ───────────────── XP ───────────────── */
 
   xpHeader: {
     flexDirection: "row",
@@ -1545,6 +1884,8 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
+  /* ───────────────── SECURITY ───────────────── */
+
   rowAction: {
     minHeight: 58,
     flexDirection: "row",
@@ -1557,7 +1898,7 @@ const styles = StyleSheet.create({
   rowTitle: {
     color: "#dbe4f0",
     fontSize: 12,
-    fontWeight: "750",
+    fontWeight: "700",
   },
 
   rowDescription: {
@@ -1565,6 +1906,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 3,
   },
+
+  /* ───────────────── TOOLS ───────────────── */
 
   toolRow: {
     minHeight: 52,
@@ -1582,11 +1925,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
+  /* ───────────────── LINKS ───────────────── */
+
   linksHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 12,
+  },
+
+  linksTitleBlock: {
+    flex: 1,
+    paddingRight: 10,
   },
 
   addButton: {
@@ -1600,6 +1950,50 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
   },
+
+  socialLinks: {
+    gap: 7,
+  },
+
+  socialLinkRow: {
+    minHeight: 58,
+    paddingHorizontal: 9,
+    borderRadius: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.025)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.045)",
+  },
+
+  socialLinkIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(139,92,246,0.10)",
+    marginRight: 10,
+  },
+
+  socialLinkBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  socialLinkLabel: {
+    color: "#dbe4f0",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  socialLinkUrl: {
+    color: "#64748b",
+    fontSize: 9,
+    marginTop: 3,
+  },
+
+  /* ───────────────── ACTIVITY ───────────────── */
 
   activitySummary: {
     flexDirection: "row",
@@ -1650,6 +2044,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
+
+  /* ───────────────── LEADERBOARD ───────────────── */
 
   sectionEyebrow: {
     color: "#64748b",
@@ -1796,6 +2192,8 @@ const styles = StyleSheet.create({
     fontSize: 9,
     marginTop: 2,
   },
+
+  /* ───────────────── AUTH ───────────────── */
 
   authScreen: {
     flex: 1,

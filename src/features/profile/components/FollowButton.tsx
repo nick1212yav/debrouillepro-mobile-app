@@ -1,14 +1,13 @@
-import { Pressable, View } from "react-native";
-
 // src/features/profile/components/FollowButton.tsx
 
 import { useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { UserCheck, UserPlus } from "lucide-react-native";
 import { toast } from "sonner";
-import { UserPlus, UserCheck } from "lucide-react-native";
-import { cn } from "@/lib/utils.ts";
-import type { Id } from "@/convex/_generated/dataModel";
+
+import { api } from "@/convex/_generated/api.js";
+import type { Id } from "@/convex/_generated/dataModel.js";
 
 interface FollowButtonProps {
   userId: Id<"users">;
@@ -17,36 +16,89 @@ interface FollowButtonProps {
 
 export function FollowButton({ userId, isFollowing }: FollowButtonProps) {
   const [loading, setLoading] = useState(false);
+
   const toggleFollow = useMutation(api.follows.toggleFollow);
 
-  const handleClick = async () => {
+  const handlePress = async () => {
+    if (loading) {
+      return;
+    }
+
     setLoading(true);
+
     try {
-      const now = await toggleFollow({ targetUserId: userId });
-      toast(now ? "Abonnement confirmé" : "Abonnement retiré", {
-        icon: now ? "✅" : "👋",
+      const following = await toggleFollow({
+        targetUserId: userId,
       });
-    } catch {
-      toast.error("Impossible de modifier l'abonnement");
+
+      toast.success(following ? "Abonnement confirmé" : "Abonnement retiré");
+    } catch (error) {
+      console.error("Failed to toggle follow relationship:", error);
+
+      toast.error("Impossible de modifier l’abonnement");
     } finally {
       setLoading(false);
     }
   };
 
+  const active = isFollowing;
+
   return (
-    <Pressable onPress={() => void handleClick()} disabled={loading} className={cn(
-        "flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold transition-all active:scale-95 cursor-pointer",
-        isFollowing ? "text-white/70" : "text-white",
-      )} style={{ borderColor: "rgba(255,255,255,0.15)", borderStyle: "solid", boxShadow: isFollowing ? "none" : "0 4px 20px rgba(99,102,241,0.4)" }}>
+    <Pressable
+      onPress={() => {
+        void handlePress();
+      }}
+      disabled={loading}
+      accessibilityRole="button"
+      accessibilityState={{
+        disabled: loading,
+        selected: active,
+      }}
+      accessibilityLabel={
+        active ? "Ne plus suivre cet utilisateur" : "Suivre cet utilisateur"
+      }
+      style={({ pressed }) => ({
+        minHeight: 44,
+        minWidth: 112,
+        paddingHorizontal: 18,
+        paddingVertical: 10,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: active
+          ? "rgba(255,255,255,0.12)"
+          : "rgba(99,102,241,0.45)",
+        backgroundColor: active
+          ? "rgba(255,255,255,0.05)"
+          : "rgba(99,102,241,0.16)",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "row",
+        opacity: loading ? 0.65 : pressed ? 0.78 : 1,
+      })}
+    >
       {loading ? (
-        <View className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-      ) : isFollowing ? (
         <>
-          <UserCheck size={15} /> Abonné
+          <ActivityIndicator size="small" color="rgba(255,255,255,0.9)" />
+
+          <Text className="ml-2 text-xs font-bold text-white/80">
+            Traitement…
+          </Text>
+        </>
+      ) : active ? (
+        <>
+          <UserCheck
+            size={16}
+            color="rgba(255,255,255,0.75)"
+            strokeWidth={2.2}
+          />
+
+          <Text className="ml-2 text-xs font-bold text-white/75">Abonné</Text>
         </>
       ) : (
         <>
-          <UserPlus size={15} /> Suivre
+          <UserPlus size={16} color="#ffffff" strokeWidth={2.2} />
+
+          <Text className="ml-2 text-xs font-bold text-white">Suivre</Text>
         </>
       )}
     </Pressable>

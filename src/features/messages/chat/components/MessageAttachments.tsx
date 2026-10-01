@@ -6,11 +6,16 @@ interface MessageAttachmentsProps {
 }
 
 export function MessageAttachments({ messageId }: MessageAttachmentsProps) {
+  // Le messageId est conservé dans le contrat du composant.
+  // Le rendu des pièces jointes est délégué aux composants média
+  // lorsqu'ils sont intégrés à cette zone.
+  void messageId;
+
   return (
-    <View data-message-id={String(messageId)} className="mt-2">
-      {/* Le module media rend les attachments réels.
-          Ce composant sert de point d'insertion dans le chat. */}
-    </View>
+    <View
+      className="mt-2 w-full"
+      accessibilityLabel="Pièces jointes du message"
+    />
   );
 }
 
