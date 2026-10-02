@@ -51,6 +51,7 @@ import {
   Phone,
   Plane,
   Plus,
+  Radio,
   Search,
   ShoppingBag,
   Sparkles,
@@ -116,9 +117,17 @@ import CreateReelSheet from "./CreateReelSheet";
 interface CreateBottomSheetProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Callback de navigation.
+   *
+   * Utilisé uniquement pour "Live" : le Live n'a pas de formulaire
+   * dans le sheet. On ferme le sheet et on délègue la navigation
+   * à HomePage.
+   */
+  onNavigate?: (page: string) => void;
 }
 
-type ExtendedPublicationType = PublicationType | "network" | "voyages";
+type ExtendedPublicationType = PublicationType | "network" | "voyages" | "live";
 
 type GenericPublicationType = "energie" | "ong" | "video" | "sondage";
 
@@ -600,6 +609,30 @@ const CREATE_OPTIONS: CreateOption[] = [
     ],
   },
   {
+    id: "live",
+    icon: Radio,
+    label: "Live",
+    desc: "Diffusez en direct",
+    color: "#EF4444",
+    keywords: [
+      "live",
+      "direct",
+      "streaming",
+      "diffusion",
+      "stream",
+      "broadcast",
+    ],
+    intents: [
+      "diffuser en direct",
+      "lancer un live",
+      "faire un live",
+      "streamer",
+      "passer en direct",
+      "émettre en direct",
+      "partager en direct",
+    ],
+  },
+  {
     id: "article",
     icon: BookOpen,
     label: "Article",
@@ -745,7 +778,7 @@ const CREATE_GROUPS: {
     label: "Média & Création",
     icon: Video,
     color: "#EF4444",
-    ids: ["video", "article", "sondage"],
+    ids: ["video", "live", "article", "sondage"],
   },
 ];
 
@@ -829,6 +862,7 @@ const AI_CONTENT_TYPE_MAP: Record<
   energie: "product_description",
   ong: "post",
   video: "post",
+  live: "post",
   article: "post",
   sondage: "post",
   marketplace: "product_description",
@@ -3161,6 +3195,7 @@ function CreationAssistant({
 export default function CreateBottomSheet({
   isOpen,
   onClose,
+  onNavigate,
 }: CreateBottomSheetProps) {
   const { height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -3252,6 +3287,15 @@ export default function CreateBottomSheet({
     async (id: ExtendedPublicationType) => {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+      // Cas particulier : Live n'ouvre pas de formulaire dans le sheet.
+      // On ferme le sheet et on délègue la navigation à HomePage
+      // (LiveStreamingPage possède déjà son propre GoLiveForm).
+      if (id === "live") {
+        onClose();
+        onNavigate?.("live-streaming");
+        return;
+      }
+
       const nextHistory = await addHistory(id, history);
 
       setHistory(nextHistory);
@@ -3259,7 +3303,7 @@ export default function CreateBottomSheet({
       setSearchQuery("");
       setActiveType(id);
     },
-    [history],
+    [history, onClose, onNavigate],
   );
 
   const backToHub = useCallback(() => {

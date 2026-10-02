@@ -16,33 +16,30 @@ import {
   Pressable,
   ScrollView,
   Share,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   View,
   Animated,
   Easing,
+  useWindowDimensions,
 } from "react-native";
 
 import {
   ArrowLeft,
   ChevronRight,
   Clock,
-  Diamond,
   Eye,
-  Flame,
   Gift,
   Heart,
   MessageCircle,
   Mic,
-  MicOff,
   Play,
   Plus,
   Radio,
-  Rocket,
   Send,
   Share2,
-  Star,
   TrendingUp,
   Users,
   Video,
@@ -119,13 +116,20 @@ const BACKGROUND = "#050812";
 
 const PANEL = "rgba(255,255,255,0.045)";
 
-const PANEL_STRONG = "rgba(255,255,255,0.075)";
-
 const BORDER = "rgba(255,255,255,0.08)";
 
 const LIVE_RED = "#EF4444";
 
 const PRIMARY = "#6366F1";
+
+/**
+ * Hauteur de la barre d'état Android.
+ *
+ * Les Modals utilisent `statusBarTranslucent` : le contenu passe SOUS la
+ * barre d'état. Sans cette marge, le bouton retour se superpose à l'heure.
+ */
+const TOP_INSET: number =
+  Platform.OS === "android" ? (StatusBar.currentHeight ?? 28) : 44;
 
 /* Fréquence du heartbeat de présence.
  * Doit rester <= PRESENCE_TIMEOUT_MS / 2 côté backend.
@@ -426,6 +430,13 @@ function WatchView({
   streamId: Id<"liveStreams">;
   onClose: () => void;
 }) {
+  /**
+   * Dimensions EXPLICITES : dans le Modal natif Android, `flex: 1` et
+   * `width: "100%"` n'ont pas de parent aux dimensions définies, et le
+   * contenu s'effondrait en une bande étroite (reste de l'écran blanc).
+   */
+  const { width, height } = useWindowDimensions();
+
   const { isAuthenticated } = useConvexAuth();
 
   const stream = useQuery(api.liveStreams.getStream, {
@@ -827,8 +838,14 @@ function WatchView({
       statusBarTranslucent
       onRequestClose={onClose}
     >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
+
       <KeyboardAvoidingView
-        style={styles.watchScreen}
+        style={[styles.watchScreen, { width, height }]}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         {/* ================================================================
@@ -1067,9 +1084,10 @@ function WatchView({
           visible={showGifts}
           transparent
           animationType="slide"
+          statusBarTranslucent
           onRequestClose={() => setShowGifts(false)}
         >
-          <View style={styles.modalBackdrop}>
+          <View style={[styles.modalBackdrop, { width, height }]}>
             <Pressable
               style={styles.modalDismissArea}
               onPress={() => setShowGifts(false)}
@@ -1156,6 +1174,8 @@ function GoLiveForm({
   onClose: () => void;
   onStarted: (id: Id<"liveStreams">) => void;
 }) {
+  const { width, height } = useWindowDimensions();
+
   const [title, setTitle] = useState("");
 
   const [category, setCategory] = useState("Musique");
@@ -1207,8 +1227,14 @@ function GoLiveForm({
   }, [category, isPublic, loading, onStarted, startStream, title]);
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
+    <Modal
+      visible
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={[styles.modalBackdrop, { width, height }]}>
         <Pressable style={styles.modalDismissArea} onPress={onClose} />
 
         <KeyboardAvoidingView
@@ -1609,10 +1635,13 @@ function StreamCard({
           </Text>
         </View>
 
-        <View style={styles.joinButton}>
-          <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
+        {/* Centrage par conteneur pleine largeur (plus de left: "50%"). */}
+        <View pointerEvents="none" style={styles.joinWrap}>
+          <View style={styles.joinButton}>
+            <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
 
-          <Text style={styles.joinButtonText}>Rejoindre</Text>
+            <Text style={styles.joinButtonText}>Rejoindre</Text>
+          </View>
         </View>
       </View>
 
@@ -2067,7 +2096,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: "#64748B",
     fontSize: 8.5,
-    fontWeight: "650",
+    fontWeight: "600",
   },
 
   headerGoLive: {
@@ -2134,7 +2163,7 @@ const styles = StyleSheet.create({
   myLiveTitle: {
     color: "#FFFFFF",
     fontSize: 9.5,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   myLiveMeta: {
@@ -2154,7 +2183,7 @@ const styles = StyleSheet.create({
   manageButtonText: {
     color: "#A5B4FC",
     fontSize: 7.5,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   endButton: {
@@ -2170,7 +2199,7 @@ const styles = StyleSheet.create({
   endButtonText: {
     color: "#FCA5A5",
     fontSize: 7.5,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   /* ------------------------------------------------------------------------
@@ -2246,7 +2275,7 @@ const styles = StyleSheet.create({
   categoryChipText: {
     color: "#64748B",
     fontSize: 8,
-    fontWeight: "750",
+    fontWeight: "700",
   },
 
   categoryChipTextSelected: {
@@ -2325,7 +2354,7 @@ const styles = StyleSheet.create({
   streamLiveText: {
     color: "#FFFFFF",
     fontSize: 7.5,
-    fontWeight: "950",
+    fontWeight: "900",
     letterSpacing: 0.5,
   },
 
@@ -2348,13 +2377,22 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  joinButton: {
+  /**
+   * Centrage horizontal du bouton "Rejoindre" par un conteneur plein
+   * largeur, au lieu de `left: "50%"` + `marginLeft: -51` (largeur codée en
+   * dur qui ne correspondait pas à la largeur réelle du bouton).
+   */
+  joinWrap: {
     position: "absolute",
-    left: "50%",
+    left: 0,
+    right: 0,
     bottom: 13,
+    alignItems: "center",
+  },
+
+  joinButton: {
     minHeight: 36,
     paddingHorizontal: 15,
-    marginLeft: -51,
     borderRadius: 999,
     flexDirection: "row",
     alignItems: "center",
@@ -2385,7 +2423,7 @@ const styles = StyleSheet.create({
     color: "#F8FAFC",
     fontSize: 10.5,
     lineHeight: 15,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   streamMeta: {
@@ -2424,7 +2462,7 @@ const styles = StyleSheet.create({
   likesText: {
     color: "#94A3B8",
     fontSize: 7.5,
-    fontWeight: "750",
+    fontWeight: "700",
   },
 
   /* ------------------------------------------------------------------------
@@ -2516,7 +2554,7 @@ const styles = StyleSheet.create({
   integrityTitle: {
     color: "#CBD5E1",
     fontSize: 9,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   integrityText: {
@@ -2552,7 +2590,7 @@ const styles = StyleSheet.create({
     marginTop: 13,
     color: "#CBD5E1",
     fontSize: 12,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   emptyDescription: {
@@ -2606,7 +2644,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     color: "#CBD5E1",
     fontSize: 13,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   loadingText: {
@@ -2662,8 +2700,11 @@ const styles = StyleSheet.create({
    * WATCH
    * ---------------------------------------------------------------------- */
 
+  /**
+   * Racine du Modal de visionnage. Les dimensions sont fournies en inline
+   * (voir WatchView) : fond noir pour qu'aucune zone blanche n'apparaisse.
+   */
   watchScreen: {
-    flex: 1,
     backgroundColor: "#000000",
   },
 
@@ -2708,7 +2749,7 @@ const styles = StyleSheet.create({
 
   watchHeader: {
     position: "absolute",
-    top: 12,
+    top: TOP_INSET + 8,
     left: 13,
     right: 13,
     flexDirection: "row",
@@ -2744,14 +2785,14 @@ const styles = StyleSheet.create({
   hostName: {
     color: "#FFFFFF",
     fontSize: 10.5,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   hostCategory: {
     marginTop: 3,
     color: "rgba(255,255,255,0.58)",
     fontSize: 7.5,
-    fontWeight: "650",
+    fontWeight: "600",
   },
 
   watchHeaderRight: {
@@ -2769,10 +2810,17 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(220,38,38,0.94)",
   },
 
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+  },
+
   livePillText: {
     color: "#FFFFFF",
     fontSize: 7,
-    fontWeight: "950",
+    fontWeight: "900",
   },
 
   viewerPill: {
@@ -2788,13 +2836,13 @@ const styles = StyleSheet.create({
   viewerPillText: {
     color: "#FFFFFF",
     fontSize: 7.5,
-    fontWeight: "750",
+    fontWeight: "700",
   },
 
   watchTitleArea: {
     position: "absolute",
     left: 14,
-    right: 14,
+    right: 80,
     bottom: 14,
     zIndex: 7,
   },
@@ -2858,7 +2906,7 @@ const styles = StyleSheet.create({
   actionLabel: {
     color: "#FFFFFF",
     fontSize: 7.5,
-    fontWeight: "750",
+    fontWeight: "700",
   },
 
   /* ------------------------------------------------------------------------
@@ -2892,7 +2940,7 @@ const styles = StyleSheet.create({
   chatHeaderText: {
     color: "#CBD5E1",
     fontSize: 8.5,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   chatHeaderHint: {
@@ -2925,7 +2973,7 @@ const styles = StyleSheet.create({
   chatAuthor: {
     color: "#A5B4FC",
     fontSize: 7.5,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   chatText: {
@@ -2970,20 +3018,20 @@ const styles = StyleSheet.create({
   superChatAuthor: {
     color: "#C4B5FD",
     fontSize: 7.5,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   superChatText: {
     marginTop: 2,
     color: "#FFFFFF",
     fontSize: 8,
-    fontWeight: "650",
+    fontWeight: "600",
   },
 
   superChatAmount: {
     color: "#FBBF24",
     fontSize: 8,
-    fontWeight: "950",
+    fontWeight: "900",
   },
 
   composer: {
@@ -3040,7 +3088,6 @@ const styles = StyleSheet.create({
    * ---------------------------------------------------------------------- */
 
   modalBackdrop: {
-    flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.76)",
   },
@@ -3139,7 +3186,7 @@ const styles = StyleSheet.create({
   giftPrice: {
     marginTop: 3,
     fontSize: 7.5,
-    fontWeight: "950",
+    fontWeight: "900",
   },
 
   giftDisclaimer: {
@@ -3182,7 +3229,7 @@ const styles = StyleSheet.create({
   broadcastStatusTitle: {
     color: "#CBD5E1",
     fontSize: 9,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   broadcastStatusText: {
@@ -3197,7 +3244,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     color: "#94A3B8",
     fontSize: 8,
-    fontWeight: "850",
+    fontWeight: "800",
   },
 
   titleInput: {
@@ -3223,24 +3270,9 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
 
-  categoryChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.055)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-  },
-
   categoryChipActive: {
     backgroundColor: "rgba(99,102,241,0.18)",
     borderColor: "rgba(129,140,248,0.32)",
-  },
-
-  categoryChipText: {
-    color: "#64748B",
-    fontSize: 7.5,
-    fontWeight: "750",
   },
 
   categoryChipTextActive: {
@@ -3279,7 +3311,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: "#475569",
     fontSize: 7,
-    fontWeight: "650",
+    fontWeight: "600",
   },
 
   controlDivider: {
@@ -3326,7 +3358,7 @@ const styles = StyleSheet.create({
   goLiveButtonText: {
     color: "#FFFFFF",
     fontSize: 10,
-    fontWeight: "950",
+    fontWeight: "900",
   },
 
   goLiveDisclaimer: {

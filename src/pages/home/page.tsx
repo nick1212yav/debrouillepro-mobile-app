@@ -1068,6 +1068,7 @@ export default function HomePage() {
       <CreateBottomSheet
         isOpen={createOpen}
         onClose={() => setCreateOpen(false)}
+        onNavigate={navigate}
       />
 
       <CommandPalette onNavigate={navigate} />
