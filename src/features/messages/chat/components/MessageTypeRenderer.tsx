@@ -9,13 +9,62 @@ import ContactMessage from "../../contacts/components/ContactMessage";
 import EventMessage from "../../events/components/EventMessage";
 
 import { JobMessage } from "../../jobs/components/JobMessage";
-import { PropertyMessage } from "../../immo/components/PropertyMessage";
 
 import PollMessage from "../../polls/components/PollMessage";
+
+import type { LocationMessage as LocationMessageData } from "../../locations/services/locations.service";
+
+import type { ContactMessage as ContactMessageData } from "../../contacts/services/contacts.service";
+
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 interface MessageTypeRendererProps {
   message: Message;
   own?: boolean;
+}
+
+/* ============================================================================
+ * ADAPTATEURS
+ *
+ * Message = contrat Convex générique.
+ *
+ * LocationMessage / ContactMessage utilisent des contrats spécialisés.
+ * On construit ici uniquement les données nécessaires à ces composants,
+ * sans cast et sans duplication du contrat backend.
+ * ========================================================================== */
+
+function toLocationMessage(message: Message): LocationMessageData | null {
+  if (message.type !== "location") {
+    return null;
+  }
+
+  if (!message.metadata || typeof message.metadata !== "object") {
+    return null;
+  }
+
+  return {
+    ...message,
+    type: "location",
+    metadata: message.metadata,
+  };
+}
+
+function toContactMessage(message: Message): ContactMessageData | null {
+  if (message.type !== "contact") {
+    return null;
+  }
+
+  if (!message.metadata || typeof message.metadata !== "object") {
+    return null;
+  }
+
+  return {
+    ...message,
+    type: "contact",
+    metadata: message.metadata,
+  };
 }
 
 /* ============================================================================
@@ -62,7 +111,11 @@ function UnsupportedMessage({ message }: { message: Message }) {
  * LOCATION
  * ========================================================================== */
 
-function LocationMessageRenderer({ message }: { message: Message }) {
+function LocationMessageRenderer({
+  message,
+}: {
+  message: LocationMessageData;
+}) {
   return (
     <View className="w-full min-w-0 max-w-[360px]">
       <LocationMessage message={message} />
@@ -74,7 +127,7 @@ function LocationMessageRenderer({ message }: { message: Message }) {
  * CONTACT
  * ========================================================================== */
 
-function ContactMessageRenderer({ message }: { message: Message }) {
+function ContactMessageRenderer({ message }: { message: ContactMessageData }) {
   return (
     <View className="w-full min-w-0 max-w-[380px]">
       <ContactMessage message={message} />
@@ -102,18 +155,6 @@ function JobMessageRenderer({ message }: { message: Message }) {
   return (
     <View className="w-full min-w-0 max-w-[390px]">
       <JobMessage message={message} />
-    </View>
-  );
-}
-
-/* ============================================================================
- * IMMOBILIER
- * ========================================================================== */
-
-function PropertyMessageRenderer({ message }: { message: Message }) {
-  return (
-    <View className="w-full min-w-0 max-w-[390px]">
-      <PropertyMessage message={message} />
     </View>
   );
 }
@@ -150,69 +191,44 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
   }
 
   /*
-   * Normalisation défensive du type.
+   * Normalisation défensive.
    */
   const type = String(message.type ?? "text")
     .trim()
     .toLowerCase();
 
   switch (type) {
-    /* ------------------------------------------------------------------------
-     * TEXTE
-     * ---------------------------------------------------------------------- */
-
     case "text":
       return <TextMessage message={message} />;
 
-    /* ------------------------------------------------------------------------
-     * LOCALISATION
-     * ---------------------------------------------------------------------- */
+    case "location": {
+      const locationMessage = toLocationMessage(message);
 
-    case "location":
-      return <LocationMessageRenderer message={message} />;
+      if (!locationMessage) {
+        return <UnsupportedMessage message={message} />;
+      }
 
-    /* ------------------------------------------------------------------------
-     * CONTACT
-     * ---------------------------------------------------------------------- */
+      return <LocationMessageRenderer message={locationMessage} />;
+    }
 
-    case "contact":
-      return <ContactMessageRenderer message={message} />;
+    case "contact": {
+      const contactMessage = toContactMessage(message);
 
-    /* ------------------------------------------------------------------------
-     * ÉVÉNEMENT
-     * ---------------------------------------------------------------------- */
+      if (!contactMessage) {
+        return <UnsupportedMessage message={message} />;
+      }
+
+      return <ContactMessageRenderer message={contactMessage} />;
+    }
 
     case "event":
       return <EventMessageRenderer message={message} />;
 
-    /* ------------------------------------------------------------------------
-     * JOB
-     * ---------------------------------------------------------------------- */
-
     case "job":
       return <JobMessageRenderer message={message} />;
 
-    /* ------------------------------------------------------------------------
-     * IMMOBILIER
-     * ---------------------------------------------------------------------- */
-
-    case "property":
-    case "immo":
-      return <PropertyMessageRenderer message={message} />;
-
-    /* ------------------------------------------------------------------------
-     * SONDAGE
-     * ---------------------------------------------------------------------- */
-
     case "poll":
       return <PollMessageRenderer message={message} />;
-
-    /* ------------------------------------------------------------------------
-     * VOCAL
-     *
-     * Le contrat exact du composant VoiceMessage n'est pas présent ici.
-     * On conserve donc le rendu par attachment sans inventer de props.
-     * ---------------------------------------------------------------------- */
 
     case "voice":
       return (
@@ -225,22 +241,12 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
         </View>
       );
 
-    /* ------------------------------------------------------------------------
-     * IMAGE
-     *
-     * Le composant MessageAttachments reste la source de rendu média.
-     * ---------------------------------------------------------------------- */
-
     case "image":
       return (
         <View className="w-full min-w-0 overflow-hidden rounded-xl">
           <MessageAttachments messageId={message._id} />
         </View>
       );
-
-    /* ------------------------------------------------------------------------
-     * VIDÉO
-     * ---------------------------------------------------------------------- */
 
     case "video":
       return (
@@ -249,11 +255,20 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
         </View>
       );
 
-    /* ------------------------------------------------------------------------
-     * FICHIER / DOCUMENT
-     * ---------------------------------------------------------------------- */
+    case "audio":
+      return (
+        <View className="w-full min-w-0 max-w-[340px]">
+          <MessageAttachments messageId={message._id} />
+        </View>
+      );
 
     case "file":
+      return (
+        <View className="w-full min-w-0 max-w-[360px]">
+          <MessageAttachments messageId={message._id} />
+        </View>
+      );
+
     case "document":
       return (
         <View className="w-full min-w-0 max-w-[360px]">
@@ -261,12 +276,16 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
         </View>
       );
 
-    /* ------------------------------------------------------------------------
-     * PAIEMENT
-     *
-     * Le contrat PaymentMessage n'est pas suffisamment établi ici pour
-     * construire artificiellement son objet payment.
-     * ---------------------------------------------------------------------- */
+    case "publication":
+      return (
+        <View className="w-full min-w-0 max-w-[390px]">
+          {message.text?.trim() ? (
+            <Text className="text-sm leading-5 text-white">{message.text}</Text>
+          ) : null}
+
+          <MessageAttachments messageId={message._id} />
+        </View>
+      );
 
     case "payment":
       return (
@@ -285,9 +304,16 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
         </View>
       );
 
-    /* ------------------------------------------------------------------------
-     * FALLBACK
-     * ---------------------------------------------------------------------- */
+    case "system":
+      return (
+        <View className="w-full items-center">
+          {message.text?.trim() ? (
+            <Text className="text-xs leading-4 text-white/40">
+              {message.text}
+            </Text>
+          ) : null}
+        </View>
+      );
 
     default:
       return <UnsupportedMessage message={message} />;

@@ -164,7 +164,7 @@ function createSelectedMedia(
     kind,
     width: asset.width,
     height: asset.height,
-    duration: asset.duration,
+    duration: asset.duration ?? undefined,
   };
 }
 
