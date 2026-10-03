@@ -2,6 +2,8 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { normalizeUserSearchQuery } from "./lib/userSearch";
+import { runSearch } from "./search/engine";
+import type { SearchResponse } from "./search/types";
 
 /**
  * ============================================================================
@@ -16,6 +18,15 @@ import { normalizeUserSearchQuery } from "./lib/userSearch";
  * - Filtres compatibles avec les Search Index Convex
  * - Pas de pagination simulée
  * - Aucun fallback fictif
+ *
+ * Architecture V2 :
+ *   - `searchPublications`, `searchUsers`, `getTrendingTags`
+ *     → queries spécialisées historiques
+ *   - `smartSearch`
+ *     → ancienne preview multi-sources (4 sources fixes)
+ *   - `searchV2`
+ *     → moteur intelligent multi-domaines (extensible)
+ *       (search/engine.ts + search/registry.ts + search/sources/*)
  *
  * ============================================================================
  */
@@ -430,5 +441,38 @@ export const smartSearch = query({
         price: course.price,
       })),
     };
+  },
+});
+
+/**
+ * ============================================================================
+ * SEARCH V2 — Moteur intelligent multi-domaines
+ * ============================================================================
+ *
+ * Différent de `smartSearch` (legacy, 4 sources, format spécifique).
+ *
+ * `searchV2` :
+ *   - parse l'intention utilisateur (actions, entités, localisation)
+ *   - détecte les domaines pertinents via le registry
+ *   - interroge les sources en parallèle
+ *   - score + groupe les résultats
+ *
+ * À l'Étape 3, aucune source n'est encore branchée :
+ *   → `searchV2` retourne { parsed, groups: [], totalCount: 0 }
+ *   → Les sources arriveront à l'Étape 4 sans modifier cette query.
+ *
+ * L'ajout d'un module finalisé ne nécessite QUE :
+ *   1. Son searchIndex dans schema.ts
+ *   2. Son entrée dans search/registry.ts
+ *   3. Son source adapter dans search/sources/
+ *   → Aucune modification de `searchV2`.
+ */
+export const searchV2 = query({
+  args: {
+    query: v.string(),
+  },
+
+  handler: async (ctx, { query: rawQuery }): Promise<SearchResponse> => {
+    return runSearch(ctx, rawQuery);
   },
 });

@@ -12,11 +12,16 @@ import {
   Platform,
   Modal,
   Keyboard,
+  KeyboardAvoidingView,
+  StatusBar,
+  ActivityIndicator,
   useWindowDimensions,
   type GestureResponderEvent,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  Component,
   useState,
   useRef,
   useEffect,
@@ -44,385 +49,399 @@ import {
   Sparkles,
   Package,
   LayoutGrid,
-  Heart,
   BookOpen,
   Wallet,
   Users,
   Radio,
+  Building2,
+  Hotel,
+  ShoppingBag,
+  PlayCircle,
+  MapPin,
 } from "lucide-react-native";
 
-const isBrowser = typeof window !== "undefined";
+/**
+ * IMPORTANT : en React Native, `typeof window !== "undefined"` est VRAI
+ * (window existe) mais `window.addEventListener` et `window.localStorage`
+ * n'existent pas. L'ancien test `isBrowser` faisait donc planter l'ouverture
+ * de la recherche. On se base uniquement sur Platform.OS.
+ */
+const isWeb = Platform.OS === "web";
+
+/**
+ * Hauteur de la barre d'état Android : le Modal est `statusBarTranslucent`,
+ * le contenu passe sous la barre d'état.
+ */
+const TOP_INSET: number =
+  Platform.OS === "android" ? (StatusBar.currentHeight ?? 28) : 44;
 
 /* ============================================================
- * TYPES
+ * TYPES — alignés sur `searchV2`
  * ============================================================ */
 
-type ResultCategory =
-  | "Immo"
-  | "Jobs/Pro"
-  | "Santé"
-  | "Agri"
-  | "Media"
-  | "Événements"
-  | "Voyages"
-  | "Modules"
-  | "Bien-être"
-  | "Éducation"
-  | "Finance"
-  | "Communauté"
-  | "Services";
+type ParsedIntent = {
+  raw: string;
+  normalized: string;
+  tokens: string[];
+  meaningfulTokens: string[];
+  actions: string[];
+  primaryAction: string | null;
+  entities: string[];
+  primaryEntity: string | null;
+  locations: string[];
+  primaryLocation: string | null;
+  domains: string[];
+};
 
-interface SearchResult {
+type ScoredHit = {
   id: string;
-  category: ResultCategory;
   title: string;
   subtitle: string;
-  meta: string;
+  meta?: string;
   badge?: string;
   badgeColor?: string;
-  page: string;
-}
+  route: string;
+  score: number;
+  domain: string;
+  fields: {
+    title: string;
+    description?: string;
+    tags?: string[];
+    city?: string;
+    country?: string;
+    category?: string;
+    type?: string;
+  };
+};
+
+type ResultGroup = {
+  domain: string;
+  label: string;
+  route: string;
+  color: string;
+  description: string;
+  totalCount: number;
+  topResults: ScoredHit[];
+};
+
+type SearchV2Response = {
+  parsed?: ParsedIntent;
+  groups?: ResultGroup[];
+  totalCount?: number;
+};
 
 /* ============================================================
- * MODULE DIRECTORY
+ * QUICK MODULES (raccourcis + repli local de recherche)
  * ============================================================ */
 
-const MODULE_ENTRIES: SearchResult[] = [
+interface QuickModule {
+  id: string;
+  title: string;
+  color: string;
+  route: string;
+  keywords: string[];
+}
+
+const QUICK_MODULES: QuickModule[] = [
   {
     id: "mod-immo",
-    category: "Modules",
     title: "Immobilier",
-    subtitle: "Locations, ventes, terrains",
-    meta: "→ Ouvrir",
-    badge: "Immo",
-    badgeColor: "#34D399",
-    page: "immo",
-  },
-  {
-    id: "mod-logement",
-    category: "Modules",
-    title: "Logement social",
-    subtitle: "Programmes sociaux & coopératives",
-    meta: "→ Ouvrir",
-    badge: "Logement",
-    badgeColor: "#34D399",
-    page: "logement",
-  },
-  {
-    id: "mod-hebergement",
-    category: "Modules",
-    title: "Hébergement",
-    subtitle: "Hôtels, AirBnB, auberges",
-    meta: "→ Ouvrir",
-    badge: "Hôtels",
-    badgeColor: "#34D399",
-    page: "hebergement",
+    color: "#34D399",
+    route: "immo",
+    keywords: [
+      "maison",
+      "louer",
+      "location",
+      "appartement",
+      "terrain",
+      "logement",
+      "villa",
+      "studio",
+      "habiter",
+    ],
   },
   {
     id: "mod-jobs",
-    category: "Modules",
-    title: "Emploi & Jobs",
-    subtitle: "Offres d'emploi & recrutement",
-    meta: "→ Ouvrir",
-    badge: "Emploi",
-    badgeColor: "#A78BFA",
-    page: "jobs",
+    title: "Emploi",
+    color: "#A78BFA",
+    route: "jobs",
+    keywords: [
+      "emploi",
+      "travail",
+      "travailler",
+      "job",
+      "stage",
+      "recrutement",
+      "poste",
+      "mission",
+      "freelance",
+    ],
   },
   {
-    id: "mod-marketplace",
-    category: "Modules",
+    id: "mod-market",
     title: "Marketplace",
-    subtitle: "Achat & vente entre particuliers",
-    meta: "→ Ouvrir",
-    badge: "Market",
-    badgeColor: "#F472B6",
-    page: "marketplace",
+    color: "#F472B6",
+    route: "marketplace",
+    keywords: [
+      "marketplace",
+      "boutique",
+      "produit",
+      "vendre",
+      "acheter",
+      "iphone",
+      "telephone",
+      "shop",
+    ],
   },
   {
     id: "mod-annonces",
-    category: "Modules",
     title: "Annonces",
-    subtitle: "Petites annonces & offres locales",
-    meta: "→ Ouvrir",
-    badge: "Annonces",
-    badgeColor: "#FBBF24",
-    page: "annonces",
+    color: "#FBBF24",
+    route: "annonces",
+    keywords: ["annonce", "annonces", "occasion", "vente", "troc"],
   },
   {
     id: "mod-sante",
-    category: "Modules",
     title: "Santé",
-    subtitle: "Médecins, pharmacies, téléconsultation",
-    meta: "→ Ouvrir",
-    badge: "Santé",
-    badgeColor: "#F87171",
-    page: "sante",
-  },
-  {
-    id: "mod-agri",
-    category: "Modules",
-    title: "Agriculture",
-    subtitle: "Intrants, prix, alertes phytosanitaires",
-    meta: "→ Ouvrir",
-    badge: "Agri",
-    badgeColor: "#A3E635",
-    page: "agri",
+    color: "#F87171",
+    route: "sante",
+    keywords: [
+      "sante",
+      "medecin",
+      "docteur",
+      "pharmacie",
+      "hopital",
+      "clinique",
+      "urgence",
+    ],
   },
   {
     id: "mod-services",
-    category: "Modules",
-    title: "Services à la Personne",
-    subtitle: "Aide à domicile, nettoyage, bricolage",
-    meta: "→ Ouvrir",
-    badge: "Services",
-    badgeColor: "#818CF8",
-    page: "services",
+    title: "Services",
+    color: "#818CF8",
+    route: "services",
+    keywords: [
+      "service",
+      "services",
+      "plombier",
+      "electricien",
+      "reparation",
+      "artisan",
+      "depannage",
+      "chauffeur",
+    ],
   },
   {
     id: "mod-evenements",
-    category: "Modules",
     title: "Événements",
-    subtitle: "Concerts, foires, sorties",
-    meta: "→ Ouvrir",
-    badge: "Events",
-    badgeColor: "#F472B6",
-    page: "evenements",
+    color: "#F472B6",
+    route: "evenements",
+    keywords: [
+      "evenement",
+      "evenements",
+      "concert",
+      "fete",
+      "soiree",
+      "festival",
+    ],
   },
   {
     id: "mod-voyages",
-    category: "Modules",
     title: "Voyages",
-    subtitle: "Billets de voyage inter-villes",
-    meta: "→ Ouvrir",
-    badge: "Voyages",
-    badgeColor: "#818CF8",
-    page: "voyages",
+    color: "#818CF8",
+    route: "voyages",
+    keywords: [
+      "voyage",
+      "voyager",
+      "billet",
+      "avion",
+      "vol",
+      "vacances",
+      "destination",
+    ],
   },
   {
     id: "mod-apprendre",
-    category: "Modules",
-    title: "Apprendre",
-    subtitle: "Cours en ligne & tutoriels",
-    meta: "→ Ouvrir",
-    badge: "Learn",
-    badgeColor: "#818CF8",
-    page: "apprendre",
-  },
-  {
-    id: "mod-paiement",
-    category: "Modules",
-    title: "Paiements",
-    subtitle: "Mobile money, cartes, crypto",
-    meta: "→ Ouvrir",
-    badge: "Pay",
-    badgeColor: "#34D399",
-    page: "paiement",
-  },
-  {
-    id: "mod-community",
-    category: "Modules",
-    title: "Communauté",
-    subtitle: "Forum, entraide & réseau local",
-    meta: "→ Ouvrir",
-    badge: "Community",
-    badgeColor: "#F472B6",
-    page: "community",
-  },
-  {
-    id: "mod-messages",
-    category: "Modules",
-    title: "Messages",
-    subtitle: "Chat privé & conversations",
-    meta: "→ Ouvrir",
-    badge: "Chat",
-    badgeColor: "#818CF8",
-    page: "messages",
+    title: "Cours",
+    color: "#22D3EE",
+    route: "cours",
+    keywords: [
+      "cours",
+      "apprendre",
+      "formation",
+      "ecole",
+      "javascript",
+      "tutoriel",
+    ],
   },
   {
     id: "mod-live",
-    category: "Modules",
     title: "Live",
-    subtitle: "Vidéos en direct & stories",
-    meta: "→ Ouvrir",
-    badge: "Live",
-    badgeColor: "#F87171",
-    page: "live",
+    color: "#F87171",
+    route: "live-streaming",
+    keywords: ["live", "direct", "streaming", "diffusion"],
   },
   {
-    id: "mod-profile",
-    category: "Modules",
-    title: "Mon Profil",
-    subtitle: "Votre identité, badge et QR Code",
-    meta: "→ Ouvrir",
-    badge: "Profil",
-    badgeColor: "#A78BFA",
-    page: "profile",
+    id: "mod-agri",
+    title: "Agri",
+    color: "#A3E635",
+    route: "agri",
+    keywords: ["agri", "agriculture", "ferme", "recolte", "elevage", "champ"],
+  },
+  {
+    id: "mod-community",
+    title: "Communauté",
+    color: "#FB7185",
+    route: "community",
+    keywords: ["communaute", "community", "groupe", "discussion", "forum"],
   },
 ];
 
 /* ============================================================
- * SEARCH CONTENT
+ * TRENDING (queries suggérées)
  * ============================================================ */
 
-const CONTENT_RESULTS: SearchResult[] = [
-  {
-    id: "i1",
-    category: "Immo",
-    title: "Maison 3 ch. – Kolwezi",
-    subtitle: "Quartier Joli Site",
-    meta: "$450/mois",
-    badge: "À louer",
-    badgeColor: "#34D399",
-    page: "immo",
-  },
-  {
-    id: "j1",
-    category: "Jobs/Pro",
-    title: "Développeur React Senior",
-    subtitle: "TechAfrique – Dakar",
-    meta: "2 500 000 FCFA/mois",
-    badge: "Urgent",
-    badgeColor: "#F87171",
-    page: "jobs",
-  },
-  {
-    id: "j2",
-    category: "Jobs/Pro",
-    title: "Soudeur Métal expérimenté",
-    subtitle: "Kolwezi Industries",
-    meta: "$600/mois",
-    badge: "CDI",
-    badgeColor: "#34D399",
-    page: "jobs",
-  },
-  {
-    id: "s1",
-    category: "Santé",
-    title: "Consultation générale",
-    subtitle: "Téléconsultation",
-    meta: "Disponible",
-    badge: "Santé",
-    badgeColor: "#F87171",
-    page: "sante",
-  },
-  {
-    id: "a1",
-    category: "Agri",
-    title: "Sac de maïs 50kg",
-    subtitle: "Agriculture",
-    meta: "Stock disponible",
-    badge: "Agri",
-    badgeColor: "#A3E635",
-    page: "agri",
-  },
-  {
-    id: "e1",
-    category: "Événements",
-    title: "Événements à proximité",
-    subtitle: "Concerts, foires, sorties",
-    meta: "À découvrir",
-    badge: "Events",
-    badgeColor: "#F472B6",
-    page: "evenements",
-  },
-  {
-    id: "v1",
-    category: "Voyages",
-    title: "Voyages inter-villes",
-    subtitle: "Transport & destinations",
-    meta: "Réserver",
-    badge: "Voyages",
-    badgeColor: "#818CF8",
-    page: "voyages",
-  },
-  {
-    id: "sv1",
-    category: "Services",
-    title: "Services à proximité",
-    subtitle: "Professionnels & artisans",
-    meta: "Explorer",
-    badge: "Services",
-    badgeColor: "#FBBF24",
-    page: "services",
-  },
-];
-
-const ALL_RESULTS: SearchResult[] = [...MODULE_ENTRIES, ...CONTENT_RESULTS];
-
 const TRENDING = [
-  "Appartement",
-  "Emploi",
-  "Service",
-  "Acheter",
-  "Vendre",
-  "Voyage",
+  "maison à louer",
+  "chauffeur Kolwezi",
+  "javascript",
+  "plombier",
+  "billet Lubumbashi",
+  "iPhone",
+  "live",
 ];
-
-const CATEGORY_COLORS: Record<ResultCategory, string> = {
-  Immo: "#34D399",
-  "Jobs/Pro": "#A78BFA",
-  Santé: "#F87171",
-  Agri: "#A3E635",
-  Media: "#FB923C",
-  Événements: "#F472B6",
-  Voyages: "#818CF8",
-  Modules: "#C4B5FD",
-  "Bien-être": "#F9A8D4",
-  Éducation: "#22D3EE",
-  Finance: "#34D399",
-  Communauté: "#FB7185",
-  Services: "#FBBF24",
-};
 
 /* ============================================================
- * STORAGE
+ * HELPERS
+ * ============================================================ */
+
+function normalizeText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Repli LOCAL : retrouve les modules de l'app correspondant à la requête,
+ * sans dépendre du backend. Garantit que la recherche mène toujours quelque
+ * part, même si `searchV2` est lent, vide ou en erreur.
+ */
+function buildModuleHits(rawQuery: string): ScoredHit[] {
+  const tokens = normalizeText(rawQuery)
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3);
+
+  if (tokens.length === 0) {
+    return [];
+  }
+
+  const hits: ScoredHit[] = [];
+
+  for (const mod of QUICK_MODULES) {
+    const words = [mod.title, ...mod.keywords].map(normalizeText);
+
+    let score = 0;
+
+    for (const token of tokens) {
+      for (const word of words) {
+        if (word === token) {
+          score += 3;
+          break;
+        }
+
+        if (
+          word.startsWith(token) ||
+          (word.length >= 4 && token.startsWith(word))
+        ) {
+          score += 2;
+          break;
+        }
+      }
+    }
+
+    if (score > 0) {
+      hits.push({
+        id: `module-${mod.id}`,
+        title: mod.title,
+        subtitle: "Ouvrir ce module",
+        badge: "Module",
+        badgeColor: mod.color,
+        route: mod.route,
+        score,
+        domain: mod.route,
+        fields: { title: mod.title },
+      });
+    }
+  }
+
+  return hits.sort((a, b) => b.score - a.score).slice(0, 4);
+}
+
+function getDomainIcon(
+  domain: string,
+  size = 14,
+  color = "#C4B5FD",
+): ReactNode {
+  const props = { size, color };
+
+  switch (domain) {
+    case "immo":
+      return <Home {...props} />;
+    case "jobs":
+      return <Briefcase {...props} />;
+    case "apprendre":
+    case "cours":
+      return <BookOpen {...props} />;
+    case "publications":
+      return <Newspaper {...props} />;
+    case "live":
+    case "live-streaming":
+      return <Radio {...props} />;
+    case "hebergement":
+      return <Hotel {...props} />;
+    case "marketplace":
+      return <ShoppingBag {...props} />;
+    case "annonces":
+      return <Newspaper {...props} />;
+    case "sante":
+      return <Stethoscope {...props} />;
+    case "agri":
+      return <Leaf {...props} />;
+    case "services":
+      return <Package {...props} />;
+    case "evenements":
+      return <Calendar {...props} />;
+    case "voyages":
+      return <Plane {...props} />;
+    case "finance":
+      return <Wallet {...props} />;
+    case "community":
+      return <Users {...props} />;
+    case "business":
+      return <Building2 {...props} />;
+    case "media":
+      return <Newspaper {...props} />;
+    case "series":
+      return <PlayCircle {...props} />;
+    case "urban":
+      return <Building2 {...props} />;
+    default:
+      return <Search {...props} />;
+  }
+}
+
+/* ============================================================
+ * HISTORIQUE (AsyncStorage — fonctionne sur Android, iOS et web)
  * ============================================================ */
 
 const HISTORY_KEY = "debrouille_search_history";
+const MAX_HISTORY = 8;
 
-const memoryStore: Record<string, string> = {};
-
-const store = {
-  get(key: string): string | null {
-    if (isBrowser) {
-      try {
-        return window.localStorage.getItem(key);
-      } catch {
-        return null;
-      }
-    }
-
-    return memoryStore[key] ?? null;
-  },
-
-  set(key: string, value: string): void {
-    if (isBrowser) {
-      try {
-        window.localStorage.setItem(key, value);
-      } catch {
-        // Storage unavailable: search remains fully usable in memory.
-      }
-    } else {
-      memoryStore[key] = value;
-    }
-  },
-
-  remove(key: string): void {
-    if (isBrowser) {
-      try {
-        window.localStorage.removeItem(key);
-      } catch {
-        // Storage unavailable.
-      }
-    } else {
-      delete memoryStore[key];
-    }
-  },
-};
-
-function getHistory(): string[] {
+async function loadHistory(): Promise<string[]> {
   try {
-    const raw = store.get(HISTORY_KEY);
+    const raw = await AsyncStorage.getItem(HISTORY_KEY);
 
     if (!raw) {
       return [];
@@ -434,172 +453,19 @@ function getHistory(): string[] {
       return [];
     }
 
-    return parsed.filter((value): value is string => typeof value === "string");
+    return parsed
+      .filter((value): value is string => typeof value === "string")
+      .slice(0, MAX_HISTORY);
   } catch {
     return [];
   }
 }
 
-function saveHistory(value: string): void {
-  const query = value.trim();
-
-  if (!query) {
-    return;
-  }
-
-  const previous = getHistory().filter((item) => item !== query);
-  const next = [query, ...previous].slice(0, 8);
-
-  store.set(HISTORY_KEY, JSON.stringify(next));
-}
-
-function removeHistory(value: string): void {
-  store.set(
-    HISTORY_KEY,
-    JSON.stringify(getHistory().filter((item) => item !== value)),
-  );
-}
-
-/* ============================================================
- * HELPERS
- * ============================================================ */
-
-function normalizeSearchValue(value: unknown): string {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function categoryFromType(type: unknown): ResultCategory {
-  const value = normalizeSearchValue(type);
-
-  if (["job", "emploi", "employment"].includes(value)) {
-    return "Jobs/Pro";
-  }
-
-  if (
-    ["property", "immo", "immobilier", "realestate", "real_estate"].includes(
-      value,
-    )
-  ) {
-    return "Immo";
-  }
-
-  if (["sante", "health", "medical"].includes(value)) {
-    return "Santé";
-  }
-
-  if (["agri", "agriculture"].includes(value)) {
-    return "Agri";
-  }
-
-  if (["evenement", "evenements", "event", "events"].includes(value)) {
-    return "Événements";
-  }
-
-  if (["voyage", "voyages", "travel"].includes(value)) {
-    return "Voyages";
-  }
-
-  if (["education", "apprendre", "course", "cours"].includes(value)) {
-    return "Éducation";
-  }
-
-  if (["finance", "paiement", "wallet", "pay"].includes(value)) {
-    return "Finance";
-  }
-
-  if (["community", "communaute", "group", "groupe"].includes(value)) {
-    return "Communauté";
-  }
-
-  if (["service", "services"].includes(value)) {
-    return "Services";
-  }
-
-  if (["media", "article", "video", "podcast"].includes(value)) {
-    return "Media";
-  }
-
-  if (
-    ["fitness", "sport", "nutrition", "bienetre", "wellness"].includes(value)
-  ) {
-    return "Bien-être";
-  }
-
-  return "Services";
-}
-
-function getPageForCategory(category: ResultCategory): string {
-  const pages: Partial<Record<ResultCategory, string>> = {
-    Immo: "immo",
-    "Jobs/Pro": "jobs",
-    Santé: "sante",
-    Agri: "agri",
-    Media: "media",
-    Événements: "evenements",
-    Voyages: "voyages",
-    "Bien-être": "bienetre",
-    Éducation: "cours",
-    Finance: "finances",
-    Communauté: "community",
-    Services: "services",
-    Modules: "explorer",
-  };
-
-  return pages[category] ?? "explorer";
-}
-
-function getCategoryIcon(category: ResultCategory, size = 13): ReactNode {
-  const props = {
-    size,
-    color: CATEGORY_COLORS[category],
-  };
-
-  switch (category) {
-    case "Immo":
-      return <Home {...props} />;
-
-    case "Jobs/Pro":
-      return <Briefcase {...props} />;
-
-    case "Santé":
-      return <Stethoscope {...props} />;
-
-    case "Agri":
-      return <Leaf {...props} />;
-
-    case "Media":
-      return <Newspaper {...props} />;
-
-    case "Événements":
-      return <Calendar {...props} />;
-
-    case "Voyages":
-      return <Plane {...props} />;
-
-    case "Modules":
-      return <LayoutGrid {...props} />;
-
-    case "Bien-être":
-      return <Heart {...props} />;
-
-    case "Éducation":
-      return <BookOpen {...props} />;
-
-    case "Finance":
-      return <Wallet {...props} />;
-
-    case "Communauté":
-      return <Users {...props} />;
-
-    case "Services":
-      return <Package {...props} />;
-
-    default:
-      return <Search {...props} />;
+async function persistHistory(list: string[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(list));
+  } catch {
+    // L'historique est une préférence locale non critique.
   }
 }
 
@@ -621,13 +487,19 @@ function FadeUp({
   const animation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(animation, {
+    const running = Animated.timing(animation, {
       toValue: 1,
       duration: 380,
       delay,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start();
+    });
+
+    running.start();
+
+    return () => {
+      running.stop();
+    };
   }, [animation, delay]);
 
   return (
@@ -653,42 +525,419 @@ function FadeUp({
 }
 
 /* ============================================================
- * HOME SEARCH ACTION
+ * SECTION LABEL
  * ============================================================ */
 
-interface HomeAction {
-  id: string;
-  label: string;
-  query: string;
+function SectionLabel({
+  icon,
+  children,
+}: {
   icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.sectionLabelRow}>
+      {icon}
+      <Text style={styles.sectionLabelText}>{children}</Text>
+    </View>
+  );
 }
 
-const HOME_ACTIONS: HomeAction[] = [
-  {
-    id: "emploi",
-    label: "Emploi",
-    query: "emploi",
-    icon: <Briefcase size={13} color="#A78BFA" strokeWidth={2} />,
-  },
-  {
-    id: "service",
-    label: "Service",
-    query: "service",
-    icon: <Package size={13} color="#FBBF24" strokeWidth={2} />,
-  },
-  {
-    id: "acheter",
-    label: "Acheter",
-    query: "acheter",
-    icon: <LayoutGrid size={13} color="#F472B6" strokeWidth={2} />,
-  },
-  {
-    id: "vendre",
-    label: "Vendre",
-    query: "vendre",
-    icon: <ArrowUpRight size={13} color="#34D399" strokeWidth={2} />,
-  },
-];
+/* ============================================================
+ * RESULT ROW
+ * ============================================================ */
+
+function ResultRow({
+  hit,
+  index,
+  onSelect,
+}: {
+  hit: ScoredHit;
+  index: number;
+  onSelect: (hit: ScoredHit) => void;
+}) {
+  const color = hit.badgeColor ?? "#C4B5FD";
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = useCallback(() => {
+    Animated.spring(scale, {
+      toValue: 0.99,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  }, [scale]);
+
+  const onPressOut = useCallback(() => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
+  }, [scale]);
+
+  return (
+    <FadeUp delay={Math.min(index * 25, 300)} distance={5}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          onPress={() => onSelect(hit)}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`${hit.title} — ${hit.subtitle}`}
+          style={styles.resultRow}
+        >
+          <LinearGradient
+            colors={[`${color}14`, "rgba(255,255,255,0)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+
+          <View
+            style={[
+              styles.resultIcon,
+              {
+                backgroundColor: `${color}22`,
+                borderColor: `${color}44`,
+              },
+            ]}
+          >
+            {getDomainIcon(hit.domain, 14, color)}
+          </View>
+
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.resultTitle} numberOfLines={1}>
+              {hit.title}
+            </Text>
+            <Text style={styles.resultSubtitle} numberOfLines={1}>
+              {hit.subtitle}
+            </Text>
+          </View>
+
+          <View style={styles.resultMetaCol}>
+            {hit.meta ? (
+              <Text style={styles.resultMeta} numberOfLines={1}>
+                {hit.meta}
+              </Text>
+            ) : null}
+
+            {hit.badge ? (
+              <View
+                style={[styles.resultBadge, { backgroundColor: `${color}22` }]}
+              >
+                <Text
+                  style={[styles.resultBadgeText, { color }]}
+                  numberOfLines={1}
+                >
+                  {hit.badge}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <ChevronRight size={13} color="rgba(255,255,255,0.3)" />
+        </Pressable>
+      </Animated.View>
+    </FadeUp>
+  );
+}
+
+/* ============================================================
+ * SECTION « MODULES » (repli local)
+ * ============================================================ */
+
+function ModuleHitsSection({
+  hits,
+  onSelect,
+}: {
+  hits: ScoredHit[];
+  onSelect: (hit: ScoredHit) => void;
+}) {
+  if (hits.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.resultGroup}>
+      <SectionLabel icon={<LayoutGrid size={12} color="#C4B5FD" />}>
+        Modules ({hits.length})
+      </SectionLabel>
+
+      {hits.map((hit, index) => (
+        <ResultRow key={hit.id} hit={hit} index={index} onSelect={onSelect} />
+      ))}
+    </View>
+  );
+}
+
+/* ============================================================
+ * ERROR BOUNDARY
+ *
+ * Convex `useQuery` RELANCE dans le rendu toute erreur levée par la fonction
+ * serveur (ou par un `api.search.searchV2` introuvable). Sans boundary, cela
+ * fait planter toute l'application. Ici l'erreur reste confinée à la zone de
+ * résultats, qui affiche un repli local.
+ * ============================================================ */
+
+type SearchBoundaryProps = {
+  children: ReactNode;
+  resetKey: string;
+  fallback: (reset: () => void) => ReactNode;
+};
+
+type SearchBoundaryState = {
+  hasError: boolean;
+};
+
+class SearchErrorBoundary extends Component<
+  SearchBoundaryProps,
+  SearchBoundaryState
+> {
+  state: SearchBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): SearchBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidUpdate(previous: SearchBoundaryProps): void {
+    if (previous.resetKey !== this.props.resetKey && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  reset = (): void => {
+    this.setState({ hasError: false });
+  };
+
+  render(): ReactNode {
+    if (this.state.hasError) {
+      return this.props.fallback(this.reset);
+    }
+
+    return this.props.children;
+  }
+}
+
+function SearchFallback({
+  moduleHits,
+  onSelectHit,
+  onRetry,
+}: {
+  moduleHits: ScoredHit[];
+  onSelectHit: (hit: ScoredHit) => void;
+  onRetry: () => void;
+}) {
+  return (
+    <View style={styles.resultsContainer}>
+      <FadeUp>
+        <View style={styles.fallbackBox}>
+          <Text style={styles.fallbackTitle}>
+            Recherche en ligne indisponible
+          </Text>
+
+          <Text style={styles.fallbackText}>
+            Impossible de joindre le moteur de recherche pour le moment. Les
+            modules ci-dessous restent accessibles.
+          </Text>
+
+          <Pressable
+            onPress={onRetry}
+            accessibilityRole="button"
+            accessibilityLabel="Réessayer la recherche"
+            style={styles.noResultsButton}
+          >
+            <Text style={styles.noResultsButtonText}>Réessayer</Text>
+          </Pressable>
+        </View>
+      </FadeUp>
+
+      <ModuleHitsSection hits={moduleHits} onSelect={onSelectHit} />
+    </View>
+  );
+}
+
+/* ============================================================
+ * PANNEAU DE RÉSULTATS (appelle Convex — protégé par le boundary)
+ * ============================================================ */
+
+function SearchResultsPanel({
+  query,
+  moduleHits,
+  onSelectHit,
+  onSeeAll,
+  onClear,
+}: {
+  query: string;
+  moduleHits: ScoredHit[];
+  onSelectHit: (hit: ScoredHit) => void;
+  onSeeAll: (route: string) => void;
+  onClear: () => void;
+}) {
+  const response = useQuery(api.search.searchV2, {
+    query,
+  }) as SearchV2Response | null | undefined;
+
+  const [slow, setSlow] = useState(false);
+
+  const loading = response === undefined;
+
+  useEffect(() => {
+    if (!loading) {
+      setSlow(false);
+      return;
+    }
+
+    const timer = setTimeout(() => setSlow(true), 8000);
+
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  const groups = useMemo<ResultGroup[]>(() => {
+    if (!response || !Array.isArray(response.groups)) {
+      return [];
+    }
+
+    return response.groups.filter(
+      (group): group is ResultGroup =>
+        Boolean(group) && Array.isArray(group.topResults),
+    );
+  }, [response]);
+
+  const backendCount = groups.reduce(
+    (sum, group) =>
+      sum +
+      (typeof group.totalCount === "number"
+        ? group.totalCount
+        : group.topResults.length),
+    0,
+  );
+
+  const parsed = response?.parsed;
+
+  const nothing = !loading && backendCount === 0 && moduleHits.length === 0;
+
+  return (
+    <View style={styles.resultsContainer}>
+      {/* ─── INTENT CHIPS ─── */}
+      {!loading && parsed && backendCount > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View
+            style={[
+              styles.chip,
+              {
+                backgroundColor: "rgba(196,181,253,0.18)",
+                borderColor: "rgba(196,181,253,0.4)",
+              },
+            ]}
+          >
+            <Sparkles size={10} color="#C4B5FD" />
+            <Text style={[styles.chipText, { color: "#fff" }]}>
+              {backendCount} résultat{backendCount > 1 ? "s" : ""}
+            </Text>
+          </View>
+
+          {parsed.primaryAction ? (
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>⚡ {parsed.primaryAction}</Text>
+            </View>
+          ) : null}
+
+          {parsed.primaryEntity ? (
+            <View style={styles.chip}>
+              <Text style={styles.chipText}>{parsed.primaryEntity}</Text>
+            </View>
+          ) : null}
+
+          {parsed.primaryLocation ? (
+            <View style={styles.chip}>
+              <MapPin size={10} color="#94A3B8" />
+              <Text style={styles.chipText}>{parsed.primaryLocation}</Text>
+            </View>
+          ) : null}
+        </ScrollView>
+      ) : null}
+
+      {/* ─── MODULES (repli local, immédiat) ─── */}
+      <ModuleHitsSection hits={moduleHits} onSelect={onSelectHit} />
+
+      {/* ─── CHARGEMENT ─── */}
+      {loading ? (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color="#C4B5FD" />
+
+          <Text style={styles.loadingRowText}>
+            {slow ? "La recherche est un peu lente…" : "Recherche…"}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* ─── RÉSULTATS BACKEND ─── */}
+      {!loading
+        ? groups.map((group) => (
+            <FadeUp key={group.domain}>
+              <View style={styles.resultGroup}>
+                <SectionLabel
+                  icon={getDomainIcon(group.domain, 12, group.color)}
+                >
+                  {group.label} ({group.totalCount})
+                </SectionLabel>
+
+                {group.topResults.map((hit, index) => (
+                  <ResultRow
+                    key={hit.id}
+                    hit={hit}
+                    index={index}
+                    onSelect={onSelectHit}
+                  />
+                ))}
+
+                {group.totalCount > group.topResults.length ? (
+                  <Pressable
+                    onPress={() => onSeeAll(group.route)}
+                    style={({ pressed }) => [
+                      styles.seeAllBtn,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Text style={styles.seeAllBtnText}>
+                      Voir les {group.totalCount} résultats dans {group.label}
+                    </Text>
+                    <ArrowUpRight size={11} color="#C4B5FD" />
+                  </Pressable>
+                ) : null}
+              </View>
+            </FadeUp>
+          ))
+        : null}
+
+      {/* ─── AUCUN RÉSULTAT ─── */}
+      {nothing ? (
+        <FadeUp>
+          <View style={styles.noResultsWrap}>
+            <View style={styles.noResultsIcon}>
+              <Search size={24} color="rgba(196,181,253,0.85)" />
+            </View>
+
+            <Text style={styles.noResultsTitle}>Aucun résultat</Text>
+
+            <Text style={styles.noResultsQuery} numberOfLines={2}>
+              « {query} »
+            </Text>
+
+            <Pressable onPress={onClear} style={styles.noResultsButton}>
+              <Text style={styles.noResultsButtonText}>Nouvelle recherche</Text>
+            </Pressable>
+          </View>
+        </FadeUp>
+      ) : null}
+    </View>
+  );
+}
 
 /* ============================================================
  * HOME TRIGGER
@@ -720,9 +969,7 @@ function HomeSearchTrigger({
         }),
       ]),
     );
-
     animation.start();
-
     return () => {
       animation.stop();
     };
@@ -766,17 +1013,12 @@ function HomeSearchTrigger({
             <Text numberOfLines={1} style={styles.homeSearchTitle}>
               Que veux-tu faire ?
             </Text>
-
             <Text numberOfLines={1} style={styles.homeSearchHint}>
               Recherche intelligente dans DébrouillePro
             </Text>
           </View>
 
-          <Animated.View
-            style={{
-              transform: [{ scale: sparkleScale }],
-            }}
-          >
+          <Animated.View style={{ transform: [{ scale: sparkleScale }] }}>
             <View style={styles.homeSearchSparkle}>
               <Sparkles size={15} color="#C4B5FD" strokeWidth={2} />
             </View>
@@ -788,8 +1030,15 @@ function HomeSearchTrigger({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.homeActionRow}
           scrollEnabled
+          keyboardShouldPersistTaps="handled"
         >
-          {HOME_ACTIONS.map((action) => (
+          {[
+            { id: "emploi", label: "Emploi", query: "emploi" },
+            { id: "service", label: "Service", query: "service" },
+            { id: "maison", label: "Maison", query: "maison" },
+            { id: "annonces", label: "Annonces", query: "annonce" },
+            { id: "voyage", label: "Voyager", query: "voyage" },
+          ].map((action) => (
             <Pressable
               key={action.id}
               onPress={() => onQuickSearch(action.query)}
@@ -800,39 +1049,9 @@ function HomeSearchTrigger({
                 pressed && styles.homeActionPillPressed,
               ]}
             >
-              {action.icon}
-
               <Text style={styles.homeActionText}>{action.label}</Text>
             </Pressable>
           ))}
-
-          <Pressable
-            onPress={() => onQuickSearch("annonces")}
-            accessibilityRole="button"
-            accessibilityLabel="Annonces"
-            style={({ pressed }) => [
-              styles.homeActionPill,
-              pressed && styles.homeActionPillPressed,
-            ]}
-          >
-            <Newspaper size={13} color="#818CF8" strokeWidth={2} />
-
-            <Text style={styles.homeActionText}>Annonces</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => onQuickSearch("voyage")}
-            accessibilityRole="button"
-            accessibilityLabel="Voyager"
-            style={({ pressed }) => [
-              styles.homeActionPill,
-              pressed && styles.homeActionPillPressed,
-            ]}
-          >
-            <Plane size={13} color="#818CF8" strokeWidth={2} />
-
-            <Text style={styles.homeActionText}>Voyager</Text>
-          </Pressable>
 
           <Pressable
             onPress={onOpen}
@@ -852,148 +1071,7 @@ function HomeSearchTrigger({
 }
 
 /* ============================================================
- * RESULT ROW
- * ============================================================ */
-
-function ResultRow({
-  result,
-  index,
-  compact = false,
-  onSelect,
-}: {
-  result: SearchResult;
-  index: number;
-  compact?: boolean;
-  onSelect: (result: SearchResult) => void;
-}) {
-  const color = result.badgeColor ?? CATEGORY_COLORS[result.category];
-
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const onPressIn = useCallback(() => {
-    Animated.spring(scale, {
-      toValue: 0.99,
-      useNativeDriver: true,
-      speed: 40,
-    }).start();
-  }, [scale]);
-
-  const onPressOut = useCallback(() => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 40,
-    }).start();
-  }, [scale]);
-
-  return (
-    <FadeUp delay={Math.min(index * 25, 300)} distance={5}>
-      <Animated.View
-        style={{
-          transform: [{ scale }],
-        }}
-      >
-        <Pressable
-          onPress={() => onSelect(result)}
-          onPressIn={onPressIn}
-          onPressOut={onPressOut}
-          accessibilityRole="button"
-          accessibilityLabel={`${result.title} — ${result.category}`}
-          style={[styles.resultRow, compact && styles.resultRowCompact]}
-        >
-          <LinearGradient
-            colors={[`${color}14`, "rgba(255,255,255,0)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-
-          <View
-            style={[
-              compact ? styles.resultIconCompact : styles.resultIcon,
-              {
-                backgroundColor: `${color}22`,
-                borderColor: `${color}44`,
-              },
-            ]}
-          >
-            {getCategoryIcon(result.category, compact ? 13 : 14)}
-          </View>
-
-          <View
-            style={{
-              flex: 1,
-              minWidth: 0,
-            }}
-          >
-            <Text style={styles.resultTitle} numberOfLines={1}>
-              {result.title}
-            </Text>
-
-            <Text style={styles.resultSubtitle} numberOfLines={1}>
-              {result.subtitle}
-            </Text>
-          </View>
-
-          <View style={styles.resultMetaCol}>
-            {result.meta ? (
-              <Text style={styles.resultMeta} numberOfLines={1}>
-                {result.meta}
-              </Text>
-            ) : null}
-
-            {result.badge ? (
-              <View
-                style={[
-                  styles.resultBadge,
-                  {
-                    backgroundColor: `${color}22`,
-                  },
-                ]}
-              >
-                {result.badge === "En direct" ? (
-                  <Radio size={8} color={color} />
-                ) : null}
-
-                <Text
-                  style={[styles.resultBadgeText, { color }]}
-                  numberOfLines={1}
-                >
-                  {result.badge}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          <ChevronRight size={13} color="rgba(255,255,255,0.3)" />
-        </Pressable>
-      </Animated.View>
-    </FadeUp>
-  );
-}
-
-/* ============================================================
- * SECTION LABEL
- * ============================================================ */
-
-function SectionLabel({
-  icon,
-  children,
-}: {
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <View style={styles.sectionLabelRow}>
-      {icon}
-
-      <Text style={styles.sectionLabelText}>{children}</Text>
-    </View>
-  );
-}
-
-/* ============================================================
- * COMPONENT
+ * COMPOSANT PRINCIPAL
  * ============================================================ */
 
 interface SmartSearchProps {
@@ -1001,34 +1079,90 @@ interface SmartSearchProps {
   onAdvancedSearch?: () => void;
 }
 
-export default function SmartSearch({
-  onNavigate,
-  onAdvancedSearch,
-}: SmartSearchProps) {
-  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+export default function SmartSearch({ onNavigate }: SmartSearchProps) {
+  /**
+   * Dimensions EXPLICITES : dans le Modal natif Android, `flex: 1` /
+   * `absoluteFill` n'ont pas de parent aux dimensions définies et le contenu
+   * s'effondrait en une bande étroite.
+   */
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
 
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [listening, setListening] = useState(false);
-  const [history, setHistory] = useState<string[]>(() => getHistory());
-  const [activeCategory, setActiveCategory] = useState<ResultCategory | "Tout">(
-    "Tout",
-  );
+  const [history, setHistory] = useState<string[]>([]);
   const [isVoiceSupported, setIsVoiceSupported] = useState(false);
 
   const inputRef = useRef<TextInput>(null);
-
+  const historyRef = useRef<string[]>([]);
+  const closingRef = useRef(false);
   const backdropAnim = useRef(new Animated.Value(0)).current;
-
   const panelAnim = useRef(new Animated.Value(0)).current;
 
-  const liveData = useQuery(
-    api.search.smartSearch,
-    query.trim().length >= 2 ? { query: query.trim() } : "skip",
+  const trimmedQuery = query.trim();
+  const showResults = trimmedQuery.length >= 2;
+  const debouncePending = showResults && debouncedQuery !== trimmedQuery;
+
+  const moduleHits = useMemo(
+    () => (showResults ? buildModuleHits(trimmedQuery) : []),
+    [showResults, trimmedQuery],
+  );
+
+  /* ─── HISTORY ─── */
+  const commitHistory = useCallback((next: string[]) => {
+    historyRef.current = next;
+    setHistory(next);
+    void persistHistory(next);
+  }, []);
+
+  const rememberQuery = useCallback(
+    (value: string) => {
+      const clean = value.trim();
+
+      if (clean.length < 2) {
+        return;
+      }
+
+      commitHistory(
+        [clean, ...historyRef.current.filter((item) => item !== clean)].slice(
+          0,
+          MAX_HISTORY,
+        ),
+      );
+    },
+    [commitHistory],
   );
 
   useEffect(() => {
-    if (!isBrowser) {
+    let cancelled = false;
+
+    void loadHistory().then((loaded) => {
+      if (cancelled) {
+        return;
+      }
+
+      historyRef.current = loaded;
+      setHistory(loaded);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* ─── DEBOUNCE (évite une souscription Convex par frappe) ─── */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(trimmedQuery);
+    }, 280);
+
+    return () => clearTimeout(timer);
+  }, [trimmedQuery]);
+
+  /* ─── VOICE SUPPORT DETECTION (web uniquement) ─── */
+  useEffect(() => {
+    if (!isWeb || typeof window === "undefined") {
       return;
     }
 
@@ -1037,10 +1171,13 @@ export default function SmartSearch({
     );
   }, []);
 
+  /* ─── ENTRANCE ANIMATION ─── */
   useEffect(() => {
     if (!open) {
       return;
     }
+
+    closingRef.current = false;
 
     backdropAnim.setValue(0);
     panelAnim.setValue(0);
@@ -1061,139 +1198,17 @@ export default function SmartSearch({
     ]).start();
   }, [open, backdropAnim, panelAnim]);
 
-  const liveResults = useMemo<SearchResult[]>(() => {
-    if (!liveData) {
-      return [];
-    }
-
-    const mapped: SearchResult[] = [];
-
-    for (const publication of liveData.publications) {
-      const category = categoryFromType(publication.type);
-
-      mapped.push({
-        id: `live-pub-${publication._id}`,
-        category,
-        title: publication.title,
-        subtitle:
-          publication.location ?? publication.type ?? "Contenu DébrouillePro",
-        meta: publication.price ?? "",
-        badge: "En direct",
-        badgeColor: CATEGORY_COLORS[category],
-        page: getPageForCategory(category),
-      });
-    }
-
-    for (const job of liveData.jobs) {
-      mapped.push({
-        id: `live-job-${job._id}`,
-        category: "Jobs/Pro",
-        title: job.title,
-        subtitle: `${job.company} – ${job.city}`,
-        meta: job.contractType.toUpperCase(),
-        badge: "En direct",
-        badgeColor: CATEGORY_COLORS["Jobs/Pro"],
-        page: "jobs",
-      });
-    }
-
-    for (const property of liveData.properties) {
-      mapped.push({
-        id: `live-prop-${property._id}`,
-        category: "Immo",
-        title: property.title,
-        subtitle: `${property.type} – ${property.city}`,
-        meta: `${property.price.toLocaleString()} FCFA`,
-        badge: "En direct",
-        badgeColor: CATEGORY_COLORS.Immo,
-        page: "immo",
-      });
-    }
-
-    for (const course of liveData.courses) {
-      mapped.push({
-        id: `live-course-${course._id}`,
-        category: "Éducation",
-        title: course.title,
-        subtitle: course.category,
-        meta: course.isFree
-          ? "Gratuit"
-          : `${course.price.toLocaleString()} FCFA`,
-        badge: "En direct",
-        badgeColor: CATEGORY_COLORS.Éducation,
-        page: "cours",
-      });
-    }
-
-    return mapped;
-  }, [liveData]);
-
-  const staticResults = useMemo<SearchResult[]>(() => {
-    const normalizedQuery = normalizeSearchValue(query);
-
-    if (normalizedQuery.length < 2) {
-      return [];
-    }
-
-    return ALL_RESULTS.filter((result) => {
-      if (activeCategory !== "Tout" && result.category !== activeCategory) {
-        return false;
-      }
-
-      return [result.title, result.subtitle, result.category, result.badge]
-        .filter(Boolean)
-        .some((value) => normalizeSearchValue(value).includes(normalizedQuery));
-    });
-  }, [query, activeCategory]);
-
-  const filteredLiveResults = useMemo(
-    () =>
-      activeCategory === "Tout"
-        ? liveResults
-        : liveResults.filter((result) => result.category === activeCategory),
-    [activeCategory, liveResults],
-  );
-
-  const results = useMemo(
-    () => [...filteredLiveResults, ...staticResults],
-    [filteredLiveResults, staticResults],
-  );
-
-  const grouped = useMemo(
-    () =>
-      results.reduce<Partial<Record<ResultCategory, SearchResult[]>>>(
-        (accumulator, result) => {
-          (
-            accumulator[result.category] ?? (accumulator[result.category] = [])
-          ).push(result);
-
-          return accumulator;
-        },
-        {},
-      ),
-    [results],
-  );
-
-  const allCategories: (ResultCategory | "Tout")[] = [
-    "Tout",
-    "Modules",
-    "Immo",
-    "Jobs/Pro",
-    "Santé",
-    "Agri",
-    "Media",
-    "Événements",
-    "Voyages",
-    "Bien-être",
-    "Éducation",
-    "Finance",
-    "Communauté",
-    "Services",
-  ];
-
-  const quickModules = MODULE_ENTRIES.slice(0, 12);
+  /* ─── HANDLERS ─── */
 
   const handleClose = useCallback(() => {
+    if (closingRef.current) {
+      return;
+    }
+
+    closingRef.current = true;
+
+    Keyboard.dismiss();
+
     Animated.parallel([
       Animated.timing(backdropAnim, {
         toValue: 0,
@@ -1210,81 +1225,82 @@ export default function SmartSearch({
     ]).start(() => {
       setOpen(false);
       setQuery("");
+      setDebouncedQuery("");
       setListening(false);
-      setActiveCategory("Tout");
-      Keyboard.dismiss();
+      closingRef.current = false;
     });
   }, [backdropAnim, panelAnim]);
 
   const handleOpen = useCallback(() => {
     setOpen(true);
-
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 200);
+    setTimeout(() => inputRef.current?.focus(), 260);
   }, []);
 
-  const handleSelect = useCallback(
-    (result: SearchResult) => {
-      saveHistory(result.title);
-      setHistory(getHistory());
+  const handleQuickSearch = useCallback((value: string) => {
+    setQuery(value);
+    setOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 280);
+  }, []);
+
+  const handleSelectHit = useCallback(
+    (hit: ScoredHit) => {
+      rememberQuery(trimmedQuery);
       handleClose();
-      onNavigate(result.page);
+      onNavigate(hit.route);
+    },
+    [handleClose, onNavigate, rememberQuery, trimmedQuery],
+  );
+
+  const handleSeeAll = useCallback(
+    (route: string) => {
+      rememberQuery(trimmedQuery);
+      handleClose();
+      onNavigate(route);
+    },
+    [handleClose, onNavigate, rememberQuery, trimmedQuery],
+  );
+
+  const handleSelectModule = useCallback(
+    (mod: QuickModule) => {
+      handleClose();
+      onNavigate(mod.route);
     },
     [handleClose, onNavigate],
   );
 
-  const handleQuickSearch = useCallback((value: string) => {
-    setQuery(value);
-    setActiveCategory("Tout");
-    setOpen(true);
-
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 220);
-  }, []);
-
   const handleHistorySelect = useCallback((value: string) => {
     setQuery(value);
-    setActiveCategory("Tout");
-
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 0);
+    setTimeout(() => inputRef.current?.focus(), 0);
   }, []);
 
   const handleRemoveHistory = useCallback(
     (value: string, event: GestureResponderEvent) => {
       event.stopPropagation?.();
-      removeHistory(value);
-      setHistory(getHistory());
+      commitHistory(historyRef.current.filter((item) => item !== value));
     },
-    [],
+    [commitHistory],
   );
 
-  const handleSubmit = useCallback((value: string) => {
-    const trimmed = value.trim();
+  const handleClearHistory = useCallback(() => {
+    commitHistory([]);
+  }, [commitHistory]);
 
-    if (trimmed.length < 2) {
+  const handleSubmit = useCallback(() => {
+    rememberQuery(trimmedQuery);
+  }, [rememberQuery, trimmedQuery]);
+
+  const handleVoice = useCallback(() => {
+    if (!isWeb || typeof window === "undefined" || !isVoiceSupported) {
       return;
     }
 
-    saveHistory(trimmed);
-    setHistory(getHistory());
-  }, []);
-
-  const handleVoice = useCallback(() => {
-    if (!isBrowser || !isVoiceSupported || listening) {
+    if (listening) {
       return;
     }
 
     type SpeechRecognitionResultEvent = Event & {
       results?: {
-        [index: number]: {
-          [index: number]: {
-            transcript?: string;
-          };
-        };
+        [index: number]: { [index: number]: { transcript?: string } };
       };
     };
 
@@ -1313,21 +1329,14 @@ export default function SmartSearch({
     }
 
     const recognition = new SpeechRecognitionAPI();
-
     recognition.lang = "fr-FR";
     recognition.interimResults = false;
-
     recognition.onstart = () => setListening(true);
-
     recognition.onend = () => setListening(false);
-
     recognition.onerror = () => setListening(false);
-
     recognition.onresult = (event) => {
       const transcript = event.results?.[0]?.[0]?.transcript ?? "";
-
       setQuery(transcript);
-      setActiveCategory("Tout");
     };
 
     try {
@@ -1337,8 +1346,14 @@ export default function SmartSearch({
     }
   }, [isVoiceSupported, listening]);
 
+  /* ─── WEB ESCAPE KEY (jamais sur natif) ─── */
   useEffect(() => {
-    if (!isBrowser || !open) {
+    if (
+      !isWeb ||
+      !open ||
+      typeof window === "undefined" ||
+      typeof window.addEventListener !== "function"
+    ) {
       return;
     }
 
@@ -1350,15 +1365,10 @@ export default function SmartSearch({
 
     window.addEventListener("keydown", handler);
 
-    return () => {
-      window.removeEventListener("keydown", handler);
-    };
+    return () => window.removeEventListener("keydown", handler);
   }, [handleClose, open]);
 
-  const showResults = query.trim().length >= 2;
-
-  const backdropOpacity = backdropAnim;
-
+  /* ─── DERIVED ─── */
   const panelTranslateY = panelAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [SCREEN_HEIGHT * 0.04, 0],
@@ -1369,21 +1379,19 @@ export default function SmartSearch({
     outputRange: [0.985, 1],
   });
 
+  /* ========================================================
+   * RENDER
+   * ====================================================== */
+
   return (
     <>
-      {/* ======================================================
-       * HOME TRIGGER
-       * ==================================================== */}
-
+      {/* ═══════════ TRIGGER HOME ═══════════ */}
       <HomeSearchTrigger
         onOpen={handleOpen}
         onQuickSearch={handleQuickSearch}
       />
 
-      {/* ======================================================
-       * SEARCH MODAL
-       * ==================================================== */}
-
+      {/* ═══════════ MODAL ═══════════ */}
       {open ? (
         <Modal
           transparent
@@ -1392,15 +1400,11 @@ export default function SmartSearch({
           onRequestClose={handleClose}
           statusBarTranslucent
         >
-          <View style={StyleSheet.absoluteFill}>
-            <Animated.View
-              style={[
-                styles.backdrop,
-                {
-                  opacity: backdropOpacity,
-                },
-              ]}
-            >
+          <KeyboardAvoidingView
+            style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
+            <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
               <Pressable
                 onPress={handleClose}
                 style={StyleSheet.absoluteFill}
@@ -1413,12 +1417,8 @@ export default function SmartSearch({
                 styles.panel,
                 {
                   transform: [
-                    {
-                      translateY: panelTranslateY,
-                    },
-                    {
-                      scale: panelScale,
-                    },
+                    { translateY: panelTranslateY },
+                    { scale: panelScale },
                   ],
                 },
               ]}
@@ -1427,42 +1427,21 @@ export default function SmartSearch({
               <LinearGradient
                 colors={["#06061A", "#0A0620", "#06061A"]}
                 locations={[0, 0.5, 1]}
-                start={{
-                  x: 0,
-                  y: 0,
-                }}
-                end={{
-                  x: 1,
-                  y: 1,
-                }}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
 
               <View style={styles.ambientGlowTop} pointerEvents="none" />
-
               <View style={styles.ambientGlowRight} pointerEvents="none" />
 
               {/* HEADER */}
-
-              <View
-                style={[
-                  styles.header,
-                  {
-                    paddingTop: Platform.OS === "android" ? 20 : 40,
-                  },
-                ]}
-              >
+              <View style={[styles.header, { paddingTop: TOP_INSET + 8 }]}>
                 <View style={styles.headerTopRow}>
-                  <View
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                  >
+                  <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.headerEyebrow}>
                       DÉBROUILLEPRO SEARCH
                     </Text>
-
                     <Text style={styles.headerTitle}>Que cherches-tu ?</Text>
                   </View>
 
@@ -1472,33 +1451,29 @@ export default function SmartSearch({
                     accessibilityLabel="Fermer la recherche"
                     style={({ pressed }) => [
                       styles.headerCloseBtn,
-                      pressed && {
-                        opacity: 0.75,
-                      },
+                      pressed && { opacity: 0.75 },
                     ]}
                   >
                     <X size={17} color="rgba(255,255,255,0.75)" />
                   </Pressable>
                 </View>
 
-                {/* SEARCH INPUT */}
-
+                {/* SEARCH BAR */}
                 <View style={styles.searchBar}>
                   <Search size={18} color="#C4B5FD" strokeWidth={2.4} />
 
                   <TextInput
                     ref={inputRef}
                     value={query}
-                    onChangeText={(value) => {
-                      setQuery(value);
-                      setActiveCategory("Tout");
-                    }}
-                    onSubmitEditing={() => handleSubmit(query)}
-                    placeholder="Modules, services, emplois, contenus…"
+                    onChangeText={setQuery}
+                    onSubmitEditing={handleSubmit}
+                    placeholder="Que veux-tu faire ? (ex: maison à louer)"
                     placeholderTextColor="rgba(255,255,255,0.3)"
                     style={styles.searchInput}
                     autoComplete="off"
+                    autoCorrect={false}
                     autoCapitalize="none"
+                    returnKeyType="search"
                     accessibilityLabel="Rechercher"
                   />
 
@@ -1509,9 +1484,7 @@ export default function SmartSearch({
                       accessibilityLabel="Effacer la recherche"
                       style={({ pressed }) => [
                         styles.searchClearBtn,
-                        pressed && {
-                          opacity: 0.7,
-                        },
+                        pressed && { opacity: 0.7 },
                       ]}
                     >
                       <X size={15} color="rgba(255,255,255,0.6)" />
@@ -1526,16 +1499,12 @@ export default function SmartSearch({
                           ? "Arrêter la dictée"
                           : "Rechercher avec la voix"
                       }
-                      accessibilityState={{
-                        selected: listening,
-                      }}
+                      accessibilityState={{ selected: listening }}
                       hitSlop={6}
                       style={({ pressed }) => [
                         styles.searchMicBtn,
                         listening && styles.searchMicBtnActive,
-                        pressed && {
-                          opacity: 0.85,
-                        },
+                        pressed && { opacity: 0.85 },
                       ]}
                     >
                       <Mic
@@ -1546,96 +1515,19 @@ export default function SmartSearch({
                     </Pressable>
                   ) : null}
                 </View>
-
-                {/* CATEGORIES */}
-
-                {showResults && results.length > 0 ? (
-                  <FadeUp distance={6}>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.chipsRow}
-                    >
-                      {allCategories.map((category) => {
-                        const count =
-                          category === "Tout"
-                            ? results.length
-                            : (grouped[category as ResultCategory]?.length ??
-                              0);
-
-                        if (category !== "Tout" && count === 0) {
-                          return null;
-                        }
-
-                        const color =
-                          category === "Tout"
-                            ? "#C4B5FD"
-                            : CATEGORY_COLORS[category as ResultCategory];
-
-                        const active = activeCategory === category;
-
-                        return (
-                          <Pressable
-                            key={category}
-                            onPress={() => setActiveCategory(category)}
-                            style={({ pressed }) => [
-                              styles.chip,
-                              {
-                                backgroundColor: active
-                                  ? `${color}30`
-                                  : "rgba(255,255,255,0.04)",
-                                borderColor: active
-                                  ? `${color}66`
-                                  : "rgba(255,255,255,0.08)",
-                              },
-                              pressed && {
-                                opacity: 0.8,
-                              },
-                            ]}
-                          >
-                            {category !== "Tout"
-                              ? getCategoryIcon(category as ResultCategory, 11)
-                              : null}
-
-                            <Text
-                              style={[
-                                styles.chipText,
-                                active && {
-                                  color: "#fff",
-                                },
-                              ]}
-                            >
-                              {category}
-                            </Text>
-
-                            <Text style={styles.chipCount}>{count}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </ScrollView>
-                  </FadeUp>
-                ) : null}
               </View>
 
               {/* BODY */}
-
               <ScrollView
-                style={{
-                  flex: 1,
-                }}
+                style={{ flex: 1 }}
                 contentContainerStyle={styles.bodyContent}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
               >
+                {/* ─── ÉTAT IDLE (pas de recherche) ─── */}
                 {!showResults ? (
-                  <View
-                    style={{
-                      gap: 28,
-                      paddingTop: 12,
-                    }}
-                  >
+                  <View style={{ gap: 28, paddingTop: 12 }}>
                     {/* QUICK MODULES */}
-
                     <View>
                       <SectionLabel
                         icon={
@@ -1649,50 +1541,38 @@ export default function SmartSearch({
                       </SectionLabel>
 
                       <View style={styles.quickGrid}>
-                        {quickModules.map((module, index) => (
+                        {QUICK_MODULES.map((mod, index) => (
                           <FadeUp
-                            key={module.id}
+                            key={mod.id}
                             delay={index * 25}
                             distance={8}
                             style={styles.quickGridItemWrap}
                           >
                             <Pressable
-                              onPress={() => handleSelect(module)}
+                              onPress={() => handleSelectModule(mod)}
+                              accessibilityRole="button"
+                              accessibilityLabel={mod.title}
                               style={({ pressed }) => [
                                 styles.quickModule,
-                                pressed && {
-                                  opacity: 0.85,
-                                },
+                                pressed && { opacity: 0.85 },
                               ]}
                             >
                               <LinearGradient
-                                colors={[
-                                  `${module.badgeColor ?? "#A78BFA"}22`,
-                                  `${module.badgeColor ?? "#A78BFA"}08`,
-                                ]}
-                                start={{
-                                  x: 0,
-                                  y: 0,
-                                }}
-                                end={{
-                                  x: 1,
-                                  y: 1,
-                                }}
+                                colors={[`${mod.color}22`, `${mod.color}08`]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
                                 style={[
                                   styles.quickModuleIcon,
-                                  {
-                                    borderColor: `${module.badgeColor ?? "#A78BFA"}44`,
-                                  },
+                                  { borderColor: `${mod.color}44` },
                                 ]}
                               >
-                                {getCategoryIcon("Modules", 15)}
+                                {getDomainIcon(mod.route, 15, mod.color)}
                               </LinearGradient>
-
                               <Text
                                 style={styles.quickModuleLabel}
                                 numberOfLines={2}
                               >
-                                {module.title}
+                                {mod.title}
                               </Text>
                             </Pressable>
                           </FadeUp>
@@ -1701,7 +1581,6 @@ export default function SmartSearch({
                     </View>
 
                     {/* HISTORY */}
-
                     {history.length > 0 ? (
                       <FadeUp>
                         <View>
@@ -1717,13 +1596,7 @@ export default function SmartSearch({
                               Récent
                             </SectionLabel>
 
-                            <Pressable
-                              onPress={() => {
-                                store.remove(HISTORY_KEY);
-                                setHistory([]);
-                              }}
-                              hitSlop={6}
-                            >
+                            <Pressable onPress={handleClearHistory} hitSlop={6}>
                               <Text style={styles.historyClear}>Effacer</Text>
                             </Pressable>
                           </View>
@@ -1745,14 +1618,12 @@ export default function SmartSearch({
                                   size={14}
                                   color="rgba(255,255,255,0.35)"
                                 />
-
                                 <Text
                                   style={styles.historyText}
                                   numberOfLines={1}
                                 >
                                   {item}
                                 </Text>
-
                                 <Pressable
                                   onPress={(event) =>
                                     handleRemoveHistory(item, event)
@@ -1769,8 +1640,7 @@ export default function SmartSearch({
                       </FadeUp>
                     ) : null}
 
-                    {/* TRENDS */}
-
+                    {/* TRENDING */}
                     <FadeUp>
                       <View>
                         <SectionLabel
@@ -1791,16 +1661,13 @@ export default function SmartSearch({
                                 onPress={() => setQuery(item)}
                                 style={({ pressed }) => [
                                   styles.trendingChip,
-                                  pressed && {
-                                    opacity: 0.85,
-                                  },
+                                  pressed && { opacity: 0.85 },
                                 ]}
                               >
                                 <TrendingUp
                                   size={11}
                                   color="rgba(251,146,60,0.85)"
                                 />
-
                                 <Text style={styles.trendingChipText}>
                                   {item}
                                 </Text>
@@ -1811,8 +1678,7 @@ export default function SmartSearch({
                       </View>
                     </FadeUp>
 
-                    {/* AI */}
-
+                    {/* AI CARD */}
                     <FadeUp>
                       <View style={styles.aiCard}>
                         <LinearGradient
@@ -1822,14 +1688,8 @@ export default function SmartSearch({
                             "rgba(15,7,32,0.6)",
                           ]}
                           locations={[0, 0.5, 1]}
-                          start={{
-                            x: 0,
-                            y: 0,
-                          }}
-                          end={{
-                            x: 1,
-                            y: 1,
-                          }}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
                           style={StyleSheet.absoluteFill}
                         />
 
@@ -1838,34 +1698,24 @@ export default function SmartSearch({
                             <Sparkles size={16} color="#C4B5FD" />
                           </View>
 
-                          <View
-                            style={{
-                              flex: 1,
-                              minWidth: 0,
-                            }}
-                          >
+                          <View style={{ flex: 1, minWidth: 0 }}>
                             <Text style={styles.aiCardEyebrow}>
                               DÉBROUILLE AI
                             </Text>
-
                             <Text style={styles.aiCardText}>
-                              Je peux t'aider à trouver un emploi, un logement,
-                              un service ou une opportunité plus rapidement.
+                              Décris ton besoin en langage naturel. Je trouve où
+                              et comment le satisfaire.
                             </Text>
-
                             <Pressable
-                              onPress={() => setQuery("emploi")}
+                              onPress={() => setQuery("maison à louer")}
                               style={({ pressed }) => [
                                 styles.aiCardBtn,
-                                pressed && {
-                                  opacity: 0.7,
-                                },
+                                pressed && { opacity: 0.7 },
                               ]}
                             >
                               <Text style={styles.aiCardBtnText}>
-                                Explorer les opportunités
+                                Essayer une recherche
                               </Text>
-
                               <ArrowUpRight size={11} color="#C4B5FD" />
                             </Pressable>
                           </View>
@@ -1875,65 +1725,46 @@ export default function SmartSearch({
                   </View>
                 ) : null}
 
-                {/* NO RESULTS */}
+                {/* ─── RECHERCHE EN COURS DE SAISIE (debounce) ─── */}
+                {showResults && debouncePending ? (
+                  <View style={styles.resultsContainer}>
+                    <ModuleHitsSection
+                      hits={moduleHits}
+                      onSelect={handleSelectHit}
+                    />
 
-                {showResults && results.length === 0 ? (
-                  <FadeUp>
-                    <View style={styles.noResultsWrap}>
-                      <View style={styles.noResultsIcon}>
-                        <Search size={24} color="rgba(196,181,253,0.85)" />
-                      </View>
+                    <View style={styles.loadingRow}>
+                      <ActivityIndicator size="small" color="#C4B5FD" />
 
-                      <Text style={styles.noResultsTitle}>
-                        Aucun résultat trouvé
-                      </Text>
-
-                      <Text style={styles.noResultsQuery} numberOfLines={1}>
-                        « {query.trim()} »
-                      </Text>
-
-                      <Pressable
-                        onPress={() => setQuery("")}
-                        style={styles.noResultsButton}
-                      >
-                        <Text style={styles.noResultsButtonText}>
-                          Nouvelle recherche
-                        </Text>
-                      </Pressable>
+                      <Text style={styles.loadingRowText}>Recherche…</Text>
                     </View>
-                  </FadeUp>
+                  </View>
                 ) : null}
 
-                {/* RESULTS */}
-
-                {showResults && results.length > 0 ? (
-                  <View style={styles.resultsContainer}>
-                    {(
-                      Object.entries(grouped) as [
-                        ResultCategory,
-                        SearchResult[],
-                      ][]
-                    ).map(([category, categoryResults], categoryIndex) => (
-                      <View key={category} style={styles.resultGroup}>
-                        <SectionLabel icon={getCategoryIcon(category, 12)}>
-                          {category}
-                        </SectionLabel>
-
-                        {categoryResults.map((result, resultIndex) => (
-                          <ResultRow
-                            key={result.id}
-                            result={result}
-                            index={categoryIndex + resultIndex}
-                            onSelect={handleSelect}
-                          />
-                        ))}
-                      </View>
-                    ))}
-                  </View>
+                {/* ─── RÉSULTATS (Convex isolé par un error boundary) ─── */}
+                {showResults && !debouncePending ? (
+                  <SearchErrorBoundary
+                    resetKey={debouncedQuery}
+                    fallback={(reset) => (
+                      <SearchFallback
+                        moduleHits={moduleHits}
+                        onSelectHit={handleSelectHit}
+                        onRetry={reset}
+                      />
+                    )}
+                  >
+                    <SearchResultsPanel
+                      query={debouncedQuery}
+                      moduleHits={moduleHits}
+                      onSelectHit={handleSelectHit}
+                      onSeeAll={handleSeeAll}
+                      onClear={() => setQuery("")}
+                    />
+                  </SearchErrorBoundary>
                 ) : null}
               </ScrollView>
             </Animated.View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       ) : null}
     </>
@@ -1946,12 +1777,7 @@ export default function SmartSearch({
 
 const styles = StyleSheet.create({
   /* HOME */
-
-  homeTriggerWrap: {
-    marginTop: 8,
-    marginHorizontal: 16,
-  },
-
+  homeTriggerWrap: { marginTop: 8, marginHorizontal: 16 },
   homeSearchCard: {
     minHeight: 112,
     overflow: "hidden",
@@ -1961,22 +1787,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.09)",
   },
-
   homeSearchCardPressed: {
     backgroundColor: "rgba(255,255,255,0.065)",
     borderColor: "rgba(196,181,253,0.20)",
-    transform: [
-      {
-        scale: 0.99,
-      },
-    ],
+    transform: [{ scale: 0.99 }],
   },
-
-  homeSearchTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
+  homeSearchTopRow: { flexDirection: "row", alignItems: "center" },
   homeSearchIcon: {
     width: 36,
     height: 36,
@@ -1988,12 +1804,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(196,181,253,0.13)",
   },
-
-  homeSearchTitleWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-
+  homeSearchTitleWrap: { flex: 1, minWidth: 0 },
   homeSearchTitle: {
     color: "#F8FAFC",
     fontSize: 15,
@@ -2001,7 +1812,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: -0.25,
   },
-
   homeSearchHint: {
     marginTop: 2,
     color: "#64748B",
@@ -2009,7 +1819,6 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     fontWeight: "600",
   },
-
   homeSearchSparkle: {
     width: 34,
     height: 34,
@@ -2021,13 +1830,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(196,181,253,0.12)",
   },
-
   homeActionRow: {
     paddingTop: 11,
     paddingRight: 4,
     gap: 7,
+    alignItems: "center",
   },
-
   homeActionPill: {
     minHeight: 30,
     paddingHorizontal: 10,
@@ -2039,19 +1847,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
-
   homeActionPillPressed: {
     backgroundColor: "rgba(196,181,253,0.10)",
     borderColor: "rgba(196,181,253,0.18)",
   },
-
   homeActionText: {
     color: "#CBD5E1",
     fontSize: 10,
     lineHeight: 13,
     fontWeight: "700",
   },
-
   homeActionMore: {
     width: 30,
     height: 30,
@@ -2062,7 +1867,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.07)",
   },
-
   homeActionMoreText: {
     color: "#94A3B8",
     fontSize: 17,
@@ -2071,18 +1875,11 @@ const styles = StyleSheet.create({
   },
 
   /* MODAL */
-
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(2,4,18,0.78)",
   },
-
-  panel: {
-    flex: 1,
-    overflow: "hidden",
-    backgroundColor: "#06061A",
-  },
-
+  panel: { flex: 1, overflow: "hidden", backgroundColor: "#06061A" },
   ambientGlowTop: {
     position: "absolute",
     top: -180,
@@ -2092,7 +1889,6 @@ const styles = StyleSheet.create({
     borderRadius: 170,
     backgroundColor: "rgba(124,58,237,0.08)",
   },
-
   ambientGlowRight: {
     position: "absolute",
     top: "35%",
@@ -2102,18 +1898,12 @@ const styles = StyleSheet.create({
     borderRadius: 150,
     backgroundColor: "rgba(79,70,229,0.06)",
   },
-
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-
+  header: { paddingHorizontal: 16, paddingBottom: 12 },
   headerTopRow: {
     minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
   },
-
   headerEyebrow: {
     color: "#8B5CF6",
     fontSize: 8,
@@ -2121,7 +1911,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 1.2,
   },
-
   headerTitle: {
     marginTop: 3,
     color: "#F8FAFC",
@@ -2130,7 +1919,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: -0.6,
   },
-
   headerCloseBtn: {
     width: 38,
     height: 38,
@@ -2142,7 +1930,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
-
   searchBar: {
     minHeight: 54,
     paddingHorizontal: 14,
@@ -2153,7 +1940,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(196,181,253,0.14)",
   },
-
   searchInput: {
     flex: 1,
     minWidth: 0,
@@ -2162,7 +1948,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-
   searchClearBtn: {
     width: 30,
     height: 30,
@@ -2170,7 +1955,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   searchMicBtn: {
     width: 31,
     height: 31,
@@ -2180,17 +1964,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(167,139,250,0.10)",
   },
+  searchMicBtnActive: { backgroundColor: "rgba(248,113,113,0.14)" },
 
-  searchMicBtnActive: {
-    backgroundColor: "rgba(248,113,113,0.14)",
-  },
-
-  chipsRow: {
-    paddingTop: 9,
-    paddingRight: 8,
-    gap: 7,
-  },
-
+  chipsRow: { paddingRight: 8, gap: 7 },
   chip: {
     minHeight: 30,
     paddingHorizontal: 9,
@@ -2199,32 +1975,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
+  chipText: { color: "#94A3B8", fontSize: 9, fontWeight: "700" },
 
-  chipText: {
-    color: "#94A3B8",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-
-  chipCount: {
-    color: "#64748B",
-    fontSize: 8,
-    fontWeight: "800",
-  },
-
-  bodyContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-  },
-
+  bodyContent: { paddingHorizontal: 16, paddingBottom: 40 },
   sectionLabelRow: {
     marginBottom: 9,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-
   sectionLabelText: {
     color: "#64748B",
     fontSize: 9,
@@ -2234,22 +1996,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
 
-  quickGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 9,
-  },
-
-  quickGridItemWrap: {
-    width: "22.5%",
-  },
-
+  quickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  quickGridItemWrap: { width: "22.5%" },
   quickModule: {
     minHeight: 78,
     alignItems: "center",
     justifyContent: "center",
   },
-
   quickModuleIcon: {
     width: 42,
     height: 42,
@@ -2258,7 +2011,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-
   quickModuleLabel: {
     marginTop: 7,
     color: "#CBD5E1",
@@ -2273,13 +2025,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-
-  historyClear: {
-    color: "#8B5CF6",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-
+  historyClear: { color: "#8B5CF6", fontSize: 9, fontWeight: "700" },
   historyCard: {
     overflow: "hidden",
     borderRadius: 17,
@@ -2287,7 +2033,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.07)",
   },
-
   historyRow: {
     minHeight: 46,
     paddingHorizontal: 13,
@@ -2295,12 +2040,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-
   historyRowBorder: {
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.06)",
   },
-
   historyText: {
     flex: 1,
     color: "#CBD5E1",
@@ -2308,12 +2051,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  trendingRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 7,
-  },
-
+  trendingRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   trendingChip: {
     minHeight: 31,
     paddingHorizontal: 10,
@@ -2325,12 +2063,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.07)",
   },
-
-  trendingChipText: {
-    color: "#94A3B8",
-    fontSize: 9,
-    fontWeight: "700",
-  },
+  trendingChipText: { color: "#94A3B8", fontSize: 9, fontWeight: "700" },
 
   aiCard: {
     overflow: "hidden",
@@ -2340,12 +2073,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(167,139,250,0.14)",
   },
-
-  aiCardRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-
+  aiCardRow: { flexDirection: "row", alignItems: "flex-start" },
   aiCardIcon: {
     width: 38,
     height: 38,
@@ -2357,14 +2085,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(196,181,253,0.16)",
   },
-
   aiCardEyebrow: {
     color: "#A78BFA",
     fontSize: 8,
     fontWeight: "900",
     letterSpacing: 0.9,
   },
-
   aiCardText: {
     marginTop: 4,
     color: "#CBD5E1",
@@ -2372,7 +2098,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "600",
   },
-
   aiCardBtn: {
     alignSelf: "flex-start",
     marginTop: 9,
@@ -2380,21 +2105,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
+  aiCardBtnText: { color: "#C4B5FD", fontSize: 9, fontWeight: "800" },
 
-  aiCardBtnText: {
-    color: "#C4B5FD",
-    fontSize: 9,
-    fontWeight: "800",
-  },
-
-  resultsContainer: {
-    gap: 22,
-    paddingTop: 12,
-  },
-
-  resultGroup: {
-    gap: 7,
-  },
+  resultsContainer: { gap: 18, paddingTop: 12 },
+  resultGroup: { gap: 7 },
 
   resultRow: {
     minHeight: 66,
@@ -2408,11 +2122,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.065)",
   },
-
-  resultRowCompact: {
-    minHeight: 56,
-  },
-
   resultIcon: {
     width: 38,
     height: 38,
@@ -2422,24 +2131,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-
-  resultIconCompact: {
-    width: 32,
-    height: 32,
-    marginRight: 9,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-
   resultTitle: {
     color: "#F8FAFC",
     fontSize: 11,
     lineHeight: 15,
     fontWeight: "800",
   },
-
   resultSubtitle: {
     marginTop: 2,
     color: "#64748B",
@@ -2447,19 +2144,8 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     fontWeight: "600",
   },
-
-  resultMetaCol: {
-    maxWidth: 75,
-    marginLeft: 8,
-    alignItems: "flex-end",
-  },
-
-  resultMeta: {
-    color: "#94A3B8",
-    fontSize: 8,
-    fontWeight: "700",
-  },
-
+  resultMetaCol: { maxWidth: 90, marginLeft: 8, alignItems: "flex-end" },
+  resultMeta: { color: "#94A3B8", fontSize: 8, fontWeight: "700" },
   resultBadge: {
     minHeight: 17,
     marginTop: 3,
@@ -2469,19 +2155,64 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 3,
   },
+  resultBadgeText: { fontSize: 7, fontWeight: "900" },
 
-  resultBadgeText: {
-    fontSize: 7,
-    fontWeight: "900",
+  seeAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  seeAllBtnText: {
+    color: "#C4B5FD",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  loadingRow: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  loadingRowText: {
+    color: "#94A3B8",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  fallbackBox: {
+    padding: 16,
+    borderRadius: 18,
+    alignItems: "center",
+    backgroundColor: "rgba(248,113,113,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.2)",
+  },
+  fallbackTitle: {
+    color: "#F8FAFC",
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  fallbackText: {
+    marginTop: 6,
+    color: "#94A3B8",
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: "600",
+    textAlign: "center",
   },
 
   noResultsWrap: {
-    minHeight: 300,
+    minHeight: 260,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
   },
-
   noResultsIcon: {
     width: 64,
     height: 64,
@@ -2493,13 +2224,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(196,181,253,0.13)",
   },
-
-  noResultsTitle: {
-    color: "#F8FAFC",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-
+  noResultsTitle: { color: "#F8FAFC", fontSize: 16, fontWeight: "800" },
   noResultsQuery: {
     maxWidth: "90%",
     marginTop: 5,
@@ -2507,7 +2232,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
-
   noResultsButton: {
     minHeight: 38,
     marginTop: 17,
@@ -2519,10 +2243,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(167,139,250,0.18)",
   },
-
-  noResultsButtonText: {
-    color: "#C4B5FD",
-    fontSize: 10,
-    fontWeight: "800",
-  },
+  noResultsButtonText: { color: "#C4B5FD", fontSize: 10, fontWeight: "800" },
 });
