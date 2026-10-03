@@ -1,85 +1,129 @@
+// src/features/auth/pages/AuthPage.tsx
+
+import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+
 import { AuthLayout } from "../components/AuthLayout";
-import { LoginForm } from "../components/LoginForm";
-import { RegisterForm } from "../components/RegisterForm";
+import { Divider } from "../components/Divider";
 import { ForgotPassword } from "../components/ForgotPassword";
 import { GoogleButton } from "../components/GoogleButton";
-import { PhoneButton } from "../components/PhoneButton"; // ✅ Nouveau bouton téléphone
-import { Divider } from "../components/Divider"; // ✅ Composant séparateur
+import { LoginForm } from "../components/LoginForm";
+import { PhoneButton } from "../components/PhoneButton";
+import { RegisterForm } from "../components/RegisterForm";
 import { useAuthRedirect } from "../hooks/useAuthRedirect";
 
 type AuthMode = "login" | "register" | "phone" | "forgot";
 
-export function AuthPage() {
-  const [searchParams] = useSearchParams();
-  const initialMode = (searchParams.get("mode") as AuthMode) || "login";
-  const [mode, setMode] = useState<AuthMode>(initialMode);
-  useAuthRedirect();
+interface AuthPageProps {
+  initialMode?: AuthMode;
+  onNavigate?: (path: string) => void;
+}
+
+const AUTH_MODES: readonly AuthMode[] = [
+  "login",
+  "register",
+  "phone",
+  "forgot",
+];
+
+const TITLES: Record<AuthMode, { title: string; subtitle: string }> = {
+  login: {
+    title: "Bienvenue",
+    subtitle: "Connectez-vous à votre compte",
+  },
+  register: {
+    title: "Créer un compte",
+    subtitle: "Rejoignez la communauté Débrouille",
+  },
+  phone: {
+    title: "Connexion par téléphone",
+    subtitle: "Recevez un code par SMS",
+  },
+  forgot: {
+    title: "Mot de passe oublié",
+    subtitle: "Réinitialisez votre mot de passe",
+  },
+};
+
+function normalizeInitialMode(value?: string): AuthMode {
+  return value && AUTH_MODES.includes(value as AuthMode)
+    ? (value as AuthMode)
+    : "login";
+}
+
+export function AuthPage({ initialMode = "login", onNavigate }: AuthPageProps) {
+  const [mode, setMode] = useState<AuthMode>(normalizeInitialMode(initialMode));
+
+  useAuthRedirect({
+    redirectTo: "/",
+    onRedirect: onNavigate,
+  });
+
+  const titleContent = useMemo(() => TITLES[mode], [mode]);
+
+  const goToLogin = () => setMode("login");
+  const goToRegister = () => setMode("register");
+  const goToForgot = () => setMode("forgot");
 
   const renderContent = () => {
     switch (mode) {
       case "login":
         return (
-          <>
-            {/* ✅ Ordre : Google → Téléphone → Séparateur → Email */}
+          <View className="w-full">
+            {/* Authentification rapide */}
             <GoogleButton />
-            <PhoneButton />
+
+            <View className="mt-3">
+              <PhoneButton />
+            </View>
+
             <Divider />
+
+            {/* Authentification email */}
             <LoginForm
-              onRegisterClick={() => setMode("register")}
-              onForgotPasswordClick={() => setMode("forgot")}
+              onRegisterClick={goToRegister}
+              onForgotPasswordClick={goToForgot}
             />
-          </>
+          </View>
         );
 
       case "register":
-        return <RegisterForm onLoginClick={() => setMode("login")} />;
+        return <RegisterForm onLoginClick={goToLogin} />;
 
       case "phone":
-        // Le modal du téléphone est géré par PhoneButton,
-        // cette vue n'est plus nécessaire mais on garde le fallback
         return (
-          <View className="text-center py-8">
-            <Text className="text-white/50 text-sm">
-              Utilisez le bouton "Continuer avec Téléphone" sur l'écran de
-              connexion.
+          <View className="w-full items-center py-8">
+            <Text className="text-center text-sm leading-5 text-white/50">
+              Utilisez le bouton{" "}
+              <Text className="font-semibold text-white/70">
+                « Continuer avec Téléphone »
+              </Text>{" "}
+              depuis l'écran de connexion.
             </Text>
-            <Pressable onPress={() => setMode("login")} className="mt-4 text-violet-400">
-              ← Retour à la connexion
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Retour à la connexion"
+              onPress={goToLogin}
+              className="mt-5 rounded-xl px-3 py-2 active:opacity-70"
+            >
+              <Text className="text-sm font-semibold text-violet-400">
+                ← Retour à la connexion
+              </Text>
             </Pressable>
           </View>
         );
 
       case "forgot":
-        return <ForgotPassword onBack={() => setMode("login")} />;
+        return <ForgotPassword onBack={goToLogin} />;
 
       default:
         return null;
     }
   };
 
-  const titles = {
-    login: { title: "Bienvenue", subtitle: "Connectez-vous à votre compte" },
-    register: {
-      title: "Créer un compte",
-      subtitle: "Rejoignez la communauté Débrouille",
-    },
-    phone: {
-      title: "Connexion par téléphone",
-      subtitle: "Recevez un code par SMS",
-    },
-    forgot: {
-      title: "Mot de passe oublié",
-      subtitle: "Réinitialisez votre mot de passe",
-    },
-  };
-
-  const { title, subtitle } = titles[mode];
-
   return (
-    <AuthLayout title={title} subtitle={subtitle}>
+    <AuthLayout title={titleContent.title} subtitle={titleContent.subtitle}>
       {renderContent()}
     </AuthLayout>
   );

@@ -1,6 +1,12 @@
 export function getPhoneErrorMessage(error: unknown): string {
-  const err = error as { code?: string; message?: string };
-  const code = err.code || "auth/unknown";
+  const err =
+    typeof error === "object" && error !== null
+      ? (error as { code?: unknown; message?: unknown })
+      : {};
+
+  const code =
+    typeof err.code === "string" && err.code.trim() ? err.code : "auth/unknown";
+
   const messages: Record<string, string> = {
     "auth/invalid-phone-number": "Numéro de téléphone invalide",
     "auth/too-many-requests":
@@ -13,7 +19,13 @@ export function getPhoneErrorMessage(error: unknown): string {
     "auth/missing-verification-code": "Veuillez entrer le code reçu par SMS",
     "auth/unknown": "Une erreur est survenue",
   };
-  return messages[code] || err.message || "Une erreur est survenue";
+
+  const fallbackMessage =
+    typeof err.message === "string" && err.message.trim()
+      ? err.message
+      : "Une erreur est survenue";
+
+  return messages[code] ?? fallbackMessage;
 }
 
 export const PHONE_VALIDATION = {

@@ -9,3 +9,5 @@ export const AUTH_ROUTES = {
   verifyEmail: "/auth/verify-email",
   logout: "/auth/logout",
 } as const;
+
+export type AuthRoute = (typeof AUTH_ROUTES)[keyof typeof AUTH_ROUTES];

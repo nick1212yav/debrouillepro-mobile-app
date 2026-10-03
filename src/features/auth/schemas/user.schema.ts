@@ -1,8 +1,11 @@
 /**
- * Schéma de la table `users` dans Convex.
- * Ce fichier sert de documentation et de référence pour l'équipe.
+ * Schéma documentaire de la table `users` dans Convex.
  *
- * @see convex/schema.ts pour l'implémentation réelle
+ * Ce fichier sert de référence pour l'équipe.
+ * L'implémentation réelle et faisant foi se trouve dans :
+ * `convex/schema.ts`
+ *
+ * @see convex/schema.ts
  */
 export const UserSchema = {
   uid: "string (unique, Firebase UID)",
@@ -23,3 +26,5 @@ export const UserSchema = {
   interests: "array of strings (optional)",
   isAdmin: "boolean (déprécié, utiliser permissions à la place)",
 } as const;
+
+export type UserSchemaKey = keyof typeof UserSchema;

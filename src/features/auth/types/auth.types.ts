@@ -26,35 +26,51 @@ export type AuthUser = {
 
 export type ConvexUser = {
   _id: string;
-  uid: string; // ✅ Firebase UID
-  tokenIdentifier: string; // ✅ Convex token
+  uid: string;
+  tokenIdentifier: string;
+
   email?: string;
   phone?: string;
+
   name: string;
   avatar?: string;
+
   roles: string[];
   permissions?: string[];
+
   emailVerified: boolean;
   onboardingCompleted: boolean;
   reputationScore: number;
+
   city?: string;
   country?: string;
   language?: string;
   profession?: string;
   interests?: string[];
-  isAdmin?: boolean; // ⚠️ déprécié, gardé pour rétrocompatibilité
+
+  /**
+   * @deprecated
+   * Conservé uniquement pour la rétrocompatibilité.
+   * Utiliser `permissions` pour les contrôles d'accès.
+   */
+  isAdmin?: boolean;
 };
 
 export type UserSyncData = {
   uid: string;
   tokenIdentifier: string;
+
   email?: string;
   phone?: string;
+
   name: string;
   avatar?: string;
+
   roles: string[];
   permissions?: string[];
+
   emailVerified: boolean;
+
   city?: string;
   country?: string;
   language?: string;

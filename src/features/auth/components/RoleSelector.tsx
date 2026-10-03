@@ -1,12 +1,18 @@
-import { View, Text, Pressable } from "react-native";
+// src/features/auth/components/RoleSelector.tsx
+
+import { useMemo } from "react";
+import { Pressable, Text, View } from "react-native";
+
 import type { UserRole } from "../types/auth.types";
 
-const ROLES: {
+interface RoleOption {
   value: UserRole;
   label: string;
   emoji: string;
   description: string;
-}[] = [
+}
+
+const ROLES: readonly RoleOption[] = [
   {
     value: "particulier",
     label: "Particulier",
@@ -70,33 +76,90 @@ export function RoleSelector({
   label = "Type de compte",
   multiple = false,
 }: RoleSelectorProps) {
+  const selectedRoles = useMemo(() => new Set(selected), [selected]);
+
   const toggleRole = (role: UserRole) => {
     if (multiple) {
-      if (selected.includes(role)) {
-        onChange(selected.filter((r) => r !== role));
+      if (selectedRoles.has(role)) {
+        onChange(selected.filter((current) => current !== role));
       } else {
         onChange([...selected, role]);
       }
-    } else {
-      onChange([role]);
+
+      return;
     }
+
+    onChange([role]);
   };
 
   return (
-    <View className="space-y-3"><Text className="block text-xs font-medium text-white/60">{label}</Text><View className="gap-3">{ROLES.map((role) => {
-          const active = selected.includes(role.value);
+    <View className="w-full">
+      <Text className="mb-3 text-xs font-medium text-white/60">{label}</Text>
+
+      <View className="w-full">
+        {ROLES.map((role) => {
+          const active = selectedRoles.has(role.value);
 
           return (
-            <Pressable key={role.value} onPress={() => toggleRole(role.value)} className="rounded-2xl p-3 text-left transition-all duration-200 active:scale-95" style={{ backgroundColor: active
-                              ? "rgba(139,92,246,.18)"
-                              : "rgba(255,255,255,.05)", borderColor: "rgba(139,92,246,.6)", borderStyle: "solid" }}><View className="flex items-start gap-3"><Text className="text-xl leading-none">{role.emoji}</Text><View className="min-w-0"><Text className={`text-sm font-semibold ${
+            <Pressable
+              key={role.value}
+              accessibilityRole={multiple ? "checkbox" : "radio"}
+              accessibilityLabel={`${role.label}. ${role.description}`}
+              accessibilityState={{
+                checked: active,
+              }}
+              onPress={() => toggleRole(role.value)}
+              className={`mb-2 w-full rounded-2xl border p-3 active:opacity-80 ${
+                active
+                  ? "border-violet-500/60 bg-violet-500/[0.18]"
+                  : "border-white/10 bg-white/[0.05]"
+              }`}
+            >
+              <View className="flex-row items-center">
+                <View
+                  className={`mr-3 h-10 w-10 items-center justify-center rounded-xl ${
+                    active ? "bg-violet-500/20" : "bg-white/[0.05]"
+                  }`}
+                >
+                  <Text className="text-xl">{role.emoji}</Text>
+                </View>
+
+                <View className="flex-1 pr-3">
+                  <Text
+                    className={`text-sm font-semibold ${
                       active ? "text-white" : "text-white/80"
-                    }`}>{role.label}</Text><Text className="mt-1 text-[11px] leading-4 text-white/40">{role.description}</Text></View></View></Pressable>
+                    }`}
+                  >
+                    {role.label}
+                  </Text>
+
+                  <Text className="mt-1 text-[11px] leading-4 text-white/40">
+                    {role.description}
+                  </Text>
+                </View>
+
+                <View
+                  className={`h-5 w-5 items-center justify-center rounded-full border ${
+                    active
+                      ? "border-violet-400 bg-violet-500"
+                      : "border-white/20 bg-transparent"
+                  }`}
+                >
+                  {active ? (
+                    <Text className="text-[11px] font-bold text-white">✓</Text>
+                  ) : null}
+                </View>
+              </View>
+            </Pressable>
           );
-        })}</View>{multiple && (
-        <Text className="text-xs text-white/35">
+        })}
+      </View>
+
+      {multiple ? (
+        <Text className="mt-1 text-xs leading-4 text-white/35">
           Vous pouvez sélectionner plusieurs rôles.
         </Text>
-      )}</View>
+      ) : null}
+    </View>
   );
 }

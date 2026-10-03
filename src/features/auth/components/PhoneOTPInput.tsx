@@ -1,12 +1,12 @@
 // src/features/auth/components/PhoneOTPInput.tsx
 
-import {
-  View,
-  TextInput,
-  type TextInputKeyPressEventData,
-  type NativeSyntheticEvent,
-} from "react-native";
 import { useRef } from "react";
+import {
+  TextInput,
+  View,
+  type NativeSyntheticEvent,
+  type TextInputKeyPressEventData,
+} from "react-native";
 
 interface PhoneOTPInputProps {
   value: string;
@@ -25,23 +25,42 @@ export function PhoneOTPInput({
 }: PhoneOTPInputProps) {
   const inputRefs = useRef<Array<TextInput | null>>([]);
 
-  const digits = Array.from({ length }, (_, index) => value[index] ?? "");
+  const safeLength = Math.max(1, Math.floor(length));
+
+  const normalizedValue = value.replace(/\D/g, "").slice(0, safeLength);
+
+  const digits = Array.from(
+    { length: safeLength },
+    (_, index) => normalizedValue[index] ?? "",
+  );
+
+  const focusInput = (index: number) => {
+    if (index < 0 || index >= safeLength) return;
+
+    inputRefs.current[index]?.focus();
+  };
+
+  const emitValue = (nextValue: string) => {
+    const sanitized = nextValue.replace(/\D/g, "").slice(0, safeLength);
+
+    onChange(sanitized);
+
+    if (sanitized.length === safeLength) {
+      onComplete?.(sanitized);
+    }
+  };
 
   const updateValue = (index: number, digit: string) => {
     const chars = digits.slice();
 
-    chars[index] = digit;
+    chars[index] = digit.replace(/\D/g, "").slice(0, 1);
 
-    const nextValue = chars.join("").replace(/\D/g, "").slice(0, length);
+    const nextValue = chars.join("");
 
-    onChange(nextValue);
+    emitValue(nextValue);
 
-    if (digit && index < length - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    if (nextValue.length === length) {
-      onComplete?.(nextValue);
+    if (chars[index] && index < safeLength - 1) {
+      focusInput(index + 1);
     }
   };
 
@@ -49,29 +68,30 @@ export function PhoneOTPInput({
     index: number,
     event: NativeSyntheticEvent<TextInputKeyPressEventData>,
   ) => {
-    switch (event.nativeEvent.key) {
-      case "Backspace": {
-        if (digits[index]) {
-          updateValue(index, "");
-        } else if (index > 0) {
-          inputRefs.current[index - 1]?.focus();
-        }
-        break;
+    const key = event.nativeEvent.key;
+
+    if (key === "Backspace") {
+      if (digits[index]) {
+        updateValue(index, "");
+      } else if (index > 0) {
+        const chars = digits.slice();
+
+        chars[index - 1] = "";
+
+        emitValue(chars.join(""));
+        focusInput(index - 1);
       }
 
-      case "ArrowLeft": {
-        if (index > 0) {
-          inputRefs.current[index - 1]?.focus();
-        }
-        break;
-      }
+      return;
+    }
 
-      case "ArrowRight": {
-        if (index < length - 1) {
-          inputRefs.current[index + 1]?.focus();
-        }
-        break;
-      }
+    if (key === "ArrowLeft") {
+      focusInput(index - 1);
+      return;
+    }
+
+    if (key === "ArrowRight") {
+      focusInput(index + 1);
     }
   };
 
@@ -84,24 +104,17 @@ export function PhoneOTPInput({
     }
 
     /*
-     * Android/iOS peuvent transmettre plusieurs caractères
-     * lorsqu'un utilisateur colle un code OTP.
-     *
-     * On traite donc directement la chaîne complète ici.
+     * iOS/Android peuvent fournir plusieurs caractères lors
+     * d'un collage ou de l'autocomplétion d'un code SMS.
      */
     if (sanitized.length > 1) {
-      const pastedCode = sanitized.slice(0, length);
+      const pastedCode = sanitized.slice(0, safeLength);
 
-      onChange(pastedCode);
+      emitValue(pastedCode);
 
-      if (pastedCode.length === length) {
-        onComplete?.(pastedCode);
-      }
+      const nextIndex = Math.min(pastedCode.length, safeLength - 1);
 
-      const nextIndex = Math.min(pastedCode.length, length - 1);
-
-      inputRefs.current[nextIndex]?.focus();
-
+      focusInput(nextIndex);
       return;
     }
 
@@ -109,32 +122,45 @@ export function PhoneOTPInput({
   };
 
   return (
-    <View className="flex items-center justify-center gap-2">
-      {digits.map((digit, index) => (
-        <TextInput
-          key={index}
-          ref={(element) => {
-            inputRefs.current[index] = element;
-          }}
-          inputMode="numeric"
-          keyboardType="number-pad"
-          autoComplete="one-time-code"
-          textContentType="oneTimeCode"
-          maxLength={length}
-          value={digit}
-          editable={!disabled}
-          selectTextOnFocus
-          onChangeText={(input) => handleChangeText(index, input)}
-          onKeyPress={(event) => handleKeyPress(index, event)}
-          className="w-12 h-14 rounded-2xl text-center text-2xl font-bold text-white"
-          style={{
-            backgroundColor: "rgba(255,255,255,0.06)",
-            borderColor: "rgba(139,92,246,0.55)",
-            borderWidth: 1,
-            borderStyle: "solid",
-          }}
-        />
-      ))}
+    <View className="w-full flex-row items-center justify-center">
+      {digits.map((digit, index) => {
+        const isFilled = digit.length > 0;
+
+        return (
+          <View
+            key={`otp-${index}`}
+            className={index === safeLength - 1 ? "" : "mr-2"}
+          >
+            <TextInput
+              ref={(element) => {
+                inputRefs.current[index] = element;
+              }}
+              value={digit}
+              editable={!disabled}
+              selectTextOnFocus
+              maxLength={safeLength}
+              keyboardType="number-pad"
+              inputMode="numeric"
+              autoComplete={index === 0 ? "one-time-code" : "off"}
+              textContentType={index === 0 ? "oneTimeCode" : "none"}
+              accessibilityLabel={`Chiffre ${index + 1} sur ${safeLength}`}
+              accessibilityValue={{
+                text: digit || "vide",
+              }}
+              onChangeText={(input) => handleChangeText(index, input)}
+              onKeyPress={(event) => handleKeyPress(index, event)}
+              className={`h-14 w-12 rounded-2xl border text-center text-2xl font-bold ${
+                isFilled
+                  ? "border-violet-500/70 bg-violet-500/10"
+                  : "border-white/10 bg-white/[0.06]"
+              } text-white disabled:opacity-50`}
+              style={{
+                borderWidth: 1,
+              }}
+            />
+          </View>
+        );
+      })}
     </View>
   );
 }

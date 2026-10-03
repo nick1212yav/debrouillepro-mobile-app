@@ -1,14 +1,13 @@
-import { View } from "react-native";
 import {
-  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile,
-  sendPasswordResetEmail,
-  sendEmailVerification,
-  signInWithPhoneNumber,
-  RecaptchaVerifier,
-  signInWithPopup,
   GoogleAuthProvider,
+  RecaptchaVerifier,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signInWithPhoneNumber,
+  signInWithPopup,
+  updateProfile,
 } from "firebase/auth";
 import type { ConfirmationResult, User } from "firebase/auth";
 
@@ -22,12 +21,12 @@ import { mapFirebaseError } from "../../utils/errors";
 let recaptchaVerifier: RecaptchaVerifier | null = null;
 
 export function getRecaptchaVerifier(
-  container: View,
+  container: HTMLElement,
 ): RecaptchaVerifier {
   if (!recaptchaVerifier) {
     recaptchaVerifier = new RecaptchaVerifier(auth, container, {
       size: "invisible",
-      callback: () => {},
+      callback: () => undefined,
     });
   }
 
@@ -35,10 +34,12 @@ export function getRecaptchaVerifier(
 }
 
 export function resetRecaptchaVerifier(): void {
-  if (recaptchaVerifier) {
-    recaptchaVerifier.clear();
-    recaptchaVerifier = null;
+  if (!recaptchaVerifier) {
+    return;
   }
+
+  recaptchaVerifier.clear();
+  recaptchaVerifier = null;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ export async function registerWithEmail(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Réinitialisation mot de passe
+// Réinitialisation du mot de passe
 // ─────────────────────────────────────────────────────────────
 
 export async function sendPasswordReset(email: string): Promise<void> {
@@ -105,6 +106,10 @@ export async function sendPasswordReset(email: string): Promise<void> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Vérification de l'adresse email
+// ─────────────────────────────────────────────────────────────
+
 export async function resendVerificationEmail(user: User): Promise<void> {
   try {
     await sendEmailVerification(user);
@@ -115,17 +120,17 @@ export async function resendVerificationEmail(user: User): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Connexion Téléphone
+// Connexion par téléphone
 // ─────────────────────────────────────────────────────────────
 
 export async function sendPhoneCode(
   phoneNumber: string,
-  container: View,
+  container: HTMLElement,
 ): Promise<ConfirmationResult> {
   try {
     const verifier = getRecaptchaVerifier(container);
 
-    return await signInWithPhoneNumber(auth, phoneNumber, verifier);
+    return await signInWithPhoneNumber(auth, phoneNumber.trim(), verifier);
   } catch (error) {
     console.error("🔥 Firebase Phone Error:", error);
     throw mapFirebaseError(error);
@@ -137,7 +142,7 @@ export async function verifyPhoneCode(
   code: string,
 ): Promise<User> {
   try {
-    const credential = await confirmation.confirm(code);
+    const credential = await confirmation.confirm(code.trim());
 
     return credential.user;
   } catch (error) {
@@ -147,7 +152,7 @@ export async function verifyPhoneCode(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Google
+// Connexion Google
 // ─────────────────────────────────────────────────────────────
 
 export async function loginWithGoogle(): Promise<User> {

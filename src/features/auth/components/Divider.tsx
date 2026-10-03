@@ -1,7 +1,21 @@
-import { View, Text } from "react-native";
+// src/features/auth/components/Divider.tsx
 
-export function Divider({ label = "ou" }: { label?: string }) {
+import { Text, View } from "react-native";
+
+interface DividerProps {
+  label?: string;
+}
+
+export function Divider({ label = "ou" }: DividerProps) {
   return (
-    <View className="relative my-4"><View className="absolute inset-0 flex items-center"><View className="w-full border-t border-white/10" /></View><View className="relative flex justify-center text-xs"><Text className="px-4 bg-transparent text-white/30">{label}</Text></View></View>
+    <View className="my-4 w-full flex-row items-center">
+      <View className="h-px flex-1 bg-white/10" />
+
+      <View className="mx-4">
+        <Text className="text-xs font-medium text-white/30">{label}</Text>
+      </View>
+
+      <View className="h-px flex-1 bg-white/10" />
+    </View>
   );
 }

@@ -1145,13 +1145,9 @@ function WatchViewInner({
   const { isAuthenticated, userId: authUserId } = useConvexAuth();
 
   /**
-   * Fallback fiable pour `userId` : si `convex-auth-compat` n'expose pas
-   * `userId`, on récupère l'identité via `api.users.getMe` pour que
-   * `isHost` (et donc toutes les actions de modération / cohost) reste
-   * fonctionnel.
-   *
-   * ⚠️ Cette query DOIT exister côté backend et retourner :
-   *    { _id: Id<"users">, name?, avatarUrl?, image? } | null
+   * Identifiant utilisateur fourni par l'authentification Convex.
+   * Il est utilisé pour déterminer le rôle de l'utilisateur courant,
+   * notamment pour les actions liées à l'hôte, à la modération et aux cohosts.
    */
   const myUserId = authUserId ?? null;
 

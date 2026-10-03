@@ -1,6 +1,9 @@
-import { useState, useRef, useCallback } from "react";
+// src/features/auth/hooks/usePhoneAuth.ts
+
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ConfirmationResult, RecaptchaVerifier } from "firebase/auth";
+
 import {
   createRecaptchaVerifier,
   sendPhoneCode,
@@ -17,81 +20,139 @@ export function usePhoneAuth() {
     null,
   );
   const [phoneNumber, setPhoneNumber] = useState("");
-  const recaptchaRef = useRef<View>(null);
+
+  /**
+   * Firebase Phone Auth Web utilise un conteneur DOM
+   * pour le reCAPTCHA.
+   *
+   * Ne pas typer cette ref en React Native `View`.
+   */
+  const recaptchaRef = useRef<HTMLDivElement | null>(null);
   const verifierRef = useRef<RecaptchaVerifier | null>(null);
 
-  const initRecaptcha = useCallback(() => {
-    if (!recaptchaRef.current) return null;
-    if (verifierRef.current) {
-      verifierRef.current.clear();
+  const clearRecaptcha = useCallback(() => {
+    try {
+      verifierRef.current?.clear();
+    } finally {
       verifierRef.current = null;
     }
-    verifierRef.current = createRecaptchaVerifier(recaptchaRef.current);
-    return verifierRef.current;
   }, []);
+
+  const initRecaptcha = useCallback(() => {
+    const container = recaptchaRef.current;
+
+    if (!container) {
+      return null;
+    }
+
+    clearRecaptcha();
+
+    try {
+      const verifier = createRecaptchaVerifier(container);
+      verifierRef.current = verifier;
+
+      return verifier;
+    } catch (error) {
+      verifierRef.current = null;
+      toast.error(getPhoneErrorMessage(error));
+      return null;
+    }
+  }, [clearRecaptcha]);
 
   const sendCode = useCallback(
     async (phone: string) => {
-      const verifier = initRecaptcha();
-      if (!verifier) {
-        toast.error("Erreur de chargement du reCAPTCHA");
+      const normalizedPhone = phone.trim();
+
+      if (!normalizedPhone) {
+        toast.error("Veuillez saisir votre numéro de téléphone.");
         return false;
       }
+
+      if (loading) {
+        return false;
+      }
+
+      const verifier = initRecaptcha();
+
+      if (!verifier) {
+        toast.error("Erreur de chargement du reCAPTCHA.");
+        return false;
+      }
+
       setLoading(true);
+
       try {
-        const result = await sendPhoneCode(phone, verifier);
+        const result = await sendPhoneCode(normalizedPhone, verifier);
+
         setConfirmation(result);
-        setPhoneNumber(phone);
+        setPhoneNumber(normalizedPhone);
         setStep("otp");
+
         toast.success("Code SMS envoyé !");
+
         return true;
       } catch (error) {
+        clearRecaptcha();
         toast.error(getPhoneErrorMessage(error));
-        // Réinitialiser le reCAPTCHA en cas d'erreur
-        verifierRef.current?.clear();
-        verifierRef.current = null;
+
         return false;
       } finally {
         setLoading(false);
       }
     },
-    [initRecaptcha],
+    [clearRecaptcha, initRecaptcha, loading],
   );
 
   const verifyCode = useCallback(
     async (code: string): Promise<boolean> => {
+      const normalizedCode = code.replace(/\D/g, "").slice(0, 6);
+
       if (!confirmation) {
-        toast.error("Aucune confirmation en cours");
+        toast.error("Aucune confirmation en cours.");
         return false;
       }
+
+      if (normalizedCode.length !== 6) {
+        toast.error("Le code doit contenir 6 chiffres.");
+        return false;
+      }
+
+      if (loading) {
+        return false;
+      }
+
       setLoading(true);
+
       try {
-        await verifyPhoneCode(confirmation, code);
+        await verifyPhoneCode(confirmation, normalizedCode);
+
         toast.success("Connexion réussie !");
-        verifierRef.current?.clear();
-        verifierRef.current = null;
-        // ✅ UserSync va automatiquement synchroniser l'utilisateur
+
+        clearRecaptcha();
+
+        /*
+         * UserSync synchronise automatiquement l'utilisateur
+         * Firebase → Convex après l'authentification.
+         */
         return true;
       } catch (error) {
+        clearRecaptcha();
         toast.error(getPhoneErrorMessage(error));
-        // Réinitialiser le reCAPTCHA en cas d'erreur
-        verifierRef.current?.clear();
-        verifierRef.current = null;
+
         return false;
       } finally {
         setLoading(false);
       }
     },
-    [confirmation],
+    [clearRecaptcha, confirmation, loading],
   );
 
   const reset = useCallback(() => {
     setStep("phone");
     setConfirmation(null);
     setPhoneNumber("");
-    verifierRef.current?.clear();
-    verifierRef.current = null;
-  }, []);
+    clearRecaptcha();
+  }, [clearRecaptcha]);
 
   return {
     loading,

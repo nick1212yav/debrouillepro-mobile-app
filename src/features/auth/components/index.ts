@@ -1,3 +1,5 @@
+// src/features/auth/components/index.ts
+
 export { AuthLayout } from "./AuthLayout";
 export { LoginForm } from "./LoginForm";
 export { RegisterForm } from "./RegisterForm";

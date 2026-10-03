@@ -1,35 +1,41 @@
-import { View } from "react-native";
+// src/features/auth/guards/AuthGuard.tsx
+
 import type { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { View } from "react-native";
+
 import { useFirebaseUser } from "../hooks/useFirebaseUser";
 
 interface AuthGuardProps {
   children: ReactNode;
-  fallback?: string;
-  requireEmailVerified?: boolean;
+  fallback?: ReactNode;
 }
 
-export function AuthGuard({
-  children,
-  fallback = "/auth",
-  requireEmailVerified = false,
-}: AuthGuardProps) {
+/**
+ * AuthGuard
+ *
+ * Garde réutilisable pour protéger un écran ou une section
+ * nécessitant une authentification Firebase.
+ *
+ * Le composant reste indépendant du système de routing :
+ * aucune dépendance à react-router-dom ou à une API DOM.
+ *
+ * `fallback` permet au parent de fournir son propre écran
+ * lorsque l'utilisateur n'est pas authentifié.
+ */
+export function AuthGuard({ children, fallback = null }: AuthGuardProps) {
   const { isAuthenticated, loading } = useFirebaseUser();
 
   if (loading) {
     return (
-      <View className="min-h-screen flex items-center justify-center bg-[#020617]">
-        <View className="w-8 h-8 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+      <View className="min-h-screen flex-1 items-center justify-center bg-[#020617]">
+        <View className="h-8 w-8 rounded-full border-2 border-violet-400 border-t-transparent" />
       </View>
     );
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={fallback} replace />;
+    return <>{fallback}</>;
   }
-
-  // Optionnel : vérifier que l'email est vérifié
-  // (à implémenter avec useAuthContext)
 
   return <>{children}</>;
 }

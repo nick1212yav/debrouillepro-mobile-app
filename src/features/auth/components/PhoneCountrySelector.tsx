@@ -1,6 +1,9 @@
-import { Text, Pressable, View } from "react-native";
-import { useState } from "react";
-import { ChevronDown, Check } from "lucide-react-native";
+// src/features/auth/components/PhoneCountrySelector.tsx
+
+import { useMemo, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { Check, ChevronDown } from "lucide-react-native";
+
 import { COUNTRIES } from "@/constants/countries";
 
 interface PhoneCountrySelectorProps {
@@ -12,39 +15,130 @@ interface PhoneCountrySelectorProps {
 export function PhoneCountrySelector({
   value,
   onChange,
-  disabled,
+  disabled = false,
 }: PhoneCountrySelectorProps) {
   const [open, setOpen] = useState(false);
-  const selected = COUNTRIES.find((c) => c.code === value) || COUNTRIES[0];
+
+  const selected = useMemo(
+    () => COUNTRIES.find((country) => country.code === value) ?? COUNTRIES[0],
+    [value],
+  );
+
+  const handleToggle = () => {
+    if (disabled) return;
+    setOpen((current) => !current);
+  };
+
+  const handleSelect = (code: string) => {
+    onChange(code);
+    setOpen(false);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+  };
 
   return (
-    <View className="relative">
-      <Pressable onPress={() => setOpen(!open)} disabled={disabled} className="flex items-center gap-2 px-3 py-3 rounded-2xl text-white text-sm font-medium transition-all active:scale-95" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}>
-        <Text className="text-lg">{selected.flag}</Text>
-        <Text>{selected.code}</Text>
-        <ChevronDown size={14} className="text-white/40" />
+    <View className="relative z-50">
+      {/* Selected country */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Pays sélectionné : ${selected.label}, ${selected.code}`}
+        accessibilityState={{
+          disabled,
+          expanded: open,
+        }}
+        disabled={disabled}
+        onPress={handleToggle}
+        className="min-w-[112px] flex-row items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-3 active:opacity-70 disabled:opacity-50"
+      >
+        <Text className="mr-2 text-lg">{selected.flag}</Text>
+
+        <Text className="text-sm font-medium text-white">{selected.code}</Text>
+
+        <ChevronDown
+          size={15}
+          color="rgba(255,255,255,0.45)"
+          className="ml-2"
+        />
       </Pressable>
 
-      {open && (
+      {open ? (
         <>
-          <View className="fixed inset-0 z-40" onPress={() => setOpen(false)} />
-          <View className="absolute top-full left-0 z-50 mt-1 w-64 max-h-60 overflow-y-auto rounded-2xl p-1" style={{ backgroundColor: "#1a1a2e", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid", boxShadow: "0 16px 48px rgba(0,0,0,0.6)" }}>
-            {COUNTRIES.map((c) => (
-              <Pressable key={c.iso} onPress={() => {
-                  onChange(c.code);
-                  setOpen(false);
-                }} className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left text-sm text-white/80 transition-colors">
-                <Text className="text-lg">{c.flag}</Text>
-                <Text>{c.label}</Text>
-                <Text className="text-white/40">{c.code}</Text>
-                {c.code === value && (
-                  <Check size={14} className="ml-auto text-violet-400" />
-                )}
-              </Pressable>
-            ))}
+          {/* Backdrop */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Fermer la sélection du pays"
+            onPress={handleClose}
+            className="absolute -inset-[1000px] z-40"
+          />
+
+          {/* Country menu */}
+          <View
+            className="absolute left-0 top-full z-50 mt-2 w-[280px] overflow-hidden rounded-2xl border border-white/10 p-1"
+            style={{
+              backgroundColor: "#111525",
+              shadowColor: "#000000",
+              shadowOffset: {
+                width: 0,
+                height: 12,
+              },
+              shadowOpacity: 0.45,
+              shadowRadius: 24,
+              elevation: 16,
+            }}
+          >
+            <ScrollView
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              className="max-h-72"
+            >
+              {COUNTRIES.map((country) => {
+                const isSelected = country.code === value;
+
+                return (
+                  <Pressable
+                    key={country.iso}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${country.label}, ${country.code}`}
+                    accessibilityState={{
+                      checked: isSelected,
+                    }}
+                    onPress={() => handleSelect(country.code)}
+                    className={`mb-0.5 min-h-[44px] flex-row items-center rounded-xl px-3 py-2.5 active:opacity-70 ${
+                      isSelected ? "bg-violet-500/10" : "bg-transparent"
+                    }`}
+                  >
+                    <Text className="mr-3 text-lg">{country.flag}</Text>
+
+                    <View className="min-w-0 flex-1">
+                      <Text
+                        numberOfLines={1}
+                        className={`text-sm ${
+                          isSelected
+                            ? "font-semibold text-white"
+                            : "font-medium text-white/80"
+                        }`}
+                      >
+                        {country.label}
+                      </Text>
+                    </View>
+
+                    <Text className="ml-3 text-xs text-white/40">
+                      {country.code}
+                    </Text>
+
+                    {isSelected ? (
+                      <Check size={16} color="#a78bfa" className="ml-3" />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </View>
         </>
-      )}
+      ) : null}
     </View>
   );
 }

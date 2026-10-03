@@ -1,8 +1,18 @@
 import type { AuthError } from "../types/auth.types";
 
+/**
+ * Convertit une erreur Firebase Auth en erreur applicative
+ * stable et exploitable par l'interface.
+ */
 export function mapFirebaseError(error: unknown): AuthError {
-  const err = error as { code?: string; message?: string };
-  const code = err.code || "auth/unknown";
+  const err =
+    typeof error === "object" && error !== null
+      ? (error as { code?: unknown; message?: unknown })
+      : {};
+
+  const code =
+    typeof err.code === "string" && err.code.trim() ? err.code : "auth/unknown";
+
   const messages: Record<string, string> = {
     "auth/user-not-found": "Aucun compte trouvé avec cet email",
     "auth/wrong-password": "Mot de passe incorrect",
@@ -20,19 +30,35 @@ export function mapFirebaseError(error: unknown): AuthError {
     "auth/credential-already-in-use":
       "Ce compte est déjà lié à un utilisateur existant",
   };
+
+  const fallbackMessage =
+    typeof err.message === "string" && err.message.trim()
+      ? err.message
+      : "Une erreur est survenue";
+
   return {
     code,
-    message: messages[code] || err.message || "Une erreur est survenue",
+    message: messages[code] ?? fallbackMessage,
   };
 }
 
+/**
+ * Vérifie de manière sûre qu'une valeur correspond
+ * à la structure minimale d'une erreur Firebase.
+ */
 export function isFirebaseError(
   error: unknown,
 ): error is { code: string; message: string } {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const candidate = error as {
+    code?: unknown;
+    message?: unknown;
+  };
+
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    "message" in error
+    typeof candidate.code === "string" && typeof candidate.message === "string"
   );
 }

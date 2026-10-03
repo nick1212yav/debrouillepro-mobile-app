@@ -1,28 +1,56 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+// src/features/auth/hooks/useLogin.ts
+
+import { useCallback, useState } from "react";
+
 import { toast } from "sonner";
+
 import { loginWithEmail } from "../services/firebase/auth.service";
 
-export function useLogin() {
-  const navigate = useNavigate();
+interface UseLoginOptions {
+  onSuccess?: () => void;
+}
+
+export function useLogin(options: UseLoginOptions = {}) {
+  const { onSuccess } = options;
+
   const [loading, setLoading] = useState(false);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    try {
-      await loginWithEmail(email, password);
-      toast.success("Connexion réussie !");
-      navigate("/");
-      return true;
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Erreur de connexion",
-      );
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const login = useCallback(
+    async (email: string, password: string) => {
+      if (loading) return false;
 
-  return { login, loading };
+      const normalizedEmail = email.trim();
+
+      if (!normalizedEmail || !password) {
+        toast.error("Veuillez renseigner votre email et votre mot de passe.");
+        return false;
+      }
+
+      setLoading(true);
+
+      try {
+        await loginWithEmail(normalizedEmail, password);
+
+        toast.success("Connexion réussie !");
+
+        onSuccess?.();
+
+        return true;
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Erreur de connexion",
+        );
+
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loading, onSuccess],
+  );
+
+  return {
+    login,
+    loading,
+  };
 }

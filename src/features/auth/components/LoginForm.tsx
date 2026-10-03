@@ -1,6 +1,9 @@
-import { View, Text, TextInput, NativeSyntheticEvent, Pressable } from "react-native";
+// src/features/auth/components/LoginForm.tsx
+
 import { useState } from "react";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { Eye, EyeOff, Loader2 } from "lucide-react-native";
+
 import { useLogin } from "../hooks/useLogin";
 
 interface LoginFormProps {
@@ -15,22 +18,142 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
   const { login, loading } = useLogin();
 
-  const handleSubmit = async (e: NativeSyntheticEvent<any>) => {
-    e.preventDefault();
-    await login(email, password);
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !loading;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+
+    await login(email.trim(), password);
   };
 
   return (
-    <View className="space-y-4"><View><Text className="text-xs text-white/50 font-medium mb-1.5 block">Email
-        </Text><TextInput value={email} onChangeText={(value) => setEmail(value)} placeholder="exemple@email.com" className="w-full px-4 py-3 rounded-2xl text-sm text-white placeholder:text-white/25 outline-none" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} required keyboardType="email-address" autoCapitalize="none" autoCorrect={false} editable={!(loading)} /></View><View><Text className="text-xs text-white/50 font-medium mb-1.5 block">Mot de passe
-        </Text><View className="relative"><TextInput value={password} onChangeText={(value) => setPassword(value)} placeholder="••••••••" className="w-full px-4 py-3 rounded-2xl text-sm text-white placeholder:text-white/25 outline-none pr-10" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }} required editable={!(loading)} /><Pressable onPress={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</Pressable></View></View><View className="text-right"><Pressable onPress={onForgotPasswordClick} className="text-xs text-violet-400">Mot de passe oublié ?
-        </Pressable></View><Pressable disabled={loading} className="w-full py-3.5 rounded-2xl font-bold text-white transition-all active:scale-95 disabled:opacity-60" style={{  }}>{loading ? (
-          <Loader2 size={20} className="animate-spin mx-auto" />
-        ) : (
-          "Se connecter"
-        )}</Pressable><Text className="text-center text-sm text-white/40">Vous n'avez pas de compte ?{" "}<Pressable onPress={onRegisterClick} className="text-violet-400 font-semibold">Créer un compte
-        </Pressable></Text></View>
+    <View className="w-full">
+      {/* Email */}
+      <View className="mb-4">
+        <Text className="mb-2 text-xs font-medium text-white/50">Email</Text>
+
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          placeholder="exemple@email.com"
+          placeholderTextColor="rgba(255,255,255,0.25)"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          textContentType="emailAddress"
+          editable={!loading}
+          returnKeyType="next"
+          accessibilityLabel="Adresse email"
+          className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3.5 text-sm text-white"
+        />
+      </View>
+
+      {/* Password */}
+      <View className="mb-3">
+        <Text className="mb-2 text-xs font-medium text-white/50">
+          Mot de passe
+        </Text>
+
+        <View className="relative">
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="••••••••"
+            placeholderTextColor="rgba(255,255,255,0.25)"
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="password"
+            textContentType="password"
+            editable={!loading}
+            returnKeyType="done"
+            onSubmitEditing={handleSubmit}
+            accessibilityLabel="Mot de passe"
+            className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3.5 pr-12 text-sm text-white"
+          />
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              showPassword
+                ? "Masquer le mot de passe"
+                : "Afficher le mot de passe"
+            }
+            accessibilityState={{ disabled: loading }}
+            disabled={loading}
+            onPress={() => setShowPassword((visible) => !visible)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl p-2 active:opacity-60 disabled:opacity-40"
+          >
+            {showPassword ? (
+              <EyeOff size={18} color="rgba(255,255,255,0.45)" />
+            ) : (
+              <Eye size={18} color="rgba(255,255,255,0.45)" />
+            )}
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Forgot password */}
+      <View className="mb-5 items-end">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Mot de passe oublié"
+          disabled={loading}
+          onPress={onForgotPasswordClick}
+          className="rounded-lg px-1 py-1 active:opacity-70 disabled:opacity-50"
+        >
+          <Text className="text-xs font-medium text-violet-400">
+            Mot de passe oublié ?
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Login */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Se connecter"
+        accessibilityState={{
+          disabled: !canSubmit,
+          busy: loading,
+        }}
+        disabled={!canSubmit}
+        onPress={handleSubmit}
+        className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 py-3.5 active:opacity-80 disabled:opacity-60"
+      >
+        <View className="min-h-[20px] flex-row items-center justify-center">
+          {loading ? (
+            <>
+              <Loader2 size={20} color="#ffffff" className="mr-2" />
+              <Text className="text-sm font-bold text-white">Connexion...</Text>
+            </>
+          ) : (
+            <Text className="text-sm font-bold text-white">Se connecter</Text>
+          )}
+        </View>
+      </Pressable>
+
+      {/* Register */}
+      <View className="mt-5 flex-row items-center justify-center">
+        <Text className="text-sm text-white/40">
+          Vous n'avez pas de compte ?{" "}
+        </Text>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Créer un compte"
+          disabled={loading}
+          onPress={onRegisterClick}
+          className="rounded-lg px-1 py-1 active:opacity-70 disabled:opacity-50"
+        >
+          <Text className="text-sm font-semibold text-violet-400">
+            Créer un compte
+          </Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }

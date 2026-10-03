@@ -1,14 +1,39 @@
+// src/features/auth/hooks/useAuthRedirect.ts
+
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+
 import { useFirebaseUser } from "./useFirebaseUser";
 
-export function useAuthRedirect(redirectTo = "/") {
-  const navigate = useNavigate();
+interface UseAuthRedirectOptions {
+  redirectTo?: string;
+  onRedirect?: (path: string) => void;
+}
+
+/**
+ * useAuthRedirect
+ *
+ * Déclenche une redirection lorsque l'utilisateur est authentifié.
+ *
+ * Le hook ne dépend volontairement d'aucun routeur web :
+ * la navigation est déléguée au composant appelant via `onRedirect`.
+ *
+ * Exemple :
+ * useAuthRedirect({
+ *   redirectTo: "/",
+ *   onRedirect: navigate,
+ * });
+ */
+export function useAuthRedirect({
+  redirectTo = "/",
+  onRedirect,
+}: UseAuthRedirectOptions = {}) {
   const { isAuthenticated, loading } = useFirebaseUser();
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      navigate(redirectTo);
+    if (loading || !isAuthenticated || !onRedirect) {
+      return;
     }
-  }, [isAuthenticated, loading, navigate, redirectTo]);
+
+    onRedirect(redirectTo);
+  }, [isAuthenticated, loading, onRedirect, redirectTo]);
 }

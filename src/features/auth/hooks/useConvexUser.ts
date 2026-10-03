@@ -1,15 +1,22 @@
+// src/features/auth/hooks/useConvexUser.ts
+
 import { useQuery } from "convex/react";
+
 import { api } from "@/convex/_generated/api.js";
+
 import { useFirebaseUser } from "./useFirebaseUser";
 
 /**
- * Récupère l'utilisateur Convex à partir de l'identité Firebase.
- * getCurrentUser utilise ctx.auth.getUserIdentity() (args: {}).
+ * Récupère l'utilisateur Convex correspondant
+ * à l'identité Firebase actuellement authentifiée.
+ *
+ * `api.users.getCurrentUser` utilise
+ * `ctx.auth.getUserIdentity()` côté Convex
+ * et n'accepte donc aucun argument métier.
  */
 export function useConvexUser() {
   const { isAuthenticated } = useFirebaseUser();
 
-  // ✅ getCurrentUser attend {} et utilise ctx.auth.getUserIdentity()
   const convexUser = useQuery(
     api.users.getCurrentUser,
     isAuthenticated ? {} : "skip",
@@ -17,6 +24,6 @@ export function useConvexUser() {
 
   return {
     convexUser: convexUser ?? null,
-    isLoading: convexUser === undefined,
+    isLoading: isAuthenticated && convexUser === undefined,
   };
 }

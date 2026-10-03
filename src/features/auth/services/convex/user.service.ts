@@ -3,14 +3,18 @@ import type { UserSyncData } from "../../types/auth.types";
 
 /**
  * Service de synchronisation entre Firebase Auth et Convex.
- * Utilise `uid` (Firebase) et `tokenIdentifier` (Convex) pour la stabilité.
+ *
+ * `uid` est l'identifiant stable provenant de Firebase.
+ * `tokenIdentifier` conserve la même valeur pour garantir une
+ * synchronisation déterministe avec l'utilisateur Convex.
  */
 export class ConvexUserService {
   /**
    * Construit les données à synchroniser avec Convex.
-   * @param firebaseUser - Utilisateur Firebase authentifié
-   * @param roles - Liste des rôles (ex: ['particulier', 'vendeur'])
-   * @param extras - Champs optionnels (city, country, language, profession, interests)
+   *
+   * @param firebaseUser Utilisateur Firebase authentifié.
+   * @param roles Liste des rôles de l'utilisateur.
+   * @param extras Champs optionnels supplémentaires du profil.
    */
   static buildSyncData(
     firebaseUser: User,
@@ -30,36 +34,40 @@ export class ConvexUserService {
       >
     >,
   ): UserSyncData {
+    const email = firebaseUser.email || undefined;
+    const phone = firebaseUser.phoneNumber || undefined;
+
+    const name =
+      firebaseUser.displayName || email?.split("@")[0] || "Utilisateur";
+
     return {
-      // ✅ Clés stables
       uid: firebaseUser.uid,
-      tokenIdentifier: firebaseUser.uid, // On utilise le même UID pour les deux (compatible Convex)
+      tokenIdentifier: firebaseUser.uid,
 
-      // Identifiants
-      email: firebaseUser.email || undefined,
-      phone: firebaseUser.phoneNumber || undefined,
+      email,
+      phone,
 
-      // Profil
-      name:
-        firebaseUser.displayName ||
-        firebaseUser.email?.split("@")[0] ||
-        "Utilisateur",
+      name,
       avatar: firebaseUser.photoURL || undefined,
 
-      // Rôles & permissions
       roles,
       permissions: [],
 
-      // Statut
       emailVerified: firebaseUser.emailVerified,
 
-      // Champs optionnels enrichis
       ...extras,
     };
   }
 
+  /**
+   * Indique si un utilisateur Firebase dispose des informations
+   * minimales permettant une synchronisation.
+   */
   static userNeedsSync(firebaseUser: User | null): boolean {
-    if (!firebaseUser) return false;
-    return !!(firebaseUser.email || firebaseUser.phoneNumber);
+    if (!firebaseUser) {
+      return false;
+    }
+
+    return Boolean(firebaseUser.email || firebaseUser.phoneNumber);
   }
 }
