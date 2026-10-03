@@ -7,11 +7,13 @@ import React, {
 } from "react";
 
 import {
+  ActivityIndicator,
   Alert,
   AppState,
   Image,
   KeyboardAvoidingView,
   Modal,
+  PermissionsAndroid,
   Platform,
   Pressable,
   ScrollView,
@@ -24,23 +26,33 @@ import {
   Animated,
   Easing,
   useWindowDimensions,
+  type Permission,
 } from "react-native";
 
 import {
   ArrowLeft,
+  Ban,
   ChevronRight,
   Clock,
+  Clock3,
   Eye,
   Gift,
   Heart,
   MessageCircle,
   Mic,
+  MicOff,
+  PhoneOff,
   Play,
+  PlayCircle,
   Plus,
+  Shield,
+  ShieldOff,
   Radio,
   Send,
   Share2,
   TrendingUp,
+  UserMinus,
+  UserPlus,
   Users,
   Video,
   VideoOff,
@@ -48,7 +60,22 @@ import {
   Zap,
 } from "lucide-react-native";
 
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
+
+import {
+  AudioSession,
+  AudioTrack,
+  LiveKitRoom,
+  VideoTrack,
+  isTrackReference,
+  useConnectionState,
+  useLocalParticipant,
+  useRemoteParticipants,
+  useTracks,
+} from "@livekit/react-native";
+
+import { ConnectionState, Track } from "livekit-client";
+import { ResizeMode, Video as ExpoVideo } from "expo-av";
 
 import { useConvexAuth } from "@/lib/convex-auth-compat";
 
@@ -71,6 +98,7 @@ type FloatingReaction = {
 
 type LiveMessage = {
   _id: string;
+  userId: Id<"users">;
   text: string;
   type: string;
   amount?: number | null;
@@ -80,6 +108,7 @@ type LiveMessage = {
 
 type LiveStream = {
   _id: Id<"liveStreams">;
+  hostId: Id<"users">;
   title: string;
   description?: string;
   category: string;
@@ -94,6 +123,9 @@ type LiveStream = {
   isPublic: boolean;
   hostName: string;
   hostAvatar?: string;
+  replayUrl?: string | null;
+  replayDurationMs?: number | null;
+  egressStatus?: string | null;
 };
 
 type LiveStreamingPageProps = {
@@ -201,14 +233,18 @@ function isHttpUrl(value?: string): boolean {
   return Boolean(value && /^https?:\/\//i.test(value));
 }
 
-function formatDuration(startedAt?: string, endedAt?: string): string {
+function formatDuration(
+  startedAt?: string,
+  endedAt?: string,
+  nowMs?: number,
+): string {
   if (!startedAt) {
     return "00:00";
   }
 
   const start = new Date(startedAt).getTime();
 
-  const end = endedAt ? new Date(endedAt).getTime() : Date.now();
+  const end = endedAt ? new Date(endedAt).getTime() : (nowMs ?? Date.now());
 
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
     return "00:00";
@@ -233,6 +269,112 @@ function formatDuration(startedAt?: string, endedAt?: string): string {
 
 function createReactionId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/* ============================================================================
+ * BROADCAST TYPES & HELPERS (LIVEKIT)
+ * ========================================================================== */
+
+type BroadcastCredentials = {
+  serverUrl: string;
+  token: string;
+};
+
+type BroadcastPrefs = {
+  micOn: boolean;
+  camOn: boolean;
+};
+
+/**
+ * Forme tolérante de la réponse de `api.livekit.getLiveKitToken`.
+ * Le champ d'URL est lu sous `serverUrl` en priorité, `url` en secours.
+ */
+type LiveKitTokenResult = {
+  serverUrl?: string;
+  url?: string;
+  token?: string;
+};
+
+type BroadcastState = {
+  streamId: Id<"liveStreams">;
+  prefs: BroadcastPrefs;
+};
+
+const DEFAULT_BROADCAST_PREFS: BroadcastPrefs = {
+  micOn: true,
+  camOn: true,
+};
+
+/**
+ * Android exige CAMERA + RECORD_AUDIO accordées AVANT toute capture WebRTC.
+ * Les deux permissions sont demandées ensemble, quelles que soient les
+ * préférences initiales, pour que l'activation ultérieure du micro ou de la
+ * caméra fonctionne sans nouvelle demande.
+ */
+async function ensureBroadcastPermissions(): Promise<boolean> {
+  if (Platform.OS !== "android") {
+    return true;
+  }
+
+  const wanted: Permission[] = [
+    PermissionsAndroid.PERMISSIONS.CAMERA,
+    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+  ];
+
+  const result = await PermissionsAndroid.requestMultiple(wanted);
+
+  return wanted.every(
+    (permission) => result[permission] === PermissionsAndroid.RESULTS.GRANTED,
+  );
+}
+
+/**
+ * Variante dédiée aux co-hosts : mêmes permissions, mais le message d'erreur
+ * côté UI est différent (c'est l'invité qui accepte ou refuse).
+ */
+async function ensureCohostPermissions(): Promise<boolean> {
+  return ensureBroadcastPermissions();
+}
+
+function confirmEndLive(): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    Alert.alert(
+      "Terminer le live",
+      "Voulez-vous réellement terminer cette diffusion ?",
+      [
+        {
+          text: "Annuler",
+          style: "cancel",
+          onPress: () => resolve(false),
+        },
+        {
+          text: "Terminer",
+          style: "destructive",
+          onPress: () => resolve(true),
+        },
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => resolve(false),
+      },
+    );
+  });
+}
+
+function describeConnection(state: ConnectionState): {
+  label: string;
+  color: string;
+} {
+  switch (state) {
+    case ConnectionState.Connected:
+      return { label: "Connecté", color: "#34D399" };
+    case ConnectionState.Connecting:
+      return { label: "Connexion…", color: "#FBBF24" };
+    case ConnectionState.Disconnected:
+      return { label: "Déconnecté", color: "#F87171" };
+    default:
+      return { label: "Reconnexion…", color: "#FBBF24" };
+  }
 }
 
 /* ============================================================================
@@ -368,12 +510,20 @@ function FloatingEmoji({
  * CHAT ROW
  * ========================================================================== */
 
-function ChatRow({ msg }: { msg: LiveMessage }) {
+function ChatRow({
+  msg,
+  onLongPress,
+}: {
+  msg: LiveMessage;
+  onLongPress?: () => void;
+}) {
   if (msg.type === "system") {
     return (
-      <View style={styles.systemMessage}>
-        <Text style={styles.systemMessageText}>{msg.text}</Text>
-      </View>
+      <Pressable onLongPress={onLongPress} delayLongPress={350}>
+        <View style={styles.systemMessage}>
+          <Text style={styles.systemMessageText}>{msg.text}</Text>
+        </View>
+      </Pressable>
     );
   }
 
@@ -386,41 +536,361 @@ function ChatRow({ msg }: { msg: LiveMessage }) {
         .find((part) => GIFTS.some((gift) => gift.emoji === part)) ?? "🎁";
 
     return (
-      <View style={styles.superChat}>
-        <Text style={styles.superChatEmoji}>{giftEmoji}</Text>
+      <Pressable onLongPress={onLongPress} delayLongPress={350}>
+        <View style={styles.superChat}>
+          <Text style={styles.superChatEmoji}>{giftEmoji}</Text>
 
-        <View style={styles.superChatBody}>
-          <Text style={styles.superChatAuthor} numberOfLines={1}>
-            {msg.userName}
-          </Text>
+          <View style={styles.superChatBody}>
+            <Text style={styles.superChatAuthor} numberOfLines={1}>
+              {msg.userName}
+            </Text>
 
-          <Text style={styles.superChatText} numberOfLines={2}>
-            {msg.text}
-          </Text>
+            <Text style={styles.superChatText} numberOfLines={2}>
+              {msg.text}
+            </Text>
+          </View>
+
+          {typeof msg.amount === "number" && (
+            <Text style={styles.superChatAmount}>{msg.amount} pts</Text>
+          )}
         </View>
-
-        {typeof msg.amount === "number" && (
-          <Text style={styles.superChatAmount}>{msg.amount} pts</Text>
-        )}
-      </View>
+      </Pressable>
     );
   }
 
   return (
-    <View style={styles.chatRow}>
-      <Avatar uri={msg.userAvatar} name={msg.userName} size={25} />
+    <Pressable onLongPress={onLongPress} delayLongPress={350}>
+      <View style={styles.chatRow}>
+        <Avatar uri={msg.userAvatar} name={msg.userName} size={25} />
 
-      <View style={styles.chatBody}>
-        <Text style={styles.chatAuthor}>{msg.userName}</Text>
+        <View style={styles.chatBody}>
+          <Text style={styles.chatAuthor}>{msg.userName}</Text>
 
-        <Text style={styles.chatText}>{msg.text}</Text>
+          <Text style={styles.chatText}>{msg.text}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/* ============================================================================
+ * WATCH VIEW — REMOTE VIDEO TRACK (HOST + COHOSTS GRID)
+ * ========================================================================== */
+
+/**
+ * Scène vidéo du viewer.
+ *
+ * - 0 caméra distante   → thumbnail / spinner
+ * - 1 caméra distante   → plein écran
+ * - 2+ caméras          → host en plein écran + cohosts en miniatures
+ *
+ * L'identité LiveKit est le `userId` (voir `getLiveKitToken`), donc on peut
+ * identifier le host par `stream.hostId` et le sortir de la grille.
+ */
+function WatchViewRemoteVideo({
+  thumbnailUrl,
+  hostId,
+}: {
+  thumbnailUrl?: string;
+  hostId?: Id<"users">;
+}) {
+  const tracks = useTracks([Track.Source.Camera]);
+
+  const remoteTracks = useMemo(
+    () => tracks.filter(isTrackReference).filter((t) => !t.participant.isLocal),
+    [tracks],
+  );
+
+  const hostTrack = useMemo(() => {
+    if (!hostId) return null;
+    return (
+      remoteTracks.find((t) => t.participant.identity === (hostId as string)) ??
+      null
+    );
+  }, [remoteTracks, hostId]);
+
+  const cohostTracks = useMemo(() => {
+    const others = hostId
+      ? remoteTracks.filter(
+          (t) => t.participant.identity !== (hostId as string),
+        )
+      : remoteTracks.slice(1);
+    return others.slice(0, 3);
+  }, [remoteTracks, hostId]);
+
+  if (remoteTracks.length === 0) {
+    if (isHttpUrl(thumbnailUrl)) {
+      return (
+        <Image
+          source={{ uri: thumbnailUrl }}
+          resizeMode="cover"
+          style={styles.watchImage}
+        />
+      );
+    }
+    return (
+      <View style={styles.watchFallback}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text style={styles.broadcastFallbackText}>
+          Connexion au flux du diffuseur…
+        </Text>
+      </View>
+    );
+  }
+
+  const primaryTrack = hostTrack ?? remoteTracks[0];
+
+  if (cohostTracks.length === 0) {
+    return (
+      <VideoTrack
+        trackRef={primaryTrack}
+        style={StyleSheet.absoluteFillObject}
+        objectFit="cover"
+        zOrder={0}
+      />
+    );
+  }
+
+  return (
+    <View style={StyleSheet.absoluteFillObject}>
+      <VideoTrack
+        trackRef={primaryTrack}
+        style={StyleSheet.absoluteFillObject}
+        objectFit="cover"
+        zOrder={0}
+      />
+
+      <View style={styles.cohostGrid} pointerEvents="none">
+        {cohostTracks.map((trackRef) => (
+          <View key={trackRef.participant.identity} style={styles.cohostTile}>
+            <VideoTrack
+              trackRef={trackRef}
+              style={styles.cohostTileVideo}
+              objectFit="cover"
+              zOrder={1}
+            />
+          </View>
+        ))}
       </View>
     </View>
   );
 }
 
 /* ============================================================================
- * WATCH VIEW
+ * COHOST PUBLISHER
+ * ========================================================================== */
+
+/**
+ * Publie caméra + micro lorsque l'utilisateur est un co-host / guest accepté.
+ *
+ * Important :
+ * - le composant reste dans la même <LiveKitRoom> que le viewer ;
+ * - une seule séquence WebRTC peut être active ;
+ * - le cleanup React ne désactive PAS directement les tracks ;
+ * - la désactivation intervient uniquement lorsque `enabled` devient false ;
+ * - cela évite les séquences OFF → ON concurrentes pendant les cycles
+ *   React StrictMode / re-render.
+ */
+function CohostPublisher({ enabled }: { enabled: boolean }) {
+  const { localParticipant } = useLocalParticipant();
+
+  /**
+   * Séquence de publication actuellement autorisée.
+   */
+  const sequenceRef = useRef(0);
+
+  /**
+   * Verrou de publication.
+   */
+  const publishingRef = useRef(false);
+
+  /**
+   * Empêche plusieurs désactivations concurrentes.
+   */
+  const disablingRef = useRef(false);
+
+  useEffect(() => {
+    /**
+     * ------------------------------------------------------------------------
+     * COHOST DÉSACTIVÉ
+     * ------------------------------------------------------------------------
+     *
+     * C'est ici, et uniquement ici, que nous demandons à LiveKit de couper
+     * caméra + micro.
+     */
+    if (!enabled || !localParticipant) {
+      if (!localParticipant || disablingRef.current) {
+        return;
+      }
+
+      disablingRef.current = true;
+
+      const disable = async () => {
+        try {
+          if (localParticipant.isCameraEnabled) {
+            await localParticipant.setCameraEnabled(false);
+          }
+
+          if (localParticipant.isMicrophoneEnabled) {
+            await localParticipant.setMicrophoneEnabled(false);
+          }
+        } catch (error) {
+          console.warn("[Cohost] disable failed:", error);
+        } finally {
+          disablingRef.current = false;
+          publishingRef.current = false;
+        }
+      };
+
+      void disable();
+
+      return;
+    }
+
+    /**
+     * ------------------------------------------------------------------------
+     * COHOST DÉJÀ EN COURS DE PUBLICATION
+     * ------------------------------------------------------------------------
+     */
+    if (publishingRef.current) {
+      return;
+    }
+
+    publishingRef.current = true;
+
+    const sequenceId = ++sequenceRef.current;
+
+    let cancelled = false;
+
+    const isCurrent = () => !cancelled && sequenceRef.current === sequenceId;
+
+    const publish = async () => {
+      try {
+        /**
+         * Sécurité supplémentaire :
+         * si une désactivation précédente est encore en cours, on attend
+         * qu'elle soit terminée avant de republier.
+         */
+        while (disablingRef.current && isCurrent()) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 50);
+          });
+        }
+
+        if (!isCurrent()) {
+          return;
+        }
+
+        const granted = await ensureCohostPermissions();
+
+        if (!isCurrent()) {
+          return;
+        }
+
+        if (!granted) {
+          Alert.alert(
+            "Permissions requises",
+            "Autorisez la caméra et le micro dans les réglages Android pour apparaître en direct.",
+          );
+          return;
+        }
+
+        /**
+         * --------------------------------------------------------------------
+         * CAMÉRA
+         * --------------------------------------------------------------------
+         */
+        if (!localParticipant.isCameraEnabled) {
+          await localParticipant.setCameraEnabled(true);
+        }
+
+        if (!isCurrent()) {
+          return;
+        }
+
+        /**
+         * --------------------------------------------------------------------
+         * MICRO
+         * --------------------------------------------------------------------
+         */
+        if (!localParticipant.isMicrophoneEnabled) {
+          await localParticipant.setMicrophoneEnabled(true);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("[Cohost] publish failed:", error);
+        }
+      } finally {
+        /**
+         * Ne libère le verrou que pour la séquence qui nous appartient.
+         */
+        if (sequenceRef.current === sequenceId) {
+          publishingRef.current = false;
+        }
+      }
+    };
+
+    void publish();
+
+    /**
+     * ------------------------------------------------------------------------
+     * CLEANUP
+     * ------------------------------------------------------------------------
+     *
+     * IMPORTANT :
+     *
+     * Nous n'appelons volontairement PAS :
+     *
+     *   setCameraEnabled(false)
+     *   setMicrophoneEnabled(false)
+     *
+     * ici.
+     *
+     * React StrictMode peut exécuter :
+     *
+     *   effect → cleanup → effect
+     *
+     * alors que l'opération WebRTC du premier effect n'est pas encore
+     * terminée.
+     *
+     * Déclencher OFF dans ce cleanup provoquait potentiellement :
+     *
+     *   ON → OFF → ON
+     *
+     * sur le même MediaStreamTrack.
+     */
+    return () => {
+      cancelled = true;
+
+      if (sequenceRef.current === sequenceId) {
+        sequenceRef.current++;
+      }
+
+      /**
+       * On ne remet PAS publishingRef.current à false ici.
+       *
+       * Le finally de la séquence async s'en charge lorsque l'opération
+       * LiveKit réellement en cours est terminée.
+       */
+    };
+  }, [enabled, localParticipant]);
+
+  if (!enabled) {
+    return null;
+  }
+
+  return (
+    <View style={styles.cohostOverlay} pointerEvents="none">
+      <View style={styles.cohostOverlayBadge}>
+        <View style={styles.liveDot} />
+
+        <Text style={styles.cohostOverlayText}>VOUS ÊTES EN DIRECT</Text>
+      </View>
+    </View>
+  );
+}
+/* ============================================================================
+ * WATCH VIEW (décision live vs replay AVANT token LiveKit)
  * ========================================================================== */
 
 function WatchView({
@@ -430,14 +900,260 @@ function WatchView({
   streamId: Id<"liveStreams">;
   onClose: () => void;
 }) {
-  /**
-   * Dimensions EXPLICITES : dans le Modal natif Android, `flex: 1` et
-   * `width: "100%"` n'ont pas de parent aux dimensions définies, et le
-   * contenu s'effondrait en une bande étroite (reste de l'écran blanc).
-   */
+  const getLiveKitToken = useAction(api.livekit.getLiveKitToken);
+
+  const stream = useQuery(api.liveStreams.getStream, {
+    streamId,
+  }) as LiveStream | null | undefined;
+
+  const replay = useQuery(
+    api.liveReplayQueries.getReplay, // ✅ ÇA
+    stream ? { streamId } : "skip",
+  ) as
+    | {
+        status: string | null;
+        url: string | null;
+      }
+    | null
+    | undefined;
+
+  const [credentials, setCredentials] = useState<BroadcastCredentials | null>(
+    null,
+  );
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    void AudioSession.startAudioSession();
+    return () => {
+      void AudioSession.stopAudioSession();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!stream || stream.status !== "live") {
+      return;
+    }
+
+    let cancelled = false;
+
+    setErrorMessage(null);
+
+    const fetchToken = async () => {
+      try {
+        const result = (await getLiveKitToken({
+          streamId,
+        })) as LiveKitTokenResult;
+
+        if (cancelled) return;
+
+        const serverUrl = result.serverUrl ?? result.url;
+        const token = result.token;
+
+        if (!serverUrl || !token) {
+          setErrorMessage(
+            "Le serveur n'a pas renvoyé d'identifiants de diffusion valides.",
+          );
+          return;
+        }
+
+        setCredentials({ serverUrl, token });
+      } catch {
+        if (!cancelled) {
+          setErrorMessage("Impossible de rejoindre cette diffusion.");
+        }
+      }
+    };
+
+    void fetchToken();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getLiveKitToken, stream, streamId]);
+
+  /* ------------------------------------------------------------------------
+   * LOADING / ERREURS
+   * ---------------------------------------------------------------------- */
+
+  if (stream === undefined) {
+    return (
+      <View style={styles.loadingScreen}>
+        <View style={styles.loadingIndicator}>
+          <Radio size={26} color={LIVE_RED} />
+        </View>
+        <Text style={styles.loadingTitle}>Connexion au live…</Text>
+        <Text style={styles.loadingText}>
+          Chargement des données de la diffusion.
+        </Text>
+      </View>
+    );
+  }
+
+  if (!stream) {
+    return (
+      <View style={styles.loadingScreen}>
+        <View style={styles.loadingIndicator}>
+          <Radio size={26} color="#475569" />
+        </View>
+        <Text style={styles.loadingTitle}>Live indisponible</Text>
+        <Text style={styles.loadingText}>
+          Cette diffusion n'est plus disponible.
+        </Text>
+        <Pressable onPress={onClose} style={styles.primaryButton}>
+          <ArrowLeft size={15} color="#FFFFFF" />
+          <Text style={styles.primaryButtonText}>Retour</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  /* ------------------------------------------------------------------------
+   * STREAM TERMINÉ → REPLAY
+   * ---------------------------------------------------------------------- */
+
+  if (stream.status === "ended") {
+    if (replay?.url) {
+      return (
+        <ReplayPlayer url={replay.url} title={stream.title} onClose={onClose} />
+      );
+    }
+
+    if (replay?.status === "processing" || replay?.status === "recording") {
+      return (
+        <View style={styles.loadingScreen}>
+          <ActivityIndicator size="large" color={PRIMARY} />
+          <Text style={styles.loadingTitle}>Replay en préparation…</Text>
+          <Text style={styles.loadingText}>
+            Le fichier est en cours de traitement, revenez dans quelques
+            minutes.
+          </Text>
+          <Pressable onPress={onClose} style={styles.primaryButton}>
+            <ArrowLeft size={15} color="#FFFFFF" />
+            <Text style={styles.primaryButtonText}>Retour</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.loadingScreen}>
+        <View style={styles.loadingIndicator}>
+          <Radio size={26} color="#475569" />
+        </View>
+        <Text style={styles.loadingTitle}>Live terminé</Text>
+        <Text style={styles.loadingText}>
+          Aucun replay n'est disponible pour cette diffusion.
+        </Text>
+        <Pressable onPress={onClose} style={styles.primaryButton}>
+          <ArrowLeft size={15} color="#FFFFFF" />
+          <Text style={styles.primaryButtonText}>Retour</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  /* ------------------------------------------------------------------------
+   * ERREUR TOKEN
+   * ---------------------------------------------------------------------- */
+
+  if (errorMessage) {
+    return (
+      <View style={styles.loadingScreen}>
+        <View style={styles.loadingIndicator}>
+          <Radio size={26} color="#F87171" />
+        </View>
+        <Text style={styles.loadingTitle}>Live indisponible</Text>
+        <Text style={styles.loadingText}>{errorMessage}</Text>
+        <Pressable onPress={onClose} style={styles.primaryButton}>
+          <ArrowLeft size={15} color="#FFFFFF" />
+          <Text style={styles.primaryButtonText}>Retour</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!credentials) {
+    return (
+      <View style={styles.loadingScreen}>
+        <View style={styles.loadingIndicator}>
+          <Radio size={26} color={LIVE_RED} />
+        </View>
+        <Text style={styles.loadingTitle}>Connexion au live…</Text>
+        <Text style={styles.loadingText}>
+          Récupération des accès à la diffusion.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <LiveKitRoom
+      serverUrl={credentials.serverUrl}
+      token={credentials.token}
+      connect={true}
+      audio={false}
+      video={false}
+      onDisconnected={onClose}
+    >
+      <WatchViewRemoteAudio />
+      <WatchViewInner streamId={streamId} onClose={onClose} />
+    </LiveKitRoom>
+  );
+}
+
+/* ============================================================================
+ * WATCH VIEW — REMOTE AUDIO TRACKS
+ * ========================================================================== */
+
+function WatchViewRemoteAudio() {
+  const tracks = useTracks([Track.Source.Microphone]);
+
+  const remoteAudioTracks = useMemo(
+    () =>
+      tracks
+        .filter(isTrackReference)
+        .filter((track) => !track.participant.isLocal),
+    [tracks],
+  );
+
+  return (
+    <>
+      {remoteAudioTracks.map((trackRef) => (
+        <AudioTrack
+          key={`${trackRef.participant.identity}-audio`}
+          trackRef={trackRef}
+        />
+      ))}
+    </>
+  );
+}
+
+/* ============================================================================
+ * WATCH VIEW — INNER
+ * ========================================================================== */
+
+function WatchViewInner({
+  streamId,
+  onClose,
+}: {
+  streamId: Id<"liveStreams">;
+  onClose: () => void;
+}) {
   const { width, height } = useWindowDimensions();
 
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated, userId: authUserId } = useConvexAuth();
+
+  /**
+   * Fallback fiable pour `userId` : si `convex-auth-compat` n'expose pas
+   * `userId`, on récupère l'identité via `api.users.getMe` pour que
+   * `isHost` (et donc toutes les actions de modération / cohost) reste
+   * fonctionnel.
+   *
+   * ⚠️ Cette query DOIT exister côté backend et retourner :
+   *    { _id: Id<"users">, name?, avatarUrl?, image? } | null
+   */
+  const myUserId = authUserId ?? null;
 
   const stream = useQuery(api.liveStreams.getStream, {
     streamId,
@@ -446,6 +1162,52 @@ function WatchView({
   const messages = useQuery(api.liveStreams.getStreamMessages, {
     streamId,
   }) as LiveMessage[] | undefined;
+
+  const [modTarget, setModTarget] = useState<{
+    userId: Id<"users">;
+    userName: string;
+    userAvatar?: string;
+  } | null>(null);
+
+  const [showBanList, setShowBanList] = useState(false);
+
+  const [showCohosts, setShowCohosts] = useState(false);
+
+  const [inviteTarget, setInviteTarget] = useState<{
+    userId: Id<"users">;
+    userName: string;
+  } | null>(null);
+
+  const banUser = useMutation(api.liveModeration.banUser);
+  const timeoutUser = useMutation(api.liveModeration.timeoutUser);
+  const muteUser = useMutation(api.liveModeration.muteUser);
+  const revokeSanction = useMutation(api.liveModeration.revokeSanction);
+
+  const sanctions = useQuery(
+    api.liveModeration.listActiveSanctions,
+    stream ? { streamId: stream._id } : "skip",
+  );
+
+  const cohosts = useQuery(
+    api.liveCohosts.list,
+    stream ? { streamId: stream._id } : "skip",
+  );
+
+  const pendingInvite = useQuery(
+    api.liveCohosts.myPendingInvite,
+    stream ? { streamId: stream._id } : "skip",
+  );
+
+  const inviteCohost = useMutation(api.liveCohosts.invite);
+  const removeCohost = useMutation(api.liveCohosts.remove);
+  const respondInvite = useMutation(api.liveCohosts.respond);
+
+  const myStageRole = useQuery(
+    api.liveCohosts.amIOnStage,
+    stream ? { streamId: stream._id } : "skip",
+  );
+
+  const isHost = !!stream && !!myUserId && stream.hostId === myUserId;
 
   const sendMessage = useMutation(api.liveStreams.sendMessage);
 
@@ -476,20 +1238,11 @@ function WatchView({
   const chatScrollRef = useRef<ScrollView>(null);
 
   /* --------------------------------------------------------------------------
-   * LIVE PRESENCE — JOIN / HEARTBEAT / RESUME / LEAVE
-   *
-   * Cycle production :
-   *   - join + heartbeat à l'ouverture
-   *   - heartbeat toutes les 30 s (2× sous PRESENCE_TIMEOUT_MS = 60 s)
-   *   - interval explicitement stoppé en arrière-plan
-   *   - au retour au premier plan : re-join + heartbeat immédiat
-   *   - si backend retourne active=false : re-join + heartbeat
-   *   - lock anti-chevauchement heartbeatInFlight
-   *   - leave au démontage
+   * LIVE PRESENCE
    * ------------------------------------------------------------------------ */
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || stream?.status !== "live") {
       return;
     }
 
@@ -512,36 +1265,27 @@ function WatchView({
       heartbeatInFlight = true;
 
       try {
-        const result = await heartbeatStream({
-          streamId,
-        });
+        const result = await heartbeatStream({ streamId });
 
         if (!mounted) {
           return;
         }
 
-        // Le backend signale que la présence n'existe plus
-        // (expirée, consommée, ou stream plus live).
-        // On re-join avant le prochain heartbeat.
         if (result && result.active === false) {
           try {
-            await joinStream({
-              streamId,
-            });
+            await joinStream({ streamId });
 
             if (!mounted) {
               return;
             }
 
-            await heartbeatStream({
-              streamId,
-            });
+            await heartbeatStream({ streamId });
           } catch {
             // La prochaine pulsation réessaiera.
           }
         }
       } catch {
-        // Télémétrie de session : l'échec du heartbeat ne ferme pas le live.
+        // Télémétrie de session.
       } finally {
         heartbeatInFlight = false;
       }
@@ -563,23 +1307,18 @@ function WatchView({
       }
 
       try {
-        await joinStream({
-          streamId,
-        });
+        await joinStream({ streamId });
 
         if (!mounted) {
           return;
         }
 
-        await heartbeatStream({
-          streamId,
-        });
+        await heartbeatStream({ streamId });
       } catch {
-        // Idem : télémétrie silencieuse.
+        // Télémétrie silencieuse.
       }
     };
 
-    // Bootstrap
     void joinAndResume();
     startHeartbeatInterval();
 
@@ -591,13 +1330,9 @@ function WatchView({
         }
 
         if (nextState === "active") {
-          // Retour au premier plan : la présence a pu expirer côté backend.
-          // On re-join explicitement puis on redémarre l'interval.
           void joinAndResume();
           startHeartbeatInterval();
         } else {
-          // Passage en arrière-plan : on ne fait pas confiance à la
-          // suspension automatique des timers par Android/iOS.
           stopHeartbeatInterval();
         }
       },
@@ -607,11 +1342,16 @@ function WatchView({
       mounted = false;
       stopHeartbeatInterval();
       appStateSubscription.remove();
-      void leaveStream({
-        streamId,
-      }).catch(() => null);
+      void leaveStream({ streamId }).catch(() => null);
     };
-  }, [heartbeatStream, isAuthenticated, joinStream, leaveStream, streamId]);
+  }, [
+    heartbeatStream,
+    isAuthenticated,
+    joinStream,
+    leaveStream,
+    stream?.status,
+    streamId,
+  ]);
 
   /* --------------------------------------------------------------------------
    * CHAT AUTO SCROLL
@@ -619,9 +1359,7 @@ function WatchView({
 
   useEffect(() => {
     requestAnimationFrame(() => {
-      chatScrollRef.current?.scrollToEnd({
-        animated: true,
-      });
+      chatScrollRef.current?.scrollToEnd({ animated: true });
     });
   }, [messages]);
 
@@ -631,18 +1369,9 @@ function WatchView({
 
   const addReaction = useCallback((emoji: string, color: string) => {
     const id = createReactionId();
-
     const x = 12 + Math.random() * 70;
 
-    setReactions((current) => [
-      ...current,
-      {
-        id,
-        emoji,
-        x,
-        color,
-      },
-    ]);
+    setReactions((current) => [...current, { id, emoji, x, color }]);
   }, []);
 
   const removeReaction = useCallback((id: string) => {
@@ -666,9 +1395,7 @@ function WatchView({
     setLikePending(true);
 
     try {
-      await likeStream({
-        streamId,
-      });
+      await likeStream({ streamId });
 
       setLiked(true);
 
@@ -709,11 +1436,7 @@ function WatchView({
     setMessagePending(true);
 
     try {
-      await sendMessage({
-        streamId,
-        text,
-        type: "chat",
-      });
+      await sendMessage({ streamId, text, type: "chat" });
 
       setChatText("");
     } catch {
@@ -783,8 +1506,7 @@ function WatchView({
         message: `${stream.title} — Live sur DébrouillePro`,
       });
     } catch {
-      // L'annulation native du partage
-      // ne constitue pas une erreur utilisateur.
+      // L'annulation native du partage ne constitue pas une erreur.
     }
   }, [stream]);
 
@@ -798,9 +1520,7 @@ function WatchView({
         <View style={styles.loadingIndicator}>
           <Radio size={26} color={LIVE_RED} />
         </View>
-
         <Text style={styles.loadingTitle}>Connexion au live…</Text>
-
         <Text style={styles.loadingText}>
           Chargement des données de la diffusion.
         </Text>
@@ -814,16 +1534,12 @@ function WatchView({
         <View style={styles.loadingIndicator}>
           <Radio size={26} color="#475569" />
         </View>
-
         <Text style={styles.loadingTitle}>Live indisponible</Text>
-
         <Text style={styles.loadingText}>
           Cette diffusion n'est plus disponible.
         </Text>
-
         <Pressable onPress={onClose} style={styles.primaryButton}>
           <ArrowLeft size={15} color="#FFFFFF" />
-
           <Text style={styles.primaryButtonText}>Retour</Text>
         </Pressable>
       </View>
@@ -848,29 +1564,15 @@ function WatchView({
         style={[styles.watchScreen, { width, height }]}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* ================================================================
-         * VISUAL AREA
-         * ============================================================ */}
-
+        {/* VISUAL AREA */}
         <View style={styles.watchVisual}>
-          {isHttpUrl(stream.thumbnailUrl) ? (
-            <Image
-              source={{
-                uri: stream.thumbnailUrl,
-              }}
-              accessibilityLabel={stream.title}
-              resizeMode="cover"
-              style={styles.watchImage}
-            />
-          ) : (
-            <View style={styles.watchFallback}>
-              <Radio size={64} color="rgba(255,255,255,0.12)" />
-            </View>
-          )}
+          <WatchViewRemoteVideo
+            thumbnailUrl={stream.thumbnailUrl}
+            hostId={stream.hostId}
+          />
 
           <View style={styles.watchShade} />
 
-          {/* Reactions */}
           <View pointerEvents="none" style={styles.reactionLayer}>
             {reactions.map((reaction) => (
               <FloatingEmoji
@@ -881,7 +1583,6 @@ function WatchView({
             ))}
           </View>
 
-          {/* Header */}
           <View style={styles.watchHeader}>
             <Pressable
               onPress={onClose}
@@ -914,13 +1615,11 @@ function WatchView({
             <View style={styles.watchHeaderRight}>
               <View style={styles.livePill}>
                 <View style={styles.liveDot} />
-
                 <Text style={styles.livePillText}>LIVE</Text>
               </View>
 
               <View style={styles.viewerPill}>
                 <Eye size={11} color="#CBD5E1" />
-
                 <Text style={styles.viewerPillText}>
                   {stream.viewerCount.toLocaleString()}
                 </Text>
@@ -928,7 +1627,6 @@ function WatchView({
             </View>
           </View>
 
-          {/* Title */}
           <View style={styles.watchTitleArea}>
             <Text style={styles.watchTitle} numberOfLines={3}>
               {stream.title}
@@ -937,7 +1635,6 @@ function WatchView({
             <View style={styles.watchStats}>
               <View style={styles.watchStat}>
                 <Heart size={12} color={LIVE_RED} fill={LIVE_RED} />
-
                 <Text style={styles.watchStatText}>
                   {stream.likeCount.toLocaleString()}
                 </Text>
@@ -946,7 +1643,6 @@ function WatchView({
               {stream.startedAt ? (
                 <View style={styles.watchStat}>
                   <Clock size={12} color="#94A3B8" />
-
                   <Text style={styles.watchStatText}>
                     {formatDuration(stream.startedAt)}
                   </Text>
@@ -955,7 +1651,6 @@ function WatchView({
             </View>
           </View>
 
-          {/* Action rail */}
           <View style={styles.actionRail}>
             <Pressable
               onPress={() => void handleLike()}
@@ -988,7 +1683,6 @@ function WatchView({
               <View style={styles.actionCircle}>
                 <Gift size={25} color="#F59E0B" />
               </View>
-
               <Text style={styles.actionLabel}>Cadeau</Text>
             </Pressable>
 
@@ -1001,28 +1695,79 @@ function WatchView({
               <View style={styles.actionCircle}>
                 <Share2 size={24} color="#FFFFFF" />
               </View>
-
               <Text style={styles.actionLabel}>Partager</Text>
             </Pressable>
           </View>
         </View>
 
-        {/* ================================================================
-         * CHAT
-         * ============================================================ */}
+        {pendingInvite ? (
+          <View style={styles.cohostInviteBanner}>
+            <UserPlus size={16} color="#A5B4FC" />
 
+            <Text style={styles.cohostInviteText}>
+              L'hôte vous invite comme {pendingInvite.role}.
+            </Text>
+
+            <Pressable
+              onPress={() => void respondInvite({ streamId, accept: true })}
+              style={styles.cohostAccept}
+              accessibilityRole="button"
+              accessibilityLabel="Accepter l'invitation co-host"
+            >
+              <Text style={styles.cohostAcceptText}>Rejoindre</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => void respondInvite({ streamId, accept: false })}
+              style={styles.cohostDecline}
+              accessibilityRole="button"
+              accessibilityLabel="Refuser l'invitation co-host"
+            >
+              <Text style={styles.cohostDeclineText}>Refuser</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* CHAT */}
         <View style={styles.chatPanel}>
           <View style={styles.chatHeader}>
             <View style={styles.chatHeaderTitle}>
               <MessageCircle size={15} color="#A5B4FC" />
-
               <Text style={styles.chatHeaderText}>Discussion en direct</Text>
             </View>
 
-            <Text style={styles.chatHeaderHint}>
-              {messages?.length ?? 0} message
-              {(messages?.length ?? 0) !== 1 ? "s" : ""}
-            </Text>
+            {isHost ? (
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                <Pressable
+                  onPress={() => setShowBanList(true)}
+                  style={styles.chatHeaderMod}
+                  accessibilityRole="button"
+                  accessibilityLabel="Voir les sanctions actives"
+                >
+                  <Shield size={13} color="#F87171" />
+                  <Text style={styles.chatHeaderModText}>
+                    {sanctions?.length ?? 0}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setShowCohosts(true)}
+                  style={styles.chatHeaderMod}
+                  accessibilityRole="button"
+                  accessibilityLabel="Gérer les co-hosts"
+                >
+                  <UserPlus size={13} color="#A5B4FC" />
+                  <Text style={styles.chatHeaderModText}>
+                    {cohosts?.length ?? 0}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Text style={styles.chatHeaderHint}>
+                {messages?.length ?? 0} message
+                {(messages?.length ?? 0) !== 1 ? "s" : ""}
+              </Text>
+            )}
           </View>
 
           <ScrollView
@@ -1033,7 +1778,20 @@ function WatchView({
             keyboardShouldPersistTaps="handled"
           >
             {(messages ?? []).map((message) => (
-              <ChatRow key={message._id} msg={message} />
+              <ChatRow
+                key={message._id}
+                msg={message}
+                onLongPress={
+                  isHost && message.type === "chat"
+                    ? () =>
+                        setModTarget({
+                          userId: message.userId,
+                          userName: message.userName,
+                          userAvatar: message.userAvatar,
+                        })
+                    : undefined
+                }
+              />
             ))}
           </ScrollView>
 
@@ -1076,10 +1834,7 @@ function WatchView({
           </View>
         </View>
 
-        {/* ================================================================
-         * GIFTS
-         * ============================================================ */}
-
+        {/* GIFTS */}
         <Modal
           visible={showGifts}
           transparent
@@ -1097,7 +1852,6 @@ function WatchView({
               <View style={styles.sheetHeader}>
                 <View style={styles.sheetTitleRow}>
                   <Gift size={19} color="#F59E0B" />
-
                   <Text style={styles.sheetTitle}>Envoyer un cadeau</Text>
                 </View>
 
@@ -1134,17 +1888,8 @@ function WatchView({
                     ]}
                   >
                     <Text style={styles.giftEmoji}>{gift.emoji}</Text>
-
                     <Text style={styles.giftName}>{gift.label}</Text>
-
-                    <Text
-                      style={[
-                        styles.giftPrice,
-                        {
-                          color: gift.color,
-                        },
-                      ]}
-                    >
+                    <Text style={[styles.giftPrice, { color: gift.color }]}>
                       {gift.price} pts
                     </Text>
                   </Pressable>
@@ -1158,7 +1903,391 @@ function WatchView({
             </View>
           </View>
         </Modal>
+
+        {/* MODAL MODÉRATION */}
+        <Modal
+          visible={modTarget !== null}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setModTarget(null)}
+        >
+          <View style={[styles.modalBackdrop, { width, height }]}>
+            <Pressable
+              style={styles.modalDismissArea}
+              onPress={() => setModTarget(null)}
+            />
+
+            <View style={styles.moderationSheet}>
+              <View style={styles.sheetHeader}>
+                <View style={styles.sheetTitleRow}>
+                  <Shield size={18} color="#F87171" />
+                  <Text style={styles.sheetTitle}>
+                    Modérer {modTarget?.userName}
+                  </Text>
+                </View>
+
+                <Pressable
+                  onPress={() => setModTarget(null)}
+                  style={styles.sheetClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer"
+                >
+                  <X size={17} color="#FFFFFF" />
+                </Pressable>
+              </View>
+
+              <Pressable
+                onPress={() => {
+                  if (!modTarget) return;
+                  void timeoutUser({
+                    streamId,
+                    userId: modTarget.userId,
+                    duration: "5m",
+                  });
+                  setModTarget(null);
+                }}
+                style={styles.modAction}
+              >
+                <Clock3 size={17} color="#FBBF24" />
+                <Text style={styles.modActionText}>Timeout 5 min</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  if (!modTarget) return;
+                  void timeoutUser({
+                    streamId,
+                    userId: modTarget.userId,
+                    duration: "1h",
+                  });
+                  setModTarget(null);
+                }}
+                style={styles.modAction}
+              >
+                <Clock3 size={17} color="#F59E0B" />
+                <Text style={styles.modActionText}>Timeout 1 heure</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  if (!modTarget) return;
+                  void muteUser({
+                    streamId,
+                    userId: modTarget.userId,
+                  });
+                  setModTarget(null);
+                }}
+                style={styles.modAction}
+              >
+                <ShieldOff size={17} color="#94A3B8" />
+                <Text style={styles.modActionText}>Mute permanent</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  if (!modTarget) return;
+                  void banUser({
+                    streamId,
+                    userId: modTarget.userId,
+                  });
+                  setModTarget(null);
+                }}
+                style={[styles.modAction, styles.modActionDanger]}
+              >
+                <Ban size={17} color="#FCA5A5" />
+                <Text style={[styles.modActionText, { color: "#FCA5A5" }]}>
+                  Bannir
+                </Text>
+              </Pressable>
+
+              <View style={styles.modSeparator} />
+
+              <Pressable
+                onPress={() => {
+                  if (!modTarget) return;
+                  setInviteTarget({
+                    userId: modTarget.userId,
+                    userName: modTarget.userName,
+                  });
+                  setModTarget(null);
+                }}
+                style={styles.modAction}
+              >
+                <UserPlus size={17} color="#A5B4FC" />
+                <Text style={styles.modActionText}>Inviter comme co-host</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL BAN LIST */}
+        <Modal
+          visible={showBanList}
+          transparent
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={() => setShowBanList(false)}
+        >
+          <View style={[styles.modalBackdrop, { width, height }]}>
+            <Pressable
+              style={styles.modalDismissArea}
+              onPress={() => setShowBanList(false)}
+            />
+
+            <View style={styles.giftSheet}>
+              <View style={styles.sheetHeader}>
+                <View style={styles.sheetTitleRow}>
+                  <ShieldOff size={18} color="#F87171" />
+                  <Text style={styles.sheetTitle}>
+                    Sanctions actives ({sanctions?.length ?? 0})
+                  </Text>
+                </View>
+
+                <Pressable
+                  onPress={() => setShowBanList(false)}
+                  style={styles.sheetClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer"
+                >
+                  <X size={17} color="#FFFFFF" />
+                </Pressable>
+              </View>
+
+              <ScrollView style={{ maxHeight: 360, marginTop: 10 }}>
+                {(sanctions ?? []).length === 0 ? (
+                  <Text style={styles.sheetDescription}>
+                    Aucune sanction active.
+                  </Text>
+                ) : (
+                  (sanctions ?? []).map((sanction) => (
+                    <View key={sanction._id} style={styles.banRow}>
+                      <Avatar
+                        uri={sanction.userAvatar}
+                        name={sanction.userName}
+                        size={34}
+                      />
+
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.banName}>{sanction.userName}</Text>
+
+                        <Text style={styles.banMeta}>
+                          {sanction.type === "ban"
+                            ? "Banni"
+                            : sanction.type === "mute"
+                              ? "Mute"
+                              : `Timeout jusqu'à ${new Date(
+                                  sanction.expiresAt ?? 0,
+                                ).toLocaleTimeString()}`}
+                        </Text>
+                      </View>
+
+                      <Pressable
+                        onPress={() =>
+                          void revokeSanction({
+                            streamId,
+                            banId: sanction._id,
+                          })
+                        }
+                        style={styles.unbanButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Révoquer la sanction de ${sanction.userName}`}
+                      >
+                        <Text style={styles.unbanButtonText}>Révoquer</Text>
+                      </Pressable>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL COHOSTS */}
+        <Modal
+          visible={showCohosts}
+          transparent
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={() => setShowCohosts(false)}
+        >
+          <View style={[styles.modalBackdrop, { width, height }]}>
+            <Pressable
+              style={styles.modalDismissArea}
+              onPress={() => setShowCohosts(false)}
+            />
+
+            <View style={styles.giftSheet}>
+              <View style={styles.sheetHeader}>
+                <View style={styles.sheetTitleRow}>
+                  <UserPlus size={18} color="#A5B4FC" />
+                  <Text style={styles.sheetTitle}>Co-hosts / Modérateurs</Text>
+                </View>
+
+                <Pressable
+                  onPress={() => setShowCohosts(false)}
+                  style={styles.sheetClose}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer"
+                >
+                  <X size={17} color="#FFFFFF" />
+                </Pressable>
+              </View>
+
+              <Text style={styles.sheetDescription}>
+                Long-press un message → "Inviter comme co-host".
+              </Text>
+
+              {(cohosts ?? []).map((cohost) => (
+                <View key={cohost._id} style={styles.banRow}>
+                  <Avatar
+                    uri={cohost.userAvatar}
+                    name={cohost.userName}
+                    size={34}
+                  />
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.banName}>{cohost.userName}</Text>
+                    <Text style={styles.banMeta}>
+                      {cohost.role} · {cohost.status}
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    onPress={() =>
+                      void removeCohost({
+                        streamId,
+                        userId: cohost.userId,
+                      })
+                    }
+                    style={styles.unbanButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Retirer ${cohost.userName}`}
+                  >
+                    <UserMinus size={13} color="#FCA5A5" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL INVITE ROLE */}
+        <Modal
+          visible={inviteTarget !== null}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setInviteTarget(null)}
+        >
+          <View style={[styles.modalBackdrop, { width, height }]}>
+            <Pressable
+              style={styles.modalDismissArea}
+              onPress={() => setInviteTarget(null)}
+            />
+
+            <View style={styles.moderationSheet}>
+              <Text style={styles.sheetTitle}>
+                Rôle pour {inviteTarget?.userName}
+              </Text>
+
+              {(["cohost", "moderator", "guest"] as const).map((role) => (
+                <Pressable
+                  key={role}
+                  onPress={() => {
+                    if (!inviteTarget) return;
+
+                    void inviteCohost({
+                      streamId,
+                      userId: inviteTarget.userId,
+                      role,
+                    });
+
+                    setInviteTarget(null);
+                  }}
+                  style={styles.modAction}
+                >
+                  <UserPlus size={17} color="#A5B4FC" />
+
+                  <Text style={styles.modActionText}>
+                    {role === "cohost"
+                      ? "Co-host (peut publier caméra + micro)"
+                      : role === "moderator"
+                        ? "Modérateur (peut modérer le chat)"
+                        : "Invité (peut publier caméra)"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </Modal>
+
+        <CohostPublisher
+          enabled={
+            myStageRole?.role === "cohost" || myStageRole?.role === "guest"
+          }
+        />
       </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+ * REPLAY PLAYER
+ * ========================================================================== */
+
+function ReplayPlayer({
+  url,
+  title,
+  onClose,
+}: {
+  url: string;
+  title: string;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible
+      animationType="fade"
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
+
+      <View style={{ flex: 1, backgroundColor: "#000" }}>
+        <View style={styles.watchHeader}>
+          <Pressable
+            onPress={onClose}
+            style={styles.roundButton}
+            accessibilityRole="button"
+            accessibilityLabel="Retour au live"
+          >
+            <ArrowLeft size={18} color="#FFFFFF" />
+          </Pressable>
+
+          <View style={styles.hostIdentity}>
+            <View style={styles.hostIdentityText}>
+              <Text style={styles.hostName} numberOfLines={1}>
+                {title}
+              </Text>
+              <Text style={styles.hostCategory}>Replay</Text>
+            </View>
+          </View>
+        </View>
+
+        <ExpoVideo
+          source={{ uri: url }}
+          useNativeControls
+          resizeMode={ResizeMode.CONTAIN}
+          shouldPlay
+          style={StyleSheet.absoluteFillObject}
+        />
+      </View>
     </Modal>
   );
 }
@@ -1172,20 +2301,15 @@ function GoLiveForm({
   onStarted,
 }: {
   onClose: () => void;
-  onStarted: (id: Id<"liveStreams">) => void;
+  onStarted: (id: Id<"liveStreams">, prefs: BroadcastPrefs) => void;
 }) {
   const { width, height } = useWindowDimensions();
 
   const [title, setTitle] = useState("");
-
   const [category, setCategory] = useState("Musique");
-
   const [isPublic, setIsPublic] = useState(true);
-
   const [micOn, setMicOn] = useState(true);
-
   const [camOn, setCamOn] = useState(true);
-
   const [loading, setLoading] = useState(false);
 
   const startStream = useMutation(api.liveStreams.startStream);
@@ -1215,7 +2339,7 @@ function GoLiveForm({
         isPublic,
       });
 
-      onStarted(id);
+      onStarted(id, { micOn, camOn });
     } catch {
       Alert.alert(
         "Démarrage impossible",
@@ -1224,7 +2348,16 @@ function GoLiveForm({
     } finally {
       setLoading(false);
     }
-  }, [category, isPublic, loading, onStarted, startStream, title]);
+  }, [
+    camOn,
+    category,
+    isPublic,
+    loading,
+    micOn,
+    onStarted,
+    startStream,
+    title,
+  ]);
 
   return (
     <Modal
@@ -1244,7 +2377,6 @@ function GoLiveForm({
           <View style={styles.sheetHeader}>
             <View style={styles.sheetTitleRow}>
               <Radio size={19} color={LIVE_RED} />
-
               <Text style={styles.sheetTitle}>Lancer un Live</Text>
             </View>
 
@@ -1257,10 +2389,6 @@ function GoLiveForm({
               <X size={17} color="#FFFFFF" />
             </Pressable>
           </View>
-
-          {/* --------------------------------------------------------------
-           * PREPARATION STATUS
-           * ------------------------------------------------------------ */}
 
           <View style={styles.broadcastStatus}>
             <View style={styles.broadcastIcon}>
@@ -1275,17 +2403,12 @@ function GoLiveForm({
               <Text style={styles.broadcastStatusTitle}>
                 Préparation de la diffusion
               </Text>
-
               <Text style={styles.broadcastStatusText}>
-                Le backend va créer la diffusion. Le transport vidéo/audio doit
-                être fourni par l'infrastructure de streaming native du projet.
+                Votre caméra et votre micro seront diffusés en direct via
+                LiveKit dès que vous démarrez.
               </Text>
             </View>
           </View>
-
-          {/* --------------------------------------------------------------
-           * TITLE
-           * ------------------------------------------------------------ */}
 
           <Text style={styles.fieldLabel}>Titre du live</Text>
 
@@ -1300,20 +2423,7 @@ function GoLiveForm({
 
           <Text style={styles.characterCount}>{title.length}/120</Text>
 
-          {/* --------------------------------------------------------------
-           * CATEGORY
-           * ------------------------------------------------------------ */}
-
-          <Text
-            style={[
-              styles.fieldLabel,
-              {
-                marginTop: 14,
-              },
-            ]}
-          >
-            Catégorie
-          </Text>
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Catégorie</Text>
 
           <ScrollView
             horizontal
@@ -1328,9 +2438,7 @@ function GoLiveForm({
                   key={item}
                   onPress={() => setCategory(item)}
                   accessibilityRole="button"
-                  accessibilityState={{
-                    selected: active,
-                  }}
+                  accessibilityState={{ selected: active }}
                   style={[
                     styles.categoryChip,
                     active && styles.categoryChipActive,
@@ -1349,10 +2457,6 @@ function GoLiveForm({
             })}
           </ScrollView>
 
-          {/* --------------------------------------------------------------
-           * CONTROLS
-           * ------------------------------------------------------------ */}
-
           <View style={styles.controlPanel}>
             <View style={styles.controlRow}>
               <View style={styles.controlIdentity}>
@@ -1360,7 +2464,6 @@ function GoLiveForm({
 
                 <View>
                   <Text style={styles.controlTitle}>Microphone</Text>
-
                   <Text style={styles.controlSubtitle}>
                     {micOn ? "Activé" : "Désactivé"}
                   </Text>
@@ -1370,9 +2473,7 @@ function GoLiveForm({
               <Pressable
                 onPress={() => setMicOn((value) => !value)}
                 accessibilityRole="switch"
-                accessibilityState={{
-                  checked: micOn,
-                }}
+                accessibilityState={{ checked: micOn }}
                 style={[styles.switch, micOn && styles.switchActive]}
               >
                 <View
@@ -1393,7 +2494,6 @@ function GoLiveForm({
 
                 <View>
                   <Text style={styles.controlTitle}>Caméra</Text>
-
                   <Text style={styles.controlSubtitle}>
                     {camOn ? "Activée" : "Désactivée"}
                   </Text>
@@ -1403,9 +2503,7 @@ function GoLiveForm({
               <Pressable
                 onPress={() => setCamOn((value) => !value)}
                 accessibilityRole="switch"
-                accessibilityState={{
-                  checked: camOn,
-                }}
+                accessibilityState={{ checked: camOn }}
                 style={[styles.switch, camOn && styles.switchActive]}
               >
                 <View
@@ -1422,7 +2520,6 @@ function GoLiveForm({
 
                 <View>
                   <Text style={styles.controlTitle}>Live public</Text>
-
                   <Text style={styles.controlSubtitle}>
                     {isPublic ? "Visible publiquement" : "Accès restreint"}
                   </Text>
@@ -1432,9 +2529,7 @@ function GoLiveForm({
               <Pressable
                 onPress={() => setIsPublic((value) => !value)}
                 accessibilityRole="switch"
-                accessibilityState={{
-                  checked: isPublic,
-                }}
+                accessibilityState={{ checked: isPublic }}
                 style={[styles.switch, isPublic && styles.switchActive]}
               >
                 <View
@@ -1446,10 +2541,6 @@ function GoLiveForm({
               </Pressable>
             </View>
           </View>
-
-          {/* --------------------------------------------------------------
-           * START
-           * ------------------------------------------------------------ */}
 
           <Pressable
             onPress={() => void handleStart()}
@@ -1466,10 +2557,445 @@ function GoLiveForm({
           </Pressable>
 
           <Text style={styles.goLiveDisclaimer}>
-            La création de la diffusion utilise la mutation réelle du backend.
-            Aucun flux vidéo fictif n'est affiché.
+            Android vous demandera l'autorisation d'utiliser la caméra et le
+            micro.
           </Text>
         </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+/* ============================================================================
+ * LIVE BROADCASTER — HOST
+ * ========================================================================== */
+
+function BroadcasterInner({
+  stream,
+  ending,
+  onRequestEnd,
+}: {
+  stream: LiveStream | null | undefined;
+  ending: boolean;
+  onRequestEnd: () => void;
+}) {
+  const { localParticipant, isCameraEnabled, isMicrophoneEnabled } =
+    useLocalParticipant();
+
+  const connectionState = useConnectionState();
+
+  const tracks = useTracks([Track.Source.Camera]);
+
+  const [now, setNow] = useState(() => Date.now());
+
+  const [pendingToggle, setPendingToggle] = useState<
+    "camera" | "microphone" | null
+  >(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const localCameraTrack = useMemo(
+    () =>
+      tracks
+        .filter(isTrackReference)
+        .find((trackRef) => trackRef.participant.isLocal),
+    [tracks],
+  );
+
+  const connection = describeConnection(connectionState);
+
+  const remoteParticipants = useRemoteParticipants();
+  const liveKitViewerCount = remoteParticipants.length;
+  const convexViewerCount = stream?.viewerCount ?? 0;
+  const viewerCountsDiverge =
+    Math.abs(liveKitViewerCount - convexViewerCount) >= 2;
+  const displayedViewerCount = viewerCountsDiverge
+    ? liveKitViewerCount
+    : convexViewerCount;
+
+  const toggleCamera = useCallback(async () => {
+    if (pendingToggle) {
+      return;
+    }
+
+    setPendingToggle("camera");
+
+    try {
+      await localParticipant.setCameraEnabled(!isCameraEnabled);
+    } catch {
+      Alert.alert(
+        "Caméra indisponible",
+        "Impossible de modifier l'état de la caméra.",
+      );
+    } finally {
+      setPendingToggle(null);
+    }
+  }, [isCameraEnabled, localParticipant, pendingToggle]);
+
+  const toggleMicrophone = useCallback(async () => {
+    if (pendingToggle) {
+      return;
+    }
+
+    setPendingToggle("microphone");
+
+    try {
+      await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
+    } catch {
+      Alert.alert(
+        "Micro indisponible",
+        "Impossible de modifier l'état du micro.",
+      );
+    } finally {
+      setPendingToggle(null);
+    }
+  }, [isMicrophoneEnabled, localParticipant, pendingToggle]);
+
+  return (
+    <View style={styles.broadcastStage}>
+      {localCameraTrack && isCameraEnabled ? (
+        <VideoTrack
+          trackRef={localCameraTrack}
+          style={StyleSheet.absoluteFill}
+          objectFit="cover"
+          zOrder={0}
+        />
+      ) : (
+        <View style={styles.broadcastFallback}>
+          {isCameraEnabled ? (
+            <>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={styles.broadcastFallbackText}>
+                Démarrage de la caméra…
+              </Text>
+            </>
+          ) : (
+            <>
+              <VideoOff size={44} color="rgba(255,255,255,0.35)" />
+              <Text style={styles.broadcastFallbackText}>
+                Caméra désactivée
+              </Text>
+            </>
+          )}
+        </View>
+      )}
+
+      <View pointerEvents="none" style={styles.broadcastTopShade} />
+      <View pointerEvents="none" style={styles.broadcastBottomShade} />
+
+      <View style={styles.broadcastHeader}>
+        <View style={styles.broadcastHeaderLeft}>
+          <View style={styles.livePill}>
+            <View style={styles.liveDot} />
+            <Text style={styles.livePillText}>LIVE</Text>
+          </View>
+
+          <View style={styles.viewerPill}>
+            <Eye size={11} color="#CBD5E1" />
+            <Text style={styles.viewerPillText}>
+              {displayedViewerCount.toLocaleString()}
+            </Text>
+          </View>
+
+          {stream?.startedAt ? (
+            <View style={styles.viewerPill}>
+              <Clock size={11} color="#CBD5E1" />
+              <Text style={styles.viewerPillText}>
+                {formatDuration(stream.startedAt, undefined, now)}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.connectionPill}>
+          <View
+            style={[
+              styles.connectionPillDot,
+              { backgroundColor: connection.color },
+            ]}
+          />
+          <Text style={styles.connectionPillText}>{connection.label}</Text>
+        </View>
+      </View>
+
+      {stream?.title ? (
+        <View pointerEvents="none" style={styles.broadcastTitleArea}>
+          <Text style={styles.broadcastTitle} numberOfLines={2}>
+            {stream.title}
+          </Text>
+
+          <View style={styles.watchStats}>
+            <View style={styles.watchStat}>
+              <Heart size={12} color={LIVE_RED} fill={LIVE_RED} />
+              <Text style={styles.watchStatText}>
+                {(stream.likeCount ?? 0).toLocaleString()}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.broadcastControls}>
+        <Pressable
+          onPress={() => void toggleCamera()}
+          disabled={pendingToggle !== null || ending}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isCameraEnabled ? "Désactiver la caméra" : "Activer la caméra"
+          }
+          style={[
+            styles.broadcastControl,
+            !isCameraEnabled && styles.broadcastControlOff,
+          ]}
+        >
+          {isCameraEnabled ? (
+            <Video size={22} color="#FFFFFF" />
+          ) : (
+            <VideoOff size={22} color="#FFFFFF" />
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => void toggleMicrophone()}
+          disabled={pendingToggle !== null || ending}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isMicrophoneEnabled ? "Couper le micro" : "Activer le micro"
+          }
+          style={[
+            styles.broadcastControl,
+            !isMicrophoneEnabled && styles.broadcastControlOff,
+          ]}
+        >
+          {isMicrophoneEnabled ? (
+            <Mic size={22} color="#FFFFFF" />
+          ) : (
+            <MicOff size={22} color="#FFFFFF" />
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={onRequestEnd}
+          disabled={ending}
+          accessibilityRole="button"
+          accessibilityLabel="Terminer le live"
+          style={[styles.endLiveButton, ending && styles.disabledButton]}
+        >
+          <PhoneOff size={19} color="#FFFFFF" />
+          <Text style={styles.endLiveButtonText}>
+            {ending ? "Fin du live…" : "Terminer"}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function LiveBroadcaster({
+  streamId,
+  prefs,
+  onEnded,
+}: {
+  streamId: Id<"liveStreams">;
+  prefs: BroadcastPrefs;
+  onEnded: () => void;
+}) {
+  const { width, height } = useWindowDimensions();
+
+  const getLiveKitToken = useAction(api.livekit.getLiveKitToken);
+
+  const endStream = useMutation(api.liveStreams.endStream);
+
+  const stream = useQuery(api.liveStreams.getStream, {
+    streamId,
+  }) as LiveStream | null | undefined;
+
+  const [credentials, setCredentials] = useState<BroadcastCredentials | null>(
+    null,
+  );
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [attempt, setAttempt] = useState(0);
+
+  const [ending, setEnding] = useState(false);
+
+  useEffect(() => {
+    void AudioSession.startAudioSession();
+
+    return () => {
+      void AudioSession.stopAudioSession();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setCredentials(null);
+    setErrorMessage(null);
+
+    const prepare = async () => {
+      try {
+        const granted = await ensureBroadcastPermissions();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!granted) {
+          setErrorMessage(
+            "Autorisez la caméra et le micro dans les réglages Android pour diffuser.",
+          );
+          return;
+        }
+
+        const result = (await getLiveKitToken({
+          streamId,
+        })) as LiveKitTokenResult;
+
+        if (cancelled) {
+          return;
+        }
+
+        const serverUrl = result.serverUrl ?? result.url;
+        const token = result.token;
+
+        if (!serverUrl || !token) {
+          setErrorMessage(
+            "Le serveur n'a pas renvoyé d'identifiants de diffusion valides.",
+          );
+          return;
+        }
+
+        setCredentials({ serverUrl, token });
+      } catch {
+        if (!cancelled) {
+          setErrorMessage("Impossible d'obtenir l'accès à la diffusion.");
+        }
+      }
+    };
+
+    void prepare();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt, getLiveKitToken, streamId]);
+
+  useEffect(() => {
+    if (stream === null || (stream && stream.status !== "live")) {
+      onEnded();
+    }
+  }, [onEnded, stream]);
+
+  const handleRequestEnd = useCallback(async () => {
+    if (ending) {
+      return;
+    }
+
+    const confirmed = await confirmEndLive();
+
+    if (!confirmed) {
+      return;
+    }
+
+    setEnding(true);
+
+    try {
+      await endStream({ streamId });
+      onEnded();
+    } catch {
+      Alert.alert(
+        "Impossible de terminer",
+        "La diffusion n'a pas pu être terminée.",
+      );
+
+      setEnding(false);
+    }
+  }, [ending, endStream, onEnded, streamId]);
+
+  return (
+    <Modal
+      visible
+      animationType="fade"
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+      onRequestClose={() => void handleRequestEnd()}
+    >
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
+
+      <View style={[styles.broadcastRoot, { width, height }]}>
+        {errorMessage ? (
+          <View style={styles.loadingScreen}>
+            <View style={styles.loadingIndicator}>
+              <Radio size={26} color="#F87171" />
+            </View>
+
+            <Text style={styles.loadingTitle}>Diffusion impossible</Text>
+            <Text style={styles.loadingText}>{errorMessage}</Text>
+
+            <View style={styles.statusButtonRow}>
+              <Pressable
+                onPress={() => setAttempt((value) => value + 1)}
+                accessibilityRole="button"
+                accessibilityLabel="Réessayer"
+                style={styles.primaryButton}
+              >
+                <Radio size={15} color="#FFFFFF" />
+                <Text style={styles.primaryButtonText}>Réessayer</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => void handleRequestEnd()}
+                disabled={ending}
+                accessibilityRole="button"
+                accessibilityLabel="Terminer le live"
+                style={[styles.dangerButton, ending && styles.disabledButton]}
+              >
+                <PhoneOff size={15} color="#FFFFFF" />
+                <Text style={styles.primaryButtonText}>Terminer le live</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : credentials ? (
+          <LiveKitRoom
+            serverUrl={credentials.serverUrl}
+            token={credentials.token}
+            connect={true}
+            audio={prefs.micOn}
+            video={prefs.camOn}
+            onError={() => {
+              setErrorMessage("La connexion à la diffusion a échoué.");
+            }}
+          >
+            <BroadcasterInner
+              stream={stream}
+              ending={ending}
+              onRequestEnd={() => void handleRequestEnd()}
+            />
+          </LiveKitRoom>
+        ) : (
+          <View style={styles.loadingScreen}>
+            <ActivityIndicator size="large" color={LIVE_RED} />
+
+            <Text style={styles.loadingTitle}>
+              Préparation de la diffusion…
+            </Text>
+            <Text style={styles.loadingText}>
+              Autorisations, puis connexion à LiveKit.
+            </Text>
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -1501,24 +3027,7 @@ function MyLiveBanner({
       return;
     }
 
-    const confirmed = await new Promise<boolean>((resolve) => {
-      Alert.alert(
-        "Terminer le live",
-        "Voulez-vous réellement terminer cette diffusion ?",
-        [
-          {
-            text: "Annuler",
-            style: "cancel",
-            onPress: () => resolve(false),
-          },
-          {
-            text: "Terminer",
-            style: "destructive",
-            onPress: () => resolve(true),
-          },
-        ],
-      );
-    });
+    const confirmed = await confirmEndLive();
 
     if (!confirmed) {
       return;
@@ -1527,10 +3036,7 @@ function MyLiveBanner({
     setEnding(true);
 
     try {
-      await endStream({
-        streamId,
-      });
-
+      await endStream({ streamId });
       onEnd();
     } catch {
       Alert.alert(
@@ -1578,7 +3084,6 @@ function MyLiveBanner({
         style={styles.endButton}
       >
         <X size={13} color="#FCA5A5" />
-
         <Text style={styles.endButtonText}>{ending ? "…" : "Terminer"}</Text>
       </Pressable>
     </View>
@@ -1596,19 +3101,27 @@ function StreamCard({
   stream: LiveStream;
   onWatch: () => void;
 }) {
+  const isReplay = stream.status === "ended";
+  const canPlay = stream.status === "live" || Boolean(stream.replayUrl);
+
   return (
     <Pressable
       onPress={onWatch}
+      disabled={!canPlay}
       accessibilityRole="button"
-      accessibilityLabel={`Rejoindre ${stream.title}`}
-      style={({ pressed }) => [styles.streamCard, pressed && styles.pressed]}
+      accessibilityLabel={`${isReplay ? "Voir le replay" : "Rejoindre"} ${
+        stream.title
+      }`}
+      style={({ pressed }) => [
+        styles.streamCard,
+        pressed && styles.pressed,
+        !canPlay && styles.disabledButton,
+      ]}
     >
       <View style={styles.streamThumbnailContainer}>
         {isHttpUrl(stream.thumbnailUrl) ? (
           <Image
-            source={{
-              uri: stream.thumbnailUrl,
-            }}
+            source={{ uri: stream.thumbnailUrl }}
             accessibilityLabel={stream.title}
             resizeMode="cover"
             style={styles.streamThumbnail}
@@ -1621,28 +3134,47 @@ function StreamCard({
 
         <View style={styles.streamShade} />
 
-        <View style={styles.streamLiveBadge}>
-          <View style={styles.liveDot} />
-
-          <Text style={styles.streamLiveText}>LIVE</Text>
+        <View
+          style={[styles.streamLiveBadge, isReplay && styles.streamReplayBadge]}
+        >
+          {isReplay ? (
+            <>
+              <PlayCircle size={10} color="#FFFFFF" />
+              <Text style={styles.streamLiveText}>REPLAY</Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.liveDot} />
+              <Text style={styles.streamLiveText}>LIVE</Text>
+            </>
+          )}
         </View>
 
-        <View style={styles.streamViewerBadge}>
-          <Eye size={10} color="#FFFFFF" />
-
-          <Text style={styles.streamViewerText}>
-            {stream.viewerCount.toLocaleString()}
-          </Text>
-        </View>
-
-        {/* Centrage par conteneur pleine largeur (plus de left: "50%"). */}
-        <View pointerEvents="none" style={styles.joinWrap}>
-          <View style={styles.joinButton}>
-            <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
-
-            <Text style={styles.joinButtonText}>Rejoindre</Text>
+        {!isReplay ? (
+          <View style={styles.streamViewerBadge}>
+            <Eye size={10} color="#FFFFFF" />
+            <Text style={styles.streamViewerText}>
+              {stream.viewerCount.toLocaleString()}
+            </Text>
           </View>
-        </View>
+        ) : null}
+
+        {canPlay ? (
+          <View pointerEvents="none" style={styles.joinWrap}>
+            <View style={[styles.joinButton, isReplay && styles.replayButton]}>
+              <Play size={13} color="#FFFFFF" fill="#FFFFFF" />
+              <Text style={styles.joinButtonText}>
+                {isReplay ? "Voir le replay" : "Rejoindre"}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View pointerEvents="none" style={styles.joinWrap}>
+            <View style={[styles.joinButton, styles.joinButtonDisabled]}>
+              <Text style={styles.joinButtonText}>Replay indisponible</Text>
+            </View>
+          </View>
+        )}
       </View>
 
       <View style={styles.streamCardBody}>
@@ -1650,7 +3182,7 @@ function StreamCard({
           uri={stream.hostAvatar}
           name={stream.hostName}
           size={40}
-          borderColor={LIVE_RED}
+          borderColor={isReplay ? PRIMARY : LIVE_RED}
         />
 
         <View style={styles.streamCardIdentity}>
@@ -1671,7 +3203,6 @@ function StreamCard({
 
         <View style={styles.likesColumn}>
           <Heart size={12} color="#F472B6" fill="#F472B6" />
-
           <Text style={styles.likesText}>
             {stream.likeCount.toLocaleString()}
           </Text>
@@ -1712,7 +3243,6 @@ function EmptyLiveState({
           style={styles.emptyButton}
         >
           <Plus size={16} color="#FFFFFF" />
-
           <Text style={styles.emptyButtonText}>Démarrer un Live</Text>
         </Pressable>
       ) : null}
@@ -1729,12 +3259,20 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
 
   const [watchingId, setWatchingId] = useState<Id<"liveStreams"> | null>(null);
 
+  const [broadcast, setBroadcast] = useState<BroadcastState | null>(null);
+
   const [showGoLive, setShowGoLive] = useState(false);
 
   const { isAuthenticated } = useConvexAuth();
 
+  /**
+   * ⚠️ La requête utilise `status: "all"` : le backend `listLiveStreams`
+   * doit accepter cette valeur et retourner :
+   *   - les streams `live`
+   *   - les streams `ended` avec `replayUrl` non null (limités, triés desc)
+   */
   const liveStreams = useQuery(api.liveStreams.listLiveStreams, {
-    status: "live",
+    status: "all" as const,
   }) as LiveStream[] | undefined;
 
   const myActiveStream = useQuery(
@@ -1761,9 +3299,15 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
     [liveStreams],
   );
 
-  /* --------------------------------------------------------------------------
-   * WATCH MODE
-   * ------------------------------------------------------------------------ */
+  if (broadcast) {
+    return (
+      <LiveBroadcaster
+        streamId={broadcast.streamId}
+        prefs={broadcast.prefs}
+        onEnded={() => setBroadcast(null)}
+      />
+    );
+  }
 
   if (watchingId) {
     return (
@@ -1773,10 +3317,6 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
 
   return (
     <View style={styles.screen}>
-      {/* ================================================================
-       * HEADER
-       * ============================================================ */}
-
       <View style={styles.pageHeader}>
         <Pressable
           onPress={onBack}
@@ -1790,14 +3330,13 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
         <View style={styles.pageHeaderIdentity}>
           <View style={styles.pageTitleRow}>
             <Radio size={17} color={LIVE_RED} />
-
             <Text style={styles.pageTitle}>Live Streaming</Text>
           </View>
 
           <Text style={styles.pageSubtitle}>
             {liveStreams === undefined
               ? "Chargement des diffusions…"
-              : `${liveStreams.length} diffusion${liveStreams.length !== 1 ? "s" : ""} en direct`}
+              : `${liveStreams.length} diffusion${liveStreams.length !== 1 ? "s" : ""}`}
           </Text>
         </View>
 
@@ -1809,7 +3348,6 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
             style={styles.headerGoLive}
           >
             <Radio size={13} color="#FFFFFF" />
-
             <Text style={styles.headerGoLiveText}>Go Live</Text>
           </Pressable>
         ) : (
@@ -1819,30 +3357,25 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
         )}
       </View>
 
-      {/* ================================================================
-       * MY ACTIVE LIVE
-       * ============================================================ */}
-
       {myActiveStream ? (
         <MyLiveBanner
           streamId={myActiveStream._id}
-          onEnterOwn={() => setWatchingId(myActiveStream._id)}
+          onEnterOwn={() =>
+            setBroadcast({
+              streamId: myActiveStream._id,
+              prefs: DEFAULT_BROADCAST_PREFS,
+            })
+          }
           onEnd={() => undefined}
         />
       ) : null}
-
-      {/* ================================================================
-       * REAL-TIME METRICS
-       * ============================================================ */}
 
       <View style={styles.metricsRow}>
         <View style={styles.metricCard}>
           <View
             style={[
               styles.metricIcon,
-              {
-                backgroundColor: "rgba(99,102,241,0.10)",
-              },
+              { backgroundColor: "rgba(99,102,241,0.10)" },
             ]}
           >
             <Users size={16} color="#818CF8" />
@@ -1851,7 +3384,6 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
           <Text style={styles.metricValue}>
             {liveStreams === undefined ? "—" : totalViewers.toLocaleString()}
           </Text>
-
           <Text style={styles.metricLabel}>Spectateurs</Text>
         </View>
 
@@ -1859,9 +3391,7 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
           <View
             style={[
               styles.metricIcon,
-              {
-                backgroundColor: "rgba(239,68,68,0.10)",
-              },
+              { backgroundColor: "rgba(239,68,68,0.10)" },
             ]}
           >
             <Radio size={16} color="#F87171" />
@@ -1870,17 +3400,14 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
           <Text style={styles.metricValue}>
             {liveStreams === undefined ? "—" : liveStreams.length}
           </Text>
-
-          <Text style={styles.metricLabel}>Créateurs</Text>
+          <Text style={styles.metricLabel}>Diffusions</Text>
         </View>
 
         <View style={styles.metricCard}>
           <View
             style={[
               styles.metricIcon,
-              {
-                backgroundColor: "rgba(16,185,129,0.10)",
-              },
+              { backgroundColor: "rgba(16,185,129,0.10)" },
             ]}
           >
             <TrendingUp size={16} color="#34D399" />
@@ -1889,14 +3416,9 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
           <Text style={styles.metricValue}>
             {liveStreams === undefined ? "—" : filtered.length}
           </Text>
-
           <Text style={styles.metricLabel}>Sélection</Text>
         </View>
       </View>
-
-      {/* ================================================================
-       * CATEGORIES
-       * ============================================================ */}
 
       <ScrollView
         horizontal
@@ -1911,9 +3433,7 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
               key={category}
               onPress={() => setActiveCategory(category)}
               accessibilityRole="button"
-              accessibilityState={{
-                selected: active,
-              }}
+              accessibilityState={{ selected: active }}
               style={[
                 styles.categoryChip,
                 active && styles.categoryChipSelected,
@@ -1932,10 +3452,6 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
         })}
       </ScrollView>
 
-      {/* ================================================================
-       * STREAM LIST
-       * ============================================================ */}
-
       <ScrollView
         style={styles.mainScroll}
         contentContainerStyle={styles.mainContent}
@@ -1946,7 +3462,6 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
             {[0, 1, 2].map((item) => (
               <View key={item} style={styles.streamSkeleton}>
                 <View style={styles.skeletonImage} />
-
                 <View style={styles.skeletonBody} />
               </View>
             ))}
@@ -1968,10 +3483,6 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
           </View>
         )}
 
-        {/* ================================================================
-         * CREATOR CTA
-         * ============================================================ */}
-
         {isAuthenticated && !myActiveStream ? (
           <View style={styles.creatorCard}>
             <View style={styles.creatorIcon}>
@@ -1991,17 +3502,11 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
               style={styles.creatorButton}
             >
               <Radio size={15} color="#FFFFFF" />
-
               <Text style={styles.creatorButtonText}>Démarrer un Live</Text>
-
               <ChevronRight size={15} color="#FFFFFF" />
             </Pressable>
           </View>
         ) : null}
-
-        {/* ================================================================
-         * DATA INTEGRITY
-         * ============================================================ */}
 
         <View style={styles.integrityCard}>
           <View style={styles.integrityIcon}>
@@ -2010,7 +3515,6 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
 
           <View style={styles.integrityBody}>
             <Text style={styles.integrityTitle}>Données en temps réel</Text>
-
             <Text style={styles.integrityText}>
               Les diffusions et compteurs présentés ici proviennent des données
               disponibles du backend. Aucun live, compteur ou pourcentage
@@ -2020,16 +3524,12 @@ export default function LiveStreamingPage({ onBack }: LiveStreamingPageProps) {
         </View>
       </ScrollView>
 
-      {/* ================================================================
-       * GO LIVE
-       * ============================================================ */}
-
       {showGoLive ? (
         <GoLiveForm
           onClose={() => setShowGoLive(false)}
-          onStarted={(id) => {
+          onStarted={(id, prefs) => {
             setShowGoLive(false);
-            setWatchingId(id);
+            setBroadcast({ streamId: id, prefs });
           }}
         />
       ) : null}
@@ -2046,10 +3546,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BACKGROUND,
   },
-
-  /* ------------------------------------------------------------------------
-   * PAGE HEADER
-   * ---------------------------------------------------------------------- */
 
   pageHeader: {
     minHeight: 77,
@@ -2131,10 +3627,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /* ------------------------------------------------------------------------
-   * MY LIVE
-   * ---------------------------------------------------------------------- */
-
   myLiveBanner: {
     marginHorizontal: 14,
     marginTop: 11,
@@ -2202,10 +3694,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /* ------------------------------------------------------------------------
-   * METRICS
-   * ---------------------------------------------------------------------- */
-
   metricsRow: {
     paddingHorizontal: 14,
     paddingTop: 12,
@@ -2247,10 +3735,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  /* ------------------------------------------------------------------------
-   * CATEGORIES
-   * ---------------------------------------------------------------------- */
-
   categories: {
     paddingHorizontal: 14,
     paddingTop: 12,
@@ -2282,10 +3766,6 @@ const styles = StyleSheet.create({
     color: "#C7D2FE",
   },
 
-  /* ------------------------------------------------------------------------
-   * CONTENT
-   * ---------------------------------------------------------------------- */
-
   mainScroll: {
     flex: 1,
   },
@@ -2301,10 +3781,6 @@ const styles = StyleSheet.create({
   streamList: {
     gap: 11,
   },
-
-  /* ------------------------------------------------------------------------
-   * STREAM CARD
-   * ---------------------------------------------------------------------- */
 
   streamCard: {
     borderRadius: 20,
@@ -2351,6 +3827,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(220,38,38,0.94)",
   },
 
+  streamReplayBadge: {
+    backgroundColor: "rgba(99,102,241,0.94)",
+  },
+
   streamLiveText: {
     color: "#FFFFFF",
     fontSize: 7.5,
@@ -2377,11 +3857,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /**
-   * Centrage horizontal du bouton "Rejoindre" par un conteneur plein
-   * largeur, au lieu de `left: "50%"` + `marginLeft: -51` (largeur codée en
-   * dur qui ne correspondait pas à la largeur réelle du bouton).
-   */
   joinWrap: {
     position: "absolute",
     left: 0,
@@ -2399,6 +3874,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     backgroundColor: "rgba(79,70,229,0.94)",
+  },
+
+  joinButtonDisabled: {
+    backgroundColor: "rgba(71,85,105,0.85)",
+  },
+
+  replayButton: {
+    backgroundColor: "rgba(99,102,241,0.94)",
   },
 
   joinButtonText: {
@@ -2465,10 +3948,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  /* ------------------------------------------------------------------------
-   * CREATOR
-   * ---------------------------------------------------------------------- */
-
   creatorCard: {
     marginTop: 15,
     padding: 17,
@@ -2522,10 +4001,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  /* ------------------------------------------------------------------------
-   * INTEGRITY
-   * ---------------------------------------------------------------------- */
-
   integrityCard: {
     marginTop: 14,
     padding: 13,
@@ -2563,10 +4038,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     lineHeight: 13,
   },
-
-  /* ------------------------------------------------------------------------
-   * EMPTY
-   * ---------------------------------------------------------------------- */
 
   emptyState: {
     minHeight: 300,
@@ -2618,10 +4089,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: "900",
   },
-
-  /* ------------------------------------------------------------------------
-   * LOADING
-   * ---------------------------------------------------------------------- */
 
   loadingScreen: {
     flex: 1,
@@ -2696,14 +4163,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.025)",
   },
 
-  /* ------------------------------------------------------------------------
-   * WATCH
-   * ---------------------------------------------------------------------- */
-
-  /**
-   * Racine du Modal de visionnage. Les dimensions sont fournies en inline
-   * (voir WatchView) : fond noir pour qu'aucune zone blanche n'apparaisse.
-   */
   watchScreen: {
     backgroundColor: "#000000",
   },
@@ -2745,6 +4204,33 @@ const styles = StyleSheet.create({
 
   floatingEmojiText: {
     fontSize: 31,
+  },
+
+  /**
+   * Grille cohosts — miniatures empilées verticalement en haut à droite.
+   * Le host reste affiché en plein écran derrière cette colonne.
+   */
+  cohostGrid: {
+    position: "absolute",
+    top: TOP_INSET + 60,
+    right: 10,
+    gap: 6,
+    zIndex: 5,
+  },
+
+  cohostTile: {
+    width: 92,
+    height: 122,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "#0D1422",
+  },
+
+  cohostTileVideo: {
+    width: "100%",
+    height: "100%",
   },
 
   watchHeader: {
@@ -2909,10 +4395,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  /* ------------------------------------------------------------------------
-   * CHAT
-   * ---------------------------------------------------------------------- */
-
   chatPanel: {
     height: 255,
     maxHeight: 300,
@@ -2947,6 +4429,22 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 7,
     fontWeight: "700",
+  },
+
+  chatHeaderMod: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(239,68,68,0.12)",
+  },
+
+  chatHeaderModText: {
+    color: "#F87171",
+    fontSize: 8,
+    fontWeight: "900",
   },
 
   chatScroll: {
@@ -3083,10 +4581,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  /* ------------------------------------------------------------------------
-   * MODALS
-   * ---------------------------------------------------------------------- */
-
   modalBackdrop: {
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.76)",
@@ -3094,6 +4588,154 @@ const styles = StyleSheet.create({
 
   modalDismissArea: {
     flex: 1,
+  },
+
+  moderationSheet: {
+    paddingHorizontal: 17,
+    paddingTop: 15,
+    paddingBottom: 25,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    backgroundColor: "#0A0E1B",
+    borderTopWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    gap: 8,
+  },
+
+  modAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.045)",
+  },
+
+  modActionDanger: {
+    backgroundColor: "rgba(239,68,68,0.12)",
+  },
+
+  modActionText: {
+    color: "#CBD5E1",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  modSeparator: {
+    height: 1,
+    marginVertical: 6,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  banRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+
+  banName: {
+    color: "#F8FAFC",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  banMeta: {
+    marginTop: 2,
+    color: "#64748B",
+    fontSize: 7.5,
+  },
+
+  unbanButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: "rgba(239,68,68,0.14)",
+  },
+
+  unbanButtonText: {
+    color: "#FCA5A5",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+
+  cohostInviteBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginHorizontal: 10,
+    marginBottom: 6,
+    borderRadius: 13,
+    backgroundColor: "rgba(99,102,241,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(129,140,248,0.28)",
+  },
+
+  cohostInviteText: {
+    flex: 1,
+    color: "#C7D2FE",
+    fontSize: 8.5,
+    fontWeight: "700",
+  },
+
+  cohostAccept: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 9,
+    backgroundColor: PRIMARY,
+  },
+
+  cohostAcceptText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+
+  cohostDecline: {
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  cohostDeclineText: {
+    color: "#94A3B8",
+    fontSize: 8,
+    fontWeight: "800",
+  },
+
+  cohostOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+    paddingTop: TOP_INSET + 60,
+    paddingLeft: 14,
+    zIndex: 20,
+  },
+
+  cohostOverlayBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(220,38,38,0.94)",
+  },
+
+  cohostOverlayText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.5,
   },
 
   giftSheet: {
@@ -3152,10 +4794,6 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 
-  /* ------------------------------------------------------------------------
-   * GIFTS
-   * ---------------------------------------------------------------------- */
-
   giftGrid: {
     marginTop: 14,
     flexDirection: "row",
@@ -3196,10 +4834,6 @@ const styles = StyleSheet.create({
     lineHeight: 12,
     textAlign: "center",
   },
-
-  /* ------------------------------------------------------------------------
-   * GO LIVE
-   * ---------------------------------------------------------------------- */
 
   broadcastStatus: {
     marginTop: 14,
@@ -3369,9 +5003,165 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  /* ------------------------------------------------------------------------
-   * AVATAR
-   * ---------------------------------------------------------------------- */
+  broadcastRoot: {
+    backgroundColor: "#000000",
+  },
+
+  broadcastStage: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000000",
+  },
+
+  broadcastFallback: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    backgroundColor: "#080C15",
+  },
+
+  broadcastFallbackText: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  broadcastTopShade: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 170,
+    backgroundColor: "rgba(0,0,0,0.30)",
+  },
+
+  broadcastBottomShade: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 230,
+    backgroundColor: "rgba(0,0,0,0.38)",
+  },
+
+  broadcastHeader: {
+    position: "absolute",
+    top: TOP_INSET + 8,
+    left: 13,
+    right: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    zIndex: 10,
+  },
+
+  broadcastHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  connectionPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(0,0,0,0.58)",
+  },
+
+  connectionPillDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+  },
+
+  connectionPillText: {
+    color: "#FFFFFF",
+    fontSize: 8.5,
+    fontWeight: "800",
+  },
+
+  broadcastTitleArea: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 128,
+    zIndex: 7,
+  },
+
+  broadcastTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "900",
+  },
+
+  broadcastControls: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+    zIndex: 12,
+  },
+
+  broadcastControl: {
+    width: 58,
+    height: 58,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+
+  broadcastControlOff: {
+    backgroundColor: "rgba(239,68,68,0.32)",
+    borderColor: "rgba(239,68,68,0.55)",
+  },
+
+  endLiveButton: {
+    height: 58,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: LIVE_RED,
+  },
+
+  endLiveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  statusButtonRow: {
+    marginTop: 4,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 10,
+  },
+
+  dangerButton: {
+    marginTop: 15,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: LIVE_RED,
+  },
 
   avatar: {
     backgroundColor: "#111827",
@@ -3383,10 +5173,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#5B21B6",
     borderWidth: 1,
   },
-
-  /* ------------------------------------------------------------------------
-   * GENERAL
-   * ---------------------------------------------------------------------- */
 
   disabledButton: {
     opacity: 0.38,

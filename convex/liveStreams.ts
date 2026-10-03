@@ -1,40 +1,15 @@
+// convex/liveStreams.ts
+
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { startStreamInternal, endStreamInternal } from "./liveStreamsHelpers";
 
 type AuthCtx = QueryCtx | MutationCtx;
 
-const LIVE_STATUSES = ["scheduled", "live", "ended", "cancelled"] as const;
-
 const GIFT_TYPES = ["star", "crown", "fire", "diamond", "rocket"] as const;
-
-const REPORT_REASONS = [
-  "spam",
-  "nudity",
-  "violence",
-  "harassment",
-  "misinformation",
-  "copyright",
-  "other",
-] as const;
-
-const COHOST_ROLES = ["cohost", "moderator", "guest"] as const;
-
-const COHOST_STATUSES = ["invited", "accepted", "declined", "removed"] as const;
-
-const BAN_TYPES = ["ban", "mute", "timeout"] as const;
-
-const REPORT_STATUSES = ["open", "reviewing", "resolved", "dismissed"] as const;
-
-const MESSAGE_TYPES = ["chat", "super_chat", "system", "gift"] as const;
-
-const MODERATION_STATUSES = ["pending", "approved", "rejected"] as const;
-
-const VISIBILITIES = ["public", "followers", "private"] as const;
-
-const PRESENCE_TIMEOUT_MS = 60_000;
 
 const MAX_MESSAGE_LENGTH = 300;
 const MAX_TITLE_LENGTH = 200;
@@ -45,6 +20,8 @@ const MAX_GIFT_MESSAGE_LENGTH = 500;
 const MAX_REPORT_DETAILS_LENGTH = 2_000;
 
 const DEFAULT_GIFT_CURRENCY = "credits";
+
+const PRESENCE_TIMEOUT_MS = 60_000;
 
 /* ============================================================================
  * TIMESTAMP HELPERS
@@ -225,7 +202,10 @@ async function assertHost(ctx: MutationCtx, streamId: Id<"liveStreams">) {
     });
   }
 
-  return { user, stream };
+  return {
+    user,
+    stream,
+  };
 }
 
 async function assertStreamExists(ctx: AuthCtx, streamId: Id<"liveStreams">) {
@@ -278,9 +258,21 @@ async function getActiveBan(
   return null;
 }
 
+async function isUserRestricted(
+  ctx: AuthCtx,
+  streamId: Id<"liveStreams">,
+  userId: Id<"users">,
+) {
+  const ban = await getActiveBan(ctx, streamId, userId);
+
+  return ban !== null;
+}
+
 async function assertCanChat(
   ctx: MutationCtx,
-  stream: { _id: Id<"liveStreams"> },
+  stream: {
+    _id: Id<"liveStreams">;
+  },
   userId: Id<"users">,
 ) {
   const ban = await getActiveBan(ctx, stream._id, userId);
@@ -307,13 +299,12 @@ async function assertCanChat(
     const remaining =
       ban.expiresAt !== undefined ? Math.max(0, ban.expiresAt - Date.now()) : 0;
 
-    throw new ConvexError({
-      code: "FORBIDDEN",
-      message:
-        remaining > 0
-          ? "Vous êtes temporairement réduit au silence"
-          : "Vous pouvez à nouveau participer au chat",
-    });
+    if (remaining > 0) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Vous êtes temporairement réduit au silence",
+      });
+    }
   }
 }
 
@@ -332,7 +323,10 @@ async function assertCanModerate(
   }
 
   if (stream.hostId === user._id || isAdmin(user)) {
-    return { user, stream };
+    return {
+      user,
+      stream,
+    };
   }
 
   const cohost = await ctx.db
@@ -347,7 +341,10 @@ async function assertCanModerate(
     cohost.status === "accepted" &&
     (cohost.role === "moderator" || cohost.role === "cohost")
   ) {
-    return { user, stream };
+    return {
+      user,
+      stream,
+    };
   }
 
   throw new ConvexError({
@@ -380,27 +377,77 @@ function isPubliclyDiscoverable(stream: {
  * STREAMS — LIST
  * ========================================================================== */
 
+/**
+ * Catalogue Live.
+ *
+ * `status` accepte désormais `"all"` en plus des statuts individuels.
+ *
+ *   - "all"     → live + ended avec replay (limités, triés desc)
+ *   - "live"    → live uniquement
+ *   - autre     → un seul statut
+ *
+ * Le filtre de visibilité est appliqué PAR STREAM (pas par requête),
+ * pour gérer correctement le mélange live/ended.
+ */
 export const listLiveStreams = query({
   args: {
     status: v.optional(
-      v.union(v.literal("live"), v.literal("scheduled"), v.literal("ended")),
+      v.union(
+        v.literal("live"),
+        v.literal("scheduled"),
+        v.literal("ended"),
+        v.literal("all"),
+      ),
     ),
   },
 
   handler: async (ctx, args) => {
-    const status = args.status ?? "live";
+    const requested = args.status ?? "live";
 
-    const streams = await ctx.db
-      .query("liveStreams")
-      .withIndex("by_status", (q) => q.eq("status", status))
-      .order("desc")
-      .take(20);
+    /* ------------------------------------------------------------------------
+     * RÉCUPÉRATION BRUTE
+     *
+     * ⚠️ `Doc<"liveStreams">[]` — sinon TS infère l'union de TOUS les
+     * documents du schema et casse tous les accès `.status`, `.hostId`, etc.
+     * ---------------------------------------------------------------------- */
 
-    const visibleStreams = streams.filter((stream) => {
-      if (status === "live") {
+    let raw: Doc<"liveStreams">[] = [];
+
+    if (requested === "all") {
+      const live = await ctx.db
+        .query("liveStreams")
+        .withIndex("by_status", (q) => q.eq("status", "live"))
+        .order("desc")
+        .take(20);
+
+      const ended = await ctx.db
+        .query("liveStreams")
+        .withIndex("by_status", (q) => q.eq("status", "ended"))
+        .order("desc")
+        .take(40);
+
+      // On ne garde que les `ended` avec un replay prêt.
+      const endedWithReplay = ended.filter((s) => !!s.replayUrl);
+
+      raw = [...live, ...endedWithReplay];
+    } else {
+      raw = await ctx.db
+        .query("liveStreams")
+        .withIndex("by_status", (q) => q.eq("status", requested))
+        .order("desc")
+        .take(20);
+    }
+
+    /* ------------------------------------------------------------------------
+     * FILTRAGE VISIBILITÉ (par stream)
+     * ---------------------------------------------------------------------- */
+
+    const visibleStreams = raw.filter((stream) => {
+      if (stream.status === "live") {
         return isPubliclyDiscoverable(stream);
       }
 
+      // scheduled / ended : ne pas exposer les masqués / supprimés
       return (
         stream.moderationStatus === "approved" &&
         stream.isActive === true &&
@@ -408,25 +455,29 @@ export const listLiveStreams = query({
       );
     });
 
+    /* ------------------------------------------------------------------------
+     * ENRICHISSEMENT
+     * ---------------------------------------------------------------------- */
+
     return Promise.all(
       visibleStreams.map(async (stream) => {
         const host = await ctx.db.get(stream.hostId);
+        const now = Date.now();
 
         const activeViewerCount =
-          status === "live"
+          stream.status === "live"
             ? await ctx.db
                 .query("liveStreamPresence")
                 .withIndex("by_stream_and_heartbeat", (q) =>
                   q
                     .eq("streamId", stream._id)
-                    .gt("lastHeartbeatAt", Date.now() - PRESENCE_TIMEOUT_MS),
+                    .gt("lastHeartbeatAt", now - PRESENCE_TIMEOUT_MS),
                 )
                 .collect()
                 .then(
                   (presence) =>
                     presence.filter(
-                      (item) =>
-                        item.leftAt === undefined || item.leftAt > Date.now(),
+                      (item) => item.leftAt === undefined || item.leftAt > now,
                     ).length,
                 )
             : stream.viewerCount;
@@ -447,6 +498,7 @@ export const listLiveStreamsPaginated = query({
     status: v.optional(
       v.union(v.literal("live"), v.literal("scheduled"), v.literal("ended")),
     ),
+
     paginationOpts: v.object({
       numItems: v.number(),
       cursor: v.union(v.string(), v.null()),
@@ -510,6 +562,7 @@ export const getStream = query({
     }
 
     const host = await ctx.db.get(stream.hostId);
+    const now = Date.now();
 
     const activeViewerCount =
       stream.status === "live"
@@ -518,14 +571,13 @@ export const getStream = query({
             .withIndex("by_stream_and_heartbeat", (q) =>
               q
                 .eq("streamId", args.streamId)
-                .gt("lastHeartbeatAt", Date.now() - PRESENCE_TIMEOUT_MS),
+                .gt("lastHeartbeatAt", now - PRESENCE_TIMEOUT_MS),
             )
             .collect()
             .then(
               (presence) =>
                 presence.filter(
-                  (item) =>
-                    item.leftAt === undefined || item.leftAt > Date.now(),
+                  (item) => item.leftAt === undefined || item.leftAt > now,
                 ).length,
             )
         : stream.viewerCount;
@@ -547,10 +599,16 @@ export const getStream = query({
 
     return {
       ...stream,
+
       hostName: host?.name ?? "Inconnu",
       hostAvatar: host?.avatar ?? undefined,
       liveViewerCount: activeViewerCount,
       likedByMe,
+
+      replayUrl: stream.replayUrl ?? null,
+      replayDurationMs: stream.replayDurationMs ?? null,
+      egressStatus: stream.egressStatus ?? null,
+      egressId: stream.egressId ?? null,
     };
   },
 });
@@ -568,6 +626,7 @@ export const getLiveStream = query({
     }
 
     const host = await ctx.db.get(stream.hostId);
+    const now = Date.now();
 
     const activeViewerCount =
       stream.status === "live"
@@ -576,23 +635,28 @@ export const getLiveStream = query({
             .withIndex("by_stream_and_heartbeat", (q) =>
               q
                 .eq("streamId", args.streamId)
-                .gt("lastHeartbeatAt", Date.now() - PRESENCE_TIMEOUT_MS),
+                .gt("lastHeartbeatAt", now - PRESENCE_TIMEOUT_MS),
             )
             .collect()
             .then(
               (presence) =>
                 presence.filter(
-                  (item) =>
-                    item.leftAt === undefined || item.leftAt > Date.now(),
+                  (item) => item.leftAt === undefined || item.leftAt > now,
                 ).length,
             )
         : stream.viewerCount;
 
     return {
       ...stream,
+
       hostName: host?.name ?? "Inconnu",
       hostAvatar: host?.avatar ?? undefined,
       liveViewerCount: activeViewerCount,
+
+      replayUrl: stream.replayUrl ?? null,
+      replayDurationMs: stream.replayDurationMs ?? null,
+      egressStatus: stream.egressStatus ?? null,
+      egressId: stream.egressId ?? null,
     };
   },
 });
@@ -672,11 +736,13 @@ export const createStream = mutation({
     }
 
     const now = Date.now();
+
     const title = normalizeTitle(args.title);
     const description = normalizeDescription(args.description);
     const tags = normalizeTags(args.tags);
 
     parseLegacyTimestamp(args.scheduledAt);
+
     const scheduledAtIso = args.scheduledAt;
     const isScheduled = scheduledAtIso !== undefined;
 
@@ -695,12 +761,17 @@ export const createStream = mutation({
 
       playbackUrl: undefined,
       ingestUrl: undefined,
+
       replayStorageId: undefined,
       replayUrl: undefined,
       replayDurationMs: undefined,
 
+      egressId: undefined,
+      egressStatus: undefined,
+
       status: isScheduled ? "scheduled" : "live",
       moderationStatus: "approved",
+
       visibility,
 
       isActive: true,
@@ -728,12 +799,18 @@ export const createStream = mutation({
       languageCode: undefined,
     });
 
+    if (!isScheduled) {
+      await ctx.scheduler.runAfter(0, internal.liveReplay.startReplayEgress, {
+        streamId,
+      });
+    }
+
     return streamId;
   },
 });
 
 /* ============================================================================
- * START LIVE STREAM — délègue au helper canonique
+ * START LIVE STREAM — EGRESS V2
  * ========================================================================== */
 
 export const startStream = mutation({
@@ -756,7 +833,7 @@ export const startStream = mutation({
       });
     }
 
-    return startStreamInternal(ctx, user, {
+    const streamId = await startStreamInternal(ctx, user, {
       title: args.title,
       description: args.description,
       category: args.category,
@@ -764,11 +841,17 @@ export const startStream = mutation({
       tags: args.tags,
       isPublic: args.isPublic,
     });
+
+    await ctx.scheduler.runAfter(0, internal.liveReplay.startReplayEgress, {
+      streamId,
+    });
+
+    return streamId;
   },
 });
 
 /* ============================================================================
- * GO LIVE — SCHEDULED STREAM
+ * GO LIVE — SCHEDULED STREAM + EGRESS
  * ========================================================================== */
 
 export const goLive = mutation({
@@ -787,6 +870,9 @@ export const goLive = mutation({
       });
     }
 
+    const egressAlreadyActive =
+      stream.egressStatus === "starting" || stream.egressStatus === "recording";
+
     const now = Date.now();
 
     await ctx.db.patch(args.streamId, {
@@ -799,12 +885,18 @@ export const goLive = mutation({
       streamUrl: args.streamUrl,
     });
 
+    if (!egressAlreadyActive) {
+      await ctx.scheduler.runAfter(0, internal.liveReplay.startReplayEgress, {
+        streamId: args.streamId,
+      });
+    }
+
     return args.streamId;
   },
 });
 
 /* ============================================================================
- * END STREAM — délègue au helper canonique
+ * END STREAM — STOP EGRESS
  * ========================================================================== */
 
 export const endStream = mutation({
@@ -814,7 +906,13 @@ export const endStream = mutation({
 
   handler: async (ctx, args) => {
     await assertHost(ctx, args.streamId);
+
     await endStreamInternal(ctx, args.streamId);
+
+    await ctx.scheduler.runAfter(0, internal.liveReplay.stopReplayEgress, {
+      streamId: args.streamId,
+    });
+
     return args.streamId;
   },
 });
@@ -839,6 +937,10 @@ export const cancelStream = mutation({
       endedAt: toIso(now),
       updatedAt: now,
       viewerCount: 0,
+    });
+
+    await ctx.scheduler.runAfter(0, internal.liveReplay.stopReplayEgress, {
+      streamId: args.streamId,
     });
 
     return args.streamId;
@@ -873,6 +975,7 @@ export const getStreamMessages = query({
 
           return {
             ...message,
+            userId: message.userId,
             userName: user?.name ?? "Utilisateur",
             userAvatar: user?.avatar ?? undefined,
           };
@@ -884,6 +987,7 @@ export const getStreamMessages = query({
 export const getStreamMessagesPaginated = query({
   args: {
     streamId: v.id("liveStreams"),
+
     paginationOpts: v.object({
       numItems: v.number(),
       cursor: v.union(v.string(), v.null()),
@@ -909,6 +1013,7 @@ export const getStreamMessagesPaginated = query({
 
           return {
             ...message,
+            userId: message.userId,
             userName: user?.name ?? "Utilisateur",
             userAvatar: user?.avatar ?? undefined,
           };
@@ -929,10 +1034,13 @@ export const getStreamMessagesPaginated = query({
 export const sendMessage = mutation({
   args: {
     streamId: v.id("liveStreams"),
+
     text: v.string(),
+
     type: v.optional(
       v.union(v.literal("chat"), v.literal("super_chat"), v.literal("system")),
     ),
+
     amount: v.optional(v.number()),
     currency: v.optional(v.string()),
     giftType: v.optional(v.string()),
@@ -942,6 +1050,13 @@ export const sendMessage = mutation({
 
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
+    if (await isUserRestricted(ctx, args.streamId, user._id)) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Vous êtes actuellement restreint sur ce live.",
+      });
+    }
 
     const stream = await assertStreamExists(ctx, args.streamId);
 
@@ -1004,16 +1119,15 @@ export const sendMessage = mutation({
       userId: user._id,
       text,
       type: messageType,
-
       amount: args.amount,
       currency: args.currency,
       giftType: args.giftType,
       giftQuantity: args.giftQuantity,
-
       replyToMessageId: args.replyToMessageId,
 
       isDeleted: false,
       isPinned: false,
+
       moderationStatus: "approved",
 
       createdAt: now,
@@ -1029,19 +1143,33 @@ export const sendMessage = mutation({
   },
 });
 
+/* ============================================================================
+ * SEND STREAM MESSAGE — LEGACY COMPATIBILITY
+ * ========================================================================== */
+
 export const sendStreamMessage = mutation({
   args: {
     streamId: v.id("liveStreams"),
+
     text: v.string(),
+
     type: v.optional(
       v.union(v.literal("chat"), v.literal("super_chat"), v.literal("system")),
     ),
+
     amount: v.optional(v.number()),
     currency: v.optional(v.string()),
   },
 
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
+
+    if (await isUserRestricted(ctx, args.streamId, user._id)) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Vous êtes actuellement restreint sur ce live.",
+      });
+    }
 
     const stream = await assertStreamExists(ctx, args.streamId);
 
@@ -1078,12 +1206,12 @@ export const sendStreamMessage = mutation({
       userId: user._id,
       text,
       type: messageType,
-
       amount: args.amount,
       currency: args.currency,
 
       isDeleted: false,
       isPinned: false,
+
       moderationStatus: "approved",
 
       createdAt: now,
@@ -1100,7 +1228,7 @@ export const sendStreamMessage = mutation({
 });
 
 /* ============================================================================
- * LIKES — REAL SOURCE OF TRUTH
+ * LIKES
  * ========================================================================== */
 
 export const likeStream = mutation({
@@ -1245,8 +1373,10 @@ export const joinStream = mutation({
       streamId: args.streamId,
       userId: user._id,
       sessionId: args.sessionId,
+
       joinedAt: now,
       lastHeartbeatAt: now,
+
       leftAt: undefined,
       counted: true,
     });
@@ -1426,7 +1556,6 @@ export const sendGift = mutation({
     ),
 
     amount: v.number(),
-
     quantity: v.optional(v.number()),
     currency: v.optional(v.string()),
     message: v.optional(v.string()),
@@ -1494,6 +1623,7 @@ export const sendGift = mutation({
 
       isDeleted: false,
       isPinned: false,
+
       moderationStatus: "approved",
 
       createdAt: now,
@@ -1502,11 +1632,13 @@ export const sendGift = mutation({
 
     const giftId = await ctx.db.insert("liveStreamGifts", {
       streamId: args.streamId,
+
       senderId: user._id,
       recipientId: stream.hostId,
 
       giftType: args.giftType,
       quantity,
+
       amount: args.amount,
       currency,
 
@@ -1518,11 +1650,15 @@ export const sendGift = mutation({
 
     await ctx.db.insert("creatorEarnings", {
       creatorId: stream.hostId,
+
       amount: args.amount,
       currency,
+
       type: "gift",
+
       sourceId: String(giftId),
       sourceType: "liveStream",
+
       createdAt: new Date(now).toISOString(),
     });
 
@@ -1551,7 +1687,9 @@ export const banUser = mutation({
   args: {
     streamId: v.id("liveStreams"),
     userId: v.id("users"),
+
     type: v.union(v.literal("ban"), v.literal("mute"), v.literal("timeout")),
+
     reason: v.optional(v.string()),
     durationMs: v.optional(v.number()),
   },
@@ -1592,8 +1730,10 @@ export const banUser = mutation({
       await ctx.db.patch(existing._id, {
         type: args.type,
         reason: args.reason?.trim(),
+
         expiresAt:
           args.type === "timeout" ? now + (args.durationMs ?? 0) : undefined,
+
         isActive: true,
       });
 
@@ -1606,7 +1746,6 @@ export const banUser = mutation({
       bannedBy: user._id,
 
       type: args.type,
-
       reason: args.reason?.trim(),
 
       expiresAt:
@@ -1653,13 +1792,11 @@ export const listStreamBans = query({
   },
 
   handler: async (ctx, args) => {
-    const bans = await ctx.db
+    return ctx.db
       .query("liveStreamBans")
       .withIndex("by_stream", (q) => q.eq("streamId", args.streamId))
       .order("desc")
       .take(100);
-
-    return bans;
   },
 });
 
@@ -1682,7 +1819,6 @@ export const reportStream = mutation({
     ),
 
     details: v.optional(v.string()),
-
     messageId: v.optional(v.id("liveStreamMessages")),
   },
 
@@ -1714,21 +1850,17 @@ export const reportStream = mutation({
 
     const now = Date.now();
 
-    const reportId = await ctx.db.insert("liveStreamReports", {
+    return ctx.db.insert("liveStreamReports", {
       streamId: args.streamId,
       reporterId: user._id,
 
       reason: args.reason,
       details,
-
       messageId: args.messageId,
 
       status: "open",
-
       createdAt: now,
     });
-
-    return reportId;
   },
 });
 
@@ -1771,6 +1903,7 @@ export const listStreamReports = query({
 export const reviewReport = mutation({
   args: {
     reportId: v.id("liveStreamReports"),
+
     status: v.union(
       v.literal("reviewing"),
       v.literal("resolved"),
@@ -1817,6 +1950,7 @@ export const inviteCoHost = mutation({
   args: {
     streamId: v.id("liveStreams"),
     userId: v.id("users"),
+
     role: v.union(
       v.literal("cohost"),
       v.literal("moderator"),
@@ -1880,6 +2014,7 @@ export const inviteCoHost = mutation({
 export const respondToCoHostInvite = mutation({
   args: {
     coHostId: v.id("liveStreamCoHosts"),
+
     status: v.union(v.literal("accepted"), v.literal("declined")),
   },
 
@@ -1981,7 +2116,6 @@ export const updateStream = mutation({
     description: v.optional(v.string()),
     category: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
-
     thumbnailUrl: v.optional(v.string()),
     playbackUrl: v.optional(v.string()),
 
@@ -1999,7 +2133,18 @@ export const updateStream = mutation({
   handler: async (ctx, args) => {
     await assertHost(ctx, args.streamId);
 
-    const patch: Record<string, unknown> = {
+    const patch: {
+      updatedAt: number;
+      title?: string;
+      description?: string;
+      category?: string;
+      tags?: string[];
+      thumbnailUrl?: string;
+      playbackUrl?: string;
+      streamUrl?: string;
+      visibility?: "public" | "followers" | "private";
+      isPublic?: boolean;
+    } = {
       updatedAt: Date.now(),
     };
 
@@ -2061,9 +2206,14 @@ export const deleteStream = mutation({
       isDeleted: true,
       isActive: false,
       status: "ended",
+
       endedAt: toIso(now),
       updatedAt: now,
       viewerCount: 0,
+    });
+
+    await ctx.scheduler.runAfter(0, internal.liveReplay.stopReplayEgress, {
+      streamId: args.streamId,
     });
 
     return args.streamId;
@@ -2077,6 +2227,7 @@ export const deleteStream = mutation({
 export const updateModerationStatus = mutation({
   args: {
     streamId: v.id("liveStreams"),
+
     moderationStatus: v.union(
       v.literal("pending"),
       v.literal("approved"),
@@ -2107,8 +2258,10 @@ export const updateModerationStatus = mutation({
 
     await ctx.db.patch(args.streamId, {
       moderationStatus: args.moderationStatus,
+
       isActive:
         args.moderationStatus !== "rejected" && stream.isDeleted !== true,
+
       updatedAt: now,
     });
 

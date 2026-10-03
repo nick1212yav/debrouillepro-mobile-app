@@ -29,6 +29,8 @@
         "foregroundImage": "./assets/branding/debrouillepro-mark.png"
       },
 
+      "permissions": ["CAMERA", "RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"],
+
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -59,7 +61,19 @@
 
       "expo-video",
       "expo-web-browser",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+
+      "@config-plugins/react-native-webrtc",
+      "@livekit/react-native-expo-plugin",
+
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Autoriser DébrouillePro à accéder à votre caméra pour diffuser en direct",
+          "microphonePermission": "Autoriser DébrouillePro à accéder à votre micro pour diffuser en direct",
+          "recordAudioAndroid": true
+        }
+      ]
     ],
 
     "experiments": {

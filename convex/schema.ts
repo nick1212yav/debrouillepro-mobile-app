@@ -4199,6 +4199,7 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
+
   // ═══════════════════════════════════════════════════════════════
   // LIVE — STREAMING
   // CONTRAT PRODUCTION v1 — PHASE 1
@@ -4258,13 +4259,28 @@ export default defineSchema({
     // URL de lecture publique HLS/MP4.
     playbackUrl: v.optional(v.string()),
 
-    // URL d'ingestion RTMP/SRT pour le pipeline broadcaster.
+    // URL d’ingestion RTMP/SRT pour le pipeline broadcaster.
     ingestUrl: v.optional(v.string()),
 
     // ─── REPLAY / VOD ──────────────────────────────────────────
     replayStorageId: v.optional(v.id("_storage")),
     replayUrl: v.optional(v.string()),
     replayDurationMs: v.optional(v.number()),
+
+    // ─── REPLAY — ÉTAT EGRESS EN COURS ────────────────────────
+    // Identifiant LiveKit Egress utilisé pour suivre l'enregistrement.
+    egressId: v.optional(v.string()),
+
+    // État du pipeline de génération du replay.
+    egressStatus: v.optional(
+      v.union(
+        v.literal("starting"),
+        v.literal("recording"),
+        v.literal("processing"),
+        v.literal("ready"),
+        v.literal("failed"),
+      ),
+    ),
 
     // ─── ÉTAT DU STREAM ────────────────────────────────────────
     status: v.union(
@@ -4352,8 +4368,13 @@ export default defineSchema({
       "moderationStatus",
       "isActive",
       "createdAt",
-    ]),
+    ])
 
+    // ─── RECHERCHE V2 ──────────────────────────────────────────
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["status", "category", "city"],
+    }),
   // ═══════════════════════════════════════════════════════════════
   // LIVE — MESSAGES / CHAT
   // ═══════════════════════════════════════════════════════════════
@@ -4594,6 +4615,46 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_stream_and_user", ["streamId", "userId"])
     .index("by_user_and_status", ["userId", "status"]),
+
+  // ═══════════════════════════════════════════════════════════════
+  // LIVE — REPLAYS (Egress LiveKit)
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // Historique des replays par stream. Un stream peut avoir plusieurs
+  // replays (ex : reconnexions Egress). On garde `replayUrl` /
+  // `egressStatus` sur `liveStreams` comme raccourci d'accès rapide.
+  // ═══════════════════════════════════════════════════════════════
+
+  liveStreamReplays: defineTable({
+    streamId: v.id("liveStreams"),
+
+    // Identifiant LiveKit Egress (retourné par startRoomCompositeEgress).
+    egressId: v.string(),
+
+    status: v.union(
+      v.literal("starting"),
+      v.literal("recording"),
+      v.literal("processing"),
+      v.literal("ready"),
+      v.literal("failed"),
+    ),
+
+    // URL publique du MP4/HLS généré (S3 / R2).
+    url: v.optional(v.string()),
+
+    // Convex Storage : utilisé si on rapatrie le fichier en interne.
+    storageId: v.optional(v.id("_storage")),
+
+    durationSec: v.optional(v.number()),
+    sizeBytes: v.optional(v.number()),
+
+    error: v.optional(v.string()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_stream", ["streamId"])
+    .index("by_egress", ["egressId"]),
 
   // ─────────────────────────────────────────────────────────────────────────
   // HÉBERGEMENT RÉSERVATIONS (enrichi)

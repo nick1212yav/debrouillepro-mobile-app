@@ -162,12 +162,15 @@ export const getPublicProfile = query({
         .unique();
 
       if (currentUser && currentUser._id !== args.userId) {
+        // Important:
+        // Une relation "follows" peut avoir des doublons historiques.
+        // first() ne lève pas d'erreur dans ce cas.
         const existingFollow = await ctx.db
           .query("follows")
           .withIndex("by_follower_and_following", (q) =>
             q.eq("followerId", currentUser._id).eq("followingId", args.userId),
           )
-          .unique();
+          .first();
 
         isFollowedByMe = existingFollow !== null;
       }
@@ -309,24 +312,32 @@ export const toggleFollow = mutation({
     }
 
     // ------------------------------------------------------------------------
-    // Recherche relation existante
+    // Recherche relation(s) existante(s)
+    //
+    // On utilise collect() volontairement :
+    // - aucun crash si des doublons historiques existent ;
+    // - tous les doublons sont supprimés lors de l'unfollow ;
+    // - la relation revient ainsi progressivement à un état propre.
     // ------------------------------------------------------------------------
 
-    const existingFollow = await ctx.db
+    const existingFollows = await ctx.db
       .query("follows")
       .withIndex("by_follower_and_following", (q) =>
         q
           .eq("followerId", currentUser._id)
           .eq("followingId", args.targetUserId),
       )
-      .unique();
+      .collect();
 
     // ------------------------------------------------------------------------
     // UNFOLLOW
     // ------------------------------------------------------------------------
 
-    if (existingFollow) {
-      await ctx.db.delete(existingFollow._id);
+    if (existingFollows.length > 0) {
+      for (const follow of existingFollows) {
+        await ctx.db.delete(follow._id);
+      }
+
       return false;
     }
 
@@ -487,12 +498,14 @@ export const getSuggestedUsers = query({
         continue;
       }
 
+      // first() au lieu de unique() :
+      // les doublons historiques ne peuvent plus faire tomber la query.
       const existingFollow = await ctx.db
         .query("follows")
         .withIndex("by_follower_and_following", (q) =>
           q.eq("followerId", currentUser._id).eq("followingId", candidate._id),
         )
-        .unique();
+        .first();
 
       if (existingFollow) {
         continue;
