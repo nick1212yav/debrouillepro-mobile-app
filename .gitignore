@@ -37,3 +37,6 @@ scripts/theme/backups/
 google-services.json
 
 android/app/google-services.json
+
+# TypeScript incremental build cache
+*.tsbuildinfo
