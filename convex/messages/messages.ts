@@ -1,8 +1,13 @@
 // convex/messages/messages.ts
 
-import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
 import { paginationOptsValidator } from "convex/server";
+import { v } from "convex/values";
+import {
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
 // ============================================================================
@@ -21,6 +26,8 @@ type MessagePage = {
   continueCursor: string;
 };
 
+type MessageContext = QueryCtx | MutationCtx;
+
 // ============================================================================
 // AUTHENTICATION
 // ============================================================================
@@ -28,7 +35,7 @@ type MessagePage = {
 /**
  * Retourne l'utilisateur Convex correspondant à l'identité authentifiée.
  */
-async function getCurrentUser(ctx: any): Promise<CurrentUser> {
+async function getCurrentUser(ctx: MessageContext): Promise<CurrentUser> {
   const identity = await ctx.auth.getUserIdentity();
 
   if (!identity) {
@@ -43,7 +50,7 @@ async function getCurrentUser(ctx: any): Promise<CurrentUser> {
 
   const user = await ctx.db
     .query("users")
-    .withIndex("by_token", (q: any) => q.eq("tokenIdentifier", tokenIdentifier))
+    .withIndex("by_token", (q) => q.eq("tokenIdentifier", tokenIdentifier))
     .unique();
 
   if (!user) {
@@ -64,7 +71,7 @@ async function getCurrentUser(ctx: any): Promise<CurrentUser> {
  * participantIds reste un fallback pour les anciennes conversations.
  */
 async function requireConversationAccess(
-  ctx: any,
+  ctx: MessageContext,
   conversationId: Id<"conversations">,
   userId: Id<"users">,
 ) {
@@ -76,7 +83,7 @@ async function requireConversationAccess(
 
   const member = await ctx.db
     .query("conversationMembers")
-    .withIndex("by_user_and_conversation", (q: any) =>
+    .withIndex("by_user_and_conversation", (q) =>
       q.eq("userId", userId).eq("conversationId", conversationId),
     )
     .unique();
@@ -100,7 +107,7 @@ async function requireConversationAccess(
  * Enrichit un message avec les informations de son auteur.
  */
 async function enrichMessage(
-  ctx: any,
+  ctx: MessageContext,
   message: Doc<"messages">,
 ): Promise<MessageWithSender> {
   const sender = await ctx.db.get(message.senderId);
@@ -115,7 +122,7 @@ async function enrichMessage(
  * Enrichit plusieurs messages.
  */
 async function enrichMessages(
-  ctx: any,
+  ctx: MessageContext,
   messages: Doc<"messages">[],
 ): Promise<MessageWithSender[]> {
   const result: MessageWithSender[] = [];
@@ -231,7 +238,6 @@ export const getRecent = query({
     await requireConversationAccess(ctx, args.conversationId, currentUser._id);
 
     const requestedLimit = args.limit ?? 50;
-
     const limit = Math.min(Math.max(requestedLimit, 1), 100);
 
     const messages = await ctx.db
