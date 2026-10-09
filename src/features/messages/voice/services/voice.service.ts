@@ -1,3 +1,5 @@
+// src/features/messages/voice/services/voice.service.ts
+
 import type { Id } from "@/convex/_generated/dataModel";
 
 export interface SendVoiceMessageArgs {
@@ -24,8 +26,8 @@ export const voiceService = {
   async sendVoiceMessage(
     mutation: SendVoiceMutation,
     args: SendVoiceMessageArgs,
-  ) {
-    if (args.duration < 0) {
+  ): Promise<Id<"messages">> {
+    if (!Number.isFinite(args.duration) || args.duration < 0) {
       throw new Error("La durée du message vocal est invalide.");
     }
 
@@ -36,7 +38,10 @@ export const voiceService = {
     });
   },
 
-  async getVoiceMessage(query: GetVoiceQuery, messageId: Id<"messages">) {
+  async getVoiceMessage(
+    query: GetVoiceQuery,
+    messageId: Id<"messages">,
+  ): Promise<VoiceMessageData | null> {
     return query({
       messageId,
     });

@@ -9,16 +9,18 @@ import { api } from "@/convex/_generated/api";
 export type PaymentStatus = "idle" | "processing" | "succeeded" | "failed";
 
 /**
- * Arguments exacts attendus par la mutation createPaymentIntent
- * (extraits directement du contrat généré par Convex).
+ * Contrat exact généré par Convex pour
+ * createPaymentIntent.
  */
 type CreatePaymentIntentArgs = FunctionArgs<
   typeof api.payments.createPaymentIntent
 >;
 
 /**
- * Entrée publique : identique à createPaymentIntent,
- * sauf "type" qui est figé à "peer_transfer" côté hook Messages.
+ * Contrat public du module Messages.
+ *
+ * Le type de paiement est imposé à
+ * "peer_transfer" par ce hook.
  */
 export type MessagePaymentInput = Omit<CreatePaymentIntentArgs, "type">;
 
@@ -26,23 +28,17 @@ export interface UseMessagePaymentsResult {
   isLoading: boolean;
   error: string | null;
   status: PaymentStatus;
-  /**
-   * Crée une intention de paiement de type peer_transfer.
-   * Retourne l'ID Convex de l'intention ou null en cas d'échec.
-   */
-  processPayment: (
-    input: MessagePaymentInput,
-  ) => Promise<string | null>;
+  processPayment: (input: MessagePaymentInput) => Promise<string | null>;
   clear: () => void;
 }
 
 export function useMessagePayments(): UseMessagePaymentsResult {
-  const createPaymentIntent = useMutation(
-    api.payments.createPaymentIntent,
-  );
+  const createPaymentIntent = useMutation(api.payments.createPaymentIntent);
 
   const [isLoading, setIsLoading] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
+
   const [status, setStatus] = useState<PaymentStatus>("idle");
 
   const processPayment = useCallback(
@@ -53,7 +49,7 @@ export function useMessagePayments(): UseMessagePaymentsResult {
         return null;
       }
 
-      if (!input.currency.trim()) {
+      if (typeof input.currency !== "string" || !input.currency.trim()) {
         setError("La devise du paiement est obligatoire.");
         setStatus("failed");
         return null;
@@ -70,6 +66,7 @@ export function useMessagePayments(): UseMessagePaymentsResult {
         });
 
         setStatus("succeeded");
+
         return String(result);
       } catch (err) {
         const message =
@@ -79,6 +76,7 @@ export function useMessagePayments(): UseMessagePaymentsResult {
 
         setError(message);
         setStatus("failed");
+
         return null;
       } finally {
         setIsLoading(false);

@@ -1,7 +1,8 @@
-import { Pressable, Text, StyleSheet } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-
 // src/features/messages/media/components/AttachmentPicker.tsx
+
+import { useCallback } from "react";
+import { Pressable, StyleSheet, Text } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 
 export type NativePickedFile = {
   uri: string;
@@ -38,11 +39,16 @@ export function AttachmentPicker({
   multiple = true,
   disabled = false,
 }: AttachmentPickerProps) {
-  const handlePress = async () => {
-    if (disabled) return;
+  const handlePress = useCallback(async () => {
+    if (disabled) {
+      return;
+    }
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return;
+
+    if (!permission.granted) {
+      return;
+    }
 
     const pickerMediaTypes =
       mediaTypes === "images"
@@ -57,16 +63,28 @@ export function AttachmentPicker({
       quality: 0.85,
     });
 
-    if (result.canceled || !result.assets?.length) return;
+    if (result.canceled || result.assets.length === 0) {
+      return;
+    }
+
     onFilesSelected(result.assets.map(mapAsset));
-  };
+  }, [disabled, mediaTypes, multiple, onFilesSelected]);
 
   return (
     <Pressable
       disabled={disabled}
       onPress={() => void handlePress()}
-      style={[styles.button, disabled && styles.disabled]}
+      accessibilityRole="button"
       accessibilityLabel="Ajouter une pièce jointe"
+      accessibilityHint="Ouvre votre galerie pour sélectionner des fichiers"
+      accessibilityState={{
+        disabled,
+      }}
+      style={({ pressed }) => [
+        styles.button,
+        disabled && styles.disabled,
+        pressed && !disabled && styles.pressed,
+      ]}
     >
       <Text style={styles.icon}>📎</Text>
     </Pressable>
@@ -74,9 +92,27 @@ export function AttachmentPicker({
 }
 
 const styles = StyleSheet.create({
-  button: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 18 },
-  disabled: { opacity: 0.5 },
-  icon: { fontSize: 18 },
+  button: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  disabled: {
+    opacity: 0.5,
+  },
+
+  pressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.96 }],
+  },
+
+  icon: {
+    fontSize: 18,
+  },
 });
 
 export default AttachmentPicker;

@@ -1,5 +1,8 @@
+// src/features/messages/presence/hooks/usePresence.ts
+
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useRef } from "react";
+import { AppState, Platform } from "react-native";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -20,7 +23,12 @@ interface UsePresenceOptions {
 }
 
 export function usePresence(options: UsePresenceOptions = {}) {
-  const { userId, userIds = [], device = "web", autoStart = true } = options;
+  const {
+    userId,
+    userIds = [],
+    device = Platform.OS,
+    autoStart = true,
+  } = options;
 
   const { isAuthenticated } = useConvexAuth();
 
@@ -177,7 +185,6 @@ export function usePresence(options: UsePresenceOptions = {}) {
     return () => {
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
-
         heartbeatRef.current = null;
       }
 
@@ -192,18 +199,35 @@ export function usePresence(options: UsePresenceOptions = {}) {
       return;
     }
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
+    if (Platform.OS === "web") {
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === "visible") {
+          void goOnline();
+        } else {
+          void goAway();
+        }
+      };
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
+      return () => {
+        document.removeEventListener(
+          "visibilitychange",
+          handleVisibilityChange,
+        );
+      };
+    }
+
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
         void goOnline();
       } else {
         void goAway();
       }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    });
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      subscription.remove();
     };
   }, [autoStart, goAway, goOnline, isAuthenticated]);
 

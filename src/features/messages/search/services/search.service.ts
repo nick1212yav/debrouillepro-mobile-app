@@ -1,4 +1,10 @@
+// src/features/messages/search/services/search.service.ts
+
 import type { Id } from "@/convex/_generated/dataModel";
+
+/* -------------------------------------------------------------------------- */
+/*                                  RESULTS                                   */
+/* -------------------------------------------------------------------------- */
 
 export type MessageSearchResult = {
   messageId: Id<"messages">;
@@ -29,6 +35,10 @@ export type GlobalSearchResult = {
   messages: MessageSearchResult[];
 };
 
+/* -------------------------------------------------------------------------- */
+/*                                  CONTRACTS                                 */
+/* -------------------------------------------------------------------------- */
+
 type SearchMessagesFn = (args: {
   query: string;
   conversationId?: Id<"conversations">;
@@ -51,6 +61,10 @@ type GlobalSearchFn = (args: {
   limit?: number;
 }) => Promise<GlobalSearchResult>;
 
+/* -------------------------------------------------------------------------- */
+/*                                  SERVICE                                   */
+/* -------------------------------------------------------------------------- */
+
 export const searchService = {
   searchMessages(
     search: SearchMessagesFn,
@@ -59,7 +73,7 @@ export const searchService = {
       conversationId?: Id<"conversations">;
       limit?: number;
     },
-  ) {
+  ): Promise<MessageSearchResult[]> {
     const normalizedQuery = query.trim();
 
     if (!normalizedQuery) {
@@ -78,7 +92,7 @@ export const searchService = {
     conversationId: Id<"conversations">,
     query: string,
     limit = 50,
-  ) {
+  ): Promise<MessageSearchResult[]> {
     const normalizedQuery = query.trim();
 
     if (!normalizedQuery) {
@@ -96,7 +110,7 @@ export const searchService = {
     search: SearchConversationsFn,
     query: string,
     limit = 30,
-  ) {
+  ): Promise<ConversationSearchResult[]> {
     const normalizedQuery = query.trim();
 
     if (!normalizedQuery) {
@@ -109,7 +123,11 @@ export const searchService = {
     });
   },
 
-  globalSearch(search: GlobalSearchFn, query: string, limit = 20) {
+  globalSearch(
+    search: GlobalSearchFn,
+    query: string,
+    limit = 20,
+  ): Promise<GlobalSearchResult> {
     const normalizedQuery = query.trim();
 
     if (!normalizedQuery) {

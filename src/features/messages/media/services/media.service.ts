@@ -1,4 +1,16 @@
+// src/features/messages/media/services/media.service.ts
+
 import type { Id } from "@/convex/_generated/dataModel";
+
+export interface NativeMediaFile {
+  uri: string;
+  name: string;
+  type: string;
+  size: number;
+  width?: number;
+  height?: number;
+  duration?: number;
+}
 
 export interface AddAttachmentArgs {
   messageId: Id<"messages">;
@@ -52,12 +64,19 @@ type DeleteAttachmentMutation = (args: {
 export const mediaService = {
   /**
    * Upload réel dans Convex Storage.
+   *
+   * Flux :
+   * generateUploadUrl()
+   *       ↓
+   * POST multipart/octet-stream
+   *       ↓
+   * storageId
    */
   async uploadFile(
     generateUploadUrl: GenerateUploadUrlMutation,
-    file: File,
+    file: NativeMediaFile,
   ): Promise<string> {
-    if (!(file instanceof File)) {
+    if (!file.uri.trim()) {
       throw new Error("Fichier invalide.");
     }
 
@@ -72,7 +91,7 @@ export const mediaService = {
       headers: {
         "Content-Type": file.type || "application/octet-stream",
       },
-      body: file,
+      body: await this.createUploadBody(file),
     });
 
     if (!response.ok) {
@@ -90,22 +109,30 @@ export const mediaService = {
     return result.storageId;
   },
 
+  /**
+   * Prépare puis envoie un fichier.
+   */
   async prepareUpload(
     generateUploadUrl: GenerateUploadUrlMutation,
-    file: File,
+    file: NativeMediaFile,
   ): Promise<UploadFileResult> {
+    if (!file.uri.trim()) {
+      throw new Error("Fichier invalide.");
+    }
+
     if (file.size <= 0) {
       throw new Error("Le fichier est vide.");
     }
 
     const dimensions = await this.getImageDimensions(file);
+
     const duration = await this.getVideoDuration(file);
 
     const fileId = await this.uploadFile(generateUploadUrl, file);
 
     return {
       fileId,
-      fileName: file.name,
+      fileName: file.name || "fichier",
       mimeType: file.type || "application/octet-stream",
       fileSize: file.size,
       ...dimensions,
@@ -113,10 +140,24 @@ export const mediaService = {
     };
   },
 
+  /**
+   * Crée le body attendu par fetch
+   * pour un fichier local React Native.
+   */
+  async createUploadBody(file: NativeMediaFile): Promise<Blob> {
+    const response = await fetch(file.uri);
+
+    if (!response.ok) {
+      throw new Error("Impossible de lire le fichier local.");
+    }
+
+    return response.blob();
+  },
+
   async addAttachment(
     mutation: AddAttachmentMutation,
     args: AddAttachmentArgs,
-  ) {
+  ): Promise<Id<"attachments">> {
     if (!args.fileId.trim()) {
       throw new Error("Identifiant du fichier manquant.");
     }
@@ -136,91 +177,77 @@ export const mediaService = {
     return mutation(args);
   },
 
-  async getAttachments(query: GetAttachmentsQuery, messageId: Id<"messages">) {
+  async getAttachments(
+    query: GetAttachmentsQuery,
+    messageId: Id<"messages">,
+  ): Promise<Attachment[]> {
     return query({ messageId });
   },
 
   async deleteAttachment(
     mutation: DeleteAttachmentMutation,
     attachmentId: Id<"attachments">,
-  ) {
+  ): Promise<boolean> {
     return mutation({ attachmentId });
   },
 
-  async getImageDimensions(
-    file: File,
-  ): Promise<{ width?: number; height?: number }> {
+  /**
+   * Les dimensions sont normalement fournies
+   * directement par expo-image-picker.
+   *
+   * Le service conserve donc ces métadonnées
+   * lorsqu'elles existent déjà.
+   */
+  async getImageDimensions(file: NativeMediaFile): Promise<{
+    width?: number;
+    height?: number;
+  }> {
     if (!file.type.startsWith("image/")) {
       return {};
     }
 
-    if (typeof window === "undefined") {
+    if (file.width === undefined || file.height === undefined) {
       return {};
     }
 
-    return new Promise((resolve) => {
-      const image = new Image();
-      const url = URL.createObjectURL(file);
-
-      image.onload = () => {
-        URL.revokeObjectURL(url);
-
-        resolve({
-          width: image.naturalWidth,
-          height: image.naturalHeight,
-        });
-      };
-
-      image.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve({});
-      };
-
-      image.src = url;
-    });
+    return {
+      width: file.width,
+      height: file.height,
+    };
   },
 
-  async getVideoDuration(file: File): Promise<number | undefined> {
+  /**
+   * La durée vidéo est fournie par
+   * expo-image-picker lorsqu'elle est disponible.
+   */
+  async getVideoDuration(file: NativeMediaFile): Promise<number | undefined> {
     if (!file.type.startsWith("video/")) {
       return undefined;
     }
 
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    return new Promise((resolve) => {
-      const video = document.createElement("video");
-      const url = URL.createObjectURL(file);
-
-      video.preload = "metadata";
-
-      video.onloadedmetadata = () => {
-        const duration = Number.isFinite(video.duration)
-          ? video.duration
-          : undefined;
-
-        URL.revokeObjectURL(url);
-        resolve(duration);
-      };
-
-      video.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve(undefined);
-      };
-
-      video.src = url;
-    });
+    return file.duration;
   },
 
-  createLocalPreviewUrl(file: File) {
-    return URL.createObjectURL(file);
+  /**
+   * En React Native, il n'existe pas
+   * d'équivalent direct et universel à
+   * URL.createObjectURL(File).
+   *
+   * L'URI locale du picker est déjà
+   * utilisable comme preview.
+   */
+  createLocalPreviewUrl(file: NativeMediaFile): string {
+    return file.uri;
   },
 
-  revokeLocalPreviewUrl(url: string) {
-    if (typeof URL !== "undefined") {
-      URL.revokeObjectURL(url);
-    }
+  /**
+   * Les URI locales RN ne nécessitent pas
+   * URL.revokeObjectURL().
+   */
+  revokeLocalPreviewUrl(_url: string): void {
+    // No-op volontairement :
+    // les URI locales RN sont gérées
+    // par le système / picker.
   },
 };
 

@@ -1,17 +1,25 @@
-import { View, Pressable, Text } from "react-native";
-import { ArrowLeft, MessageCircle, Plus, X } from "lucide-react-native";
-
-// src/features/messages/MessagesPage.tsx
-
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  BackHandler,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { ArrowLeft, MessageCircle, Plus, X } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
+
 import { useMessagesFeature } from "./hooks/useMessagesFeature";
 import { useConversations } from "./conversations/hooks/useConversations";
+import { usePresence } from "./presence/hooks/usePresence";
 
 import { ConversationList } from "./conversations/components/ConversationList";
 import { ConversationSearch } from "./conversations/components/ConversationSearch";
@@ -25,40 +33,181 @@ import { ErrorState } from "./shared/components/ErrorState";
 
 import type { ConversationPreview } from "./conversations/services/conversations.service";
 
-// ============================================================================
-// TYPES
-// ============================================================================
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 type ConversationId = Id<"conversations">;
 
 type UserId = Id<"users">;
 
+type ConversationFilter = "all" | "unread" | "groups";
+
 type MessagesPageProps = {
   initialConversationId?: ConversationId;
   className?: string;
   onBack?: () => void;
+
+  /**
+   * Espace réservé en bas de l'écran pour ne pas passer sous la barre
+   * d'onglets flottante de l'app (bouton « + » et fin de liste).
+   */
+  bottomInset?: number;
 };
 
-// ============================================================================
-// PAGE
-// ============================================================================
+/* ============================================================================
+ * CONSTANTS
+ * ========================================================================== */
+
+/** Au-delà de cette largeur : liste + conversation côte à côte (tablette/web). */
+const WIDE_BREAKPOINT = 768;
+
+const LIST_PANEL_WIDTH = 380;
+
+const DEFAULT_BOTTOM_INSET = 96;
+
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
+
+/**
+ * Lecture défensive : on ne suppose pas que `ConversationPreview` expose
+ * `unreadCount` / `isGroup`. Si le champ n'existe pas, le filtre associé est
+ * simplement masqué au lieu de produire de mauvais résultats.
+ */
+function readUnread(conversation: ConversationPreview): number {
+  const value = (
+    conversation as unknown as {
+      unreadCount?: unknown;
+    }
+  ).unreadCount;
+
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function hasUnreadField(conversation: ConversationPreview): boolean {
+  return (
+    typeof (
+      conversation as unknown as {
+        unreadCount?: unknown;
+      }
+    ).unreadCount === "number"
+  );
+}
+
+function readIsGroup(conversation: ConversationPreview): boolean {
+  return (
+    (
+      conversation as unknown as {
+        isGroup?: unknown;
+      }
+    ).isGroup === true
+  );
+}
+
+function hasGroupField(conversation: ConversationPreview): boolean {
+  return (
+    typeof (
+      conversation as unknown as {
+        isGroup?: unknown;
+      }
+    ).isGroup === "boolean"
+  );
+}
+
+/* ============================================================================
+ * FILTER CHIP
+ * ========================================================================== */
+
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={label}
+      className={[
+        "rounded-full border px-4 py-2 active:opacity-70",
+        active
+          ? "border-primary/50 bg-primary/20"
+          : "border-white/10 bg-white/[0.04]",
+      ].join(" ")}
+    >
+      <Text
+        className={[
+          "text-[13px] font-semibold",
+          active ? "text-white" : "text-white/55",
+        ].join(" ")}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/* ============================================================================
+ * PAGE
+ * ========================================================================== */
 
 export default function MessagesPage({
   initialConversationId,
   className = "",
   onBack,
+  bottomInset = DEFAULT_BOTTOM_INSET,
 }: MessagesPageProps) {
-  // ==========================================================================
-  // CURRENT USER
-  // ==========================================================================
+  const { width, height } = useWindowDimensions();
+
+  const isWide = width >= WIDE_BREAKPOINT;
+
+  const insets = useSafeAreaInsets();
+
+  /**
+   * DIMENSIONS EXPLICITES de la racine.
+   *
+   * `h-full` / `w-full` / `flex-1` dépendent d'un parent à taille définie :
+   * selon le conteneur, la page s'effondrait en bande étroite (largeur) ou en
+   * écran noir (hauteur nulle). Largeur et hauteur de la fenêtre garantissent
+   * une racine toujours visible ; `paddingTop` évite la barre d'état.
+   */
+  const rootStyle = useMemo(
+    () => ({
+      width,
+      height,
+      paddingTop: insets.top,
+    }),
+    [height, insets.top, width],
+  );
+
+  /* ==========================================================================
+   * CURRENT USER
+   * ======================================================================== */
 
   const currentUser = useCurrentUser();
 
   const currentUserId: UserId | null = currentUser?._id ?? null;
 
-  // ==========================================================================
-  // CONVERSATIONS
-  // ==========================================================================
+  /**
+   * Présence de l'utilisateur courant.
+   *
+   * Une seule instance de `usePresence` avec `autoStart: true` est montée
+   * au niveau de MessagesPage. Les ChatView utilisent `autoStart: false`
+   * uniquement pour consulter la présence de l'autre participant.
+   */
+  usePresence({
+    autoStart: true,
+  });
+
+  /* ==========================================================================
+   * CONVERSATIONS
+   * ======================================================================== */
 
   const {
     previews,
@@ -66,26 +215,26 @@ export default function MessagesPage({
     isLoading: conversationsLoading,
   } = useConversations(currentUserId);
 
-  // ==========================================================================
-  // USERS FOR NEW CONVERSATION
-  // ==========================================================================
+  /* ==========================================================================
+   * USERS FOR NEW CONVERSATION
+   * ======================================================================== */
 
   const users = useQuery(
     api.users.listForMessaging,
     currentUserId ? {} : "skip",
   );
 
-  // ==========================================================================
-  // FEATURE STATE
-  // ==========================================================================
+  /* ==========================================================================
+   * FEATURE STATE
+   * ======================================================================== */
 
   const feature = useMessagesFeature();
 
   const { activeConversationId, actions } = feature;
 
-  // ==========================================================================
-  // UI STATE
-  // ==========================================================================
+  /* ==========================================================================
+   * UI STATE
+   * ======================================================================== */
 
   const [mobilePanel, setMobilePanel] = useState<"conversations" | "chat">(
     initialConversationId ? "chat" : "conversations",
@@ -93,9 +242,11 @@ export default function MessagesPage({
 
   const [isNewConversationOpen, setIsNewConversationOpen] = useState(false);
 
-  // ==========================================================================
-  // DERIVED STATE
-  // ==========================================================================
+  const [filter, setFilter] = useState<ConversationFilter>("all");
+
+  /* ==========================================================================
+   * DERIVED STATE
+   * ======================================================================== */
 
   const selectedConversationId =
     activeConversationId ?? initialConversationId ?? null;
@@ -105,6 +256,32 @@ export default function MessagesPage({
   const isLoadingUsers = currentUserId !== null && users === undefined;
 
   const isLoading = conversationsLoading || isLoadingCurrentUser;
+
+  const showList = isWide || mobilePanel === "conversations";
+
+  const showChat = isWide || mobilePanel === "chat";
+
+  const canFilterUnread = useMemo(
+    () => previews.some(hasUnreadField),
+    [previews],
+  );
+
+  const canFilterGroups = useMemo(
+    () => previews.some(hasGroupField),
+    [previews],
+  );
+
+  const filteredPreviews = useMemo<ConversationPreview[]>(() => {
+    if (filter === "unread") {
+      return previews.filter((conversation) => readUnread(conversation) > 0);
+    }
+
+    if (filter === "groups") {
+      return previews.filter(readIsGroup);
+    }
+
+    return previews;
+  }, [filter, previews]);
 
   const activeConversation = useMemo<ConversationPreview | null>(() => {
     if (!selectedConversationId) {
@@ -119,31 +296,17 @@ export default function MessagesPage({
     );
   }, [previews, selectedConversationId]);
 
-  // ==========================================================================
-  // ROOT CLASS
-  // ==========================================================================
-
   const rootClassName = useMemo(
     () =>
-      [
-        "messages-page",
-        "flex",
-        "flex-1",
-        "flex-row",
-        "h-full",
-        "min-h-0",
-        "w-full",
-        "overflow-hidden",
-        "bg-[#050509]",
-        className,
-      ]
+      ["flex flex-row min-h-0 overflow-hidden bg-[#050509]", className]
         .filter(Boolean)
         .join(" "),
     [className],
   );
-  // ==========================================================================
-  // SELECT CONVERSATION
-  // ==========================================================================
+
+  /* ==========================================================================
+   * SELECT CONVERSATION
+   * ======================================================================== */
 
   const handleSelectConversation = useCallback(
     (conversationId: ConversationId) => {
@@ -153,10 +316,6 @@ export default function MessagesPage({
     [actions],
   );
 
-  // ==========================================================================
-  // SELECT FROM SEARCH
-  // ==========================================================================
-
   const handleSearchSelect = useCallback(
     (conversation: ConversationPreview) => {
       handleSelectConversation(conversation.conversationId);
@@ -164,9 +323,9 @@ export default function MessagesPage({
     [handleSelectConversation],
   );
 
-  // ==========================================================================
-  // INITIAL CONVERSATION
-  // ==========================================================================
+  /* ==========================================================================
+   * INITIAL CONVERSATION
+   * ======================================================================== */
 
   useEffect(() => {
     if (!initialConversationId) {
@@ -178,29 +337,47 @@ export default function MessagesPage({
     }
 
     actions.openConversation(initialConversationId);
+
     setMobilePanel("chat");
   }, [initialConversationId, activeConversationId, actions]);
 
-  // ==========================================================================
-  // BACK TO CONVERSATIONS
-  // ==========================================================================
+  /* ==========================================================================
+   * BACK NAVIGATION
+   * ======================================================================== */
 
   const handleBackToConversations = useCallback(() => {
     setMobilePanel("conversations");
   }, []);
 
-  // ==========================================================================
-  // CLOSE CONVERSATION
-  // ==========================================================================
+  /**
+   * Bouton retour matériel Android :
+   *   conversation ouverte (mobile) → retour à la liste ;
+   *   sinon on laisse la navigation de l'app gérer.
+   */
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        if (isNewConversationOpen) {
+          setIsNewConversationOpen(false);
+          return true;
+        }
 
-  const handleCloseConversation = useCallback(() => {
-    actions.closeConversation();
-    setMobilePanel("conversations");
-  }, [actions]);
+        if (!isWide && mobilePanel === "chat") {
+          setMobilePanel("conversations");
+          return true;
+        }
 
-  // ==========================================================================
-  // NEW CONVERSATION
-  // ==========================================================================
+        return false;
+      },
+    );
+
+    return () => subscription.remove();
+  }, [isNewConversationOpen, isWide, mobilePanel]);
+
+  /* ==========================================================================
+   * NEW CONVERSATION
+   * ======================================================================== */
 
   const handleNewConversation = useCallback(() => {
     setIsNewConversationOpen(true);
@@ -210,10 +387,6 @@ export default function MessagesPage({
     setIsNewConversationOpen(false);
   }, []);
 
-  // ==========================================================================
-  // CONVERSATION CREATED
-  // ==========================================================================
-
   const handleConversationCreated = useCallback(
     (conversationId: ConversationId) => {
       setIsNewConversationOpen(false);
@@ -222,375 +395,358 @@ export default function MessagesPage({
     [handleSelectConversation],
   );
 
-  // ==========================================================================
-  // LOADING
-  // ==========================================================================
+  /* ==========================================================================
+   * LOADING
+   * ======================================================================== */
 
   if (isLoading) {
     return (
-      <View className={rootClassName} accessibilityLabel="Messagerie">
-        <View className="flex h-full w-full items-center justify-center">
+      <View
+        className={rootClassName}
+        style={rootStyle}
+        accessibilityLabel="Messagerie"
+      >
+        <View className="flex-1 items-center justify-center">
           <LoadingState />
         </View>
       </View>
     );
   }
 
-  // ==========================================================================
-  // AUTHENTICATION SAFETY
-  // ==========================================================================
+  /* ==========================================================================
+   * AUTHENTICATION SAFETY
+   * ======================================================================== */
 
   if (!currentUserId) {
     return (
-      <View className={rootClassName} accessibilityLabel="Messagerie">
-        <View className="flex h-full w-full items-center justify-center p-6">
+      <View
+        className={rootClassName}
+        style={rootStyle}
+        accessibilityLabel="Messagerie"
+      >
+        <View className="flex-1 items-center justify-center p-6">
           <ErrorState />
         </View>
       </View>
     );
   }
 
-  // ==========================================================================
-  // UI
-  // ==========================================================================
+  /* ==========================================================================
+   * UI
+   * ======================================================================== */
 
   return (
     <>
-      <View className={rootClassName} accessibilityLabel="Messagerie">
-        {}
+      <View
+        className={rootClassName}
+        style={rootStyle}
+        accessibilityLabel="Messagerie"
+      >
+        {/* ==================================================================
+            LISTE DES CONVERSATIONS
+            ================================================================== */}
 
-        <View
-          className={[
-            "flex",
-            "min-h-0",
-            "min-w-0",
-            "flex-1",
-            "flex-col",
-            "border-r",
-            "border-white/10",
-            "bg-[#050509]",
-            mobilePanel === "chat" ? "hidden" : "flex",
-          ].join(" ")}
-          accessibilityLabel="Conversations"
-        >
-          {}
+        {showList ? (
+          <View
+            className="flex flex-col min-h-0 min-w-0 border-r border-white/10 bg-[#050509]"
+            style={
+              isWide
+                ? { width: LIST_PANEL_WIDTH }
+                : {
+                    flex: 1,
+                    width: "100%",
+                  }
+            }
+            accessibilityLabel="Conversations"
+          >
+            {/* HEADER */}
 
-          <View className="flex-row items-center justify-between gap-3 px-4 py-4">
-            <View className="flex-row min-w-0 flex-1 items-center gap-3">
-              {onBack && (
-                <Pressable
-                  onPress={onBack}
-                  className={[
-                    "inline-flex",
-                    "h-10",
-                    "w-10",
-                    "shrink-0",
-                    "items-center",
-                    "justify-center",
-                    "rounded-full",
-                    "border",
-                    "border-white/10",
-                    "bg-white/[0.04]",
-                    "text-white/70",
-                    "transition-all",
-                    "duration-200",
-                    "hover:bg-white/10",
-                    "hover:text-white",
-                    "active:scale-95",
-                    "focus:outline-none",
-                    "focus:ring-2",
-                    "focus:ring-primary",
-                    "focus:ring-offset-2",
-                  ].join(" ")}
-                  accessibilityLabel="Retour"
-                >
-                  <ArrowLeft size={20} color="rgba(255,255,255,0.7)" />
-                </Pressable>
-              )}
+            <View className="flex-row items-center justify-between px-4 pb-2 pt-4">
+              <View className="min-w-0 flex-1 flex-row items-center gap-3">
+                {onBack ? (
+                  <Pressable
+                    onPress={onBack}
+                    accessibilityRole="button"
+                    accessibilityLabel="Retour"
+                    hitSlop={8}
+                    className="h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] active:opacity-70"
+                  >
+                    <ArrowLeft size={20} color="rgba(255,255,255,0.8)" />
+                  </Pressable>
+                ) : null}
 
-              <View className="min-w-0 flex-1">
-                <View className="flex-row items-center gap-2">
-                  <Text className="truncate text-xl font-semibold tracking-tight text-white">
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className="text-[26px] font-bold tracking-tight text-white"
+                    numberOfLines={1}
+                  >
                     Messages
                   </Text>
 
-                  {previews.length > 0 && (
-                    <Text className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/50">
-                      {previews.length}
-                    </Text>
-                  )}
+                  <Text className="mt-0.5 text-[13px] text-white/45">
+                    {unreadCount > 0
+                      ? `${unreadCount} message${
+                          unreadCount > 1 ? "s" : ""
+                        } non lu${unreadCount > 1 ? "s" : ""}`
+                      : "Vos conversations"}
+                  </Text>
                 </View>
-
-                <Text className="mt-0.5 text-sm text-white/40">
-                  Vos conversations
-                </Text>
               </View>
+
+              {unreadCount > 0 ? (
+                <View className="h-7 min-w-[28px] items-center justify-center rounded-full bg-primary px-2">
+                  <Text className="text-[12px] font-bold text-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              ) : null}
             </View>
+
+            {/* RECHERCHE */}
+
+            <View className="px-3 pb-2 pt-1">
+              <ConversationSearch
+                conversations={previews}
+                onSelect={handleSearchSelect}
+              />
+            </View>
+
+            {/* FILTRES */}
+
+            {canFilterUnread || canFilterGroups ? (
+              <View className="flex-row gap-2 px-4 pb-2 pt-1">
+                <FilterChip
+                  label="Toutes"
+                  active={filter === "all"}
+                  onPress={() => setFilter("all")}
+                />
+
+                {canFilterUnread ? (
+                  <FilterChip
+                    label="Non lues"
+                    active={filter === "unread"}
+                    onPress={() => setFilter("unread")}
+                  />
+                ) : null}
+
+                {canFilterGroups ? (
+                  <FilterChip
+                    label="Groupes"
+                    active={filter === "groups"}
+                    onPress={() => setFilter("groups")}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+
+            {/* LISTE */}
+
+            <View
+              className="min-h-0 flex-1 px-2 py-2"
+              style={{
+                paddingBottom: bottomInset + 72,
+              }}
+            >
+              {previews.length === 0 ? (
+                <View className="flex-1 items-center justify-center px-4">
+                  <EmptyConversations
+                    onNewConversation={handleNewConversation}
+                  />
+                </View>
+              ) : filteredPreviews.length === 0 ? (
+                <View className="flex-1 items-center justify-center px-6">
+                  <Text className="text-center text-[15px] font-semibold text-white/70">
+                    Aucune conversation
+                  </Text>
+
+                  <Text className="mt-1 text-center text-[13px] text-white/40">
+                    Aucun résultat pour ce filtre.
+                  </Text>
+
+                  <Pressable
+                    onPress={() => setFilter("all")}
+                    accessibilityRole="button"
+                    className="mt-4 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 active:opacity-70"
+                  >
+                    <Text className="text-[13px] font-semibold text-white/80">
+                      Voir toutes les conversations
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <ConversationList
+                  conversations={filteredPreviews}
+                  currentConversationId={selectedConversationId}
+                  onSelect={handleSelectConversation}
+                />
+              )}
+            </View>
+
+            {/* BOUTON FLOTTANT « NOUVELLE CONVERSATION » */}
 
             <Pressable
               onPress={handleNewConversation}
-              className={[
-                "inline-flex",
-                "h-10",
-                "w-10",
-                "shrink-0",
-                "items-center",
-                "justify-center",
-                "rounded-full",
-                "bg-primary",
-                "text-primary-foreground",
-                "shadow-lg",
-                "transition-all",
-                "duration-200",
-                "hover:scale-105",
-                "hover:opacity-90",
-                "active:scale-95",
-                "focus:outline-none",
-                "focus:ring-2",
-                "focus:ring-primary",
-                "focus:ring-offset-2",
-              ].join(" ")}
+              accessibilityRole="button"
               accessibilityLabel="Nouvelle conversation"
+              className="absolute right-5 h-14 w-14 items-center justify-center rounded-2xl bg-primary active:opacity-80"
+              style={{
+                bottom: bottomInset,
+                elevation: 8,
+                shadowColor: "#7C3AED",
+                shadowOpacity: 0.45,
+                shadowRadius: 14,
+                shadowOffset: {
+                  width: 0,
+                  height: 6,
+                },
+              }}
             >
-              <Plus size={20} color="#ffffff" />
+              <Plus size={26} color="#ffffff" />
             </Pressable>
           </View>
+        ) : null}
 
-          <View className="px-3 pb-3">
-            <ConversationSearch
-              conversations={previews}
-              onSelect={handleSearchSelect}
-            />
-          </View>
+        {/* ==================================================================
+            CONVERSATION
+            ================================================================== */}
 
-          <View className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-            {previews.length > 0 ? (
-              <ConversationList
-                conversations={previews}
-                currentConversationId={selectedConversationId}
-                onSelect={handleSelectConversation}
+        {showChat ? (
+          <View
+            className="min-h-0 min-w-0 flex-1 bg-black"
+            style={{
+              flex: 1,
+              minWidth: 0,
+            }}
+            accessibilityLabel={
+              activeConversation
+                ? `Conversation avec ${activeConversation.title}`
+                : "Conversation"
+            }
+          >
+            {selectedConversationId ? (
+              <ChatView
+                conversationId={selectedConversationId}
+                currentUserId={currentUserId}
+                onBack={isWide ? undefined : handleBackToConversations}
               />
             ) : (
-              <View className="flex h-full items-center justify-center px-4">
-                <EmptyConversations onNewConversation={handleNewConversation} />
-              </View>
-            )}
-          </View>
-
-          {}
-
-          <View className="hidden shrink-0 border-t border-white/10 px-4 py-3 md:block">
-            <View className="flex items-center justify-between">
-              <Text className="text-xs text-white/30">
-                Messagerie DébrouillePro
-              </Text>
-
-              <Text className="flex items-center gap-1.5 text-[11px] text-white/30">
-                <Text className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Connecté
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {}
-
-        <View
-          className={[
-            "min-h-0",
-            "min-w-0",
-            "flex-1",
-            "h-full",
-            "bg-black",
-            mobilePanel === "conversations" ? "hidden" : "flex",
-          ].join(" ")}
-          accessibilityLabel={
-            activeConversation
-              ? `Conversation avec ${activeConversation.title}`
-              : "Conversation"
-          }
-        >
-          {selectedConversationId ? (
-            <ChatView
-              conversationId={selectedConversationId}
-              currentUserId={currentUserId}
-              onBack={handleBackToConversations}
-              onInfo={handleCloseConversation}
-            />
-          ) : (
-            <View className="relative flex h-full w-full items-center justify-center overflow-hidden bg-black p-6">
-              {}
-
-              <View
-                className="pointer-events-none absolute inset-0 opacity-40"
-                accessibilityElementsHidden={true}
-                importantForAccessibility="no-hide-descendants"
-              >
-                <View className="absolute left-[15%] top-[20%] h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-                <View className="absolute bottom-[10%] right-[15%] h-72 w-72 rounded-full bg-violet-500/10 blur-3xl" />
-              </View>
-
-              {}
-
-              <View className="relative z-10 mx-auto max-w-lg text-center">
-                {}
-
-                <View className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.04] shadow-2xl backdrop-blur-xl">
-                  <View className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+              <View className="flex-1 items-center justify-center bg-black p-6">
+                <View className="mb-6 h-24 w-24 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.04]">
+                  <View className="h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                     <MessageCircle size={32} color="#8b5cf6" />
                   </View>
                 </View>
 
-                {}
-
-                <View className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/50 backdrop-blur">
-                  <Text className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  <Text>Messagerie DébrouillePro</Text>
-                </View>
-
-                {}
-
-                <Text className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
+                <Text className="text-center text-3xl font-semibold tracking-tight text-white">
                   Vos messages
                 </Text>
 
-                {}
-
-                <Text className="mx-auto mt-4 max-w-md text-sm leading-6 text-white/40">
+                <Text className="mt-3 max-w-md text-center text-sm leading-6 text-white/40">
                   Sélectionnez une conversation pour commencer à échanger.
-                  {"\n"}
-                  Texte, médias, vocaux, appels, réactions et bien plus encore.
                 </Text>
-
-                {}
 
                 <Pressable
                   onPress={handleNewConversation}
-                  className={[
-                    "mt-7",
-                    "inline-flex",
-                    "items-center",
-                    "gap-2",
-                    "rounded-xl",
-                    "bg-primary",
-                    "px-5",
-                    "py-3",
-                    "text-sm",
-                    "font-semibold",
-                    "text-primary-foreground",
-                    "shadow-xl",
-                    "transition-all",
-                    "duration-200",
-                    "hover:scale-[1.02]",
-                    "hover:opacity-90",
-                    "active:scale-[0.98]",
-                    "focus:outline-none",
-                    "focus:ring-2",
-                    "focus:ring-primary",
-                    "focus:ring-offset-2",
-                  ].join(" ")}
+                  accessibilityRole="button"
+                  className="mt-7 flex-row items-center gap-2 rounded-xl bg-primary px-5 py-3 active:opacity-80"
                 >
                   <Plus size={16} color="#ffffff" />
-                  <Text>Nouvelle conversation</Text>
+
+                  <Text className="text-sm font-semibold text-white">
+                    Nouvelle conversation
+                  </Text>
                 </Pressable>
-
-                {}
-
-                <View className="mx-auto mt-10 flex max-w-md flex-wrap items-center justify-center gap-2">
-                  {["💬 Messages", "🎤 Vocaux", "📎 Médias", "📞 Appels"].map(
-                    (featureLabel) => (
-                      <Text
-                        key={featureLabel}
-                        className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-white/30"
-                      >
-                        {featureLabel}
-                      </Text>
-                    ),
-                  )}
-                </View>
               </View>
-            </View>
-          )}
-        </View>
+            )}
+          </View>
+        ) : null}
       </View>
 
       {/* =====================================================================
-          NEW CONVERSATION MODAL
+          NOUVELLE CONVERSATION — feuille du bas (Modal natif)
+
+          Dimensions explicites : dans un Modal Android, `flex: 1` et
+          `width: 100%` s'effondrent sans parent de taille définie.
           ===================================================================== */}
 
-      {isNewConversationOpen && (
-        <View
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-md"
-          accessibilityRole="none"
+      {isNewConversationOpen ? (
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={handleCloseNewConversation}
         >
           <View
-            className={[
-              "w-full",
-              "max-w-lg",
-              "overflow-hidden",
-              "rounded-2xl",
-              "border",
-              "border-white/10",
-              "bg-[#050509]",
-              "shadow-2xl",
-            ].join(" ")}
-            accessibilityViewIsModal={true}
-            accessibilityLabel="Nouvelle conversation"
+            className="justify-end bg-black/60"
+            style={{
+              width,
+              height,
+            }}
           >
-            {}
+            <Pressable
+              onPress={handleCloseNewConversation}
+              accessibilityLabel="Fermer"
+              className="flex-1"
+            />
 
-            <View className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <View className="min-w-0">
-                <Text className="text-lg font-semibold text-white">
-                  Nouvelle conversation
-                </Text>
-
-                <Text className="mt-0.5 text-sm text-white/40">
-                  Choisissez une personne avec qui discuter.
-                </Text>
+            <View
+              className="rounded-t-3xl border-t border-white/10 bg-[#0B0B12]"
+              style={{
+                maxHeight: height * 0.85,
+              }}
+              accessibilityViewIsModal={true}
+              accessibilityLabel="Nouvelle conversation"
+            >
+              <View className="items-center pt-2">
+                <View className="h-1 w-10 rounded-full bg-white/20" />
               </View>
 
-              <Pressable
-                onPress={handleCloseNewConversation}
-                className={[
-                  "inline-flex",
-                  "h-9",
-                  "w-9",
-                  "shrink-0",
-                  "items-center",
-                  "justify-center",
-                  "rounded-full",
-                  "text-white/40",
-                  "transition",
-                  "hover:bg-white/10",
-                  "hover:text-white",
-                  "focus:outline-none",
-                  "focus:ring-2",
-                  "focus:ring-primary",
-                ].join(" ")}
-                accessibilityLabel="Fermer"
-              >
-                <X size={20} color="rgba(255,255,255,0.6)" />
-              </Pressable>
-            </View>
+              <View className="flex-row items-center justify-between border-b border-white/10 px-5 py-4">
+                <View className="min-w-0 flex-1">
+                  <Text className="text-lg font-semibold text-white">
+                    Nouvelle conversation
+                  </Text>
 
-            {}
-
-            <View className="max-h-[70vh] overflow-y-auto p-5">
-              {isLoadingUsers ? (
-                <View className="flex min-h-40 items-center justify-center">
-                  <LoadingState />
+                  <Text className="mt-0.5 text-sm text-white/40">
+                    Choisissez une personne avec qui discuter.
+                  </Text>
                 </View>
-              ) : (
-                <NewConversation
-                  users={users ?? []}
-                  onCreated={handleConversationCreated}
-                />
-              )}
+
+                <Pressable
+                  onPress={handleCloseNewConversation}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer"
+                  hitSlop={8}
+                  className="h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] active:opacity-70"
+                >
+                  <X size={20} color="rgba(255,255,255,0.7)" />
+                </Pressable>
+              </View>
+
+              <ScrollView
+                className="px-5 pt-4"
+                contentContainerStyle={{
+                  paddingBottom: 32,
+                }}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {isLoadingUsers ? (
+                  <View className="min-h-40 items-center justify-center">
+                    <LoadingState />
+                  </View>
+                ) : (
+                  <NewConversation
+                    users={users ?? []}
+                    onCreated={handleConversationCreated}
+                  />
+                )}
+              </ScrollView>
             </View>
           </View>
-        </View>
-      )}
+        </Modal>
+      ) : null}
     </>
   );
 }

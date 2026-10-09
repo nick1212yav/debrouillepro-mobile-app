@@ -1,7 +1,7 @@
-import { Text, Pressable, StyleSheet } from "react-native";
-import type { Id } from "@/convex/_generated/dataModel";
-
 // src/features/messages/readReceipts/components/ReadReceipt.tsx
+
+import { Pressable, StyleSheet, Text } from "react-native";
+import type { Id } from "@/convex/_generated/dataModel";
 
 import { useReadReceipts } from "../hooks/useReadReceipts";
 
@@ -27,6 +27,7 @@ export function ReadReceipt({
   });
 
   const receipts = getReceiptForMessage(messageId);
+
   const isOwnMessage = Boolean(
     senderId && currentUserId && senderId === currentUserId,
   );
@@ -36,7 +37,7 @@ export function ReadReceipt({
       await markAsRead(messageId);
       onRead?.(messageId);
     } catch {
-      // erreur gérée par le hook
+      // L'erreur est gérée par le hook.
     }
   };
 
@@ -44,7 +45,11 @@ export function ReadReceipt({
     return (
       <Pressable
         onPress={handleMarkAsRead}
-        style={styles.markAsReadButton}
+        style={({ pressed }) => [
+          styles.markAsReadButton,
+          pressed && styles.markAsReadPressed,
+        ]}
+        accessibilityRole="button"
         accessibilityLabel="Marquer comme lu"
       >
         <Text style={styles.markAsReadText}>Marquer comme lu</Text>
@@ -54,6 +59,7 @@ export function ReadReceipt({
 
   if (isOwnMessage) {
     const hasBeenRead = status === "read" || receipts.length > 0;
+
     const isDelivered =
       status === "delivered" || status === "read" || receipts.length > 0;
 
@@ -62,6 +68,7 @@ export function ReadReceipt({
         <Text
           style={styles.failedText}
           accessibilityLabel="Échec de l'envoi"
+          accessibilityRole="text"
         >
           !
         </Text>
@@ -74,6 +81,7 @@ export function ReadReceipt({
       <Text
         style={[styles.statusText, hasBeenRead && styles.statusTextRead]}
         accessibilityLabel={label}
+        accessibilityRole="text"
       >
         {isDelivered ? "✓✓" : "✓"}
       </Text>
@@ -82,7 +90,11 @@ export function ReadReceipt({
 
   if (status === "read") {
     return (
-      <Text style={styles.readText} accessibilityLabel="Lu">
+      <Text
+        style={styles.readText}
+        accessibilityLabel="Lu"
+        accessibilityRole="text"
+      >
         Lu
       </Text>
     );
@@ -95,24 +107,34 @@ const styles = StyleSheet.create({
   markAsReadButton: {
     paddingVertical: 4,
   },
+
+  markAsReadPressed: {
+    opacity: 0.65,
+  },
+
   markAsReadText: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
+    color: "rgba(255,255,255,0.40)",
   },
+
   failedText: {
     fontSize: 12,
+    fontWeight: "700",
     color: "#f87171",
   },
+
   statusText: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
+    color: "rgba(255,255,255,0.40)",
   },
+
   statusTextRead: {
     color: "#60a5fa",
   },
+
   readText: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.4)",
+    color: "rgba(255,255,255,0.40)",
   },
 });
 

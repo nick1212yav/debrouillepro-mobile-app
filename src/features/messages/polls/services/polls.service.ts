@@ -1,3 +1,5 @@
+// src/features/messages/polls/services/polls.service.ts
+
 import type { Id } from "@/convex/_generated/dataModel";
 
 export interface PollOptionInput {
@@ -99,3 +101,5 @@ export const pollsService = {
     return mutation({ pollId });
   },
 };
+
+export default pollsService;

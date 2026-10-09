@@ -1,4 +1,5 @@
 import { View } from "react-native";
+
 import type { MyAnalytics } from "../services/analytics.service";
 
 import AnalyticsCard from "./AnalyticsCard";

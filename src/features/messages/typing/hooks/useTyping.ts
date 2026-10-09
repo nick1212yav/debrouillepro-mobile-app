@@ -1,5 +1,7 @@
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+// src/features/messages/typing/hooks/useTyping.ts
+
 import { useCallback, useEffect, useRef } from "react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -110,21 +112,19 @@ export function useTyping(conversationId?: Id<"conversations">) {
         timeoutRef.current = null;
       }
 
-      if (isTypingRef.current) {
+      if (isTypingRef.current && conversationId && isAuthenticated) {
         isTypingRef.current = false;
 
-        if (conversationId && isAuthenticated) {
-          void stopTypingMutation({
-            conversationId,
-          }).catch((error) => {
-            console.error("[useTyping] Nettoyage du typing échoué:", error);
-          });
-        }
+        void stopTypingMutation({
+          conversationId,
+        }).catch((error) => {
+          console.error("[useTyping] Nettoyage du typing échoué:", error);
+        });
       }
     };
   }, [conversationId, isAuthenticated, stopTypingMutation]);
 
-  const typingUsers = (typingUsersQuery ?? []) as TypingUser[];
+  const typingUsers: TypingUser[] = typingUsersQuery ?? [];
 
   const isSomeoneTyping = typingUsers.length > 0;
 
@@ -145,7 +145,6 @@ export function useTyping(conversationId?: Id<"conversations">) {
       isAuthenticated &&
       Boolean(conversationId) &&
       typingUsersQuery === undefined,
-
     startTyping,
     stopTyping,
     handleTyping,

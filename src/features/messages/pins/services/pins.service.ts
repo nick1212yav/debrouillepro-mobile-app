@@ -1,3 +1,5 @@
+// src/features/messages/pins/services/pins.service.ts
+
 import type { Id } from "@/convex/_generated/dataModel";
 
 type TogglePinMutation = (args: {
@@ -8,10 +10,10 @@ export const pinsService = {
   /**
    * Épingle ou désépingle un message.
    *
-   * Le backend se charge de vérifier :
-   * - que le message existe ;
-   * - que l'utilisateur appartient à la conversation ;
-   * - puis inverse isPinned.
+   * Le backend reste responsable de vérifier :
+   * - l'existence du message ;
+   * - l'appartenance de l'utilisateur à la conversation ;
+   * - l'inversion de isPinned.
    */
   async togglePin(
     mutation: TogglePinMutation,
@@ -22,3 +24,5 @@ export const pinsService = {
     });
   },
 };
+
+export default pinsService;

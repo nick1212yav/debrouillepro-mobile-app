@@ -1,4 +1,7 @@
-import { Text, View, Pressable, Image } from "react-native";
+// src/features/messages/groups/components/GroupHeader.tsx
+
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+
 import type { Id } from "@/convex/_generated/dataModel";
 
 interface GroupHeaderProps {
@@ -10,39 +13,132 @@ interface GroupHeaderProps {
 }
 
 export function GroupHeader({
+  conversationId: _conversationId,
   name = "Groupe",
   avatar,
   memberCount,
   onBack,
 }: GroupHeaderProps) {
-  return (
-    <View className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-      {onBack && (
-        <Pressable onPress={onBack} className="flex h-9 w-9 items-center justify-center rounded-full" accessibilityLabel="Retour">
-          ←
-        </Pressable>
-      )}
+  const normalizedName = name.trim() || "Groupe";
+  const initial = normalizedName.charAt(0).toUpperCase();
 
-      <View className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">
+  return (
+    <View style={styles.container}>
+      {onBack ? (
+        <Pressable
+          onPress={onBack}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+          style={({ pressed }) => [
+            styles.backButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.backIcon}>‹</Text>
+        </Pressable>
+      ) : null}
+
+      <View style={styles.avatar}>
         {avatar ? (
-          <Image className="h-full w-full object-cover" source={{ uri: avatar }} accessibilityLabel={name} />
+          <Image
+            source={{ uri: avatar }}
+            style={styles.avatarImage}
+            accessibilityLabel={`Avatar de ${normalizedName}`}
+          />
         ) : (
-          <Text className="font-semibold text-white/70">
-            {name.charAt(0).toUpperCase()}
+          <Text
+            style={styles.avatarInitial}
+            accessibilityLabel={`Initiale de ${normalizedName}`}
+          >
+            {initial}
           </Text>
         )}
       </View>
 
-      <View className="min-w-0">
-        <Text className="truncate text-sm font-semibold text-white">{name}</Text>
+      <View style={styles.info}>
+        <Text numberOfLines={1} ellipsizeMode="tail" style={styles.name}>
+          {normalizedName}
+        </Text>
 
-        <Text className="text-xs text-white/50">
-          {memberCount} membre
-          {memberCount !== 1 ? "s" : ""}
+        <Text style={styles.memberCount}>
+          {memberCount} membre{memberCount !== 1 ? "s" : ""}
         </Text>
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
+  },
+
+  backButton: {
+    width: 36,
+    height: 36,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+  },
+
+  backIcon: {
+    marginTop: -3,
+    fontSize: 30,
+    fontWeight: "300",
+    lineHeight: 34,
+    color: "#ffffff",
+  },
+
+  avatar: {
+    width: 44,
+    height: 44,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  avatarInitial: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.70)",
+  },
+
+  info: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  name: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+
+  memberCount: {
+    marginTop: 2,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.50)",
+  },
+
+  pressed: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+});
 
 export default GroupHeader;

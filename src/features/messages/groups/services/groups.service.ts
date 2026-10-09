@@ -1,3 +1,5 @@
+// src/features/messages/groups/services/groups.service.ts
+
 import type { Id } from "@/convex/_generated/dataModel";
 
 export type GroupId = Id<"conversations">;
@@ -81,7 +83,7 @@ export const groupsService = {
   },
 
   normalizeMembers(members: GroupMember[]): GroupMember[] {
-    return members.map(groupsService.normalizeMember);
+    return members.map((member) => groupsService.normalizeMember(member));
   },
 
   getDisplayName(member: GroupMember): string {
@@ -96,7 +98,7 @@ export const groupsService = {
     member: GroupMember,
     currentUserId: UserId | null | undefined,
   ): boolean {
-    return !!currentUserId && member.userId === currentUserId;
+    return Boolean(currentUserId && member.userId === currentUserId);
   },
 
   canInviteMembers(member: GroupMember | null): boolean {
@@ -104,7 +106,7 @@ export const groupsService = {
      * Le backend actuel autorise un membre
      * existant à inviter dans un groupe.
      */
-    return !!member;
+    return Boolean(member);
   },
 
   canRemoveMember(
@@ -115,7 +117,7 @@ export const groupsService = {
      * Le backend actuel n'autorise que
      * l'auto-suppression.
      */
-    return !!currentUserId && member.userId === currentUserId;
+    return Boolean(currentUserId && member.userId === currentUserId);
   },
 };
 

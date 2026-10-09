@@ -1,9 +1,10 @@
 // src/features/messages/events/services/events.service.ts
 
-import type { Id } from "../../../../../convex/_generated/dataModel";
 import { api } from "../../../../../convex/_generated/api";
+import type { Id } from "../../../../../convex/_generated/dataModel";
 
 export type EventId = Id<"events">;
+
 export type PublicationId = Id<"publications">;
 
 export type EventRsvpStatus = "attending" | "interested" | "not_going";
@@ -88,6 +89,26 @@ export const eventsApi = {
   getPublication: api.publications.getPublication,
 } as const;
 
+type PublicationMeta = {
+  eventId?: unknown;
+};
+
+function isPublicationMeta(value: unknown): value is PublicationMeta {
+  return typeof value === "object" && value !== null && "eventId" in value;
+}
+
+function parsePublicationMeta(value: unknown): unknown {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 export function extractEventIdFromPublication(
   publication:
     | {
@@ -96,25 +117,15 @@ export function extractEventIdFromPublication(
     | null
     | undefined,
 ): EventId | null {
-  if (!publication?.meta) {
+  if (publication?.meta === undefined) {
     return null;
   }
 
-  let meta: unknown = publication.meta;
+  const meta = parsePublicationMeta(publication.meta);
 
-  if (typeof meta === "string") {
-    try {
-      meta = JSON.parse(meta);
-    } catch {
-      return null;
-    }
-  }
-
-  if (typeof meta !== "object" || meta === null || !("eventId" in meta)) {
+  if (!isPublicationMeta(meta)) {
     return null;
   }
 
-  const eventId = (meta as { eventId?: unknown }).eventId;
-
-  return typeof eventId === "string" ? (eventId as EventId) : null;
+  return typeof meta.eventId === "string" ? (meta.eventId as EventId) : null;
 }

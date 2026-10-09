@@ -1,14 +1,7 @@
-import {
-  Pressable,
-  View,
-  TextInput,
-  Text,
-  type StyleProp,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native";
+// src/features/messages/immo/components/PropertyMessage.tsx
 
-import React, { useState } from "react";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import type { PropertyWithMedia } from "../services/immo.service";
 import { PropertyPreview } from "./PropertyPreview";
@@ -40,249 +33,276 @@ export function PropertyMessage({
   const [showRequestForm, setShowRequestForm] = useState(false);
 
   const handleSubmit = () => {
-    if (!onSendVisitRequest || isSendingRequest || !message.trim()) {
+    const trimmedMessage = message.trim();
+
+    if (!onSendVisitRequest || isSendingRequest || !trimmedMessage) {
       return;
     }
 
-    onSendVisitRequest(message.trim(), visitDate.trim() || undefined);
+    onSendVisitRequest(trimmedMessage, visitDate.trim() || undefined);
   };
+
+  const canSubmit = !isSendingRequest && Boolean(message.trim());
 
   return (
     <View
-      style={[wrapperStyle, isOwn ? ownWrapperStyle : incomingWrapperStyle]}
+      style={[
+        styles.wrapper,
+        isOwn ? styles.ownWrapper : styles.incomingWrapper,
+      ]}
     >
       <PropertyPreview property={property} compact onPress={onOpenProperty} />
 
-      <View style={actionsStyle}>
-        {!requestSent && !showRequestForm && (
+      <View style={styles.actions}>
+        {!requestSent && !showRequestForm ? (
           <Pressable
             onPress={() => setShowRequestForm(true)}
-            style={primaryButtonStyle}
             accessibilityRole="button"
             accessibilityLabel="Demander une visite"
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.primaryButtonPressed,
+            ]}
           >
-            <Text style={primaryButtonTextStyle}>📅 Demander une visite</Text>
+            <Text style={styles.primaryButtonText}>📅 Demander une visite</Text>
           </Pressable>
-        )}
+        ) : null}
 
-        {requestSent && (
-          <View style={successStyle}>
-            <Text style={successTextStyle}>✓ Demande de visite envoyée</Text>
+        {requestSent ? (
+          <View
+            style={styles.success}
+            accessibilityRole="text"
+            accessibilityLabel="Demande de visite envoyée"
+          >
+            <Text style={styles.successText}>✓ Demande de visite envoyée</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
-      {showRequestForm && !requestSent && (
-        <View style={formStyle}>
-          <Text style={labelStyle}>Message</Text>
+      {showRequestForm && !requestSent ? (
+        <View style={styles.form}>
+          <Text style={styles.label}>Message</Text>
 
           <TextInput
             value={message}
             onChangeText={setMessage}
-            style={textareaStyle}
+            style={styles.textarea}
             multiline
             textAlignVertical="top"
             editable={!isSendingRequest}
             accessibilityLabel="Message de demande de visite"
+            placeholderTextColor="#9ca3af"
           />
 
-          <Text style={labelStyle}>Date souhaitée</Text>
+          <Text style={styles.label}>Date souhaitée</Text>
 
           <TextInput
             value={visitDate}
             onChangeText={setVisitDate}
-            style={inputStyle}
+            style={styles.input}
             editable={!isSendingRequest}
             placeholder="Ex. 25/09/2026"
             placeholderTextColor="#9ca3af"
             accessibilityLabel="Date souhaitée"
           />
 
-          {error && (
-            <View style={errorStyle}>
-              <Text style={errorTextStyle}>{error}</Text>
+          {error ? (
+            <View style={styles.error} accessibilityRole="alert">
+              <Text style={styles.errorText}>{error}</Text>
             </View>
-          )}
+          ) : null}
 
-          <View style={formActionsStyle}>
+          <View style={styles.formActions}>
             <Pressable
               onPress={() => setShowRequestForm(false)}
               disabled={isSendingRequest}
-              style={({ pressed }) => [
-                secondaryButtonStyle,
-                pressed && !isSendingRequest
-                  ? secondaryButtonPressedStyle
-                  : undefined,
-                isSendingRequest ? secondaryButtonDisabledStyle : undefined,
-              ]}
               accessibilityRole="button"
-              accessibilityLabel="Annuler"
+              accessibilityLabel="Annuler la demande de visite"
+              accessibilityState={{
+                disabled: isSendingRequest,
+              }}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                pressed && !isSendingRequest && styles.secondaryButtonPressed,
+                isSendingRequest && styles.secondaryButtonDisabled,
+              ]}
             >
-              <Text style={secondaryButtonTextStyle}>Annuler</Text>
+              <Text style={styles.secondaryButtonText}>Annuler</Text>
             </Pressable>
 
             <Pressable
               onPress={handleSubmit}
-              disabled={isSendingRequest || !message.trim()}
-              style={({ pressed }) => [
-                primaryButtonStyle,
-                pressed && !isSendingRequest
-                  ? primaryButtonPressedStyle
-                  : undefined,
-                isSendingRequest || !message.trim()
-                  ? primaryButtonDisabledStyle
-                  : undefined,
-              ]}
+              disabled={!canSubmit}
               accessibilityRole="button"
-              accessibilityLabel="Envoyer la demande"
+              accessibilityLabel="Envoyer la demande de visite"
+              accessibilityState={{
+                disabled: !canSubmit,
+                busy: isSendingRequest,
+              }}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && canSubmit && styles.primaryButtonPressed,
+                !canSubmit && styles.primaryButtonDisabled,
+              ]}
             >
-              <Text style={primaryButtonTextStyle}>
+              <Text style={styles.primaryButtonText}>
                 {isSendingRequest ? "Envoi…" : "Envoyer la demande"}
               </Text>
             </Pressable>
           </View>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
 
-const wrapperStyle: ViewStyle = {
-  width: "100%",
-  maxWidth: 360,
-};
+const styles = StyleSheet.create({
+  wrapper: {
+    width: "100%",
+    maxWidth: 360,
+  },
 
-const ownWrapperStyle: ViewStyle = {
-  alignSelf: "flex-end",
-};
+  ownWrapper: {
+    alignSelf: "flex-end",
+  },
 
-const incomingWrapperStyle: ViewStyle = {
-  alignSelf: "flex-start",
-};
+  incomingWrapper: {
+    alignSelf: "flex-start",
+  },
 
-const actionsStyle: ViewStyle = {
-  marginTop: 9,
-};
+  actions: {
+    marginTop: 9,
+  },
 
-const formStyle: ViewStyle = {
-  marginTop: 10,
-  padding: 13,
-  borderRadius: 14,
-  borderWidth: 1,
-  borderColor: "#e5e7eb",
-  backgroundColor: "#ffffff",
-};
+  form: {
+    marginTop: 10,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 14,
+    backgroundColor: "#111827",
+  },
 
-const labelStyle: TextStyle = {
-  marginBottom: 5,
-  fontSize: 12,
-  fontWeight: "700",
-  color: "#374151",
-};
+  label: {
+    marginBottom: 5,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#d1d5db",
+  },
 
-const textareaStyle: TextStyle = {
-  width: "100%",
-  paddingHorizontal: 11,
-  paddingVertical: 10,
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: "#d1d5db",
-  marginBottom: 10,
-  color: "#111827",
-  minHeight: 96,
-};
+  textarea: {
+    width: "100%",
+    minHeight: 96,
+    marginBottom: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#374151",
+    borderRadius: 10,
+    backgroundColor: "#0f172a",
+    color: "#ffffff",
+  },
 
-const inputStyle: TextStyle = {
-  width: "100%",
-  paddingHorizontal: 11,
-  paddingVertical: 10,
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: "#d1d5db",
-  marginBottom: 10,
-  color: "#111827",
-};
+  input: {
+    width: "100%",
+    marginBottom: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#374151",
+    borderRadius: 10,
+    backgroundColor: "#0f172a",
+    color: "#ffffff",
+  },
 
-const formActionsStyle: ViewStyle = {
-  flexDirection: "row",
-  gap: 8,
-};
+  formActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
 
-const primaryButtonStyle: ViewStyle = {
-  flex: 1,
-  minHeight: 42,
-  paddingHorizontal: 12,
-  paddingVertical: 10,
-  borderRadius: 10,
-  backgroundColor: "#111827",
-  justifyContent: "center",
-  alignItems: "center",
-};
+  primaryButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#2563eb",
+  },
 
-const primaryButtonPressedStyle: ViewStyle = {
-  opacity: 0.82,
-};
+  primaryButtonPressed: {
+    opacity: 0.82,
+  },
 
-const primaryButtonDisabledStyle: ViewStyle = {
-  opacity: 0.45,
-};
+  primaryButtonDisabled: {
+    opacity: 0.45,
+  },
 
-const primaryButtonTextStyle: TextStyle = {
-  color: "#ffffff",
-  fontWeight: "700",
-  textAlign: "center",
-};
+  primaryButtonText: {
+    color: "#ffffff",
+    fontWeight: "700",
+    textAlign: "center",
+  },
 
-const secondaryButtonStyle: ViewStyle = {
-  flex: 1,
-  minHeight: 42,
-  paddingHorizontal: 12,
-  paddingVertical: 10,
-  borderWidth: 1,
-  borderColor: "#d1d5db",
-  borderRadius: 10,
-  backgroundColor: "#ffffff",
-  justifyContent: "center",
-  alignItems: "center",
-};
+  secondaryButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#374151",
+    borderRadius: 10,
+    backgroundColor: "#1f2937",
+  },
 
-const secondaryButtonPressedStyle: ViewStyle = {
-  opacity: 0.75,
-};
+  secondaryButtonPressed: {
+    opacity: 0.75,
+  },
 
-const secondaryButtonDisabledStyle: ViewStyle = {
-  opacity: 0.45,
-};
+  secondaryButtonDisabled: {
+    opacity: 0.45,
+  },
 
-const secondaryButtonTextStyle: TextStyle = {
-  color: "#374151",
-  fontWeight: "600",
-  textAlign: "center",
-};
+  secondaryButtonText: {
+    color: "#e5e7eb",
+    fontWeight: "600",
+    textAlign: "center",
+  },
 
-const successStyle: ViewStyle = {
-  paddingHorizontal: 12,
-  paddingVertical: 10,
-  borderRadius: 10,
-  backgroundColor: "#ecfdf5",
-};
+  success: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.20)",
+    borderRadius: 10,
+    backgroundColor: "rgba(16,185,129,0.10)",
+  },
 
-const successTextStyle: TextStyle = {
-  color: "#047857",
-  fontSize: 13,
-  fontWeight: "700",
-  textAlign: "center",
-};
+  successText: {
+    color: "#34d399",
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
+  },
 
-const errorStyle: ViewStyle = {
-  marginBottom: 10,
-  paddingHorizontal: 10,
-  paddingVertical: 9,
-  borderRadius: 9,
-  backgroundColor: "#fef2f2",
-};
+  error: {
+    marginBottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.20)",
+    borderRadius: 9,
+    backgroundColor: "rgba(239,68,68,0.10)",
+  },
 
-const errorTextStyle: TextStyle = {
-  color: "#b91c1c",
-  fontSize: 12,
-};
+  errorText: {
+    color: "#f87171",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+});
+
+export default PropertyMessage;

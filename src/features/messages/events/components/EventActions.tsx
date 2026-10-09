@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 // src/features/messages/events/components/EventActions.tsx
 
@@ -25,14 +25,22 @@ export function EventActions({
 }: EventActionsProps) {
   return (
     <View style={styles.container}>
-      {onRsvp && (
+      {onRsvp ? (
         <>
           <Pressable
             disabled={disabled}
             onPress={() => void onRsvp("attending")}
-            style={[
+            accessibilityRole="button"
+            accessibilityLabel="Participer à l'événement"
+            accessibilityState={{
+              disabled,
+              selected: currentRsvp === "attending",
+            }}
+            style={({ pressed }) => [
               styles.actionButton,
               currentRsvp === "attending" && styles.attendingBg,
+              disabled && styles.disabled,
+              pressed && !disabled && styles.pressed,
             ]}
           >
             <Text style={styles.actionText}>
@@ -43,9 +51,17 @@ export function EventActions({
           <Pressable
             disabled={disabled}
             onPress={() => void onRsvp("interested")}
-            style={[
+            accessibilityRole="button"
+            accessibilityLabel="Marquer l'événement comme intéressant"
+            accessibilityState={{
+              disabled,
+              selected: currentRsvp === "interested",
+            }}
+            style={({ pressed }) => [
               styles.actionButton,
               currentRsvp === "interested" && styles.interestedBg,
+              disabled && styles.disabled,
+              pressed && !disabled && styles.pressed,
             ]}
           >
             <Text style={styles.actionText}>
@@ -53,39 +69,76 @@ export function EventActions({
             </Text>
           </Pressable>
 
-          {currentRsvp && (
+          {currentRsvp ? (
             <Pressable
               disabled={disabled}
               onPress={() => void onRsvp("not_going")}
-              style={styles.actionButton}
+              accessibilityRole="button"
+              accessibilityLabel="Ne plus participer à l'événement"
+              accessibilityState={{
+                disabled,
+                selected: currentRsvp === "not_going",
+              }}
+              style={({ pressed }) => [
+                styles.actionButton,
+                currentRsvp === "not_going" && styles.notGoingBg,
+                disabled && styles.disabled,
+                pressed && !disabled && styles.pressed,
+              ]}
             >
               <Text style={styles.actionText}>Je ne participe plus</Text>
             </Pressable>
-          )}
+          ) : null}
         </>
-      )}
+      ) : null}
 
-      {onLike && (
+      {onLike ? (
         <Pressable
           disabled={disabled}
           onPress={() => void onLike()}
-          accessibilityLabel="J'aime l'événement"
-          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel={
+            liked ? "Retirer mon J'aime de l'événement" : "J'aime l'événement"
+          }
+          accessibilityState={{
+            disabled,
+            selected: liked,
+          }}
+          style={({ pressed }) => [
+            styles.iconButton,
+            liked && styles.activeIconButton,
+            disabled && styles.disabled,
+            pressed && !disabled && styles.pressed,
+          ]}
         >
           <Text style={styles.iconText}>{liked ? "❤️" : "♡"}</Text>
         </Pressable>
-      )}
+      ) : null}
 
-      {onBookmark && (
+      {onBookmark ? (
         <Pressable
           disabled={disabled}
           onPress={() => void onBookmark()}
-          accessibilityLabel="Enregistrer l'événement"
-          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel={
+            bookmarked
+              ? "Retirer l'événement des enregistrements"
+              : "Enregistrer l'événement"
+          }
+          accessibilityState={{
+            disabled,
+            selected: bookmarked,
+          }}
+          style={({ pressed }) => [
+            styles.iconButton,
+            bookmarked && styles.activeIconButton,
+            disabled && styles.disabled,
+            pressed && !disabled && styles.pressed,
+          ]}
         >
-          <Text style={styles.iconText}>{bookmarked ? "🔖" : "🔖"}</Text>
+          <Text style={styles.iconText}>🔖</Text>
         </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -96,35 +149,65 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+
   actionButton: {
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    backgroundColor: "#ffffff",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
+
   attendingBg: {
-    backgroundColor: "#dcfce7",
+    backgroundColor: "rgba(34,197,94,0.18)",
+    borderColor: "rgba(74,222,128,0.35)",
   },
+
   interestedBg: {
-    backgroundColor: "#fef3c7",
+    backgroundColor: "rgba(245,158,11,0.18)",
+    borderColor: "rgba(251,191,36,0.35)",
   },
+
+  notGoingBg: {
+    backgroundColor: "rgba(239,68,68,0.12)",
+    borderColor: "rgba(248,113,113,0.30)",
+  },
+
   actionText: {
     fontWeight: "700",
     fontSize: 13,
-    color: "#111827",
+    color: "#ffffff",
   },
+
   iconButton: {
+    minWidth: 42,
+    minHeight: 42,
     paddingVertical: 9,
     paddingHorizontal: 11,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#ffffff",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    alignItems: "center",
+    justifyContent: "center",
   },
+
+  activeIconButton: {
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+
   iconText: {
     fontSize: 16,
+  },
+
+  disabled: {
+    opacity: 0.45,
+  },
+
+  pressed: {
+    opacity: 0.72,
   },
 });
 

@@ -1,101 +1,51 @@
 // src/features/messages/voice/hooks/useVoiceRecorder.ts
 
 import { useCallback, useEffect, useRef, useState } from "react";
-
+import { Audio } from "expo-av";
 import type { Id } from "@/convex/_generated/dataModel";
 
-import mediaService from "../../media/services/media.service";
-import voiceService from "../services/voice.service";
+import { mediaService } from "../../media/services/media.service";
+import { voiceService } from "../services/voice.service";
+
+const DEFAULT_MIME_TYPE = "audio/mp4";
 
 export interface VoiceRecording {
+  uri: string;
   blob: Blob;
   duration: number;
   mimeType: string;
 }
 
-type GenerateUploadUrlMutation = () => Promise<string>;
-
-type SendVoiceMessageMutation = (args: {
-  conversationId: Id<"conversations">;
-  fileId: Id<"_storage">;
-  duration: number;
-}) => Promise<Id<"messages">>;
-
 interface UseVoiceRecorderOptions {
-  conversationId?: Id<"conversations"> | null;
-  generateUploadUrl?: GenerateUploadUrlMutation;
-  sendVoiceMessage?: SendVoiceMessageMutation;
-}
+  /**
+   * Optionnel : requis uniquement si `sendRecording` est utilisé.
+   *
+   * `VoiceRecorder` (record-only) peut appeler le hook sans args.
+   */
+  conversationId?: Id<"conversations">;
 
-const MIME_TYPES = [
-  "audio/webm;codecs=opus",
-  "audio/webm",
-  "audio/ogg;codecs=opus",
-  "audio/mp4",
-];
+  generateUploadUrl?: () => Promise<string>;
 
-function getSupportedMimeType() {
-  if (typeof MediaRecorder === "undefined") {
-    return "";
-  }
-
-  return MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
-}
-
-function getVoiceExtension(mimeType: string) {
-  if (mimeType.includes("ogg")) {
-    return "ogg";
-  }
-
-  if (mimeType.includes("mp4")) {
-    return "m4a";
-  }
-
-  return "webm";
+  sendVoiceMessage?: (args: {
+    conversationId: Id<"conversations">;
+    fileId: Id<"_storage">;
+    duration: number;
+  }) => Promise<Id<"messages">>;
 }
 
 export function useVoiceRecorder(options: UseVoiceRecorderOptions = {}) {
   const { conversationId, generateUploadUrl, sendVoiceMessage } = options;
 
-  const recorderRef = useRef<MediaRecorder | null>(null);
-
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const chunksRef = useRef<Blob[]>([]);
-
+  const recorderRef = useRef<Audio.Recording | null>(null);
   const startedAtRef = useRef<number | null>(null);
-
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [isRecording, setIsRecording] = useState(false);
-
   const [duration, setDuration] = useState(0);
-
   const [recording, setRecording] = useState<VoiceRecording | null>(null);
-
   const [isUploading, setIsUploading] = useState(false);
-
   const [uploadProgress, setUploadProgress] = useState(0);
-
-  const [sentMessageId, setSentMessageId] = useState<Id<"messages"> | null>(
-    null,
-  );
-
   const [error, setError] = useState<string | null>(null);
-
-  // ========================================================================
-  // MICRO
-  // ========================================================================
-
-  const stopTracks = useCallback(() => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-
-    streamRef.current = null;
-  }, []);
-
-  // ========================================================================
-  // TIMER
-  // ========================================================================
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -104,152 +54,165 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions = {}) {
     }
   }, []);
 
-  // ========================================================================
-  // START
-  // ========================================================================
+  const startTimer = useCallback(() => {
+    clearTimer();
+
+    startedAtRef.current = Date.now();
+
+    timerRef.current = setInterval(() => {
+      if (!startedAtRef.current) {
+        return;
+      }
+
+      setDuration(
+        Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000)),
+      );
+    }, 250);
+  }, [clearTimer]);
 
   const startRecording = useCallback(async () => {
-    if (isRecording) {
+    if (recorderRef.current) {
       return;
-    }
-
-    if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-      throw new Error(
-        "L'enregistrement audio n'est pas disponible sur cet appareil.",
-      );
-    }
-
-    if (typeof MediaRecorder === "undefined") {
-      throw new Error("MediaRecorder n'est pas disponible dans ce navigateur.");
     }
 
     setError(null);
     setRecording(null);
-    setSentMessageId(null);
     setDuration(0);
-    setUploadProgress(0);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
+      const permission = await Audio.requestPermissionsAsync();
+
+      if (!permission.granted) {
+        throw new Error("L'autorisation du microphone est nécessaire.");
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
       });
 
-      streamRef.current = stream;
+      const recorder = new Audio.Recording();
 
-      const mimeType = getSupportedMimeType();
+      await recorder.prepareToRecordAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY,
+      );
 
-      const recorder = mimeType
-        ? new MediaRecorder(stream, {
-            mimeType,
-          })
-        : new MediaRecorder(stream);
+      await recorder.startAsync();
 
       recorderRef.current = recorder;
-
-      chunksRef.current = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onerror = () => {
-        setError("Une erreur est survenue pendant l'enregistrement.");
-      };
-
-      recorder.onstop = () => {
-        const finalMimeType = recorder.mimeType || mimeType || "audio/webm";
-
-        const blob = new Blob(chunksRef.current, {
-          type: finalMimeType,
-        });
-
-        const finalDuration = startedAtRef.current
-          ? Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000))
-          : 0;
-
-        setRecording({
-          blob,
-          duration: finalDuration,
-          mimeType: finalMimeType,
-        });
-
-        chunksRef.current = [];
-        startedAtRef.current = null;
-
-        stopTracks();
-        clearTimer();
-      };
-
-      startedAtRef.current = Date.now();
-
-      recorder.start();
-
       setIsRecording(true);
-
-      timerRef.current = setInterval(() => {
-        if (startedAtRef.current) {
-          setDuration(Math.floor((Date.now() - startedAtRef.current) / 1000));
-        }
-      }, 250);
+      startTimer();
     } catch (err) {
-      stopTracks();
+      recorderRef.current = null;
+      setIsRecording(false);
       clearTimer();
 
       const message =
         err instanceof Error
           ? err.message
-          : "Impossible d'accéder au microphone.";
+          : "Impossible de démarrer l'enregistrement vocal.";
 
       setError(message);
-
-      throw err;
     }
-  }, [clearTimer, isRecording, stopTracks]);
+  }, [clearTimer, startTimer]);
 
-  // ========================================================================
-  // STOP
-  // ========================================================================
-
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback(async () => {
     const recorder = recorderRef.current;
 
     if (!recorder) {
       return;
     }
 
-    if (recorder.state !== "inactive") {
-      recorder.stop();
-    }
-
-    recorderRef.current = null;
-
-    setIsRecording(false);
-
     clearTimer();
+
+    try {
+      const status = await recorder.getStatusAsync();
+
+      if (status.isRecording) {
+        await recorder.stopAndUnloadAsync();
+      }
+
+      const uri = recorder.getURI();
+
+      if (!uri) {
+        throw new Error("Aucun fichier audio n'a été généré.");
+      }
+
+      const finalDuration =
+        typeof status.durationMillis === "number"
+          ? Math.max(0, Math.round(status.durationMillis / 1000))
+          : startedAtRef.current
+            ? Math.max(
+                0,
+                Math.round((Date.now() - startedAtRef.current) / 1000),
+              )
+            : 0;
+
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      const nextRecording: VoiceRecording = {
+        uri,
+        blob,
+        duration: finalDuration,
+        mimeType: DEFAULT_MIME_TYPE,
+      };
+
+      setRecording(nextRecording);
+      setDuration(finalDuration);
+      setIsRecording(false);
+      startedAtRef.current = null;
+      recorderRef.current = null;
+    } catch (err) {
+      setIsRecording(false);
+      recorderRef.current = null;
+      startedAtRef.current = null;
+
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Impossible d'arrêter l'enregistrement vocal.";
+
+      setError(message);
+    }
   }, [clearTimer]);
 
-  // ========================================================================
-  // UPLOAD + SEND
-  // ========================================================================
+  const cancelRecording = useCallback(async () => {
+    clearTimer();
+
+    const recorder = recorderRef.current;
+
+    recorderRef.current = null;
+    startedAtRef.current = null;
+
+    if (recorder) {
+      try {
+        const status = await recorder.getStatusAsync();
+
+        if (status.isRecording) {
+          await recorder.stopAndUnloadAsync();
+        }
+      } catch {
+        // Le nettoyage reste best-effort.
+      }
+    }
+
+    setIsRecording(false);
+    setRecording(null);
+    setDuration(0);
+    setUploadProgress(0);
+    setError(null);
+  }, [clearTimer]);
 
   const sendRecording = useCallback(async () => {
     if (!recording) {
-      throw new Error("Aucun enregistrement vocal à envoyer.");
+      throw new Error("Aucun message vocal à envoyer.");
     }
 
-    if (!conversationId) {
-      throw new Error("Conversation introuvable.");
-    }
-
-    if (!generateUploadUrl) {
-      throw new Error("Le service d'upload n'est pas configuré.");
-    }
-
-    if (!sendVoiceMessage) {
-      throw new Error("Le service de message vocal n'est pas configuré.");
+    if (!conversationId || !generateUploadUrl || !sendVoiceMessage) {
+      throw new Error(
+        "sendRecording nécessite conversationId, generateUploadUrl et sendVoiceMessage.",
+      );
     }
 
     if (isUploading) {
@@ -261,37 +224,21 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions = {}) {
     setUploadProgress(0);
 
     try {
-      // ================================================================
-      // BLOB → FILE
-      // ================================================================
-
       const extension = getVoiceExtension(recording.mimeType);
 
-      const file = new File(
-        [recording.blob],
-        `voice-${Date.now()}.${extension}`,
-        {
-          type: recording.mimeType || "audio/webm",
-        },
-      );
+      const file = {
+        uri: recording.uri,
+        name: `voice-${Date.now()}.${extension}`,
+        type: recording.mimeType || DEFAULT_MIME_TYPE,
+        size: recording.blob.size,
+      };
 
       setUploadProgress(5);
 
-      // ================================================================
-      // CONVEX STORAGE
-      // ================================================================
-      //
-      // IMPORTANT :
-      //
-      // mediaService.uploadFile() reçoit
-      // la mutation generateUploadUrl.
-      //
-      // Le service effectue ensuite lui-même
-      // l'obtention de l'URL et l'upload.
-      //
-      // ================================================================
-
-      const storageId = await mediaService.uploadFile(generateUploadUrl, file);
+      const storageId = (await mediaService.uploadFile(
+        generateUploadUrl,
+        file,
+      )) as Id<"_storage">;
 
       if (!storageId) {
         throw new Error(
@@ -301,19 +248,13 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions = {}) {
 
       setUploadProgress(85);
 
-      // ================================================================
-      // STORAGE → MESSAGE VOCAL
-      // ================================================================
-
       const messageId = await voiceService.sendVoiceMessage(sendVoiceMessage, {
         conversationId,
-        fileId: storageId as Id<"_storage">,
+        fileId: storageId,
         duration: recording.duration,
       });
 
       setUploadProgress(100);
-      setSentMessageId(messageId);
-
       setRecording(null);
       setDuration(0);
 
@@ -325,7 +266,6 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions = {}) {
           : "Impossible d'envoyer le message vocal.";
 
       setError(message);
-
       throw err;
     } finally {
       setIsUploading(false);
@@ -338,88 +278,67 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions = {}) {
     sendVoiceMessage,
   ]);
 
-  // ========================================================================
-  // CANCEL
-  // ========================================================================
-
-  const cancelRecording = useCallback(() => {
-    const recorder = recorderRef.current;
-
-    if (recorder) {
-      recorder.ondataavailable = null;
-      recorder.onstop = null;
-
-      if (recorder.state !== "inactive") {
-        recorder.stop();
-      }
-    }
-
+  const reset = useCallback(() => {
+    clearTimer();
     recorderRef.current = null;
-
-    chunksRef.current = [];
     startedAtRef.current = null;
 
-    stopTracks();
-    clearTimer();
-
     setIsRecording(false);
-    setDuration(0);
-    setRecording(null);
-    setUploadProgress(0);
-    setSentMessageId(null);
-    setError(null);
-  }, [clearTimer, stopTracks]);
-
-  // ========================================================================
-  // RESET
-  // ========================================================================
-
-  const resetRecording = useCallback(() => {
     setRecording(null);
     setDuration(0);
+    setIsUploading(false);
     setUploadProgress(0);
-    setSentMessageId(null);
     setError(null);
-  }, []);
-
-  // ========================================================================
-  // CLEANUP
-  // ========================================================================
+  }, [clearTimer]);
 
   useEffect(() => {
     return () => {
-      const recorder = recorderRef.current;
-
-      if (recorder && recorder.state !== "inactive") {
-        recorder.stop();
-      }
-
       clearTimer();
-      stopTracks();
-    };
-  }, [clearTimer, stopTracks]);
 
-  // ========================================================================
-  // API
-  // ========================================================================
+      const recorder = recorderRef.current;
+      recorderRef.current = null;
+
+      if (recorder) {
+        void recorder.stopAndUnloadAsync().catch(() => undefined);
+      }
+    };
+  }, [clearTimer]);
 
   return {
     isRecording,
     duration,
     recording,
-    error,
-
     isUploading,
     uploadProgress,
-
-    sentMessageId,
-
+    error,
     startRecording,
     stopRecording,
     cancelRecording,
     sendRecording,
-    resetRecording,
+    reset,
   };
+}
+
+function getVoiceExtension(mimeType: string): string {
+  const normalized = mimeType.toLowerCase();
+
+  if (normalized.includes("mpeg")) {
+    return "mp3";
+  }
+
+  if (normalized.includes("wav")) {
+    return "wav";
+  }
+
+  if (normalized.includes("ogg")) {
+    return "ogg";
+  }
+
+  if (normalized.includes("m4a") || normalized.includes("mp4")) {
+    return "m4a";
+  }
+
+  return "m4a";
 }
 
 export default useVoiceRecorder;

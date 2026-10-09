@@ -14,14 +14,17 @@ export function useMediaGallery(items: GalleryItem[] = []) {
 
   const isOpen = selectedIndex !== null;
 
-  const selectedItem = useMemo(
-    () => (selectedIndex !== null ? (items[selectedIndex] ?? null) : null),
-    [items, selectedIndex],
-  );
+  const selectedItem = useMemo(() => {
+    if (selectedIndex === null) {
+      return null;
+    }
+
+    return items[selectedIndex] ?? null;
+  }, [items, selectedIndex]);
 
   const open = useCallback(
     (index: number) => {
-      if (index < 0 || index >= items.length) {
+      if (!Number.isInteger(index) || index < 0 || index >= items.length) {
         return;
       }
 

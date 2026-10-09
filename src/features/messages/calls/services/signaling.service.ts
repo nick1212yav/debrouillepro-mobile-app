@@ -5,13 +5,13 @@ import type { SignalingMessage } from "../types/call.types";
 type SignalingListener = (message: SignalingMessage) => void;
 
 class SignalingService {
-  private listeners = new Map<string, Set<SignalingListener>>();
+  private readonly listeners = new Map<string, Set<SignalingListener>>();
 
-  private getKey(callId: Id<"calls">) {
+  private getKey(callId: Id<"calls">): string {
     return callId.toString();
   }
 
-  subscribe(callId: Id<"calls">, listener: SignalingListener) {
+  subscribe(callId: Id<"calls">, listener: SignalingListener): () => void {
     const key = this.getKey(callId);
 
     const current = this.listeners.get(key) ?? new Set<SignalingListener>();
@@ -34,7 +34,7 @@ class SignalingService {
     };
   }
 
-  emit(message: SignalingMessage) {
+  emit(message: SignalingMessage): void {
     const listeners = this.listeners.get(this.getKey(message.callId));
 
     listeners?.forEach((listener) => {
@@ -42,7 +42,7 @@ class SignalingService {
     });
   }
 
-  clear(callId: Id<"calls">) {
+  clear(callId: Id<"calls">): void {
     this.listeners.delete(this.getKey(callId));
   }
 }

@@ -9,6 +9,8 @@ interface ForwardPreviewProps {
 export function ForwardPreview({ messageId, text }: ForwardPreviewProps) {
   void messageId;
 
+  const trimmedText = text?.trim();
+
   return (
     <View
       className="mb-2 w-full overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.05] px-3.5 py-2.5"
@@ -26,13 +28,13 @@ export function ForwardPreview({ messageId, text }: ForwardPreviewProps) {
         </Text>
       </View>
 
-      {text?.trim() ? (
+      {trimmedText ? (
         <Text
           className="mt-1.5 text-xs leading-4 text-white/65"
           numberOfLines={4}
           ellipsizeMode="tail"
         >
-          {text.trim()}
+          {trimmedText}
         </Text>
       ) : (
         <Text className="mt-1.5 text-xs italic leading-4 text-white/30">

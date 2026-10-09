@@ -1,15 +1,8 @@
-import {
-  Pressable,
-  Text,
-  View,
-  TextInput,
-  type ViewStyle,
-  type TextStyle,
-} from "react-native";
-
 // src/features/messages/payments/components/PaymentComposer.tsx
 
-import React, { useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+import { useState } from "react";
 
 export interface PaymentComposerProps {
   currency?: string;
@@ -29,6 +22,8 @@ export function PaymentComposer({
 
   const isDisabled = disabled || isLoading;
 
+  const normalizedCurrency = currency.trim().toUpperCase() || "EUR";
+
   const handleSubmit = () => {
     if (isDisabled) {
       return;
@@ -40,46 +35,66 @@ export function PaymentComposer({
       return;
     }
 
-    onSubmit(parsedAmount, currency, description.trim() || undefined);
+    onSubmit(parsedAmount, normalizedCurrency, description.trim() || undefined);
   };
 
   const canSubmit = !isDisabled && amount.trim().length > 0;
 
   return (
-    <View style={containerStyle}>
-      <View style={headerContainerStyle}>
-        <Text style={headerTextStyle}>Envoyer un paiement</Text>
+    <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerText}>Envoyer un paiement</Text>
       </View>
 
-      <View style={amountRowStyle}>
+      <View style={styles.amountRow}>
         <TextInput
           value={amount}
           onChangeText={setAmount}
           placeholder="0,00"
-          style={amountInputStyle}
+          placeholderTextColor="#6b7280"
+          style={[styles.amountInput, isDisabled && styles.inputDisabled]}
           accessibilityLabel="Montant"
-          keyboardType="numeric"
+          accessibilityHint="Saisissez le montant du paiement"
+          keyboardType="decimal-pad"
           editable={!isDisabled}
+          returnKeyType="next"
         />
-        <Text style={currencyStyle}>{currency.toUpperCase()}</Text>
+
+        <Text style={styles.currency}>{normalizedCurrency}</Text>
       </View>
 
       <TextInput
         value={description}
         onChangeText={setDescription}
         placeholder="Motif du paiement"
+        placeholderTextColor="#6b7280"
         maxLength={200}
-        style={descriptionInputStyle}
+        style={[styles.descriptionInput, isDisabled && styles.inputDisabled]}
         accessibilityLabel="Motif du paiement"
         editable={!isDisabled}
+        multiline
+        numberOfLines={2}
+        textAlignVertical="top"
       />
 
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          isLoading ? "Traitement du paiement" : "Continuer le paiement"
+        }
+        accessibilityState={{
+          disabled: !canSubmit,
+          busy: isLoading,
+        }}
         disabled={!canSubmit}
         onPress={handleSubmit}
-        style={[buttonStyle, !canSubmit && buttonDisabledStyle]}
+        style={({ pressed }) => [
+          styles.button,
+          !canSubmit && styles.buttonDisabled,
+          pressed && canSubmit && styles.buttonPressed,
+        ]}
       >
-        <Text style={buttonTextStyle}>
+        <Text style={styles.buttonText}>
           {isLoading ? "Traitement..." : "Continuer"}
         </Text>
       </Pressable>
@@ -87,80 +102,94 @@ export function PaymentComposer({
   );
 }
 
-const containerStyle: ViewStyle = {
-  flexDirection: "column",
-  gap: 12,
-  padding: 16,
-  borderRadius: 16,
-  borderWidth: 1,
-  borderColor: "#e5e7eb",
-  backgroundColor: "#ffffff",
-};
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "column",
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#0c1022",
+  },
 
-const headerContainerStyle: ViewStyle = {
-  marginBottom: 4,
-};
+  headerContainer: {
+    marginBottom: 4,
+  },
 
-const headerTextStyle: TextStyle = {
-  fontSize: 15,
-  fontWeight: "600",
-  color: "#111827",
-};
+  headerText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#ffffff",
+  },
 
-const amountRowStyle: ViewStyle = {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 8,
-};
+  amountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
 
-const amountInputStyle: TextStyle = {
-  flex: 1,
-  paddingVertical: 12,
-  paddingHorizontal: 14,
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: "#d1d5db",
-  backgroundColor: "#ffffff",
-  fontSize: 18,
-  color: "#111827",
-};
+  amountInput: {
+    flex: 1,
+    minHeight: 48,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    fontSize: 18,
+    color: "#ffffff",
+  },
 
-const currencyStyle: TextStyle = {
-  fontWeight: "700",
-  fontSize: 14,
-  color: "#111827",
-};
+  currency: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#d1d5db",
+  },
 
-const descriptionInputStyle: TextStyle = {
-  width: "100%",
-  paddingVertical: 10,
-  paddingHorizontal: 12,
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: "#d1d5db",
-  backgroundColor: "#ffffff",
-  fontSize: 14,
-  color: "#111827",
-};
+  descriptionInput: {
+    width: "100%",
+    minHeight: 48,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    fontSize: 14,
+    color: "#ffffff",
+  },
 
-const buttonStyle: ViewStyle = {
-  width: "100%",
-  paddingVertical: 11,
-  paddingHorizontal: 14,
-  borderRadius: 10,
-  backgroundColor: "#111827",
-  alignItems: "center",
-  justifyContent: "center",
-};
+  inputDisabled: {
+    opacity: 0.5,
+  },
 
-const buttonDisabledStyle: ViewStyle = {
-  opacity: 0.4,
-};
+  button: {
+    width: "100%",
+    minHeight: 46,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: "#2563eb",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
-const buttonTextStyle: TextStyle = {
-  color: "#fff",
-  fontWeight: "600",
-  fontSize: 14,
-};
+  buttonDisabled: {
+    opacity: 0.4,
+  },
+
+  buttonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.99 }],
+  },
+
+  buttonText: {
+    color: "#ffffff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+});
 
 export default PaymentComposer;

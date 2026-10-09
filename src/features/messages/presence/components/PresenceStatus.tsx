@@ -1,4 +1,6 @@
-import { Text } from "react-native";
+// src/features/messages/presence/components/PresenceStatus.tsx
+
+import { StyleSheet, Text, View } from "react-native";
 import type { Id } from "@/convex/_generated/dataModel";
 
 import { usePresence } from "../hooks/usePresence";
@@ -57,7 +59,7 @@ function formatLastSeen(lastSeen: string | null) {
 export function PresenceStatus({
   userId,
   showDevice = false,
-  className = "",
+  className: _className = "",
 }: PresenceStatusProps) {
   const { presence } = usePresence({
     userId,
@@ -66,39 +68,109 @@ export function PresenceStatus({
 
   if (!presence) {
     return (
-      <Text className={`text-xs text-white/40 ${className}`}>Hors ligne</Text>
+      <Text style={styles.offline} accessibilityLabel="Hors ligne">
+        Hors ligne
+      </Text>
     );
   }
 
   if (presence.status === "online") {
     return (
-      <Text className={`inline-flex items-center gap-1.5 text-xs text-emerald-400 ${className}`}>
-        <Text className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        En ligne
-        {showDevice && presence.device && (
-          <Text className="text-white/35">· {presence.device}</Text>
-        )}
-      </Text>
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={`En ligne${
+          showDevice && presence.device ? `, ${presence.device}` : ""
+        }`}
+        style={styles.row}
+      >
+        <View style={[styles.dot, styles.onlineDot]} />
+
+        <Text style={styles.onlineText}>En ligne</Text>
+
+        {showDevice && presence.device ? (
+          <Text style={styles.deviceText}>
+            {" · "}
+            {presence.device}
+          </Text>
+        ) : null}
+      </View>
     );
   }
 
   if (presence.status === "away") {
     return (
-      <Text className={`inline-flex items-center gap-1.5 text-xs text-amber-400 ${className}`}>
-        <Text className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-        Absent
-        {showDevice && presence.device && (
-          <Text className="text-white/35">· {presence.device}</Text>
-        )}
-      </Text>
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={`Absent${
+          showDevice && presence.device ? `, ${presence.device}` : ""
+        }`}
+        style={styles.row}
+      >
+        <View style={[styles.dot, styles.awayDot]} />
+
+        <Text style={styles.awayText}>Absent</Text>
+
+        {showDevice && presence.device ? (
+          <Text style={styles.deviceText}>
+            {" · "}
+            {presence.device}
+          </Text>
+        ) : null}
+      </View>
     );
   }
 
+  const lastSeen = formatLastSeen(presence.lastSeen);
+
   return (
-    <Text className={`text-xs text-white/40 ${className}`}>
-      Hors ligne · {formatLastSeen(presence.lastSeen)}
+    <Text style={styles.offline} accessibilityLabel={`Hors ligne, ${lastSeen}`}>
+      Hors ligne · {lastSeen}
     </Text>
   );
 }
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  dot: {
+    width: 6,
+    height: 6,
+    marginRight: 6,
+    borderRadius: 3,
+  },
+
+  onlineDot: {
+    backgroundColor: "#10b981",
+  },
+
+  awayDot: {
+    backgroundColor: "#fbbf24",
+  },
+
+  onlineText: {
+    fontSize: 12,
+    color: "#34d399",
+  },
+
+  awayText: {
+    fontSize: 12,
+    color: "#fbbf24",
+  },
+
+  deviceText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.35)",
+  },
+
+  offline: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.40)",
+  },
+});
 
 export default PresenceStatus;

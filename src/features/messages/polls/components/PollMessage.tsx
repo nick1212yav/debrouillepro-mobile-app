@@ -1,4 +1,7 @@
-import { View, Text, Pressable } from "react-native";
+// src/features/messages/polls/components/PollMessage.tsx
+
+import { Pressable, StyleSheet, Text, View } from "react-native";
+
 import type { Message } from "../../chat/services/chat.service";
 
 interface PollMessageProps {
@@ -10,53 +13,316 @@ export function PollMessage({ message, own = false }: PollMessageProps) {
   const title = message.text?.trim() || "Nouveau sondage";
 
   return (
-    <View className={[
-        "w-full min-w-[250px] max-w-[380px] overflow-hidden rounded-2xl",
-        "border backdrop-blur-xl",
-        own
-          ? "border-black/10 bg-black/[0.04]"
-          : "border-white/10 bg-white/[0.035]",
-      ].join(" ")}>{}<View className={[
-          "flex items-center gap-3 border-b px-4 py-3",
-          own ? "border-black/10" : "border-white/[0.08]",
-        ].join(" ")}><View className={[
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-            own ? "bg-black/10" : "bg-cyan-500/10",
-          ].join(" ")}><Text className="text-lg">📊</Text></View><View className="min-w-0 flex-1"><Text className={[
-              "text-[10px] font-bold uppercase tracking-[0.14em]",
-              own ? "text-black/40" : "text-cyan-300/70",
-            ].join(" ")}>Sondage
-          </Text><Text className={[
-              "mt-0.5 truncate text-sm font-semibold",
-              own ? "text-black" : "text-white",
-            ].join(" ")}>{title}</Text></View></View>{}<View className="space-y-2 p-3"><View className={[
-            "rounded-xl border px-3 py-3",
-            own
-              ? "border-black/10 bg-black/[0.025]"
-              : "border-white/[0.07] bg-white/[0.025]",
-          ].join(" ")}><View className="mb-2 flex items-center justify-between"><Text className={[
-                "text-xs font-medium",
-                own ? "text-black/70" : "text-white/70",
-              ].join(" ")}>Options du sondage
-            </Text><Text className={[
-                "text-[10px]",
-                own ? "text-black/35" : "text-white/30",
-              ].join(" ")}>0 vote
-            </Text></View><View className={[
-              "h-2 overflow-hidden rounded-full",
-              own ? "bg-black/10" : "bg-white/[0.06]",
-            ].join(" ")}><View className={[
-                "h-full w-0 rounded-full",
-                own ? "bg-black/20" : "bg-cyan-400/30",
-              ].join(" ")} /></View></View><Pressable disabled className={[
-            "w-full rounded-xl px-4 py-2.5 text-xs font-semibold",
-            "transition",
-            own
-              ? "bg-black/10 text-black/35"
-              : "bg-cyan-500/10 text-cyan-300/40",
-          ].join(" ")}>Voter
-        </Pressable></View></View>
+    <View
+      style={[
+        styles.container,
+        own ? styles.containerOwn : styles.containerOther,
+      ]}
+    >
+      {/* Header */}
+      <View
+        style={[styles.header, own ? styles.headerOwn : styles.headerOther]}
+      >
+        <View
+          style={[
+            styles.iconWrapper,
+            own ? styles.iconWrapperOwn : styles.iconWrapperOther,
+          ]}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
+          <Text style={styles.icon}>📊</Text>
+        </View>
+
+        <View style={styles.headerContent}>
+          <Text
+            style={[styles.label, own ? styles.labelOwn : styles.labelOther]}
+          >
+            Sondage
+          </Text>
+
+          <Text
+            style={[styles.title, own ? styles.titleOwn : styles.titleOther]}
+            numberOfLines={2}
+          >
+            {title}
+          </Text>
+        </View>
+      </View>
+
+      {/* Poll content */}
+      <View style={styles.content}>
+        <View
+          style={[
+            styles.optionCard,
+            own ? styles.optionCardOwn : styles.optionCardOther,
+          ]}
+        >
+          <View style={styles.optionHeader}>
+            <Text
+              style={[
+                styles.optionLabel,
+                own ? styles.optionLabelOwn : styles.optionLabelOther,
+              ]}
+            >
+              Options du sondage
+            </Text>
+
+            <Text
+              style={[
+                styles.voteCount,
+                own ? styles.voteCountOwn : styles.voteCountOther,
+              ]}
+            >
+              0 vote
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.progressTrack,
+              own ? styles.progressTrackOwn : styles.progressTrackOther,
+            ]}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                own ? styles.progressFillOwn : styles.progressFillOther,
+              ]}
+            />
+          </View>
+        </View>
+
+        <Pressable
+          disabled
+          accessibilityRole="button"
+          accessibilityLabel="Voter au sondage"
+          accessibilityState={{ disabled: true }}
+          style={[
+            styles.voteButton,
+            own ? styles.voteButtonOwn : styles.voteButtonOther,
+          ]}
+        >
+          <Text
+            style={[
+              styles.voteText,
+              own ? styles.voteTextOwn : styles.voteTextOther,
+            ]}
+          >
+            Voter
+          </Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    width: "100%",
+    minWidth: 250,
+    maxWidth: 380,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderRadius: 16,
+  },
+
+  containerOwn: {
+    borderColor: "rgba(0,0,0,0.10)",
+    backgroundColor: "rgba(0,0,0,0.04)",
+  },
+
+  containerOther: {
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+
+  headerOwn: {
+    borderBottomColor: "rgba(0,0,0,0.10)",
+  },
+
+  headerOther: {
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+
+  iconWrapper: {
+    width: 40,
+    height: 40,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+  },
+
+  iconWrapperOwn: {
+    backgroundColor: "rgba(0,0,0,0.10)",
+  },
+
+  iconWrapperOther: {
+    backgroundColor: "rgba(6,182,212,0.10)",
+  },
+
+  icon: {
+    fontSize: 18,
+  },
+
+  headerContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  label: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+
+  labelOwn: {
+    color: "rgba(0,0,0,0.40)",
+  },
+
+  labelOther: {
+    color: "rgba(103,232,249,0.70)",
+  },
+
+  title: {
+    marginTop: 2,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  titleOwn: {
+    color: "#000000",
+  },
+
+  titleOther: {
+    color: "#ffffff",
+  },
+
+  content: {
+    gap: 8,
+    padding: 12,
+  },
+
+  optionCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+
+  optionCardOwn: {
+    borderColor: "rgba(0,0,0,0.10)",
+    backgroundColor: "rgba(0,0,0,0.025)",
+  },
+
+  optionCardOther: {
+    borderColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.025)",
+  },
+
+  optionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 8,
+  },
+
+  optionLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+
+  optionLabelOwn: {
+    color: "rgba(0,0,0,0.70)",
+  },
+
+  optionLabelOther: {
+    color: "rgba(255,255,255,0.70)",
+  },
+
+  voteCount: {
+    flexShrink: 0,
+    fontSize: 10,
+  },
+
+  voteCountOwn: {
+    color: "rgba(0,0,0,0.35)",
+  },
+
+  voteCountOther: {
+    color: "rgba(255,255,255,0.30)",
+  },
+
+  progressTrack: {
+    height: 8,
+    overflow: "hidden",
+    borderRadius: 999,
+  },
+
+  progressTrackOwn: {
+    backgroundColor: "rgba(0,0,0,0.10)",
+  },
+
+  progressTrackOther: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+
+  progressFill: {
+    width: "0%",
+    height: "100%",
+    borderRadius: 999,
+  },
+
+  progressFillOwn: {
+    backgroundColor: "rgba(0,0,0,0.20)",
+  },
+
+  progressFillOther: {
+    backgroundColor: "rgba(34,211,238,0.30)",
+  },
+
+  voteButton: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+
+  voteButtonOwn: {
+    backgroundColor: "rgba(0,0,0,0.10)",
+  },
+
+  voteButtonOther: {
+    backgroundColor: "rgba(6,182,212,0.10)",
+  },
+
+  voteText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  voteTextOwn: {
+    color: "rgba(0,0,0,0.35)",
+  },
+
+  voteTextOther: {
+    color: "rgba(103,232,249,0.40)",
+  },
+});
 
 export default PollMessage;

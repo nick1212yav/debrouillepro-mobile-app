@@ -1,3 +1,6 @@
+// src/features/messages/pins/hooks/usePinnedMessages.ts
+
+import { useCallback } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
@@ -19,9 +22,12 @@ export function usePinnedMessages(conversationId?: Id<"conversations">) {
 
   const togglePinMutation = useMutation(api.messages.pins.togglePin);
 
-  const togglePin = async (messageId: Id<"messages">) => {
-    return pinsService.togglePin(togglePinMutation, messageId);
-  };
+  const togglePin = useCallback(
+    async (messageId: Id<"messages">) => {
+      return pinsService.togglePin(togglePinMutation, messageId);
+    },
+    [togglePinMutation],
+  );
 
   return {
     pinnedMessages: pinnedMessages ?? [],

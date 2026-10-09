@@ -64,9 +64,15 @@ export interface WebRTCState {
   error: string | null;
 }
 
+export type SignalingMessageType =
+  | "offer"
+  | "answer"
+  | "ice-candidate"
+  | "hangup";
+
 export interface SignalingMessage {
   callId: Id<"calls">;
-  type: "offer" | "answer" | "ice-candidate" | "hangup";
+  type: SignalingMessageType;
   payload?: unknown;
   senderId?: Id<"users">;
 }

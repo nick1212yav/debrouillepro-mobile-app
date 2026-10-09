@@ -1,4 +1,7 @@
+// src/features/messages/calls/hooks/useWebRTC.ts
+
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Platform } from "react-native";
 
 import type { WebRTCState } from "../types/call.types";
 
@@ -9,6 +12,22 @@ const ICE_SERVERS: RTCConfiguration = {
     },
   ],
 };
+
+function isWebRTCAvailable(): boolean {
+  return (
+    Platform.OS === "web" &&
+    typeof navigator !== "undefined" &&
+    typeof RTCPeerConnection !== "undefined" &&
+    typeof MediaStream !== "undefined" &&
+    Boolean(navigator.mediaDevices)
+  );
+}
+
+function createUnavailableError(): Error {
+  return new Error(
+    "Les appels WebRTC natifs ne sont pas encore disponibles sur cette plateforme.",
+  );
+}
 
 export function useWebRTC(type: "audio" | "video" = "audio") {
   const peerRef = useRef<RTCPeerConnection | null>(null);
@@ -26,7 +45,15 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
     error: null,
   });
 
+  // ==========================================================================
+  // PEER CONNECTION
+  // ==========================================================================
+
   const createPeerConnection = useCallback(() => {
+    if (!isWebRTCAvailable()) {
+      throw createUnavailableError();
+    }
+
     const peer = new RTCPeerConnection(ICE_SERVERS);
 
     const remoteStream = new MediaStream();
@@ -67,9 +94,21 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
     return peer;
   }, []);
 
+  // ==========================================================================
+  // LOCAL MEDIA
+  // ==========================================================================
+
   const startLocalStream = useCallback(async () => {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-      throw new Error("Les appareils multimédia ne sont pas disponibles.");
+    if (!isWebRTCAvailable()) {
+      const error = createUnavailableError();
+
+      setState((current) => ({
+        ...current,
+        isConnecting: false,
+        error: error.message,
+      }));
+
+      throw error;
     }
 
     setState((current) => ({
@@ -121,6 +160,10 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
     }
   }, [createPeerConnection, type]);
 
+  // ==========================================================================
+  // OFFER
+  // ==========================================================================
+
   const createOffer = useCallback(async () => {
     const peer = peerRef.current ?? createPeerConnection();
 
@@ -130,6 +173,10 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
 
     return offer;
   }, [createPeerConnection]);
+
+  // ==========================================================================
+  // ANSWER
+  // ==========================================================================
 
   const createAnswer = useCallback(async () => {
     const peer = peerRef.current ?? createPeerConnection();
@@ -141,6 +188,10 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
     return answer;
   }, [createPeerConnection]);
 
+  // ==========================================================================
+  // REMOTE DESCRIPTION
+  // ==========================================================================
+
   const setRemoteDescription = useCallback(
     async (description: RTCSessionDescriptionInit) => {
       const peer = peerRef.current ?? createPeerConnection();
@@ -149,6 +200,10 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
     },
     [createPeerConnection],
   );
+
+  // ==========================================================================
+  // ICE CANDIDATE
+  // ==========================================================================
 
   const addIceCandidate = useCallback(
     async (candidate: RTCIceCandidateInit) => {
@@ -162,6 +217,10 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
     },
     [],
   );
+
+  // ==========================================================================
+  // MICROPHONE
+  // ==========================================================================
 
   const toggleMicrophone = useCallback((enabled?: boolean) => {
     const stream = localStreamRef.current;
@@ -179,6 +238,10 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
     return tracks[0]?.enabled ?? false;
   }, []);
 
+  // ==========================================================================
+  // CAMERA
+  // ==========================================================================
+
   const toggleCamera = useCallback((enabled?: boolean) => {
     const stream = localStreamRef.current;
 
@@ -194,6 +257,10 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
 
     return tracks[0]?.enabled ?? false;
   }, []);
+
+  // ==========================================================================
+  // STOP
+  // ==========================================================================
 
   const stop = useCallback(() => {
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -220,13 +287,27 @@ export function useWebRTC(type: "audio" | "video" = "audio") {
     });
   }, []);
 
+  // ==========================================================================
+  // CLEANUP
+  // ==========================================================================
+
   useEffect(() => {
     return () => {
       localStreamRef.current?.getTracks().forEach((track) => track.stop());
 
+      remoteStreamRef.current?.getTracks().forEach((track) => track.stop());
+
       peerRef.current?.close();
+
+      peerRef.current = null;
+      localStreamRef.current = null;
+      remoteStreamRef.current = null;
     };
   }, []);
+
+  // ==========================================================================
+  // RETURN
+  // ==========================================================================
 
   return {
     ...state,

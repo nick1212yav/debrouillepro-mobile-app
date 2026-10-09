@@ -1,8 +1,8 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
-import type { ViewProps, PressableProps } from "react-native";
-import type { ReactNode } from "react";
-
 // src/features/messages/shared/components/EmptyState.tsx
+
+import type { ReactNode } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { PressableProps, ViewProps } from "react-native";
 
 export interface EmptyStateProps extends Omit<ViewProps, "title"> {
   title?: ReactNode;
@@ -21,23 +21,38 @@ export function EmptyState({
   style,
   ...props
 }: EmptyStateProps) {
+  const hasAction = Boolean(actionLabel) && Boolean(onAction);
+
   return (
     <View {...props} style={[styles.container, style]}>
       {icon && (
         <View
-          accessibilityElementsHidden={true}
+          accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           style={styles.iconWrapper}
         >
-          <Text style={styles.iconText}>{icon}</Text>
+          <Text accessible={false} style={styles.iconText}>
+            {icon}
+          </Text>
         </View>
       )}
+
       {title && <Text style={styles.title}>{title}</Text>}
-      {description && (
-        <Text style={styles.description}>{description}</Text>
-      )}
-      {actionLabel && onAction && (
-        <Pressable onPress={onAction} style={styles.actionButton}>
+
+      {description && <Text style={styles.description}>{description}</Text>}
+
+      {hasAction && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            typeof actionLabel === "string" ? actionLabel : undefined
+          }
+          onPress={onAction}
+          style={({ pressed }) => [
+            styles.actionButton,
+            pressed && styles.actionButtonPressed,
+          ]}
+        >
           <Text style={styles.actionText}>{actionLabel}</Text>
         </Pressable>
       )}
@@ -47,46 +62,67 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   container: {
-    minHeight: 180,
     width: "100%",
+    minHeight: 180,
+    padding: 24,
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    padding: 24,
   },
+
   iconWrapper: {
     marginBottom: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
+
   iconText: {
     fontSize: 32,
     lineHeight: 34,
+    textAlign: "center",
+    color: "#CBD5E1",
   },
+
   title: {
     fontSize: 16,
+    lineHeight: 22,
     fontWeight: "600",
     textAlign: "center",
-    color: "#111827",
+    color: "#F8FAFC",
   },
+
   description: {
+    width: "100%",
     maxWidth: 420,
     fontSize: 14,
     lineHeight: 21,
-    opacity: 0.7,
+    fontWeight: "400",
     textAlign: "center",
-    color: "#4b5563",
+    color: "#94A3B8",
   },
+
   actionButton: {
+    minHeight: 40,
     marginTop: 6,
-    borderRadius: 8,
     paddingVertical: 9,
     paddingHorizontal: 16,
-    backgroundColor: "#111827",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "#2563EB",
   },
+
+  actionButtonPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.98 }],
+  },
+
   actionText: {
-    fontWeight: "600",
     fontSize: 14,
-    color: "#ffffff",
+    lineHeight: 20,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });
 

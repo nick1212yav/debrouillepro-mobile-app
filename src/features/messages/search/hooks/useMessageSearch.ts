@@ -25,30 +25,34 @@ export function useMessageSearch(options?: {
 
   const normalizedQuery = query.trim();
 
+  const shouldSearch = enabled && normalizedQuery.length > 0;
+
+  const searchLimit = options?.limit ?? 30;
+
   const messages = useQuery(
     api.messages.search.searchMessages,
-    enabled && normalizedQuery.length > 0
+    shouldSearch
       ? {
           query: normalizedQuery,
           conversationId: options?.conversationId,
-          limit: options?.limit ?? 30,
+          limit: searchLimit,
         }
       : "skip",
   );
 
   const conversations = useQuery(
     api.messages.search.searchConversations,
-    enabled && normalizedQuery.length > 0
+    shouldSearch
       ? {
           query: normalizedQuery,
-          limit: options?.limit ?? 30,
+          limit: searchLimit,
         }
       : "skip",
   );
 
   const global = useQuery(
     api.messages.search.globalSearch,
-    enabled && normalizedQuery.length > 0
+    shouldSearch
       ? {
           query: normalizedQuery,
           limit: options?.limit ?? 20,
@@ -57,13 +61,12 @@ export function useMessageSearch(options?: {
   );
 
   /*
-   * Les résultats sont déjà typés par les fonctions Convex générées.
-   * On conserve ici uniquement une normalisation de undefined -> [].
+   * Les fonctions Convex générées
+   * restent la source de vérité pour
+   * les types retournés.
    *
-   * IMPORTANT :
-   * Si TypeScript signale ici que `messageId` est `string`,
-   * le problème se trouve dans le retour de
-   * `convex/messages/search.ts`, pas dans ce hook.
+   * On normalise uniquement undefined
+   * vers des tableaux vides.
    */
   const messageResults = useMemo(() => messages ?? [], [messages]);
 
@@ -80,8 +83,7 @@ export function useMessageSearch(options?: {
   );
 
   const isLoading =
-    enabled &&
-    normalizedQuery.length > 0 &&
+    shouldSearch &&
     (messages === undefined ||
       conversations === undefined ||
       global === undefined);
@@ -90,26 +92,32 @@ export function useMessageSearch(options?: {
     setQuery("");
   };
 
+  const hasResults =
+    messageResults.length > 0 || conversationResults.length > 0;
+
+  const hasGlobalResults =
+    globalMessages.length > 0 || globalConversations.length > 0;
+
   return {
     query,
     setQuery,
     clear,
 
     messages: messageResults as MessageSearchResult[],
+
     conversations: conversationResults,
 
     globalMessages: globalMessages as MessageSearchResult[],
-    globalConversations,
+
+    globalConversations: globalConversations,
 
     globalResult: global ?? {
       messages: [],
       conversations: [],
     },
 
-    hasResults: messageResults.length > 0 || conversationResults.length > 0,
-
-    hasGlobalResults:
-      globalMessages.length > 0 || globalConversations.length > 0,
+    hasResults,
+    hasGlobalResults,
 
     isLoading,
     isAuthenticated,

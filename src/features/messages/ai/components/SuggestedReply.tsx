@@ -1,4 +1,4 @@
-import { View, Text, Pressable } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Lightbulb, Loader2, Sparkles } from "lucide-react-native";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -25,19 +25,53 @@ export function SuggestedReply({
   const lastMessage = messages.at(-1);
 
   return (
-    <View className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"><View className="mb-4 flex items-center gap-3"><View className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-300"><Lightbulb size={18} /></View><View className="min-w-0 flex-1"><Text className="text-sm font-semibold text-white">Réponse suggérée</Text><Text className="text-xs text-white/35">Préparation du contexte conversationnel
-          </Text></View>{onPrepare && (
-          <Pressable onPress={onPrepare} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-amber-500/90 px-3 py-2 text-xs font-medium text-black transition disabled:opacity-40">
+    <View className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <View className="mb-4 flex-row items-center gap-3">
+        <View className="h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10">
+          <Lightbulb size={18} color="#fcd34d" />
+        </View>
+
+        <View className="min-w-0 flex-1">
+          <Text className="text-sm font-semibold text-white">
+            Réponse suggérée
+          </Text>
+
+          <Text className="text-xs text-white/35">
+            Préparation du contexte conversationnel
+          </Text>
+        </View>
+
+        {onPrepare ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Préparer la réponse suggérée"
+            accessibilityState={{
+              disabled: loading,
+              busy: loading,
+            }}
+            onPress={onPrepare}
+            disabled={loading}
+            className="flex-row items-center gap-2 rounded-xl bg-amber-500/90 px-3 py-2 disabled:opacity-40"
+          >
             {loading ? (
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={14} color="#000000" />
             ) : (
-              <Sparkles size={14} />
+              <Sparkles size={14} color="#000000" />
             )}
-            Préparer
+
+            <Text className="text-xs font-medium text-black">Préparer</Text>
           </Pressable>
-        )}</View>{lastMessage ? (
-        <Pressable onPress={() => onSelect?.(lastMessage.text)} className="w-full rounded-xl border border-white/10 bg-black/10 p-3 text-left transition">
-          <Text className="mb-1 block text-[10px] uppercase tracking-wider text-white/25">
+        ) : null}
+      </View>
+
+      {lastMessage ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sélectionner le dernier contexte"
+          onPress={() => onSelect?.(lastMessage.text)}
+          className="w-full rounded-xl border border-white/10 bg-black/10 p-3"
+        >
+          <Text className="mb-1 text-[10px] uppercase tracking-wider text-white/25">
             Dernier contexte
           </Text>
 
@@ -46,12 +80,18 @@ export function SuggestedReply({
           </Text>
         </Pressable>
       ) : (
-        <View className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-white/35">
-          Aucun message disponible.
+        <View className="rounded-xl border border-dashed border-white/10 p-4">
+          <Text className="text-center text-xs text-white/35">
+            Aucun message disponible.
+          </Text>
         </View>
-      )}<Text className="mt-3 text-[11px] leading-4 text-white/25">Le backend prépare les derniers messages nécessaires à la génération
-        d'une réponse.
-      </Text></View>
+      )}
+
+      <Text className="mt-3 text-[11px] leading-4 text-white/25">
+        Le backend prépare les derniers messages nécessaires à la génération
+        d&apos;une réponse.
+      </Text>
+    </View>
   );
 }
 

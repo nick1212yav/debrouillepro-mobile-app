@@ -1,8 +1,10 @@
-import { Pressable, View } from "react-native";
+// src/features/messages/groups/components/GroupMemberActions.tsx
+
+import { Pressable, StyleSheet, Text, View } from "react-native";
+
 import type { Id } from "@/convex/_generated/dataModel";
 
 import { useGroupActions } from "../hooks/useGroupActions";
-
 import type { GroupMember } from "../services/groups.service";
 
 interface GroupMemberActionsProps {
@@ -24,23 +26,72 @@ export function GroupMemberActions({
 
   if (!isCurrentUser) {
     return (
-      <View className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-white/50">
-        Aucune action de retrait disponible pour cet utilisateur.
+      <View
+        style={styles.unavailableContainer}
+        accessibilityRole="text"
+        accessibilityLabel="Aucune action de retrait disponible pour cet utilisateur"
+      >
+        <Text style={styles.unavailableText}>
+          Aucune action de retrait disponible pour cet utilisateur.
+        </Text>
       </View>
     );
   }
 
   const handleRemove = async () => {
     await removeMember(conversationId, member.userId);
-
     onRemoved?.();
   };
 
   return (
-    <Pressable onPress={handleRemove} className="w-full rounded-xl bg-red-500/10 px-4 py-3 text-left text-sm text-red-400">
-      Quitter le groupe
+    <Pressable
+      onPress={() => void handleRemove()}
+      accessibilityRole="button"
+      accessibilityLabel="Quitter le groupe"
+      style={({ pressed }) => [
+        styles.removeButton,
+        pressed && styles.removeButtonPressed,
+      ]}
+    >
+      <Text style={styles.removeButtonText}>Quitter le groupe</Text>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  unavailableContainer: {
+    width: "100%",
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+
+  unavailableText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.50)",
+  },
+
+  removeButton: {
+    width: "100%",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(239,68,68,0.10)",
+  },
+
+  removeButtonPressed: {
+    backgroundColor: "rgba(239,68,68,0.18)",
+  },
+
+  removeButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+    color: "#f87171",
+  },
+});
 
 export default GroupMemberActions;

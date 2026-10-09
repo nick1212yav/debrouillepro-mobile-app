@@ -7,7 +7,6 @@ import type { SendMessageInput } from "../services/chat.service";
 
 export function useMessageActions() {
   const send = useMutation(api.messages.messages.send);
-
   const sendToUser = useMutation(api.messages.messages.sendToUser);
 
   const markAsRead = useMutation(api.messages.messages.markAsRead);

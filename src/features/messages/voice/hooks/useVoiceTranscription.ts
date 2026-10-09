@@ -1,3 +1,5 @@
+// src/features/messages/voice/hooks/useVoiceTranscription.ts
+
 import { useCallback, useState } from "react";
 
 export function useVoiceTranscription() {
@@ -12,16 +14,18 @@ export function useVoiceTranscription() {
     setError(null);
 
     try {
-      throw new Error(
-        "La transcription vocale n'est pas encore exposée par le backend Convex.",
-      );
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Impossible de transcrire le message vocal.";
+      /*
+       * La transcription vocale n'est actuellement pas
+       * exposée par le backend Convex fourni.
+       *
+       * Ne pas simuler une transcription et ne pas retourner
+       * un faux résultat tant qu'aucun endpoint backend réel
+       * n'est disponible.
+       */
+      const message = "La transcription vocale n'est pas encore disponible.";
 
       setError(message);
+
       return null;
     } finally {
       setIsTranscribing(false);

@@ -1,4 +1,5 @@
-import { View, Text } from "react-native";
+// src/features/messages/forwarding/components/ForwardPreview.tsx
+
 import {
   FileText,
   Image as ImageIcon,
@@ -7,6 +8,7 @@ import {
   Paperclip,
   Video,
 } from "lucide-react-native";
+import { Text, View } from "react-native";
 
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -21,48 +23,53 @@ interface ForwardPreviewProps {
   compact?: boolean;
 }
 
-function getPreview(message: ForwardPreviewProps["message"]) {
+interface PreviewData {
+  label: string;
+  icon: React.ReactNode;
+}
+
+function getPreview(message: ForwardPreviewProps["message"]): PreviewData {
   switch (message.type) {
     case "image":
       return {
         label: "Photo",
-        icon: <ImageIcon size={16} />,
+        icon: <ImageIcon size={16} color="#a78bfa" />,
       };
 
     case "video":
       return {
         label: "Vidéo",
-        icon: <Video size={16} />,
+        icon: <Video size={16} color="#a78bfa" />,
       };
 
     case "audio":
       return {
         label: "Audio",
-        icon: <Mic size={16} />,
+        icon: <Mic size={16} color="#a78bfa" />,
       };
 
     case "voice":
       return {
         label: "Message vocal",
-        icon: <Mic size={16} />,
+        icon: <Mic size={16} color="#a78bfa" />,
       };
 
     case "file":
       return {
         label: "Fichier",
-        icon: <FileText size={16} />,
+        icon: <FileText size={16} color="#a78bfa" />,
       };
 
     case "location":
       return {
         label: "Localisation",
-        icon: <MapPin size={16} />,
+        icon: <MapPin size={16} color="#a78bfa" />,
       };
 
     default:
       return {
-        label: message.text || "Message",
-        icon: <Paperclip size={16} />,
+        label: message.text.trim() || "Message",
+        icon: <Paperclip size={16} color="#a78bfa" />,
       };
   }
 }
@@ -74,14 +81,86 @@ export function ForwardPreview({
   const preview = getPreview(message);
 
   return (
-    <View className={[
-        "flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04]",
-        compact ? "px-3 py-2" : "px-4 py-3",
-      ].join(" ")}><View className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">{preview.icon}</View><View className="min-w-0 flex-1"><Text className="text-[11px] font-medium text-violet-400">Transférer</Text><Text className={[
-            "truncate text-sm text-white/70",
-            !message.text && "text-white/40",
-          ].join(" ")}>{preview.label}</Text></View></View>
+    <View
+      style={[
+        styles.container,
+        compact ? styles.containerCompact : styles.containerRegular,
+      ]}
+      accessibilityRole="summary"
+      accessibilityLabel={`Message à transférer : ${preview.label}`}
+    >
+      <View style={styles.iconWrapper}>{preview.icon}</View>
+
+      <View style={styles.content}>
+        <Text style={styles.label}>Transférer</Text>
+
+        <Text
+          style={[
+            styles.previewText,
+            !message.text.trim() && styles.previewTextMuted,
+          ]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {preview.label}
+        </Text>
+      </View>
+    </View>
   );
 }
+
+const styles = {
+  container: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+
+  containerRegular: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
+  containerCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  iconWrapper: {
+    width: 36,
+    height: 36,
+    flexShrink: 0,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    borderRadius: 8,
+    backgroundColor: "rgba(139,92,246,0.10)",
+  },
+
+  content: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  label: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+    color: "#a78bfa",
+  },
+
+  previewText: {
+    marginTop: 2,
+    fontSize: 14,
+    color: "rgba(255,255,255,0.70)",
+  },
+
+  previewTextMuted: {
+    color: "rgba(255,255,255,0.40)",
+  },
+};
 
 export default ForwardPreview;

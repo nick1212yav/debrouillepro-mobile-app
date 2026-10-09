@@ -20,16 +20,16 @@ export const MESSAGE_TYPES = {
 } as const satisfies Record<string, MessageType>;
 
 export const MESSAGE_TYPE_VALUES: readonly MessageType[] = [
-  "text",
-  "image",
-  "video",
-  "audio",
-  "voice",
-  "file",
-  "location",
-  "contact",
-  "publication",
-  "system",
+  MESSAGE_TYPES.TEXT,
+  MESSAGE_TYPES.IMAGE,
+  MESSAGE_TYPES.VIDEO,
+  MESSAGE_TYPES.AUDIO,
+  MESSAGE_TYPES.VOICE,
+  MESSAGE_TYPES.FILE,
+  MESSAGE_TYPES.LOCATION,
+  MESSAGE_TYPES.CONTACT,
+  MESSAGE_TYPES.PUBLICATION,
+  MESSAGE_TYPES.SYSTEM,
 ];
 
 // ============================================================================
@@ -44,10 +44,10 @@ export const MESSAGE_STATUS = {
 } as const satisfies Record<string, MessageStatus>;
 
 export const MESSAGE_STATUS_VALUES: readonly MessageStatus[] = [
-  "sent",
-  "delivered",
-  "read",
-  "failed",
+  MESSAGE_STATUS.SENT,
+  MESSAGE_STATUS.DELIVERED,
+  MESSAGE_STATUS.READ,
+  MESSAGE_STATUS.FAILED,
 ];
 
 // ============================================================================
@@ -61,9 +61,9 @@ export const PRESENCE_STATUS = {
 } as const satisfies Record<string, PresenceStatus>;
 
 export const PRESENCE_STATUS_VALUES: readonly PresenceStatus[] = [
-  "online",
-  "away",
-  "offline",
+  PRESENCE_STATUS.ONLINE,
+  PRESENCE_STATUS.AWAY,
+  PRESENCE_STATUS.OFFLINE,
 ];
 
 // ============================================================================
@@ -281,8 +281,8 @@ export function isValidPresenceStatus(value: string): value is PresenceStatus {
 }
 
 /**
- * Vérifie une valeur runtime sans prétendre que `UserTypingStatus`
- * est lui-même un type string.
+ * Vérifie une valeur runtime sans prétendre que
+ * `UserTypingStatus` est lui-même un type string.
  */
 export function isValidTypingStatus(value: string): boolean {
   return (

@@ -1,4 +1,4 @@
-import { Pressable, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 interface CallControlsProps {
   isMuted: boolean;
@@ -18,21 +18,40 @@ export function CallControls({
   onEnd,
 }: CallControlsProps) {
   return (
-    <View className="flex items-center justify-center gap-3">
-      <Pressable onPress={onToggleMute} className="rounded-full bg-white/10 px-4 py-3 text-sm text-white transition" accessibilityLabel={isMuted ? "Activer le microphone" : "Couper le microphone"}>
-        {isMuted ? "🔇" : "🎙️"}
+    <View className="flex-row items-center justify-center gap-3">
+      <Pressable
+        onPress={onToggleMute}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isMuted ? "Activer le microphone" : "Couper le microphone"
+        }
+        accessibilityState={{ selected: isMuted }}
+        className="h-12 w-12 items-center justify-center rounded-full bg-white/10 active:bg-white/20"
+      >
+        <Text className="text-lg">{isMuted ? "🔇" : "🎙️"}</Text>
       </Pressable>
 
-      {isVideoCall && (
-        <Pressable onPress={onToggleCamera} className="rounded-full bg-white/10 px-4 py-3 text-sm text-white transition" accessibilityLabel={
+      {isVideoCall ? (
+        <Pressable
+          onPress={onToggleCamera}
+          accessibilityRole="button"
+          accessibilityLabel={
             isCameraEnabled ? "Désactiver la caméra" : "Activer la caméra"
-          }>
-          {isCameraEnabled ? "📹" : "🚫"}
+          }
+          accessibilityState={{ selected: isCameraEnabled }}
+          className="h-12 w-12 items-center justify-center rounded-full bg-white/10 active:bg-white/20"
+        >
+          <Text className="text-lg">{isCameraEnabled ? "📹" : "🚫"}</Text>
         </Pressable>
-      )}
+      ) : null}
 
-      <Pressable onPress={onEnd} className="rounded-full bg-red-600 px-5 py-3 text-sm font-medium text-white transition" accessibilityLabel="Terminer l'appel">
-        ☎ Terminer
+      <Pressable
+        onPress={onEnd}
+        accessibilityRole="button"
+        accessibilityLabel="Terminer l'appel"
+        className="h-12 flex-row items-center justify-center rounded-full bg-red-600 px-5 active:bg-red-700"
+      >
+        <Text className="text-sm font-semibold text-white">☎ Terminer</Text>
       </Pressable>
     </View>
   );

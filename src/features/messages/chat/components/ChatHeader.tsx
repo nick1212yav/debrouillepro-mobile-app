@@ -12,7 +12,6 @@ import {
   Check,
   Info,
   MoreVertical,
-  Phone,
   PhoneCall,
   Search,
   Shield,
@@ -73,9 +72,8 @@ export function ChatHeader({
   const [menuOpen, setMenuOpen] = useState(false);
 
   /*
-   * Le conversationId fait partie du contrat du composant.
-   * Il n'est pas utilisé visuellement ici, mais sa présence permet
-   * de conserver une API prête pour les actions contextualisées.
+   * conversationId fait partie du contrat public du composant.
+   * Il est conservé pour les futures actions contextualisées.
    */
   void conversationId;
 
@@ -123,10 +121,6 @@ export function ChatHeader({
     onInfo?.();
   }, [closeMenu, onInfo]);
 
-  /*
-   * Retour matériel Android :
-   * si le menu est ouvert, il est fermé avant de quitter la conversation.
-   */
   useEffect(() => {
     if (!menuOpen || Platform.OS !== "android") {
       return;
@@ -145,7 +139,6 @@ export function ChatHeader({
 
   return (
     <View style={styles.root}>
-      {/* Ligne d'état d'appel */}
       {callActive && (
         <View pointerEvents="none" style={styles.callIndicator}>
           <View style={styles.callIndicatorLine} />
@@ -153,7 +146,6 @@ export function ChatHeader({
       )}
 
       <View style={styles.header}>
-        {/* Retour */}
         {onBack && (
           <Pressable
             onPress={onBack}
@@ -173,7 +165,6 @@ export function ChatHeader({
           </Pressable>
         )}
 
-        {/* Avatar */}
         <Pressable
           onPress={onInfo}
           disabled={!onInfo}
@@ -199,12 +190,10 @@ export function ChatHeader({
             </View>
           )}
 
-          {/* Présence */}
           {!isGroup && (
             <View style={styles.onlineDot} accessibilityLabel="En ligne" />
           )}
 
-          {/* Indicateur groupe */}
           {isGroup && (
             <View style={styles.groupDot} accessibilityLabel="Groupe">
               <View style={styles.groupDotInner} />
@@ -212,7 +201,6 @@ export function ChatHeader({
           )}
         </Pressable>
 
-        {/* Informations conversation */}
         <Pressable
           onPress={onInfo}
           disabled={!onInfo}
@@ -251,14 +239,12 @@ export function ChatHeader({
             {!isGroup && (
               <>
                 <View style={styles.subtitleDot} />
-
                 <Text style={styles.subtitleAvailable}>Disponible</Text>
               </>
             )}
           </View>
         </Pressable>
 
-        {/* Actions */}
         <View style={styles.actions}>
           {onCall && (
             <Pressable
@@ -333,7 +319,6 @@ export function ChatHeader({
             </Pressable>
           )}
 
-          {/* Menu */}
           <View style={styles.menuWrapper}>
             <Pressable
               onPress={toggleMenu}
@@ -358,7 +343,6 @@ export function ChatHeader({
 
             {menuOpen && (
               <>
-                {/* Zone tactile de fermeture */}
                 <Pressable
                   style={styles.menuDismiss}
                   onPress={closeMenu}
@@ -423,7 +407,6 @@ export function ChatHeader({
 
                   <View style={styles.menuDivider} />
 
-                  {/* Sécurité */}
                   <View style={styles.securedRow}>
                     <View style={styles.securedIcon}>
                       <Shield size={15} color="#6ee7b7" />

@@ -1,7 +1,7 @@
 // src/features/messages/events/hooks/useMessageEvents.ts
 
-import { useMutation, useQuery } from "convex/react";
 import { useEffect } from "react";
+import { useMutation, useQuery } from "convex/react";
 
 import type { Id } from "../../../../../convex/_generated/dataModel";
 
@@ -75,7 +75,7 @@ export function useMessageEvents(
    * TRACK VIEW
    * --------------------------------------------------------------------------
    *
-   * Une seule fois par affichage du message.
+   * Une seule fois par résolution de l'événement pour ce montage.
    */
 
   useEffect(() => {
@@ -131,7 +131,7 @@ export function useMessageEvents(
   const eventLoading = Boolean(resolvedEventId) && event === undefined;
 
   return {
-    event: (event ?? null) as MessageEvent | null,
+    event: event ?? null,
 
     eventId: resolvedEventId,
 

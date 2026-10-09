@@ -69,9 +69,7 @@ export const chatService = {
   },
 
   getDate(message: Message): Date | null {
-    const raw = message._creationTime;
-
-    const date = new Date(raw);
+    const date = new Date(message._creationTime);
 
     if (Number.isNaN(date.getTime())) {
       return null;
@@ -113,7 +111,6 @@ export const chatService = {
     }
 
     const previousDate = chatService.getDate(previous);
-
     const currentDate = chatService.getDate(current);
 
     if (!previousDate || !currentDate) {
@@ -128,7 +125,6 @@ export const chatService = {
 
     for (const message of messages) {
       const date = chatService.formatDate(message);
-
       const existing = groups.get(date);
 
       if (existing) {

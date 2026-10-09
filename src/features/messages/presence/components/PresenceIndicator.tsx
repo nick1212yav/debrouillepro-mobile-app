@@ -1,7 +1,7 @@
-import { View, StyleSheet } from "react-native";
-import type { Id } from "@/convex/_generated/dataModel";
-
 // src/features/messages/presence/components/PresenceIndicator.tsx
+
+import { StyleSheet, View } from "react-native";
+import type { Id } from "@/convex/_generated/dataModel";
 
 import { usePresence } from "../hooks/usePresence";
 
@@ -26,28 +26,36 @@ export function PresenceIndicator({
   });
 
   const status = presence?.status ?? "offline";
+
   const isOnline = status === "online";
   const isAway = status === "away";
 
   const dimension = SIZES[size];
-  const color = isOnline
+
+  const backgroundColor = isOnline
     ? "#10b981"
     : isAway
       ? "#fbbf24"
       : "rgba(255,255,255,0.25)";
 
-  const label = isOnline ? "En ligne" : isAway ? "Absent" : "Hors ligne";
+  const accessibilityLabel = isOnline
+    ? "En ligne"
+    : isAway
+      ? "Absent"
+      : "Hors ligne";
 
   return (
     <View
-      accessibilityLabel={label}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={accessibilityLabel}
       style={[
         styles.container,
         {
           width: dimension,
           height: dimension,
           borderRadius: dimension / 2,
-          backgroundColor: color,
+          backgroundColor,
         },
       ]}
     />

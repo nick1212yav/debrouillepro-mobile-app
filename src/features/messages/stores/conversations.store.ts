@@ -13,16 +13,24 @@ export interface ConversationsStoreState {
 
 export interface ConversationsStoreActions {
   setConversations: (conversations: Conversation[]) => void;
+
   addConversation: (conversation: Conversation) => void;
+
   updateConversation: (
     conversationId: ConversationId,
     updates: Partial<Conversation>,
   ) => void;
+
   removeConversation: (conversationId: ConversationId) => void;
+
   selectConversation: (conversationId: ConversationId | null) => void;
+
   setSearchQuery: (query: string) => void;
+
   setLoading: (loading: boolean) => void;
+
   setError: (error: string | null) => void;
+
   clear: () => void;
 }
 
@@ -46,11 +54,11 @@ export function useConversationsStore(): ConversationsStore {
   const [selectedConversationId, setSelectedConversationId] =
     useState<ConversationId | null>(INITIAL_STATE.selectedConversationId);
 
-  const [searchQuery, setSearchQueryState] = useState(
+  const [searchQuery, setSearchQueryState] = useState<string>(
     INITIAL_STATE.searchQuery,
   );
 
-  const [isLoading, setLoading] = useState(INITIAL_STATE.isLoading);
+  const [isLoading, setLoading] = useState<boolean>(INITIAL_STATE.isLoading);
 
   const [error, setError] = useState<string | null>(INITIAL_STATE.error);
 
@@ -76,7 +84,10 @@ export function useConversationsStore(): ConversationsStore {
       setConversationsState((current) =>
         current.map((conversation) =>
           conversation._id === conversationId
-            ? { ...conversation, ...updates }
+            ? {
+                ...conversation,
+                ...updates,
+              }
             : conversation,
         ),
       );

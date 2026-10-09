@@ -1,8 +1,7 @@
-import { View, Text, StyleSheet } from "react-native";
+import { useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 
 // src/features/messages/events/components/EventMessage.tsx
-
-import { useState } from "react";
 
 import type { Id } from "../../../../../convex/_generated/dataModel";
 
@@ -40,9 +39,13 @@ export function EventMessage({
 
   const [actionLoading, setActionLoading] = useState(false);
 
-  const runAction = async (action: () => Promise<unknown>) => {
-    if (actionLoading) return;
+  const runAction = async (action: () => Promise<unknown>): Promise<void> => {
+    if (actionLoading) {
+      return;
+    }
+
     setActionLoading(true);
+
     try {
       await action();
     } catch (error) {
@@ -54,7 +57,11 @@ export function EventMessage({
 
   if (isLoading) {
     return (
-      <View style={[styles.container, styles.infoContainer]}>
+      <View
+        style={[styles.container, styles.infoContainer]}
+        accessibilityRole="progressbar"
+        accessibilityLabel="Chargement de l'événement"
+      >
         <Text style={styles.infoText}>Chargement de l'événement...</Text>
       </View>
     );
@@ -62,7 +69,10 @@ export function EventMessage({
 
   if (!event || !resolvedEventId) {
     return (
-      <View style={[styles.container, styles.errorContainer]}>
+      <View
+        style={[styles.container, styles.errorContainer]}
+        accessibilityRole="alert"
+      >
         <Text style={styles.infoText}>
           Cet événement n'est plus disponible.
         </Text>
@@ -70,25 +80,42 @@ export function EventMessage({
     );
   }
 
+  const handleOpenEvent = () => {
+    onOpenEvent?.(resolvedEventId);
+  };
+
+  const handleRsvp = (status: Parameters<typeof setRsvp>[0]) => {
+    void runAction(() => setRsvp(status));
+  };
+
+  const handleLike = () => {
+    void runAction(() => toggleLike());
+  };
+
+  const handleBookmark = () => {
+    void runAction(() => toggleBookmark());
+  };
+
   return (
     <View style={styles.wrapper}>
       <EventPreview
         event={event}
         disabled={actionLoading}
-        onOpen={() => onOpenEvent?.(resolvedEventId)}
-        onRsvp={(status) => void runAction(() => setRsvp(status))}
-        onLike={() => void runAction(() => toggleLike())}
-        onBookmark={() => void runAction(() => toggleBookmark())}
+        onOpen={handleOpenEvent}
+        onRsvp={handleRsvp}
+        onLike={handleLike}
+        onBookmark={handleBookmark}
       />
+
       <View style={styles.actionsWrapper}>
         <EventActions
           currentRsvp={event.myRsvp}
           liked={event.likedByMe}
           bookmarked={event.bookmarkedByMe}
           disabled={actionLoading}
-          onRsvp={(status) => void runAction(() => setRsvp(status))}
-          onLike={() => void runAction(() => toggleLike())}
-          onBookmark={() => void runAction(() => toggleBookmark())}
+          onRsvp={handleRsvp}
+          onLike={handleLike}
+          onBookmark={handleBookmark}
         />
       </View>
     </View>
@@ -100,27 +127,33 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 540,
   },
+
   container: {
     width: "100%",
     maxWidth: 540,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
+
   infoContainer: {
-    borderColor: "#e5e7eb",
+    borderColor: "rgba(255,255,255,0.10)",
   },
+
   errorContainer: {
-    borderColor: "#fecaca",
+    borderColor: "rgba(248,113,113,0.30)",
+    backgroundColor: "rgba(239,68,68,0.06)",
   },
+
   infoText: {
     fontSize: 14,
-    color: "#4b5563",
+    lineHeight: 20,
+    color: "rgba(255,255,255,0.70)",
   },
+
   actionsWrapper: {
     marginTop: 10,
-    paddingVertical: 0,
     paddingHorizontal: 2,
   },
 });

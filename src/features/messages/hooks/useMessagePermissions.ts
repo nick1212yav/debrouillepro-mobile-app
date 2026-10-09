@@ -1,6 +1,7 @@
 // src/features/messages/hooks/useMessagePermissions.ts
 
 import { useMemo } from "react";
+
 import type {
   ConversationMember,
   Message,
@@ -38,24 +39,24 @@ export function useMessagePermissions(
 
   return useMemo<MessagePermissions>(() => {
     const isOwner = isMessageOwner(message, currentUserId);
-
     const isModerator = isAdminOrOwner(member);
+    const hasMessage = Boolean(message);
+    const hasActiveMessage = Boolean(message && !message.isDeleted);
+    const isMember = Boolean(member);
 
-    const canSend = Boolean(member);
+    const canSend = isMember;
 
-    const canEdit = isOwner && !message?.isDeleted;
+    const canEdit = isOwner && hasActiveMessage;
 
-    const canDelete = isOwner || (isModerator && Boolean(message));
+    const canDelete = isOwner || (isModerator && hasMessage);
 
-    const canReply = Boolean(member && message && !message.isDeleted);
+    const canReply = isMember && hasActiveMessage;
 
-    const canForward = Boolean(member && message && !message.isDeleted);
+    const canForward = isMember && hasActiveMessage;
 
-    const canReact = Boolean(member && message && !message.isDeleted);
+    const canReact = isMember && hasActiveMessage;
 
-    const canPin = Boolean(
-      member && message && !message.isDeleted && (isOwner || isModerator),
-    );
+    const canPin = isMember && hasActiveMessage && (isOwner || isModerator);
 
     return {
       canSend,

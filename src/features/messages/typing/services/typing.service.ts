@@ -1,3 +1,5 @@
+// src/features/messages/typing/services/typing.service.ts
+
 import type { Id } from "@/convex/_generated/dataModel";
 
 export type TypingUser = {

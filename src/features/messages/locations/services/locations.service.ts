@@ -1,7 +1,7 @@
 // src/features/messages/locations/services/locations.service.ts
 
-import type { Id } from "../../../../../convex/_generated/dataModel";
 import { api } from "../../../../../convex/_generated/api";
+import type { Id } from "../../../../../convex/_generated/dataModel";
 
 export type ConversationId = Id<"conversations">;
 
@@ -94,7 +94,7 @@ export const locationsApi = {
 } as const;
 
 /**
- * Validation côté client.
+ * Validation côté client des coordonnées GPS.
  */
 export function isValidCoordinates(
   latitude: number,
@@ -111,23 +111,22 @@ export function isValidCoordinates(
 }
 
 /**
- * Transforme les coordonnées GPS natives
- * en structure partageable.
+ * Transforme une position GPS native
+ * en structure partageable par le module.
+ *
+ * Les valeurs null de l'API Geolocation sont
+ * conservées comme null conformément au contrat
+ * `Coordinates`.
  */
 export function normalizeCoordinates(
   position: GeolocationPosition,
 ): Coordinates {
   return {
     latitude: position.coords.latitude,
-
     longitude: position.coords.longitude,
-
     accuracy: position.coords.accuracy,
-
     altitude: position.coords.altitude,
-
     heading: position.coords.heading,
-
     speed: position.coords.speed,
   };
 }
@@ -209,7 +208,6 @@ export function formatLiveDuration(seconds: number): string {
   }
 
   const hours = Math.floor(minutes / 60);
-
   const remainingMinutes = minutes % 60;
 
   if (remainingMinutes === 0) {

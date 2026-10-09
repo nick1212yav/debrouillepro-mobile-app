@@ -1,19 +1,8 @@
-import {
-  View,
-  Text,
-  Image,
-  Pressable,
-  type ViewStyle,
-  type TextStyle,
-  type ImageStyle,
-} from "react-native";
-
 // src/features/messages/immo/components/PropertyPreview.tsx
 
-import React from "react";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { PropertyWithMedia } from "../services/immo.service";
-
 import {
   formatPropertyPrice,
   getPropertyCoverImage,
@@ -36,186 +25,224 @@ export function PropertyPreview({
 
   const content = (
     <>
-      {cover && (
+      {cover ? (
         <Image
-          style={compact ? compactImageStyle : imageStyle}
+          style={compact ? styles.compactImage : styles.image}
           source={{ uri: cover }}
           resizeMode="cover"
           accessibilityLabel={property.title}
         />
-      )}
+      ) : null}
 
-      <View style={contentStyle}>
-        <View style={badgeRowStyle}>
-          <View style={badgePillStyle}>
-            <Text style={badgeTextStyle}>
+      <View style={styles.content}>
+        <View style={styles.badgeRow}>
+          <View style={styles.badgePill}>
+            <Text style={styles.badgeText}>
               {getTransactionTypeLabel(property.transactionType)}
             </Text>
           </View>
-          <Text style={typeStyle}>{getPropertyTypeLabel(property.type)}</Text>
+
+          <Text style={styles.type}>{getPropertyTypeLabel(property.type)}</Text>
         </View>
 
-        <Text style={titleStyle}>{property.title}</Text>
+        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+          {property.title}
+        </Text>
 
-        <Text style={priceStyle}>
+        <Text style={styles.price}>
           {formatPropertyPrice(property.price, property.currency)}
         </Text>
 
-        <View style={detailsStyle}>
-          {property.city && (
-            <Text style={detailTextStyle}>📍 {property.city}</Text>
-          )}
-          {property.surface !== undefined && (
-            <Text style={detailTextStyle}>📐 {property.surface} m²</Text>
-          )}
-          {property.rooms !== undefined && (
-            <Text style={detailTextStyle}>🚪 {property.rooms} pièces</Text>
-          )}
+        <View style={styles.details}>
+          {property.city ? (
+            <Text style={styles.detailText}>📍 {property.city}</Text>
+          ) : null}
+
+          {property.surface !== undefined ? (
+            <Text style={styles.detailText}>📐 {property.surface} m²</Text>
+          ) : null}
+
+          {property.rooms !== undefined ? (
+            <Text style={styles.detailText}>🚪 {property.rooms} pièces</Text>
+          ) : null}
         </View>
 
-        {property.ownerName && (
-          <View style={ownerStyle}>
+        {property.ownerName ? (
+          <View style={styles.owner}>
             {property.ownerAvatar ? (
               <Image
-                style={ownerAvatarStyle}
+                style={styles.ownerAvatar}
                 source={{ uri: property.ownerAvatar }}
-                accessibilityLabel=""
+                accessibilityLabel={`Photo de ${property.ownerName}`}
               />
             ) : (
-              <View style={ownerPlaceholderStyle}>
-                <Text style={ownerPlaceholderTextStyle}>👤</Text>
+              <View
+                style={styles.ownerPlaceholder}
+                accessibilityLabel="Photo du propriétaire indisponible"
+              >
+                <Text style={styles.ownerPlaceholderText}>👤</Text>
               </View>
             )}
 
-            <Text style={ownerNameStyle}>{property.ownerName}</Text>
+            <Text
+              style={styles.ownerName}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {property.ownerName}
+            </Text>
           </View>
-        )}
+        ) : null}
       </View>
     </>
   );
 
   if (!onPress) {
-    return <View style={cardStyle}>{content}</View>;
+    return (
+      <View
+        style={styles.card}
+        accessibilityRole="summary"
+        accessibilityLabel={`Annonce immobilière : ${property.title}`}
+      >
+        {content}
+      </View>
+    );
   }
 
   return (
-    <Pressable onPress={() => onPress(property)} style={cardStyle}>
+    <Pressable
+      onPress={() => onPress(property)}
+      accessibilityRole="button"
+      accessibilityLabel={`Ouvrir l'annonce ${property.title}`}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+    >
       {content}
     </Pressable>
   );
 }
 
-const cardStyle: ViewStyle = {
-  overflow: "hidden",
-  borderRadius: 16,
-  borderWidth: 1,
-  borderColor: "#e5e7eb",
-  backgroundColor: "#ffffff",
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  elevation: 3,
-};
+const styles = StyleSheet.create({
+  card: {
+    width: "100%",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 16,
+    backgroundColor: "#111827",
+    shadowColor: "#000000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 4,
+  },
 
-const imageStyle: ImageStyle = {
-  width: "100%",
-  height: 190,
-};
+  cardPressed: {
+    opacity: 0.92,
+  },
 
-const compactImageStyle: ImageStyle = {
-  width: "100%",
-  height: 130,
-};
+  image: {
+    width: "100%",
+    height: 190,
+  },
 
-const contentStyle: ViewStyle = {
-  padding: 14,
-};
+  compactImage: {
+    width: "100%",
+    height: 130,
+  },
 
-const badgeRowStyle: ViewStyle = {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 7,
-  flexWrap: "wrap",
-};
+  content: {
+    padding: 14,
+  },
 
-const badgePillStyle: ViewStyle = {
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 999,
-  backgroundColor: "#111827",
-};
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 7,
+  },
 
-const badgeTextStyle: TextStyle = {
-  color: "#ffffff",
-  fontSize: 11,
-  fontWeight: "700",
-};
+  badgePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#2563eb",
+  },
 
-const typeStyle: TextStyle = {
-  fontSize: 12,
-  color: "#6b7280",
-};
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
 
-const titleStyle: TextStyle = {
-  marginTop: 9,
-  marginBottom: 5,
-  fontSize: 16,
-  lineHeight: 21,
-  fontWeight: "700",
-  color: "#111827",
-};
+  type: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.55)",
+  },
 
-const priceStyle: TextStyle = {
-  fontSize: 18,
-  fontWeight: "800",
-  color: "#111827",
-};
+  title: {
+    marginTop: 9,
+    marginBottom: 5,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
 
-const detailsStyle: ViewStyle = {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 8,
-  marginTop: 9,
-};
+  price: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#ffffff",
+  },
 
-const detailTextStyle: TextStyle = {
-  fontSize: 12,
-  color: "#6b7280",
-};
+  details: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 9,
+  },
 
-const ownerStyle: ViewStyle = {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 8,
-  marginTop: 13,
-  paddingTop: 11,
-  borderTopWidth: 1,
-  borderTopColor: "#f0f0f0",
-};
+  detailText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.55)",
+  },
 
-const ownerAvatarStyle: ImageStyle = {
-  width: 26,
-  height: 26,
-  borderRadius: 13,
-};
+  owner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 13,
+    paddingTop: 11,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
 
-const ownerPlaceholderStyle: ViewStyle = {
-  width: 26,
-  height: 26,
-  borderRadius: 13,
-  backgroundColor: "#f3f4f6",
-  alignItems: "center",
-  justifyContent: "center",
-};
+  ownerAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
 
-const ownerPlaceholderTextStyle: TextStyle = {
-  fontSize: 14,
-};
+  ownerPlaceholder: {
+    width: 26,
+    height: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
 
-const ownerNameStyle: TextStyle = {
-  fontSize: 12,
-  color: "#4b5563",
-};
+  ownerPlaceholderText: {
+    fontSize: 14,
+  },
+
+  ownerName: {
+    flex: 1,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.65)",
+  },
+});
 
 export default PropertyPreview;

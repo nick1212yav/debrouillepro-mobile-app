@@ -1,4 +1,13 @@
-import { View, Pressable, TextInput, Text } from "react-native";
+// src/features/messages/search/components/MessageSearch.tsx
+
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Loader2, Search, X } from "lucide-react-native";
 import { useMemo, useState } from "react";
 
@@ -47,23 +56,82 @@ export function MessageSearch({
   }, [filter, conversations]);
 
   return (
-    <View className="flex h-full min-h-0 flex-col overflow-hidden bg-[#0b1120]"><View className="flex items-center gap-2 border-b border-white/10 px-4 py-3">{onClose && (
-          <Pressable onPress={onClose} accessibilityLabel="Fermer la recherche" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/40"><X size={18} /></Pressable>
-        )}<View className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3">{isLoading ? (
-            <Loader2
-              size={17}
-              className="shrink-0 animate-spin text-violet-400"
-            />
+    <View style={styles.container}>
+      {/* Search header */}
+      <View style={styles.header}>
+        {onClose ? (
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Fermer la recherche"
+            style={({ pressed }) => [
+              styles.closeButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <X size={18} color="rgba(255,255,255,0.40)" />
+          </Pressable>
+        ) : null}
+
+        <View style={styles.searchBar}>
+          {isLoading ? (
+            <Loader2 size={17} color="#a78bfa" />
           ) : (
-            <Search size={17} className="shrink-0 text-white/30" />
-          )}<TextInput autoFocus value={query} onChangeText={(value) => setQuery(value)} placeholder={conversationId
+            <Search size={17} color="rgba(255,255,255,0.30)" />
+          )}
+
+          <TextInput
+            autoFocus
+            value={query}
+            onChangeText={setQuery}
+            placeholder={
+              conversationId
                 ? "Rechercher dans la conversation..."
-                : "Rechercher dans les messages..."} className="h-11 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/25" returnKeyType="search" />{query && (
-            <Pressable onPress={clear} accessibilityLabel="Effacer la recherche" className="text-white/30"><X size={16} /></Pressable>
-          )}</View></View><SearchFilters value={filter} onChange={setFilter} /><View className="min-h-0 flex-1 overflow-y-auto">{!query.trim() ? (
-          <View className="flex flex-col items-center justify-center px-6 py-16 text-center"><View className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10"><Search size={23} className="text-violet-400" /></View><Text className="text-sm font-medium text-white/60">Rechercher dans la messagerie
-            </Text><Text className="mt-1 max-w-xs text-xs leading-5 text-white/30">Recherche un mot, une phrase ou un nom de conversation.
-            </Text></View>
+                : "Rechercher dans les messages..."
+            }
+            placeholderTextColor="rgba(255,255,255,0.25)"
+            returnKeyType="search"
+            style={styles.input}
+            accessibilityLabel="Recherche dans la messagerie"
+          />
+
+          {query ? (
+            <Pressable
+              onPress={clear}
+              accessibilityRole="button"
+              accessibilityLabel="Effacer la recherche"
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.clearButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <X size={16} color="rgba(255,255,255,0.30)" />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      <SearchFilters value={filter} onChange={setFilter} />
+
+      <ScrollView
+        style={styles.resultsContainer}
+        contentContainerStyle={styles.resultsContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {!query.trim() ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}>
+              <Search size={23} color="#a78bfa" />
+            </View>
+
+            <Text style={styles.emptyTitle}>Rechercher dans la messagerie</Text>
+
+            <Text style={styles.emptyDescription}>
+              Recherche un mot, une phrase ou un nom de conversation.
+            </Text>
+          </View>
         ) : (
           <SearchResults
             messages={filteredMessages}
@@ -74,8 +142,111 @@ export function MessageSearch({
               onConversationClick?.(conversation.conversationId)
             }
           />
-        )}</View></View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#0b1120",
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
+  },
+
+  closeButton: {
+    width: 36,
+    height: 36,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+  },
+
+  searchBar: {
+    flex: 1,
+    minWidth: 0,
+    height: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+
+  input: {
+    flex: 1,
+    minWidth: 0,
+    height: 44,
+    paddingVertical: 0,
+    fontSize: 14,
+    color: "#ffffff",
+  },
+
+  clearButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 2,
+  },
+
+  pressed: {
+    opacity: 0.6,
+  },
+
+  resultsContainer: {
+    flex: 1,
+  },
+
+  resultsContent: {
+    flexGrow: 1,
+  },
+
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 64,
+  },
+
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    marginBottom: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: "rgba(139,92,246,0.10)",
+  },
+
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+    color: "rgba(255,255,255,0.60)",
+  },
+
+  emptyDescription: {
+    maxWidth: 320,
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 20,
+    textAlign: "center",
+    color: "rgba(255,255,255,0.30)",
+  },
+});
 
 export default MessageSearch;

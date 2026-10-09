@@ -1,4 +1,4 @@
-import { Pressable, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import {
   Bot,
   Languages,
@@ -13,7 +13,6 @@ import type { AIAction } from "../services/ai.service";
 
 interface AiActionsProps {
   onAction: (action: AIAction) => void;
-
   disabled?: boolean;
   loading?: boolean;
 }
@@ -65,16 +64,28 @@ export function AiActions({
   disabled = false,
   loading = false,
 }: AiActionsProps) {
+  const isDisabled = disabled || loading;
+
   return (
-    <View className="flex flex-wrap gap-2">
+    <View className="flex-row flex-wrap gap-2">
       {actions.map((action) => {
         const Icon = action.icon;
 
         return (
-          <Pressable key={action.id} disabled={disabled || loading} onPress={() => onAction(action.id)} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-medium text-white/70 transition disabled:opacity-40">
-            <Icon size={14} />
+          <Pressable
+            key={action.id}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            accessibilityState={{ disabled: isDisabled, busy: loading }}
+            disabled={isDisabled}
+            onPress={() => onAction(action.id)}
+            className="flex-row items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 disabled:opacity-40"
+          >
+            <Icon size={14} color="rgba(255,255,255,0.7)" />
 
-            {action.label}
+            <Text className="text-xs font-medium text-white/70">
+              {action.label}
+            </Text>
           </Pressable>
         );
       })}

@@ -118,24 +118,16 @@ export const conversationsService = {
   ): ConversationPreview {
     return {
       conversationId: conversation._id,
-
       title: conversationsService.getTitle(conversation, currentUserId),
-
       avatar: conversationsService.getAvatar(conversation, currentUserId),
-
       isGroup: conversation.isGroup,
-
       lastMessageText: conversation.lastMessageText ?? null,
-
       lastMessageSenderId: conversation.lastMessageSenderId ?? null,
-
       updatedAt: conversation.updatedAt,
-
       unreadCount: conversationsService.getUnreadCount(
         conversation,
         currentUserId,
       ),
-
       participants: conversation.participants,
     };
   },

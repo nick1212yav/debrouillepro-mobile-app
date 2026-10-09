@@ -1,4 +1,6 @@
-import { View, Text } from "react-native";
+// src/features/messages/voice/components/VoiceWaveform.tsx
+
+import { StyleSheet, View } from "react-native";
 
 interface VoiceWaveformProps {
   progress?: number;
@@ -13,29 +15,56 @@ export function VoiceWaveform({
 }: VoiceWaveformProps) {
   const safeProgress = Math.max(0, Math.min(1, progress));
 
+  const safeBars = Math.max(1, Math.floor(bars));
+
   return (
-    <View className="flex h-8 flex-1 items-center gap-[2px]" accessibilityElementsHidden={true} importantForAccessibility="no-hide-descendants">
-      {Array.from({
-        length: bars,
-      }).map((_, index) => {
-        const position = index / Math.max(bars - 1, 1);
+    <View
+      style={styles.container}
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      {Array.from({ length: safeBars }).map((_, index) => {
+        const position = index / Math.max(safeBars - 1, 1);
 
         const height = 20 + ((index * 17) % 60);
 
         const isActive = position <= safeProgress;
 
         return (
-          <Text key={index} className={`w-[2px] rounded-full transition-opacity ${
-              isActive || active
-                ? "bg-current opacity-100"
-                : "bg-current opacity-30"
-            }`} style={{
-              height: `${height}%`,
-            }} />
+          <View
+            key={index}
+            style={[
+              styles.bar,
+              {
+                height: `${height}%`,
+                opacity: isActive || active ? 1 : 0.3,
+              },
+            ]}
+          />
         );
       })}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    height: 32,
+    minWidth: 0,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    overflow: "hidden",
+  },
+
+  bar: {
+    width: 2,
+    flexShrink: 0,
+    borderRadius: 999,
+    backgroundColor: "#ffffff",
+  },
+});
 
 export default VoiceWaveform;

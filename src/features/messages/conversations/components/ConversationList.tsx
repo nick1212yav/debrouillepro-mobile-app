@@ -1,7 +1,7 @@
-import { View, StyleSheet } from "react-native";
-import type { Id } from "@/convex/_generated/dataModel";
-
 // src/features/messages/conversations/components/ConversationList.tsx
+
+import { StyleSheet, View } from "react-native";
+import type { Id } from "@/convex/_generated/dataModel";
 
 import { ConversationItem } from "./ConversationItem";
 import type { ConversationPreview } from "../services/conversations.service";
@@ -17,18 +17,28 @@ export function ConversationList({
   currentConversationId,
   onSelect,
 }: ConversationListProps) {
-  if (conversations.length === 0) return null;
+  if (conversations.length === 0) {
+    return null;
+  }
 
   return (
-    <View style={styles.container}>
-      {conversations.map((conversation) => (
-        <ConversationItem
-          key={String(conversation.conversationId)}
-          conversation={conversation}
-          active={conversation.conversationId === currentConversationId}
-          onClick={() => onSelect(conversation.conversationId)}
-        />
-      ))}
+    <View
+      style={styles.container}
+      accessibilityRole="list"
+      accessibilityLabel="Liste des conversations"
+    >
+      {conversations.map((conversation) => {
+        const conversationId = conversation.conversationId;
+
+        return (
+          <ConversationItem
+            key={String(conversationId)}
+            conversation={conversation}
+            active={conversationId === currentConversationId}
+            onClick={() => onSelect(conversationId)}
+          />
+        );
+      })}
     </View>
   );
 }

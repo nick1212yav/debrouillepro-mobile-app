@@ -58,17 +58,19 @@ export function useChatStore(): ChatStore {
     INITIAL_STATE.selectedMessageId,
   );
 
-  const [isSearchOpen, setSearchOpen] = useState(INITIAL_STATE.isSearchOpen);
+  const [isSearchOpen, setSearchOpen] = useState<boolean>(
+    INITIAL_STATE.isSearchOpen,
+  );
 
-  const [isAttachmentPickerOpen, setAttachmentPickerOpen] = useState(
+  const [isAttachmentPickerOpen, setAttachmentPickerOpen] = useState<boolean>(
     INITIAL_STATE.isAttachmentPickerOpen,
   );
 
-  const [isEmojiPickerOpen, setEmojiPickerOpen] = useState(
+  const [isEmojiPickerOpen, setEmojiPickerOpen] = useState<boolean>(
     INITIAL_STATE.isEmojiPickerOpen,
   );
 
-  const [isContextMenuOpen, setContextMenuOpen] = useState(
+  const [isContextMenuOpen, setContextMenuOpen] = useState<boolean>(
     INITIAL_STATE.isContextMenuOpen,
   );
 

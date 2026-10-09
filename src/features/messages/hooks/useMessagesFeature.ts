@@ -1,6 +1,7 @@
 // src/features/messages/hooks/useMessagesFeature.ts
 
 import { useCallback, useMemo, useState } from "react";
+
 import type { ConversationId, MessageId } from "../types";
 
 export interface MessagesFeatureState {

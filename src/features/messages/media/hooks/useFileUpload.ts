@@ -1,83 +1,73 @@
 // src/features/messages/media/hooks/useFileUpload.ts
 
 import { useCallback, useRef, useState } from "react";
+import { mediaService } from "../services/media.service";
 
-import mediaService, { type UploadFileResult } from "../services/media.service";
+export interface NativeUploadFile {
+  uri: string;
+  fileName?: string;
+  mimeType?: string;
+  fileSize?: number;
+  width?: number;
+  height?: number;
+  duration?: number;
+}
 
-type GenerateUploadUrlMutation = () => Promise<string>;
+export interface FileUploadResult {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  duration?: number;
+}
 
-export function useFileUpload(generateUploadUrl: GenerateUploadUrlMutation) {
-  const [isUploading, setIsUploading] = useState(false);
+interface UseFileUploadOptions {
+  generateUploadUrl: () => Promise<string>;
+}
+
+export function useFileUpload({ generateUploadUrl }: UseFileUploadOptions) {
   const [progress, setProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const uploadFile = useCallback(
-    async (file: File): Promise<UploadFileResult> => {
-      setIsUploading(true);
-      setProgress(0);
-      setError(null);
-
+  const upload = useCallback(
+    async (file: NativeUploadFile): Promise<FileUploadResult> => {
       const controller = new AbortController();
 
       abortControllerRef.current = controller;
 
+      setIsUploading(true);
+      setProgress(0);
+      setError(null);
+
       try {
-        // ================================================================
-        // VALIDATION
-        // ================================================================
-
-        if (file.size <= 0) {
-          throw new Error("Le fichier est vide.");
-        }
-
-        if (controller.signal.aborted) {
-          throw new DOMException("Upload annulé", "AbortError");
+        if (!file.uri) {
+          throw new Error("Le fichier sélectionné est invalide.");
         }
 
         setProgress(10);
 
-        // ================================================================
-        // MÉTADONNÉES IMAGE
-        // ================================================================
-
-        const dimensions = await mediaService.getImageDimensions(file);
+        const mediaFile = {
+          uri: file.uri,
+          name: file.fileName ?? "fichier",
+          type: file.mimeType ?? "application/octet-stream",
+          size: file.fileSize ?? 0,
+          ...(file.width !== undefined ? { width: file.width } : {}),
+          ...(file.height !== undefined ? { height: file.height } : {}),
+          ...(file.duration !== undefined ? { duration: file.duration } : {}),
+        };
 
         setProgress(25);
 
-        // ================================================================
-        // MÉTADONNÉES VIDÉO
-        // ================================================================
-
-        const duration = await mediaService.getVideoDuration(file);
-
-        setProgress(40);
-
         if (controller.signal.aborted) {
-          throw new DOMException("Upload annulé", "AbortError");
+          throw new Error("Upload annulé.");
         }
 
-        // ================================================================
-        // UPLOAD CONVEX STORAGE
-        // ================================================================
-        //
-        // IMPORTANT :
-        //
-        // mediaService.uploadFile() attend la mutation
-        // generateUploadUrl, pas l'URL déjà générée.
-        //
-        // Le service gère donc :
-        //
-        // generateUploadUrl()
-        //        ↓
-        // upload HTTP
-        //        ↓
-        // storageId
-        //
-        // ================================================================
-
-        const fileId = await mediaService.uploadFile(generateUploadUrl, file);
+        const fileId = await mediaService.uploadFile(
+          generateUploadUrl,
+          mediaFile,
+        );
 
         if (!fileId) {
           throw new Error("Convex n'a pas retourné l'identifiant du fichier.");
@@ -85,17 +75,11 @@ export function useFileUpload(generateUploadUrl: GenerateUploadUrlMutation) {
 
         setProgress(100);
 
-        // ================================================================
-        // RESULTAT
-        // ================================================================
-
         return {
-          fileId,
-          fileName: file.name,
-          mimeType: file.type || "application/octet-stream",
-          fileSize: file.size,
-          ...dimensions,
-          duration,
+          fileId: String(fileId),
+          fileName: file.fileName ?? "fichier",
+          mimeType: file.mimeType ?? "application/octet-stream",
+          ...(file.duration !== undefined ? { duration: file.duration } : {}),
         };
       } catch (err) {
         const message =
@@ -104,7 +88,6 @@ export function useFileUpload(generateUploadUrl: GenerateUploadUrlMutation) {
             : "Impossible d'envoyer le fichier.";
 
         setError(message);
-
         throw err;
       } finally {
         setIsUploading(false);
@@ -114,37 +97,25 @@ export function useFileUpload(generateUploadUrl: GenerateUploadUrlMutation) {
     [generateUploadUrl],
   );
 
-  // ================================================================
-  // ANNULER
-  // ================================================================
-
-  const cancelUpload = useCallback(() => {
+  const cancel = useCallback(() => {
     abortControllerRef.current?.abort();
-
     abortControllerRef.current = null;
-
     setIsUploading(false);
-    setProgress(0);
   }, []);
 
-  // ================================================================
-  // RESET
-  // ================================================================
-
   const reset = useCallback(() => {
-    setError(null);
     setProgress(0);
+    setError(null);
     setIsUploading(false);
   }, []);
 
   return {
-    isUploading,
-    progress,
-    error,
-
-    uploadFile,
-    cancelUpload,
+    upload,
+    cancel,
     reset,
+    progress,
+    isUploading,
+    error,
   };
 }
 

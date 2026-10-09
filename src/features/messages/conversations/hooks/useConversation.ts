@@ -3,9 +3,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
-import conversationsService, {
-  type Conversation,
-} from "../services/conversations.service";
+import conversationsService from "../services/conversations.service";
 
 export function useConversation(
   conversationId: Id<"conversations"> | null | undefined,
@@ -20,34 +18,28 @@ export function useConversation(
       : "skip",
   );
 
-  const normalizedConversation = conversation
-    ? (conversation as Conversation)
-    : null;
-
-  const preview = normalizedConversation
-    ? conversationsService.toPreview(normalizedConversation, currentUserId)
+  const preview = conversation
+    ? conversationsService.toPreview(conversation, currentUserId)
     : null;
 
   const unreadCount =
-    normalizedConversation?.members?.find(
-      (member) => member.userId === currentUserId,
-    )?.unreadCount ?? 0;
+    conversation?.members?.find((member) => member.userId === currentUserId)
+      ?.unreadCount ?? 0;
+
+  const title = conversation
+    ? conversationsService.getTitle(conversation, currentUserId)
+    : "Conversation";
+
+  const avatar = conversation
+    ? conversationsService.getAvatar(conversation, currentUserId)
+    : null;
 
   return {
-    conversation: normalizedConversation,
-
+    conversation,
     preview,
-
     unreadCount,
-
-    title: normalizedConversation
-      ? conversationsService.getTitle(normalizedConversation, currentUserId)
-      : "Conversation",
-
-    avatar: normalizedConversation
-      ? conversationsService.getAvatar(normalizedConversation, currentUserId)
-      : null,
-
+    title,
+    avatar,
     isLoading: conversation === undefined,
   };
 }

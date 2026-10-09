@@ -1,9 +1,11 @@
+// src/features/messages/groups/hooks/useGroups.ts
+
 import { useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
-import groupsService, { type GroupMember } from "../services/groups.service";
+import groupsService from "../services/groups.service";
 
 export function useGroups(
   conversationId: Id<"conversations"> | null | undefined,
@@ -36,14 +38,14 @@ export function useGroups(
   );
 
   const normalizedMembers = members
-    ? groupsService.normalizeMembers(members as GroupMember[])
+    ? groupsService.normalizeMembers(members)
     : [];
 
   return {
     members: normalizedMembers,
     memberCount: count ?? normalizedMembers.length,
     currentMember: currentMember
-      ? groupsService.normalizeMember(currentMember as GroupMember)
+      ? groupsService.normalizeMember(currentMember)
       : null,
     isLoading:
       members === undefined ||

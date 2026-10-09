@@ -1,8 +1,9 @@
-import { Text, Pressable, View } from "react-native";
+// src/features/messages/voice/components/VoicePlayer.tsx
+
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMemo } from "react";
 
 import { useVoicePlayer } from "../hooks/useVoicePlayer";
-
 import { VoiceWaveform } from "./VoiceWaveform";
 
 interface VoicePlayerProps {
@@ -10,7 +11,7 @@ interface VoicePlayerProps {
   duration?: number;
 }
 
-function formatTime(seconds: number) {
+function formatTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds));
 
   const minutes = Math.floor(safeSeconds / 60);
@@ -29,38 +30,136 @@ export function VoicePlayer({
 
   const totalDuration = duration || initialDuration || 0;
 
-  const progress = useMemo(
-    () => (totalDuration > 0 ? currentTime / totalDuration : 0),
-    [currentTime, totalDuration],
-  );
+  const progress = useMemo(() => {
+    if (totalDuration <= 0) {
+      return 0;
+    }
+
+    return Math.min(1, Math.max(0, currentTime / totalDuration));
+  }, [currentTime, totalDuration]);
+
+  const displayedTime = currentTime > 0 ? currentTime : totalDuration;
+
+  const handleToggle = () => {
+    void toggle();
+  };
+
+  const handleSeek = () => {
+    if (totalDuration <= 0) {
+      return;
+    }
+
+    const next =
+      progress >= 0.95 ? 0 : Math.min(totalDuration, currentTime + 5);
+
+    seek(next);
+  };
 
   return (
-    <View className="flex min-w-0 items-center gap-3">
-      <Pressable onPress={() => {
-          void toggle();
-        }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm text-white" accessibilityLabel={isPlaying ? "Mettre en pause" : "Lire le message vocal"}>
-        {isPlaying ? "Ⅱ" : "▶"}
+    <View
+      style={styles.container}
+      accessible
+      accessibilityLabel={`Message vocal, durée ${formatTime(totalDuration)}`}
+    >
+      <Pressable
+        onPress={handleToggle}
+        style={({ pressed }) => [
+          styles.playButton,
+          pressed && styles.playButtonPressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isPlaying ? "Mettre en pause" : "Lire le message vocal"
+        }
+        accessibilityHint={
+          isPlaying
+            ? "Met en pause la lecture du message vocal"
+            : "Lance la lecture du message vocal"
+        }
+      >
+        <Text style={styles.playIcon}>{isPlaying ? "Ⅱ" : "▶"}</Text>
       </Pressable>
 
-      <Pressable onPress={() => {
-          if (totalDuration <= 0) {
-            return;
-          }
-
-          const next = progress >= 0.95 ? 0 : currentTime + 5;
-
-          seek(next);
-        }} className="min-w-0 flex-1 text-left text-white" accessibilityLabel="Avancer dans le message vocal">
+      <Pressable
+        onPress={handleSeek}
+        style={styles.waveformButton}
+        accessibilityRole="button"
+        accessibilityLabel="Avancer dans le message vocal"
+        accessibilityHint="Avance de cinq secondes, ou revient au début lorsque la lecture est presque terminée"
+      >
         <VoiceWaveform progress={progress} active={isPlaying} />
       </Pressable>
 
-      <Text className="shrink-0 text-xs text-white/60">
-        {formatTime(currentTime || totalDuration)}
+      <Text
+        style={styles.time}
+        accessibilityLabel={`Temps ${formatTime(displayedTime)}`}
+      >
+        {formatTime(displayedTime)}
       </Text>
 
-      {error && <Text className="text-xs text-red-400">Erreur</Text>}
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          Erreur
+        </Text>
+      ) : null}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  playButton: {
+    width: 36,
+    height: 36,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+
+  playButtonPressed: {
+    opacity: 0.7,
+    transform: [
+      {
+        scale: 0.96,
+      },
+    ],
+  },
+
+  playIcon: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+
+  waveformButton: {
+    minWidth: 0,
+    flex: 1,
+  },
+
+  time: {
+    flexShrink: 0,
+    minWidth: 38,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: "right",
+    color: "rgba(255,255,255,0.60)",
+  },
+
+  error: {
+    flexShrink: 0,
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#f87171",
+  },
+});
 
 export default VoicePlayer;

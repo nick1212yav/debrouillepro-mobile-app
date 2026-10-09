@@ -1,4 +1,5 @@
-import { Pressable, Text, View, Image } from "react-native";
+import { Image, Pressable, Text, View } from "react-native";
+
 import type { Call } from "../types/call.types";
 
 interface OutgoingCallProps {
@@ -14,24 +15,41 @@ export function OutgoingCall({
   recipientAvatar,
   onCancel,
 }: OutgoingCallProps) {
+  const isVideoCall = call.type === "video";
+
   return (
-    <View className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl bg-zinc-950 p-8 text-white">
+    <View className="min-h-[320px] items-center justify-center rounded-2xl bg-zinc-950 p-8">
       {recipientAvatar ? (
-        <Image className="h-24 w-24 rounded-full object-cover" source={{ uri: recipientAvatar }} accessibilityLabel={recipientName} />
+        <Image
+          source={{ uri: recipientAvatar }}
+          accessibilityLabel={recipientName}
+          className="h-24 w-24 rounded-full"
+        />
       ) : (
-        <View className="flex h-24 w-24 items-center justify-center rounded-full bg-white/10 text-3xl">
-          {call.type === "video" ? "📹" : "📞"}
+        <View className="h-24 w-24 items-center justify-center rounded-full bg-white/10">
+          <Text className="text-3xl">{isVideoCall ? "📹" : "📞"}</Text>
         </View>
       )}
 
-      <Text className="mt-5 text-xl font-semibold">{recipientName}</Text>
-
-      <Text className="mt-1 text-sm text-white/50">
-        Appel {call.type === "video" ? "vidéo" : "audio"} en cours...
+      <Text
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        className="mt-5 max-w-full text-center text-xl font-semibold text-white"
+      >
+        {recipientName}
       </Text>
 
-      <Pressable onPress={onCancel} className="mt-8 rounded-full bg-red-600 px-6 py-3 font-medium">
-        Annuler
+      <Text className="mt-1 text-center text-sm text-white/50">
+        Appel {isVideoCall ? "vidéo" : "audio"} en cours...
+      </Text>
+
+      <Pressable
+        onPress={onCancel}
+        accessibilityRole="button"
+        accessibilityLabel="Annuler l'appel"
+        className="mt-8 rounded-full bg-red-600 px-6 py-3 active:bg-red-700"
+      >
+        <Text className="font-semibold text-white">Annuler</Text>
       </Pressable>
     </View>
   );

@@ -1,4 +1,6 @@
-import { View, Pressable, Text } from "react-native";
+// src/features/messages/voice/components/VoiceRecorder.tsx
+
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useEffect } from "react";
 
 import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
@@ -14,10 +16,12 @@ interface VoiceRecorderProps {
   disabled?: boolean;
 }
 
-function formatDuration(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
+function formatDuration(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
 
-  const remaining = seconds % 60;
+  const minutes = Math.floor(safeSeconds / 60);
+
+  const remaining = safeSeconds % 60;
 
   return `${minutes}:${remaining.toString().padStart(2, "0")}`;
 }
@@ -45,22 +49,204 @@ export function VoiceRecorder({
     onRecorded(recording);
   }, [onRecorded, recording]);
 
+  const handleRecordingToggle = () => {
+    if (disabled) {
+      return;
+    }
+
+    if (isRecording) {
+      void stopRecording();
+      return;
+    }
+
+    void startRecording();
+  };
+
   const handleCancel = () => {
-    cancelRecording();
+    if (disabled) {
+      return;
+    }
+
+    void cancelRecording();
     onCancel?.();
   };
 
+  const waveformProgress = duration > 0 ? 0.5 : 0;
+
   return (
-    <View className="flex items-center gap-3 rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3"><Pressable disabled={disabled} onPress={isRecording ? stopRecording : startRecording} className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white ${
-          isRecording ? "bg-red-600" : "bg-emerald-600"
-        } disabled:cursor-not-allowed disabled:opacity-50`} accessibilityLabel={isRecording
+    <View style={[styles.container, disabled && styles.containerDisabled]}>
+      <Pressable
+        disabled={disabled}
+        onPress={handleRecordingToggle}
+        style={({ pressed }) => [
+          styles.recordButton,
+          isRecording ? styles.recordButtonRecording : styles.recordButtonIdle,
+          pressed && !disabled && styles.recordButtonPressed,
+          disabled && styles.recordButtonDisabled,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isRecording
             ? "Arrêter l'enregistrement"
-            : "Commencer l'enregistrement"}>{isRecording ? "■" : "🎙"}</Pressable><View className="min-w-0 flex-1"><View className="flex items-center gap-3 text-xs text-white/60"><Text>{formatDuration(duration)}</Text><VoiceWaveform progress={duration > 0 ? 0.5 : 0} active={isRecording} /></View>{error && <Text className="mt-1 truncate text-xs text-red-400">{error}</Text>}</View>{isRecording && (
-        <Pressable onPress={handleCancel} className="text-xs text-white/60">
-          Annuler
+            : "Commencer l'enregistrement"
+        }
+        accessibilityState={{
+          disabled,
+          busy: isRecording,
+        }}
+      >
+        <Text style={styles.recordIcon}>{isRecording ? "■" : "🎙"}</Text>
+      </Pressable>
+
+      <View style={styles.content}>
+        <View style={styles.waveformRow}>
+          <Text
+            style={styles.duration}
+            accessibilityLabel={`Durée ${formatDuration(duration)}`}
+          >
+            {formatDuration(duration)}
+          </Text>
+
+          <View style={styles.waveform}>
+            <VoiceWaveform progress={waveformProgress} active={isRecording} />
+          </View>
+        </View>
+
+        {error ? (
+          <Text
+            style={styles.error}
+            numberOfLines={2}
+            accessibilityRole="alert"
+          >
+            {error}
+          </Text>
+        ) : null}
+      </View>
+
+      {isRecording && onCancel ? (
+        <Pressable
+          onPress={handleCancel}
+          disabled={disabled}
+          style={({ pressed }) => [
+            styles.cancelButton,
+            pressed && !disabled && styles.cancelButtonPressed,
+            disabled && styles.cancelButtonDisabled,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Annuler l'enregistrement"
+          accessibilityState={{
+            disabled,
+          }}
+        >
+          <Text style={styles.cancelText}>Annuler</Text>
         </Pressable>
-      )}</View>
+      ) : null}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 16,
+    backgroundColor: "#18181b",
+  },
+
+  containerDisabled: {
+    opacity: 0.6,
+  },
+
+  recordButton: {
+    width: 40,
+    height: 40,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+  },
+
+  recordButtonIdle: {
+    backgroundColor: "#059669",
+  },
+
+  recordButtonRecording: {
+    backgroundColor: "#dc2626",
+  },
+
+  recordButtonPressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.95 }],
+  },
+
+  recordButtonDisabled: {
+    opacity: 0.5,
+  },
+
+  recordIcon: {
+    fontSize: 16,
+    lineHeight: 20,
+    color: "#ffffff",
+  },
+
+  content: {
+    minWidth: 0,
+    flex: 1,
+  },
+
+  waveformRow: {
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  duration: {
+    flexShrink: 0,
+    minWidth: 36,
+    fontSize: 12,
+    lineHeight: 16,
+    color: "rgba(255,255,255,0.60)",
+  },
+
+  waveform: {
+    minWidth: 0,
+    flex: 1,
+  },
+
+  error: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#f87171",
+  },
+
+  cancelButton: {
+    flexShrink: 0,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+  },
+
+  cancelButtonPressed: {
+    opacity: 0.65,
+  },
+
+  cancelButtonDisabled: {
+    opacity: 0.5,
+  },
+
+  cancelText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.60)",
+  },
+});
 
 export default VoiceRecorder;

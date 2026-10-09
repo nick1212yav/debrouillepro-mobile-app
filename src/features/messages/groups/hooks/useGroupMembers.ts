@@ -1,9 +1,11 @@
+// src/features/messages/groups/hooks/useGroupMembers.ts
+
 import { useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
-import groupsService, { type GroupMember } from "../services/groups.service";
+import groupsService from "../services/groups.service";
 
 export function useGroupMembers(
   conversationId: Id<"conversations"> | null | undefined,
@@ -18,7 +20,7 @@ export function useGroupMembers(
   );
 
   const normalizedMembers = members
-    ? groupsService.normalizeMembers(members as GroupMember[])
+    ? groupsService.normalizeMembers(members)
     : [];
 
   return {

@@ -18,7 +18,6 @@ export function useCall({ conversationId, callId }: UseCallOptions = {}) {
   const { isAuthenticated } = useConvexAuth();
 
   const [error, setError] = useState<string | null>(null);
-
   const [isMinimized, setIsMinimized] = useState(false);
 
   // ==========================================================================
@@ -26,15 +25,10 @@ export function useCall({ conversationId, callId }: UseCallOptions = {}) {
   // ==========================================================================
 
   const startCallMutation = useMutation(api.messages.calls.startCall);
-
   const answerCallMutation = useMutation(api.messages.calls.answerCall);
-
   const rejectCallMutation = useMutation(api.messages.calls.rejectCall);
-
   const endCallMutation = useMutation(api.messages.calls.endCall);
-
   const missedCallMutation = useMutation(api.messages.calls.markAsMissed);
-
   const cleanupMutation = useMutation(api.messages.calls.cleanupStaleCalls);
 
   // ==========================================================================
@@ -53,14 +47,6 @@ export function useCall({ conversationId, callId }: UseCallOptions = {}) {
 
   // ==========================================================================
   // START CALL
-  // ==========================================================================
-  //
-  // Le backend Convex expose actuellement `status` comme `string`.
-  // Le service de calls attend, pour le résultat initial, le statut
-  // littéral `"pending"`.
-  //
-  // On normalise donc ici la réponse de la mutation à la frontière
-  // Convex -> service, sans cast dangereux.
   // ==========================================================================
 
   const startCall = useCallback(
@@ -276,7 +262,6 @@ export function useCall({ conversationId, callId }: UseCallOptions = {}) {
     error,
 
     isMinimized,
-
     setIsMinimized,
 
     startCall,

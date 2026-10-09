@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useMutation, useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
@@ -25,23 +26,29 @@ export function useAttachments(messageId: Id<"messages"> | null | undefined) {
     api.messages.attachments.deleteAttachment,
   );
 
-  const addAttachment = async (args: Omit<AddAttachmentArgs, "messageId">) => {
-    if (!messageId) {
-      throw new Error("Message introuvable.");
-    }
+  const addAttachment = useCallback(
+    async (args: Omit<AddAttachmentArgs, "messageId">) => {
+      if (!messageId) {
+        throw new Error("Message introuvable.");
+      }
 
-    return mediaService.addAttachment(addAttachmentMutation, {
-      ...args,
-      messageId,
-    });
-  };
+      return mediaService.addAttachment(addAttachmentMutation, {
+        ...args,
+        messageId,
+      });
+    },
+    [addAttachmentMutation, messageId],
+  );
 
-  const deleteAttachment = async (attachmentId: Id<"attachments">) => {
-    return mediaService.deleteAttachment(
-      deleteAttachmentMutation,
-      attachmentId,
-    );
-  };
+  const deleteAttachment = useCallback(
+    async (attachmentId: Id<"attachments">) => {
+      return mediaService.deleteAttachment(
+        deleteAttachmentMutation,
+        attachmentId,
+      );
+    },
+    [deleteAttachmentMutation],
+  );
 
   return {
     attachments: attachments ?? [],

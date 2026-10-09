@@ -1,12 +1,4 @@
-import { View, Text, StyleSheet } from "react-native";
-
-// src/features/messages/calls/components/VideoGrid.tsx
-//
-// NOTE (Sprint 3.4) :
-// Ce composant utilise actuellement un placeholder View pour chaque tuile
-// vidéo. Le branchement réel se fera via RTCView de react-native-webrtc.
-// Les streams sont volontairement typés `VideoStream` (opaque) pour
-// ne pas dépendre du type DOM MediaStream, indisponible en RN natif.
+import { StyleSheet, Text, View } from "react-native";
 
 type VideoStream = unknown;
 
@@ -15,20 +7,19 @@ interface VideoGridProps {
   remoteStream: VideoStream | null;
 }
 
-function VideoTile({
-  stream,
-  muted = false,
-  label,
-}: {
+interface VideoTileProps {
   stream: VideoStream | null;
   muted?: boolean;
   label: string;
-}) {
-  // `muted` sera utilisé par RTCView en Sprint 3.4 (coupe le flux local).
+}
+
+function VideoTile({ stream, muted = false, label }: VideoTileProps) {
+  // `muted` sera transmis à RTCView lors du branchement
+  // réel de react-native-webrtc.
   void muted;
 
   return (
-    <View style={styles.tile}>
+    <View style={styles.tile} accessibilityLabel={`Tuile vidéo : ${label}`}>
       {stream ? (
         <View style={styles.streamPlaceholder}>
           <Text style={styles.streamPlaceholderText}>Flux vidéo actif</Text>
@@ -39,7 +30,9 @@ function VideoTile({
         </View>
       )}
 
-      <Text style={styles.label}>{label}</Text>
+      <View style={styles.labelContainer}>
+        <Text style={styles.label}>{label}</Text>
+      </View>
     </View>
   );
 }
@@ -48,6 +41,7 @@ export function VideoGrid({ localStream, remoteStream }: VideoGridProps) {
   return (
     <View style={styles.container}>
       <VideoTile stream={remoteStream} label="Correspondant" />
+
       <VideoTile stream={localStream} muted label="Vous" />
     </View>
   );
@@ -55,40 +49,46 @@ export function VideoGrid({ localStream, remoteStream }: VideoGridProps) {
 
 const styles = StyleSheet.create({
   container: {
-    height: "100%",
     minHeight: 360,
+    flex: 1,
     gap: 12,
   },
+
   tile: {
-    flex: 1,
     minHeight: 180,
+    flex: 1,
     overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 16,
     backgroundColor: "#000000",
-    alignItems: "center",
-    justifyContent: "center",
   },
+
   streamPlaceholder: {
-    flex: 1,
     width: "100%",
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
+
   streamPlaceholderText: {
     fontSize: 13,
     color: "rgba(255,255,255,0.60)",
   },
+
   emptyState: {
-    flex: 1,
     width: "100%",
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
+
   emptyStateText: {
     fontSize: 14,
     color: "rgba(255,255,255,0.50)",
   },
-  label: {
+
+  labelContainer: {
     position: "absolute",
     bottom: 12,
     left: 12,
@@ -96,6 +96,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.50)",
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+
+  label: {
     fontSize: 12,
     color: "#ffffff",
   },

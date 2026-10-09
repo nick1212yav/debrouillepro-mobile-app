@@ -17,7 +17,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
 import { useMessageComposer } from "../hooks/useMessageComposer";
-import { ReplyPreview } from "./ReplyPreview";
+import { useTyping } from "../../typing/hooks/useTyping";
 
 interface MessageComposerProps {
   conversationId: Id<"conversations">;
@@ -129,14 +129,8 @@ const TOOL_ITEMS: Array<{
 ];
 
 function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} o`;
-  }
-
-  if (bytes < 1024 * 1024) {
-    return `${Math.round(bytes / 1024)} Ko`;
-  }
-
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
@@ -145,7 +139,6 @@ function formatRecordingTime(seconds: number): string {
     .toString()
     .padStart(2, "0");
   const remaining = (seconds % 60).toString().padStart(2, "0");
-
   return `${minutes}:${remaining}`;
 }
 
@@ -171,19 +164,14 @@ function createSelectedMedia(
 function isStorageUploadResponse(
   value: unknown,
 ): value is { storageId: string } {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  if (!("storageId" in value)) {
-    return false;
-  }
-
+  if (typeof value !== "object" || value === null) return false;
+  if (!("storageId" in value)) return false;
   return typeof value.storageId === "string" && value.storageId.length > 0;
 }
 
 export function MessageComposer({ conversationId }: MessageComposerProps) {
   const composer = useMessageComposer(conversationId);
+  const typing = useTyping(conversationId);
 
   const sendMessage = useMutation(api.messages.messages.send);
   const generateUploadUrl = useMutation(
@@ -214,7 +202,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     }
 
     const startedAt = Date.now();
-
     const timer = setInterval(() => {
       setRecordingSeconds(Math.floor((Date.now() - startedAt) / 1000));
     }, 500);
@@ -225,7 +212,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   useEffect(() => {
     return () => {
       const recording = recordingRef.current;
-
       if (recording) {
         void recording.stopAndUnloadAsync().catch(() => undefined);
         recordingRef.current = null;
@@ -245,10 +231,11 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   const insertEmoji = useCallback(
     (emoji: string) => {
       composer.setText(`${composer.text}${emoji}`);
+      typing.handleTyping();
       setShowEmojiPicker(false);
       focusComposer();
     },
-    [composer.text, composer.setText, focusComposer],
+    [composer.text, composer.setText, focusComposer, typing.handleTyping],
   );
 
   const ingestAssets = useCallback((assets: ImagePicker.ImagePickerAsset[]) => {
@@ -261,7 +248,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     closeMenus();
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     if (!permission.granted) {
       setAttachmentError("Permission galerie refusée.");
       return;
@@ -273,10 +259,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       quality: 0.9,
     });
 
-    if (result.canceled || result.assets.length === 0) {
-      return;
-    }
-
+    if (result.canceled || result.assets.length === 0) return;
     ingestAssets(result.assets);
   }, [closeMenus, ingestAssets]);
 
@@ -285,7 +268,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     closeMenus();
 
     const permission = await ImagePicker.requestCameraPermissionsAsync();
-
     if (!permission.granted) {
       setAttachmentError("Permission caméra refusée.");
       return;
@@ -296,10 +278,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       quality: 0.9,
     });
 
-    if (result.canceled || result.assets.length === 0) {
-      return;
-    }
-
+    if (result.canceled || result.assets.length === 0) return;
     ingestAssets(result.assets);
   }, [closeMenus, ingestAssets]);
 
@@ -310,7 +289,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   const uploadUri = useCallback(
     async (uri: string, mimeType: string): Promise<string> => {
       const uploadUrl = await generateUploadUrl();
-
       const response = await fetch(uri);
 
       if (!response.ok) {
@@ -321,9 +299,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
 
       const uploadResponse = await fetch(uploadUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": mimeType,
-        },
+        headers: { "Content-Type": mimeType },
         body: blob,
       });
 
@@ -343,13 +319,8 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   );
 
   const sendCurrentMessage = useCallback(async () => {
-    if (isSubmitting || !conversationId) {
-      return;
-    }
-
-    if (!hasText && !hasMedia) {
-      return;
-    }
+    if (isSubmitting || !conversationId) return;
+    if (!hasText && !hasMedia) return;
 
     setIsSubmitting(true);
     setAttachmentError(null);
@@ -379,6 +350,8 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         });
       }
 
+      void typing.stopTyping();
+
       composer.reset();
       setSelectedMedia([]);
       setActiveTool(null);
@@ -388,7 +361,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         error instanceof Error
           ? error.message
           : "Impossible d'envoyer le message.";
-
       setAttachmentError(message);
     } finally {
       setIsSubmitting(false);
@@ -396,8 +368,8 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   }, [
     addAttachment,
     closeMenus,
-    composer.reset,
     composer.replyTo,
+    composer.reset,
     composer.sharedPublicationId,
     composer.text,
     conversationId,
@@ -406,83 +378,67 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     isSubmitting,
     selectedMedia,
     sendMessage,
+    typing.stopTyping,
     uploadUri,
   ]);
 
   const startRecording = useCallback(async () => {
-    if (isRecording || isSubmitting) {
+    if (isSubmitting || isRecording) return;
+
+    setAttachmentError(null);
+
+    const permission = await Audio.requestPermissionsAsync();
+    if (!permission.granted) {
+      setAttachmentError("Permission microphone refusée.");
       return;
     }
 
-    setAttachmentError(null);
-    closeMenus();
-
     try {
-      const permission = await Audio.requestPermissionsAsync();
-
-      if (!permission.granted) {
-        setAttachmentError("Permission microphone refusée.");
-        return;
-      }
-
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
 
-      const { recording } = await Audio.Recording.createAsync(
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
+      await recording.startAsync();
 
       recordingRef.current = recording;
-      setRecordingSeconds(0);
       setIsRecording(true);
     } catch (error) {
-      const message =
+      setAttachmentError(
         error instanceof Error
           ? error.message
-          : "Impossible de démarrer l'enregistrement.";
-
-      setAttachmentError(message);
-      recordingRef.current = null;
-      setIsRecording(false);
+          : "Impossible de démarrer l'enregistrement.",
+      );
     }
-  }, [closeMenus, isRecording, isSubmitting]);
+  }, [isRecording, isSubmitting]);
 
   const cancelRecording = useCallback(async () => {
     const recording = recordingRef.current;
-
     recordingRef.current = null;
     setIsRecording(false);
-    setRecordingSeconds(0);
 
-    if (!recording) {
-      return;
-    }
+    if (!recording) return;
 
     try {
       await recording.stopAndUnloadAsync();
     } catch {
-      // Rien à envoyer : le fichier local est abandonné.
-    } finally {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      }).catch(() => undefined);
+      // Le nettoyage est best-effort.
     }
   }, []);
 
   const sendRecording = useCallback(async () => {
     const recording = recordingRef.current;
-
-    if (!recording || isSubmitting) {
-      return;
-    }
+    if (!recording || isSubmitting) return;
 
     setIsSubmitting(true);
     setAttachmentError(null);
 
     try {
-      const status = await recording.stopAndUnloadAsync();
+      await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
 
       recordingRef.current = null;
@@ -492,7 +448,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         throw new Error("Enregistrement vocal introuvable.");
       }
 
-      const storageId = await uploadUri(uri, "audio/mp4");
+      const storageId = await uploadUri(uri, "audio/m4a");
 
       const createdMessage = await sendMessage({
         conversationId,
@@ -502,74 +458,50 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       await addAttachment({
         messageId: createdMessage._id,
         fileId: storageId,
-        fileName: `message-vocal-${Date.now()}.m4a`,
-        mimeType: "audio/mp4",
+        fileName: `voice-${Date.now()}.m4a`,
+        mimeType: "audio/m4a",
         fileSize: 0,
-        duration: Math.max(1, status.durationMillis / 1000),
       });
-
-      composer.reset();
-      closeMenus();
     } catch (error) {
-      const message =
+      setAttachmentError(
         error instanceof Error
           ? error.message
-          : "Impossible d'envoyer le vocal.";
-
-      setAttachmentError(message);
-      setIsRecording(false);
+          : "Impossible d'envoyer le message vocal.",
+      );
     } finally {
-      recordingRef.current = null;
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      }).catch(() => undefined);
-
       setIsSubmitting(false);
     }
-  }, [
-    addAttachment,
-    closeMenus,
-    composer.reset,
-    conversationId,
-    isSubmitting,
-    sendMessage,
-    uploadUri,
-  ]);
-
-  const handleToolClick = useCallback(
-    (tool: Exclude<ComposerTool, null>) => {
-      setActiveTool(tool);
-      closeMenus();
-    },
-    [closeMenus],
-  );
+  }, [addAttachment, conversationId, isSubmitting, sendMessage, uploadUri]);
 
   const canSend = !isBusy && (hasText || hasMedia);
 
   return (
     <View style={styles.container}>
-      {composer.replyTo && (
+      {composer.replyTo ? (
         <View style={styles.replyBar}>
           <View style={styles.replyAccent} />
 
           <View style={styles.replyContent}>
-            <Text style={styles.replyLabel}>Réponse</Text>
+            <Text style={styles.replyLabel}>Répondre au message</Text>
 
-            <ReplyPreview replyToId={composer.replyTo._id} own={false} />
+            <Text numberOfLines={1} style={styles.replyText}>
+              {composer.replyTo.text?.trim() || "[message sans texte]"}
+            </Text>
           </View>
 
           <Pressable
             onPress={composer.cancelReply}
-            style={styles.iconButton}
+            accessibilityRole="button"
             accessibilityLabel="Annuler la réponse"
+            hitSlop={8}
+            style={styles.replyCancel}
           >
-            <Text style={styles.iconText}>×</Text>
+            <Text style={styles.replyCancelText}>×</Text>
           </Pressable>
         </View>
-      )}
+      ) : null}
 
-      {activeTool && (
+      {activeTool ? (
         <View style={styles.toolBanner}>
           <Text style={styles.toolIcon}>
             {TOOL_ITEMS.find((item) => item.key === activeTool)?.icon}
@@ -582,32 +514,29 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           <Pressable
             onPress={() => setActiveTool(null)}
             style={styles.toolCancel}
+            accessibilityLabel="Fermer l'outil"
           >
-            <Text style={styles.toolCancelText}>Annuler</Text>
+            <Text style={styles.toolCancelText}>Fermer</Text>
           </Pressable>
         </View>
-      )}
+      ) : null}
 
-      {(composer.error || attachmentError) && (
+      {attachmentError ? (
         <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>
-            {composer.error ?? attachmentError}
-          </Text>
+          <Text style={styles.errorText}>{attachmentError}</Text>
         </View>
-      )}
+      ) : null}
 
-      {selectedMedia.length > 0 && (
+      {selectedMedia.length > 0 ? (
         <View style={styles.mediaContainer}>
           <View style={styles.mediaHeader}>
-            <Text style={styles.mediaHeaderText}>
-              Pièces jointes · {selectedMedia.length}
-            </Text>
+            <Text style={styles.mediaHeaderText}>Pièces jointes</Text>
 
             <Pressable
               onPress={() => setSelectedMedia([])}
               accessibilityLabel="Supprimer toutes les pièces jointes"
             >
-              <Text style={styles.clearText}>Tout retirer</Text>
+              <Text style={styles.clearText}>Tout supprimer</Text>
             </Pressable>
           </View>
 
@@ -634,13 +563,13 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
                   </View>
                 )}
 
-                {media.fileSize !== undefined && (
+                {typeof media.fileSize === "number" ? (
                   <View style={styles.fileSizeBadge}>
                     <Text style={styles.fileSizeText}>
                       {formatFileSize(media.fileSize)}
                     </Text>
                   </View>
-                )}
+                ) : null}
 
                 <Pressable
                   onPress={() => removeMedia(media.id)}
@@ -653,96 +582,14 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             ))}
           </ScrollView>
         </View>
-      )}
+      ) : null}
 
-      {showAttachments && !isRecording && (
-        <View style={styles.panel}>
-          <View style={styles.panelHeader}>
-            <Text style={styles.panelTitle}>Partager</Text>
-
-            <Pressable
-              onPress={() => setShowAttachments(false)}
-              accessibilityLabel="Fermer"
-            >
-              <Text style={styles.iconText}>×</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.toolGrid}>
-            <Pressable
-              onPress={() => void pickFromCamera()}
-              style={styles.toolButton}
-            >
-              <Text style={styles.toolButtonIcon}>📷</Text>
-              <Text style={styles.toolButtonText}>Caméra</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => void pickFromGallery()}
-              style={styles.toolButton}
-            >
-              <Text style={styles.toolButtonIcon}>🖼️</Text>
-              <Text style={styles.toolButtonText}>Galerie</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => void startRecording()}
-              style={styles.toolButton}
-            >
-              <Text style={styles.toolButtonIcon}>🎙️</Text>
-              <Text style={styles.toolButtonText}>Vocal</Text>
-            </Pressable>
-
-            {TOOL_ITEMS.map((tool) => (
-              <Pressable
-                key={tool.key}
-                onPress={() => handleToolClick(tool.key)}
-                style={styles.toolButton}
-              >
-                <Text style={styles.toolButtonIcon}>{tool.icon}</Text>
-
-                <Text style={styles.toolButtonText}>{tool.title}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {showEmojiPicker && !isRecording && (
-        <View style={styles.panel}>
-          <View style={styles.panelHeader}>
-            <Text style={styles.panelTitle}>Emoji</Text>
-
-            <Pressable
-              onPress={() => setShowEmojiPicker(false)}
-              accessibilityLabel="Fermer"
-            >
-              <Text style={styles.iconText}>×</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.emojiGrid}>
-            {EMOJIS.map((emoji) => (
-              <Pressable
-                key={emoji}
-                onPress={() => insertEmoji(emoji)}
-                style={styles.emojiButton}
-                accessibilityLabel={`Ajouter ${emoji}`}
-              >
-                <Text style={styles.emoji}>{emoji}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {isRecording && (
+      {isRecording ? (
         <View style={styles.recordingBar}>
           <View style={styles.recordingDot} />
 
           <View style={styles.recordingInfo}>
-            <Text style={styles.recordingTitle}>Message vocal</Text>
-
+            <Text style={styles.recordingTitle}>Enregistrement vocal</Text>
             <Text style={styles.recordingTime}>
               {formatRecordingTime(recordingSeconds)}
             </Text>
@@ -751,15 +598,16 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           <Pressable
             onPress={() => void cancelRecording()}
             style={styles.recordingCancel}
-            accessibilityLabel="Annuler le vocal"
+            accessibilityLabel="Annuler l'enregistrement"
           >
             <Text style={styles.recordingCancelText}>Annuler</Text>
           </Pressable>
 
           <Pressable
             onPress={() => void sendRecording()}
+            disabled={isSubmitting}
             style={styles.recordingSend}
-            accessibilityLabel="Envoyer le vocal"
+            accessibilityLabel="Envoyer le message vocal"
           >
             {isSubmitting ? (
               <ActivityIndicator size="small" color="#000000" />
@@ -768,10 +616,90 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             )}
           </Pressable>
         </View>
-      )}
+      ) : null}
 
-      {!isRecording && (
+      {!isRecording ? (
         <>
+          {showAttachments ? (
+            <View style={styles.panel}>
+              <View style={styles.panelHeader}>
+                <Text style={styles.panelTitle}>Ajouter</Text>
+
+                <Pressable
+                  onPress={() => setShowAttachments(false)}
+                  accessibilityLabel="Fermer les pièces jointes"
+                >
+                  <Text style={styles.clearText}>Fermer</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.toolGrid}>
+                <Pressable
+                  onPress={() => void pickFromGallery()}
+                  style={styles.toolButton}
+                  accessibilityLabel="Choisir une photo ou vidéo"
+                >
+                  <Text style={styles.toolButtonIcon}>🖼️</Text>
+                  <Text style={styles.toolButtonText}>Galerie</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => void pickFromCamera()}
+                  style={styles.toolButton}
+                  accessibilityLabel="Prendre une photo ou vidéo"
+                >
+                  <Text style={styles.toolButtonIcon}>📷</Text>
+                  <Text style={styles.toolButtonText}>Caméra</Text>
+                </Pressable>
+
+                {TOOL_ITEMS.map((item) => (
+                  <Pressable
+                    key={item.key}
+                    onPress={() => {
+                      setActiveTool(item.key);
+                      setShowAttachments(false);
+                    }}
+                    style={styles.toolButton}
+                    accessibilityLabel={item.title}
+                  >
+                    <Text style={styles.toolButtonIcon}>{item.icon}</Text>
+                    <Text style={styles.toolButtonText} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {showEmojiPicker ? (
+            <View style={styles.panel}>
+              <View style={styles.panelHeader}>
+                <Text style={styles.panelTitle}>Emoji</Text>
+
+                <Pressable
+                  onPress={() => setShowEmojiPicker(false)}
+                  accessibilityLabel="Fermer les emojis"
+                >
+                  <Text style={styles.clearText}>Fermer</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.emojiGrid}>
+                {EMOJIS.map((emoji) => (
+                  <Pressable
+                    key={emoji}
+                    onPress={() => insertEmoji(emoji)}
+                    style={styles.emojiButton}
+                    accessibilityLabel={`Ajouter ${emoji}`}
+                  >
+                    <Text style={styles.emoji}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.inputRow}>
             <Pressable
               onPress={() => {
@@ -787,7 +715,15 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             <TextInput
               ref={inputRef}
               value={composer.text}
-              onChangeText={composer.setText}
+              onChangeText={(value) => {
+                composer.setText(value);
+
+                if (value.trim().length > 0) {
+                  typing.handleTyping();
+                } else {
+                  void typing.stopTyping();
+                }
+              }}
               placeholder="Écrire un message..."
               placeholderTextColor="rgba(255,255,255,0.30)"
               style={styles.input}
@@ -850,7 +786,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             </Text>
           </View>
         </>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -893,6 +829,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     color: "#C4B5FD",
+  },
+
+  replyText: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: "rgba(255,255,255,0.55)",
+  },
+
+  replyCancel: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+
+  replyCancelText: {
+    fontSize: 20,
+    lineHeight: 22,
+    color: "rgba(255,255,255,0.55)",
   },
 
   toolBanner: {

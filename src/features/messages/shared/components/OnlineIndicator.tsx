@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet } from "react-native";
-import type { ViewProps } from "react-native";
-
 // src/features/messages/shared/components/OnlineIndicator.tsx
+
+import { StyleSheet, Text, View } from "react-native";
+import type { ViewProps } from "react-native";
 
 export interface OnlineIndicatorProps extends ViewProps {
   online?: boolean;
@@ -23,16 +23,27 @@ export function OnlineIndicator({
   ...props
 }: OnlineIndicatorProps) {
   const indicatorSize = SIZES[size];
-  const dotColor = online ? "#22c55e" : "#9ca3af";
+
+  const dotColor = online ? "#22C55E" : "#9CA3AF";
+
+  const accessibilityText = online ? "En ligne" : "Hors ligne";
 
   return (
     <View
       {...props}
-      style={[styles.container, style]}
-      accessibilityLabel={online ? "En ligne" : "Hors ligne"}
+      style={[
+        styles.container,
+        size === "sm" && styles.containerSmall,
+        size === "lg" && styles.containerLarge,
+        style,
+      ]}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityText}
     >
       <View
-        accessibilityElementsHidden={true}
+        accessible={false}
+        accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
         style={[
           styles.dot,
@@ -43,11 +54,18 @@ export function OnlineIndicator({
           },
         ]}
       />
-      {showLabel && (
-        <Text style={styles.label}>
-          {online ? "En ligne" : "Hors ligne"}
+
+      {showLabel ? (
+        <Text
+          accessible={false}
+          style={[
+            styles.label,
+            online ? styles.labelOnline : styles.labelOffline,
+          ]}
+        >
+          {accessibilityText}
         </Text>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -58,12 +76,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
+
+  containerSmall: {
+    gap: 5,
+  },
+
+  containerLarge: {
+    gap: 8,
+  },
+
   dot: {
     borderRadius: 999,
   },
+
   label: {
     fontSize: 13,
-    color: "#4b5563",
+    lineHeight: 18,
+    fontWeight: "500",
+  },
+
+  labelOnline: {
+    color: "#86EFAC",
+  },
+
+  labelOffline: {
+    color: "#94A3B8",
   },
 });
 

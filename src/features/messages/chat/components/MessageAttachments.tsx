@@ -7,8 +7,8 @@ interface MessageAttachmentsProps {
 
 export function MessageAttachments({ messageId }: MessageAttachmentsProps) {
   // Le messageId est conservé dans le contrat du composant.
-  // Le rendu des pièces jointes est délégué aux composants média
-  // lorsqu'ils sont intégrés à cette zone.
+  // Le rendu réel des pièces jointes sera délégué aux composants
+  // média lorsqu'ils seront intégrés à cette zone.
   void messageId;
 
   return (

@@ -1,6 +1,8 @@
+// src/features/messages/shared/components/LoadingState.tsx
+
+import type { ReactNode } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import type { ViewProps } from "react-native";
-import type { ReactNode } from "react";
 
 export interface LoadingStateProps extends ViewProps {
   message?: ReactNode;
@@ -27,7 +29,12 @@ export function LoadingState({
   return (
     <View
       {...props}
-      style={[styles.container, style]}
+      style={[
+        styles.container,
+        size === "sm" && styles.containerSmall,
+        size === "lg" && styles.containerLarge,
+        style,
+      ]}
       accessibilityRole="progressbar"
       accessibilityLabel={
         typeof message === "string" ? message : "Chargement en cours"
@@ -36,7 +43,7 @@ export function LoadingState({
     >
       <ActivityIndicator
         size={indicatorSize}
-        color="#60a5fa"
+        color="#60A5FA"
         accessibilityLabel="Chargement en cours"
       />
 
@@ -56,12 +63,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 
+  containerSmall: {
+    minHeight: 80,
+    padding: 16,
+    gap: 8,
+  },
+
+  containerLarge: {
+    minHeight: 160,
+    padding: 28,
+    gap: 14,
+  },
+
   message: {
     fontSize: 14,
     lineHeight: 20,
-    color: "#d1d5db",
-    opacity: 0.8,
+    fontWeight: "400",
     textAlign: "center",
+    color: "#CBD5E1",
   },
 });
 

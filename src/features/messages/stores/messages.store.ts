@@ -15,15 +15,25 @@ export interface MessagesStoreState {
 
 export interface MessagesStoreActions {
   setMessages: (messages: Message[]) => void;
+
   addMessage: (message: Message) => void;
+
   updateMessage: (messageId: MessageId, updates: Partial<Message>) => void;
+
   removeMessage: (messageId: MessageId) => void;
+
   setActiveConversation: (conversationId: ConversationId | null) => void;
+
   selectMessage: (messageId: MessageId | null) => void;
+
   setLoading: (loading: boolean) => void;
+
   setLoadingMore: (loading: boolean) => void;
+
   setHasMore: (hasMore: boolean) => void;
+
   setError: (error: string | null) => void;
+
   clear: () => void;
 }
 
@@ -42,7 +52,9 @@ const INITIAL_STATE: MessagesStoreState = {
 };
 
 export function useMessagesStore(): MessagesStore {
-  const [messages, setMessages] = useState<Message[]>(INITIAL_STATE.messages);
+  const [messages, setMessagesState] = useState<Message[]>(
+    INITIAL_STATE.messages,
+  );
 
   const [activeConversationId, setActiveConversation] =
     useState<ConversationId | null>(INITIAL_STATE.activeConversationId);
@@ -51,21 +63,23 @@ export function useMessagesStore(): MessagesStore {
     INITIAL_STATE.selectedMessageId,
   );
 
-  const [isLoading, setLoading] = useState(INITIAL_STATE.isLoading);
+  const [isLoading, setLoading] = useState<boolean>(INITIAL_STATE.isLoading);
 
-  const [isLoadingMore, setLoadingMore] = useState(INITIAL_STATE.isLoadingMore);
+  const [isLoadingMore, setLoadingMore] = useState<boolean>(
+    INITIAL_STATE.isLoadingMore,
+  );
 
-  const [hasMore, setHasMore] = useState(INITIAL_STATE.hasMore);
+  const [hasMore, setHasMore] = useState<boolean>(INITIAL_STATE.hasMore);
 
   const [error, setError] = useState<string | null>(INITIAL_STATE.error);
 
   const replaceMessages = useCallback((nextMessages: Message[]) => {
-    setMessages(nextMessages);
+    setMessagesState(nextMessages);
     setError(null);
   }, []);
 
   const addMessage = useCallback((message: Message) => {
-    setMessages((current) => {
+    setMessagesState((current) => {
       const exists = current.some((item) => item._id === message._id);
 
       if (exists) {
@@ -78,9 +92,14 @@ export function useMessagesStore(): MessagesStore {
 
   const updateMessage = useCallback(
     (messageId: MessageId, updates: Partial<Message>) => {
-      setMessages((current) =>
+      setMessagesState((current) =>
         current.map((message) =>
-          message._id === messageId ? { ...message, ...updates } : message,
+          message._id === messageId
+            ? {
+                ...message,
+                ...updates,
+              }
+            : message,
         ),
       );
     },
@@ -88,7 +107,7 @@ export function useMessagesStore(): MessagesStore {
   );
 
   const removeMessage = useCallback((messageId: MessageId) => {
-    setMessages((current) =>
+    setMessagesState((current) =>
       current.filter((message) => message._id !== messageId),
     );
 
@@ -100,7 +119,7 @@ export function useMessagesStore(): MessagesStore {
   }, []);
 
   const clear = useCallback(() => {
-    setMessages([]);
+    setMessagesState([]);
     setActiveConversation(null);
     setSelectedMessage(null);
     setLoading(false);
@@ -128,7 +147,6 @@ export function useMessagesStore(): MessagesStore {
       addMessage,
       updateMessage,
       removeMessage,
-      setActiveConversation,
       selectMessage,
       clear,
     ],

@@ -1,4 +1,5 @@
-import { View, Image, Text, Pressable } from "react-native";
+import { Image, Pressable, Text, View } from "react-native";
+
 import type { Call } from "../types/call.types";
 
 interface IncomingCallProps {
@@ -16,16 +17,58 @@ export function IncomingCall({
   onAccept,
   onReject,
 }: IncomingCallProps) {
+  const isVideoCall = call.type === "video";
+
   return (
-    <View className="fixed inset-x-4 top-4 z-50 mx-auto max-w-md rounded-2xl border border-white/10 bg-zinc-900 p-5 shadow-2xl"><View className="flex items-center gap-4">{callerAvatar ? (
-          <Image className="h-14 w-14 rounded-full object-cover" source={{ uri: callerAvatar }} accessibilityLabel={callerName} />
+    <View className="mx-4 mt-4 rounded-2xl border border-white/10 bg-zinc-900 p-5 shadow-2xl">
+      <View className="flex-row items-center gap-4">
+        {callerAvatar ? (
+          <Image
+            source={{ uri: callerAvatar }}
+            accessibilityLabel={callerName}
+            className="h-14 w-14 rounded-full"
+          />
         ) : (
-          <View className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-xl">{call.type === "video" ? "📹" : "📞"}</View>
-        )}<View className="min-w-0 flex-1"><Text className="font-semibold text-white">{callerName}</Text><Text className="text-sm text-white/50">{call.type === "video"
-              ? "Appel vidéo entrant"
-              : "Appel audio entrant"}</Text></View></View><View className="mt-5 flex gap-3"><Pressable onPress={onReject} className="flex-1 rounded-xl bg-red-600 px-4 py-3 font-medium text-white">Refuser
-        </Pressable><Pressable onPress={onAccept} className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 font-medium text-white">Accepter
-        </Pressable></View></View>
+          <View className="h-14 w-14 items-center justify-center rounded-full bg-white/10">
+            <Text className="text-xl">{isVideoCall ? "📹" : "📞"}</Text>
+          </View>
+        )}
+
+        <View className="min-w-0 flex-1">
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            className="font-semibold text-white"
+          >
+            {callerName}
+          </Text>
+
+          <Text className="mt-1 text-sm text-white/50">
+            {isVideoCall ? "Appel vidéo entrant" : "Appel audio entrant"}
+          </Text>
+        </View>
+      </View>
+
+      <View className="mt-5 flex-row gap-3">
+        <Pressable
+          onPress={onReject}
+          accessibilityRole="button"
+          accessibilityLabel="Refuser l'appel"
+          className="flex-1 items-center justify-center rounded-xl bg-red-600 px-4 py-3 active:bg-red-700"
+        >
+          <Text className="font-semibold text-white">Refuser</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={onAccept}
+          accessibilityRole="button"
+          accessibilityLabel="Accepter l'appel"
+          className="flex-1 items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 active:bg-emerald-700"
+        >
+          <Text className="font-semibold text-white">Accepter</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 

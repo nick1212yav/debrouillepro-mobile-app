@@ -1,6 +1,5 @@
 // src/features/messages/contacts/services/contacts.service.ts
 
-import type { FunctionReference } from "convex/server";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { api } from "../../../../../convex/_generated/api";
 
@@ -62,7 +61,8 @@ export interface ContactMessage {
 /**
  * API Convex.
  *
- * `contacts.ts` est ajouté côté backend.
+ * Les fonctions correspondantes doivent exister dans
+ * `convex/contacts.ts`.
  */
 export const contactsApi = {
   search: api.contacts.search,

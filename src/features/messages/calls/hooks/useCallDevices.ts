@@ -1,4 +1,7 @@
+// src/features/messages/calls/hooks/useCallDevices.ts
+
 import { useCallback, useEffect, useState } from "react";
+import { Platform } from "react-native";
 
 import type { CallDeviceState } from "../types/call.types";
 
@@ -8,18 +11,34 @@ const emptyDevices: CallDeviceState = {
   videoInput: [],
 };
 
+type WebMediaDevices = MediaDevices;
+
+function getWebMediaDevices(): WebMediaDevices | null {
+  if (
+    Platform.OS !== "web" ||
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices
+  ) {
+    return null;
+  }
+
+  return navigator.mediaDevices;
+}
+
 export function useCallDevices() {
   const [devices, setDevices] = useState<CallDeviceState>(emptyDevices);
 
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
   const refreshDevices = useCallback(async () => {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices) {
+    const mediaDevices = getWebMediaDevices();
+
+    if (!mediaDevices) {
       return;
     }
 
     try {
-      const list = await navigator.mediaDevices.enumerateDevices();
+      const list = await mediaDevices.enumerateDevices();
 
       setDevices({
         audioInput: list.filter((device) => device.kind === "audioinput"),
@@ -39,50 +58,64 @@ export function useCallDevices() {
 
   const requestPermissions = useCallback(
     async (type: "audio" | "video") => {
-      if (typeof navigator === "undefined" || !navigator.mediaDevices) {
+      const mediaDevices = getWebMediaDevices();
+
+      if (!mediaDevices) {
         throw new Error(
-          "Les appels multimédia ne sont pas disponibles sur cet appareil.",
+          "La gestion directe des périphériques multimédia n'est pas disponible sur cette plateforme.",
         );
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia(
-        type === "video"
-          ? {
-              audio: true,
-              video: true,
-            }
-          : {
-              audio: true,
-              video: false,
-            },
-      );
+      try {
+        const stream = await mediaDevices.getUserMedia(
+          type === "video"
+            ? {
+                audio: true,
+                video: true,
+              }
+            : {
+                audio: true,
+                video: false,
+              },
+        );
 
-      stream.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach((track) => {
+          track.stop();
+        });
 
-      await refreshDevices();
+        await refreshDevices();
 
-      return true;
+        return true;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Impossible d'obtenir les permissions multimédia.";
+
+        setPermissionError(message);
+        throw error;
+      }
     },
     [refreshDevices],
   );
 
   useEffect(() => {
+    const mediaDevices = getWebMediaDevices();
+
+    if (!mediaDevices) {
+      return;
+    }
+
     void refreshDevices();
 
     const handleDeviceChange = () => {
       void refreshDevices();
     };
 
-    navigator.mediaDevices?.addEventListener(
-      "devicechange",
-      handleDeviceChange,
-    );
+    mediaDevices.addEventListener("devicechange", handleDeviceChange);
 
     return () => {
-      navigator.mediaDevices?.removeEventListener(
-        "devicechange",
-        handleDeviceChange,
-      );
+      mediaDevices.removeEventListener("devicechange", handleDeviceChange);
     };
   }, [refreshDevices]);
 

@@ -86,17 +86,19 @@ export function useCallsStore(): CallsStore {
 
   const [status, setStatus] = useState<CallStatus>(INITIAL_STATE.status);
 
-  const [isMuted, setMuted] = useState(INITIAL_STATE.isMuted);
+  const [isMuted, setMuted] = useState<boolean>(INITIAL_STATE.isMuted);
 
-  const [isCameraEnabled, setCameraEnabled] = useState(
+  const [isCameraEnabled, setCameraEnabled] = useState<boolean>(
     INITIAL_STATE.isCameraEnabled,
   );
 
-  const [isSpeakerEnabled, setSpeakerEnabled] = useState(
+  const [isSpeakerEnabled, setSpeakerEnabled] = useState<boolean>(
     INITIAL_STATE.isSpeakerEnabled,
   );
 
-  const [isMinimized, setMinimized] = useState(INITIAL_STATE.isMinimized);
+  const [isMinimized, setMinimized] = useState<boolean>(
+    INITIAL_STATE.isMinimized,
+  );
 
   const [error, setError] = useState<string | null>(INITIAL_STATE.error);
 
@@ -111,7 +113,9 @@ export function useCallsStore(): CallsStore {
       setConversationId(params.conversationId);
       setParticipantIds(params.participantIds);
       setCallType(params.callType);
+
       setStatus("outgoing");
+
       setMuted(false);
       setCameraEnabled(true);
       setSpeakerEnabled(true);
@@ -131,6 +135,7 @@ export function useCallsStore(): CallsStore {
     setParticipantIds([]);
     setCallType(null);
     setStatus("idle");
+
     setMuted(false);
     setCameraEnabled(true);
     setSpeakerEnabled(true);

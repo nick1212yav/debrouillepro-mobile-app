@@ -1,6 +1,8 @@
+// src/features/messages/shared/components/ErrorState.tsx
+
+import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { PressableProps, ViewProps } from "react-native";
-import type { ReactNode } from "react";
 
 export interface ErrorStateProps extends Omit<ViewProps, "title"> {
   title?: ReactNode;
@@ -28,12 +30,14 @@ export function ErrorState({
     >
       {icon ? (
         <View
-          style={styles.iconWrapper}
           accessible={false}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
+          style={styles.iconWrapper}
         >
-          <Text style={styles.iconText}>{icon}</Text>
+          <Text accessible={false} style={styles.iconText}>
+            {icon}
+          </Text>
         </View>
       ) : null}
 
@@ -80,6 +84,7 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 34,
     textAlign: "center",
+    color: "#FCD34D",
   },
 
   title: {
@@ -87,7 +92,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: "600",
     textAlign: "center",
-    color: "#f9fafb",
+    color: "#F8FAFC",
   },
 
   message: {
@@ -97,18 +102,18 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     fontWeight: "400",
     textAlign: "center",
-    color: "#9ca3af",
+    color: "#94A3B8",
   },
 
   actionButton: {
-    marginTop: 6,
     minHeight: 42,
-    paddingHorizontal: 18,
+    marginTop: 6,
     paddingVertical: 10,
-    borderRadius: 10,
+    paddingHorizontal: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#2563eb",
+    borderRadius: 10,
+    backgroundColor: "#2563EB",
   },
 
   actionButtonPressed: {
@@ -120,7 +125,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "600",
-    color: "#ffffff",
+    color: "#FFFFFF",
   },
 });
 

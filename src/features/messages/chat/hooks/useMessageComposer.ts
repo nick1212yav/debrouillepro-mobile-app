@@ -1,5 +1,3 @@
-// src/features/messages/chat/hooks/useMessageComposer.ts
-
 import { useCallback, useState } from "react";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -55,8 +53,8 @@ export interface ComposerEvent {
  * IMPORTANT :
  * "jobs" n'existe pas actuellement comme table Convex.
  *
- * On garde donc un identifiant applicatif générique.
- * Le module jobs pourra ensuite le remplacer par son propre type
+ * On conserve donc un identifiant applicatif générique.
+ * Le module Jobs pourra ensuite le remplacer par son propre type
  * lorsqu'une table Convex "jobs" existera réellement.
  */
 export interface ComposerJob {
@@ -408,7 +406,7 @@ export function useMessageComposer(
     const trimmedText = text.trim();
 
     /*
-     * Le composer orchestre.
+     * Le composer orchestre les différents modes.
      *
      * Les modules spécialisés prennent en charge :
      * - Storage
@@ -422,12 +420,9 @@ export function useMessageComposer(
      * - polls
      * - payments
      *
-     * Ici, l'envoi directement géré reste le message texte.
+     * L'envoi directement géré ici reste le message texte,
+     * avec prise en charge du reply et de la publication partagée.
      */
-
-    if (mode !== "text" && !trimmedText) {
-      return null;
-    }
 
     if (!trimmedText) {
       return null;
@@ -470,7 +465,6 @@ export function useMessageComposer(
     conversationId,
     isSending,
     text,
-    mode,
     replyTo,
     sharedPublicationId,
     sendMessage,

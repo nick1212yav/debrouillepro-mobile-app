@@ -1,5 +1,3 @@
-// src/features/messages/contacts/hooks/useContacts.ts
-
 import { useMutation, useQuery } from "convex/react";
 import { useMemo } from "react";
 
@@ -70,13 +68,9 @@ export function useContacts(options: UseContactsOptions = {}) {
 
   return {
     contacts: normalizedContacts,
-
     isLoading: contacts === undefined,
-
     search: normalizedSearch,
-
     getContact,
-
     sendContact,
   };
 }

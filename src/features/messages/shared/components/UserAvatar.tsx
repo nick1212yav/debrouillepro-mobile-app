@@ -1,7 +1,7 @@
-import { Text, View, Image, StyleSheet } from "react-native";
-import type { ViewProps } from "react-native";
-
 // src/features/messages/shared/components/UserAvatar.tsx
+
+import { Image, StyleSheet, Text, View } from "react-native";
+import type { ViewProps } from "react-native";
 
 export interface UserAvatarProps extends Omit<ViewProps, "children"> {
   name?: string | null;
@@ -11,10 +11,19 @@ export interface UserAvatarProps extends Omit<ViewProps, "children"> {
 }
 
 function getInitials(name?: string | null): string {
-  if (!name?.trim()) return "?";
+  if (!name?.trim()) {
+    return "?";
+  }
+
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0] ?? ""}${
+    parts[parts.length - 1][0] ?? ""
+  }`.toUpperCase();
 }
 
 export function UserAvatar({
@@ -25,9 +34,14 @@ export function UserAvatar({
   style,
   ...props
 }: UserAvatarProps) {
+  const safeSize = Math.max(1, size);
   const initials = getInitials(name);
-  const fontSize = Math.max(11, Math.round(size * 0.34));
-  const onlineSize = Math.max(8, Math.round(size * 0.24));
+
+  const fontSize = Math.max(11, Math.round(safeSize * 0.34));
+
+  const onlineSize = Math.max(8, Math.round(safeSize * 0.24));
+
+  const accessibilityLabel = name?.trim() || "Utilisateur";
 
   return (
     <View
@@ -35,24 +49,29 @@ export function UserAvatar({
       style={[
         styles.container,
         {
-          width: size,
-          height: size,
-          minWidth: size,
-          borderRadius: size / 2,
+          width: safeSize,
+          height: safeSize,
+          minWidth: safeSize,
+          borderRadius: safeSize / 2,
         },
         style,
       ]}
-      accessibilityLabel={name ?? "Utilisateur"}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={accessibilityLabel}
     >
       {avatar ? (
         <Image
-          style={styles.image}
           source={{ uri: avatar }}
-          accessibilityLabel={name ?? "Utilisateur"}
+          resizeMode="cover"
+          style={styles.image}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
         />
       ) : (
         <Text
-          accessibilityElementsHidden={true}
+          accessible={false}
+          accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           style={[styles.initials, { fontSize }]}
         >
@@ -60,45 +79,52 @@ export function UserAvatar({
         </Text>
       )}
 
-      {online && (
+      {online ? (
         <View
-          accessibilityLabel="En ligne"
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
           style={[
             styles.onlineDot,
             {
               width: onlineSize,
               height: onlineSize,
               borderRadius: onlineSize / 2,
+              borderWidth: Math.max(1, Math.round(safeSize * 0.05)),
             },
           ]}
         />
-      )}
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    position: "relative",
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#e5e7eb",
+    backgroundColor: "#1E293B",
   },
+
   image: {
     width: "100%",
     height: "100%",
   },
+
   initials: {
-    fontWeight: "600",
-    color: "#374151",
+    fontWeight: "700",
+    color: "#E2E8F0",
+    textAlign: "center",
   },
+
   onlineDot: {
     position: "absolute",
     right: 1,
     bottom: 1,
-    backgroundColor: "#22c55e",
-    borderWidth: 2,
-    borderColor: "#ffffff",
+    backgroundColor: "#22C55E",
+    borderColor: "#020617",
   },
 });
 
