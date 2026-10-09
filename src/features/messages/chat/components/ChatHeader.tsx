@@ -1,11 +1,13 @@
+// src/features/messages/chat/components/ChatHeader.tsx
+
 import {
-  View,
-  Pressable,
-  Text,
-  Image,
-  StyleSheet,
   BackHandler,
+  Image,
   Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import {
   ArrowLeft,
@@ -21,8 +23,6 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { Id } from "@/convex/_generated/dataModel";
-
-// src/features/messages/chat/components/ChatHeader.tsx
 
 interface ChatHeaderProps {
   conversationId: Id<"conversations">;
@@ -221,7 +221,6 @@ export function ChatHeader({
             {callActive && (
               <View style={styles.callBadge}>
                 <View style={styles.callBadgeDot} />
-
                 <Text style={styles.callBadgeText}>En appel</Text>
               </View>
             )}
@@ -329,9 +328,7 @@ export function ChatHeader({
               ]}
               accessibilityRole="button"
               accessibilityLabel="Plus d'options"
-              accessibilityState={{
-                expanded: menuOpen,
-              }}
+              accessibilityState={{ expanded: menuOpen }}
               hitSlop={4}
             >
               <MoreVertical

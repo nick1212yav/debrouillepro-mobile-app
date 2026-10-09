@@ -1,3 +1,5 @@
+// src/features/messages/MessagesPage.tsx
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BackHandler,
@@ -38,7 +40,6 @@ import type { ConversationPreview } from "./conversations/services/conversations
  * ========================================================================== */
 
 type ConversationId = Id<"conversations">;
-
 type UserId = Id<"users">;
 
 type ConversationFilter = "all" | "unread" | "groups";
@@ -49,8 +50,8 @@ type MessagesPageProps = {
   onBack?: () => void;
 
   /**
-   * Espace réservé en bas de l'écran pour ne pas passer sous la barre
-   * d'onglets flottante de l'app (bouton « + » et fin de liste).
+   * Espace réservé en bas de l'écran pour ne pas passer sous la navigation
+   * flottante de l'application.
    */
   bottomInset?: number;
 };
@@ -59,59 +60,36 @@ type MessagesPageProps = {
  * CONSTANTS
  * ========================================================================== */
 
-/** Au-delà de cette largeur : liste + conversation côte à côte (tablette/web). */
 const WIDE_BREAKPOINT = 768;
-
 const LIST_PANEL_WIDTH = 380;
-
 const DEFAULT_BOTTOM_INSET = 96;
 
 /* ============================================================================
  * HELPERS
  * ========================================================================== */
 
-/**
- * Lecture défensive : on ne suppose pas que `ConversationPreview` expose
- * `unreadCount` / `isGroup`. Si le champ n'existe pas, le filtre associé est
- * simplement masqué au lieu de produire de mauvais résultats.
- */
 function readUnread(conversation: ConversationPreview): number {
-  const value = (
-    conversation as unknown as {
-      unreadCount?: unknown;
-    }
-  ).unreadCount;
+  const value = (conversation as unknown as { unreadCount?: unknown })
+    .unreadCount;
 
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function hasUnreadField(conversation: ConversationPreview): boolean {
   return (
-    typeof (
-      conversation as unknown as {
-        unreadCount?: unknown;
-      }
-    ).unreadCount === "number"
+    typeof (conversation as unknown as { unreadCount?: unknown })
+      .unreadCount === "number"
   );
 }
 
 function readIsGroup(conversation: ConversationPreview): boolean {
-  return (
-    (
-      conversation as unknown as {
-        isGroup?: unknown;
-      }
-    ).isGroup === true
-  );
+  return (conversation as unknown as { isGroup?: unknown }).isGroup === true;
 }
 
 function hasGroupField(conversation: ConversationPreview): boolean {
   return (
-    typeof (
-      conversation as unknown as {
-        isGroup?: unknown;
-      }
-    ).isGroup === "boolean"
+    typeof (conversation as unknown as { isGroup?: unknown }).isGroup ===
+    "boolean"
   );
 }
 
@@ -134,6 +112,7 @@ function FilterChip({
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}
+      hitSlop={4}
       className={[
         "rounded-full border px-4 py-2 active:opacity-70",
         active
@@ -164,19 +143,14 @@ export default function MessagesPage({
   bottomInset = DEFAULT_BOTTOM_INSET,
 }: MessagesPageProps) {
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const isWide = width >= WIDE_BREAKPOINT;
 
-  const insets = useSafeAreaInsets();
+  /* ==========================================================================
+   * ROOT DIMENSIONS
+   * ======================================================================== */
 
-  /**
-   * DIMENSIONS EXPLICITES de la racine.
-   *
-   * `h-full` / `w-full` / `flex-1` dépendent d'un parent à taille définie :
-   * selon le conteneur, la page s'effondrait en bande étroite (largeur) ou en
-   * écran noir (hauteur nulle). Largeur et hauteur de la fenêtre garantissent
-   * une racine toujours visible ; `paddingTop` évite la barre d'état.
-   */
   const rootStyle = useMemo(
     () => ({
       width,
@@ -195,15 +169,11 @@ export default function MessagesPage({
   const currentUserId: UserId | null = currentUser?._id ?? null;
 
   /**
-   * Présence de l'utilisateur courant.
-   *
-   * Une seule instance de `usePresence` avec `autoStart: true` est montée
-   * au niveau de MessagesPage. Les ChatView utilisent `autoStart: false`
-   * uniquement pour consulter la présence de l'autre participant.
+   * Une seule instance globale de présence est démarrée au niveau de la page.
+   * Les écrans enfants peuvent ensuite uniquement observer la présence
+   * nécessaire à leur contexte.
    */
-  usePresence({
-    autoStart: true,
-  });
+  usePresence({ autoStart: true });
 
   /* ==========================================================================
    * CONVERSATIONS
@@ -216,7 +186,7 @@ export default function MessagesPage({
   } = useConversations(currentUserId);
 
   /* ==========================================================================
-   * USERS FOR NEW CONVERSATION
+   * USERS — NEW CONVERSATION
    * ======================================================================== */
 
   const users = useQuery(
@@ -225,7 +195,7 @@ export default function MessagesPage({
   );
 
   /* ==========================================================================
-   * FEATURE STATE
+   * MESSAGE FEATURE STATE
    * ======================================================================== */
 
   const feature = useMessagesFeature();
@@ -272,15 +242,17 @@ export default function MessagesPage({
   );
 
   const filteredPreviews = useMemo<ConversationPreview[]>(() => {
-    if (filter === "unread") {
-      return previews.filter((conversation) => readUnread(conversation) > 0);
-    }
+    switch (filter) {
+      case "unread":
+        return previews.filter((conversation) => readUnread(conversation) > 0);
 
-    if (filter === "groups") {
-      return previews.filter(readIsGroup);
-    }
+      case "groups":
+        return previews.filter(readIsGroup);
 
-    return previews;
+      case "all":
+      default:
+        return previews;
+    }
   }, [filter, previews]);
 
   const activeConversation = useMemo<ConversationPreview | null>(() => {
@@ -333,11 +305,11 @@ export default function MessagesPage({
     }
 
     if (activeConversationId === initialConversationId) {
+      setMobilePanel("chat");
       return;
     }
 
     actions.openConversation(initialConversationId);
-
     setMobilePanel("chat");
   }, [initialConversationId, activeConversationId, actions]);
 
@@ -350,9 +322,11 @@ export default function MessagesPage({
   }, []);
 
   /**
-   * Bouton retour matériel Android :
-   *   conversation ouverte (mobile) → retour à la liste ;
-   *   sinon on laisse la navigation de l'app gérer.
+   * Android hardware back:
+   *
+   * 1. ferme la feuille "Nouvelle conversation" si elle est ouverte ;
+   * 2. sur mobile, revient du chat vers la liste ;
+   * 3. sinon laisse la navigation racine de l'application gérer le retour.
    */
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
@@ -372,7 +346,9 @@ export default function MessagesPage({
       },
     );
 
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+    };
   }, [isNewConversationOpen, isWide, mobilePanel]);
 
   /* ==========================================================================
@@ -443,7 +419,7 @@ export default function MessagesPage({
         accessibilityLabel="Messagerie"
       >
         {/* ==================================================================
-            LISTE DES CONVERSATIONS
+            CONVERSATIONS LIST
             ================================================================== */}
 
         {showList ? (
@@ -502,7 +478,7 @@ export default function MessagesPage({
               ) : null}
             </View>
 
-            {/* RECHERCHE */}
+            {/* SEARCH */}
 
             <View className="px-3 pb-2 pt-1">
               <ConversationSearch
@@ -511,7 +487,7 @@ export default function MessagesPage({
               />
             </View>
 
-            {/* FILTRES */}
+            {/* FILTERS */}
 
             {canFilterUnread || canFilterGroups ? (
               <View className="flex-row gap-2 px-4 pb-2 pt-1">
@@ -539,7 +515,7 @@ export default function MessagesPage({
               </View>
             ) : null}
 
-            {/* LISTE */}
+            {/* LIST */}
 
             <View
               className="min-h-0 flex-1 px-2 py-2"
@@ -566,6 +542,7 @@ export default function MessagesPage({
                   <Pressable
                     onPress={() => setFilter("all")}
                     accessibilityRole="button"
+                    accessibilityLabel="Voir toutes les conversations"
                     className="mt-4 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 active:opacity-70"
                   >
                     <Text className="text-[13px] font-semibold text-white/80">
@@ -582,12 +559,13 @@ export default function MessagesPage({
               )}
             </View>
 
-            {/* BOUTON FLOTTANT « NOUVELLE CONVERSATION » */}
+            {/* NEW CONVERSATION FAB */}
 
             <Pressable
               onPress={handleNewConversation}
               accessibilityRole="button"
               accessibilityLabel="Nouvelle conversation"
+              hitSlop={6}
               className="absolute right-5 h-14 w-14 items-center justify-center rounded-2xl bg-primary active:opacity-80"
               style={{
                 bottom: bottomInset,
@@ -607,7 +585,7 @@ export default function MessagesPage({
         ) : null}
 
         {/* ==================================================================
-            CONVERSATION
+            CHAT
             ================================================================== */}
 
         {showChat ? (
@@ -648,6 +626,7 @@ export default function MessagesPage({
                 <Pressable
                   onPress={handleNewConversation}
                   accessibilityRole="button"
+                  accessibilityLabel="Nouvelle conversation"
                   className="mt-7 flex-row items-center gap-2 rounded-xl bg-primary px-5 py-3 active:opacity-80"
                 >
                   <Plus size={16} color="#ffffff" />
@@ -663,10 +642,7 @@ export default function MessagesPage({
       </View>
 
       {/* =====================================================================
-          NOUVELLE CONVERSATION — feuille du bas (Modal natif)
-
-          Dimensions explicites : dans un Modal Android, `flex: 1` et
-          `width: 100%` s'effondrent sans parent de taille définie.
+          NEW CONVERSATION MODAL
           ===================================================================== */}
 
       {isNewConversationOpen ? (
@@ -684,26 +660,36 @@ export default function MessagesPage({
               height,
             }}
           >
+            {/* BACKDROP */}
+
             <Pressable
               onPress={handleCloseNewConversation}
+              accessibilityRole="button"
               accessibilityLabel="Fermer"
               className="flex-1"
             />
+
+            {/* SHEET */}
 
             <View
               className="rounded-t-3xl border-t border-white/10 bg-[#0B0B12]"
               style={{
                 maxHeight: height * 0.85,
+                paddingBottom: Math.max(insets.bottom, 12),
               }}
-              accessibilityViewIsModal={true}
+              accessibilityViewIsModal
               accessibilityLabel="Nouvelle conversation"
             >
+              {/* HANDLE */}
+
               <View className="items-center pt-2">
                 <View className="h-1 w-10 rounded-full bg-white/20" />
               </View>
 
+              {/* HEADER */}
+
               <View className="flex-row items-center justify-between border-b border-white/10 px-5 py-4">
-                <View className="min-w-0 flex-1">
+                <View className="min-w-0 flex-1 pr-4">
                   <Text className="text-lg font-semibold text-white">
                     Nouvelle conversation
                   </Text>
@@ -723,6 +709,8 @@ export default function MessagesPage({
                   <X size={20} color="rgba(255,255,255,0.7)" />
                 </Pressable>
               </View>
+
+              {/* CONTENT */}
 
               <ScrollView
                 className="px-5 pt-4"

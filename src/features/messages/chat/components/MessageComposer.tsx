@@ -1,6 +1,9 @@
+// src/features/messages/chat/components/MessageComposer.tsx
+
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +21,23 @@ import type { Id } from "@/convex/_generated/dataModel";
 
 import { useMessageComposer } from "../hooks/useMessageComposer";
 import { useTyping } from "../../typing/hooks/useTyping";
+
+import { LocationPicker } from "../../locations/components/LocationPicker";
+import { ContactPicker } from "../../contacts/components/ContactPicker";
+import { PollComposer } from "../../polls/components/PollComposer";
+import { PaymentComposer } from "../../payments/components/PaymentComposer";
+import { usePolls } from "../../polls/hooks/usePolls";
+
+import {
+  PublicationPicker,
+  type PublicationShareType,
+} from "./PublicationPicker";
+
+import type { Contact } from "../../contacts/services/contacts.service";
+
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 interface MessageComposerProps {
   conversationId: Id<"conversations">;
@@ -38,12 +58,16 @@ interface SelectedMedia {
 type ComposerTool =
   | "location"
   | "contact"
+  | "poll"
+  | "payment"
   | "event"
   | "job"
   | "property"
-  | "poll"
-  | "payment"
   | null;
+
+/* ============================================================================
+ * CONSTANTS
+ * ========================================================================== */
 
 const EMOJIS = [
   "😀",
@@ -128,6 +152,19 @@ const TOOL_ITEMS: Array<{
   },
 ];
 
+const PUBLICATION_TYPES: Record<
+  "event" | "job" | "property",
+  PublicationShareType
+> = {
+  event: "evenement",
+  job: "job",
+  property: "immo",
+};
+
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
@@ -169,9 +206,22 @@ function isStorageUploadResponse(
   return typeof value.storageId === "string" && value.storageId.length > 0;
 }
 
+function buildContactMessageText(contact: Contact): string {
+  const name = contact.name.trim() || "Contact";
+  const parts = [`👤 ${name}`];
+  if (contact.phone) parts.push(`📞 ${contact.phone}`);
+  if (contact.email) parts.push(`✉️ ${contact.email}`);
+  return parts.join("\n");
+}
+
+/* ============================================================================
+ * COMPOSER
+ * ========================================================================== */
+
 export function MessageComposer({ conversationId }: MessageComposerProps) {
   const composer = useMessageComposer(conversationId);
   const typing = useTyping(conversationId);
+  const polls = usePolls(conversationId);
 
   const sendMessage = useMutation(api.messages.messages.send);
   const generateUploadUrl = useMutation(
@@ -195,6 +245,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   const hasMedia = selectedMedia.length > 0;
   const isBusy = isSubmitting || isRecording;
 
+  /* RECORDING TIMER */
   useEffect(() => {
     if (!isRecording) {
       setRecordingSeconds(0);
@@ -209,6 +260,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     return () => clearInterval(timer);
   }, [isRecording]);
 
+  /* CLEANUP */
   useEffect(() => {
     return () => {
       const recording = recordingRef.current;
@@ -219,6 +271,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     };
   }, []);
 
+  /* UI HELPERS */
   const focusComposer = useCallback(() => {
     inputRef.current?.focus();
   }, []);
@@ -228,6 +281,12 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     setShowEmojiPicker(false);
   }, []);
 
+  const closeTool = useCallback(() => {
+    setActiveTool(null);
+    closeMenus();
+  }, [closeMenus]);
+
+  /* EMOJI */
   const insertEmoji = useCallback(
     (emoji: string) => {
       composer.setText(`${composer.text}${emoji}`);
@@ -238,6 +297,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     [composer.text, composer.setText, focusComposer, typing.handleTyping],
   );
 
+  /* MEDIA */
   const ingestAssets = useCallback((assets: ImagePicker.ImagePickerAsset[]) => {
     const additions = assets.map(createSelectedMedia);
     setSelectedMedia((current) => [...current, ...additions]);
@@ -286,6 +346,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     setSelectedMedia((current) => current.filter((media) => media.id !== id));
   }, []);
 
+  /* UPLOAD */
   const uploadUri = useCallback(
     async (uri: string, mimeType: string): Promise<string> => {
       const uploadUrl = await generateUploadUrl();
@@ -318,6 +379,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     [generateUploadUrl],
   );
 
+  /* SEND TEXT + MEDIA */
   const sendCurrentMessage = useCallback(async () => {
     if (isSubmitting || !conversationId) return;
     if (!hasText && !hasMedia) return;
@@ -357,11 +419,11 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       setActiveTool(null);
       closeMenus();
     } catch (error) {
-      const message =
+      setAttachmentError(
         error instanceof Error
           ? error.message
-          : "Impossible d'envoyer le message.";
-      setAttachmentError(message);
+          : "Impossible d'envoyer le message.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -382,9 +444,9 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     uploadUri,
   ]);
 
+  /* VOICE RECORDING */
   const startRecording = useCallback(async () => {
     if (isSubmitting || isRecording) return;
-
     setAttachmentError(null);
 
     const permission = await Audio.requestPermissionsAsync();
@@ -473,17 +535,90 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     }
   }, [addAttachment, conversationId, isSubmitting, sendMessage, uploadUri]);
 
+  /* TOOL HANDLERS */
+  const handleSendContact = useCallback(
+    async (contact: Contact) => {
+      try {
+        await sendMessage({
+          conversationId,
+          text: buildContactMessageText(contact),
+        });
+        closeTool();
+      } catch (error) {
+        setAttachmentError(
+          error instanceof Error
+            ? error.message
+            : "Impossible d'envoyer le contact.",
+        );
+      }
+    },
+    [closeTool, conversationId, sendMessage],
+  );
+
+  const handleSendPayment = useCallback(
+    async (amount: number, currency: string, description?: string) => {
+      try {
+        const header = `💳 Paiement : ${amount.toFixed(2)} ${currency}`;
+        const body = description ? `${header}\n${description}` : header;
+
+        await sendMessage({ conversationId, text: body });
+        closeTool();
+      } catch (error) {
+        setAttachmentError(
+          error instanceof Error
+            ? error.message
+            : "Impossible d'envoyer le paiement.",
+        );
+      }
+    },
+    [closeTool, conversationId, sendMessage],
+  );
+
+  const handlePollCreated = useCallback(() => {
+    closeTool();
+  }, [closeTool]);
+
+  const handlePaymentComposerSubmit = useCallback(
+    (amount: number, currency: string, description?: string) => {
+      void handleSendPayment(amount, currency, description);
+    },
+    [handleSendPayment],
+  );
+
+  const handleSharePublication = useCallback(
+    async (publicationId: Id<"publications">) => {
+      try {
+        await sendMessage({
+          conversationId,
+          text: "",
+          ...(composer.replyTo ? { replyToId: composer.replyTo._id } : {}),
+          sharedPublicationId: publicationId,
+        });
+
+        composer.reset();
+        closeTool();
+      } catch (error) {
+        setAttachmentError(
+          error instanceof Error ? error.message : "Impossible de partager.",
+        );
+        throw error;
+      }
+    },
+    [closeTool, composer.replyTo, composer.reset, conversationId, sendMessage],
+  );
+
   const canSend = !isBusy && (hasText || hasMedia);
 
+  /* RENDER */
   return (
     <View style={styles.container}>
+      {/* REPLY BAR */}
       {composer.replyTo ? (
         <View style={styles.replyBar}>
           <View style={styles.replyAccent} />
 
           <View style={styles.replyContent}>
             <Text style={styles.replyLabel}>Répondre au message</Text>
-
             <Text numberOfLines={1} style={styles.replyText}>
               {composer.replyTo.text?.trim() || "[message sans texte]"}
             </Text>
@@ -501,32 +636,14 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         </View>
       ) : null}
 
-      {activeTool ? (
-        <View style={styles.toolBanner}>
-          <Text style={styles.toolIcon}>
-            {TOOL_ITEMS.find((item) => item.key === activeTool)?.icon}
-          </Text>
-
-          <Text style={styles.toolTitle}>
-            {TOOL_ITEMS.find((item) => item.key === activeTool)?.title}
-          </Text>
-
-          <Pressable
-            onPress={() => setActiveTool(null)}
-            style={styles.toolCancel}
-            accessibilityLabel="Fermer l'outil"
-          >
-            <Text style={styles.toolCancelText}>Fermer</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
+      {/* ERROR BANNER */}
       {attachmentError ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{attachmentError}</Text>
         </View>
       ) : null}
 
+      {/* SELECTED MEDIA */}
       {selectedMedia.length > 0 ? (
         <View style={styles.mediaContainer}>
           <View style={styles.mediaHeader}>
@@ -584,6 +701,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         </View>
       ) : null}
 
+      {/* RECORDING BAR */}
       {isRecording ? (
         <View style={styles.recordingBar}>
           <View style={styles.recordingDot} />
@@ -618,6 +736,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         </View>
       ) : null}
 
+      {/* COMPOSER */}
       {!isRecording ? (
         <>
           {showAttachments ? (
@@ -787,9 +906,125 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           </View>
         </>
       ) : null}
+
+      {/* LOCATION PICKER */}
+      {activeTool === "location" ? (
+        <LocationPicker
+          open
+          conversationId={conversationId}
+          onClose={closeTool}
+          onSent={closeTool}
+        />
+      ) : null}
+
+      {/* CONTACT PICKER */}
+      {activeTool === "contact" ? (
+        <ContactPicker
+          open
+          conversationId={conversationId}
+          onClose={closeTool}
+          onSend={handleSendContact}
+        />
+      ) : null}
+
+      {/* POLL COMPOSER */}
+      {activeTool === "poll" ? (
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={closeTool}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={closeTool}
+              accessibilityLabel="Fermer le sondage"
+            />
+
+            <View style={styles.modalSheet}>
+              <ScrollView
+                contentContainerStyle={styles.modalContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <PollComposer
+                  conversationId={conversationId}
+                  onCreate={(input) => polls.createPoll(input)}
+                  onCreated={handlePollCreated}
+                  onCancel={closeTool}
+                />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+
+      {/* PAYMENT COMPOSER */}
+      {activeTool === "payment" ? (
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={closeTool}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={closeTool}
+              accessibilityLabel="Fermer le paiement"
+            />
+
+            <View style={styles.modalSheet}>
+              <View style={styles.modalContent}>
+                <PaymentComposer
+                  currency="USD"
+                  onSubmit={handlePaymentComposerSubmit}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+
+      {/* PUBLICATION PICKER — Événement */}
+      {activeTool === "event" ? (
+        <PublicationPicker
+          open
+          type={PUBLICATION_TYPES.event}
+          onClose={closeTool}
+          onSelect={handleSharePublication}
+        />
+      ) : null}
+
+      {/* PUBLICATION PICKER — Emploi */}
+      {activeTool === "job" ? (
+        <PublicationPicker
+          open
+          type={PUBLICATION_TYPES.job}
+          onClose={closeTool}
+          onSelect={handleSharePublication}
+        />
+      ) : null}
+
+      {/* PUBLICATION PICKER — Immobilier */}
+      {activeTool === "property" ? (
+        <PublicationPicker
+          open
+          type={PUBLICATION_TYPES.property}
+          onClose={closeTool}
+          onSelect={handleSharePublication}
+        />
+      ) : null}
     </View>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
 
 const styles = StyleSheet.create({
   container: {
@@ -819,10 +1054,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#8B5CF6",
   },
 
-  replyContent: {
-    flex: 1,
-    minWidth: 0,
-  },
+  replyContent: { flex: 1, minWidth: 0 },
 
   replyLabel: {
     marginBottom: 3,
@@ -851,40 +1083,6 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
   },
 
-  toolBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: "rgba(139,92,246,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.18)",
-  },
-
-  toolIcon: {
-    marginRight: 8,
-    fontSize: 17,
-  },
-
-  toolTitle: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#DDD6FE",
-  },
-
-  toolCancel: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-
-  toolCancelText: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.45)",
-  },
-
   errorBanner: {
     marginBottom: 8,
     paddingHorizontal: 12,
@@ -895,11 +1093,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(239,68,68,0.07)",
   },
 
-  errorText: {
-    fontSize: 11,
-    lineHeight: 16,
-    color: "#FCA5A5",
-  },
+  errorText: { fontSize: 11, lineHeight: 16, color: "#FCA5A5" },
 
   mediaContainer: {
     marginBottom: 8,
@@ -926,15 +1120,9 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.75)",
   },
 
-  clearText: {
-    fontSize: 10,
-    color: "#C4B5FD",
-  },
+  clearText: { fontSize: 10, color: "#C4B5FD" },
 
-  mediaRow: {
-    flexDirection: "row",
-    padding: 8,
-  },
+  mediaRow: { flexDirection: "row", padding: 8 },
 
   mediaCard: {
     width: 82,
@@ -947,10 +1135,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#111111",
   },
 
-  mediaImage: {
-    width: "100%",
-    height: "100%",
-  },
+  mediaImage: { width: "100%", height: "100%" },
 
   videoPlaceholder: {
     flex: 1,
@@ -959,11 +1144,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
 
-  videoIcon: {
-    marginBottom: 4,
-    fontSize: 24,
-    color: "#FFFFFF",
-  },
+  videoIcon: { marginBottom: 4, fontSize: 24, color: "#FFFFFF" },
 
   videoName: {
     fontSize: 9,
@@ -982,10 +1163,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.72)",
   },
 
-  fileSizeText: {
-    fontSize: 8,
-    color: "rgba(255,255,255,0.70)",
-  },
+  fileSizeText: { fontSize: 8, color: "rgba(255,255,255,0.70)" },
 
   mediaRemove: {
     position: "absolute",
@@ -999,11 +1177,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.75)",
   },
 
-  mediaRemoveText: {
-    fontSize: 16,
-    lineHeight: 18,
-    color: "#FFFFFF",
-  },
+  mediaRemoveText: { fontSize: 16, lineHeight: 18, color: "#FFFFFF" },
 
   panel: {
     marginBottom: 8,
@@ -1022,16 +1196,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
 
-  panelTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
+  panelTitle: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
 
-  toolGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
+  toolGrid: { flexDirection: "row", flexWrap: "wrap" },
 
   toolButton: {
     width: "25%",
@@ -1042,10 +1209,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
 
-  toolButtonIcon: {
-    marginBottom: 5,
-    fontSize: 22,
-  },
+  toolButtonIcon: { marginBottom: 5, fontSize: 22 },
 
   toolButtonText: {
     fontSize: 9,
@@ -1067,9 +1231,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
-  emoji: {
-    fontSize: 20,
-  },
+  emoji: { fontSize: 20 },
 
   recordingBar: {
     flexDirection: "row",
@@ -1091,22 +1253,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#EF4444",
   },
 
-  recordingInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
+  recordingInfo: { flex: 1, minWidth: 0 },
 
-  recordingTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
+  recordingTitle: { fontSize: 11, fontWeight: "700", color: "#FFFFFF" },
 
-  recordingTime: {
-    marginTop: 2,
-    fontSize: 11,
-    color: "#FCA5A5",
-  },
+  recordingTime: { marginTop: 2, fontSize: 11, color: "#FCA5A5" },
 
   recordingCancel: {
     marginRight: 6,
@@ -1114,10 +1265,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
 
-  recordingCancelText: {
-    fontSize: 10,
-    color: "rgba(255,255,255,0.50)",
-  },
+  recordingCancelText: { fontSize: 10, color: "rgba(255,255,255,0.50)" },
 
   recordingSend: {
     width: 38,
@@ -1128,10 +1276,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  recordingSendText: {
-    fontSize: 16,
-    color: "#000000",
-  },
+  recordingSendText: { fontSize: 16, color: "#000000" },
 
   inputRow: {
     flexDirection: "row",
@@ -1169,10 +1314,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.65)",
   },
 
-  iconText: {
-    fontSize: 19,
-    color: "rgba(255,255,255,0.55)",
-  },
+  iconText: { fontSize: 19, color: "rgba(255,255,255,0.55)" },
 
   sendButton: {
     width: 40,
@@ -1182,18 +1324,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
 
-  sendButtonEnabled: {
-    backgroundColor: "#FFFFFF",
-  },
+  sendButtonEnabled: { backgroundColor: "#FFFFFF" },
 
-  sendButtonDisabled: {
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
+  sendButtonDisabled: { backgroundColor: "rgba(255,255,255,0.10)" },
 
-  sendIcon: {
-    fontSize: 17,
-    color: "#000000",
-  },
+  sendIcon: { fontSize: 17, color: "#000000" },
 
   footer: {
     minHeight: 14,
@@ -1202,10 +1337,25 @@ const styles = StyleSheet.create({
     paddingTop: 3,
   },
 
-  footerText: {
-    fontSize: 8,
-    color: "rgba(255,255,255,0.18)",
+  footerText: { fontSize: 8, color: "rgba(255,255,255,0.18)" },
+
+  modalOverlay: { flex: 1, justifyContent: "flex-end" },
+
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.65)",
   },
+
+  modalSheet: {
+    maxHeight: "85%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#0B0B12",
+  },
+
+  modalContent: { padding: 16, paddingBottom: 32 },
 });
 
 export default MessageComposer;

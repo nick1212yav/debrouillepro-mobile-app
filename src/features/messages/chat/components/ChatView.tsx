@@ -1,3 +1,5 @@
+// src/features/messages/chat/components/ChatView.tsx
+
 import { useMemo } from "react";
 import {
   Image,
@@ -21,6 +23,10 @@ import { useChat } from "../hooks/useChat";
 import { MessagesArea } from "./MessagesArea";
 import { MessageComposer } from "./MessageComposer";
 
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
+
 interface ChatViewProps {
   conversationId: Id<"conversations">;
   currentUserId: Id<"users">;
@@ -32,10 +38,16 @@ interface ChatViewProps {
   onVideoCall?: () => void;
 }
 
+/* ============================================================================
+ * CONSTANTS
+ * ========================================================================== */
+
 const CHAT_BACKGROUND = "#07070C";
 const HEADER_BACKGROUND = "#0D0D15";
 const BORDER_COLOR = "rgba(255,255,255,0.08)";
+
 const TOP_BAR_HEIGHT = 64;
+const AVATAR_SIZE = 42;
 
 const AVATAR_COLORS = [
   "#6D28D9",
@@ -47,6 +59,10 @@ const AVATAR_COLORS = [
   "#9333EA",
   "#C2410C",
 ];
+
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
 
 function isHttpUrl(value?: string | null): value is string {
   return typeof value === "string" && /^https?:\/\/.+/i.test(value);
@@ -62,10 +78,14 @@ function pickAvatarColor(seed: string): string {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
+/* ============================================================================
+ * AVATAR
+ * ========================================================================== */
+
 function TopBarAvatar({
   title,
   avatar,
-  size = 42,
+  size = AVATAR_SIZE,
 }: {
   title: string;
   avatar?: string | null;
@@ -77,7 +97,9 @@ function TopBarAvatar({
     return (
       <Image
         source={{ uri: avatar }}
+        accessibilityRole="image"
         accessibilityLabel={title}
+        resizeMode="cover"
         style={{
           width: size,
           height: size,
@@ -90,6 +112,9 @@ function TopBarAvatar({
 
   return (
     <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={title}
       style={{
         width: size,
         height: size,
@@ -105,6 +130,10 @@ function TopBarAvatar({
     </View>
   );
 }
+
+/* ============================================================================
+ * CHAT TOP BAR
+ * ========================================================================== */
 
 function ChatTopBar({
   title,
@@ -134,7 +163,9 @@ function ChatTopBar({
     : (presenceLabel ?? null);
 
   return (
-    <View style={styles.topBar}>
+    <View style={styles.topBar} accessibilityRole="header">
+      {/* BACK */}
+
       {onBack ? (
         <Pressable
           onPress={onBack}
@@ -152,7 +183,11 @@ function ChatTopBar({
         <View style={styles.topBarSpacer} />
       )}
 
+      {/* AVATAR */}
+
       <TopBarAvatar title={displayTitle} avatar={avatar} />
+
+      {/* TITLE / PRESENCE */}
 
       <View style={styles.topBarText}>
         <Text style={styles.topBarTitle} numberOfLines={1} ellipsizeMode="tail">
@@ -169,6 +204,8 @@ function ChatTopBar({
           </Text>
         ) : null}
       </View>
+
+      {/* ACTIONS */}
 
       <View style={styles.topBarActions}>
         {onVideoCall ? (
@@ -220,6 +257,75 @@ function ChatTopBar({
   );
 }
 
+/* ============================================================================
+ * LOADING STATE
+ * ========================================================================== */
+
+function ChatLoadingState({ onBack }: { onBack?: () => void }) {
+  return (
+    <View
+      style={styles.root}
+      accessibilityLabel="Chargement de la conversation"
+      accessibilityState={{ busy: true }}
+    >
+      <View style={styles.topBar}>
+        {onBack ? (
+          <Pressable
+            onPress={onBack}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+            style={styles.iconButton}
+          >
+            <ArrowLeft size={22} color="rgba(255,255,255,0.9)" />
+          </Pressable>
+        ) : (
+          <View style={styles.topBarSpacer} />
+        )}
+
+        <View
+          accessible
+          accessibilityLabel="Chargement"
+          style={styles.skeletonAvatar}
+        />
+
+        <View style={styles.topBarText}>
+          <View style={styles.skeletonLineLong} />
+          <View style={styles.skeletonLineShort} />
+        </View>
+      </View>
+
+      <View style={styles.skeletonBody}>
+        <View style={[styles.skeletonBubble, styles.skeletonIncoming]} />
+
+        <View style={[styles.skeletonBubble, styles.skeletonOutgoing]} />
+
+        <View
+          style={[
+            styles.skeletonBubble,
+            styles.skeletonIncoming,
+            { width: "62%" },
+          ]}
+        />
+
+        <View
+          style={[
+            styles.skeletonBubble,
+            styles.skeletonOutgoing,
+            { width: "38%" },
+          ]}
+        />
+
+        <Text style={styles.loadingText}>Chargement de la conversation…</Text>
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * CHAT VIEW
+ * ========================================================================== */
+
 export function ChatView({
   conversationId,
   currentUserId,
@@ -230,9 +336,21 @@ export function ChatView({
 }: ChatViewProps) {
   const { height } = useWindowDimensions();
 
+  /* --------------------------------------------------------------------------
+   * CHAT DATA
+   * ------------------------------------------------------------------------ */
+
   const chat = useChat(conversationId, currentUserId);
 
+  /* --------------------------------------------------------------------------
+   * TYPING
+   * ------------------------------------------------------------------------ */
+
   const typing = useTyping(conversationId);
+
+  /* --------------------------------------------------------------------------
+   * OTHER PARTICIPANT
+   * ------------------------------------------------------------------------ */
 
   const otherParticipant = useMemo(() => {
     const participants = chat.conversation?.participants;
@@ -250,10 +368,18 @@ export function ChatView({
 
   const otherUserId = otherParticipant?._id;
 
+  /* --------------------------------------------------------------------------
+   * PRESENCE
+   * ------------------------------------------------------------------------ */
+
   const presence = usePresence({
     userId: otherUserId,
     autoStart: false,
   });
+
+  /* --------------------------------------------------------------------------
+   * HEADER STATUS
+   * ------------------------------------------------------------------------ */
 
   const presenceLabel = typing.isSomeoneTyping
     ? typing.typingText
@@ -261,74 +387,39 @@ export function ChatView({
       ? "en ligne"
       : null;
 
+  /* --------------------------------------------------------------------------
+   * LOADING
+   * ------------------------------------------------------------------------ */
+
   if (chat.isLoading) {
-    return (
-      <View
-        style={styles.root}
-        accessibilityLabel="Chargement de la conversation"
-        accessibilityState={{ busy: true }}
-      >
-        <View style={styles.topBar}>
-          {onBack ? (
-            <Pressable
-              onPress={onBack}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Retour"
-              style={styles.iconButton}
-            >
-              <ArrowLeft size={22} color="rgba(255,255,255,0.9)" />
-            </Pressable>
-          ) : (
-            <View style={styles.topBarSpacer} />
-          )}
-
-          <View style={styles.skeletonAvatar} />
-
-          <View style={styles.topBarText}>
-            <View style={styles.skeletonLineLong} />
-            <View style={styles.skeletonLineShort} />
-          </View>
-        </View>
-
-        <View style={styles.skeletonBody}>
-          <View style={[styles.skeletonBubble, styles.skeletonIncoming]} />
-
-          <View style={[styles.skeletonBubble, styles.skeletonOutgoing]} />
-
-          <View
-            style={[
-              styles.skeletonBubble,
-              styles.skeletonIncoming,
-              { width: "62%" },
-            ]}
-          />
-
-          <View
-            style={[
-              styles.skeletonBubble,
-              styles.skeletonOutgoing,
-              { width: "38%" },
-            ]}
-          />
-
-          <Text style={styles.loadingText}>Chargement de la conversation…</Text>
-        </View>
-      </View>
-    );
+    return <ChatLoadingState onBack={onBack} />;
   }
+
+  /* --------------------------------------------------------------------------
+   * CONVERSATION
+   * ------------------------------------------------------------------------ */
+
+  const conversationIsGroup = chat.conversation?.isGroup ?? false;
+
+  const memberCount = chat.conversation?.participants?.length ?? 0;
+
+  const chatTitle = chat.title?.trim() || "Conversation";
 
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      accessibilityLabel={chat.title?.trim() || "Conversation"}
+      accessibilityLabel={chatTitle}
     >
+      {/* ======================================================================
+          HEADER
+          ==================================================================== */}
+
       <ChatTopBar
         title={chat.title}
         avatar={chat.avatar}
-        isGroup={chat.conversation?.isGroup ?? false}
-        memberCount={chat.conversation?.participants?.length ?? 0}
+        isGroup={conversationIsGroup}
+        memberCount={memberCount}
         presenceLabel={presenceLabel}
         onBack={onBack}
         onInfo={onInfo}
@@ -336,7 +427,14 @@ export function ChatView({
         onVideoCall={onVideoCall}
       />
 
-      <View style={styles.messagesWrap}>
+      {/* ======================================================================
+          MESSAGES
+          ==================================================================== */}
+
+      <View
+        style={styles.messagesWrap}
+        accessibilityLabel="Messages de la conversation"
+      >
         <MessagesArea
           messages={chat.messages}
           currentUserId={currentUserId}
@@ -346,18 +444,41 @@ export function ChatView({
         />
       </View>
 
+      {/* ======================================================================
+          TYPING INDICATOR
+          ==================================================================== */}
+
       {typing.isSomeoneTyping ? (
-        <View style={styles.typingFooter}>
+        <View
+          style={styles.typingFooter}
+          accessibilityLiveRegion="polite"
+          accessibilityLabel={typing.typingText}
+        >
           <Text style={styles.typingText}>{typing.typingText}</Text>
         </View>
       ) : null}
 
-      <View style={[styles.composerWrap, { maxHeight: height * 0.5 }]}>
+      {/* ======================================================================
+          COMPOSER
+          ==================================================================== */}
+
+      <View
+        style={[
+          styles.composerWrap,
+          {
+            maxHeight: Math.max(220, height * 0.5),
+          },
+        ]}
+      >
         <MessageComposer conversationId={conversationId} />
       </View>
     </KeyboardAvoidingView>
   );
 }
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
 
 const styles = StyleSheet.create({
   root: {
@@ -366,6 +487,10 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: CHAT_BACKGROUND,
   },
+
+  /* --------------------------------------------------------------------------
+   * TOP BAR
+   * ------------------------------------------------------------------------ */
 
   topBar: {
     height: TOP_BAR_HEIGHT,
@@ -379,6 +504,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: BORDER_COLOR,
     zIndex: 20,
+    elevation: 4,
   },
 
   topBarSpacer: {
@@ -422,11 +548,19 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
   },
 
+  /* --------------------------------------------------------------------------
+   * AVATAR
+   * ------------------------------------------------------------------------ */
+
   avatarInitial: {
     color: "#FFFFFF",
     fontSize: 17,
     fontWeight: "700",
   },
+
+  /* --------------------------------------------------------------------------
+   * MESSAGE AREA
+   * ------------------------------------------------------------------------ */
 
   messagesWrap: {
     flex: 1,
@@ -434,11 +568,17 @@ const styles = StyleSheet.create({
     backgroundColor: CHAT_BACKGROUND,
   },
 
+  /* --------------------------------------------------------------------------
+   * TYPING
+   * ------------------------------------------------------------------------ */
+
   typingFooter: {
     flexShrink: 0,
     paddingHorizontal: 16,
     paddingVertical: 6,
     backgroundColor: HEADER_BACKGROUND,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.04)",
   },
 
   typingText: {
@@ -448,6 +588,10 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
   },
 
+  /* --------------------------------------------------------------------------
+   * COMPOSER
+   * ------------------------------------------------------------------------ */
+
   composerWrap: {
     flexShrink: 0,
     zIndex: 20,
@@ -456,10 +600,14 @@ const styles = StyleSheet.create({
     borderTopColor: BORDER_COLOR,
   },
 
+  /* --------------------------------------------------------------------------
+   * LOADING SKELETON
+   * ------------------------------------------------------------------------ */
+
   skeletonAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     backgroundColor: "rgba(255,255,255,0.07)",
   },
 
