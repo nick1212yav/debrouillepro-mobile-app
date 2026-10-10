@@ -21,6 +21,15 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useMessageComposer } from "../hooks/useMessageComposer";
 import { useTyping } from "../../typing/hooks/useTyping";
 
+import { usePolls } from "../../polls/hooks/usePolls";
+import { LocationPicker } from "../../locations/components/LocationPicker";
+import { ContactPicker } from "../../contacts/components/ContactPicker";
+import { PollComposer } from "../../polls/components/PollComposer";
+import { PaymentComposer } from "../../payments/components/PaymentComposer";
+import { PublicationPicker } from "./PublicationPicker";
+
+import type { Contact } from "../../contacts/services/contacts.service";
+
 /* ============================================================================
  * TYPES
  * ========================================================================== */
@@ -170,6 +179,15 @@ function createSelectedMedia(
   const kind: SelectedMedia["kind"] =
     asset.type === "video" ? "video" : "image";
 
+  /*
+   * expo-image-picker retourne duration en millisecondes.
+   * Le backend / renderer utilise les secondes.
+   */
+  const durationSeconds =
+    typeof asset.duration === "number" && asset.duration > 0
+      ? asset.duration / 1000
+      : undefined;
+
   return {
     id: `${asset.uri}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     uri: asset.uri,
@@ -179,7 +197,7 @@ function createSelectedMedia(
     kind,
     width: asset.width,
     height: asset.height,
-    duration: asset.duration ?? undefined,
+    duration: durationSeconds,
   };
 }
 
@@ -198,10 +216,7 @@ function isStorageUploadResponse(
 }
 
 /**
- * Convex Storage attend le fichier binaire.
- *
- * On centralise l'upload afin que les médias et les vocaux
- * utilisent exactement le même pipeline.
+ * Upload binaire vers Convex Storage.
  */
 async function uploadBlobToConvex(
   uploadUrl: string,
@@ -230,12 +245,13 @@ async function uploadBlobToConvex(
 }
 
 /* ============================================================================
- * COMPOSER
+ * COMPONENT
  * ========================================================================== */
 
 export function MessageComposer({ conversationId }: MessageComposerProps) {
   const composer = useMessageComposer(conversationId);
   const typing = useTyping(conversationId);
+  const polls = usePolls(conversationId);
 
   const sendMessage = useMutation(api.messages.messages.send);
 
@@ -249,23 +265,17 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   const recordingRef = useRef<Audio.Recording | null>(null);
 
   const [showAttachments, setShowAttachments] = useState(false);
-
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia[]>([]);
-
   const [activeTool, setActiveTool] = useState<ComposerTool>(null);
 
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [isRecording, setIsRecording] = useState(false);
-
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   const hasText = composer.text.trim().length > 0;
-
   const hasMedia = selectedMedia.length > 0;
 
   const isBusy = isSubmitting || isRecording;
@@ -311,7 +321,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   }, []);
 
   /* ==========================================================================
-   * UI
+   * UI HELPERS
    * ======================================================================== */
 
   const focusComposer = useCallback(() => {
@@ -321,6 +331,10 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   const closeMenus = useCallback(() => {
     setShowAttachments(false);
     setShowEmojiPicker(false);
+  }, []);
+
+  const closeTool = useCallback(() => {
+    setActiveTool(null);
   }, []);
 
   /* ==========================================================================
@@ -528,11 +542,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         return;
       }
 
-      /*
-       * Important :
-       * le mode audio doit être configuré AVANT
-       * la création du Recording.
-       */
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -609,10 +618,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     setAttachmentError(null);
 
     try {
-      /*
-       * On arrête l'enregistrement avant
-       * de récupérer son URI.
-       */
       const status = await recording.stopAndUnloadAsync();
 
       const uri = recording.getURI();
@@ -628,12 +633,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         ? Math.max(0.1, status.durationMillis / 1000)
         : undefined;
 
-      /*
-       * Sur Expo Audio / Android, HIGH_QUALITY
-       * produit normalement un fichier M4A/AAC.
-       */
       const voiceMimeType = "audio/mp4";
-
       const voiceFileName = `voice-${Date.now()}.m4a`;
 
       const uploadUrl = await generateUploadUrl();
@@ -656,11 +656,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         voiceMimeType,
       );
 
-      /*
-       * Le message est créé uniquement après
-       * que le fichier soit réellement présent
-       * dans Convex Storage.
-       */
       const createdMessage = await sendMessage({
         conversationId,
         text: "",
@@ -688,11 +683,6 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       setIsRecording(false);
       setRecordingSeconds(0);
 
-      /*
-       * CRITIQUE :
-       * on rend le micro à l'application après
-       * chaque tentative d'envoi.
-       */
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
@@ -708,6 +698,71 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     isSubmitting,
     sendMessage,
   ]);
+
+  /* ==========================================================================
+   * TOOL HANDLERS
+   * ======================================================================== */
+
+  const handleLocationSent = useCallback(() => {
+    setActiveTool(null);
+  }, []);
+
+  const handleSendContact = useCallback(
+    async (contact: Contact) => {
+      const lines: string[] = [`📇 ${contact.name.trim() || "Contact"}`];
+
+      if (contact.phone) {
+        lines.push(contact.phone);
+      }
+
+      if (contact.email) {
+        lines.push(contact.email);
+      }
+
+      await sendMessage({
+        conversationId,
+        text: lines.join("\n"),
+      });
+
+      setActiveTool(null);
+    },
+    [conversationId, sendMessage],
+  );
+
+  const handlePollCreated = useCallback(() => {
+    setActiveTool(null);
+  }, []);
+
+  const handlePaymentSubmit = useCallback(
+    async (amount: number, currency: string, description?: string) => {
+      const parts: string[] = [`💳 ${amount} ${currency}`];
+
+      if (description && description.trim().length > 0) {
+        parts.push(description.trim());
+      }
+
+      await sendMessage({
+        conversationId,
+        text: parts.join(" — "),
+      });
+
+      setActiveTool(null);
+    },
+    [conversationId, sendMessage],
+  );
+
+  const handlePublicationSelect = useCallback(
+    async (publicationId: Id<"publications">) => {
+      await sendMessage({
+        conversationId,
+        text: "",
+        sharedPublicationId: publicationId,
+      });
+
+      setActiveTool(null);
+    },
+    [conversationId, sendMessage],
+  );
 
   const canSend = !isBusy && (hasText || hasMedia);
 
@@ -741,24 +796,64 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         </View>
       ) : null}
 
-      {activeTool ? (
-        <View style={styles.toolBanner}>
-          <Text style={styles.toolIcon}>
-            {TOOL_ITEMS.find((item) => item.key === activeTool)?.icon}
-          </Text>
+      {/* ====================================================================
+          OUTILS
+          ================================================================== */}
 
-          <Text style={styles.toolTitle}>
-            {TOOL_ITEMS.find((item) => item.key === activeTool)?.title}
-          </Text>
+      {activeTool === "location" ? (
+        <LocationPicker
+          conversationId={conversationId}
+          onClose={closeTool}
+          onSent={handleLocationSent}
+        />
+      ) : null}
 
-          <Pressable
-            onPress={() => setActiveTool(null)}
-            style={styles.toolCancel}
-            accessibilityLabel="Fermer l'outil"
-          >
-            <Text style={styles.toolCancelText}>Fermer</Text>
-          </Pressable>
-        </View>
+      {activeTool === "contact" ? (
+        <ContactPicker
+          conversationId={conversationId}
+          onClose={closeTool}
+          onSend={handleSendContact}
+        />
+      ) : null}
+
+      {activeTool === "poll" ? (
+        <PollComposer
+          conversationId={conversationId}
+          onCreate={polls.createPoll}
+          onCreated={handlePollCreated}
+          onCancel={closeTool}
+        />
+      ) : null}
+
+      {activeTool === "payment" ? (
+        <PaymentComposer currency="EUR" onSubmit={handlePaymentSubmit} />
+      ) : null}
+
+      {activeTool === "event" ? (
+        <PublicationPicker
+          open
+          type="evenement"
+          onClose={closeTool}
+          onSelect={handlePublicationSelect}
+        />
+      ) : null}
+
+      {activeTool === "job" ? (
+        <PublicationPicker
+          open
+          type="job"
+          onClose={closeTool}
+          onSelect={handlePublicationSelect}
+        />
+      ) : null}
+
+      {activeTool === "property" ? (
+        <PublicationPicker
+          open
+          type="immo"
+          onClose={closeTool}
+          onSelect={handlePublicationSelect}
+        />
       ) : null}
 
       {attachmentError ? (
@@ -1105,40 +1200,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
     color: "rgba(255,255,255,0.55)",
-  },
-
-  toolBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: "rgba(139,92,246,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(139,92,246,0.18)",
-  },
-
-  toolIcon: {
-    marginRight: 8,
-    fontSize: 17,
-  },
-
-  toolTitle: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#DDD6FE",
-  },
-
-  toolCancel: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-
-  toolCancelText: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.45)",
   },
 
   errorBanner: {

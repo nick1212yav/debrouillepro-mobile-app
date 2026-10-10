@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -44,21 +46,40 @@ interface AudioAttachmentProps {
 }
 
 /* ============================================================================
- * HELPERS
+ * HELPERS — détection de type
  * ========================================================================== */
 
-function isAudioAttachment(attachment: AttachmentLike): boolean {
-  const mimeType = (
-    attachment.fileMimeType ??
-    attachment.mimeType ??
-    ""
-  ).toLowerCase();
+function readMimeType(attachment: AttachmentLike): string {
+  return (attachment.fileMimeType ?? attachment.mimeType ?? "").toLowerCase();
+}
 
-  const fileName = (attachment.fileName ?? "").toLowerCase();
+function isAudioAttachment(attachment: AttachmentLike): boolean {
+  const mime = readMimeType(attachment);
+  const name = (attachment.fileName ?? "").toLowerCase();
 
   return (
-    mimeType.startsWith("audio/") ||
-    /\.(mp3|m4a|aac|wav|ogg|oga|webm|opus|3gp|amr)$/i.test(fileName)
+    mime.startsWith("audio/") ||
+    /\.(mp3|m4a|aac|wav|ogg|oga|webm|opus|3gp|amr)$/i.test(name)
+  );
+}
+
+function isImageAttachment(attachment: AttachmentLike): boolean {
+  const mime = readMimeType(attachment);
+  const name = (attachment.fileName ?? "").toLowerCase();
+
+  return (
+    mime.startsWith("image/") ||
+    /\.(jpg|jpeg|png|gif|webp|heic|heif|bmp|tiff)$/i.test(name)
+  );
+}
+
+function isVideoAttachment(attachment: AttachmentLike): boolean {
+  const mime = readMimeType(attachment);
+  const name = (attachment.fileName ?? "").toLowerCase();
+
+  return (
+    mime.startsWith("video/") ||
+    /\.(mp4|mov|m4v|webm|mkv|avi|3gp|mpeg|mpg)$/i.test(name)
   );
 }
 
@@ -87,6 +108,41 @@ function formatFileSize(bytes?: number): string {
 }
 
 /* ============================================================================
+ * DIMENSIONS MÉDIA
+ * ========================================================================== */
+
+const MEDIA_MAX_WIDTH = 260;
+const MEDIA_MIN_HEIGHT = 140;
+const MEDIA_MAX_HEIGHT = 320;
+
+function computeMediaSize(attachment: AttachmentLike): {
+  width: number;
+  height: number;
+} {
+  const width = attachment.width ?? 0;
+  const height = attachment.height ?? 0;
+
+  if (width > 0 && height > 0) {
+    const ratio = width / height;
+
+    let displayHeight = MEDIA_MAX_WIDTH / ratio;
+
+    if (displayHeight < MEDIA_MIN_HEIGHT) {
+      displayHeight = MEDIA_MIN_HEIGHT;
+    }
+
+    if (displayHeight > MEDIA_MAX_HEIGHT) {
+      displayHeight = MEDIA_MAX_HEIGHT;
+    }
+
+    return { width: MEDIA_MAX_WIDTH, height: displayHeight };
+  }
+
+  /* Fallback : ratio 4:3 paysage */
+  return { width: MEDIA_MAX_WIDTH, height: 195 };
+}
+
+/* ============================================================================
  * AUDIO PLAYER
  * ========================================================================== */
 
@@ -108,7 +164,6 @@ function isLoadedPlaybackStatus(
   return status.isLoaded;
 }
 
-/* Largeur totale du lecteur — fixe pour garantir le rendu. */
 const AUDIO_CARD_WIDTH = 260;
 const AUDIO_CARD_HEIGHT = 68;
 
@@ -136,13 +191,13 @@ function AudioAttachment({ attachment, own }: AudioAttachmentProps) {
       try {
         await currentSound.stopAsync();
       } catch {
-        // Best effort.
+        /* Best effort. */
       }
 
       try {
         await currentSound.unloadAsync();
       } catch {
-        // Best effort.
+        /* Best effort. */
       }
 
       if (!targetSound || targetSound === sound) {
@@ -279,7 +334,7 @@ function AudioAttachment({ attachment, own }: AudioAttachmentProps) {
         try {
           await createdSound.unloadAsync();
         } catch {
-          // Best effort.
+          /* Best effort. */
         }
       }
 
@@ -351,27 +406,18 @@ function AudioAttachment({ attachment, own }: AudioAttachmentProps) {
 
   const fileSize = formatFileSize(attachment.fileSize);
 
-  /* Couleurs adaptées à la bulle */
   const primaryColor = own ? "#0F172A" : "#FFFFFF";
-
   const secondaryColor = own ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.45)";
-
   const tertiaryColor = own ? "rgba(0,0,0,0.42)" : "rgba(255,255,255,0.36)";
-
   const trackBg = own ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.12)";
-
   const cardBg = own ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.055)";
-
   const cardBorder = own ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
 
   return (
     <View
       style={[
         styles.audioCard,
-        {
-          backgroundColor: cardBg,
-          borderColor: cardBorder,
-        },
+        { backgroundColor: cardBg, borderColor: cardBorder },
       ]}
       accessibilityLabel="Message vocal"
     >
@@ -382,9 +428,7 @@ function AudioAttachment({ attachment, own }: AudioAttachmentProps) {
         accessibilityLabel={
           isPlaying ? "Mettre le vocal en pause" : "Lire le vocal"
         }
-        accessibilityState={{
-          busy: isLoading,
-        }}
+        accessibilityState={{ busy: isLoading }}
         style={({ pressed }) => [
           styles.playButton,
           pressed && styles.playButtonPressed,
@@ -420,12 +464,7 @@ function AudioAttachment({ attachment, own }: AudioAttachmentProps) {
           accessibilityLabel="Progression du vocal"
         >
           <View
-            style={[
-              styles.progressFill,
-              {
-                width: `${progress * 100}%`,
-              },
-            ]}
+            style={[styles.progressFill, { width: `${progress * 100}%` }]}
           />
         </View>
 
@@ -450,6 +489,122 @@ function AudioAttachment({ attachment, own }: AudioAttachmentProps) {
 }
 
 /* ============================================================================
+ * IMAGE ATTACHMENT
+ * ========================================================================== */
+
+function ImageAttachment({
+  attachment,
+  own,
+}: {
+  attachment: AttachmentLike;
+  own: boolean;
+}) {
+  const url = attachment.mediaUrl ?? null;
+
+  const openExternal = useCallback(() => {
+    if (!url) {
+      return;
+    }
+
+    void Linking.openURL(url).catch(() => undefined);
+  }, [url]);
+
+  if (!url) {
+    return <GenericAttachment attachment={attachment} own={own} />;
+  }
+
+  const size = computeMediaSize(attachment);
+
+  return (
+    <Pressable
+      onPress={openExternal}
+      accessibilityRole="imagebutton"
+      accessibilityLabel={attachment.fileName ?? "Image"}
+      style={({ pressed }) => [
+        styles.mediaFrame,
+        { width: size.width, height: size.height },
+        pressed && styles.mediaFramePressed,
+      ]}
+    >
+      <Image
+        source={{ uri: url }}
+        style={styles.mediaImage}
+        resizeMode="cover"
+        accessibilityIgnoresInvertColors
+      />
+    </Pressable>
+  );
+}
+
+/* ============================================================================
+ * VIDEO ATTACHMENT
+ * ========================================================================== */
+
+function VideoAttachment({
+  attachment,
+  own,
+}: {
+  attachment: AttachmentLike;
+  own: boolean;
+}) {
+  const url = attachment.mediaUrl ?? null;
+  const thumbnail = attachment.thumbnailUrl ?? null;
+
+  const openExternal = useCallback(() => {
+    if (!url) {
+      return;
+    }
+
+    void Linking.openURL(url).catch(() => undefined);
+  }, [url]);
+
+  if (!url) {
+    return <GenericAttachment attachment={attachment} own={own} />;
+  }
+
+  const size = computeMediaSize(attachment);
+
+  const fallbackBg = own ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)";
+  const fallbackIconColor = own ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.55)";
+
+  return (
+    <Pressable
+      onPress={openExternal}
+      accessibilityRole="button"
+      accessibilityLabel="Lire la vidéo"
+      style={({ pressed }) => [
+        styles.mediaFrame,
+        { width: size.width, height: size.height },
+        pressed && styles.mediaFramePressed,
+      ]}
+    >
+      {thumbnail ? (
+        <Image
+          source={{ uri: thumbnail }}
+          style={styles.mediaImage}
+          resizeMode="cover"
+          accessibilityIgnoresInvertColors
+        />
+      ) : (
+        <View style={[styles.videoFallback, { backgroundColor: fallbackBg }]}>
+          <Text
+            style={[styles.videoFallbackIcon, { color: fallbackIconColor }]}
+          >
+            🎬
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.videoOverlay} pointerEvents="none">
+        <View style={styles.videoPlayButton}>
+          <Text style={styles.videoPlayIcon}>▶</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/* ============================================================================
  * FALLBACK ATTACHMENT
  * ========================================================================== */
 
@@ -461,29 +616,20 @@ function GenericAttachment({
   own: boolean;
 }) {
   const mimeType = attachment.fileMimeType ?? attachment.mimeType ?? "fichier";
-
   const fileName = attachment.fileName?.trim() || "Pièce jointe";
-
   const fileSize = formatFileSize(attachment.fileSize);
 
   const primaryColor = own ? "#0F172A" : "#FFFFFF";
-
   const secondaryColor = own ? "rgba(0,0,0,0.42)" : "rgba(255,255,255,0.42)";
-
   const iconBg = own ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)";
-
   const cardBg = own ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.045)";
-
   const cardBorder = own ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
 
   return (
     <View
       style={[
         styles.fileCard,
-        {
-          backgroundColor: cardBg,
-          borderColor: cardBorder,
-        },
+        { backgroundColor: cardBg, borderColor: cardBorder },
       ]}
     >
       <View style={[styles.fileIcon, { backgroundColor: iconBg }]}>
@@ -546,6 +692,18 @@ export function MessageAttachments({
           );
         }
 
+        if (isImageAttachment(attachment)) {
+          return (
+            <ImageAttachment key={key} attachment={attachment} own={own} />
+          );
+        }
+
+        if (isVideoAttachment(attachment)) {
+          return (
+            <VideoAttachment key={key} attachment={attachment} own={own} />
+          );
+        }
+
         return (
           <GenericAttachment key={key} attachment={attachment} own={own} />
         );
@@ -567,7 +725,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
 
-  /* ---- LECTEUR AUDIO : dimensions fixes, layout row verrouillé ---- */
+  /* ---- LECTEUR AUDIO ---- */
 
   audioCard: {
     width: AUDIO_CARD_WIDTH,
@@ -679,7 +837,57 @@ const styles = StyleSheet.create({
     color: "#EF4444",
   },
 
-  /* ---- Pièce jointe générique ---- */
+  /* ---- MÉDIA (image / vidéo) ---- */
+
+  mediaFrame: {
+    overflow: "hidden",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+
+  mediaFramePressed: {
+    opacity: 0.85,
+  },
+
+  mediaImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  videoFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  videoFallbackIcon: {
+    fontSize: 32,
+    opacity: 0.85,
+  },
+
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
+
+  videoPlayButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+
+  videoPlayIcon: {
+    fontSize: 20,
+    marginLeft: 3,
+    color: "#FFFFFF",
+  },
+
+  /* ---- FICHIER GÉNÉRIQUE ---- */
 
   fileCard: {
     width: AUDIO_CARD_WIDTH,
