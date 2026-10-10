@@ -1,4 +1,4 @@
-import { View, Text } from "react-native";
+import { Text, View } from "react-native";
 import type { Id } from "@/convex/_generated/dataModel";
 
 import chatService, { type Message } from "../services/chat.service";
@@ -28,6 +28,13 @@ export function MessageBubble({
   const edited = chatService.isEdited(message);
   const formattedTime = chatService.formatTime(message);
 
+  /**
+   * Voice messages contain a native audio player with a fixed usable
+   * width. Without a minimum width on the bubble, the RN flex layout
+   * can shrink the parent and compress the player into a narrow column.
+   */
+  const isVoiceMessage = message.type === "voice";
+
   const bubbleClass = own
     ? "rounded-2xl rounded-br-md bg-white"
     : "rounded-2xl rounded-bl-md bg-white/[0.08] border border-white/[0.06]";
@@ -48,10 +55,21 @@ export function MessageBubble({
       >
         <View
           className={[
-            "min-w-0 max-w-[86%] overflow-hidden px-3.5 py-2.5",
+            "min-w-0 max-w-[86%] px-3.5 py-2.5",
             bubbleClass,
             textClass,
           ].join(" ")}
+          style={
+            isVoiceMessage
+              ? {
+                  minWidth: 288,
+                  maxWidth: "86%",
+                  overflow: "visible",
+                }
+              : {
+                  overflow: "hidden",
+                }
+          }
         >
           {/* Expéditeur — uniquement pour les messages reçus */}
           {!own && (
@@ -72,7 +90,18 @@ export function MessageBubble({
           )}
 
           {/* Contenu principal du message */}
-          <View className="min-w-0">
+          <View
+            className="min-w-0"
+            style={
+              isVoiceMessage
+                ? {
+                    width: "100%",
+                    minWidth: 260,
+                    alignSelf: "stretch",
+                  }
+                : undefined
+            }
+          >
             <MessageTypeRenderer message={message} own={own} />
           </View>
 

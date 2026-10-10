@@ -30,9 +30,13 @@ export function ConversationItem({
 }: ConversationItemProps) {
   const title = conversation.title?.trim() || "Conversation";
   const initial = title.charAt(0).toUpperCase() || "?";
+
   const unreadCount = Math.max(0, conversation.unreadCount ?? 0);
+
   const lastMessageText =
     conversation.lastMessageText?.trim() || "Aucun message";
+
+  const formattedTime = formatDate(conversation.updatedAt);
 
   return (
     <Pressable
@@ -47,179 +51,326 @@ export function ConversationItem({
       style={({ pressed }) => [
         styles.container,
         active && styles.containerActive,
-        pressed && onClick ? styles.containerPressed : undefined,
+        pressed && onClick && styles.containerPressed,
       ]}
     >
-      <View
-        style={styles.avatarWrapper}
-        accessibilityLabel={`Avatar de ${title}`}
-      >
-        {conversation.avatar ? (
-          <Image
-            style={styles.avatarImage}
-            source={{ uri: conversation.avatar }}
-            resizeMode="cover"
-            accessibilityLabel={`Photo de ${title}`}
-          />
-        ) : (
-          <Text style={styles.avatarInitial}>{initial}</Text>
-        )}
+      {/* ═══════════════════════════════════════════
+          LIGNE PRINCIPALE — horizontale stricte
+          ═══════════════════════════════════════════ */}
 
-        {conversation.isGroup ? (
-          <View
-            style={styles.groupBadge}
-            accessibilityLabel="Conversation de groupe"
-          >
-            <Text style={styles.groupBadgeText}>👥</Text>
-          </View>
-        ) : null}
-      </View>
+      <View style={styles.row}>
+        {/* ─────────────────────────────────────────
+            AVATAR
+        ───────────────────────────────────────── */}
 
-      <View style={styles.body}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
-            {title}
-          </Text>
+        <View
+          style={styles.avatarWrapper}
+          accessibilityLabel={`Avatar de ${title}`}
+        >
+          {conversation.avatar ? (
+            <Image
+              source={{ uri: conversation.avatar }}
+              style={styles.avatarImage}
+              resizeMode="cover"
+              accessibilityLabel={`Photo de ${title}`}
+            />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarInitial}>{initial}</Text>
+            </View>
+          )}
 
-          <Text style={styles.time}>{formatDate(conversation.updatedAt)}</Text>
-        </View>
-
-        <View style={styles.previewRow}>
-          <Text style={styles.preview} numberOfLines={1} ellipsizeMode="tail">
-            {lastMessageText}
-          </Text>
-
-          {unreadCount > 0 ? (
+          {conversation.isGroup ? (
             <View
-              style={styles.unreadBadge}
-              accessibilityLabel={`${unreadCount} message${
-                unreadCount > 1 ? "s" : ""
-              } non lu${unreadCount > 1 ? "s" : ""}`}
+              style={styles.groupBadge}
+              accessibilityLabel="Conversation de groupe"
             >
-              <Text style={styles.unreadText}>
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </Text>
+              <Text style={styles.groupBadgeText}>👥</Text>
             </View>
           ) : null}
         </View>
+
+        {/* ─────────────────────────────────────────
+            INFORMATIONS
+        ───────────────────────────────────────── */}
+
+        <View style={styles.content}>
+          {/* Nom + heure */}
+
+          <View style={styles.titleRow}>
+            <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+              {title}
+            </Text>
+
+            {formattedTime ? (
+              <Text style={styles.time} numberOfLines={1} ellipsizeMode="tail">
+                {formattedTime}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Dernier message + badge non-lus */}
+
+          <View style={styles.previewRow}>
+            <Text style={styles.preview} numberOfLines={1} ellipsizeMode="tail">
+              {lastMessageText}
+            </Text>
+
+            {unreadCount > 0 ? (
+              <View
+                style={styles.unreadBadge}
+                accessibilityLabel={`${unreadCount} message${
+                  unreadCount > 1 ? "s" : ""
+                } non lu${unreadCount > 1 ? "s" : ""}`}
+              >
+                <Text style={styles.unreadText}>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
       </View>
+
+      {/* ═══════════════════════════════════════════
+          SÉPARATEUR VISIBLE (preuve que ce fichier tourne)
+          ═══════════════════════════════════════════ */}
+
+      <View style={styles.separator} />
     </Pressable>
   );
 }
 
+const AVATAR_SIZE = 54;
+
 const styles = StyleSheet.create({
+  /* ───────────────────────────────────────────
+     CONTAINER EXTÉRIEUR
+     ─────────────────────────────────────────── */
+
   container: {
     width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+
+    flexDirection: "column",
+    alignItems: "stretch",
+
+    backgroundColor: "transparent",
   },
 
   containerActive: {
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
 
   containerPressed: {
     opacity: 0.72,
   },
 
+  /* ───────────────────────────────────────────
+     LIGNE HORIZONTALE — imposition stricte
+     ─────────────────────────────────────────── */
+
+  row: {
+    width: "100%",
+
+    minHeight: 72,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+
+  /* ───────────────────────────────────────────
+     AVATAR
+     ─────────────────────────────────────────── */
+
   avatarWrapper: {
-    position: "relative",
-    width: 48,
-    height: 48,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+
+    minWidth: AVATAR_SIZE,
+    maxWidth: AVATAR_SIZE,
+
+    minHeight: AVATAR_SIZE,
+    maxHeight: AVATAR_SIZE,
+
+    flexGrow: 0,
     flexShrink: 0,
+
     alignItems: "center",
     justifyContent: "center",
+
+    borderRadius: AVATAR_SIZE / 2,
     overflow: "hidden",
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.10)",
+
+    backgroundColor: "#25212F",
   },
 
   avatarImage: {
-    width: "100%",
-    height: "100%",
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+
+    borderRadius: AVATAR_SIZE / 2,
+  },
+
+  avatarFallback: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   avatarInitial: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.70)",
+    fontSize: 20,
+    lineHeight: 24,
+
+    fontWeight: "700",
+
+    color: "#FFFFFF",
+
+    textAlign: "center",
   },
 
   groupBadge: {
     position: "absolute",
-    right: 0,
-    bottom: 0,
-    width: 16,
-    height: 16,
+
+    right: -1,
+    bottom: -1,
+
+    width: 18,
+    height: 18,
+
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-    borderRadius: 8,
-    backgroundColor: "#000000",
+
+    borderRadius: 9,
+
+    borderWidth: 2,
+    borderColor: "#050509",
+
+    backgroundColor: "#8B5CF6",
   },
 
   groupBadgeText: {
     fontSize: 9,
+    lineHeight: 11,
+
+    textAlign: "center",
   },
 
-  body: {
+  /* ───────────────────────────────────────────
+     CONTENU (nom + preview)
+     ─────────────────────────────────────────── */
+
+  content: {
     flex: 1,
     minWidth: 0,
+
+    marginLeft: 14,
+
+    justifyContent: "center",
   },
 
   titleRow: {
+    width: "100%",
+    minWidth: 0,
+
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
   },
 
   title: {
     flex: 1,
     minWidth: 0,
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#ffffff",
+
+    fontSize: 15,
+    lineHeight: 20,
+
+    fontWeight: "700",
+
+    color: "#FFFFFF",
   },
 
   time: {
+    flexGrow: 0,
     flexShrink: 0,
+
+    marginLeft: 10,
+
+    maxWidth: 58,
+
     fontSize: 11,
-    color: "rgba(255,255,255,0.40)",
+    lineHeight: 15,
+
+    fontWeight: "500",
+
+    color: "rgba(255,255,255,0.42)",
+
+    textAlign: "right",
   },
 
   previewRow: {
+    width: "100%",
+    minWidth: 0,
+
+    marginTop: 4,
+
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 4,
   },
 
   preview: {
     flex: 1,
     minWidth: 0,
-    fontSize: 12,
+
+    fontSize: 13,
+    lineHeight: 18,
+
+    fontWeight: "400",
+
     color: "rgba(255,255,255,0.50)",
   },
 
   unreadBadge: {
-    minWidth: 20,
+    minWidth: 22,
+    height: 22,
+
+    flexGrow: 0,
+    flexShrink: 0,
+
+    marginLeft: 8,
+    paddingHorizontal: 6,
+
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 999,
-    backgroundColor: "#ffffff",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+
+    borderRadius: 11,
+
+    backgroundColor: "#2563EB",
   },
 
   unreadText: {
     fontSize: 10,
-    fontWeight: "700",
-    color: "#000000",
+    lineHeight: 13,
+
+    fontWeight: "800",
+
+    color: "#FFFFFF",
+
+    textAlign: "center",
+  },
+
+  /* ───────────────────────────────────────────
+     SÉPARATEUR
+     ─────────────────────────────────────────── */
+
+  separator: {
+    width: "100%",
+    height: 1,
+
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
 });
 

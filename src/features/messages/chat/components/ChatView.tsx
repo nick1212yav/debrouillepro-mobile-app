@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,7 +10,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { ArrowLeft, Info, Phone, Video } from "lucide-react-native";
+import { ArrowLeft } from "lucide-react-native";
 
 import type { Id } from "@/convex/_generated/dataModel";
 
@@ -20,6 +19,7 @@ import { useTyping } from "../../typing/hooks/useTyping";
 
 import { useChat } from "../hooks/useChat";
 
+import { ChatHeader } from "./ChatHeader";
 import { MessagesArea } from "./MessagesArea";
 import { MessageComposer } from "./MessageComposer";
 
@@ -36,6 +36,14 @@ interface ChatViewProps {
 
   onCall?: () => void;
   onVideoCall?: () => void;
+
+  isCallActive?: boolean;
+  isVideoCallActive?: boolean;
+  hasIncomingCall?: boolean;
+
+  onSearch?: () => void;
+  onMute?: () => void;
+  onClearChat?: () => void;
 }
 
 /* ============================================================================
@@ -48,214 +56,6 @@ const BORDER_COLOR = "rgba(255,255,255,0.08)";
 
 const TOP_BAR_HEIGHT = 64;
 const AVATAR_SIZE = 42;
-
-const AVATAR_COLORS = [
-  "#6D28D9",
-  "#0E7490",
-  "#B45309",
-  "#BE185D",
-  "#047857",
-  "#1D4ED8",
-  "#9333EA",
-  "#C2410C",
-];
-
-/* ============================================================================
- * HELPERS
- * ========================================================================== */
-
-function isHttpUrl(value?: string | null): value is string {
-  return typeof value === "string" && /^https?:\/\/.+/i.test(value);
-}
-
-function pickAvatarColor(seed: string): string {
-  let hash = 0;
-
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
-  }
-
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-}
-
-/* ============================================================================
- * AVATAR
- * ========================================================================== */
-
-function TopBarAvatar({
-  title,
-  avatar,
-  size = AVATAR_SIZE,
-}: {
-  title: string;
-  avatar?: string | null;
-  size?: number;
-}) {
-  const radius = size / 2;
-
-  if (isHttpUrl(avatar)) {
-    return (
-      <Image
-        source={{ uri: avatar }}
-        accessibilityRole="image"
-        accessibilityLabel={title}
-        resizeMode="cover"
-        style={{
-          width: size,
-          height: size,
-          borderRadius: radius,
-          backgroundColor: "#1F1F2B",
-        }}
-      />
-    );
-  }
-
-  return (
-    <View
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={title}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: radius,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: pickAvatarColor(title),
-      }}
-    >
-      <Text style={styles.avatarInitial}>
-        {title.trim().charAt(0).toUpperCase() || "?"}
-      </Text>
-    </View>
-  );
-}
-
-/* ============================================================================
- * CHAT TOP BAR
- * ========================================================================== */
-
-function ChatTopBar({
-  title,
-  avatar,
-  isGroup,
-  memberCount,
-  presenceLabel,
-  onBack,
-  onInfo,
-  onCall,
-  onVideoCall,
-}: {
-  title?: string | null;
-  avatar?: string | null;
-  isGroup: boolean;
-  memberCount: number;
-  presenceLabel?: string | null;
-  onBack?: () => void;
-  onInfo?: () => void;
-  onCall?: () => void;
-  onVideoCall?: () => void;
-}) {
-  const displayTitle = title?.trim() || "Conversation";
-
-  const subtitle = isGroup
-    ? `${memberCount} participant${memberCount > 1 ? "s" : ""}`
-    : (presenceLabel ?? null);
-
-  return (
-    <View style={styles.topBar} accessibilityRole="header">
-      {/* BACK */}
-
-      {onBack ? (
-        <Pressable
-          onPress={onBack}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-          style={({ pressed }) => [
-            styles.iconButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <ArrowLeft size={22} color="rgba(255,255,255,0.9)" />
-        </Pressable>
-      ) : (
-        <View style={styles.topBarSpacer} />
-      )}
-
-      {/* AVATAR */}
-
-      <TopBarAvatar title={displayTitle} avatar={avatar} />
-
-      {/* TITLE / PRESENCE */}
-
-      <View style={styles.topBarText}>
-        <Text style={styles.topBarTitle} numberOfLines={1} ellipsizeMode="tail">
-          {displayTitle}
-        </Text>
-
-        {subtitle ? (
-          <Text
-            style={styles.topBarSubtitle}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-
-      {/* ACTIONS */}
-
-      <View style={styles.topBarActions}>
-        {onVideoCall ? (
-          <Pressable
-            onPress={onVideoCall}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="Appel vidéo"
-            style={({ pressed }) => [
-              styles.iconButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Video size={21} color="rgba(255,255,255,0.85)" />
-          </Pressable>
-        ) : null}
-
-        {onCall ? (
-          <Pressable
-            onPress={onCall}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="Appel vocal"
-            style={({ pressed }) => [
-              styles.iconButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Phone size={20} color="rgba(255,255,255,0.85)" />
-          </Pressable>
-        ) : null}
-
-        {onInfo ? (
-          <Pressable
-            onPress={onInfo}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="Informations"
-            style={({ pressed }) => [
-              styles.iconButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Info size={21} color="rgba(255,255,255,0.85)" />
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
-  );
-}
 
 /* ============================================================================
  * LOADING STATE
@@ -333,6 +133,12 @@ export function ChatView({
   onInfo,
   onCall,
   onVideoCall,
+  isCallActive = false,
+  isVideoCallActive = false,
+  hasIncomingCall = false,
+  onSearch,
+  onMute,
+  onClearChat,
 }: ChatViewProps) {
   const { height } = useWindowDimensions();
 
@@ -379,9 +185,10 @@ export function ChatView({
 
   /* --------------------------------------------------------------------------
    * HEADER STATUS
+   * typing > présence > rien
    * ------------------------------------------------------------------------ */
 
-  const presenceLabel = typing.isSomeoneTyping
+  const headerStatus = typing.isSomeoneTyping
     ? typing.typingText
     : presence.presence?.status === "online"
       ? "en ligne"
@@ -412,19 +219,25 @@ export function ChatView({
       accessibilityLabel={chatTitle}
     >
       {/* ======================================================================
-          HEADER
+          HEADER — composant riche
           ==================================================================== */}
 
-      <ChatTopBar
-        title={chat.title}
+      <ChatHeader
+        conversationId={conversationId}
+        title={chat.title ?? "Conversation"}
         avatar={chat.avatar}
         isGroup={conversationIsGroup}
         memberCount={memberCount}
-        presenceLabel={presenceLabel}
         onBack={onBack}
         onInfo={onInfo}
         onCall={onCall}
         onVideoCall={onVideoCall}
+        isCallActive={isCallActive}
+        isVideoCallActive={isVideoCallActive}
+        hasIncomingCall={hasIncomingCall}
+        onSearch={onSearch}
+        onMute={onMute}
+        onClearChat={onClearChat}
       />
 
       {/* ======================================================================
@@ -454,7 +267,9 @@ export function ChatView({
           accessibilityLiveRegion="polite"
           accessibilityLabel={typing.typingText}
         >
-          <Text style={styles.typingText}>{typing.typingText}</Text>
+          <Text style={styles.typingText}>
+            {headerStatus ?? typing.typingText}
+          </Text>
         </View>
       ) : null}
 
@@ -465,9 +280,7 @@ export function ChatView({
       <View
         style={[
           styles.composerWrap,
-          {
-            maxHeight: Math.max(220, height * 0.5),
-          },
+          { maxHeight: Math.max(220, height * 0.5) },
         ]}
       >
         <MessageComposer conversationId={conversationId} />
@@ -488,9 +301,7 @@ const styles = StyleSheet.create({
     backgroundColor: CHAT_BACKGROUND,
   },
 
-  /* --------------------------------------------------------------------------
-   * TOP BAR
-   * ------------------------------------------------------------------------ */
+  /* ---------------------------- TOP BAR (skeleton only) ------------------- */
 
   topBar: {
     height: TOP_BAR_HEIGHT,
@@ -517,25 +328,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  topBarTitle: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: "700",
-  },
-
-  topBarSubtitle: {
-    marginTop: 1,
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 12.5,
-    lineHeight: 16,
-  },
-
-  topBarActions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
   iconButton: {
     width: 40,
     height: 40,
@@ -544,23 +336,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  pressed: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-
-  /* --------------------------------------------------------------------------
-   * AVATAR
-   * ------------------------------------------------------------------------ */
-
-  avatarInitial: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "700",
-  },
-
-  /* --------------------------------------------------------------------------
-   * MESSAGE AREA
-   * ------------------------------------------------------------------------ */
+  /* ---------------------------- MESSAGES AREA ----------------------------- */
 
   messagesWrap: {
     flex: 1,
@@ -568,9 +344,7 @@ const styles = StyleSheet.create({
     backgroundColor: CHAT_BACKGROUND,
   },
 
-  /* --------------------------------------------------------------------------
-   * TYPING
-   * ------------------------------------------------------------------------ */
+  /* ---------------------------- TYPING ------------------------------------ */
 
   typingFooter: {
     flexShrink: 0,
@@ -588,9 +362,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
   },
 
-  /* --------------------------------------------------------------------------
-   * COMPOSER
-   * ------------------------------------------------------------------------ */
+  /* ---------------------------- COMPOSER ---------------------------------- */
 
   composerWrap: {
     flexShrink: 0,
@@ -600,9 +372,7 @@ const styles = StyleSheet.create({
     borderTopColor: BORDER_COLOR,
   },
 
-  /* --------------------------------------------------------------------------
-   * LOADING SKELETON
-   * ------------------------------------------------------------------------ */
+  /* ---------------------------- LOADING SKELETON -------------------------- */
 
   skeletonAvatar: {
     width: AVATAR_SIZE,

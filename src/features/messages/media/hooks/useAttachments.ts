@@ -1,3 +1,5 @@
+// src/features/messages/media/hooks/useAttachments.ts
+
 import { useCallback } from "react";
 import { useMutation, useQuery } from "convex/react";
 
@@ -32,9 +34,27 @@ export function useAttachments(messageId: Id<"messages"> | null | undefined) {
         throw new Error("Message introuvable.");
       }
 
-      return mediaService.addAttachment(addAttachmentMutation, {
-        ...args,
+      /*
+       * Appel direct de la mutation Convex.
+       *
+       * On évite `mediaService.addAttachment` ici car son type
+       * intermédiaire (AddAttachmentMutation) est désynchronisé
+       * avec la signature backend qui exige désormais
+       * fileId: Id<"_storage">.
+       *
+       * Le storageId provient toujours de `uploadUri()` côté
+       * composer, qui l'obtient de Convex Storage. Le cast est
+       * donc légitime : c'est un ID Convex Storage réel.
+       */
+      return addAttachmentMutation({
         messageId,
+        fileId: args.fileId as Id<"_storage">,
+        fileName: args.fileName,
+        mimeType: args.mimeType,
+        fileSize: args.fileSize,
+        width: args.width,
+        height: args.height,
+        duration: args.duration,
       });
     },
     [addAttachmentMutation, messageId],

@@ -1,13 +1,13 @@
 // src/features/messages/chat/components/ChatHeader.tsx
 
 import {
-  BackHandler,
-  Image,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
   View,
+  Pressable,
+  Text,
+  Image,
+  StyleSheet,
+  BackHandler,
+  Platform,
 } from "react-native";
 import {
   ArrowLeft,
@@ -71,10 +71,7 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  /*
-   * conversationId fait partie du contrat public du composant.
-   * Il est conservé pour les futures actions contextualisées.
-   */
+  // Kept as part of the public component contract.
   void conversationId;
 
   const normalizedTitle = title.trim() || "Conversation";
@@ -146,7 +143,8 @@ export function ChatHeader({
       )}
 
       <View style={styles.header}>
-        {onBack && (
+        {/* BACK */}
+        {onBack ? (
           <Pressable
             onPress={onBack}
             style={({ pressed }) => [
@@ -158,13 +156,16 @@ export function ChatHeader({
             hitSlop={6}
           >
             <ArrowLeft
-              size={21}
+              size={22}
               strokeWidth={2}
-              color="rgba(255,255,255,0.78)"
+              color="rgba(255,255,255,0.82)"
             />
           </Pressable>
+        ) : (
+          <View style={styles.leadingSpacer} />
         )}
 
+        {/* AVATAR */}
         <Pressable
           onPress={onInfo}
           disabled={!onInfo}
@@ -201,6 +202,7 @@ export function ChatHeader({
           )}
         </Pressable>
 
+        {/* TITLE / STATUS */}
         <Pressable
           onPress={onInfo}
           disabled={!onInfo}
@@ -221,6 +223,7 @@ export function ChatHeader({
             {callActive && (
               <View style={styles.callBadge}>
                 <View style={styles.callBadgeDot} />
+
                 <Text style={styles.callBadgeText}>En appel</Text>
               </View>
             )}
@@ -238,12 +241,14 @@ export function ChatHeader({
             {!isGroup && (
               <>
                 <View style={styles.subtitleDot} />
+
                 <Text style={styles.subtitleAvailable}>Disponible</Text>
               </>
             )}
           </View>
         </Pressable>
 
+        {/* ACTIONS */}
         <View style={styles.actions}>
           {onCall && (
             <Pressable
@@ -260,9 +265,9 @@ export function ChatHeader({
               hitSlop={4}
             >
               <PhoneCall
-                size={19}
+                size={20}
                 strokeWidth={2}
-                color={isCallActive ? "#6ee7b7" : "rgba(255,255,255,0.65)"}
+                color={isCallActive ? "#6ee7b7" : "rgba(255,255,255,0.70)"}
               />
 
               {hasIncomingCall && !isCallActive && (
@@ -291,7 +296,7 @@ export function ChatHeader({
               <Video
                 size={20}
                 strokeWidth={2}
-                color={isVideoCallActive ? "#c4b5fd" : "rgba(255,255,255,0.65)"}
+                color={isVideoCallActive ? "#c4b5fd" : "rgba(255,255,255,0.70)"}
               />
 
               {hasIncomingCall && !isVideoCallActive && (
@@ -314,10 +319,11 @@ export function ChatHeader({
               accessibilityLabel="Informations"
               hitSlop={4}
             >
-              <Info size={19} strokeWidth={2} color="rgba(255,255,255,0.62)" />
+              <Info size={20} strokeWidth={2} color="rgba(255,255,255,0.66)" />
             </Pressable>
           )}
 
+          {/* MORE MENU */}
           <View style={styles.menuWrapper}>
             <Pressable
               onPress={toggleMenu}
@@ -332,9 +338,9 @@ export function ChatHeader({
               hitSlop={4}
             >
               <MoreVertical
-                size={20}
+                size={21}
                 strokeWidth={2}
-                color={menuOpen ? "#ffffff" : "rgba(255,255,255,0.52)"}
+                color={menuOpen ? "#ffffff" : "rgba(255,255,255,0.56)"}
               />
             </Pressable>
 
@@ -453,43 +459,109 @@ export function ChatHeader({
 }
 
 const styles = StyleSheet.create({
+  /**
+   * ============================================================
+   * ROOT
+   * ============================================================
+   *
+   * Important:
+   * - hauteur déterministe
+   * - aucun flex vertical
+   * - aucun étirement par le parent
+   */
   root: {
     position: "relative",
     width: "100%",
-    backgroundColor: "#000000",
+    height: 72,
+    minHeight: 72,
+    maxHeight: 72,
+    flexGrow: 0,
+    flexShrink: 0,
+    alignSelf: "stretch",
+    backgroundColor: "#050509",
     zIndex: 100,
+    elevation: 8,
   },
 
+  /**
+   * ============================================================
+   * HEADER
+   * ============================================================
+   */
   header: {
-    minHeight: 64,
     width: "100%",
+    height: 72,
+    minHeight: 72,
+    maxHeight: 72,
+
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+
+    flexGrow: 0,
+    flexShrink: 0,
+
+    paddingHorizontal: 8,
+    paddingVertical: 0,
+
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.09)",
-    backgroundColor: "rgba(0,0,0,0.94)",
+    borderBottomColor: "rgba(255,255,255,0.10)",
+
+    backgroundColor: "#0B0A12",
   },
 
+  /**
+   * Keeps the left side deterministic when there is no back button.
+   */
+  leadingSpacer: {
+    width: 40,
+    height: 40,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+
+  /**
+   * ============================================================
+   * CALL INDICATOR
+   * ============================================================
+   *
+   * Horizontal only. Never allowed to participate in layout.
+   */
   callIndicator: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
+
+    width: "100%",
     height: 2,
-    zIndex: 10,
+
+    zIndex: 50,
   },
 
   callIndicatorLine: {
-    flex: 1,
+    width: "100%",
+    height: 2,
     backgroundColor: "#8b5cf6",
   },
 
+  /**
+   * ============================================================
+   * ICON BUTTON
+   * ============================================================
+   */
   iconButton: {
     width: 40,
     height: 40,
+    minWidth: 40,
+    minHeight: 40,
+    maxWidth: 40,
+    maxHeight: 40,
+
+    flexGrow: 0,
+    flexShrink: 0,
+
     borderRadius: 20,
+
     alignItems: "center",
     justifyContent: "center",
   },
@@ -510,16 +582,34 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.10)",
   },
 
+  /**
+   * ============================================================
+   * AVATAR
+   * ============================================================
+   */
   avatarWrapper: {
     position: "relative",
+
     width: 44,
     height: 44,
+    minWidth: 44,
+    minHeight: 44,
+    maxWidth: 44,
+    maxHeight: 44,
+
+    flexGrow: 0,
+    flexShrink: 0,
+    alignSelf: "center",
+
     marginLeft: 2,
+
     borderRadius: 22,
     overflow: "hidden",
-    backgroundColor: "#181229",
+
     alignItems: "center",
     justifyContent: "center",
+
+    backgroundColor: "#181229",
   },
 
   avatarPressed: {
@@ -527,49 +617,88 @@ const styles = StyleSheet.create({
   },
 
   avatarImage: {
-    width: "100%",
-    height: "100%",
+    width: 44,
+    height: 44,
+    minWidth: 44,
+    minHeight: 44,
+    maxWidth: 44,
+    maxHeight: 44,
+
+    flexGrow: 0,
+    flexShrink: 0,
+
+    borderRadius: 22,
   },
 
   avatarFallback: {
-    width: "100%",
-    height: "100%",
+    width: 44,
+    height: 44,
+    minWidth: 44,
+    minHeight: 44,
+    maxWidth: 44,
+    maxHeight: 44,
+
+    flexGrow: 0,
+    flexShrink: 0,
+
     alignItems: "center",
     justifyContent: "center",
+
     backgroundColor: "#31235f",
   },
 
   avatarInitials: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: "700",
     color: "#ffffff",
   },
 
   onlineDot: {
     position: "absolute",
-    right: 1,
-    bottom: 1,
+
+    right: 0,
+    bottom: 0,
+
     width: 12,
     height: 12,
+
+    minWidth: 12,
+    minHeight: 12,
+    maxWidth: 12,
+    maxHeight: 12,
+
     borderRadius: 6,
+
     backgroundColor: "#34d399",
+
     borderWidth: 2,
-    borderColor: "#000000",
+    borderColor: "#0B0A12",
   },
 
   groupDot: {
     position: "absolute",
-    right: 1,
-    bottom: 1,
+
+    right: 0,
+    bottom: 0,
+
     width: 12,
     height: 12,
+
+    minWidth: 12,
+    minHeight: 12,
+    maxWidth: 12,
+    maxHeight: 12,
+
     borderRadius: 6,
+
     alignItems: "center",
     justifyContent: "center",
+
     backgroundColor: "#8b5cf6",
+
     borderWidth: 2,
-    borderColor: "#000000",
+    borderColor: "#0B0A12",
   },
 
   groupDotInner: {
@@ -579,44 +708,72 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
 
+  /**
+   * ============================================================
+   * TITLE AREA
+   * ============================================================
+   */
   titleWrapper: {
     flex: 1,
     minWidth: 0,
+    minHeight: 0,
+
+    flexGrow: 1,
+    flexShrink: 1,
+
+    alignSelf: "stretch",
+    justifyContent: "center",
+
     marginLeft: 8,
-    marginRight: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 5,
-    borderRadius: 10,
+    marginRight: 2,
+
+    paddingHorizontal: 4,
   },
 
   titlePressed: {
     backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 10,
   },
 
   titleRow: {
+    width: "100%",
     minWidth: 0,
+
     flexDirection: "row",
     alignItems: "center",
   },
 
   title: {
+    flex: 1,
+    minWidth: 0,
+
+    flexGrow: 1,
     flexShrink: 1,
-    fontSize: 15,
-    lineHeight: 19,
+
+    fontSize: 17,
+    lineHeight: 21,
     fontWeight: "700",
+
     color: "#ffffff",
   },
 
   callBadge: {
+    flexGrow: 0,
     flexShrink: 0,
+
     flexDirection: "row",
     alignItems: "center",
+
     marginLeft: 7,
+
     paddingHorizontal: 7,
     paddingVertical: 3,
+
     borderRadius: 999,
+
     borderWidth: 1,
     borderColor: "rgba(52,211,153,0.20)",
+
     backgroundColor: "rgba(52,211,153,0.10)",
   },
 
@@ -632,84 +789,144 @@ const styles = StyleSheet.create({
     fontSize: 9,
     lineHeight: 11,
     fontWeight: "700",
+
     color: "#6ee7b7",
+
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
 
   subtitleRow: {
+    width: "100%",
+    minWidth: 0,
+
     flexDirection: "row",
     alignItems: "center",
-    minWidth: 0,
+
     marginTop: 2,
   },
 
   subtitle: {
     flexShrink: 1,
+
     fontSize: 11,
     lineHeight: 15,
-    color: "rgba(255,255,255,0.38)",
+
+    color: "rgba(255,255,255,0.40)",
   },
 
   subtitleDot: {
     width: 4,
     height: 4,
+
     marginHorizontal: 6,
+
     borderRadius: 2,
-    backgroundColor: "rgba(52,211,153,0.8)",
+
+    backgroundColor: "rgba(52,211,153,0.80)",
   },
 
   subtitleAvailable: {
+    flexShrink: 0,
+
     fontSize: 11,
     lineHeight: 15,
-    color: "rgba(52,211,153,0.72)",
+
+    color: "rgba(52,211,153,0.76)",
   },
 
+  /**
+   * ============================================================
+   * ACTIONS
+   * ============================================================
+   */
   actions: {
+    flexGrow: 0,
+    flexShrink: 0,
+
     flexDirection: "row",
     alignItems: "center",
+
     marginLeft: 2,
   },
 
   incomingBadge: {
     position: "absolute",
+
     top: 5,
     right: 5,
+
     width: 9,
     height: 9,
+
+    minWidth: 9,
+    minHeight: 9,
+    maxWidth: 9,
+    maxHeight: 9,
+
     borderRadius: 5,
+
     backgroundColor: "#ef4444",
+
     borderWidth: 1.5,
-    borderColor: "#000000",
+    borderColor: "#0B0A12",
   },
 
+  /**
+   * ============================================================
+   * MENU
+   * ============================================================
+   */
   menuWrapper: {
     position: "relative",
+
+    width: 40,
+    height: 40,
+
+    minWidth: 40,
+    minHeight: 40,
+    maxWidth: 40,
+    maxHeight: 40,
+
+    flexGrow: 0,
+    flexShrink: 0,
+
     zIndex: 200,
   },
 
   menuDismiss: {
     position: "absolute",
+
     top: -1000,
     right: -1000,
+
     width: 2000,
     height: 2000,
+
     zIndex: 0,
   },
 
   menu: {
     position: "absolute",
+
     top: 46,
     right: 0,
+
     width: 232,
+
     padding: 6,
+
     borderRadius: 17,
     overflow: "hidden",
+
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.11)",
+
     backgroundColor: "#111116",
+
     zIndex: 10,
     elevation: 20,
+
     shadowColor: "#000000",
     shadowOpacity: 0.45,
     shadowRadius: 18,
@@ -729,16 +946,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 13,
     fontWeight: "700",
+
     color: "rgba(255,255,255,0.28)",
+
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
 
   menuItem: {
     minHeight: 48,
+
     flexDirection: "row",
     alignItems: "center",
+
     paddingHorizontal: 10,
+
     borderRadius: 12,
   },
 
@@ -749,10 +971,19 @@ const styles = StyleSheet.create({
   menuIcon: {
     width: 32,
     height: 32,
+
+    minWidth: 32,
+    minHeight: 32,
+    maxWidth: 32,
+    maxHeight: 32,
+
     marginRight: 11,
+
     borderRadius: 9,
+
     alignItems: "center",
     justifyContent: "center",
+
     backgroundColor: "rgba(255,255,255,0.055)",
   },
 
@@ -762,38 +993,57 @@ const styles = StyleSheet.create({
 
   menuItemText: {
     flex: 1,
+    minWidth: 0,
+
     fontSize: 14,
     lineHeight: 18,
+
     color: "rgba(255,255,255,0.74)",
   },
 
   menuIconDanger: {
     width: 32,
     height: 32,
+
+    minWidth: 32,
+    minHeight: 32,
+    maxWidth: 32,
+    maxHeight: 32,
+
     marginRight: 11,
+
     borderRadius: 9,
+
     alignItems: "center",
     justifyContent: "center",
+
     backgroundColor: "rgba(239,68,68,0.10)",
   },
 
   menuItemTextDanger: {
     flex: 1,
+    minWidth: 0,
+
     fontSize: 14,
     lineHeight: 18,
+
     color: "#fca5a5",
   },
 
   menuDivider: {
     height: StyleSheet.hairlineWidth,
+
     marginVertical: 6,
+
     backgroundColor: "rgba(255,255,255,0.07)",
   },
 
   securedRow: {
     minHeight: 50,
+
     flexDirection: "row",
     alignItems: "center",
+
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -801,10 +1051,19 @@ const styles = StyleSheet.create({
   securedIcon: {
     width: 32,
     height: 32,
+
+    minWidth: 32,
+    minHeight: 32,
+    maxWidth: 32,
+    maxHeight: 32,
+
     marginRight: 11,
+
     borderRadius: 9,
+
     alignItems: "center",
     justifyContent: "center",
+
     backgroundColor: "rgba(52,211,153,0.10)",
   },
 
@@ -817,13 +1076,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "600",
+
     color: "rgba(255,255,255,0.72)",
   },
 
   securedSubtitle: {
     marginTop: 2,
+
     fontSize: 10,
     lineHeight: 13,
+
     color: "rgba(255,255,255,0.30)",
   },
 });

@@ -17,6 +17,7 @@ export const generateUploadUrl = mutation({
     return await ctx.storage.generateUploadUrl();
   },
 });
+
 // ============================================================================
 // AJOUTER UNE PIÈCE JOINTE À UN MESSAGE
 // ============================================================================
@@ -24,7 +25,7 @@ export const generateUploadUrl = mutation({
 export const addAttachment = mutation({
   args: {
     messageId: v.id("messages"),
-    fileId: v.string(),
+    fileId: v.id("_storage"),
     fileName: v.string(),
     mimeType: v.string(),
     fileSize: v.number(),
@@ -93,6 +94,12 @@ export const addAttachment = mutation({
 
 // ============================================================================
 // RÉCUPÉRER LES PIÈCES JOINTES D'UN MESSAGE
+//
+// IMPORTANT :
+// Chaque pièce jointe est enrichie avec `mediaUrl`, obtenue via
+// ctx.storage.getUrl(fileId). Sans cela, le frontend reçoit uniquement
+// un Storage ID opaque, qu'il ne peut pas utiliser dans un lecteur audio
+// ni dans un composant <Image source={{ uri }} />.
 // ============================================================================
 
 export const getAttachments = query({
@@ -132,10 +139,33 @@ export const getAttachments = query({
     // Récupérer toutes les pièces jointes
     // ------------------------------------------------------------------------
 
-    return await ctx.db
+    const attachments = await ctx.db
       .query("attachments")
       .withIndex("by_message", (q) => q.eq("messageId", args.messageId))
       .collect();
+
+    // ------------------------------------------------------------------------
+    // Résoudre chaque Storage ID en URL publique
+    // ------------------------------------------------------------------------
+
+    const enriched = await Promise.all(
+      attachments.map(async (attachment) => {
+        let mediaUrl: string | null = null;
+
+        try {
+          mediaUrl = await ctx.storage.getUrl(attachment.fileId);
+        } catch {
+          mediaUrl = null;
+        }
+
+        return {
+          ...attachment,
+          mediaUrl,
+        };
+      }),
+    );
+
+    return enriched;
   },
 });
 

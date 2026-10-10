@@ -1,8 +1,14 @@
 // src/features/messages/media/components/AudioPlayer.tsx
 
-import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Audio } from "expo-av";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 interface AudioPlayerProps {
   src: string;
@@ -14,30 +20,105 @@ export function AudioPlayer({
   className: _className = "",
 }: AudioPlayerProps) {
   const soundRef = useRef<Audio.Sound | null>(null);
+  const mountedRef = useRef(true);
 
+  const [isLoaded, setIsLoaded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [isBuffering, setIsBuffering] = useState(false);
+
+  const resetState = useCallback(() => {
+    if (!mountedRef.current) {
+      return;
+    }
+
+    setIsLoaded(false);
+    setIsPlaying(false);
+    setIsBuffering(false);
+    setDuration(0);
+    setCurrentTime(0);
+  }, []);
+
+  const unloadSound = useCallback(async () => {
+    const sound = soundRef.current;
+
+    soundRef.current = null;
+
+    if (!sound) {
+      return;
+    }
+
+    try {
+      await sound.stopAsync();
+    } catch {
+      // Le son peut déjà être arrêté ou déchargé.
+    }
+
+    try {
+      await sound.unloadAsync();
+    } catch {
+      // Nettoyage best-effort.
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let createdSound: Audio.Sound | null = null;
 
     const loadAudio = async () => {
-      try {
-        setIsBuffering(true);
+      if (!src.trim()) {
+        resetState();
+        return;
+      }
 
-        const { sound } = await Audio.Sound.createAsync(
+      await unloadSound();
+      resetState();
+
+      try {
+        if (mountedRef.current) {
+          setIsBuffering(true);
+        }
+
+        /*
+         * Autorise la lecture audio même lorsque le téléphone
+         * est en mode silencieux sur iOS.
+         */
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+
+        const result = await Audio.Sound.createAsync(
           { uri: src },
           {
             shouldPlay: false,
-            progressUpdateIntervalMillis: 250,
+            isLooping: false,
+            progressUpdateIntervalMillis: 100,
           },
           (status) => {
-            if (!mounted || !status.isLoaded) {
+            if (cancelled || !mountedRef.current) {
               return;
             }
 
+            if (!status.isLoaded) {
+              setIsLoaded(false);
+              setIsPlaying(false);
+              setIsBuffering(false);
+              return;
+            }
+
+            setIsLoaded(true);
             setIsPlaying(status.isPlaying);
             setIsBuffering(status.isBuffering);
 
@@ -60,14 +141,47 @@ export function AudioPlayer({
           },
         );
 
-        if (!mounted) {
-          await sound.unloadAsync();
+        createdSound = result.sound;
+
+        if (cancelled || !mountedRef.current) {
+          await createdSound.unloadAsync();
+          createdSound = null;
           return;
         }
 
-        soundRef.current = sound;
+        soundRef.current = createdSound;
+
+        if (result.status.isLoaded) {
+          setIsLoaded(true);
+
+          setDuration(
+            typeof result.status.durationMillis === "number"
+              ? result.status.durationMillis / 1000
+              : 0,
+          );
+
+          setCurrentTime(
+            typeof result.status.positionMillis === "number"
+              ? result.status.positionMillis / 1000
+              : 0,
+          );
+        }
+
+        setIsBuffering(false);
       } catch {
-        if (mounted) {
+        if (createdSound) {
+          try {
+            await createdSound.unloadAsync();
+          } catch {
+            // Best effort.
+          }
+        }
+
+        createdSound = null;
+
+        if (!cancelled && mountedRef.current) {
+          setIsLoaded(false);
+          setIsPlaying(false);
           setIsBuffering(false);
         }
       }
@@ -76,21 +190,26 @@ export function AudioPlayer({
     void loadAudio();
 
     return () => {
-      mounted = false;
+      cancelled = true;
 
       const sound = soundRef.current;
+
       soundRef.current = null;
 
       if (sound) {
         void sound.unloadAsync();
       }
-    };
-  }, [src]);
 
-  const togglePlayback = async () => {
+      if (createdSound && createdSound !== sound) {
+        void createdSound.unloadAsync();
+      }
+    };
+  }, [src, resetState, unloadSound]);
+
+  const togglePlayback = useCallback(async () => {
     const sound = soundRef.current;
 
-    if (!sound) {
+    if (!sound || !isLoaded || isBuffering) {
       return;
     }
 
@@ -98,54 +217,101 @@ export function AudioPlayer({
       const status = await sound.getStatusAsync();
 
       if (!status.isLoaded) {
+        if (mountedRef.current) {
+          setIsLoaded(false);
+          setIsPlaying(false);
+        }
+
         return;
       }
 
       if (status.isPlaying) {
         await sound.pauseAsync();
-      } else {
-        if (
-          status.positionMillis >=
-          (status.durationMillis ?? Number.MAX_SAFE_INTEGER)
-        ) {
-          await sound.setPositionAsync(0);
-        }
-
-        await sound.playAsync();
+        return;
       }
-    } catch {
-      setIsPlaying(false);
-    }
-  };
 
-  const progress =
-    duration > 0 ? Math.min(Math.max(currentTime / duration, 0), 1) : 0;
+      const durationMillis = status.durationMillis ?? 0;
+
+      /*
+       * Si le vocal est arrivé à sa fin, on repart proprement
+       * depuis le début.
+       */
+      if (durationMillis > 0 && status.positionMillis >= durationMillis - 100) {
+        await sound.setPositionAsync(0);
+
+        if (mountedRef.current) {
+          setCurrentTime(0);
+        }
+      }
+
+      await sound.playAsync();
+    } catch {
+      if (mountedRef.current) {
+        setIsPlaying(false);
+      }
+    }
+  }, [isLoaded, isBuffering]);
+
+  const progress = useMemo(() => {
+    if (!Number.isFinite(duration) || duration <= 0) {
+      return 0;
+    }
+
+    if (!Number.isFinite(currentTime) || currentTime <= 0) {
+      return 0;
+    }
+
+    return Math.min(1, currentTime / duration);
+  }, [currentTime, duration]);
+
+  const buttonLabel = isBuffering
+    ? "Chargement du vocal"
+    : isPlaying
+      ? "Mettre le vocal en pause"
+      : "Lire le vocal";
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessibilityLabel="Lecteur de message vocal"
+    >
       <Pressable
         onPress={() => void togglePlayback()}
-        disabled={isBuffering}
+        disabled={!isLoaded || isBuffering}
         accessibilityRole="button"
-        accessibilityLabel={
-          isPlaying ? "Mettre l'audio en pause" : "Lire l'audio"
-        }
+        accessibilityLabel={buttonLabel}
         accessibilityState={{
           busy: isBuffering,
-          disabled: isBuffering,
+          disabled: !isLoaded || isBuffering,
         }}
         style={({ pressed }) => [
           styles.playButton,
           pressed && styles.playButtonPressed,
-          isBuffering && styles.playButtonDisabled,
+          (!isLoaded || isBuffering) && styles.playButtonDisabled,
         ]}
       >
-        <Text style={styles.playIcon}>{isPlaying ? "Ⅱ" : "▶"}</Text>
+        {isBuffering ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Text style={styles.playIcon}>{isPlaying ? "Ⅱ" : "▶"}</Text>
+        )}
       </Pressable>
 
       <View style={styles.content}>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progress, { width: `${progress * 100}%` }]} />
+        <View
+          style={styles.progressTrack}
+          accessibilityLabel={`Progression ${Math.round(
+            progress * 100,
+          )} pour cent`}
+        >
+          <View
+            style={[
+              styles.progress,
+              {
+                width: `${progress * 100}%`,
+              },
+            ]}
+          />
         </View>
 
         <View style={styles.timeRow}>
@@ -159,11 +325,12 @@ export function AudioPlayer({
 }
 
 function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
     return "0:00";
   }
 
   const totalSeconds = Math.floor(seconds);
+
   const minutes = Math.floor(totalSeconds / 60);
   const remainingSeconds = totalSeconds % 60;
 
@@ -172,62 +339,89 @@ function formatTime(seconds: number): string {
 
 const styles = StyleSheet.create({
   container: {
+    width: "100%",
     minWidth: 220,
-    maxWidth: 320,
+    maxWidth: 340,
+
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 16,
+
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 16,
+
+    backgroundColor: "rgba(255,255,255,0.055)",
   },
 
   playButton: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
+
+    flexGrow: 0,
+    flexShrink: 0,
+
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 19,
-    backgroundColor: "rgba(99,102,241,0.22)",
+
+    marginRight: 10,
+
+    borderRadius: 20,
+
+    backgroundColor: "rgba(99,102,241,0.28)",
   },
 
   playButtonPressed: {
-    opacity: 0.7,
-    transform: [{ scale: 0.95 }],
+    opacity: 0.72,
+    transform: [{ scale: 0.94 }],
   },
 
   playButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
 
   playIcon: {
+    marginLeft: 2,
+
     fontSize: 15,
-    fontWeight: "700",
-    color: "#ffffff",
+    lineHeight: 18,
+
+    fontWeight: "800",
+
+    color: "#FFFFFF",
   },
 
   content: {
     flex: 1,
+    minWidth: 0,
+
     gap: 6,
   },
 
   progressTrack: {
-    height: 4,
+    width: "100%",
+    height: 5,
+
     overflow: "hidden",
-    borderRadius: 2,
+
+    borderRadius: 3,
+
     backgroundColor: "rgba(255,255,255,0.12)",
   },
 
   progress: {
     height: "100%",
-    borderRadius: 2,
-    backgroundColor: "#818cf8",
+
+    borderRadius: 3,
+
+    backgroundColor: "#818CF8",
   },
 
   timeRow: {
+    width: "100%",
+
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -235,6 +429,10 @@ const styles = StyleSheet.create({
 
   time: {
     fontSize: 10,
+    lineHeight: 14,
+
+    fontWeight: "500",
+
     color: "rgba(255,255,255,0.48)",
   },
 });

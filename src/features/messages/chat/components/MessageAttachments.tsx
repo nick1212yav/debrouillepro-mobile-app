@@ -1,22 +1,732 @@
-import { View } from "react-native";
+// src/features/messages/chat/components/MessageAttachments.tsx
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { Audio } from "expo-av";
+import { useQuery } from "convex/react";
+
 import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/convex/_generated/api";
+
+/* ============================================================================
+ * TYPES
+ * ========================================================================== */
 
 interface MessageAttachmentsProps {
   messageId: Id<"messages">;
+  own?: boolean;
 }
 
-export function MessageAttachments({ messageId }: MessageAttachmentsProps) {
-  // Le messageId est conservé dans le contrat du composant.
-  // Le rendu réel des pièces jointes sera délégué aux composants
-  // média lorsqu'ils seront intégrés à cette zone.
-  void messageId;
+interface AttachmentLike {
+  _id?: string;
+  id?: string;
+  fileId?: string;
+  fileName?: string;
+  fileMimeType?: string;
+  mimeType?: string;
+  fileSize?: number;
+  mediaUrl?: string | null;
+  thumbnailUrl?: string | null;
+  width?: number;
+  height?: number;
+  duration?: number;
+}
+
+interface AudioAttachmentProps {
+  attachment: AttachmentLike;
+  own: boolean;
+}
+
+/* ============================================================================
+ * HELPERS
+ * ========================================================================== */
+
+function isAudioAttachment(attachment: AttachmentLike): boolean {
+  const mimeType = (
+    attachment.fileMimeType ??
+    attachment.mimeType ??
+    ""
+  ).toLowerCase();
+
+  const fileName = (attachment.fileName ?? "").toLowerCase();
+
+  return (
+    mimeType.startsWith("audio/") ||
+    /\.(mp3|m4a|aac|wav|ogg|oga|webm|opus|3gp|amr)$/i.test(fileName)
+  );
+}
+
+function formatDuration(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+function formatFileSize(bytes?: number): string {
+  if (!bytes || bytes <= 0) {
+    return "";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/* ============================================================================
+ * AUDIO PLAYER
+ * ========================================================================== */
+
+interface PlaybackStatusLike {
+  isLoaded: boolean;
+  isPlaying?: boolean;
+  positionMillis?: number;
+  durationMillis?: number;
+  didJustFinish?: boolean;
+}
+
+function isLoadedPlaybackStatus(
+  status: PlaybackStatusLike,
+): status is PlaybackStatusLike & {
+  isLoaded: true;
+  isPlaying: boolean;
+  positionMillis: number;
+} {
+  return status.isLoaded;
+}
+
+/* Largeur totale du lecteur — fixe pour garantir le rendu. */
+const AUDIO_CARD_WIDTH = 260;
+const AUDIO_CARD_HEIGHT = 68;
+
+function AudioAttachment({ attachment, own }: AudioAttachmentProps) {
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [positionMillis, setPositionMillis] = useState(0);
+
+  const [durationMillis, setDurationMillis] = useState(
+    Math.max(0, (attachment.duration ?? 0) * 1000),
+  );
+
+  const audioUrl = attachment.mediaUrl ?? null;
+
+  const cleanupSound = useCallback(
+    async (targetSound?: Audio.Sound | null) => {
+      const currentSound = targetSound ?? sound;
+
+      if (!currentSound) {
+        return;
+      }
+
+      try {
+        await currentSound.stopAsync();
+      } catch {
+        // Best effort.
+      }
+
+      try {
+        await currentSound.unloadAsync();
+      } catch {
+        // Best effort.
+      }
+
+      if (!targetSound || targetSound === sound) {
+        setSound(null);
+        setIsPlaying(false);
+        setPositionMillis(0);
+      }
+    },
+    [sound],
+  );
+
+  useEffect(() => {
+    return () => {
+      const currentSound = sound;
+
+      if (currentSound) {
+        void currentSound.unloadAsync().catch(() => undefined);
+      }
+    };
+  }, [sound]);
+
+  const onPlaybackStatusUpdate = useCallback(
+    (status: PlaybackStatusLike) => {
+      if (!isLoadedPlaybackStatus(status)) {
+        setIsPlaying(false);
+        return;
+      }
+
+      setIsPlaying(status.isPlaying === true);
+      setPositionMillis(status.positionMillis ?? 0);
+
+      if (status.durationMillis !== undefined && status.durationMillis > 0) {
+        setDurationMillis(status.durationMillis);
+      }
+
+      if (status.didJustFinish) {
+        setIsPlaying(false);
+        setPositionMillis(0);
+
+        const currentSound = sound;
+
+        if (currentSound) {
+          void currentSound.setPositionAsync(0).catch(() => undefined);
+        }
+      }
+    },
+    [sound],
+  );
+
+  useEffect(() => {
+    if (!sound) {
+      return;
+    }
+
+    sound.setOnPlaybackStatusUpdate(onPlaybackStatusUpdate);
+
+    return () => {
+      sound.setOnPlaybackStatusUpdate(null);
+    };
+  }, [onPlaybackStatusUpdate, sound]);
+
+  const loadAndPlay = useCallback(async () => {
+    if (!audioUrl || isLoading) {
+      if (!audioUrl) {
+        setLoadError("URL audio manquante.");
+      }
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadError(null);
+
+    let createdSound: Audio.Sound | null = null;
+
+    try {
+      if (sound) {
+        const status = await sound.getStatusAsync();
+
+        if (status.isLoaded) {
+          if (status.isPlaying) {
+            await sound.pauseAsync();
+          } else {
+            await sound.playAsync();
+          }
+
+          return;
+        }
+
+        await cleanupSound(sound);
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+      });
+
+      const result = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        {
+          shouldPlay: true,
+          positionMillis: 0,
+          progressUpdateIntervalMillis: 100,
+        },
+        onPlaybackStatusUpdate,
+      );
+
+      createdSound = result.sound;
+
+      if (result.status.isLoaded) {
+        if (
+          result.status.durationMillis !== undefined &&
+          result.status.durationMillis > 0
+        ) {
+          setDurationMillis(result.status.durationMillis);
+        }
+
+        setPositionMillis(result.status.positionMillis);
+        setIsPlaying(result.status.isPlaying);
+      }
+
+      setSound(createdSound);
+      createdSound = null;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erreur inconnue";
+
+      console.error("[MessageAttachments] Erreur lecture:", error);
+
+      setLoadError(message);
+      setIsPlaying(false);
+    } finally {
+      if (createdSound) {
+        try {
+          await createdSound.unloadAsync();
+        } catch {
+          // Best effort.
+        }
+      }
+
+      setIsLoading(false);
+    }
+  }, [audioUrl, cleanupSound, isLoading, onPlaybackStatusUpdate, sound]);
+
+  const togglePlayback = useCallback(async () => {
+    if (!audioUrl || isLoading) {
+      return;
+    }
+
+    if (!sound) {
+      await loadAndPlay();
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      const status = await sound.getStatusAsync();
+
+      if (!status.isLoaded) {
+        await cleanupSound(sound);
+        await loadAndPlay();
+        return;
+      }
+
+      if (status.isPlaying) {
+        await sound.pauseAsync();
+        return;
+      }
+
+      const duration = status.durationMillis ?? 0;
+      const position = status.positionMillis ?? 0;
+
+      if (duration > 0 && position >= duration - 100) {
+        await sound.setPositionAsync(0);
+        setPositionMillis(0);
+      }
+
+      await sound.playAsync();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur lecture";
+
+      console.error("[MessageAttachments] Erreur lecture:", error);
+
+      setLoadError(message);
+      setIsPlaying(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [audioUrl, cleanupSound, isLoading, loadAndPlay, sound]);
+
+  const progress = useMemo(() => {
+    if (!durationMillis || durationMillis <= 0) {
+      return 0;
+    }
+
+    return Math.min(1, Math.max(0, positionMillis / durationMillis));
+  }, [durationMillis, positionMillis]);
+
+  const durationSeconds = durationMillis / 1000;
+  const positionSeconds = positionMillis / 1000;
+
+  const displayDuration =
+    durationSeconds > 0 ? durationSeconds : (attachment.duration ?? 0);
+
+  const fileSize = formatFileSize(attachment.fileSize);
+
+  /* Couleurs adaptées à la bulle */
+  const primaryColor = own ? "#0F172A" : "#FFFFFF";
+
+  const secondaryColor = own ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.45)";
+
+  const tertiaryColor = own ? "rgba(0,0,0,0.42)" : "rgba(255,255,255,0.36)";
+
+  const trackBg = own ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.12)";
+
+  const cardBg = own ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.055)";
+
+  const cardBorder = own ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
 
   return (
     <View
-      className="mt-2 w-full"
-      accessibilityLabel="Pièces jointes du message"
-    />
+      style={[
+        styles.audioCard,
+        {
+          backgroundColor: cardBg,
+          borderColor: cardBorder,
+        },
+      ]}
+      accessibilityLabel="Message vocal"
+    >
+      <Pressable
+        onPress={() => void togglePlayback()}
+        disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isPlaying ? "Mettre le vocal en pause" : "Lire le vocal"
+        }
+        accessibilityState={{
+          busy: isLoading,
+        }}
+        style={({ pressed }) => [
+          styles.playButton,
+          pressed && styles.playButtonPressed,
+        ]}
+      >
+        {isLoading ? (
+          <ActivityIndicator size="small" color={primaryColor} />
+        ) : (
+          <Text style={[styles.playIcon, { color: primaryColor }]}>
+            {isPlaying ? "Ⅱ" : "▶"}
+          </Text>
+        )}
+      </Pressable>
+
+      <View style={styles.audioContent}>
+        <View style={styles.audioTitleRow}>
+          <Text
+            style={[styles.audioTitle, { color: primaryColor }]}
+            numberOfLines={1}
+          >
+            Message vocal
+          </Text>
+
+          {fileSize ? (
+            <Text style={[styles.audioSize, { color: tertiaryColor }]}>
+              {fileSize}
+            </Text>
+          ) : null}
+        </View>
+
+        <View
+          style={[styles.progressTrack, { backgroundColor: trackBg }]}
+          accessibilityLabel="Progression du vocal"
+        >
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${progress * 100}%`,
+              },
+            ]}
+          />
+        </View>
+
+        <View style={styles.timeRow}>
+          <Text style={[styles.timeText, { color: secondaryColor }]}>
+            {formatDuration(positionSeconds)}
+          </Text>
+
+          <Text style={[styles.timeText, { color: secondaryColor }]}>
+            {formatDuration(displayDuration)}
+          </Text>
+        </View>
+
+        {loadError ? (
+          <Text style={styles.errorText} numberOfLines={2}>
+            {loadError}
+          </Text>
+        ) : null}
+      </View>
+    </View>
   );
 }
+
+/* ============================================================================
+ * FALLBACK ATTACHMENT
+ * ========================================================================== */
+
+function GenericAttachment({
+  attachment,
+  own,
+}: {
+  attachment: AttachmentLike;
+  own: boolean;
+}) {
+  const mimeType = attachment.fileMimeType ?? attachment.mimeType ?? "fichier";
+
+  const fileName = attachment.fileName?.trim() || "Pièce jointe";
+
+  const fileSize = formatFileSize(attachment.fileSize);
+
+  const primaryColor = own ? "#0F172A" : "#FFFFFF";
+
+  const secondaryColor = own ? "rgba(0,0,0,0.42)" : "rgba(255,255,255,0.42)";
+
+  const iconBg = own ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.08)";
+
+  const cardBg = own ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.045)";
+
+  const cardBorder = own ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
+
+  return (
+    <View
+      style={[
+        styles.fileCard,
+        {
+          backgroundColor: cardBg,
+          borderColor: cardBorder,
+        },
+      ]}
+    >
+      <View style={[styles.fileIcon, { backgroundColor: iconBg }]}>
+        <Text style={[styles.fileIconText, { color: primaryColor }]}>
+          {mimeType.startsWith("image/")
+            ? "▧"
+            : mimeType.startsWith("video/")
+              ? "▶"
+              : "↗"}
+        </Text>
+      </View>
+
+      <View style={styles.fileContent}>
+        <Text
+          style={[styles.fileName, { color: primaryColor }]}
+          numberOfLines={1}
+        >
+          {fileName}
+        </Text>
+
+        <Text style={[styles.fileMeta, { color: secondaryColor }]}>
+          {fileSize || mimeType}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/* ============================================================================
+ * MAIN
+ * ========================================================================== */
+
+export function MessageAttachments({
+  messageId,
+  own = false,
+}: MessageAttachmentsProps) {
+  const attachments = useQuery(api.messages.attachments.getAttachments, {
+    messageId,
+  }) as AttachmentLike[] | undefined;
+
+  if (!attachments || attachments.length === 0) {
+    return null;
+  }
+
+  return (
+    <View
+      style={styles.container}
+      accessibilityLabel="Pièces jointes du message"
+    >
+      {attachments.map((attachment, index) => {
+        const key =
+          attachment._id ??
+          attachment.id ??
+          attachment.fileId ??
+          `${String(messageId)}-${index}`;
+
+        if (isAudioAttachment(attachment)) {
+          return (
+            <AudioAttachment key={key} attachment={attachment} own={own} />
+          );
+        }
+
+        return (
+          <GenericAttachment key={key} attachment={attachment} own={own} />
+        );
+      })}
+    </View>
+  );
+}
+
+/* ============================================================================
+ * STYLES
+ * ========================================================================== */
+
+const styles = StyleSheet.create({
+  container: {
+    width: "100%",
+    minWidth: 0,
+    marginTop: 8,
+    gap: 8,
+    alignItems: "flex-start",
+  },
+
+  /* ---- LECTEUR AUDIO : dimensions fixes, layout row verrouillé ---- */
+
+  audioCard: {
+    width: AUDIO_CARD_WIDTH,
+    height: AUDIO_CARD_HEIGHT,
+    minWidth: AUDIO_CARD_WIDTH,
+    maxWidth: AUDIO_CARD_WIDTH,
+    minHeight: AUDIO_CARD_HEIGHT,
+    maxHeight: AUDIO_CARD_HEIGHT,
+
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+
+    borderWidth: 1,
+    borderRadius: 16,
+  },
+
+  playButton: {
+    width: 42,
+    height: 42,
+    minWidth: 42,
+    maxWidth: 42,
+    minHeight: 42,
+    maxHeight: 42,
+
+    flexGrow: 0,
+    flexShrink: 0,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    marginRight: 10,
+
+    borderRadius: 21,
+    backgroundColor: "rgba(99,102,241,0.28)",
+  },
+
+  playButtonPressed: {
+    opacity: 0.72,
+    transform: [{ scale: 0.94 }],
+  },
+
+  playIcon: {
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: "800",
+  },
+
+  audioContent: {
+    flex: 1,
+    minWidth: 0,
+
+    flexDirection: "column",
+    justifyContent: "center",
+
+    gap: 4,
+  },
+
+  audioTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  audioTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "700",
+  },
+
+  audioSize: {
+    marginLeft: 6,
+    fontSize: 9,
+    lineHeight: 12,
+  },
+
+  progressTrack: {
+    width: "100%",
+    height: 4,
+    overflow: "hidden",
+    borderRadius: 2,
+  },
+
+  progressFill: {
+    height: "100%",
+    borderRadius: 2,
+    backgroundColor: "#818CF8",
+  },
+
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  timeText: {
+    fontSize: 9,
+    lineHeight: 12,
+  },
+
+  errorText: {
+    marginTop: 2,
+    fontSize: 9,
+    lineHeight: 12,
+    color: "#EF4444",
+  },
+
+  /* ---- Pièce jointe générique ---- */
+
+  fileCard: {
+    width: AUDIO_CARD_WIDTH,
+    minHeight: 58,
+
+    flexDirection: "row",
+    alignItems: "center",
+
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+
+    borderWidth: 1,
+    borderRadius: 14,
+  },
+
+  fileIcon: {
+    width: 38,
+    height: 38,
+    flexGrow: 0,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    borderRadius: 12,
+  },
+
+  fileIconText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  fileContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  fileName: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
+
+  fileMeta: {
+    marginTop: 2,
+    fontSize: 9,
+    lineHeight: 13,
+  },
+});
 
 export default MessageAttachments;

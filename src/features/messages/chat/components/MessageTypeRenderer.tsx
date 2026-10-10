@@ -1,3 +1,5 @@
+// src/features/messages/chat/components/MessageTypeRenderer.tsx
+
 import { Text, View } from "react-native";
 
 import type { Message } from "../services/chat.service";
@@ -13,7 +15,6 @@ import { JobMessage } from "../../jobs/components/JobMessage";
 import PollMessage from "../../polls/components/PollMessage";
 
 import type { LocationMessage as LocationMessageData } from "../../locations/services/locations.service";
-
 import type { ContactMessage as ContactMessageData } from "../../contacts/services/contacts.service";
 
 /* ============================================================================
@@ -27,12 +28,6 @@ interface MessageTypeRendererProps {
 
 /* ============================================================================
  * ADAPTATEURS
- *
- * Message = contrat Convex générique.
- *
- * LocationMessage / ContactMessage utilisent des contrats spécialisés.
- * On construit ici uniquement les données nécessaires à ces composants,
- * sans cast et sans duplication du contrat backend.
  * ========================================================================== */
 
 function toLocationMessage(message: Message): LocationMessageData | null {
@@ -71,16 +66,23 @@ function toContactMessage(message: Message): ContactMessageData | null {
  * TEXTE
  * ========================================================================== */
 
-function TextMessage({ message }: { message: Message }) {
+function TextMessage({ message, own }: { message: Message; own: boolean }) {
   const hasText = Boolean(message.text?.trim());
 
   return (
     <View className="w-full gap-1">
       {hasText ? (
-        <Text className="text-sm leading-5 text-inherit">{message.text}</Text>
+        <Text
+          className={[
+            "text-sm leading-5",
+            own ? "text-black" : "text-white",
+          ].join(" ")}
+        >
+          {message.text}
+        </Text>
       ) : null}
 
-      <MessageAttachments messageId={message._id} />
+      <MessageAttachments messageId={message._id} own={own} />
     </View>
   );
 }
@@ -89,18 +91,36 @@ function TextMessage({ message }: { message: Message }) {
  * FALLBACK
  * ========================================================================== */
 
-function UnsupportedMessage({ message }: { message: Message }) {
+function UnsupportedMessage({
+  message,
+  own,
+}: {
+  message: Message;
+  own: boolean;
+}) {
   const hasText = Boolean(message.text?.trim());
 
   return (
     <View className="w-full gap-2">
       {hasText ? (
-        <Text className="text-sm leading-5 text-white">{message.text}</Text>
+        <Text
+          className={[
+            "text-sm leading-5",
+            own ? "text-black" : "text-white",
+          ].join(" ")}
+        >
+          {message.text}
+        </Text>
       ) : null}
 
-      <MessageAttachments messageId={message._id} />
+      <MessageAttachments messageId={message._id} own={own} />
 
-      <Text className="text-[11px] leading-4 text-white/40">
+      <Text
+        className={[
+          "text-[11px] leading-4",
+          own ? "text-black/40" : "text-white/40",
+        ].join(" ")}
+      >
         Type de message non reconnu.
       </Text>
     </View>
@@ -175,14 +195,18 @@ function PollMessageRenderer({ message }: { message: Message }) {
  * MAIN RENDERER
  * ========================================================================== */
 
-export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
-  /*
-   * Un message supprimé ne doit jamais afficher son contenu original.
-   */
+export function MessageTypeRenderer({
+  message,
+  own = false,
+}: MessageTypeRendererProps) {
+  /* Message supprimé : jamais son contenu original */
   if (message.isDeleted) {
     return (
       <Text
-        className="text-sm italic leading-5 text-white/40"
+        className={[
+          "text-sm italic leading-5",
+          own ? "text-black/40" : "text-white/40",
+        ].join(" ")}
         accessibilityLabel="Message supprimé"
       >
         Message supprimé
@@ -190,22 +214,19 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
     );
   }
 
-  /*
-   * Normalisation défensive.
-   */
   const type = String(message.type ?? "text")
     .trim()
     .toLowerCase();
 
   switch (type) {
     case "text":
-      return <TextMessage message={message} />;
+      return <TextMessage message={message} own={own} />;
 
     case "location": {
       const locationMessage = toLocationMessage(message);
 
       if (!locationMessage) {
-        return <UnsupportedMessage message={message} />;
+        return <UnsupportedMessage message={message} own={own} />;
       }
 
       return <LocationMessageRenderer message={locationMessage} />;
@@ -215,7 +236,7 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
       const contactMessage = toContactMessage(message);
 
       if (!contactMessage) {
-        return <UnsupportedMessage message={message} />;
+        return <UnsupportedMessage message={message} own={own} />;
       }
 
       return <ContactMessageRenderer message={contactMessage} />;
@@ -234,45 +255,52 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
       return (
         <View className="w-full min-w-0 max-w-[340px]">
           {message.text?.trim() ? (
-            <Text className="text-sm leading-5 text-white">{message.text}</Text>
+            <Text
+              className={[
+                "text-sm leading-5",
+                own ? "text-black" : "text-white",
+              ].join(" ")}
+            >
+              {message.text}
+            </Text>
           ) : null}
 
-          <MessageAttachments messageId={message._id} />
+          <MessageAttachments messageId={message._id} own={own} />
         </View>
       );
 
     case "image":
       return (
         <View className="w-full min-w-0 overflow-hidden rounded-xl">
-          <MessageAttachments messageId={message._id} />
+          <MessageAttachments messageId={message._id} own={own} />
         </View>
       );
 
     case "video":
       return (
         <View className="w-full min-w-0 overflow-hidden rounded-xl">
-          <MessageAttachments messageId={message._id} />
+          <MessageAttachments messageId={message._id} own={own} />
         </View>
       );
 
     case "audio":
       return (
         <View className="w-full min-w-0 max-w-[340px]">
-          <MessageAttachments messageId={message._id} />
+          <MessageAttachments messageId={message._id} own={own} />
         </View>
       );
 
     case "file":
       return (
         <View className="w-full min-w-0 max-w-[360px]">
-          <MessageAttachments messageId={message._id} />
+          <MessageAttachments messageId={message._id} own={own} />
         </View>
       );
 
     case "document":
       return (
         <View className="w-full min-w-0 max-w-[360px]">
-          <MessageAttachments messageId={message._id} />
+          <MessageAttachments messageId={message._id} own={own} />
         </View>
       );
 
@@ -280,27 +308,44 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
       return (
         <View className="w-full min-w-0 max-w-[390px]">
           {message.text?.trim() ? (
-            <Text className="text-sm leading-5 text-white">{message.text}</Text>
+            <Text
+              className={[
+                "text-sm leading-5",
+                own ? "text-black" : "text-white",
+              ].join(" ")}
+            >
+              {message.text}
+            </Text>
           ) : null}
 
-          <MessageAttachments messageId={message._id} />
+          <MessageAttachments messageId={message._id} own={own} />
         </View>
       );
 
     case "payment":
       return (
         <View className="w-full min-w-0 max-w-[390px]">
-          <Text className="text-sm font-semibold leading-5 text-white">
+          <Text
+            className={[
+              "text-sm font-semibold leading-5",
+              own ? "text-black" : "text-white",
+            ].join(" ")}
+          >
             Paiement
           </Text>
 
           {message.text?.trim() ? (
-            <Text className="mt-1 text-sm leading-5 text-white/70">
+            <Text
+              className={[
+                "mt-1 text-sm leading-5",
+                own ? "text-black/70" : "text-white/70",
+              ].join(" ")}
+            >
               {message.text}
             </Text>
           ) : null}
 
-          <MessageAttachments messageId={message._id} />
+          <MessageAttachments messageId={message._id} own={own} />
         </View>
       );
 
@@ -308,7 +353,12 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
       return (
         <View className="w-full items-center">
           {message.text?.trim() ? (
-            <Text className="text-xs leading-4 text-white/40">
+            <Text
+              className={[
+                "text-xs leading-4",
+                own ? "text-black/40" : "text-white/40",
+              ].join(" ")}
+            >
               {message.text}
             </Text>
           ) : null}
@@ -316,7 +366,7 @@ export function MessageTypeRenderer({ message }: MessageTypeRendererProps) {
       );
 
     default:
-      return <UnsupportedMessage message={message} />;
+      return <UnsupportedMessage message={message} own={own} />;
   }
 }
 
