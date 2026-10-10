@@ -1,6 +1,6 @@
 // src/features/messages/chat/components/ChatView.tsx
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -13,6 +13,7 @@ import {
 import { ArrowLeft } from "lucide-react-native";
 
 import type { Id } from "@/convex/_generated/dataModel";
+import type { Message } from "../services/chat.service";
 
 import { usePresence } from "../../presence/hooks/usePresence";
 import { useTyping } from "../../typing/hooks/useTyping";
@@ -155,6 +156,20 @@ export function ChatView({
   const typing = useTyping(conversationId);
 
   /* --------------------------------------------------------------------------
+   * REPLY STATE — lifted so both MessagesArea and MessageComposer share it
+   * ------------------------------------------------------------------------ */
+
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+
+  const handleReply = useCallback((message: Message) => {
+    setReplyTo(message);
+  }, []);
+
+  const handleReplyHandled = useCallback(() => {
+    setReplyTo(null);
+  }, []);
+
+  /* --------------------------------------------------------------------------
    * OTHER PARTICIPANT
    * ------------------------------------------------------------------------ */
 
@@ -254,6 +269,7 @@ export function ChatView({
           isLoadingMore={chat.isLoadingMore}
           isDone={chat.isDone}
           onLoadMore={chat.loadMoreMessages}
+          onReply={handleReply}
         />
       </View>
 
@@ -283,7 +299,11 @@ export function ChatView({
           { maxHeight: Math.max(220, height * 0.5) },
         ]}
       >
-        <MessageComposer conversationId={conversationId} />
+        <MessageComposer
+          conversationId={conversationId}
+          replyTo={replyTo}
+          onReplyHandled={handleReplyHandled}
+        />
       </View>
     </KeyboardAvoidingView>
   );

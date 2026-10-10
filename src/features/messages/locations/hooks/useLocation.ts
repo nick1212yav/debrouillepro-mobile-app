@@ -1,5 +1,6 @@
 // src/features/messages/locations/hooks/useLocation.ts
 
+import * as Location from "expo-location";
 import { useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -7,7 +8,6 @@ import type { Id } from "../../../../../convex/_generated/dataModel";
 
 import {
   locationsApi,
-  normalizeCoordinates,
   type Coordinates,
   type LocationMessage,
 } from "../services/locations.service";
@@ -17,10 +17,56 @@ export interface UseLocationOptions {
   enableHighAccuracy?: boolean;
 }
 
-interface LocationRequestOptions {
-  enableHighAccuracy: boolean;
-  timeout: number;
-  maximumAge: number;
+const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_MAX_AGE_MS = 10000;
+const WATCH_TIME_INTERVAL_MS = 5000;
+
+/**
+ * Convertit un `Location.LocationObject` d'expo-location
+ * vers le type `Coordinates` métier.
+ */
+function toCoordinates(location: Location.LocationObject): Coordinates {
+  return {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    accuracy:
+      typeof location.coords.accuracy === "number"
+        ? location.coords.accuracy
+        : undefined,
+    altitude:
+      typeof location.coords.altitude === "number"
+        ? location.coords.altitude
+        : undefined,
+    heading:
+      typeof location.coords.heading === "number"
+        ? location.coords.heading
+        : undefined,
+    speed:
+      typeof location.coords.speed === "number"
+        ? location.coords.speed
+        : undefined,
+  };
+}
+
+/**
+ * Traduit les erreurs expo-location en messages utilisateur.
+ */
+function describeLocationError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (/permission/i.test(message)) {
+    return "L'accès à votre position a été refusé.";
+  }
+
+  if (/timeout|timed out/i.test(message)) {
+    return "La récupération de votre position a expiré.";
+  }
+
+  if (/unavailable|not available/i.test(message)) {
+    return "Votre position est momentanément indisponible.";
+  }
+
+  return "Impossible de récupérer votre position.";
 }
 
 export function useLocation(options: UseLocationOptions = {}) {
@@ -31,38 +77,75 @@ export function useLocation(options: UseLocationOptions = {}) {
   );
 
   const [isLocating, setIsLocating] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
 
-  const watchIdRef = useRef<number | null>(null);
+  const watchSubscriptionRef = useRef<Location.LocationSubscription | null>(
+    null,
+  );
 
   const locatingRequestRef = useRef(false);
 
   const sendLocationMutation = useMutation(locationsApi.send);
-
   const startLiveMutation = useMutation(locationsApi.startLive);
-
   const updateLiveMutation = useMutation(locationsApi.updateLive);
-
   const stopLiveMutation = useMutation(locationsApi.stopLive);
 
-  const getGeolocation = useCallback(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      return null;
-    }
+  const accuracyValue = enableHighAccuracy
+    ? Location.Accuracy.High
+    : Location.Accuracy.Balanced;
 
-    return navigator.geolocation;
+  /**
+   * Vérifie que le service de localisation est actif au niveau OS.
+   * Renvoie true si on peut continuer.
+   */
+  const ensureServicesEnabled = useCallback(async (): Promise<boolean> => {
+    try {
+      const enabled = await Location.hasServicesEnabledAsync();
+
+      if (!enabled) {
+        setError(
+          "Le service de localisation est désactivé. Activez-le dans les paramètres de votre appareil.",
+        );
+
+        return false;
+      }
+
+      return true;
+    } catch {
+      return true;
+    }
   }, []);
 
-  const getCurrentPosition = useCallback(() => {
-    const geolocation = getGeolocation();
+  /**
+   * Demande la permission foreground (idempotent).
+   * Renvoie true si accordée.
+   */
+  const ensureForegroundPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      const existing = await Location.getForegroundPermissionsAsync();
 
-    if (!geolocation) {
-      setError("La géolocalisation n'est pas disponible sur cet appareil.");
+      if (existing.status === "granted") {
+        return true;
+      }
 
-      return;
+      const requested = await Location.requestForegroundPermissionsAsync();
+
+      if (requested.status !== "granted") {
+        setError("L'accès à votre position a été refusé.");
+        return false;
+      }
+
+      return true;
+    } catch {
+      setError("Impossible de vérifier l'autorisation de localisation.");
+      return false;
     }
+  }, []);
 
+  /**
+   * Position ponctuelle — API callback compatible avec l'ancien contrat.
+   */
+  const getCurrentPosition = useCallback(async () => {
     if (locatingRequestRef.current) {
       return;
     }
@@ -71,175 +154,157 @@ export function useLocation(options: UseLocationOptions = {}) {
     setIsLocating(true);
     setError(null);
 
-    const options: LocationRequestOptions = {
-      enableHighAccuracy,
-      timeout: 15000,
-      maximumAge: 10000,
-    };
+    try {
+      const servicesOk = await ensureServicesEnabled();
 
-    geolocation.getCurrentPosition(
-      (position) => {
-        locatingRequestRef.current = false;
+      if (!servicesOk) {
+        return;
+      }
 
-        const coordinates = normalizeCoordinates(position);
+      const permissionOk = await ensureForegroundPermission();
 
-        setCurrentPosition(coordinates);
-        setIsLocating(false);
-      },
-      (geoError) => {
-        locatingRequestRef.current = false;
-        setIsLocating(false);
+      if (!permissionOk) {
+        return;
+      }
 
-        switch (geoError.code) {
-          case geoError.PERMISSION_DENIED:
-            setError("L'accès à votre position a été refusé.");
-            break;
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: accuracyValue,
+        mayShowUserSettingsDialog: true,
+      });
 
-          case geoError.POSITION_UNAVAILABLE:
-            setError("Votre position est momentanément indisponible.");
-            break;
-
-          case geoError.TIMEOUT:
-            setError("La récupération de votre position a expiré.");
-            break;
-
-          default:
-            setError("Impossible de récupérer votre position.");
-        }
-      },
-      options,
-    );
-  }, [enableHighAccuracy, getGeolocation]);
+      setCurrentPosition(toCoordinates(position));
+    } catch (locationError) {
+      setError(describeLocationError(locationError));
+    } finally {
+      locatingRequestRef.current = false;
+      setIsLocating(false);
+    }
+  }, [accuracyValue, ensureForegroundPermission, ensureServicesEnabled]);
 
   /**
    * Récupère une position ponctuelle sous forme de Promise.
    *
-   * Indispensable pour les opérations qui doivent
-   * attendre une position fraîche avant de continuer
-   * (notamment le démarrage d'une localisation Live).
+   * Utilisé en interne par le mode Live.
    */
   const requestCurrentPosition = useCallback(async (): Promise<Coordinates> => {
-    const geolocation = getGeolocation();
+    const servicesOk = await ensureServicesEnabled();
 
-    if (!geolocation) {
-      const message =
-        "La géolocalisation n'est pas disponible sur cet appareil.";
+    if (!servicesOk) {
+      throw new Error("Location services disabled");
+    }
+
+    const permissionOk = await ensureForegroundPermission();
+
+    if (!permissionOk) {
+      throw new Error("Location permission denied");
+    }
+
+    setIsLocating(true);
+    setError(null);
+
+    try {
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: accuracyValue,
+        mayShowUserSettingsDialog: true,
+      });
+
+      const coordinates = toCoordinates(position);
+
+      setCurrentPosition(coordinates);
+
+      return coordinates;
+    } catch (locationError) {
+      const message = describeLocationError(locationError);
 
       setError(message);
       throw new Error(message);
+    } finally {
+      setIsLocating(false);
+    }
+  }, [accuracyValue, ensureForegroundPermission, ensureServicesEnabled]);
+
+  /**
+   * Démarre un suivi continu de la position.
+   */
+  const startWatching = useCallback(async () => {
+    if (watchSubscriptionRef.current) {
+      return;
     }
 
-    setIsLocating(true);
     setError(null);
+    setIsLocating(true);
 
-    const position = await new Promise<GeolocationPosition>(
-      (resolve, reject) => {
-        geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy,
-          timeout: 15000,
-          maximumAge: 10000,
-        });
-      },
-    ).catch((geoError: GeolocationPositionError) => {
-      switch (geoError.code) {
-        case geoError.PERMISSION_DENIED:
-          setError("L'accès à votre position a été refusé.");
-          break;
+    try {
+      const servicesOk = await ensureServicesEnabled();
 
-        case geoError.POSITION_UNAVAILABLE:
-          setError("Votre position est momentanément indisponible.");
-          break;
-
-        case geoError.TIMEOUT:
-          setError("La récupération de votre position a expiré.");
-          break;
-
-        default:
-          setError("Impossible de récupérer votre position.");
+      if (!servicesOk) {
+        setIsLocating(false);
+        return;
       }
 
-      throw geoError;
-    });
+      const permissionOk = await ensureForegroundPermission();
 
-    const coordinates = normalizeCoordinates(position);
-
-    setCurrentPosition(coordinates);
-    setIsLocating(false);
-
-    return coordinates;
-  }, [enableHighAccuracy, getGeolocation]);
-
-  const startWatching = useCallback(() => {
-    const geolocation = getGeolocation();
-
-    if (!geolocation) {
-      setError("La géolocalisation n'est pas disponible.");
-
-      return;
-    }
-
-    if (watchIdRef.current !== null) {
-      return;
-    }
-
-    setError(null);
-    setIsLocating(true);
-
-    watchIdRef.current = geolocation.watchPosition(
-      (position) => {
-        const coordinates = normalizeCoordinates(position);
-
-        setCurrentPosition(coordinates);
+      if (!permissionOk) {
         setIsLocating(false);
-      },
-      (geoError) => {
-        setIsLocating(false);
+        return;
+      }
 
-        if (geoError.code === geoError.PERMISSION_DENIED) {
-          setError("L'accès à votre position a été refusé.");
-        } else if (geoError.code === geoError.POSITION_UNAVAILABLE) {
-          setError("Votre position est momentanément indisponible.");
-        } else if (geoError.code === geoError.TIMEOUT) {
-          setError("La récupération de votre position a expiré.");
-        } else {
-          setError("Impossible de mettre à jour votre position.");
-        }
-      },
-      {
-        enableHighAccuracy,
-        timeout: 15000,
-        maximumAge: 5000,
-      },
-    );
-  }, [enableHighAccuracy, getGeolocation]);
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: accuracyValue,
+          timeInterval: WATCH_TIME_INTERVAL_MS,
+          distanceInterval: 0,
+        },
+        (location) => {
+          setCurrentPosition(toCoordinates(location));
+          setIsLocating(false);
+        },
+      );
+
+      watchSubscriptionRef.current = subscription;
+    } catch (locationError) {
+      setError(describeLocationError(locationError));
+      setIsLocating(false);
+    }
+  }, [accuracyValue, ensureForegroundPermission, ensureServicesEnabled]);
 
   const stopWatching = useCallback(() => {
-    const geolocation = getGeolocation();
+    const subscription = watchSubscriptionRef.current;
 
-    if (watchIdRef.current !== null && geolocation) {
-      geolocation.clearWatch(watchIdRef.current);
+    watchSubscriptionRef.current = null;
+
+    if (subscription) {
+      try {
+        subscription.remove();
+      } catch {
+        /* Best effort. */
+      }
     }
 
-    watchIdRef.current = null;
     setIsLocating(false);
-  }, [getGeolocation]);
+  }, []);
 
   useEffect(() => {
     if (autoStart) {
-      startWatching();
+      void startWatching();
     }
 
     return () => {
-      const geolocation = getGeolocation();
+      const subscription = watchSubscriptionRef.current;
 
-      if (watchIdRef.current !== null && geolocation) {
-        geolocation.clearWatch(watchIdRef.current);
+      watchSubscriptionRef.current = null;
+
+      if (subscription) {
+        try {
+          subscription.remove();
+        } catch {
+          /* Best effort. */
+        }
       }
 
-      watchIdRef.current = null;
       locatingRequestRef.current = false;
     };
-  }, [autoStart, startWatching, getGeolocation]);
+  }, [autoStart, startWatching]);
 
   /**
    * Partage un emplacement fixe.
@@ -279,10 +344,6 @@ export function useLocation(options: UseLocationOptions = {}) {
 
   /**
    * Démarre une localisation Live.
-   *
-   * Une position fraîche est obtenue avant la création
-   * du message Live lorsque aucune position fiable
-   * n'est encore disponible.
    */
   const startLiveLocation = useCallback(
     async ({
@@ -300,7 +361,7 @@ export function useLocation(options: UseLocationOptions = {}) {
         position = await requestCurrentPosition();
       }
 
-      startWatching();
+      void startWatching();
 
       return startLiveMutation({
         conversationId,

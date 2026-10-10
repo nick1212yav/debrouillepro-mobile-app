@@ -122,6 +122,10 @@ export const createPoll = mutation({
 
     const now = new Date().toISOString();
 
+    /* ------------------------------------------------------------------------
+     * 1. Créer le poll
+     * ---------------------------------------------------------------------- */
+
     const pollId = await ctx.db.insert("polls", {
       conversationId: args.conversationId,
       creatorId: user._id,
@@ -136,7 +140,72 @@ export const createPoll = mutation({
       updatedAt: now,
     });
 
-    return await ctx.db.get(pollId);
+    /* ------------------------------------------------------------------------
+     * 2. Créer le message associé
+     * ---------------------------------------------------------------------- */
+
+    const messageId = await ctx.db.insert("messages", {
+      type: "poll",
+      conversationId: args.conversationId,
+      senderId: user._id,
+      text: question,
+      status: "sent",
+      reactions: [],
+      pollId,
+    });
+
+    /* ------------------------------------------------------------------------
+     * 3. Relier le poll à son message
+     * ---------------------------------------------------------------------- */
+
+    await ctx.db.patch(pollId, {
+      messageId,
+      updatedAt: now,
+    });
+
+    /* ------------------------------------------------------------------------
+     * 4. Mettre à jour la conversation (aperçu + horodatage)
+     * ---------------------------------------------------------------------- */
+
+    await ctx.db.patch(args.conversationId, {
+      lastMessageText: `📊 ${question}`,
+      lastMessageSenderId: user._id,
+      updatedAt: now,
+    });
+
+    /* ------------------------------------------------------------------------
+     * 5. Incrémenter les messages non lus des autres membres
+     * ---------------------------------------------------------------------- */
+
+    const conversation = await ctx.db.get(args.conversationId);
+
+    if (conversation) {
+      const members = await ctx.db
+        .query("conversationMembers")
+        .withIndex("by_conversation", (q) =>
+          q.eq("conversationId", args.conversationId),
+        )
+        .collect();
+
+      for (const member of members) {
+        if (member.userId === user._id) {
+          continue;
+        }
+
+        await ctx.db.patch(member._id, {
+          unreadCount: member.unreadCount + 1,
+        });
+      }
+    }
+
+    const poll = await ctx.db.get(pollId);
+
+    const message = await ctx.db.get(messageId);
+
+    return {
+      poll,
+      message,
+    };
   },
 });
 

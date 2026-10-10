@@ -70,6 +70,7 @@ export function getMessageTypeLabel(type: MessageType): string {
     location: "Localisation",
     contact: "Contact",
     publication: "Publication",
+    poll: "Sondage",
     system: "Système",
   };
 
@@ -90,6 +91,7 @@ export function getMessageTypeIcon(type: MessageType): string {
     location: "📍",
     contact: "👤",
     publication: "📰",
+    poll: "📊",
     system: "ℹ️",
   };
 

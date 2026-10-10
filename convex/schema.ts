@@ -164,6 +164,7 @@ export default defineSchema({
       v.literal("location"),
       v.literal("contact"),
       v.literal("publication"),
+      v.literal("poll"),
       v.literal("system"),
     ),
 
@@ -186,6 +187,7 @@ export default defineSchema({
     // Réponse / partage
     replyToId: v.optional(v.id("messages")),
     sharedPublicationId: v.optional(v.id("publications")),
+    pollId: v.optional(v.id("polls")),
 
     // Édition
     isEdited: v.optional(v.boolean()),

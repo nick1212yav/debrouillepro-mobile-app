@@ -29,7 +29,13 @@
         "foregroundImage": "./assets/branding/debrouillepro-mark.png"
       },
 
-      "permissions": ["CAMERA", "RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"],
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
 
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -72,6 +78,13 @@
           "cameraPermission": "Autoriser DébrouillePro à accéder à votre caméra pour diffuser en direct",
           "microphonePermission": "Autoriser DébrouillePro à accéder à votre micro pour diffuser en direct",
           "recordAudioAndroid": true
+        }
+      ],
+
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Autoriser DébrouillePro à accéder à votre position pour partager votre localisation dans les conversations."
         }
       ]
     ],

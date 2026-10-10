@@ -5,6 +5,7 @@ import {
   Text,
   ScrollView,
   StyleSheet,
+  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type ScrollView as ScrollViewType,
@@ -34,6 +35,39 @@ const RESET_LOAD_THRESHOLD = 220;
 const BOTTOM_THRESHOLD = 180;
 const LOAD_BATCH_SIZE = 30;
 
+/**
+ * Fenêtre pendant laquelle toute variation de hauteur du contenu (chargement
+ * d'image, layout de média, etc.) déclenche un scroll inconditionnel vers le
+ * bas. Basé sur le temps, pas sur un nombre de frames, car une image met
+ * souvent 500 ms à 2 s à charger.
+ */
+const INITIAL_SETTLING_WINDOW_MS = 2500;
+
+/**
+ * Durée pendant laquelle on ignore les événements de scroll après un
+ * scrollToEnd programmatique. Sans ce garde-fou, l'événement virtuel émis
+ * par notre propre scrollToEnd est confondu avec un scroll utilisateur et
+ * désactive le suivi du bas.
+ */
+const PROGRAMMATIC_SCROLL_LOCK_MS = 600;
+
+const scrollToBottom = (
+  scrollRef: React.RefObject<ScrollViewType | null>,
+  animated: boolean,
+) => {
+  requestAnimationFrame(() => {
+    scrollRef.current?.scrollToEnd({ animated });
+
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated });
+
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollToEnd({ animated });
+      });
+    });
+  });
+};
+
 export function MessagesArea({
   messages,
   currentUserId,
@@ -49,30 +83,49 @@ export function MessagesArea({
   const hasInitialScrollRef = useRef(false);
   const wasLoadingMoreRef = useRef(false);
 
-  const isNearBottomRef = useRef(true);
+  const shouldFollowBottomRef = useRef(true);
+  const hasUserScrolledRef = useRef(false);
+  const initialSettlingRef = useRef(true);
 
-  /**
-   * Maintient la position du lecteur :
-   * - bas de conversation → on peut suivre les nouveaux messages
-   * - lecture ancienne → ne pas forcer le scroll
-   */
+  const lastContentHeightRef = useRef(0);
+
+  const programmaticScrollUntilRef = useRef(0);
+  const initialLayoutTimeRef = useRef(0);
+
+  const forceScrollToBottom = useCallback((animated: boolean) => {
+    programmaticScrollUntilRef.current =
+      Date.now() + PROGRAMMATIC_SCROLL_LOCK_MS;
+
+    scrollToBottom(scrollRef, animated);
+  }, []);
+
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      // Ignore les events émis par nos propres scrollToEnd.
+      if (Date.now() < programmaticScrollUntilRef.current) {
+        return;
+      }
+
       const { contentOffset, contentSize, layoutMeasurement } =
         event.nativeEvent;
 
       const offsetY = Math.max(contentOffset.y, 0);
 
-      const distanceFromBottom =
-        contentSize.height - (offsetY + layoutMeasurement.height);
+      const distanceFromBottom = Math.max(
+        0,
+        contentSize.height - (offsetY + layoutMeasurement.height),
+      );
 
-      isNearBottomRef.current = distanceFromBottom <= BOTTOM_THRESHOLD;
+      const isNearBottom = distanceFromBottom <= BOTTOM_THRESHOLD;
 
-      /**
-       * Arrivé en haut :
-       * demander les anciens messages une seule fois
-       * jusqu'à ce que l'utilisateur redescende.
-       */
+      hasUserScrolledRef.current = true;
+
+      if (initialSettlingRef.current) {
+        shouldFollowBottomRef.current = true;
+      } else {
+        shouldFollowBottomRef.current = isNearBottom;
+      }
+
       if (offsetY > RESET_LOAD_THRESHOLD) {
         hasTriggeredLoadMoreRef.current = false;
       }
@@ -93,62 +146,123 @@ export function MessagesArea({
     [isLoadingMore, isDone, onLoadMore],
   );
 
-  /**
-   * Premier affichage :
-   * une conversation doit s'ouvrir sur les derniers messages,
-   * comme une vraie application de messagerie.
-   */
-  const handleContentSizeChange = useCallback(
-    (_width: number, _height: number) => {
-      if (!scrollRef.current || messages.length === 0) {
+  const handleLayout = useCallback(
+    (_event: LayoutChangeEvent) => {
+      if (messages.length === 0) {
         return;
       }
 
       if (!hasInitialScrollRef.current) {
         hasInitialScrollRef.current = true;
+        shouldFollowBottomRef.current = true;
+        hasUserScrolledRef.current = false;
+        initialSettlingRef.current = true;
+        initialLayoutTimeRef.current = Date.now();
+
+        forceScrollToBottom(false);
 
         requestAnimationFrame(() => {
-          scrollRef.current?.scrollToEnd({
-            animated: false,
+          forceScrollToBottom(false);
+
+          requestAnimationFrame(() => {
+            forceScrollToBottom(false);
           });
         });
+      }
+    },
+    [forceScrollToBottom, messages.length],
+  );
 
+  const handleContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      const previousHeight = lastContentHeightRef.current;
+      lastContentHeightRef.current = height;
+
+      if (!scrollRef.current || messages.length === 0) {
         return;
       }
 
-      /**
-       * Si la modification provient du chargement des anciens messages,
-       * surtout ne pas renvoyer l'utilisateur au dernier message.
-       */
       if (wasLoadingMoreRef.current) {
         wasLoadingMoreRef.current = false;
         return;
       }
 
-      /**
-       * Nouveaux messages :
-       * seulement si l'utilisateur était déjà proche du bas.
-       */
-      if (isNearBottomRef.current) {
+      if (!hasInitialScrollRef.current) {
+        hasInitialScrollRef.current = true;
+        shouldFollowBottomRef.current = true;
+        hasUserScrolledRef.current = false;
+        initialSettlingRef.current = true;
+        initialLayoutTimeRef.current = Date.now();
+
+        forceScrollToBottom(false);
+
         requestAnimationFrame(() => {
-          scrollRef.current?.scrollToEnd({
-            animated: true,
-          });
+          forceScrollToBottom(false);
         });
+
+        return;
+      }
+
+      const timeSinceInitial = Date.now() - initialLayoutTimeRef.current;
+
+      const inSettlingWindow =
+        initialSettlingRef.current ||
+        (timeSinceInitial < INITIAL_SETTLING_WINDOW_MS &&
+          !hasUserScrolledRef.current);
+
+      if (inSettlingWindow) {
+        forceScrollToBottom(false);
+        return;
+      }
+
+      if (height === previousHeight) {
+        return;
+      }
+
+      if (shouldFollowBottomRef.current) {
+        forceScrollToBottom(true);
       }
     },
-    [messages.length],
+    [forceScrollToBottom, messages.length],
   );
 
-  /**
-   * Si le chargement initial arrive après le premier rendu,
-   * on s'assure que la conversation arrive bien en bas.
-   */
+  useEffect(() => {
+    if (messages.length === 0) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      initialSettlingRef.current = false;
+    }, INITIAL_SETTLING_WINDOW_MS);
+
+    return () => clearTimeout(timer);
+  }, [messages.length]);
+
   useEffect(() => {
     if (messages.length === 0) {
       hasInitialScrollRef.current = false;
+      shouldFollowBottomRef.current = true;
+      hasUserScrolledRef.current = false;
+      initialSettlingRef.current = true;
+      lastContentHeightRef.current = 0;
+      initialLayoutTimeRef.current = 0;
+      programmaticScrollUntilRef.current = 0;
     }
   }, [messages.length]);
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      return;
+    }
+
+    if (
+      hasInitialScrollRef.current &&
+      !wasLoadingMoreRef.current &&
+      shouldFollowBottomRef.current
+    ) {
+      forceScrollToBottom(true);
+    }
+  }, [forceScrollToBottom, messages.length]);
 
   return (
     <ScrollView
@@ -159,6 +273,7 @@ export function MessagesArea({
         messages.length === 0 && styles.emptyContent,
       ]}
       onScroll={handleScroll}
+      onLayout={handleLayout}
       onContentSizeChange={handleContentSizeChange}
       scrollEventThrottle={16}
       keyboardShouldPersistTaps="handled"
@@ -281,7 +396,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.1)",
   },
 
   emptyIconText: {

@@ -21,6 +21,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useMessageComposer } from "../hooks/useMessageComposer";
 import { useTyping } from "../../typing/hooks/useTyping";
 
+import type { Message } from "../services/chat.service";
+
 import { usePolls } from "../../polls/hooks/usePolls";
 import { LocationPicker } from "../../locations/components/LocationPicker";
 import { ContactPicker } from "../../contacts/components/ContactPicker";
@@ -36,6 +38,8 @@ import type { Contact } from "../../contacts/services/contacts.service";
 
 interface MessageComposerProps {
   conversationId: Id<"conversations">;
+  replyTo?: Message | null;
+  onReplyHandled?: () => void;
 }
 
 interface SelectedMedia {
@@ -248,10 +252,22 @@ async function uploadBlobToConvex(
  * COMPONENT
  * ========================================================================== */
 
-export function MessageComposer({ conversationId }: MessageComposerProps) {
+export function MessageComposer({
+  conversationId,
+  replyTo: externalReplyTo,
+  onReplyHandled,
+}: MessageComposerProps) {
   const composer = useMessageComposer(conversationId);
   const typing = useTyping(conversationId);
   const polls = usePolls(conversationId);
+
+  /**
+   * Reply state :
+   * - priorité à la prop `externalReplyTo` (remontée par ChatView via
+   *   MessagesArea → MessageContextMenu)
+   * - fallback sur l'état interne de `useMessageComposer` si présent
+   */
+  const effectiveReplyTo = externalReplyTo ?? composer.replyTo;
 
   const sendMessage = useMutation(api.messages.messages.send);
 
@@ -279,6 +295,15 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   const hasMedia = selectedMedia.length > 0;
 
   const isBusy = isSubmitting || isRecording;
+
+  /* ==========================================================================
+   * REPLY CANCEL
+   * ======================================================================== */
+
+  const handleCancelReply = useCallback(() => {
+    composer.cancelReply();
+    onReplyHandled?.();
+  }, [composer, onReplyHandled]);
 
   /* ==========================================================================
    * RECORDING TIMER
@@ -460,9 +485,9 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         conversationId,
         text: composer.text.trim(),
 
-        ...(composer.replyTo
+        ...(effectiveReplyTo
           ? {
-              replyToId: composer.replyTo._id,
+              replyToId: effectiveReplyTo._id,
             }
           : {}),
 
@@ -491,6 +516,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
       void typing.stopTyping();
 
       composer.reset();
+      onReplyHandled?.();
 
       setSelectedMedia([]);
       setActiveTool(null);
@@ -508,14 +534,15 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   }, [
     addAttachment,
     closeMenus,
-    composer.replyTo,
     composer.reset,
     composer.sharedPublicationId,
     composer.text,
     conversationId,
+    effectiveReplyTo,
     hasMedia,
     hasText,
     isSubmitting,
+    onReplyHandled,
     selectedMedia,
     sendMessage,
     typing.stopTyping,
@@ -730,6 +757,8 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
   );
 
   const handlePollCreated = useCallback(() => {
+    /* Le backend crée le message ET le poll.
+       La subscription met à jour la conversation automatiquement. */
     setActiveTool(null);
   }, []);
 
@@ -751,11 +780,21 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
     [conversationId, sendMessage],
   );
 
-  const handlePublicationSelect = useCallback(
-    async (publicationId: Id<"publications">) => {
+  /**
+   * Publication (événement / emploi / immobilier).
+   *
+   * Envoie un message portant :
+   *  - un `text` lisible (label du type de publication)
+   *  - un `sharedPublicationId` (référence backend)
+   *
+   * Permet d'éviter une bulle vide quand le rendu carte n'est pas
+   * encore branché côté `MessageTypeRenderer`.
+   */
+  const handlePublicationSend = useCallback(
+    async (publicationId: Id<"publications">, label: string) => {
       await sendMessage({
         conversationId,
-        text: "",
+        text: label,
         sharedPublicationId: publicationId,
       });
 
@@ -772,7 +811,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
 
   return (
     <View style={styles.container}>
-      {composer.replyTo ? (
+      {effectiveReplyTo ? (
         <View style={styles.replyBar}>
           <View style={styles.replyAccent} />
 
@@ -780,12 +819,12 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
             <Text style={styles.replyLabel}>Répondre au message</Text>
 
             <Text numberOfLines={1} style={styles.replyText}>
-              {composer.replyTo.text?.trim() || "[message sans texte]"}
+              {effectiveReplyTo.text?.trim() || "[message sans texte]"}
             </Text>
           </View>
 
           <Pressable
-            onPress={composer.cancelReply}
+            onPress={handleCancelReply}
             accessibilityRole="button"
             accessibilityLabel="Annuler la réponse"
             hitSlop={8}
@@ -812,6 +851,7 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
         <ContactPicker
           conversationId={conversationId}
           onClose={closeTool}
+          onSelect={(contact) => void handleSendContact(contact)}
           onSend={handleSendContact}
         />
       ) : null}
@@ -834,7 +874,9 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           open
           type="evenement"
           onClose={closeTool}
-          onSelect={handlePublicationSelect}
+          onSelect={(id) =>
+            void handlePublicationSend(id, "📅 Événement partagé")
+          }
         />
       ) : null}
 
@@ -843,7 +885,9 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           open
           type="job"
           onClose={closeTool}
-          onSelect={handlePublicationSelect}
+          onSelect={(id) =>
+            void handlePublicationSend(id, "💼 Offre d'emploi partagée")
+          }
         />
       ) : null}
 
@@ -852,7 +896,9 @@ export function MessageComposer({ conversationId }: MessageComposerProps) {
           open
           type="immo"
           onClose={closeTool}
-          onSelect={handlePublicationSelect}
+          onSelect={(id) =>
+            void handlePublicationSend(id, "🏠 Bien immobilier partagé")
+          }
         />
       ) : null}
 

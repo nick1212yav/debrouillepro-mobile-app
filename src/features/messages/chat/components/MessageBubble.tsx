@@ -112,6 +112,10 @@ export function MessageBubble({
               metaClass,
             ].join(" ")}
           >
+            {message.isPinned && (
+              <Text className="mr-1 text-[10px] leading-3">📌</Text>
+            )}
+
             {edited && (
               <Text className="mr-1 text-[10px] leading-3">modifié</Text>
             )}

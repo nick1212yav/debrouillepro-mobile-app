@@ -1,7 +1,14 @@
 // src/features/messages/polls/components/PollComposer.tsx
 
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Check, Clock3, Plus, Trash2, Vote } from "lucide-react-native";
 
 import type { Id } from "@/convex/_generated/dataModel";
@@ -130,159 +137,172 @@ export function PollComposer({
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <Vote size={20} color="#a78bfa" />
-        </View>
-
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Créer un sondage</Text>
-
-          <Text style={styles.headerSubtitle}>
-            Pose une question à la conversation
-          </Text>
-        </View>
-      </View>
-
-      {/* Question */}
-      <TextInput
-        value={question}
-        onChangeText={setQuestion}
-        placeholder="Pose ta question..."
-        placeholderTextColor="rgba(255,255,255,0.30)"
-        maxLength={500}
-        multiline
-        textAlignVertical="top"
-        editable={!isSubmitting}
-        accessibilityLabel="Question du sondage"
-        style={styles.questionInput}
-      />
-
-      {/* Options */}
-      <View style={styles.options}>
-        {options.map((option, index) => (
-          <View key={option.id} style={styles.optionRow}>
-            <TextInput
-              value={option.text}
-              onChangeText={(value) => updateOption(option.id, value)}
-              placeholder={`Choix ${index + 1}`}
-              placeholderTextColor="rgba(255,255,255,0.30)"
-              maxLength={200}
-              editable={!isSubmitting}
-              accessibilityLabel={`Choix ${index + 1}`}
-              style={styles.optionInput}
-            />
-
-            {options.length > 2 ? (
-              <Pressable
-                onPress={() => removeOption(option.id)}
-                disabled={isSubmitting}
-                accessibilityRole="button"
-                accessibilityLabel={`Supprimer le choix ${index + 1}`}
-                accessibilityState={{
-                  disabled: isSubmitting,
-                }}
-                hitSlop={6}
-                style={({ pressed }) => [
-                  styles.removeButton,
-                  pressed && !isSubmitting && styles.pressed,
-                ]}
-              >
-                <Trash2 size={16} color="rgba(255,255,255,0.45)" />
-              </Pressable>
-            ) : null}
-          </View>
-        ))}
-      </View>
-
-      {/* Add option */}
-      {options.length < 20 ? (
-        <Pressable
-          onPress={addOption}
-          disabled={isSubmitting}
-          accessibilityRole="button"
-          accessibilityLabel="Ajouter un choix"
-          accessibilityState={{
-            disabled: isSubmitting,
-          }}
-          style={({ pressed }) => [
-            styles.addOptionButton,
-            pressed && !isSubmitting && styles.pressed,
-          ]}
-        >
-          <Plus size={15} color="#a78bfa" />
-
-          <Text style={styles.addOptionText}>Ajouter un choix</Text>
-        </Pressable>
-      ) : null}
-
-      <View style={styles.separator} />
-
-      {/* Settings */}
-      <View style={styles.settings}>
-        <PollSetting
-          title="Plusieurs réponses"
-          description="Autoriser plusieurs choix"
-          checked={multipleChoice}
-          disabled={isSubmitting}
-          onToggle={() => setMultipleChoice((current) => !current)}
-        />
-
-        <PollSetting
-          title="Vote anonyme"
-          description="Ne pas afficher qui a voté"
-          checked={anonymous}
-          disabled={isSubmitting}
-          onToggle={() => setAnonymous((current) => !current)}
-        />
-
-        <View style={styles.settingBlock}>
-          <View style={styles.settingMain}>
-            <View style={styles.settingIcon}>
-              <Clock3 size={16} color="rgba(255,255,255,0.45)" />
-            </View>
-
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Date d'expiration</Text>
-
-              <Text style={styles.settingDescription}>
-                Fermer automatiquement après cette date
-              </Text>
-            </View>
+      {/* ----------------------------------------------------------------------
+          ZONE DÉFILABLE : header + question + options + réglages
+          -------------------------------------------------------------------- */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerIcon}>
+            <Vote size={20} color="#a78bfa" />
           </View>
 
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Créer un sondage</Text>
+
+            <Text style={styles.headerSubtitle}>
+              Pose une question à la conversation
+            </Text>
+          </View>
+        </View>
+
+        {/* Question */}
+        <TextInput
+          value={question}
+          onChangeText={setQuestion}
+          placeholder="Pose ta question..."
+          placeholderTextColor="rgba(255,255,255,0.30)"
+          maxLength={500}
+          multiline
+          textAlignVertical="top"
+          editable={!isSubmitting}
+          accessibilityLabel="Question du sondage"
+          style={styles.questionInput}
+        />
+
+        {/* Options */}
+        <View style={styles.options}>
+          {options.map((option, index) => (
+            <View key={option.id} style={styles.optionRow}>
+              <TextInput
+                value={option.text}
+                onChangeText={(value) => updateOption(option.id, value)}
+                placeholder={`Choix ${index + 1}`}
+                placeholderTextColor="rgba(255,255,255,0.30)"
+                maxLength={200}
+                editable={!isSubmitting}
+                accessibilityLabel={`Choix ${index + 1}`}
+                style={styles.optionInput}
+              />
+
+              {options.length > 2 ? (
+                <Pressable
+                  onPress={() => removeOption(option.id)}
+                  disabled={isSubmitting}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Supprimer le choix ${index + 1}`}
+                  accessibilityState={{
+                    disabled: isSubmitting,
+                  }}
+                  hitSlop={6}
+                  style={({ pressed }) => [
+                    styles.removeButton,
+                    pressed && !isSubmitting && styles.pressed,
+                  ]}
+                >
+                  <Trash2 size={16} color="rgba(255,255,255,0.45)" />
+                </Pressable>
+              ) : null}
+            </View>
+          ))}
+        </View>
+
+        {/* Add option */}
+        {options.length < 20 ? (
           <Pressable
-            onPress={() => setHasExpiration((current) => !current)}
+            onPress={addOption}
             disabled={isSubmitting}
-            accessibilityRole="checkbox"
-            accessibilityLabel="Activer la date d'expiration"
+            accessibilityRole="button"
+            accessibilityLabel="Ajouter un choix"
             accessibilityState={{
-              checked: hasExpiration,
               disabled: isSubmitting,
             }}
-            style={[styles.checkbox, hasExpiration && styles.checkboxChecked]}
+            style={({ pressed }) => [
+              styles.addOptionButton,
+              pressed && !isSubmitting && styles.pressed,
+            ]}
           >
-            {hasExpiration ? (
-              <Check size={13} color="#ffffff" strokeWidth={3} />
-            ) : null}
+            <Plus size={15} color="#a78bfa" />
+
+            <Text style={styles.addOptionText}>Ajouter un choix</Text>
           </Pressable>
-        </View>
-
-        {hasExpiration ? (
-          <TextInput
-            value={expiresAt}
-            onChangeText={setExpiresAt}
-            placeholder="Date et heure d'expiration"
-            placeholderTextColor="rgba(255,255,255,0.30)"
-            editable={!isSubmitting}
-            accessibilityLabel="Date et heure d'expiration"
-            style={styles.expirationInput}
-          />
         ) : null}
-      </View>
 
-      {/* Actions */}
+        <View style={styles.separator} />
+
+        {/* Settings */}
+        <View style={styles.settings}>
+          <PollSetting
+            title="Plusieurs réponses"
+            description="Autoriser plusieurs choix"
+            checked={multipleChoice}
+            disabled={isSubmitting}
+            onToggle={() => setMultipleChoice((current) => !current)}
+          />
+
+          <PollSetting
+            title="Vote anonyme"
+            description="Ne pas afficher qui a voté"
+            checked={anonymous}
+            disabled={isSubmitting}
+            onToggle={() => setAnonymous((current) => !current)}
+          />
+
+          <View style={styles.settingBlock}>
+            <View style={styles.settingMain}>
+              <View style={styles.settingIcon}>
+                <Clock3 size={16} color="rgba(255,255,255,0.45)" />
+              </View>
+
+              <View style={styles.settingContent}>
+                <Text style={styles.settingTitle}>Date d'expiration</Text>
+
+                <Text style={styles.settingDescription}>
+                  Fermer automatiquement après cette date
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              onPress={() => setHasExpiration((current) => !current)}
+              disabled={isSubmitting}
+              accessibilityRole="checkbox"
+              accessibilityLabel="Activer la date d'expiration"
+              accessibilityState={{
+                checked: hasExpiration,
+                disabled: isSubmitting,
+              }}
+              style={[styles.checkbox, hasExpiration && styles.checkboxChecked]}
+            >
+              {hasExpiration ? (
+                <Check size={13} color="#ffffff" strokeWidth={3} />
+              ) : null}
+            </Pressable>
+          </View>
+
+          {hasExpiration ? (
+            <TextInput
+              value={expiresAt}
+              onChangeText={setExpiresAt}
+              placeholder="Date et heure d'expiration"
+              placeholderTextColor="rgba(255,255,255,0.30)"
+              editable={!isSubmitting}
+              accessibilityLabel="Date et heure d'expiration"
+              style={styles.expirationInput}
+            />
+          ) : null}
+        </View>
+      </ScrollView>
+
+      {/* ----------------------------------------------------------------------
+          ACTIONS FIXES : toujours visibles en bas
+          -------------------------------------------------------------------- */}
       <View style={styles.actions}>
         {onCancel ? (
           <Pressable
@@ -376,11 +396,22 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     maxWidth: 512,
+    maxHeight: "100%",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
     borderRadius: 16,
     backgroundColor: "#111827",
+    overflow: "hidden",
+  },
+
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+
+  scrollContent: {
     padding: 16,
+    paddingBottom: 8,
   },
 
   header: {
@@ -558,7 +589,11 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     gap: 8,
-    marginTop: 20,
+    padding: 16,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "#111827",
   },
 
   cancelButton: {

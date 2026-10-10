@@ -183,10 +183,16 @@ function JobMessageRenderer({ message }: { message: Message }) {
  * SONDAGE
  * ========================================================================== */
 
-function PollMessageRenderer({ message }: { message: Message }) {
+function PollMessageRenderer({
+  message,
+  own,
+}: {
+  message: Message;
+  own: boolean;
+}) {
   return (
     <View className="w-full min-w-0 max-w-[390px]">
-      <PollMessage message={message} />
+      <PollMessage message={message} own={own} />
     </View>
   );
 }
@@ -249,7 +255,7 @@ export function MessageTypeRenderer({
       return <JobMessageRenderer message={message} />;
 
     case "poll":
-      return <PollMessageRenderer message={message} />;
+      return <PollMessageRenderer message={message} own={own} />;
 
     case "voice":
       return (
