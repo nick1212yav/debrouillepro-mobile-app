@@ -4,9 +4,22 @@ import type { QueryCtx, MutationCtx } from "./_generated/server";
 
 async function requireUser(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new ConvexError({ code: "UNAUTHENTICATED", message: "Connexion requise" });
-  const user = await ctx.db.query("users").withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier)).unique();
-  if (!user) throw new ConvexError({ code: "NOT_FOUND", message: "Utilisateur introuvable" });
+  if (!identity)
+    throw new ConvexError({
+      code: "UNAUTHENTICATED",
+      message: "Connexion requise",
+    });
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_token", (q) =>
+      q.eq("tokenIdentifier", identity.tokenIdentifier),
+    )
+    .unique();
+  if (!user)
+    throw new ConvexError({
+      code: "NOT_FOUND",
+      message: "Utilisateur introuvable",
+    });
   return user;
 }
 
@@ -17,37 +30,70 @@ export const getMyTransactions = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    const user = await ctx.db.query("users").withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier)).unique();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
     if (!user) return [];
-    const txs = await ctx.db.query("walletTransactions").withIndex("by_user", (q) => q.eq("userId", user._id)).order("desc").take(args.limit ?? 50);
-    return Promise.all(txs.map(async (tx) => {
-      const counterpart = tx.counterpartId ? await ctx.db.get(tx.counterpartId) : null;
-      return { ...tx, counterpartName: counterpart?.name, counterpartAvatar: counterpart?.avatar };
-    }));
+    const txs = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .take(args.limit ?? 50);
+    return Promise.all(
+      txs.map(async (tx) => {
+        const counterpart = tx.counterpartId
+          ? await ctx.db.get(tx.counterpartId)
+          : null;
+        return {
+          ...tx,
+          counterpartName: counterpart?.name,
+          counterpartAvatar: counterpart?.avatar,
+        };
+      }),
+    );
   },
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SÉCURITÉ : createTransaction est neutralisée.
+//
+// Avant : mutation PUBLIQUE permettant à n'importe quel utilisateur authentifié
+// d'insérer une `walletTransactions` avec `status: "completed"` et n'importe
+// quel `type` / `amount` / `currency`. Un simple appel client créditait le
+// wallet sans aucun paiement réel.
+//
+// Le Payment Core (convex/payments.ts) est désormais l'unique chemin
+// financier autorisé :
+//   createPaymentIntent -> startPayment -> Provider -> ledger
+//
+// La signature d'arguments est conservée pour ne pas casser les appelants
+// existants ; seul le handler est neutralisé.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const createTransaction = mutation({
   args: {
-    type: v.union(v.literal("deposit"), v.literal("withdrawal"), v.literal("transfer"), v.literal("payment"), v.literal("refund"), v.literal("reward")),
+    type: v.union(
+      v.literal("deposit"),
+      v.literal("withdrawal"),
+      v.literal("transfer"),
+      v.literal("payment"),
+      v.literal("refund"),
+      v.literal("reward"),
+    ),
     amount: v.number(),
     currency: v.string(),
     description: v.string(),
     counterpartId: v.optional(v.id("users")),
     referenceId: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    return ctx.db.insert("walletTransactions", {
-      userId: user._id,
-      type: args.type,
-      amount: args.amount,
-      currency: args.currency,
-      description: args.description,
-      status: "completed",
-      counterpartId: args.counterpartId,
-      referenceId: args.referenceId,
-      completedAt: new Date().toISOString(),
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. Utilisez le Payment Core : api.payments.createPaymentIntent + startPayment.",
     });
   },
 });
@@ -57,13 +103,30 @@ export const getWalletSummary = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
-    const user = await ctx.db.query("users").withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier)).unique();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
     if (!user) return null;
-    const txs = await ctx.db.query("walletTransactions").withIndex("by_user", (q) => q.eq("userId", user._id)).collect();
+    const txs = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
     const completed = txs.filter((t) => t.status === "completed");
-    const totalIn = completed.filter((t) => ["deposit", "refund", "reward"].includes(t.type)).reduce((s, t) => s + t.amount, 0);
-    const totalOut = completed.filter((t) => ["withdrawal", "transfer", "payment"].includes(t.type)).reduce((s, t) => s + t.amount, 0);
-    return { balance: totalIn - totalOut, totalIn, totalOut, transactionCount: txs.length };
+    const totalIn = completed
+      .filter((t) => ["deposit", "refund", "reward"].includes(t.type))
+      .reduce((s, t) => s + t.amount, 0);
+    const totalOut = completed
+      .filter((t) => ["withdrawal", "transfer", "payment"].includes(t.type))
+      .reduce((s, t) => s + t.amount, 0);
+    return {
+      balance: totalIn - totalOut,
+      totalIn,
+      totalOut,
+      transactionCount: txs.length,
+    };
   },
 });
 
@@ -74,19 +137,34 @@ export const getMyBudgets = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    const user = await ctx.db.query("users").withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier)).unique();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
     if (!user) return [];
-    return ctx.db.query("budgets").withIndex("by_user", (q) => q.eq("userId", user._id)).order("desc").take(20);
+    return ctx.db
+      .query("budgets")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .take(20);
   },
 });
 
 export const createBudget = mutation({
   args: {
     name: v.string(),
-    period: v.union(v.literal("monthly"), v.literal("yearly"), v.literal("custom")),
+    period: v.union(
+      v.literal("monthly"),
+      v.literal("yearly"),
+      v.literal("custom"),
+    ),
     startDate: v.string(),
     endDate: v.optional(v.string()),
-    categories: v.array(v.object({ name: v.string(), allocated: v.number(), spent: v.number() })),
+    categories: v.array(
+      v.object({ name: v.string(), allocated: v.number(), spent: v.number() }),
+    ),
     currency: v.string(),
     totalAllocated: v.number(),
   },
@@ -97,12 +175,19 @@ export const createBudget = mutation({
 });
 
 export const updateBudgetSpent = mutation({
-  args: { budgetId: v.id("budgets"), categoryName: v.string(), spent: v.number() },
+  args: {
+    budgetId: v.id("budgets"),
+    categoryName: v.string(),
+    spent: v.number(),
+  },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const budget = await ctx.db.get(args.budgetId);
-    if (!budget || budget.userId !== user._id) throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
-    const updatedCats = budget.categories.map((c) => c.name === args.categoryName ? { ...c, spent: args.spent } : c);
+    if (!budget || budget.userId !== user._id)
+      throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
+    const updatedCats = budget.categories.map((c) =>
+      c.name === args.categoryName ? { ...c, spent: args.spent } : c,
+    );
     await ctx.db.patch(args.budgetId, { categories: updatedCats });
   },
 });
@@ -114,9 +199,18 @@ export const getMyExpenses = query({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    const user = await ctx.db.query("users").withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier)).unique();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
     if (!user) return [];
-    return ctx.db.query("expenses").withIndex("by_user", (q) => q.eq("userId", user._id)).order("desc").take(100);
+    return ctx.db
+      .query("expenses")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .take(100);
   },
 });
 
@@ -142,7 +236,8 @@ export const deleteExpense = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const expense = await ctx.db.get(args.expenseId);
-    if (!expense || expense.userId !== user._id) throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
+    if (!expense || expense.userId !== user._id)
+      throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
     await ctx.db.delete(args.expenseId);
   },
 });
@@ -154,9 +249,17 @@ export const getMyInvestments = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    const user = await ctx.db.query("users").withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier)).unique();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
     if (!user) return [];
-    return ctx.db.query("investmentAssets").withIndex("by_user", (q) => q.eq("userId", user._id)).collect();
+    return ctx.db
+      .query("investmentAssets")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
   },
 });
 
@@ -177,7 +280,8 @@ export const upsertInvestment = mutation({
     const { assetId, ...data } = args;
     if (assetId) {
       const asset = await ctx.db.get(assetId);
-      if (!asset || asset.userId !== user._id) throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
+      if (!asset || asset.userId !== user._id)
+        throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
       await ctx.db.patch(assetId, data);
       return assetId;
     }
@@ -190,7 +294,8 @@ export const deleteInvestment = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const asset = await ctx.db.get(args.assetId);
-    if (!asset || asset.userId !== user._id) throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
+    if (!asset || asset.userId !== user._id)
+      throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
     await ctx.db.delete(args.assetId);
   },
 });
@@ -202,9 +307,17 @@ export const getMySavingsGoals = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
-    const user = await ctx.db.query("users").withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier)).unique();
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
+      )
+      .unique();
     if (!user) return [];
-    return ctx.db.query("savingsGoals").withIndex("by_user", (q) => q.eq("userId", user._id)).collect();
+    return ctx.db
+      .query("savingsGoals")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
   },
 });
 
@@ -224,7 +337,8 @@ export const upsertSavingsGoal = mutation({
     const { goalId, ...data } = args;
     if (goalId) {
       const goal = await ctx.db.get(goalId);
-      if (!goal || goal.userId !== user._id) throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
+      if (!goal || goal.userId !== user._id)
+        throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
       await ctx.db.patch(goalId, data);
       return goalId;
     }
@@ -237,8 +351,11 @@ export const contributeToGoal = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const goal = await ctx.db.get(args.goalId);
-    if (!goal || goal.userId !== user._id) throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
-    await ctx.db.patch(args.goalId, { currentAmount: goal.currentAmount + args.amount });
+    if (!goal || goal.userId !== user._id)
+      throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
+    await ctx.db.patch(args.goalId, {
+      currentAmount: goal.currentAmount + args.amount,
+    });
   },
 });
 
@@ -247,7 +364,8 @@ export const deleteSavingsGoal = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const goal = await ctx.db.get(args.goalId);
-    if (!goal || goal.userId !== user._id) throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
+    if (!goal || goal.userId !== user._id)
+      throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé" });
     await ctx.db.delete(args.goalId);
   },
 });

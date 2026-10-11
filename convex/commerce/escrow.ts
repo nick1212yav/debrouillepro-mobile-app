@@ -1,4 +1,29 @@
 // convex/commerce/escrow.ts
+//
+// ─────────────────────────────────────────────────────────────────────────────
+// SÉCURITÉ : les mutations d'escrow ont été neutralisées.
+//
+// Avant :
+//   - `initiateEscrowPayment` créait un walletTransactions (pending)
+//   - `confirmEscrowPayment` le passait à completed SANS preuve de paiement
+//   - `releaseEscrowPayment` créditait le seller en deposit/completed
+//   - `cancelEscrowPayment` créditait le buyer en refund/completed
+//
+// Un utilisateur authentifié pouvait donc créditer n'importe quel wallet
+// (seller ou buyer) sans qu'aucun paiement externe n'ait été vérifié.
+//
+// Le Payment Core (convex/payments.ts) est désormais l'unique chemin
+// financier autorisé :
+//   createPaymentIntent -> startPayment -> Provider -> finalizeProviderSuccess
+//
+// Les signatures d'arguments sont conservées pour ne pas casser les appelants
+// existants ; seuls les handlers sont neutralisés.
+//
+// Conservé tel quel :
+//   - disputeEscrowPayment (ne touche pas au ledger)
+//   - getEscrowStatus / getMyEscrowTransactions (read-only)
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { v, ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { requireUser, requireQueryUser } from "../publications";
@@ -19,49 +44,12 @@ export const initiateEscrowPayment = mutation({
       v.literal("bank_transfer"),
     ),
   },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    const seller = await ctx.db.get(args.sellerId);
-    if (!seller) {
-      throw new ConvexError({
-        message: "Vendeur introuvable",
-        code: "NOT_FOUND",
-      });
-    }
-
-    if (user._id === args.sellerId) {
-      throw new ConvexError({
-        message: "Vous ne pouvez pas payer votre propre produit",
-        code: "FORBIDDEN",
-      });
-    }
-
-    const escrowId = await ctx.db.insert("escrowTransactions", {
-      buyerId: user._id,
-      sellerId: args.sellerId,
-      orderId: args.orderId,
-      productId: args.productId,
-      amount: args.amount,
-      currency: args.currency,
-      method: args.method,
-      status: "pending",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. Utilisez le Payment Core : api.payments.createPaymentIntent + startPayment.",
     });
-
-    await ctx.db.insert("walletTransactions", {
-      userId: user._id,
-      type: "payment",
-      amount: args.amount,
-      currency: args.currency,
-      description: `Paiement sécurisé - ${escrowId}`,
-      status: "pending",
-      referenceId: escrowId,
-      counterpartId: args.sellerId,
-    });
-
-    return { escrowId, transactionId: escrowId };
   },
 });
 
@@ -69,57 +57,12 @@ export const releaseEscrowPayment = mutation({
   args: {
     escrowId: v.id("escrowTransactions"),
   },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    const escrow = await ctx.db.get(args.escrowId);
-    if (!escrow) {
-      throw new ConvexError({
-        message: "Transaction introuvable",
-        code: "NOT_FOUND",
-      });
-    }
-
-    if (escrow.buyerId !== user._id) {
-      throw new ConvexError({
-        message: "Seul l'acheteur peut confirmer la réception",
-        code: "FORBIDDEN",
-      });
-    }
-
-    if (escrow.status !== "confirmed") {
-      throw new ConvexError({
-        message: "Le paiement n'est pas encore confirmé",
-        code: "INVALID_STATE",
-      });
-    }
-
-    await ctx.db.patch(args.escrowId, {
-      status: "released",
-      releasedAt: Date.now(),
-      updatedAt: Date.now(),
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. La libération des fonds doit être déclenchée par un événement provider vérifié.",
     });
-
-    await ctx.db.insert("walletTransactions", {
-      userId: escrow.sellerId,
-      type: "deposit",
-      amount: escrow.amount,
-      currency: escrow.currency,
-      description: `Libération des fonds - ${args.escrowId}`,
-      status: "completed",
-      referenceId: args.escrowId,
-      counterpartId: escrow.buyerId,
-      completedAt: new Date().toISOString(), // ✅ string
-    });
-
-    if (escrow.orderId) {
-      await ctx.db.patch(escrow.orderId, {
-        status: "delivered",
-        deliveredAt: new Date().toISOString(), // ✅ string
-      });
-    }
-
-    return { success: true };
   },
 });
 
@@ -127,50 +70,12 @@ export const confirmEscrowPayment = mutation({
   args: {
     escrowId: v.id("escrowTransactions"),
   },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    const escrow = await ctx.db.get(args.escrowId);
-    if (!escrow) {
-      throw new ConvexError({
-        message: "Transaction introuvable",
-        code: "NOT_FOUND",
-      });
-    }
-
-    if (escrow.buyerId !== user._id && escrow.sellerId !== user._id) {
-      throw new ConvexError({
-        message: "Non autorisé",
-        code: "FORBIDDEN",
-      });
-    }
-
-    if (escrow.status !== "pending") {
-      throw new ConvexError({
-        message: "Transaction déjà traitée",
-        code: "INVALID_STATE",
-      });
-    }
-
-    await ctx.db.patch(args.escrowId, {
-      status: "confirmed",
-      confirmedAt: Date.now(),
-      updatedAt: Date.now(),
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. La confirmation d'escrow doit provenir d'un événement provider vérifié.",
     });
-
-    // Mettre à jour la transaction wallet (sans index by_reference)
-    const walletTx = await ctx.db
-      .query("walletTransactions")
-      .filter((q) => q.eq(q.field("referenceId"), args.escrowId))
-      .unique();
-    if (walletTx) {
-      await ctx.db.patch(walletTx._id, {
-        status: "completed",
-        completedAt: new Date().toISOString(), // ✅ string
-      });
-    }
-
-    return { success: true };
   },
 });
 
@@ -178,52 +83,12 @@ export const cancelEscrowPayment = mutation({
   args: {
     escrowId: v.id("escrowTransactions"),
   },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    const escrow = await ctx.db.get(args.escrowId);
-    if (!escrow) {
-      throw new ConvexError({
-        message: "Transaction introuvable",
-        code: "NOT_FOUND",
-      });
-    }
-
-    if (escrow.buyerId !== user._id && escrow.sellerId !== user._id) {
-      throw new ConvexError({
-        message: "Non autorisé",
-        code: "FORBIDDEN",
-      });
-    }
-
-    if (escrow.status === "released") {
-      throw new ConvexError({
-        message: "Les fonds ont déjà été libérés",
-        code: "INVALID_STATE",
-      });
-    }
-
-    await ctx.db.patch(args.escrowId, {
-      status: "cancelled",
-      cancelledAt: Date.now(),
-      updatedAt: Date.now(),
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. L'annulation d'escrow et les remboursements doivent passer par le Payment Core.",
     });
-
-    if (escrow.status === "confirmed") {
-      await ctx.db.insert("walletTransactions", {
-        userId: escrow.buyerId,
-        type: "refund",
-        amount: escrow.amount,
-        currency: escrow.currency,
-        description: `Remboursement - ${args.escrowId}`,
-        status: "completed",
-        referenceId: args.escrowId,
-        counterpartId: escrow.sellerId,
-        completedAt: new Date().toISOString(), // ✅ string
-      });
-    }
-
-    return { success: true };
   },
 });
 

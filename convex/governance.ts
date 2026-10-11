@@ -371,6 +371,22 @@ export const getMyTransactions = query({
   },
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SÉCURITÉ : createTransaction est neutralisée.
+//
+// Avant : mutation PUBLIQUE permettant à n'importe quel utilisateur authentifié
+// d'insérer une `walletTransactions` avec `status: "completed"` via un spread
+// `...args`. Un simple appel client créditait le wallet sans aucun paiement
+// réel.
+//
+// Le Payment Core (convex/payments.ts) est désormais l'unique chemin
+// financier autorisé :
+//   createPaymentIntent -> startPayment -> Provider -> ledger
+//
+// La signature d'arguments est conservée pour ne pas casser les appelants
+// existants ; seul le handler est neutralisé.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const createTransaction = mutation({
   args: {
     type: v.union(
@@ -388,14 +404,11 @@ export const createTransaction = mutation({
     counterpartId: v.optional(v.id("users")),
   },
 
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    return ctx.db.insert("walletTransactions", {
-      ...args,
-      userId: user._id,
-      status: "completed",
-      completedAt: new Date().toISOString(),
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. Utilisez le Payment Core : api.payments.createPaymentIntent + startPayment.",
     });
   },
 });

@@ -1,5 +1,7 @@
 // convex/commerce.ts
 // Module Marketplace – Backend Convex – Version finale avec résolution d'images et logs de débogage
+// ✅ SÉCURITÉ : processPayment neutralisé (throw DEPRECATED_ENDPOINT).
+//    Le Payment Core est l'unique chemin financier autorisé.
 
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
@@ -873,24 +875,34 @@ export const trackRecentlyViewed = mutation({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 13. PAYMENT (simulation)
+// 13. PAYMENT
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// SÉCURITÉ :
+// Cet endpoint a été neutralisé. Il passait auparavant la commande à
+// `confirmed` sur simple appel client, sans aucune vérification de paiement
+// réel, et fabriquait un `PAY_<timestamp>`. `amount` et `method` étaient
+// reçus mais jamais utilisés.
+//
+// Le Payment Core (convex/payments.ts) est désormais l'unique chemin
+// financier autorisé :
+//   createPaymentIntent -> startPayment -> Provider -> ledger
+//
+// La signature d'arguments est conservée pour ne pas casser les appelants
+// existants ; seul le handler est neutralisé.
+
 export const processPayment = mutation({
   args: {
     orderId: v.id("orders"),
     amount: v.number(),
     method: v.string(),
   },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const order = await ctx.db.get(args.orderId);
-    if (!order || order.buyerId !== user._id)
-      throw new ConvexError({
-        code: "FORBIDDEN",
-        message: "Commande invalide",
-      });
-    await ctx.db.patch(args.orderId, { status: "confirmed" });
-    return { success: true, paymentId: `PAY_${Date.now()}` };
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. Utilisez le Payment Core : api.payments.createPaymentIntent + startPayment.",
+    });
   },
 });
 

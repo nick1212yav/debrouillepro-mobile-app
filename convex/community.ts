@@ -8,6 +8,9 @@
 //    viewStory (.first() + expiration), deleteStory (check remaining)
 // ✅ Fix TS : postsQuery typé explicitement (Doc<"publications">[])
 // ✅ Phase 6 : LIVE branché sur les helpers canoniques liveStreamsHelpers
+// ✅ SÉCURITÉ : processPayment / createPaymentIntent / confirmPayment
+//    neutralisés (throw DEPRECATED_ENDPOINT) — le Payment Core est
+//    l'unique chemin financier autorisé.
 
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
@@ -1499,6 +1502,20 @@ export const listProduct = mutation({
 // ══════════════════════════════════════════════════════════════════════════════
 // PAYMENTS
 // ══════════════════════════════════════════════════════════════════════════════
+//
+// SÉCURITÉ :
+// Ces trois endpoints ont été neutralisés. Ils écrivaient auparavant
+// directement dans `walletTransactions` avec un statut `completed` et un
+// identifiant fabriqué, sur simple appel client. C'était une faille : un
+// utilisateur authentifié pouvait créditer son propre wallet sans paiement
+// réel.
+//
+// Le Payment Core (convex/payments.ts) est désormais l'unique chemin
+// financier autorisé :
+//   createPaymentIntent -> startPayment -> Provider -> ledger
+//
+// Les signatures d'arguments sont conservées telles quelles pour ne pas
+// casser les appelants existants ; seuls les handlers sont neutralisés.
 
 export const processPayment = mutation({
   args: {
@@ -1508,22 +1525,15 @@ export const processPayment = mutation({
     description: v.optional(v.string()),
     metadata: v.optional(v.any()),
   },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const paymentId = `PAY_${Date.now()}`;
-    await ctx.db.insert("walletTransactions", {
-      userId: user._id,
-      amount: args.amount,
-      currency: args.currency,
-      description: args.description || "Paiement",
-      type: "payment",
-      status: "completed",
-      referenceId: paymentId,
-      completedAt: new Date().toISOString(),
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. Utilisez le Payment Core : createPaymentIntent + startPayment.",
     });
-    return { id: paymentId, status: "succeeded" };
   },
 });
+
 export const createPaymentIntent = mutation({
   args: {
     amount: v.number(),
@@ -1531,17 +1541,26 @@ export const createPaymentIntent = mutation({
     description: v.optional(v.string()),
     metadata: v.optional(v.any()),
   },
-  handler: async () => ({
-    id: `PI_${Date.now()}`,
-    clientSecret: `secret_${Date.now()}`,
-  }),
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. Utilisez le Payment Core : api.payments.createPaymentIntent.",
+    });
+  },
 });
+
 export const confirmPayment = mutation({
-  args: { paymentIntentId: v.string() },
-  handler: async (ctx, args) => ({
-    id: args.paymentIntentId,
-    status: "succeeded",
-  }),
+  args: {
+    paymentIntentId: v.string(),
+  },
+  handler: async () => {
+    throw new ConvexError({
+      code: "DEPRECATED_ENDPOINT",
+      message:
+        "Ce endpoint est désactivé. Le client ne peut pas confirmer un paiement.",
+    });
+  },
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
