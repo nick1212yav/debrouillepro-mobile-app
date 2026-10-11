@@ -304,18 +304,37 @@ export interface PaymentProviderResponse {
 // ============================================================================
 // CUSTOMER ACTION
 // ============================================================================
+//
+// Union discriminée par `type` :
+//
+//   - "approve_mobile_money" : aucune information Stripe, message utilisateur
+//   - "stripe_3ds"           : action Stripe nécessitant clientSecret
+//   - "stripe_confirm"       : confirmation Stripe nécessitant clientSecret
+//   - "none"                 : aucune action client requise
+//
+// Le `clientSecret` est optionnel pour rester compatible avec les cas où
+// Stripe ne le fournit pas dans son payload (payload partiel, erreur réseau).
+// Le frontend DOIT vérifier sa présence avant utilisation.
+//
+// ============================================================================
 
-export interface PaymentNextAction {
-  type: "approve_mobile_money" | "stripe_3ds" | "stripe_confirm" | "none";
-
-  message?: string;
-
-  /**
-   * Utilisé par Stripe pour transmettre le client_secret au frontend.
-   * Ne doit jamais contenir la clé secrète Stripe.
-   */
-  clientSecret?: string;
-}
+export type PaymentNextAction =
+  | {
+      type: "approve_mobile_money";
+      message?: string;
+    }
+  | {
+      type: "stripe_3ds" | "stripe_confirm";
+      /**
+       * Utilisé par Stripe pour transmettre le client_secret au frontend.
+       * Ne doit jamais contenir la clé secrète Stripe.
+       */
+      clientSecret?: string;
+    }
+  | {
+      type: "none";
+      message?: string;
+    };
 
 // ============================================================================
 // PAYMENT STATUS REQUEST

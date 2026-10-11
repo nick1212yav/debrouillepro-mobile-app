@@ -75,6 +75,7 @@ import { api, internal } from "./_generated/api";
 
 import {
   validateProviderResponse,
+  type PaymentNextAction,
   type PaymentOperation,
   type PaymentProviderName,
 } from "./providers/payment_provider";
@@ -147,7 +148,7 @@ type StartPaymentResult = {
   providerTransactionId?: string;
   reused?: boolean;
   requiresCustomerAction?: boolean;
-  nextAction?: unknown;
+  nextAction?: PaymentNextAction;
   ledgerTransactionId?: Id<"walletTransactions">;
 };
 
