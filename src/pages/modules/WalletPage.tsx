@@ -36,6 +36,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  CreditCard,
   Download,
   Edit3,
   Eye,
@@ -58,6 +59,7 @@ import {
   Unauthenticated,
 } from "@/lib/convex-auth-compat";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { PaymentSheetStripe } from "@/features/payments/PaymentSheetStripe";
 
 // ============================================================================
 // TYPES
@@ -402,6 +404,7 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
 
   const [showTopUp, setShowTopUp] = React.useState(false);
   const [showSendInfo, setShowSendInfo] = React.useState(false);
+  const [showStripeSheet, setShowStripeSheet] = React.useState(false);
 
   const [topUpProvider, setTopUpProvider] = React.useState<Provider | null>(
     null,
@@ -1484,6 +1487,30 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
               </Text>
             </Pressable>
 
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OU</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <Pressable
+              disabled={topUpSubmitting}
+              onPress={() => {
+                setShowTopUp(false);
+                setShowStripeSheet(true);
+              }}
+              style={({ pressed }) => [
+                styles.stripeButton,
+                pressed && styles.pressed,
+                topUpSubmitting && styles.disabled,
+              ]}
+            >
+              <CreditCard size={17} color="#FFFFFF" />
+              <Text style={styles.primaryButtonText}>
+                Payer par carte (USD)
+              </Text>
+            </Pressable>
+
             <Text style={styles.modalFootnote}>
               Le crédit du Wallet intervient uniquement après confirmation
               serveur du paiement.
@@ -1538,6 +1565,14 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
           </View>
         </View>
       </Modal>
+
+      {/* ================================================================
+          STRIPE PAYMENT SHEET
+      ================================================================ */}
+
+      {showStripeSheet && (
+        <PaymentSheetStripe onClose={() => setShowStripeSheet(false)} />
+      )}
     </View>
   );
 }
@@ -2944,6 +2979,44 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     textAlign: "center",
     marginTop: 9,
+  },
+
+  // --------------------------------------------------------------------------
+  // DIVIDER + STRIPE BUTTON
+  // --------------------------------------------------------------------------
+
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 18,
+    marginBottom: 12,
+  },
+
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+
+  dividerText: {
+    color: COLORS.textMuted,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+
+  stripeButton: {
+    minHeight: 49,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    backgroundColor: "#635BFF",
+    borderWidth: 1,
+    borderColor: "rgba(99,91,255,0.28)",
   },
 
   // --------------------------------------------------------------------------
