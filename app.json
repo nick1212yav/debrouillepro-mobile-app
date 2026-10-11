@@ -70,7 +70,13 @@
           "locationWhenInUsePermission": "Autoriser DébrouillePro à accéder à votre position pour partager votre localisation dans les conversations."
         }
       ],
-      "@stripe/stripe-react-native"
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "",
+          "enableGooglePay": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
