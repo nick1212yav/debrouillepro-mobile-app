@@ -4,31 +4,23 @@
     "slug": "debrouillepro-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-
     "icon": "./assets/branding/debrouillepro-icon.png",
-
     "scheme": "debrouillepro",
-
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "backgroundColor": "#050812",
     "primaryColor": "#7C3AED",
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.debrouillepro.mobile"
     },
-
     "android": {
       "package": "com.debrouillepro.mobile",
       "googleServicesFile": "./google-services.json",
-
       "adaptiveIcon": {
         "backgroundColor": "#0B041F",
         "foregroundImage": "./assets/branding/debrouillepro-mark.png"
       },
-
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -36,20 +28,16 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
-
     "web": {
       "output": "static",
       "favicon": "./assets/branding/debrouillepro-icon.png",
       "bundler": "metro"
     },
-
     "plugins": [
       "expo-router",
-
       [
         "expo-splash-screen",
         {
@@ -57,21 +45,17 @@
           "imageWidth": 220,
           "resizeMode": "contain",
           "backgroundColor": "#050812",
-
           "dark": {
             "image": "./assets/branding/debrouillepro-mark.png",
             "backgroundColor": "#050812"
           }
         }
       ],
-
       "expo-video",
       "expo-web-browser",
       "@react-native-google-signin/google-signin",
-
       "@config-plugins/react-native-webrtc",
       "@livekit/react-native-expo-plugin",
-
       [
         "expo-camera",
         {
@@ -80,20 +64,18 @@
           "recordAudioAndroid": true
         }
       ],
-
       [
         "expo-location",
         {
           "locationWhenInUsePermission": "Autoriser DébrouillePro à accéder à votre position pour partager votre localisation dans les conversations."
         }
-      ]
+      ],
+      "@stripe/stripe-react-native"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
     },
-
     "extra": {
       "eas": {
         "projectId": "0a1b046d-8df0-4f5c-b9c9-75d418f07ffc"
