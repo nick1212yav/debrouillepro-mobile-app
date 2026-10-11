@@ -3388,10 +3388,10 @@ export default defineSchema({
         v.literal("mpesa"),
         v.literal("airtel_money"),
         v.literal("mtn_momo"),
+        v.literal("stripe"),
         v.literal("internal"),
       ),
     ),
-
     // Payment Core.
     //
     // Ces références permettent de reconstruire la chaîne :
@@ -3520,6 +3520,7 @@ export default defineSchema({
       v.literal("mpesa"),
       v.literal("airtel_money"),
       v.literal("mtn_momo"),
+      v.literal("stripe"),
     ),
 
     /**
@@ -3752,6 +3753,7 @@ export default defineSchema({
       v.literal("mpesa"),
       v.literal("airtel_money"),
       v.literal("mtn_momo"),
+      v.literal("stripe"),
     ),
 
     /**
@@ -3892,6 +3894,7 @@ export default defineSchema({
       v.literal("mpesa"),
       v.literal("airtel_money"),
       v.literal("mtn_momo"),
+      v.literal("stripe"),
     ),
 
     /**

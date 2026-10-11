@@ -53,6 +53,7 @@ export const PAYMENT_PROVIDERS = [
   "mpesa",
   "airtel_money",
   "mtn_momo",
+  "stripe",
 ] as const;
 
 export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
@@ -305,9 +306,15 @@ export interface PaymentProviderResponse {
 // ============================================================================
 
 export interface PaymentNextAction {
-  type: "approve_mobile_money" | "none";
+  type: "approve_mobile_money" | "stripe_3ds" | "stripe_confirm" | "none";
 
   message?: string;
+
+  /**
+   * Utilisé par Stripe pour transmettre le client_secret au frontend.
+   * Ne doit jamais contenir la clé secrète Stripe.
+   */
+  clientSecret?: string;
 }
 
 // ============================================================================

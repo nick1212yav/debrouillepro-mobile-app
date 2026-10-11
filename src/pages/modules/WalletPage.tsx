@@ -254,6 +254,8 @@ function getProviderLabel(provider?: string): string {
       return "Airtel Money";
     case "mtn_momo":
       return "MTN MoMo";
+    case "stripe":
+      return "Stripe";
     case "internal":
       return "DébrouillePay";
     default:
@@ -1566,6 +1568,7 @@ function TransactionRow({
       | "mpesa"
       | "airtel_money"
       | "mtn_momo"
+      | "stripe"
       | "internal";
     completedAt?: string;
     counterpartName?: string;

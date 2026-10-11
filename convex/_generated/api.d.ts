@@ -126,6 +126,7 @@ import type * as providers_mpesa from "../providers/mpesa.js";
 import type * as providers_mtn_momo from "../providers/mtn_momo.js";
 import type * as providers_orange_money from "../providers/orange_money.js";
 import type * as providers_payment_provider from "../providers/payment_provider.js";
+import type * as providers_stripe from "../providers/stripe.js";
 import type * as publications from "../publications.js";
 import type * as pushIdentities from "../pushIdentities.js";
 import type * as realestate from "../realestate.js";
@@ -296,6 +297,7 @@ declare const fullApi: ApiFromModules<{
   "providers/mtn_momo": typeof providers_mtn_momo;
   "providers/orange_money": typeof providers_orange_money;
   "providers/payment_provider": typeof providers_payment_provider;
+  "providers/stripe": typeof providers_stripe;
   publications: typeof publications;
   pushIdentities: typeof pushIdentities;
   realestate: typeof realestate;

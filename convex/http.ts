@@ -5,6 +5,9 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { WebhookReceiver } from "livekit-server-sdk";
 
+import { StripeProvider } from "./providers/stripe";
+import type { NormalizedProviderEvent } from "./providers/payment_provider";
+
 const http = httpRouter();
 
 /* ============================================================================
@@ -212,6 +215,154 @@ http.route({
     return new Response("ok", {
       status: 200,
     });
+  }),
+});
+
+/* ============================================================================
+ * STRIPE WEBHOOK
+ * ========================================================================== *
+ *
+ * Endpoint:
+ *
+ *   POST /stripe/webhook
+ *
+ * Le corps est lu via req.text() — JAMAIS parsé avant la vérification de
+ * signature. La vérification cryptographique est déléguée à
+ * StripeProvider.verifyWebhook() :
+ *
+ *   - HMAC SHA-256
+ *   - comparaison à temps constant
+ *   - tolérance timestamp ±300 s
+ *   - payloadHash = SHA-256(rawBody) distinct du HMAC
+ *
+ * L'événement normalisé est ensuite transmis au Payment Core via
+ * internal.payments.processVerifiedProviderEvent.
+ *
+ * Aucun crédit ledger ne peut être écrit sans :
+ *   - signature valide ;
+ *   - vérification du providerTransactionId réel ;
+ *   - confirmation processVerifiedProviderEvent.
+ *
+ * ========================================================================== */
+
+type ProcessEventEventType =
+  | "payment_pending"
+  | "payment_processing"
+  | "payment_succeeded"
+  | "payment_failed"
+  | "payment_cancelled"
+  | "payment_reversed"
+  | "unknown";
+
+function mapStateToEventType(
+  state: NormalizedProviderEvent["state"],
+): ProcessEventEventType {
+  switch (state) {
+    case "pending":
+      return "payment_pending";
+
+    case "processing":
+      return "payment_processing";
+
+    case "succeeded":
+      return "payment_succeeded";
+
+    case "failed":
+      return "payment_failed";
+
+    case "cancelled":
+      return "payment_cancelled";
+
+    case "reversed":
+      return "payment_reversed";
+
+    default:
+      return "unknown";
+  }
+}
+
+http.route({
+  path: "/stripe/webhook",
+  method: "POST",
+
+  handler: httpAction(async (ctx, req) => {
+    /* ------------------------------------------------------------------------
+     * 1. RAW BODY
+     * ---------------------------------------------------------------------- */
+
+    const rawBody = await req.text();
+
+    /* ------------------------------------------------------------------------
+     * 2. SIGNATURE HEADER
+     * ---------------------------------------------------------------------- */
+
+    const stripeSignature = req.headers.get("stripe-signature");
+
+    if (!stripeSignature) {
+      return new Response("missing stripe-signature", { status: 401 });
+    }
+
+    /* ------------------------------------------------------------------------
+     * 3. VÉRIFICATION CRYPTOGRAPHIQUE
+     * ---------------------------------------------------------------------- */
+
+    const provider = new StripeProvider();
+
+    const verification = await provider.verifyWebhook({
+      rawBody,
+      headers: { "stripe-signature": stripeSignature },
+    });
+
+    if (!verification.verified || !verification.event) {
+      console.warn(
+        "[stripe/webhook] Verification failed:",
+        verification.errorCode,
+        verification.errorMessage,
+      );
+
+      return new Response("invalid signature", { status: 401 });
+    }
+
+    const event = verification.event;
+
+    /* ------------------------------------------------------------------------
+     * 4. FORWARD AU PAYMENT CORE
+     * ------------------------------------------------------------------------
+     *
+     * Les IDs de metadata sont transmis comme candidats (strings) —
+     * le Core les validera via ctx.db.normalizeId() côté mutation.
+     */
+
+    const eventType = mapStateToEventType(event.state);
+
+    try {
+      await ctx.runMutation(internal.payments.processVerifiedProviderEvent, {
+        provider: "stripe",
+        providerEventId: event.providerEventId,
+        providerTransactionId: event.providerTransactionId,
+        paymentIntentId: event.paymentIntentId,
+        paymentAttemptId: event.paymentAttemptId,
+        eventType,
+        signature: event.signature,
+        payloadHash: event.payloadHash,
+        rawPayload: event.rawPayload,
+        verified: true,
+      });
+    } catch (error) {
+      console.error(
+        "[stripe/webhook] processVerifiedProviderEvent failed:",
+        error instanceof Error ? error.message : error,
+      );
+
+      /*
+       * Retour 500 → Stripe retente selon exponential backoff.
+       * La mutation est idempotente via providerEventId,
+       * donc un retry ne créera pas de doublon.
+       */
+      return new Response("processing failed", { status: 500 });
+    }
+
+    return new Response("ok", { status: 200 });
   }),
 });
 

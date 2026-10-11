@@ -83,6 +83,7 @@ import { OrangeMoneyProvider } from "./providers/orange_money";
 import { MpesaProvider } from "./providers/mpesa";
 import { AirtelMoneyProvider } from "./providers/airtel_money";
 import { MtnMomoProvider } from "./providers/mtn_momo";
+import { StripeProvider } from "./providers/stripe";
 
 // ============================================================================
 // CONSTANTES
@@ -100,7 +101,12 @@ const MAX_REFERENCE_LENGTH = 200;
 // TYPES
 // ============================================================================
 
-type Provider = "orange_money" | "mpesa" | "airtel_money" | "mtn_momo";
+type Provider =
+  | "orange_money"
+  | "mpesa"
+  | "airtel_money"
+  | "mtn_momo"
+  | "stripe";
 
 type PaymentType =
   | "wallet_topup"
@@ -120,13 +126,6 @@ type PaymentEventType =
   | "payment_reversed"
   | "unknown";
 
-/**
- * Résultat explicitement typé de la préparation d'une tentative.
- *
- * L'annotation est volontaire :
- * elle empêche TypeScript de tenter d'inférer récursivement le type
- * de startPayment -> internal.payments -> startPayment.
- */
 type PreparePaymentAttemptResult = {
   reused: boolean;
   paymentAttemptId: Id<"paymentAttempts">;
@@ -135,20 +134,11 @@ type PreparePaymentAttemptResult = {
   providerTransactionId?: string;
 };
 
-/**
- * Résultat explicite de la finalisation comptable.
- */
 type FinalizeProviderSuccessResult = {
   ledgerTransactionId: Id<"walletTransactions">;
   alreadyFinalized: boolean;
 };
 
-/**
- * Contrat de sortie de l'action startPayment.
- *
- * Le type explicite casse volontairement la chaîne d'inférence circulaire
- * entre l'action et les références générées `api` / `internal`.
- */
 type StartPaymentResult = {
   paymentIntentId: Id<"paymentIntents">;
   paymentAttemptId?: Id<"paymentAttempts">;
@@ -167,7 +157,12 @@ type StartPaymentResult = {
 
 function createProvider(
   provider: Provider,
-): OrangeMoneyProvider | MpesaProvider | AirtelMoneyProvider | MtnMomoProvider {
+):
+  | OrangeMoneyProvider
+  | MpesaProvider
+  | AirtelMoneyProvider
+  | MtnMomoProvider
+  | StripeProvider {
   switch (provider) {
     case "orange_money":
       return new OrangeMoneyProvider();
@@ -180,6 +175,9 @@ function createProvider(
 
     case "mtn_momo":
       return new MtnMomoProvider();
+
+    case "stripe":
+      return new StripeProvider();
   }
 }
 
@@ -187,20 +185,6 @@ function createProvider(
 // AUTHENTIFICATION
 // ============================================================================
 
-/**
- * Helper d'authentification partagé par les queries et mutations.
- *
- * IMPORTANT :
- * `QueryCtx | MutationCtx` est intentionnel.
- *
- * Le helper ne dépend d'aucune opération exclusive aux mutations.
- * Il peut donc être utilisé correctement depuis :
- *
- *   - query()
- *   - mutation()
- *
- * sans forcer un QueryCtx à être casté en MutationCtx.
- */
 async function requireUser(ctx: QueryCtx | MutationCtx): Promise<Doc<"users">> {
   const identity = await ctx.auth.getUserIdentity();
 
@@ -329,19 +313,6 @@ function getDirection(type: PaymentType): PaymentDirection {
 // ============================================================================
 // LEDGER TYPE
 // ============================================================================
-//
-// Le schema walletTransactions utilise:
-//
-//   deposit
-//   withdrawal
-//   transfer
-//   payment
-//   refund
-//   reward
-//
-// Le Payment Core utilise uniquement ces valeurs réelles.
-//
-// ============================================================================
 
 function getLedgerType(
   type: PaymentType,
@@ -415,24 +386,6 @@ function assertProviderCapability(
 // ============================================================================
 // CREATE PAYMENT INTENT
 // ============================================================================
-//
-// Cette mutation:
-//
-//   authentifie l'utilisateur
-//   valide le montant
-//   valide la devise
-//   valide la clé d'idempotence
-//   protège contre le conflit d'idempotence
-//   crée uniquement une intention
-//
-// Elle ne:
-//
-//   contacte aucun provider
-//   crédite le wallet
-//   débite le wallet
-//   crée de transaction completed
-//
-// ============================================================================
 
 export const createPaymentIntent = mutation({
   args: {
@@ -453,6 +406,7 @@ export const createPaymentIntent = mutation({
       v.literal("mpesa"),
       v.literal("airtel_money"),
       v.literal("mtn_momo"),
+      v.literal("stripe"),
     ),
 
     idempotencyKey: v.string(),
@@ -566,16 +520,6 @@ export const createPaymentIntent = mutation({
 
 // ============================================================================
 // START PAYMENT
-// ============================================================================
-//
-// ACTION:
-//
-//   peut appeler le provider externe.
-//
-// IMPORTANT:
-//
-//   l'action ne touche jamais directement walletTransactions.
-//
 // ============================================================================
 
 export const startPayment = action({
@@ -907,7 +851,6 @@ export const startPayment = action({
       // Le Payment Core doit réconcilier le statut externe avant une
       // nouvelle soumission.
       //
-      // ----------------------------------------------------------------------
 
       if (error instanceof ConvexError) {
         throw error;
@@ -1054,13 +997,6 @@ export const getPaymentAttemptsInternalView = internalQuery({
 // ============================================================================
 // INTERNAL — PREPARE PAYMENT ATTEMPT
 // ============================================================================
-//
-// Cette mutation est atomique.
-//
-// Elle évite qu'un double clic / double invocation de startPayment()
-// crée deux tentatives actives pour la même intention.
-//
-// ============================================================================
 
 export const preparePaymentAttempt = internalMutation({
   args: {
@@ -1201,10 +1137,6 @@ export const markAttemptSubmitted = internalMutation({
       });
     }
 
-    // --------------------------------------------------------------------
-    // PROTECTION TERMINALE
-    // --------------------------------------------------------------------
-
     if (attempt.status === "succeeded") {
       return {
         paymentAttemptId: attempt._id,
@@ -1219,10 +1151,6 @@ export const markAttemptSubmitted = internalMutation({
       });
     }
 
-    // --------------------------------------------------------------------
-    // COHÉRENCE PROVIDER
-    // --------------------------------------------------------------------
-
     if (
       attempt.providerTransactionId &&
       attempt.providerTransactionId !== transactionId
@@ -1233,10 +1161,6 @@ export const markAttemptSubmitted = internalMutation({
           "La référence provider ne correspond pas à celle de la tentative.",
       });
     }
-
-    // --------------------------------------------------------------------
-    // PROTECTION CONTRE LA RÉUTILISATION
-    // --------------------------------------------------------------------
 
     const existing = await ctx.db
       .query("paymentAttempts")
@@ -1425,18 +1349,6 @@ export const markAttemptCancelled = internalMutation({
 // ============================================================================
 // INTERNAL — MARK ATTEMPT REVERSED
 // ============================================================================
-//
-// IMPORTANT:
-//
-// Une reversal n'est PAS une simple failure.
-//
-// Si le paiement avait déjà été finalisé dans le ledger, cette fonction ne
-// transforme pas arbitrairement l'historique comptable en "failed".
-//
-// La compensation comptable d'une reversal devra être implémentée via une
-// opération ledger dédiée lorsqu'elle sera supportée.
-//
-// ============================================================================
 
 export const markAttemptReversed = internalMutation({
   args: {
@@ -1465,10 +1377,6 @@ export const markAttemptReversed = internalMutation({
         message: "Payment Intent introuvable.",
       });
     }
-
-    // --------------------------------------------------------------------
-    // UNE TENTATIVE DÉJÀ RÉUSSIE NE DOIT PAS ÊTRE RÉÉCRITE EN FAILED
-    // --------------------------------------------------------------------
 
     if (attempt.status === "succeeded") {
       return {
@@ -1525,14 +1433,6 @@ export const markAttemptReversed = internalMutation({
 // ============================================================================
 // INTERNAL — FINALIZE PROVIDER SUCCESS
 // ============================================================================
-//
-// C'EST LA PORTE DE FINALISATION DU LEDGER.
-//
-// Elle est internalMutation.
-//
-// Le client ne peut pas l'appeler.
-//
-// ============================================================================
 
 export const finalizeProviderSuccess = internalMutation({
   args: {
@@ -1561,6 +1461,10 @@ export const finalizeProviderSuccess = internalMutation({
 //
 // Le frontend n'a aucun accès à cette fonction.
 //
+// ⚠️ Les IDs `paymentIntentId` et `paymentAttemptId` sont des CANDIDATS
+// strings. Ils proviennent des metadata du provider et ne sont PAS fiables.
+// Ils sont résolus via ctx.db.normalizeId() avant tout usage.
+//
 // ============================================================================
 
 export const processVerifiedProviderEvent = internalMutation({
@@ -1570,15 +1474,17 @@ export const processVerifiedProviderEvent = internalMutation({
       v.literal("mpesa"),
       v.literal("airtel_money"),
       v.literal("mtn_momo"),
+      v.literal("stripe"),
     ),
 
     providerEventId: v.string(),
 
     providerTransactionId: v.optional(v.string()),
 
-    paymentIntentId: v.optional(v.id("paymentIntents")),
-
-    paymentAttemptId: v.optional(v.id("paymentAttempts")),
+    // ⚠️ CANDIDATS — strings, PAS des Id.
+    // Le handler doit appeler ctx.db.normalizeId() avant tout usage.
+    paymentIntentId: v.optional(v.string()),
+    paymentAttemptId: v.optional(v.string()),
 
     eventType: v.union(
       v.literal("payment_pending"),
@@ -1623,6 +1529,24 @@ export const processVerifiedProviderEvent = internalMutation({
     }
 
     // --------------------------------------------------------------------
+    // RÉSOLUTION SÉCURISÉE DES CANDIDATS
+    // --------------------------------------------------------------------
+    //
+    // Les IDs reçus via les metadata du provider ne sont PAS fiables.
+    // On les résout via ctx.db.normalizeId() avant tout usage.
+    //
+    // Un candidat invalide devient `null` → il est ignoré et la tentative
+    // sera re-résolue par providerTransactionId (voir plus bas).
+
+    const resolvedPaymentIntentId = args.paymentIntentId
+      ? await ctx.db.normalizeId("paymentIntents", args.paymentIntentId)
+      : null;
+
+    const resolvedPaymentAttemptId = args.paymentAttemptId
+      ? await ctx.db.normalizeId("paymentAttempts", args.paymentAttemptId)
+      : null;
+
+    // --------------------------------------------------------------------
     // IDEMPOTENCE
     // --------------------------------------------------------------------
 
@@ -1654,9 +1578,9 @@ export const processVerifiedProviderEvent = internalMutation({
 
       providerTransactionId: args.providerTransactionId,
 
-      paymentIntentId: args.paymentIntentId,
+      paymentIntentId: resolvedPaymentIntentId ?? undefined,
 
-      paymentAttemptId: args.paymentAttemptId,
+      paymentAttemptId: resolvedPaymentAttemptId ?? undefined,
 
       eventType: args.eventType,
 
@@ -1677,8 +1601,8 @@ export const processVerifiedProviderEvent = internalMutation({
     // RÉSOUDRE ATTEMPT
     // --------------------------------------------------------------------
 
-    let attempt = args.paymentAttemptId
-      ? await ctx.db.get(args.paymentAttemptId)
+    let attempt: Doc<"paymentAttempts"> | null = resolvedPaymentAttemptId
+      ? await ctx.db.get(resolvedPaymentAttemptId)
       : null;
 
     if (!attempt && args.providerTransactionId) {
@@ -1690,11 +1614,11 @@ export const processVerifiedProviderEvent = internalMutation({
         .first();
     }
 
-    if (!attempt && args.paymentIntentId) {
+    if (!attempt && resolvedPaymentIntentId) {
       const candidates = await ctx.db
         .query("paymentAttempts")
         .withIndex("by_intent", (q) =>
-          q.eq("paymentIntentId", args.paymentIntentId!),
+          q.eq("paymentIntentId", resolvedPaymentIntentId),
         )
         .order("desc")
         .take(MAX_PAYMENT_ATTEMPTS);
@@ -1943,14 +1867,6 @@ export const processVerifiedProviderEvent = internalMutation({
       const now = Date.now();
 
       if (attempt.status === "succeeded") {
-        // ---------------------------------------------------------------
-        // Le paiement a déjà produit un ledger completed.
-        //
-        // On ne réécrit PAS la transaction en failed.
-        // Une compensation comptable devra être traitée par un flux
-        // ledger dédié lorsqu'il sera disponible.
-        // ---------------------------------------------------------------
-
         await ctx.db.patch(eventId, {
           processingStatus: "processed",
 
@@ -2111,17 +2027,6 @@ export const processVerifiedProviderEvent = internalMutation({
 // ============================================================================
 // INTERNAL HELPER — FINALIZE
 // ============================================================================
-//
-// Helper strictement typé.
-//
-// IMPORTANT:
-//
-// Ce helper est appelé depuis processVerifiedProviderEvent(), donc il reçoit
-// le contexte réel de la mutation Convex en cours.
-//
-// Il ne doit jamais utiliser `any`.
-//
-// ============================================================================
 
 async function finalizeProviderSuccessDirect(
   ctx: MutationCtx,
@@ -2154,10 +2059,6 @@ async function finalizeProviderSuccessDirect(
       message: "Payment Intent introuvable.",
     });
   }
-
-  // --------------------------------------------------------------------------
-  // COHÉRENCE PROVIDER
-  // --------------------------------------------------------------------------
 
   if (
     attempt.providerTransactionId &&
@@ -2299,7 +2200,6 @@ async function finalizeProviderSuccessDirect(
   //
   // SEUL ENDROIT où un paiement provider confirmé devient completed.
   //
-  // --------------------------------------------------------------------------
 
   const ledgerTransactionId = await ctx.db.insert("walletTransactions", {
     userId: intent.userId,
