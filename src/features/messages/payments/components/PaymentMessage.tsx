@@ -36,7 +36,7 @@ export function PaymentMessage({
     paymentIntentId.length > 0 &&
     onConfirm !== undefined;
 
-  const currency = payment.currency.trim().toUpperCase();
+  const currency = payment.currency.trim().toUpperCase() || "EUR";
 
   const statusLabel = STATUS_LABELS[payment.status] ?? "Statut inconnu";
 

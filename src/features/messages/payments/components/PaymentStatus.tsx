@@ -24,13 +24,19 @@ function getStatusSymbol(status: PaymentStatusType): string {
   switch (status) {
     case "succeeded":
       return "✓";
+
     case "failed":
       return "!";
+
     case "cancelled":
       return "×";
+
     case "pending":
     case "processing":
       return "…";
+
+    default:
+      return "•";
   }
 }
 

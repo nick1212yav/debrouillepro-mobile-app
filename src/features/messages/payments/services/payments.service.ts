@@ -1,31 +1,45 @@
-// src/features/sante/services/payment.service.ts
-//
-// SÉCURITÉ : `api.health.refundPayment` n'existe pas côté backend.
-// `useRefundPayment` est conservé pour compatibilité mais échoue
-// explicitement. `useProcessPayment` reste inchangé (endpoint légitime).
+// src/features/messages/payments/services/payments.service.ts
 
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 
+export type PaymentStatus =
+  | "pending"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+
+export interface PaymentData {
+  id?: string;
+  paymentIntentId?: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  description?: string;
+}
+
+export interface CreateMessagePaymentInput {
+  amount: number;
+  currency: string;
+  description?: string;
+}
+
+const PAYMENT_MIGRATION_MESSAGE =
+  "Le paiement Messages est en cours de migration vers DébrouillePay.";
+
 export function useProcessPayment() {
-  const mutate = useMutation(api.health.processPayment);
-  return async (data: unknown) => {
-    try {
-      const result = await mutate(data as never);
-      toast.success("Paiement réussi");
-      return result;
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erreur");
-      throw e;
-    }
+  return async (_data: CreateMessagePaymentInput): Promise<never> => {
+    toast.info(PAYMENT_MIGRATION_MESSAGE);
+    throw new Error(PAYMENT_MIGRATION_MESSAGE);
   };
 }
 
 export function useRefundPayment() {
   return async (_transactionId: string): Promise<never> => {
-    throw new Error(
-      "Le remboursement Santé est en cours de migration vers DébrouillePay.",
-    );
+    const message =
+      "Le remboursement Messages est en cours de migration vers DébrouillePay.";
+
+    toast.info(message);
+    throw new Error(message);
   };
 }

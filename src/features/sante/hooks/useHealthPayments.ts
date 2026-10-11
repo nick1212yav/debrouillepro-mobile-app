@@ -1,18 +1,20 @@
 // src/features/sante/hooks/useHealthPayments.ts
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+
 import { toast } from "sonner";
 
+export interface HealthPaymentInput {
+  amount: number;
+  currency: string;
+  description?: string;
+  referenceId?: string;
+}
+
+const PAYMENT_MIGRATION_MESSAGE =
+  "Le paiement Santé est en cours de migration vers DébrouillePay.";
+
 export function useProcessPayment() {
-  const mutate = useMutation(api.health.processPayment);
-  return async (data: any) => {
-    try {
-      const result = await mutate(data);
-      toast.success("Paiement réussi");
-      return result;
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erreur");
-      throw e;
-    }
+  return async (_data: HealthPaymentInput): Promise<never> => {
+    toast.info(PAYMENT_MIGRATION_MESSAGE);
+    throw new Error(PAYMENT_MIGRATION_MESSAGE);
   };
 }
