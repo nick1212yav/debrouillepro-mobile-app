@@ -155,6 +155,7 @@ import type * as search_types from "../search/types.js";
 import type * as seed from "../seed.js";
 import type * as series from "../series.js";
 import type * as serviceProviders from "../serviceProviders.js";
+import type * as services_availability from "../services/availability.js";
 import type * as services_bookings from "../services/bookings.js";
 import type * as services_categories from "../services/categories.js";
 import type * as services_migrations from "../services/migrations.js";
@@ -333,6 +334,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   series: typeof series;
   serviceProviders: typeof serviceProviders;
+  "services/availability": typeof services_availability;
   "services/bookings": typeof services_bookings;
   "services/categories": typeof services_categories;
   "services/migrations": typeof services_migrations;
