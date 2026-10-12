@@ -6104,7 +6104,9 @@ export default defineSchema({
     providerId: v.id("serviceProviders"),
     userId: v.id("users"),
     createdAt: v.number(),
-  }).index("by_user_and_provider", ["userId", "providerId"]),
+  })
+    .index("by_user_and_provider", ["userId", "providerId"])
+    .index("by_provider", ["providerId"]),
 
   serviceAvailability: defineTable({
     providerId: v.id("serviceProviders"),
