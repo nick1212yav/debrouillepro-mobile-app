@@ -22,6 +22,7 @@ import {
 import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { usePaymentSheet } from "@stripe/stripe-react-native";
+import { getUserFacingError } from "@/lib/errors";
 import {
   AlertCircle,
   CheckCircle2,
@@ -289,9 +290,7 @@ function StripeFlow({
 
       setStep("error");
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Le paiement n'a pas pu être démarré.",
+        getUserFacingError(error, "Le paiement n'a pas pu être démarré."),
       );
     }
   }

@@ -49,6 +49,7 @@ import {
 } from "@/lib/convex-auth-compat";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { PaymentSheetStripe } from "@/features/payments/PaymentSheetStripe";
+import { getUserFacingError } from "@/lib/errors";
 
 // ============================================================================
 // TYPES
@@ -445,10 +446,10 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
       setTopUpPhone("");
     } catch (error) {
       console.error("[Wallet] Top-up error:", error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Le paiement n'a pas pu être démarré.";
+      const message = getUserFacingError(
+        error,
+        "Le paiement n'a pas pu être démarré.",
+      );
       Alert.alert(
         "Recharge non effectuée",
         `${message}\n\nAucun mouvement financier fictif n'a été créé.`,
@@ -480,7 +481,7 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
       console.error("[Wallet] Budget creation error:", error);
       Alert.alert(
         "Impossible de créer le budget",
-        error instanceof Error ? error.message : "Une erreur est survenue.",
+        getUserFacingError(error, "Une erreur est survenue."),
       );
     } finally {
       setBudgetSaving(false);
@@ -514,7 +515,7 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
       console.error("[Wallet] Budget update error:", error);
       Alert.alert(
         "Mise à jour impossible",
-        error instanceof Error ? error.message : "Une erreur est survenue.",
+        getUserFacingError(error, "Une erreur est survenue."),
       );
     } finally {
       setBudgetSaving(false);
