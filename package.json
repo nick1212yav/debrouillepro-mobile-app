@@ -93,6 +93,7 @@
     "babel-preset-expo": "^54.0.12",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "prettier": "^3.9.6",
     "typescript": "~5.9.2"
   },
   "overrides": {},
