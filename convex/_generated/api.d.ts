@@ -164,6 +164,7 @@ import type * as services_migrations from "../services/migrations.js";
 import type * as services_providers from "../services/providers.js";
 import type * as services_questions from "../services/questions.js";
 import type * as services_quotes from "../services/quotes.js";
+import type * as services_reports from "../services/reports.js";
 import type * as services_reviews from "../services/reviews.js";
 import type * as services_search from "../services/search.js";
 import type * as settings from "../settings.js";
@@ -346,6 +347,7 @@ declare const fullApi: ApiFromModules<{
   "services/providers": typeof services_providers;
   "services/questions": typeof services_questions;
   "services/quotes": typeof services_quotes;
+  "services/reports": typeof services_reports;
   "services/reviews": typeof services_reviews;
   "services/search": typeof services_search;
   settings: typeof settings;
