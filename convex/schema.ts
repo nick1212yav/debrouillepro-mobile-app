@@ -6035,7 +6035,6 @@ export default defineSchema({
     comment: v.string(),
     createdAt: v.number(),
 
-    // === Services V1 — ajouts ===
     bookingId: v.optional(v.id("serviceBookings")),
     visible: v.optional(v.boolean()),
     reported: v.optional(v.boolean()),
@@ -6047,7 +6046,8 @@ export default defineSchema({
     .index("by_provider", ["providerId"])
     .index("by_reviewer", ["reviewerId"])
     .index("by_provider_and_createdAt", ["providerId", "createdAt"])
-    .index("by_visible", ["visible"]),
+    .index("by_visible", ["visible"])
+    .index("by_booking", ["bookingId"]),
 
   serviceQuestions: defineTable({
     providerId: v.id("serviceProviders"),
