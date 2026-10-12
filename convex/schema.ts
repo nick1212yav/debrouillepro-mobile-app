@@ -5951,9 +5951,82 @@ export default defineSchema({
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
     viewCount: v.optional(v.number()),
+
+    // === Services V1 — ajouts ===
+    status: v.optional(
+      v.union(
+        v.literal("draft"),
+        v.literal("active"),
+        v.literal("paused"),
+        v.literal("suspended"),
+        v.literal("archived"),
+      ),
+    ),
+    createdAt: v.optional(v.number()),
+    publishedAt: v.optional(v.number()),
+    archivedAt: v.optional(v.number()),
+
+    categoryId: v.optional(v.id("serviceCategories")),
+    subcategoryIds: v.optional(v.array(v.id("serviceSubcategories"))),
+
+    phone: v.optional(v.string()),
+    whatsapp: v.optional(v.string()),
+    website: v.optional(v.string()),
+    businessEmail: v.optional(v.string()),
+
+    basePrice: v.optional(v.number()),
+    priceCurrency: v.optional(v.string()),
+    pricingModel: v.optional(
+      v.union(
+        v.literal("fixed"),
+        v.literal("hourly"),
+        v.literal("daily"),
+        v.literal("quote_only"),
+        v.literal("package"),
+      ),
+    ),
+    billingUnit: v.optional(v.string()),
+    minPrice: v.optional(v.number()),
+    maxPrice: v.optional(v.number()),
+    depositPercent: v.optional(v.number()),
+
+    serviceAreas: v.optional(v.array(v.string())),
+    serviceRadiusKm: v.optional(v.number()),
+    intervenesAtClientAddress: v.optional(v.boolean()),
+    intervenesAtProviderAddress: v.optional(v.boolean()),
+    intervenesOnline: v.optional(v.boolean()),
+
+    cancellationPolicy: v.optional(v.string()),
+    cancellationWindowHours: v.optional(v.number()),
+    paymentMethodsAccepted: v.optional(
+      v.array(
+        v.union(
+          v.literal("cash"),
+          v.literal("mobile_money"),
+          v.literal("card"),
+          v.literal("wallet"),
+        ),
+      ),
+    ),
+
+    searchText: v.optional(v.string()),
+
+    migratedAt: v.optional(v.number()),
+    isDemo: v.optional(v.boolean()),
   })
     .index("by_category", ["category"])
-    .index("by_available", ["available"]),
+    .index("by_available", ["available"])
+    .index("by_userId", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_verified_and_available", ["verified", "available"])
+    .index("by_category_and_status", ["category", "status"])
+    .index("by_categoryId", ["categoryId"])
+    .index("by_createdAt", ["createdAt"])
+    .index("by_rating", ["rating"])
+    .searchIndex("search_services", {
+      searchField: "searchText",
+      filterFields: ["category", "status", "verified"],
+    }),
 
   serviceReviews: defineTable({
     providerId: v.id("serviceProviders"),
@@ -5961,7 +6034,20 @@ export default defineSchema({
     rating: v.number(),
     comment: v.string(),
     createdAt: v.number(),
-  }).index("by_provider", ["providerId"]),
+
+    // === Services V1 — ajouts ===
+    bookingId: v.optional(v.id("serviceBookings")),
+    visible: v.optional(v.boolean()),
+    reported: v.optional(v.boolean()),
+    providerResponse: v.optional(v.string()),
+    responseAt: v.optional(v.number()),
+    editedAt: v.optional(v.number()),
+    photos: v.optional(v.array(v.string())),
+  })
+    .index("by_provider", ["providerId"])
+    .index("by_reviewer", ["reviewerId"])
+    .index("by_provider_and_createdAt", ["providerId", "createdAt"])
+    .index("by_visible", ["visible"]),
 
   serviceQuestions: defineTable({
     providerId: v.id("serviceProviders"),
@@ -5971,7 +6057,13 @@ export default defineSchema({
     answererId: v.optional(v.id("users")),
     answeredAt: v.optional(v.number()),
     createdAt: v.number(),
-  }).index("by_provider", ["providerId"]),
+
+    // === Services V1 — ajouts ===
+    visible: v.optional(v.boolean()),
+    reported: v.optional(v.boolean()),
+  })
+    .index("by_provider", ["providerId"])
+    .index("by_asker", ["askerId"]),
 
   serviceQuotes: defineTable({
     providerId: v.id("serviceProviders"),
@@ -5981,9 +6073,32 @@ export default defineSchema({
       v.literal("pending"),
       v.literal("accepted"),
       v.literal("rejected"),
+      v.literal("expired"),
+      v.literal("converted"),
     ),
     createdAt: v.number(),
-  }).index("by_provider", ["providerId"]),
+
+    // === Services V1 — ajouts ===
+    amount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+    validUntil: v.optional(v.number()),
+    lineItems: v.optional(
+      v.array(
+        v.object({
+          label: v.string(),
+          qty: v.number(),
+          unitPrice: v.number(),
+          total: v.number(),
+        }),
+      ),
+    ),
+    bookingId: v.optional(v.id("serviceBookings")),
+    respondedAt: v.optional(v.number()),
+    providerNote: v.optional(v.string()),
+  })
+    .index("by_provider", ["providerId"])
+    .index("by_client", ["clientId"])
+    .index("by_status", ["status"]),
 
   serviceFavorites: defineTable({
     providerId: v.id("serviceProviders"),
@@ -5995,13 +6110,276 @@ export default defineSchema({
     providerId: v.id("serviceProviders"),
     date: v.string(),
     slots: v.array(v.object({ start: v.string(), end: v.string() })),
-  }).index("by_provider", ["providerId"]),
+
+    // === Services V1 — ajouts ===
+    timezone: v.optional(v.string()),
+    blocked: v.optional(v.boolean()),
+    isRecurring: v.optional(v.boolean()),
+    dayOfWeek: v.optional(v.number()),
+    slotDurationMinutes: v.optional(v.number()),
+  })
+    .index("by_provider", ["providerId"])
+    .index("by_provider_and_date", ["providerId", "date"]),
 
   serviceHistory: defineTable({
     providerId: v.id("serviceProviders"),
     event: v.string(),
     createdAt: v.number(),
+
+    // === Services V1 — ajouts ===
+    actorId: v.optional(v.id("users")),
+    bookingId: v.optional(v.id("serviceBookings")),
+    type: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_provider", ["providerId"])
+    .index("by_provider_and_createdAt", ["providerId", "createdAt"]),
+
+  serviceCategories: defineTable({
+    slug: v.string(),
+    name: v.string(),
+    icon: v.optional(v.string()),
+    order: v.number(),
+    active: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_active_and_order", ["active", "order"]),
+
+  serviceSubcategories: defineTable({
+    categoryId: v.id("serviceCategories"),
+    slug: v.string(),
+    name: v.string(),
+    order: v.number(),
+    active: v.boolean(),
+  })
+    .index("by_category", ["categoryId"])
+    .index("by_category_and_order", ["categoryId", "order"]),
+
+  servicePackages: defineTable({
+    providerId: v.id("serviceProviders"),
+    title: v.string(),
+    description: v.string(),
+    items: v.array(
+      v.object({
+        label: v.string(),
+        qty: v.number(),
+        unitPrice: v.number(),
+      }),
+    ),
+    totalPrice: v.number(),
+    currency: v.string(),
+    active: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_provider", ["providerId"])
+    .index("by_provider_and_active", ["providerId", "active"]),
+
+  serviceVerificationDocuments: defineTable({
+    providerId: v.id("serviceProviders"),
+    type: v.union(
+      v.literal("identity"),
+      v.literal("certificate"),
+      v.literal("insurance"),
+      v.literal("license"),
+    ),
+    documentUrl: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("expired"),
+    ),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    rejectionReason: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
+    uploadedAt: v.number(),
+  })
+    .index("by_provider", ["providerId"])
+    .index("by_status", ["status"]),
+
+  serviceDisputes: defineTable({
+    bookingId: v.id("serviceBookings"),
+    openedBy: v.id("users"),
+    againstProviderId: v.id("serviceProviders"),
+    reason: v.string(),
+    description: v.string(),
+    status: v.union(
+      v.literal("open"),
+      v.literal("investigating"),
+      v.literal("resolved"),
+      v.literal("closed"),
+    ),
+    resolution: v.optional(v.string()),
+    resolvedBy: v.optional(v.id("users")),
+    resolvedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_booking", ["bookingId"])
+    .index("by_provider", ["againstProviderId"])
+    .index("by_status", ["status"])
+    .index("by_user", ["openedBy"]),
+
+  serviceReports: defineTable({
+    targetType: v.union(
+      v.literal("provider"),
+      v.literal("review"),
+      v.literal("question"),
+      v.literal("booking"),
+    ),
+    targetId: v.string(),
+    reporterId: v.id("users"),
+    reason: v.union(
+      v.literal("spam"),
+      v.literal("fake"),
+      v.literal("inappropriate"),
+      v.literal("harassment"),
+      v.literal("fraud"),
+      v.literal("other"),
+    ),
+    details: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("reviewed"),
+      v.literal("dismissed"),
+      v.literal("actioned"),
+    ),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_target", ["targetType", "targetId"])
+    .index("by_status", ["status"])
+    .index("by_reporter", ["reporterId"]),
+
+  serviceProviderStats: defineTable({
+    providerId: v.id("serviceProviders"),
+    views: v.number(),
+    bookings: v.number(),
+    bookingsCompleted: v.number(),
+    quotesReceived: v.number(),
+    quotesAccepted: v.number(),
+    avgResponseTimeMin: v.optional(v.number()),
+    totalRevenue: v.number(),
+    revenueCurrency: v.string(),
+    lastUpdatedAt: v.number(),
   }).index("by_provider", ["providerId"]),
+
+  servicePromotions: defineTable({
+    providerId: v.id("serviceProviders"),
+    type: v.union(
+      v.literal("discount"),
+      v.literal("featured"),
+      v.literal("bundle"),
+    ),
+    discountPercent: v.optional(v.number()),
+    title: v.string(),
+    description: v.optional(v.string()),
+    startsAt: v.number(),
+    endsAt: v.number(),
+    active: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_provider", ["providerId"])
+    .index("by_active", ["active"]),
+
+  serviceAvailabilityExceptions: defineTable({
+    providerId: v.id("serviceProviders"),
+    date: v.string(),
+    reason: v.optional(v.string()),
+    allDay: v.boolean(),
+    startTime: v.optional(v.string()),
+    endTime: v.optional(v.string()),
+  }).index("by_provider_and_date", ["providerId", "date"]),
+
+  serviceInvoices: defineTable({
+    bookingId: v.id("serviceBookings"),
+    providerId: v.id("serviceProviders"),
+    userId: v.id("users"),
+    number: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("issued"),
+      v.literal("paid"),
+      v.literal("cancelled"),
+    ),
+    pdfUrl: v.optional(v.string()),
+    issuedAt: v.number(),
+    paidAt: v.optional(v.number()),
+  })
+    .index("by_booking", ["bookingId"])
+    .index("by_user", ["userId"])
+    .index("by_number", ["number"]),
+
+  serviceContracts: defineTable({
+    bookingId: v.id("serviceBookings"),
+    providerId: v.id("serviceProviders"),
+    clientId: v.id("users"),
+    terms: v.string(),
+    signedByProviderAt: v.optional(v.number()),
+    signedByClientAt: v.optional(v.number()),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("pending_signature"),
+      v.literal("signed"),
+      v.literal("cancelled"),
+    ),
+    documentUrl: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_booking", ["bookingId"])
+    .index("by_provider", ["providerId"])
+    .index("by_client", ["clientId"]),
+
+  serviceRecurringBookings: defineTable({
+    providerId: v.id("serviceProviders"),
+    userId: v.id("users"),
+    pattern: v.union(
+      v.literal("daily"),
+      v.literal("weekly"),
+      v.literal("biweekly"),
+      v.literal("monthly"),
+    ),
+    dayOfWeek: v.optional(v.number()),
+    timeSlot: v.string(),
+    message: v.string(),
+    active: v.boolean(),
+    nextOccurrence: v.number(),
+    lastCreatedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_provider", ["providerId"])
+    .index("by_user", ["userId"])
+    .index("by_next", ["nextOccurrence"])
+    .index("by_active", ["active"]),
+
+  servicePayments: defineTable({
+    bookingId: v.id("serviceBookings"),
+    paymentIntentId: v.id("paymentIntents"),
+    userId: v.id("users"),
+    providerId: v.id("serviceProviders"),
+    amount: v.number(),
+    currency: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("refunded"),
+      v.literal("disputed"),
+    ),
+    escrowReleased: v.boolean(),
+    escrowReleasedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_booking", ["bookingId"])
+    .index("by_user", ["userId"])
+    .index("by_provider", ["providerId"])
+    .index("by_intent", ["paymentIntentId"])
+    .index("by_status", ["status"]),
 
   serviceBookings: defineTable({
     providerId: v.id("serviceProviders"),
@@ -6010,14 +6388,40 @@ export default defineSchema({
     status: v.union(
       v.literal("pending"),
       v.literal("confirmed"),
+      v.literal("in_progress"),
       v.literal("done"),
       v.literal("cancelled"),
+      v.literal("disputed"),
     ),
     scheduledAt: v.optional(v.string()),
     createdAt: v.number(),
+
+    // === Services V1 — ajouts ===
+    quoteId: v.optional(v.id("serviceQuotes")),
+    paymentIntentId: v.optional(v.id("paymentIntents")),
+    conversationId: v.optional(v.id("conversations")),
+
+    totalAmount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+
+    confirmedAt: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+
+    cancelledAt: v.optional(v.number()),
+    cancelledBy: v.optional(v.id("users")),
+    cancellationReason: v.optional(v.string()),
+
+    serviceAddress: v.optional(v.string()),
+    attachments: v.optional(v.array(v.string())),
+    notes: v.optional(v.string()),
   })
     .index("by_provider", ["providerId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_provider_and_status", ["providerId", "status"])
+    .index("by_status", ["status"])
+    .index("by_scheduledAt", ["scheduledAt"]),
 
   // ===========================================================================
   // VOYAGES — TRANSPORT INTER-VILLES
