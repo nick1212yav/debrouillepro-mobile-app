@@ -276,11 +276,12 @@ export const respondToDispute = mutation({
       });
     }
 
-    // On ajoute la réponse dans la description avec un marqueur clair
-    const augmented = `${dispute.description}\n\n[RÉPONSE PRESTATAIRE]\n${message}`;
+    const now = Date.now();
 
+    // La plainte originale n'est JAMAIS modifiée
     await ctx.db.patch(args.disputeId, {
-      description: augmented,
+      providerResponse: message,
+      providerRespondedAt: now,
       status: "investigating",
     });
 
@@ -328,6 +329,12 @@ export const resolveDispute = mutation({
         message: `La résolution doit contenir au moins ${MIN_DESCRIPTION} caractères.`,
       });
     }
+    if (resolution.length > MAX_DESCRIPTION) {
+      throw new ConvexError({
+        code: "INVALID_RESOLUTION",
+        message: `Résolution trop longue (${MAX_DESCRIPTION} caractères max).`,
+      });
+    }
 
     const now = Date.now();
     await ctx.db.patch(args.disputeId, {
@@ -346,37 +353,5 @@ export const resolveDispute = mutation({
     );
 
     return { success: true, status: "resolved" as const };
-  },
-});
-
-export const closeDispute = mutation({
-  args: { disputeId: v.id("serviceDisputes") },
-  handler: async (ctx, args) => {
-    const admin = await requireAdmin(ctx);
-    const dispute = await ctx.db.get(args.disputeId);
-    if (!dispute) {
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Litige introuvable",
-      });
-    }
-    if (dispute.status !== "resolved") {
-      throw new ConvexError({
-        code: "INVALID_STATE",
-        message: "Seul un litige résolu peut être fermé.",
-      });
-    }
-
-    await ctx.db.patch(args.disputeId, { status: "closed" });
-
-    await logHistory(
-      ctx,
-      dispute.againstProviderId,
-      "dispute.closed",
-      admin._id,
-      dispute.bookingId,
-    );
-
-    return { success: true, status: "closed" as const };
   },
 });
