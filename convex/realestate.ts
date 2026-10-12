@@ -93,12 +93,19 @@ export const listProperties = query({
         // ✅ Résoudre les images
         const resolvedImages = await resolveImages(ctx, item.images || []);
 
+        // `ctx.db.get` retourne une union large lorsque l'argument n'est
+        // pas narrowé par TypeScript. On discrimine explicitement les
+        // documents `users` via leur champ unique `tokenIdentifier`.
+        const isUserOwner = owner !== null && "tokenIdentifier" in owner;
+
         return {
           ...item,
           images: resolvedImages,
-          ownerName: owner?.name ?? "Propriétaire",
-          ownerAvatar: owner?.avatar,
-          ownerPhone: owner?.phone,
+          ownerName: isUserOwner
+            ? (owner.name ?? "Propriétaire")
+            : "Propriétaire",
+          ownerAvatar: isUserOwner ? owner.avatar : undefined,
+          ownerPhone: isUserOwner ? owner.phone : undefined,
         };
       }),
     );

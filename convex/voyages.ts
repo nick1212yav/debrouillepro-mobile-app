@@ -539,7 +539,7 @@ export const bookTrip = mutation({
     // SOURCE DE VÉRITÉ : tripSeats
     // ------------------------------------------------------------------------
 
-    const selectedSeats = [];
+    const selectedSeats: Array<Doc<"tripSeats">> = [];
 
     for (const seatNumber of normalizedSeatNumbers) {
       const seat = await ctx.db
