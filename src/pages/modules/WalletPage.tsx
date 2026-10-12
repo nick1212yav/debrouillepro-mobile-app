@@ -1,18 +1,6 @@
 // ============================================================================
 // DÉBROUILLEPAY — WALLET
 // Version finale native / production
-//
-// Principes :
-// - React Native uniquement
-// - Aucun Web API
-// - Aucun faux solde
-// - Aucun faux paiement
-// - Aucun écrit direct dans walletTransactions depuis le client
-// - Recharge = PaymentIntent -> PaymentAttempt -> Provider -> confirmation
-// - Solde = lecture du ledger réel
-// - Budget = données Convex réelles uniquement
-// - Aucun graphique simulé
-// - Aucun QR simulé
 // ============================================================================
 
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
@@ -25,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import {
@@ -82,13 +71,8 @@ type BudgetCategory = {
   spent: number;
 };
 
-type WalletErrorBoundaryProps = {
-  children: ReactNode;
-};
-
-type WalletErrorBoundaryState = {
-  hasError: boolean;
-};
+type WalletErrorBoundaryProps = { children: ReactNode };
+type WalletErrorBoundaryState = { hasError: boolean };
 
 // ============================================================================
 // CONSTANTES
@@ -125,52 +109,22 @@ const PROVIDERS: ProviderOption[] = [
     shortLabel: "Orange",
     accent: "#FF7A00",
   },
-  {
-    id: "mpesa",
-    label: "M-Pesa",
-    shortLabel: "M-Pesa",
-    accent: "#22C55E",
-  },
+  { id: "mpesa", label: "M-Pesa", shortLabel: "M-Pesa", accent: "#22C55E" },
   {
     id: "airtel_money",
     label: "Airtel Money",
     shortLabel: "Airtel",
     accent: "#EF4444",
   },
-  {
-    id: "mtn_momo",
-    label: "MTN MoMo",
-    shortLabel: "MTN",
-    accent: "#FACC15",
-  },
+  { id: "mtn_momo", label: "MTN MoMo", shortLabel: "MTN", accent: "#FACC15" },
 ];
 
 const DEFAULT_BUDGET_CATEGORIES: BudgetCategory[] = [
-  {
-    name: "Transport",
-    allocated: 0,
-    spent: 0,
-  },
-  {
-    name: "Alimentation",
-    allocated: 0,
-    spent: 0,
-  },
-  {
-    name: "Santé",
-    allocated: 0,
-    spent: 0,
-  },
-  {
-    name: "Loisirs",
-    allocated: 0,
-    spent: 0,
-  },
-  {
-    name: "Autres",
-    allocated: 0,
-    spent: 0,
-  },
+  { name: "Transport", allocated: 0, spent: 0 },
+  { name: "Alimentation", allocated: 0, spent: 0 },
+  { name: "Santé", allocated: 0, spent: 0 },
+  { name: "Loisirs", allocated: 0, spent: 0 },
+  { name: "Autres", allocated: 0, spent: 0 },
 ];
 
 // ============================================================================
@@ -178,26 +132,15 @@ const DEFAULT_BUDGET_CATEGORIES: BudgetCategory[] = [
 // ============================================================================
 
 function formatAmount(amount: number, currency = "CDF"): string {
-  if (!Number.isFinite(amount)) {
-    return `0 ${currency}`;
-  }
-
+  if (!Number.isFinite(amount)) return `0 ${currency}`;
   return `${Math.round(amount).toLocaleString("fr-FR")} ${currency}`;
 }
 
 function parsePositiveAmount(value: string): number | null {
   const normalized = value.replace(",", ".").trim();
-
-  if (!normalized) {
-    return null;
-  }
-
+  if (!normalized) return null;
   const amount = Number(normalized);
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return null;
-  }
-
+  if (!Number.isFinite(amount) || amount <= 0) return null;
   return amount;
 }
 
@@ -206,22 +149,13 @@ function createIdempotencyKey(
   provider: Provider,
   amount: number,
 ): string {
-  // Pas de Math.random().
-  // Le compteur temporel rend chaque tentative distincte dans cette session.
   return `${operation}:${provider}:${amount}:${Date.now()}`;
 }
 
 function getTransactionDate(tx: { completedAt?: string }): string {
-  if (!tx.completedAt) {
-    return "Date non disponible";
-  }
-
+  if (!tx.completedAt) return "Date non disponible";
   const date = new Date(tx.completedAt);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Date non disponible";
-  }
-
+  if (Number.isNaN(date.getTime())) return "Date non disponible";
   return date.toLocaleDateString("fr-FR", {
     day: "numeric",
     month: "short",
@@ -230,16 +164,9 @@ function getTransactionDate(tx: { completedAt?: string }): string {
 }
 
 function getTransactionTime(tx: { completedAt?: string }): string {
-  if (!tx.completedAt) {
-    return "";
-  }
-
+  if (!tx.completedAt) return "";
   const date = new Date(tx.completedAt);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
+  if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleTimeString("fr-FR", {
     hour: "2-digit",
     minute: "2-digit",
@@ -286,14 +213,10 @@ class WalletErrorBoundary extends Component<
   WalletErrorBoundaryProps,
   WalletErrorBoundaryState
 > {
-  public state: WalletErrorBoundaryState = {
-    hasError: false,
-  };
+  public state: WalletErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(): WalletErrorBoundaryState {
-    return {
-      hasError: true,
-    };
+    return { hasError: true };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
@@ -302,9 +225,7 @@ class WalletErrorBoundary extends Component<
   }
 
   private handleRetry = (): void => {
-    this.setState({
-      hasError: false,
-    });
+    this.setState({ hasError: false });
   };
 
   render(): ReactNode {
@@ -314,30 +235,26 @@ class WalletErrorBoundary extends Component<
           <View style={styles.errorIcon}>
             <AlertCircle size={34} color={COLORS.red} />
           </View>
-
           <Text style={styles.errorTitle}>
             Le Wallet n'a pas pu être affiché
           </Text>
-
           <Text style={styles.errorDescription}>
             Une erreur inattendue est survenue. Aucun mouvement financier n'a
             été créé par cette erreur d'affichage.
           </Text>
-
-          <Pressable
+          <TouchableOpacity
             onPress={this.handleRetry}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.pressed,
-            ]}
+            activeOpacity={0.75}
+            style={styles.primaryButton}
           >
-            <RefreshCw size={17} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>Réessayer</Text>
-          </Pressable>
+            <View style={styles.primaryButtonInner}>
+              <RefreshCw size={17} color="#FFFFFF" />
+              <Text style={styles.primaryButtonText}>Réessayer</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       );
     }
-
     return this.props.children;
   }
 }
@@ -352,9 +269,7 @@ function WalletLoading(): React.ReactElement {
       <View style={styles.loadingLogo}>
         <WalletIcon size={30} color={COLORS.green} />
       </View>
-
       <ActivityIndicator size="small" color={COLORS.green} />
-
       <Text style={styles.loadingText}>
         Sécurisation de votre portefeuille…
       </Text>
@@ -379,13 +294,10 @@ function WalletUnauthenticated({
       >
         <ArrowLeft size={19} color={COLORS.text} />
       </Pressable>
-
       <View style={styles.unauthenticatedIcon}>
         <WalletIcon size={42} color={COLORS.textMuted} />
       </View>
-
       <Text style={styles.unauthenticatedTitle}>Votre Wallet vous attend</Text>
-
       <Text style={styles.unauthenticatedDescription}>
         Connectez-vous pour consulter votre solde, vos transactions et vos
         opérations DébrouillePay.
@@ -401,18 +313,15 @@ function WalletUnauthenticated({
 function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
   const [balanceVisible, setBalanceVisible] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState<Tab>("overview");
-
   const [showTopUp, setShowTopUp] = React.useState(false);
   const [showSendInfo, setShowSendInfo] = React.useState(false);
   const [showStripeSheet, setShowStripeSheet] = React.useState(false);
-
   const [topUpProvider, setTopUpProvider] = React.useState<Provider | null>(
     null,
   );
   const [topUpAmount, setTopUpAmount] = React.useState("");
   const [topUpPhone, setTopUpPhone] = React.useState("");
   const [topUpSubmitting, setTopUpSubmitting] = React.useState(false);
-
   const [editingCategory, setEditingCategory] = React.useState<string | null>(
     null,
   );
@@ -424,35 +333,17 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
     limit: 50,
   });
   const budget = useQuery(api.finances.getMyBudget, {});
-
   const createPaymentIntent = useMutation(api.payments.createPaymentIntent);
   const startPayment = useAction(api.payments.startPayment);
-
   const upsertBudget = useMutation(api.finances.upsertBudget);
   const updateBudgetCategory = useMutation(api.finances.updateBudgetCategory);
-
-  // --------------------------------------------------------------------------
-  // LOADING
-  // --------------------------------------------------------------------------
 
   const walletLoading = walletData === undefined;
   const transactionsLoading = transactions === undefined;
   const budgetLoading = budget === undefined;
 
-  // --------------------------------------------------------------------------
-  // REAL WALLET DATA
-  // --------------------------------------------------------------------------
-
   const balances = walletData?.balances ?? [];
 
-  /*
-   * Le Payment Core / finances protège déjà la règle :
-   * aucune addition implicite entre plusieurs devises.
-   *
-   * Si plusieurs devises existent, on ne prétend pas avoir un "solde total"
-   * converti. On affiche la première devise comme vue principale et les
-   * autres séparément.
-   */
   const primaryBalance =
     balances.length === 1
       ? balances[0]
@@ -472,27 +363,12 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
       spent: category.spent,
     })) ?? [];
 
-  const totalBudget = categories.reduce(
-    (sum, category) => sum + category.allocated,
-    0,
-  );
-
-  const totalSpent = categories.reduce(
-    (sum, category) => sum + category.spent,
-    0,
-  );
-
+  const totalBudget = categories.reduce((sum, c) => sum + c.allocated, 0);
+  const totalSpent = categories.reduce((sum, c) => sum + c.spent, 0);
   const budgetRemaining = totalBudget - totalSpent;
 
-  // --------------------------------------------------------------------------
-  // TOP UP — REAL PAYMENT CORE
-  // --------------------------------------------------------------------------
-
   async function handleTopUp(): Promise<void> {
-    if (topUpSubmitting) {
-      return;
-    }
-
+    if (topUpSubmitting) return;
     if (!topUpProvider) {
       Alert.alert(
         "Opérateur requis",
@@ -500,14 +376,11 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
       );
       return;
     }
-
     const amount = parsePositiveAmount(topUpAmount);
-
     if (!amount) {
       Alert.alert("Montant invalide", "Saisissez un montant supérieur à zéro.");
       return;
     }
-
     if (amount < 500) {
       Alert.alert(
         "Montant insuffisant",
@@ -515,9 +388,7 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
       );
       return;
     }
-
     const phone = topUpPhone.trim();
-
     if (!phone) {
       Alert.alert(
         "Numéro requis",
@@ -535,12 +406,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
         amount,
       );
 
-      /*
-       * ÉTAPE 1
-       * Création de l'intention uniquement.
-       *
-       * Aucun solde n'est crédité ici.
-       */
       const intent = await createPaymentIntent({
         type: "wallet_topup",
         amount,
@@ -550,12 +415,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
         customerReference: phone,
       });
 
-      /*
-       * ÉTAPE 2
-       * Démarrage réel auprès du provider.
-       *
-       * Le client ne touche jamais walletTransactions.
-       */
       const result = await startPayment({
         paymentIntentId: intent.paymentIntentId,
       });
@@ -586,12 +445,10 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
       setTopUpPhone("");
     } catch (error) {
       console.error("[Wallet] Top-up error:", error);
-
       const message =
         error instanceof Error
           ? error.message
           : "Le paiement n'a pas pu être démarré.";
-
       Alert.alert(
         "Recharge non effectuée",
         `${message}\n\nAucun mouvement financier fictif n'a été créé.`,
@@ -601,22 +458,11 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // BUDGET
-  // --------------------------------------------------------------------------
-
   async function handleCreateBudget(): Promise<void> {
-    if (budgetSaving) {
-      return;
-    }
-
+    if (budgetSaving) return;
     setBudgetSaving(true);
-
     try {
-      const draftCategories = DEFAULT_BUDGET_CATEGORIES.map((category) => ({
-        ...category,
-      }));
-
+      const draftCategories = DEFAULT_BUDGET_CATEGORIES.map((c) => ({ ...c }));
       await upsertBudget({
         name: "Budget mensuel",
         categories: draftCategories,
@@ -626,14 +472,12 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
           .toISOString()
           .slice(0, 10),
       });
-
       Alert.alert(
         "Budget créé",
         "Votre budget réel a été créé. Vous pouvez maintenant définir les montants par catégorie.",
       );
     } catch (error) {
       console.error("[Wallet] Budget creation error:", error);
-
       Alert.alert(
         "Impossible de créer le budget",
         error instanceof Error ? error.message : "Une erreur est survenue.",
@@ -644,12 +488,8 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
   }
 
   async function handleSaveBudgetCategory(categoryName: string): Promise<void> {
-    if (!budget || budgetSaving) {
-      return;
-    }
-
+    if (!budget || budgetSaving) return;
     const amount = Number(editingValue);
-
     if (!Number.isFinite(amount) || amount < 0) {
       Alert.alert(
         "Montant invalide",
@@ -657,26 +497,21 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
       );
       return;
     }
-
     setBudgetSaving(true);
-
     try {
       await updateBudgetCategory({
         budgetId: budget._id as Id<"budgets">,
         categoryName,
         allocated: amount,
       });
-
       setEditingCategory(null);
       setEditingValue("");
-
       Alert.alert(
         "Budget mis à jour",
         `La catégorie ${categoryName} a été enregistrée.`,
       );
     } catch (error) {
       console.error("[Wallet] Budget update error:", error);
-
       Alert.alert(
         "Mise à jour impossible",
         error instanceof Error ? error.message : "Une erreur est survenue.",
@@ -685,10 +520,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
       setBudgetSaving(false);
     }
   }
-
-  // --------------------------------------------------------------------------
-  // RENDER
-  // --------------------------------------------------------------------------
 
   return (
     <View style={styles.container}>
@@ -700,10 +531,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ================================================================
-            HEADER
-        ================================================================ */}
-
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Pressable
@@ -715,32 +542,24 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             >
               <ArrowLeft size={18} color={COLORS.text} />
             </Pressable>
-
             <View>
               <Text style={styles.headerTitle}>Wallet</Text>
               <Text style={styles.headerSubtitle}>DébrouillePay</Text>
             </View>
           </View>
-
           <View style={styles.secureBadge}>
             <Shield size={13} color={COLORS.green} />
             <Text style={styles.secureText}>Sécurisé</Text>
           </View>
         </View>
 
-        {/* ================================================================
-            MULTI-CURRENCY NOTICE
-        ================================================================ */}
-
         {balances.length > 1 && (
           <View style={styles.multiCurrencyNotice}>
             <AlertCircle size={17} color={COLORS.blue} />
-
             <View style={styles.multiCurrencyTextContainer}>
               <Text style={styles.multiCurrencyTitle}>
                 Portefeuille multi-devises
               </Text>
-
               <Text style={styles.multiCurrencyDescription}>
                 Les devises sont affichées séparément. Aucun taux de change
                 fictif n'est appliqué.
@@ -749,19 +568,13 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
           </View>
         )}
 
-        {/* ================================================================
-            BALANCE CARD
-        ================================================================ */}
-
         <View style={styles.balanceCard}>
           <View style={styles.balanceCardGlow} />
-
           <View style={styles.balanceTopRow}>
             <View style={styles.balanceBrand}>
               <View style={styles.walletMiniIcon}>
                 <WalletIcon size={16} color={COLORS.green} />
               </View>
-
               <View>
                 <Text style={styles.balanceBrandTitle}>DébrouillePay</Text>
                 <Text style={styles.balanceBrandSubtitle}>
@@ -769,7 +582,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                 </Text>
               </View>
             </View>
-
             <View style={styles.protectedBadge}>
               <Shield size={12} color={COLORS.green} />
               <Text style={styles.protectedText}>Protégé</Text>
@@ -788,9 +600,8 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                   : `•••••• ${currency}`}
               </Text>
             )}
-
             <Pressable
-              onPress={() => setBalanceVisible((visible) => !visible)}
+              onPress={() => setBalanceVisible((v) => !v)}
               style={({ pressed }) => [
                 styles.eyeButton,
                 pressed && styles.pressed,
@@ -827,9 +638,7 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                 </Text>
               </View>
             </View>
-
             <View style={styles.balanceFooterDivider} />
-
             <View>
               <Text style={styles.balanceFooterLabel}>SORTIES CE MOIS</Text>
               <View style={styles.balanceFooterValueRow}>
@@ -841,10 +650,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             </View>
           </View>
         </View>
-
-        {/* ================================================================
-            ACTIONS
-        ================================================================ */}
 
         <View style={styles.actionsRow}>
           <Pressable
@@ -858,10 +663,8 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             <View style={styles.actionIcon}>
               <Send size={18} color={COLORS.green} />
             </View>
-
             <Text style={styles.actionLabel}>Envoyer</Text>
           </Pressable>
-
           <Pressable
             onPress={() =>
               Alert.alert(
@@ -878,10 +681,8 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             <View style={styles.actionIcon}>
               <Download size={18} color={COLORS.blue} />
             </View>
-
             <Text style={styles.actionLabel}>Recevoir</Text>
           </Pressable>
-
           <Pressable
             onPress={() => setShowTopUp(true)}
             style={({ pressed }) => [
@@ -893,10 +694,8 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             <View style={styles.actionIcon}>
               <RefreshCw size={18} color={COLORS.purple} />
             </View>
-
             <Text style={styles.actionLabel}>Recharger</Text>
           </Pressable>
-
           <Pressable
             onPress={() => setActiveTab("transactions")}
             style={({ pressed }) => [
@@ -908,14 +707,9 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             <View style={styles.actionIcon}>
               <History size={18} color={COLORS.orange} />
             </View>
-
             <Text style={styles.actionLabel}>Historique</Text>
           </Pressable>
         </View>
-
-        {/* ================================================================
-            TABS
-        ================================================================ */}
 
         <View style={styles.tabsContainer}>
           {(
@@ -926,7 +720,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             ] as const
           ).map(([tab, label]) => {
             const selected = activeTab === tab;
-
             return (
               <Pressable
                 key={tab}
@@ -947,10 +740,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
           })}
         </View>
 
-        {/* ================================================================
-            OVERVIEW
-        ================================================================ */}
-
         {activeTab === "overview" && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -958,7 +747,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                 <Text style={styles.sectionEyebrow}>ACTIVITÉ RÉELLE</Text>
                 <Text style={styles.sectionTitle}>Votre portefeuille</Text>
               </View>
-
               <View style={styles.liveIndicator}>
                 <View style={styles.liveDot} />
                 <Text style={styles.liveText}>LIVE</Text>
@@ -975,25 +763,20 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                 >
                   <ArrowDownLeft size={16} color={COLORS.green} />
                 </View>
-
                 <Text style={styles.statValue}>
                   {formatAmount(monthIn, currency)}
                 </Text>
-
                 <Text style={styles.statLabel}>Entrées ce mois</Text>
               </View>
-
               <View style={styles.statCard}>
                 <View
                   style={[styles.statIcon, { backgroundColor: COLORS.redSoft }]}
                 >
                   <ArrowUpRight size={16} color={COLORS.red} />
                 </View>
-
                 <Text style={styles.statValue}>
                   {formatAmount(monthOut, currency)}
                 </Text>
-
                 <Text style={styles.statLabel}>Sorties ce mois</Text>
               </View>
             </View>
@@ -1002,10 +785,8 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
               <View style={styles.realDataIcon}>
                 <Shield size={20} color={COLORS.green} />
               </View>
-
               <View style={styles.realDataContent}>
                 <Text style={styles.realDataTitle}>Solde issu du ledger</Text>
-
                 <Text style={styles.realDataDescription}>
                   Le solde affiché provient uniquement des transactions
                   financières confirmées dans Convex. Aucune simulation locale
@@ -1016,7 +797,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
 
             <View style={styles.recentHeader}>
               <Text style={styles.sectionEyebrow}>DERNIERS MOUVEMENTS</Text>
-
               <Pressable onPress={() => setActiveTab("transactions")}>
                 <Text style={styles.seeAll}>Voir tout</Text>
               </Pressable>
@@ -1041,19 +821,13 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
           </View>
         )}
 
-        {/* ================================================================
-            TRANSACTIONS
-        ================================================================ */}
-
         {activeTab === "transactions" && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View>
                 <Text style={styles.sectionEyebrow}>HISTORIQUE</Text>
-
                 <Text style={styles.sectionTitle}>Transactions</Text>
               </View>
-
               {!transactionsLoading && (
                 <View style={styles.countBadge}>
                   <Text style={styles.countBadgeText}>
@@ -1082,16 +856,11 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
           </View>
         )}
 
-        {/* ================================================================
-            BUDGET
-        ================================================================ */}
-
         {activeTab === "budget" && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View>
                 <Text style={styles.sectionEyebrow}>PILOTAGE FINANCIER</Text>
-
                 <Text style={styles.sectionTitle}>Budget mensuel</Text>
               </View>
             </View>
@@ -1108,52 +877,45 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                 <View style={styles.emptyBudgetIcon}>
                   <WalletIcon size={28} color={COLORS.purple} />
                 </View>
-
                 <Text style={styles.emptyBudgetTitle}>
                   Aucun budget enregistré
                 </Text>
-
                 <Text style={styles.emptyBudgetDescription}>
                   Créez votre premier budget pour suivre vos dépenses
                   directement depuis DébrouillePay.
                 </Text>
-
-                <Pressable
+                <TouchableOpacity
                   disabled={budgetSaving}
+                  activeOpacity={0.75}
                   onPress={() => void handleCreateBudget()}
-                  style={({ pressed }) => [
-                    styles.primaryButton,
-                    pressed && styles.pressed,
-                    budgetSaving && styles.disabled,
-                  ]}
+                  style={styles.primaryButton}
                 >
-                  {budgetSaving ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Plus size={17} color="#FFFFFF" />
-                  )}
-
-                  <Text style={styles.primaryButtonText}>Créer mon budget</Text>
-                </Pressable>
+                  <View style={styles.primaryButtonInner}>
+                    {budgetSaving ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Plus size={17} color="#FFFFFF" />
+                    )}
+                    <Text style={styles.primaryButtonText}>
+                      Créer mon budget
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             ) : (
               <>
                 <View style={styles.budgetSummary}>
                   <View>
                     <Text style={styles.budgetSummaryLabel}>DÉPENSÉ</Text>
-
                     <Text style={styles.budgetSummaryValue}>
                       {formatAmount(totalSpent, budget.currency)}
                     </Text>
-
                     <Text style={styles.budgetSummarySecondary}>
                       sur {formatAmount(totalBudget, budget.currency)}
                     </Text>
                   </View>
-
                   <View style={styles.budgetRemaining}>
                     <Text style={styles.budgetRemainingLabel}>RESTANT</Text>
-
                     <Text
                       style={[
                         styles.budgetRemainingValue,
@@ -1176,11 +938,7 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                     style={[
                       styles.budgetProgressFill,
                       {
-                        width: `${Math.min(
-                          Math.max(totalSpent / Math.max(totalBudget, 1), 0) *
-                            100,
-                          100,
-                        )}%`,
+                        width: `${Math.min(Math.max(totalSpent / Math.max(totalBudget, 1), 0) * 100, 100)}%`,
                         backgroundColor:
                           totalSpent > totalBudget
                             ? COLORS.red
@@ -1200,11 +958,8 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                       category.allocated > 0
                         ? (category.spent / category.allocated) * 100
                         : 0;
-
                     const over = category.spent > category.allocated;
-
                     const alert = percentage >= 80;
-
                     const editing = editingCategory === category.name;
 
                     return (
@@ -1218,12 +973,10 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                         <View style={styles.categoryHeader}>
                           <View style={styles.categoryIdentity}>
                             <View style={styles.categoryDot} />
-
                             <View>
                               <Text style={styles.categoryName}>
                                 {category.name}
                               </Text>
-
                               <Text style={styles.categoryAmounts}>
                                 {formatAmount(category.spent, budget.currency)}{" "}
                                 /{" "}
@@ -1234,18 +987,15 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                               </Text>
                             </View>
                           </View>
-
                           <View style={styles.categoryActions}>
                             {over && (
                               <Text style={styles.overBudgetBadge}>
                                 DÉPASSÉ
                               </Text>
                             )}
-
                             {alert && !over && (
                               <AlertTriangle size={15} color={COLORS.orange} />
                             )}
-
                             {editing ? (
                               <>
                                 <TextInput
@@ -1257,7 +1007,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                                   placeholder="0"
                                   placeholderTextColor={COLORS.textMuted}
                                 />
-
                                 <Pressable
                                   disabled={budgetSaving}
                                   onPress={() =>
@@ -1266,7 +1015,6 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                                 >
                                   <Check size={17} color={COLORS.green} />
                                 </Pressable>
-
                                 <Pressable
                                   disabled={budgetSaving}
                                   onPress={() => {
@@ -1289,16 +1037,12 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
                             )}
                           </View>
                         </View>
-
                         <View style={styles.categoryProgressTrack}>
                           <View
                             style={[
                               styles.categoryProgressFill,
                               {
-                                width: `${Math.min(
-                                  Math.max(percentage, 0),
-                                  100,
-                                )}%`,
+                                width: `${Math.min(Math.max(percentage, 0), 100)}%`,
                                 backgroundColor: over
                                   ? COLORS.red
                                   : alert
@@ -1320,18 +1064,12 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
         <View style={styles.bottomSpace} />
       </ScrollView>
 
-      {/* ================================================================
-          TOP UP MODAL
-      ================================================================ */}
-
       <Modal
         visible={showTopUp}
         transparent
         animationType="slide"
         onRequestClose={() => {
-          if (!topUpSubmitting) {
-            setShowTopUp(false);
-          }
+          if (!topUpSubmitting) setShowTopUp(false);
         }}
       >
         <View style={styles.modalOverlay}>
@@ -1339,14 +1077,12 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             <View style={styles.modalHandle} />
 
             <View style={styles.modalHeader}>
-              <View>
+              <View style={styles.modalHeaderTextContainer}>
                 <Text style={styles.modalTitle}>Recharger le Wallet</Text>
-
                 <Text style={styles.modalSubtitle}>
                   Paiement Mobile Money réel
                 </Text>
               </View>
-
               <Pressable
                 disabled={topUpSubmitting}
                 onPress={() => setShowTopUp(false)}
@@ -1356,172 +1092,166 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
               </Pressable>
             </View>
 
-            <View style={styles.realPaymentNotice}>
-              <Shield size={17} color={COLORS.green} />
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.realPaymentNotice}>
+                <Shield size={17} color={COLORS.green} />
+                <Text style={styles.realPaymentNoticeText}>
+                  Aucun solde ne sera ajouté avant la confirmation réelle du
+                  provider.
+                </Text>
+              </View>
 
-              <Text style={styles.realPaymentNoticeText}>
-                Aucun solde ne sera ajouté avant la confirmation réelle du
-                provider.
-              </Text>
-            </View>
+              <Text style={styles.fieldLabel}>OPÉRATEUR</Text>
 
-            <Text style={styles.fieldLabel}>OPÉRATEUR</Text>
-
-            <View style={styles.providerGrid}>
-              {PROVIDERS.map((provider) => {
-                const selected = topUpProvider === provider.id;
-
-                return (
-                  <Pressable
-                    key={provider.id}
-                    disabled={topUpSubmitting}
-                    onPress={() => setTopUpProvider(provider.id)}
-                    style={({ pressed }) => [
-                      styles.providerCard,
-                      selected && {
-                        borderColor: provider.accent,
-                        backgroundColor: `${provider.accent}18`,
-                      },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.providerDot,
-                        {
-                          backgroundColor: provider.accent,
-                        },
-                      ]}
-                    />
-
-                    <Text
-                      style={[
-                        styles.providerLabel,
+              <View style={styles.providerGrid}>
+                {PROVIDERS.map((provider) => {
+                  const selected = topUpProvider === provider.id;
+                  return (
+                    <Pressable
+                      key={provider.id}
+                      disabled={topUpSubmitting}
+                      onPress={() => setTopUpProvider(provider.id)}
+                      style={({ pressed }) => [
+                        styles.providerCard,
                         selected && {
-                          color: provider.accent,
+                          borderColor: provider.accent,
+                          borderWidth: 2,
+                          backgroundColor: `${provider.accent}28`,
                         },
+                        pressed && styles.pressed,
                       ]}
                     >
-                      {provider.shortLabel}
-                    </Text>
+                      <View
+                        style={[
+                          styles.providerDot,
+                          { backgroundColor: provider.accent },
+                        ]}
+                      />
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.providerLabel,
+                          selected && {
+                            color: provider.accent,
+                            fontWeight: "900",
+                          },
+                        ]}
+                      >
+                        {provider.shortLabel}
+                      </Text>
+                      {selected && (
+                        <CheckCircle2 size={14} color={provider.accent} />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
 
-                    {selected && (
-                      <CheckCircle2 size={14} color={provider.accent} />
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
+              <Text style={styles.fieldLabel}>NUMÉRO MOBILE MONEY</Text>
+              <TextInput
+                value={topUpPhone}
+                onChangeText={setTopUpPhone}
+                keyboardType="phone-pad"
+                editable={!topUpSubmitting}
+                placeholder="+243 ..."
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.modalInput}
+              />
 
-            <Text style={styles.fieldLabel}>NUMÉRO MOBILE MONEY</Text>
-
-            <TextInput
-              value={topUpPhone}
-              onChangeText={setTopUpPhone}
-              keyboardType="phone-pad"
-              editable={!topUpSubmitting}
-              placeholder="+243 ..."
-              placeholderTextColor={COLORS.textMuted}
-              style={styles.modalInput}
-            />
-
-            <Text style={styles.fieldLabel}>MONTANT — CDF</Text>
-
-            <View style={styles.quickAmounts}>
-              {[1000, 2500, 5000, 10000].map((amount) => {
-                const selected = topUpAmount === String(amount);
-
-                return (
-                  <Pressable
-                    key={amount}
-                    disabled={topUpSubmitting}
-                    onPress={() => setTopUpAmount(String(amount))}
-                    style={({ pressed }) => [
-                      styles.quickAmount,
-                      selected && styles.quickAmountSelected,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.quickAmountText,
-                        selected && styles.quickAmountTextSelected,
+              <Text style={styles.fieldLabel}>MONTANT — CDF</Text>
+              <View style={styles.quickAmounts}>
+                {[1000, 2500, 5000, 10000].map((amount) => {
+                  const selected = topUpAmount === String(amount);
+                  return (
+                    <Pressable
+                      key={amount}
+                      disabled={topUpSubmitting}
+                      onPress={() => setTopUpAmount(String(amount))}
+                      style={({ pressed }) => [
+                        styles.quickAmount,
+                        selected && styles.quickAmountSelected,
+                        pressed && styles.pressed,
                       ]}
                     >
-                      {amount.toLocaleString("fr-FR")}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+                      <Text
+                        style={[
+                          styles.quickAmountText,
+                          selected && styles.quickAmountTextSelected,
+                        ]}
+                      >
+                        {amount.toLocaleString("fr-FR")}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
 
-            <TextInput
-              value={topUpAmount}
-              onChangeText={setTopUpAmount}
-              keyboardType="numeric"
-              editable={!topUpSubmitting}
-              placeholder="Montant personnalisé"
-              placeholderTextColor={COLORS.textMuted}
-              style={styles.modalInput}
-            />
+              <TextInput
+                value={topUpAmount}
+                onChangeText={setTopUpAmount}
+                keyboardType="numeric"
+                editable={!topUpSubmitting}
+                placeholder="Montant personnalisé"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.modalInput}
+              />
 
-            <Pressable
-              disabled={topUpSubmitting}
-              onPress={() => void handleTopUp()}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.pressed,
-                topUpSubmitting && styles.disabled,
-              ]}
-            >
-              {topUpSubmitting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Plus size={17} color="#FFFFFF" />
-              )}
+              <TouchableOpacity
+                disabled={topUpSubmitting}
+                activeOpacity={0.75}
+                onPress={() => void handleTopUp()}
+                style={styles.primaryButton}
+              >
+                <View style={styles.primaryButtonInner}>
+                  {topUpSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Plus size={18} color="#FFFFFF" />
+                  )}
+                  <Text style={styles.primaryButtonText}>
+                    {topUpSubmitting
+                      ? "Connexion au provider…"
+                      : "Lancer la recharge"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
 
-              <Text style={styles.primaryButtonText}>
-                {topUpSubmitting
-                  ? "Connexion au provider…"
-                  : "Lancer la recharge"}
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OU</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <TouchableOpacity
+                disabled={topUpSubmitting}
+                activeOpacity={0.75}
+                onPress={() => {
+                  setShowTopUp(false);
+                  setShowStripeSheet(true);
+                }}
+                style={styles.stripeButton}
+              >
+                <View style={styles.stripeButtonInner}>
+                  <CreditCard size={18} color="#FFFFFF" />
+                  <Text style={styles.stripeButtonText}>
+                    Payer par carte (USD)
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <Text style={styles.modalFootnote}>
+                Le crédit du Wallet intervient uniquement après confirmation
+                serveur du paiement.
               </Text>
-            </Pressable>
-
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OU</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <Pressable
-              disabled={topUpSubmitting}
-              onPress={() => {
-                setShowTopUp(false);
-                setShowStripeSheet(true);
-              }}
-              style={({ pressed }) => [
-                styles.stripeButton,
-                pressed && styles.pressed,
-                topUpSubmitting && styles.disabled,
-              ]}
-            >
-              <CreditCard size={17} color="#FFFFFF" />
-              <Text style={styles.primaryButtonText}>
-                Payer par carte (USD)
-              </Text>
-            </Pressable>
-
-            <Text style={styles.modalFootnote}>
-              Le crédit du Wallet intervient uniquement après confirmation
-              serveur du paiement.
-            </Text>
+            </ScrollView>
           </View>
         </View>
       </Modal>
-
-      {/* ================================================================
-          SEND INFORMATION
-      ================================================================ */}
 
       <Modal
         visible={showSendInfo}
@@ -1534,41 +1264,32 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             <View style={styles.infoModalIcon}>
               <Send size={24} color={COLORS.green} />
             </View>
-
             <Text style={styles.infoModalTitle}>Transfert sortant</Text>
-
             <Text style={styles.infoModalDescription}>
               Le Payment Core actuel ne finalise pas encore les opérations
               sortantes. Le flux `peer_transfer` / retrait reste volontairement
               bloqué tant que le provider ne dispose pas d'une implémentation
               sortante complète.
             </Text>
-
             <View style={styles.infoSecurityBox}>
               <Shield size={16} color={COLORS.green} />
-
               <Text style={styles.infoSecurityText}>
                 Aucun débit fictif ne sera effectué. Aucun `walletTransaction`
                 completed ne sera créé pour contourner cette protection.
               </Text>
             </View>
-
-            <Pressable
+            <TouchableOpacity
               onPress={() => setShowSendInfo(false)}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.pressed,
-              ]}
+              activeOpacity={0.75}
+              style={styles.primaryButton}
             >
-              <Text style={styles.primaryButtonText}>Compris</Text>
-            </Pressable>
+              <View style={styles.primaryButtonInner}>
+                <Text style={styles.primaryButtonText}>Compris</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
-
-      {/* ================================================================
-          STRIPE PAYMENT SHEET
-      ================================================================ */}
 
       {showStripeSheet && (
         <PaymentSheetStripe onClose={() => setShowStripeSheet(false)} />
@@ -1615,14 +1336,12 @@ function TransactionRow({
     transaction.type === "deposit" ||
     transaction.type === "refund" ||
     transaction.type === "reward";
-
   const statusColor =
     transaction.status === "completed"
       ? COLORS.green
       : transaction.status === "pending"
         ? COLORS.yellow
         : COLORS.red;
-
   const statusBackground =
     transaction.status === "completed"
       ? COLORS.greenSoft
@@ -1635,9 +1354,7 @@ function TransactionRow({
       <View
         style={[
           styles.transactionIcon,
-          {
-            backgroundColor: incoming ? COLORS.greenSoft : COLORS.redSoft,
-          },
+          { backgroundColor: incoming ? COLORS.greenSoft : COLORS.redSoft },
         ]}
       >
         {incoming ? (
@@ -1646,12 +1363,10 @@ function TransactionRow({
           <ArrowUpRight size={18} color={COLORS.red} />
         )}
       </View>
-
       <View style={styles.transactionMain}>
         <Text numberOfLines={1} style={styles.transactionDescription}>
           {transaction.description}
         </Text>
-
         <View style={styles.transactionMeta}>
           {transaction.status === "completed" ? (
             <CheckCircle2 size={11} color={statusColor} />
@@ -1660,28 +1375,14 @@ function TransactionRow({
           ) : (
             <AlertCircle size={11} color={statusColor} />
           )}
-
           <View
-            style={[
-              styles.statusBadge,
-              {
-                backgroundColor: statusBackground,
-              },
-            ]}
+            style={[styles.statusBadge, { backgroundColor: statusBackground }]}
           >
-            <Text
-              style={[
-                styles.statusText,
-                {
-                  color: statusColor,
-                },
-              ]}
-            >
+            <Text style={[styles.statusText, { color: statusColor }]}>
               {getStatusLabel(transaction.status)}
             </Text>
           </View>
         </View>
-
         {expanded && (
           <View style={styles.transactionDetails}>
             <Text style={styles.transactionDetailText}>
@@ -1690,19 +1391,16 @@ function TransactionRow({
                 ? ` · ${getTransactionTime(transaction)}`
                 : ""}
             </Text>
-
             {transaction.provider && (
               <Text style={styles.transactionDetailText}>
                 {getProviderLabel(transaction.provider)}
               </Text>
             )}
-
             {transaction.counterpartName && (
               <Text style={styles.transactionDetailText}>
                 {transaction.counterpartName}
               </Text>
             )}
-
             {transaction.externalReference && (
               <Text numberOfLines={1} style={styles.transactionReference}>
                 Réf. {transaction.externalReference}
@@ -1711,13 +1409,10 @@ function TransactionRow({
           </View>
         )}
       </View>
-
       <Text
         style={[
           styles.transactionAmount,
-          {
-            color: incoming ? COLORS.green : COLORS.red,
-          },
+          { color: incoming ? COLORS.green : COLORS.red },
         ]}
       >
         {incoming ? "+" : "-"}
@@ -1737,9 +1432,7 @@ function EmptyTransactions(): React.ReactElement {
       <View style={styles.emptyTransactionsIcon}>
         <History size={30} color={COLORS.textMuted} />
       </View>
-
       <Text style={styles.emptyTransactionsTitle}>Aucun mouvement</Text>
-
       <Text style={styles.emptyTransactionsDescription}>
         Vos transactions confirmées apparaîtront ici automatiquement.
       </Text>
@@ -1761,11 +1454,9 @@ export default function WalletPage({
       <AuthLoading>
         <WalletLoading />
       </AuthLoading>
-
       <Unauthenticated>
         <WalletUnauthenticated onBack={onBack} />
       </Unauthenticated>
-
       <Authenticated>
         <WalletInner onBack={onBack} />
       </Authenticated>
@@ -1778,10 +1469,7 @@ export default function WalletPage({
 // ============================================================================
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
 
   backgroundGlowOne: {
     position: "absolute",
@@ -1792,7 +1480,6 @@ const styles = StyleSheet.create({
     top: -120,
     right: -100,
   },
-
   backgroundGlowTwo: {
     position: "absolute",
     width: 260,
@@ -1803,27 +1490,11 @@ const styles = StyleSheet.create({
     left: -160,
   },
 
-  scroll: {
-    flex: 1,
-  },
+  scroll: { flex: 1 },
+  scrollContent: { paddingTop: 54, paddingHorizontal: 18 },
 
-  scrollContent: {
-    paddingTop: 54,
-    paddingHorizontal: 18,
-  },
-
-  pressed: {
-    opacity: 0.72,
-    transform: [{ scale: 0.98 }],
-  },
-
-  disabled: {
-    opacity: 0.45,
-  },
-
-  // --------------------------------------------------------------------------
-  // LOADING
-  // --------------------------------------------------------------------------
+  pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
+  disabled: { opacity: 0.45 },
 
   loadingScreen: {
     flex: 1,
@@ -1833,7 +1504,6 @@ const styles = StyleSheet.create({
     gap: 18,
     paddingHorizontal: 30,
   },
-
   loadingLogo: {
     width: 68,
     height: 68,
@@ -1844,16 +1514,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(16,185,129,0.2)",
   },
-
   loadingText: {
     color: COLORS.textSecondary,
     fontSize: 13,
     textAlign: "center",
   },
-
-  // --------------------------------------------------------------------------
-  // ERROR
-  // --------------------------------------------------------------------------
 
   errorScreen: {
     flex: 1,
@@ -1862,7 +1527,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 30,
   },
-
   errorIcon: {
     width: 70,
     height: 70,
@@ -1872,7 +1536,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.redSoft,
     marginBottom: 20,
   },
-
   errorTitle: {
     color: COLORS.text,
     fontSize: 19,
@@ -1880,7 +1543,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 10,
   },
-
   errorDescription: {
     color: COLORS.textSecondary,
     fontSize: 13,
@@ -1889,10 +1551,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // --------------------------------------------------------------------------
-  // UNAUTHENTICATED
-  // --------------------------------------------------------------------------
-
   unauthenticatedScreen: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -1900,7 +1558,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 28,
   },
-
   backButton: {
     position: "absolute",
     top: 54,
@@ -1914,7 +1571,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   unauthenticatedIcon: {
     width: 86,
     height: 86,
@@ -1926,7 +1582,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     marginBottom: 20,
   },
-
   unauthenticatedTitle: {
     color: COLORS.text,
     fontSize: 21,
@@ -1934,7 +1589,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 10,
   },
-
   unauthenticatedDescription: {
     color: COLORS.textSecondary,
     fontSize: 13,
@@ -1943,23 +1597,13 @@ const styles = StyleSheet.create({
     maxWidth: 330,
   },
 
-  // --------------------------------------------------------------------------
-  // HEADER
-  // --------------------------------------------------------------------------
-
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 18,
   },
-
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-  },
-
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 11 },
   iconButton: {
     width: 40,
     height: 40,
@@ -1970,21 +1614,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   headerTitle: {
     color: COLORS.text,
     fontSize: 20,
     fontWeight: "900",
     letterSpacing: -0.4,
   },
-
   headerSubtitle: {
     color: COLORS.green,
     fontSize: 11,
     fontWeight: "700",
     marginTop: 2,
   },
-
   secureBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -1996,16 +1637,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(16,185,129,0.18)",
   },
-
-  secureText: {
-    color: COLORS.green,
-    fontSize: 9,
-    fontWeight: "800",
-  },
-
-  // --------------------------------------------------------------------------
-  // MULTI CURRENCY
-  // --------------------------------------------------------------------------
+  secureText: { color: COLORS.green, fontSize: 9, fontWeight: "800" },
 
   multiCurrencyNotice: {
     flexDirection: "row",
@@ -2017,27 +1649,18 @@ const styles = StyleSheet.create({
     borderColor: "rgba(59,130,246,0.15)",
     marginBottom: 14,
   },
-
-  multiCurrencyTextContainer: {
-    flex: 1,
-  },
-
+  multiCurrencyTextContainer: { flex: 1 },
   multiCurrencyTitle: {
     color: COLORS.text,
     fontSize: 12,
     fontWeight: "800",
     marginBottom: 3,
   },
-
   multiCurrencyDescription: {
     color: COLORS.textSecondary,
     fontSize: 10,
     lineHeight: 15,
   },
-
-  // --------------------------------------------------------------------------
-  // BALANCE
-  // --------------------------------------------------------------------------
 
   balanceCard: {
     minHeight: 220,
@@ -2049,7 +1672,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 16,
   },
-
   balanceCardGlow: {
     position: "absolute",
     width: 170,
@@ -2059,20 +1681,13 @@ const styles = StyleSheet.create({
     right: -65,
     top: -65,
   },
-
   balanceTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 27,
   },
-
-  balanceBrand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-
+  balanceBrand: { flexDirection: "row", alignItems: "center", gap: 9 },
   walletMiniIcon: {
     width: 35,
     height: 35,
@@ -2081,31 +1696,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: COLORS.greenSoft,
   },
-
-  balanceBrandTitle: {
-    color: COLORS.text,
-    fontSize: 12,
-    fontWeight: "800",
-  },
-
-  balanceBrandSubtitle: {
-    color: COLORS.textMuted,
-    fontSize: 9,
-    marginTop: 2,
-  },
-
-  protectedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-
-  protectedText: {
-    color: COLORS.textMuted,
-    fontSize: 9,
-    fontWeight: "700",
-  },
-
+  balanceBrandTitle: { color: COLORS.text, fontSize: 12, fontWeight: "800" },
+  balanceBrandSubtitle: { color: COLORS.textMuted, fontSize: 9, marginTop: 2 },
+  protectedBadge: { flexDirection: "row", alignItems: "center", gap: 5 },
+  protectedText: { color: COLORS.textMuted, fontSize: 9, fontWeight: "700" },
   balanceLabel: {
     color: COLORS.textMuted,
     fontSize: 9,
@@ -2113,13 +1707,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 5,
   },
-
-  balanceValueRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-
+  balanceValueRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   balanceValue: {
     flexShrink: 1,
     color: COLORS.text,
@@ -2127,7 +1715,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: -1.1,
   },
-
   eyeButton: {
     width: 32,
     height: 32,
@@ -2136,27 +1723,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255,255,255,0.09)",
   },
-
   currencyLine: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
     marginTop: 10,
   },
-
   currencyPill: {
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 9,
     backgroundColor: "rgba(255,255,255,0.05)",
   },
-
-  currencyPillText: {
-    color: COLORS.textMuted,
-    fontSize: 9,
-    fontWeight: "700",
-  },
-
+  currencyPillText: { color: COLORS.textMuted, fontSize: 9, fontWeight: "700" },
   balanceFooter: {
     flexDirection: "row",
     alignItems: "center",
@@ -2165,14 +1744,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.07)",
   },
-
   balanceFooterDivider: {
     width: 1,
     height: 30,
     backgroundColor: "rgba(255,255,255,0.08)",
     marginHorizontal: 20,
   },
-
   balanceFooterLabel: {
     color: COLORS.textMuted,
     fontSize: 8,
@@ -2180,35 +1757,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     marginBottom: 4,
   },
+  balanceFooterValueRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  incomeValue: { color: COLORS.green, fontSize: 11, fontWeight: "800" },
+  expenseValue: { color: COLORS.red, fontSize: 11, fontWeight: "800" },
 
-  balanceFooterValueRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-
-  incomeValue: {
-    color: COLORS.green,
-    fontSize: 11,
-    fontWeight: "800",
-  },
-
-  expenseValue: {
-    color: COLORS.red,
-    fontSize: 11,
-    fontWeight: "800",
-  },
-
-  // --------------------------------------------------------------------------
-  // ACTIONS
-  // --------------------------------------------------------------------------
-
-  actionsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 18,
-  },
-
+  actionsRow: { flexDirection: "row", gap: 8, marginBottom: 18 },
   actionCard: {
     flex: 1,
     minHeight: 86,
@@ -2218,41 +1771,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderWidth: 1,
   },
-
   actionGreen: {
     backgroundColor: COLORS.greenSoft,
     borderColor: "rgba(16,185,129,0.15)",
   },
-
   actionBlue: {
     backgroundColor: COLORS.blueSoft,
     borderColor: "rgba(59,130,246,0.15)",
   },
-
   actionPurple: {
     backgroundColor: COLORS.purpleSoft,
     borderColor: "rgba(139,92,246,0.15)",
   },
-
   actionOrange: {
     backgroundColor: COLORS.orangeSoft,
     borderColor: "rgba(249,115,22,0.15)",
   },
-
-  actionIcon: {
-    marginBottom: 7,
-  },
-
+  actionIcon: { marginBottom: 7 },
   actionLabel: {
     color: COLORS.textSecondary,
     fontSize: 9,
     fontWeight: "800",
     textAlign: "center",
   },
-
-  // --------------------------------------------------------------------------
-  // TABS
-  // --------------------------------------------------------------------------
 
   tabsContainer: {
     flexDirection: "row",
@@ -2263,7 +1804,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     marginBottom: 22,
   },
-
   tab: {
     flex: 1,
     minHeight: 37,
@@ -2271,49 +1811,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  tabSelected: { backgroundColor: COLORS.greenSoft },
+  tabText: { color: COLORS.textMuted, fontSize: 10, fontWeight: "700" },
+  tabTextSelected: { color: COLORS.green },
 
-  tabSelected: {
-    backgroundColor: COLORS.greenSoft,
-  },
-
-  tabText: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    fontWeight: "700",
-  },
-
-  tabTextSelected: {
-    color: COLORS.green,
-  },
-
-  // --------------------------------------------------------------------------
-  // SECTIONS
-  // --------------------------------------------------------------------------
-
-  section: {
-    gap: 14,
-  },
-
+  section: { gap: 14 },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   sectionEyebrow: {
     color: COLORS.textMuted,
     fontSize: 8,
     fontWeight: "900",
     letterSpacing: 1.4,
   },
-
   sectionTitle: {
     color: COLORS.text,
     fontSize: 18,
     fontWeight: "900",
     marginTop: 4,
   },
-
   liveIndicator: {
     flexDirection: "row",
     alignItems: "center",
@@ -2323,25 +1842,14 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: COLORS.greenSoft,
   },
-
   liveDot: {
     width: 5,
     height: 5,
     borderRadius: 3,
     backgroundColor: COLORS.green,
   },
-
-  liveText: {
-    color: COLORS.green,
-    fontSize: 8,
-    fontWeight: "900",
-  },
-
-  statsGrid: {
-    flexDirection: "row",
-    gap: 10,
-  },
-
+  liveText: { color: COLORS.green, fontSize: 8, fontWeight: "900" },
+  statsGrid: { flexDirection: "row", gap: 10 },
   statCard: {
     flex: 1,
     minHeight: 115,
@@ -2351,7 +1859,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   statIcon: {
     width: 32,
     height: 32,
@@ -2360,19 +1867,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 10,
   },
-
-  statValue: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "900",
-  },
-
-  statLabel: {
-    color: COLORS.textMuted,
-    fontSize: 9,
-    marginTop: 4,
-  },
-
+  statValue: { color: COLORS.text, fontSize: 14, fontWeight: "900" },
+  statLabel: { color: COLORS.textMuted, fontSize: 9, marginTop: 4 },
   realDataCard: {
     flexDirection: "row",
     gap: 12,
@@ -2382,7 +1878,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(16,185,129,0.14)",
   },
-
   realDataIcon: {
     width: 39,
     height: 39,
@@ -2391,37 +1886,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(16,185,129,0.1)",
   },
-
-  realDataContent: {
-    flex: 1,
-  },
-
+  realDataContent: { flex: 1 },
   realDataTitle: {
     color: COLORS.text,
     fontSize: 12,
     fontWeight: "800",
     marginBottom: 4,
   },
-
   realDataDescription: {
     color: COLORS.textSecondary,
     fontSize: 10,
     lineHeight: 15,
   },
-
   recentHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 8,
   },
-
-  seeAll: {
-    color: COLORS.green,
-    fontSize: 10,
-    fontWeight: "800",
-  },
-
+  seeAll: { color: COLORS.green, fontSize: 10, fontWeight: "800" },
   countBadge: {
     minWidth: 28,
     height: 28,
@@ -2431,16 +1914,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: COLORS.greenSoft,
   },
-
-  countBadgeText: {
-    color: COLORS.green,
-    fontSize: 10,
-    fontWeight: "900",
-  },
-
-  // --------------------------------------------------------------------------
-  // LOADING PANELS
-  // --------------------------------------------------------------------------
+  countBadgeText: { color: COLORS.green, fontSize: 10, fontWeight: "900" },
 
   inlineLoading: {
     minHeight: 90,
@@ -2449,12 +1923,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
-
-  inlineLoadingText: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-  },
-
+  inlineLoadingText: { color: COLORS.textMuted, fontSize: 11 },
   loadingPanel: {
     minHeight: 180,
     borderRadius: 22,
@@ -2465,20 +1934,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  loadingPanelText: { color: COLORS.textMuted, fontSize: 11 },
 
-  loadingPanelText: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-  },
-
-  // --------------------------------------------------------------------------
-  // TRANSACTIONS
-  // --------------------------------------------------------------------------
-
-  transactionList: {
-    gap: 8,
-  },
-
+  transactionList: { gap: 8 },
   transactionCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -2489,7 +1947,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   transactionIcon: {
     width: 40,
     height: 40,
@@ -2497,60 +1954,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  transactionMain: {
-    flex: 1,
-    minWidth: 0,
-  },
-
+  transactionMain: { flex: 1, minWidth: 0 },
   transactionDescription: {
     color: COLORS.text,
     fontSize: 11,
     fontWeight: "800",
   },
-
   transactionMeta: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
     marginTop: 5,
   },
-
-  statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-
-  statusText: {
-    fontSize: 7,
-    fontWeight: "900",
-  },
-
-  transactionDetails: {
-    marginTop: 6,
-    gap: 2,
-  },
-
-  transactionDetailText: {
-    color: COLORS.textMuted,
-    fontSize: 8,
-  },
-
-  transactionReference: {
-    color: COLORS.textMuted,
-    fontSize: 8,
-  },
-
-  transactionAmount: {
-    fontSize: 10,
-    fontWeight: "900",
-    flexShrink: 0,
-  },
-
-  // --------------------------------------------------------------------------
-  // EMPTY
-  // --------------------------------------------------------------------------
+  statusBadge: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
+  statusText: { fontSize: 7, fontWeight: "900" },
+  transactionDetails: { marginTop: 6, gap: 2 },
+  transactionDetailText: { color: COLORS.textMuted, fontSize: 8 },
+  transactionReference: { color: COLORS.textMuted, fontSize: 8 },
+  transactionAmount: { fontSize: 10, fontWeight: "900", flexShrink: 0 },
 
   emptyTransactions: {
     minHeight: 190,
@@ -2562,7 +1983,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   emptyTransactionsIcon: {
     width: 62,
     height: 62,
@@ -2572,24 +1992,18 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.04)",
     marginBottom: 13,
   },
-
   emptyTransactionsTitle: {
     color: COLORS.text,
     fontSize: 14,
     fontWeight: "800",
     marginBottom: 5,
   },
-
   emptyTransactionsDescription: {
     color: COLORS.textMuted,
     fontSize: 10,
     lineHeight: 15,
     textAlign: "center",
   },
-
-  // --------------------------------------------------------------------------
-  // BUDGET
-  // --------------------------------------------------------------------------
 
   emptyBudgetCard: {
     minHeight: 310,
@@ -2601,7 +2015,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   emptyBudgetIcon: {
     width: 68,
     height: 68,
@@ -2611,14 +2024,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.purpleSoft,
     marginBottom: 17,
   },
-
   emptyBudgetTitle: {
     color: COLORS.text,
     fontSize: 16,
     fontWeight: "900",
     marginBottom: 7,
   },
-
   emptyBudgetDescription: {
     color: COLORS.textMuted,
     fontSize: 10,
@@ -2638,7 +2049,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   budgetSummaryLabel: {
     color: COLORS.textMuted,
     fontSize: 8,
@@ -2646,23 +2056,13 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 5,
   },
-
-  budgetSummaryValue: {
-    color: COLORS.text,
-    fontSize: 23,
-    fontWeight: "900",
-  },
-
+  budgetSummaryValue: { color: COLORS.text, fontSize: 23, fontWeight: "900" },
   budgetSummarySecondary: {
     color: COLORS.textMuted,
     fontSize: 9,
     marginTop: 3,
   },
-
-  budgetRemaining: {
-    alignItems: "flex-end",
-  },
-
+  budgetRemaining: { alignItems: "flex-end" },
   budgetRemainingLabel: {
     color: COLORS.textMuted,
     fontSize: 8,
@@ -2670,24 +2070,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 5,
   },
-
-  budgetRemainingValue: {
-    fontSize: 15,
-    fontWeight: "900",
-  },
-
+  budgetRemainingValue: { fontSize: 15, fontWeight: "900" },
   budgetProgressTrack: {
     height: 8,
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.07)",
   },
-
-  budgetProgressFill: {
-    height: "100%",
-    borderRadius: 8,
-  },
-
+  budgetProgressFill: { height: "100%", borderRadius: 8 },
   categoryTitle: {
     color: COLORS.textMuted,
     fontSize: 8,
@@ -2695,11 +2085,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.3,
     marginTop: 5,
   },
-
-  categoryList: {
-    gap: 8,
-  },
-
+  categoryList: { gap: 8 },
   categoryCard: {
     padding: 14,
     borderRadius: 18,
@@ -2707,51 +2093,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   categoryCardOver: {
     backgroundColor: COLORS.redSoft,
     borderColor: "rgba(239,68,68,0.18)",
   },
-
   categoryHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 10,
   },
-
   categoryIdentity: {
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
     flex: 1,
   },
-
   categoryDot: {
     width: 9,
     height: 9,
     borderRadius: 5,
     backgroundColor: COLORS.green,
   },
-
-  categoryName: {
-    color: COLORS.text,
-    fontSize: 11,
-    fontWeight: "800",
-  },
-
-  categoryAmounts: {
-    color: COLORS.textMuted,
-    fontSize: 8,
-    marginTop: 3,
-  },
-
-  categoryActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-
+  categoryName: { color: COLORS.text, fontSize: 11, fontWeight: "800" },
+  categoryAmounts: { color: COLORS.textMuted, fontSize: 8, marginTop: 3 },
+  categoryActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   overBudgetBadge: {
     color: COLORS.red,
     fontSize: 7,
@@ -2761,7 +2127,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: COLORS.redSoft,
   },
-
   categoryInput: {
     width: 76,
     height: 31,
@@ -2774,64 +2139,62 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: "right",
   },
-
   categoryProgressTrack: {
     height: 6,
     borderRadius: 6,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.07)",
   },
-
-  categoryProgressFill: {
-    height: "100%",
-    borderRadius: 6,
-  },
-
-  // --------------------------------------------------------------------------
-  // PRIMARY BUTTON
-  // --------------------------------------------------------------------------
+  categoryProgressFill: { height: "100%", borderRadius: 6 },
 
   primaryButton: {
-    minHeight: 49,
+    width: "100%",
     borderRadius: 16,
+    backgroundColor: "#2563EB",
+    borderWidth: 1,
+    borderColor: "rgba(96,165,250,0.45)",
+    overflow: "hidden",
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  primaryButtonInner: {
+    height: 54,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 18,
-    backgroundColor: "#2563EB",
-    borderWidth: 1,
-    borderColor: "rgba(96,165,250,0.18)",
   },
-
   primaryButtonText: {
     color: "#FFFFFF",
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "900",
+    letterSpacing: 0.3,
   },
-
-  // --------------------------------------------------------------------------
-  // MODAL
-  // --------------------------------------------------------------------------
 
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
+    alignItems: "stretch",
     backgroundColor: "rgba(0,0,0,0.76)",
   },
-
   modalCard: {
+    width: "100%",
+    alignSelf: "stretch",
     maxHeight: "92%",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 28,
+    paddingBottom: 0,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
+    overflow: "hidden",
   },
-
   modalHandle: {
     alignSelf: "center",
     width: 44,
@@ -2840,26 +2203,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.18)",
     marginBottom: 18,
   },
-
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 16,
   },
-
-  modalTitle: {
-    color: COLORS.text,
-    fontSize: 18,
-    fontWeight: "900",
-  },
-
-  modalSubtitle: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    marginTop: 3,
-  },
-
+  modalHeaderTextContainer: { flex: 1, minWidth: 0, paddingRight: 12 },
+  modalTitle: { color: COLORS.text, fontSize: 18, fontWeight: "900" },
+  modalSubtitle: { color: COLORS.textMuted, fontSize: 10, marginTop: 3 },
   modalClose: {
     width: 35,
     height: 35,
@@ -2867,8 +2219,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.surfaceSoft,
+    flexShrink: 0,
   },
-
+  modalScroll: { flexGrow: 0 },
+  modalScrollContent: { paddingBottom: 28 },
   realPaymentNotice: {
     flexDirection: "row",
     gap: 9,
@@ -2879,14 +2233,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(16,185,129,0.13)",
     marginBottom: 18,
   },
-
   realPaymentNoticeText: {
     flex: 1,
     color: COLORS.textSecondary,
     fontSize: 9,
     lineHeight: 14,
   },
-
   fieldLabel: {
     color: COLORS.textMuted,
     fontSize: 8,
@@ -2897,35 +2249,30 @@ const styles = StyleSheet.create({
   },
 
   providerGrid: {
+    width: "100%",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 13,
+    justifyContent: "space-between",
+    rowGap: 10,
+    marginBottom: 15,
   },
-
   providerCard: {
     width: "48%",
-    minHeight: 52,
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 11,
+    gap: 10,
+    paddingHorizontal: 13,
     borderRadius: 14,
     backgroundColor: COLORS.surfaceSoft,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
-  providerDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-  },
-
+  providerDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   providerLabel: {
     flex: 1,
     color: COLORS.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "800",
   },
 
@@ -2940,13 +2287,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 11,
   },
-
-  quickAmounts: {
-    flexDirection: "row",
-    gap: 7,
-    marginBottom: 8,
-  },
-
+  quickAmounts: { flexDirection: "row", gap: 7, marginBottom: 8 },
   quickAmount: {
     flex: 1,
     minHeight: 40,
@@ -2957,71 +2298,70 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-
   quickAmountSelected: {
     backgroundColor: COLORS.purpleSoft,
     borderColor: "rgba(139,92,246,0.4)",
   },
-
   quickAmountText: {
     color: COLORS.textSecondary,
     fontSize: 9,
     fontWeight: "800",
   },
-
-  quickAmountTextSelected: {
-    color: COLORS.purple,
-  },
-
+  quickAmountTextSelected: { color: COLORS.purple },
   modalFootnote: {
     color: COLORS.textMuted,
     fontSize: 8,
     lineHeight: 13,
     textAlign: "center",
-    marginTop: 9,
+    marginTop: 12,
   },
-
-  // --------------------------------------------------------------------------
-  // DIVIDER + STRIPE BUTTON
-  // --------------------------------------------------------------------------
 
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginTop: 18,
-    marginBottom: 12,
+    marginTop: 22,
+    marginBottom: 16,
   },
-
   dividerLine: {
     flex: 1,
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
   },
-
   dividerText: {
     color: COLORS.textMuted,
     fontSize: 9,
     fontWeight: "900",
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
 
   stripeButton: {
-    minHeight: 49,
+    width: "100%",
     borderRadius: 16,
+    backgroundColor: "#635BFF",
+    borderWidth: 1,
+    borderColor: "rgba(99,91,255,0.5)",
+    overflow: "hidden",
+    shadowColor: "#635BFF",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  stripeButtonInner: {
+    height: 54,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 18,
-    backgroundColor: "#635BFF",
-    borderWidth: 1,
-    borderColor: "rgba(99,91,255,0.28)",
   },
-
-  // --------------------------------------------------------------------------
-  // INFO MODAL
-  // --------------------------------------------------------------------------
+  stripeButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+  },
 
   centerModalOverlay: {
     flex: 1,
@@ -3030,7 +2370,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     backgroundColor: "rgba(0,0,0,0.78)",
   },
-
   infoModal: {
     width: "100%",
     borderRadius: 26,
@@ -3039,7 +2378,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderStrong,
   },
-
   infoModalIcon: {
     width: 54,
     height: 54,
@@ -3049,21 +2387,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.greenSoft,
     marginBottom: 16,
   },
-
   infoModalTitle: {
     color: COLORS.text,
     fontSize: 18,
     fontWeight: "900",
     marginBottom: 8,
   },
-
   infoModalDescription: {
     color: COLORS.textSecondary,
     fontSize: 11,
     lineHeight: 17,
     marginBottom: 15,
   },
-
   infoSecurityBox: {
     flexDirection: "row",
     gap: 9,
@@ -3072,7 +2407,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.greenSoft,
     marginBottom: 17,
   },
-
   infoSecurityText: {
     flex: 1,
     color: COLORS.textSecondary,
@@ -3080,7 +2414,5 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 
-  bottomSpace: {
-    height: 45,
-  },
+  bottomSpace: { height: 45 },
 });
