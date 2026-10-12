@@ -685,7 +685,16 @@ function WalletInner({ onBack }: { onBack: () => void }): React.ReactElement {
             <Text style={styles.actionLabel}>Recevoir</Text>
           </Pressable>
           <Pressable
-            onPress={() => setShowTopUp(true)}
+            // B1-a.1 — Recharges désactivées au lancement tant qu'aucun
+            // provider de paiement n'a validé un E2E réel.
+            // Pour réactiver : remplacer ce handler par
+            //   onPress={() => setShowTopUp(true)}
+            onPress={() =>
+              Alert.alert(
+                "Recharges bientôt disponibles",
+                "La recharge du portefeuille sera disponible prochainement.",
+              )
+            }
             style={({ pressed }) => [
               styles.actionCard,
               styles.actionPurple,
