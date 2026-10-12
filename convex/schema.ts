@@ -6216,6 +6216,11 @@ export default defineSchema({
     resolution: v.optional(v.string()),
     resolvedBy: v.optional(v.id("users")),
     resolvedAt: v.optional(v.number()),
+
+    // === Services V1 — ajouts (facultatifs, aucune migration requise) ===
+    providerResponse: v.optional(v.string()),
+    providerRespondedAt: v.optional(v.number()),
+
     createdAt: v.number(),
   })
     .index("by_booking", ["bookingId"])
