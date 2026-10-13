@@ -424,17 +424,30 @@ export const updateRecurringBooking = mutation({
         args.startDate ??
         new Date(recurring.nextOccurrence).toISOString().slice(0, 10);
 
-      // Cohérence date ↔ dayOfWeek
       assertDateMatchesDayOfWeek(dateStr, finalDayOfWeek);
 
       finalNextOccurrence = validateNextOccurrence(
         composeOccurrence(dateStr, finalTimeSlot),
       );
       finalAnchor = parseUTCDate(dateStr).d;
-    } else if (args.pattern !== undefined) {
-      // Changement de pattern sans changement de date :
-      // on recalcule l'anchor à partir de nextOccurrence si nécessaire
-      if (recurring.anchorDayOfMonth === undefined) {
+    } else {
+      // Aucun changement de startDate/timeSlot :
+      // si dayOfWeek OU pattern a changé, on valide contre la date courante.
+      const finalNeedsCheck =
+        args.dayOfWeek !== undefined || args.pattern !== undefined;
+
+      if (finalNeedsCheck) {
+        const currentDateStr = new Date(recurring.nextOccurrence)
+          .toISOString()
+          .slice(0, 10);
+        assertDateMatchesDayOfWeek(currentDateStr, finalDayOfWeek);
+      }
+
+      // Initialise l'anchor si absent (legacy)
+      if (
+        finalPattern === "monthly" &&
+        recurring.anchorDayOfMonth === undefined
+      ) {
         finalAnchor = new Date(recurring.nextOccurrence).getUTCDate();
       }
     }
@@ -564,8 +577,20 @@ export const deleteRecurringBooking = mutation({
 });
 
 // ────────────────────────────────────────────────────────────────
-// GÉNÉRATION — logique partagée
+// POLITIQUE DE RATTRAPAGE
 // ────────────────────────────────────────────────────────────────
+//
+// Si une occurrence est manquée depuis plus de GRACE_MS, on ne crée
+// PAS de booking rétroactif. On avance nextOccurrence jusqu'à la
+// prochaine occurrence FUTURE, sans générer.
+//
+// Exemple : client disparaît 3 mois sur une récurrence daily.
+// On ne crée pas 90 bookings. On avance au prochain jour futur.
+//
+// Dans la fenêtre de grâce (< GRACE_MS en retard), on génère la
+// booking due normalement.
+
+const MISSED_OCCURRENCE_GRACE_MS = 48 * 60 * 60 * 1000; // 48h
 
 async function generateForRecurring(
   ctx: MutationCtx,
@@ -573,10 +598,16 @@ async function generateForRecurring(
   actorId: Id<"users">,
 ): Promise<{
   generated: boolean;
-  reason?: "not_due_yet" | "ended" | "provider_inactive" | "inactive";
+  reason?:
+    | "not_due_yet"
+    | "ended"
+    | "provider_inactive"
+    | "inactive"
+    | "skipped_missed";
   bookingId?: Id<"serviceBookings">;
   nextOccurrence: number;
   active: boolean;
+  skippedCount?: number;
 }> {
   if (!recurring.active) {
     return {
@@ -598,6 +629,7 @@ async function generateForRecurring(
     };
   }
 
+  // Fin de récurrence déjà atteinte
   if (
     recurring.endsAt !== undefined &&
     recurring.nextOccurrence >= recurring.endsAt
@@ -622,7 +654,87 @@ async function generateForRecurring(
     };
   }
 
-  const scheduledAt = new Date(recurring.nextOccurrence).toISOString();
+  // ── Politique de rattrapage : skip si trop en retard
+  const latenessMs = now - recurring.nextOccurrence;
+  let scheduledOccurrence = recurring.nextOccurrence;
+
+  if (latenessMs > MISSED_OCCURRENCE_GRACE_MS) {
+    // Avance nextOccurrence jusqu'à la première occurrence future,
+    // sans générer de booking pour les occurrences manquées.
+    let cursor = recurring.nextOccurrence;
+    let skipped = 0;
+    const MAX_SKIP = 500; // borne de sécurité (daily sur ~1 an et demi)
+
+    while (cursor <= now && skipped < MAX_SKIP) {
+      const next = advance(
+        cursor,
+        recurring.pattern,
+        recurring.anchorDayOfMonth ?? null,
+      );
+      if (next === cursor) break; // garde-fou anti-boucle
+      cursor = next;
+      skipped++;
+
+      if (recurring.endsAt !== undefined && cursor >= recurring.endsAt) {
+        await ctx.db.patch(recurring._id, {
+          nextOccurrence: cursor,
+          active: false,
+        });
+        await logHistory(ctx, recurring.providerId, "recurring.ended", actorId);
+        return {
+          generated: false,
+          reason: "ended",
+          nextOccurrence: cursor,
+          active: false,
+          skippedCount: skipped,
+        };
+      }
+    }
+
+    if (skipped >= MAX_SKIP) {
+      // Trop d'occurrences manquées : on désactive plutôt que boucler.
+      await ctx.db.patch(recurring._id, {
+        active: false,
+        nextOccurrence: cursor,
+      });
+      await logHistory(
+        ctx,
+        recurring.providerId,
+        "recurring.abandoned",
+        actorId,
+      );
+      return {
+        generated: false,
+        reason: "skipped_missed",
+        nextOccurrence: cursor,
+        active: false,
+        skippedCount: skipped,
+      };
+    }
+
+    // cursor > now : nouvelle date valide, pas de booking pour le skip
+    await ctx.db.patch(recurring._id, {
+      nextOccurrence: cursor,
+      lastCreatedAt: now,
+    });
+    await logHistory(
+      ctx,
+      recurring.providerId,
+      "recurring.skipped_missed",
+      actorId,
+    );
+
+    return {
+      generated: false,
+      reason: "skipped_missed",
+      nextOccurrence: cursor,
+      active: true,
+      skippedCount: skipped,
+    };
+  }
+
+  // ── Fenêtre de grâce : on génère normalement
+  const scheduledAt = new Date(scheduledOccurrence).toISOString();
 
   const bookingId = await ctx.db.insert("serviceBookings", {
     providerId: recurring.providerId,
