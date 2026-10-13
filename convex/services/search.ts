@@ -1,25 +1,28 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
+import { isPubliclyVisible } from "./_shared";
 
 // Search V2 — adapter Services
-// N'utilise QUE des index. Aucun scan complet.
+// Utilise searchIndex + index by_status / by_category_and_status.
+// Aucun scan complet.
 export const searchServices = query({
   args: {
     search: v.optional(v.string()),
     category: v.optional(v.string()),
     verified: v.optional(v.boolean()),
     limit: v.optional(v.number()),
+    allowDemo: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 20;
     const term = (args.search ?? "").trim();
+    const allowDemo = args.allowDemo === true;
 
-    // ── Cas 1 : pas de terme → requête indexée ──
+    // ── Cas 1 : pas de terme → requête indexée
     if (term.length === 0) {
       let results;
 
       if (args.category) {
-        // Index by_category_and_status : premier champ = category
         results = await ctx.db
           .query("serviceProviders")
           .withIndex("by_category_and_status", (q) =>
@@ -27,17 +30,18 @@ export const searchServices = query({
           )
           .take(limit * 3);
       } else {
-        // Index by_status : premier champ = status
         results = await ctx.db
           .query("serviceProviders")
           .withIndex("by_status", (q) => q.eq("status", "active"))
           .take(limit * 3);
       }
 
-      return results.filter((p) => p.isDemo !== true).slice(0, limit);
+      return results
+        .filter((p) => isPubliclyVisible(p, allowDemo))
+        .slice(0, limit);
     }
 
-    // ── Cas 2 : terme textuel → searchIndex ──
+    // ── Cas 2 : terme textuel → searchIndex
     const results = await ctx.db
       .query("serviceProviders")
       .withSearchIndex("search_services", (q) => {
@@ -49,7 +53,7 @@ export const searchServices = query({
 
     return results
       .filter((p) => {
-        if (p.isDemo === true) return false;
+        if (!isPubliclyVisible(p, allowDemo)) return false;
         if (args.verified !== undefined && p.verified !== args.verified) {
           return false;
         }

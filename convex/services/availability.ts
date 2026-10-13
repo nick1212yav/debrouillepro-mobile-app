@@ -16,6 +16,7 @@ import { query, mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
+import { isPubliclyVisible } from "./_shared";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -165,14 +166,6 @@ function validateSlots(slots: Slot[]): Slot[] {
   }
 
   return validated;
-}
-
-// ────────────────────────────────────────────────────────────────
-// VISIBILITÉ PUBLIQUE — règle unique
-// ────────────────────────────────────────────────────────────────
-
-function isPubliclyVisible(provider: Doc<"serviceProviders">): boolean {
-  return provider.status === "active" && provider.isDemo !== true;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -369,11 +362,12 @@ export const getAvailability = query({
     providerId: v.id("serviceProviders"),
     fromDate: v.optional(v.string()),
     toDate: v.optional(v.string()),
+    allowDemo: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const provider = await ctx.db.get(args.providerId);
     if (!provider) return [];
-    if (!isPubliclyVisible(provider)) return [];
+    if (!isPubliclyVisible(provider, args.allowDemo === true)) return [];
 
     assertRange(args.fromDate, args.toDate);
 
@@ -401,11 +395,12 @@ export const getExceptions = query({
     providerId: v.id("serviceProviders"),
     fromDate: v.optional(v.string()),
     toDate: v.optional(v.string()),
+    allowDemo: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const provider = await ctx.db.get(args.providerId);
     if (!provider) return [];
-    if (!isPubliclyVisible(provider)) return [];
+    if (!isPubliclyVisible(provider, args.allowDemo === true)) return [];
 
     assertRange(args.fromDate, args.toDate);
 

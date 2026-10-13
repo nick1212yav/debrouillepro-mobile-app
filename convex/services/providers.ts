@@ -8,6 +8,7 @@ import { query, mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
+import { isPubliclyVisible } from "./_shared";
 
 type Ctx = QueryCtx | MutationCtx;
 
@@ -69,7 +70,7 @@ async function resolveImageUrl(ctx: Ctx, imgId: string): Promise<string> {
     return imgId;
   }
   if (!STORAGE_ID_RE.test(imgId)) {
-    return imgId; // format inconnu → on renvoie tel quel, pas d'erreur
+    return imgId;
   }
   try {
     const url = await ctx.storage.getUrl(imgId as Id<"_storage">);
@@ -162,16 +163,18 @@ export const getMyProviderProfile = query({
 });
 
 // ────────────────────────────────────────────────────────────────
-// LECTURE PUBLIQUE — exclusions strictes
+// LECTURE PUBLIQUE — allowDemo opt-in pour dev/preview
 // ────────────────────────────────────────────────────────────────
 
 export const listProvidersPublic = query({
   args: {
     category: v.optional(v.string()),
     limit: v.optional(v.number()),
+    allowDemo: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const limit = clampLimit(args.limit, 50);
+    const allowDemo = args.allowDemo === true;
 
     let results;
     if (args.category) {
@@ -189,7 +192,7 @@ export const listProvidersPublic = query({
     }
 
     const filtered = results
-      .filter((p) => p.isDemo !== true && p.status === "active")
+      .filter((p) => isPubliclyVisible(p, allowDemo))
       .slice(0, limit);
 
     return Promise.all(filtered.map((p) => resolveProviderImages(ctx, p)));
@@ -201,15 +204,14 @@ export const listProvidersPublic = query({
 // ────────────────────────────────────────────────────────────────
 
 export const getProviderById = query({
-  args: { id: v.id("serviceProviders") },
+  args: {
+    id: v.id("serviceProviders"),
+    allowDemo: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
     const provider = await ctx.db.get(args.id);
     if (!provider) return null;
-
-    // Exclusion stricte : démo / archivé / suspendu / pause / brouillon
-    if (provider.isDemo === true) return null;
-    if (provider.status !== "active") return null;
-
+    if (!isPubliclyVisible(provider, args.allowDemo === true)) return null;
     return await resolveProviderImages(ctx, provider);
   },
 });
@@ -319,7 +321,6 @@ export const updateProvider = mutation({
       });
     }
 
-    // Patch construit explicitement — aucun cast
     const patch: Partial<Doc<"serviceProviders">> = {};
 
     if (args.name !== undefined) patch.name = args.name;
@@ -455,7 +456,7 @@ export const deleteProvider = mutation({
 });
 
 // ────────────────────────────────────────────────────────────────
-// VIEW TRACKING — atomique sous Convex OCC
+// VIEW TRACKING
 // ────────────────────────────────────────────────────────────────
 
 export const trackView = mutation({
@@ -474,16 +475,18 @@ export const trackView = mutation({
 });
 
 // ────────────────────────────────────────────────────────────────
-// RECOMMANDATIONS — bornée, exclusions strictes
+// RECOMMANDATIONS — allowDemo opt-in
 // ────────────────────────────────────────────────────────────────
 
 export const recommend = query({
   args: {
     providerId: v.id("serviceProviders"),
     limit: v.optional(v.number()),
+    allowDemo: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const limit = clampLimit(args.limit, 6);
+    const allowDemo = args.allowDemo === true;
     const provider = await ctx.db.get(args.providerId);
     if (!provider) return [];
 
@@ -495,7 +498,9 @@ export const recommend = query({
       .take(limit * 3 + 1);
 
     const filtered = results
-      .filter((p) => p._id !== args.providerId && p.isDemo !== true)
+      .filter(
+        (p) => p._id !== args.providerId && isPubliclyVisible(p, allowDemo),
+      )
       .slice(0, limit);
 
     return Promise.all(filtered.map((p) => resolveProviderImages(ctx, p)));
