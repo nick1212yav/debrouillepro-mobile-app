@@ -6356,6 +6356,7 @@ export default defineSchema({
     active: v.boolean(),
     nextOccurrence: v.number(),
     lastCreatedAt: v.optional(v.number()),
+    endsAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_provider", ["providerId"])
