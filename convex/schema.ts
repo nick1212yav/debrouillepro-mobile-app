@@ -278,6 +278,7 @@ export default defineSchema({
       v.literal("streak"),
       v.literal("digest"),
       v.literal("annonce"),
+      v.literal("service"),
     ),
     fromUserId: v.optional(v.id("users")),
     fromUserName: v.optional(v.string()),

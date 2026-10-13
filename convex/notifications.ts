@@ -81,6 +81,7 @@ const notifTypeValidator = v.union(
   v.literal("streak"),
   v.literal("digest"),
   v.literal("annonce"),
+  v.literal("service"),
 );
 
 const priorityValidator = v.union(
@@ -836,5 +837,53 @@ export const sendSmartNotifs = mutation({
         });
       }
     }
+  },
+});
+// ─────────────────────────────────────────────────────────────────────────────
+// INSERTION VERS UN AUTRE UTILISATEUR — internalMutation
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// `insert` cible l'utilisateur courant (requireUser).
+// `createSocial` cible un autre user mais restreint les types à
+// like|comment|follow.
+//
+// Ce canal dédié permet aux modules métier (Services, etc.) d'envoyer une
+// notification à un destinataire explicite avec n'importe quel type du
+// validator. Non exposé au client.
+//
+// L'appelant DOIT avoir vérifié les permissions métier avant d'appeler.
+
+export const insertForUser = internalMutation({
+  args: {
+    userId: v.id("users"),
+    type: notifTypeValidator,
+    module: v.string(),
+    title: v.string(),
+    body: v.string(),
+    actionPage: v.optional(v.string()),
+    priority: v.optional(priorityValidator),
+    pinned: v.optional(v.boolean()),
+  },
+
+  handler: async (ctx, args): Promise<void> => {
+    assertNonEmpty(args.module, "module");
+    assertNonEmpty(args.title, "title");
+
+    assertMaxLength(args.module, MAX_MODULE_LENGTH, "module");
+    assertMaxLength(args.title, MAX_TITLE_LENGTH, "title");
+    assertMaxLength(args.body, MAX_BODY_LENGTH, "body");
+    assertMaxLength(args.actionPage, MAX_ACTION_PAGE_LENGTH, "actionPage");
+
+    await ctx.db.insert("notifications", {
+      userId: args.userId,
+      type: args.type,
+      module: args.module,
+      title: args.title,
+      body: args.body,
+      read: false,
+      pinned: args.pinned ?? false,
+      priority: args.priority ?? "normal",
+      actionPage: args.actionPage,
+    });
   },
 });
