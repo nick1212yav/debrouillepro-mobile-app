@@ -8,6 +8,11 @@
 // Règle de prix : totalPrice ≤ somme des lignes.
 // Un package peut inclure une remise groupée (total < somme),
 // jamais une majoration (total > somme).
+//
+// Règle de visibilité publique : un package n'est public que si
+//   - il est actif
+//   - son prestataire est actif ET non-démo
+// Cohérent avec `isPubliclyVisible` dans availability.ts.
 
 import { query, mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
@@ -67,6 +72,14 @@ async function requireOwnedProvider(
     });
   }
   return provider;
+}
+
+// ────────────────────────────────────────────────────────────────
+// VISIBILITÉ PUBLIQUE — règle unique
+// ────────────────────────────────────────────────────────────────
+
+function isPubliclyVisible(provider: Doc<"serviceProviders">): boolean {
+  return provider.status === "active" && provider.isDemo !== true;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -305,7 +318,7 @@ export const deletePackage = mutation({
 });
 
 // ────────────────────────────────────────────────────────────────
-// LECTURE — PUBLIQUE (uniquement actifs)
+// LECTURE — PUBLIQUE (package actif + provider visible)
 // ────────────────────────────────────────────────────────────────
 
 export const listPackages = query({
@@ -314,16 +327,18 @@ export const listPackages = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const provider = await ctx.db.get(args.providerId);
+    if (!provider) return [];
+    if (!isPubliclyVisible(provider)) return [];
+
     const limit = clampLimit(args.limit, 50);
 
-    const packages = await ctx.db
+    return ctx.db
       .query("servicePackages")
       .withIndex("by_provider_and_active", (q) =>
         q.eq("providerId", args.providerId).eq("active", true),
       )
       .take(limit);
-
-    return packages;
   },
 });
 
@@ -333,6 +348,11 @@ export const getPackageById = query({
     const pkg = await ctx.db.get(args.packageId);
     if (!pkg) return null;
     if (!pkg.active) return null;
+
+    const provider = await ctx.db.get(pkg.providerId);
+    if (!provider) return null;
+    if (!isPubliclyVisible(provider)) return null;
+
     return pkg;
   },
 });
