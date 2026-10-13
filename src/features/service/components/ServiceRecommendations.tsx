@@ -1,34 +1,63 @@
-import { View, Text, Image } from "react-native";
-import { useNavigate } from "react-router-dom";
-import { Sparkles } from "lucide-react-native";
+import { Image, Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { adaptServiceProvider } from "../adapter";
 import type { Id } from "@/convex/_generated/dataModel";
+import { adaptServiceProvider } from "../adapter";
 
 interface Props {
   providerId: Id<"serviceProviders">;
 }
 
 export function ServiceRecommendations({ providerId }: Props) {
-  const navigate = useNavigate();
-  const recsData = useQuery(api.serviceProviders.recommend, { providerId });
+  const router = useRouter();
 
-  if (!recsData || recsData.length === 0) return null;
+  // Référence conservée : vérifier l'API Convex générée avant migration.
+  const recsData = useQuery(api.serviceProviders.recommend, {
+    providerId,
+  });
 
-  const recs = recsData.map(adaptServiceProvider);
+  if (!recsData || recsData.length === 0) {
+    return null;
+  }
+
+  const recommendations = recsData.map(adaptServiceProvider).slice(0, 4);
 
   return (
-    <View className="space-y-3"><Text className="text-sm font-medium text-white/50">Recommandations</Text><View className="gap-2">{recs.slice(0, 4).map((p) => (
-          <View key={p._id} onPress={() => navigate(`/service/${p._id}`)} className="rounded-xl overflow-hidden bg-white/5 border border-white/5 p-2 transition-colors">
-            {p.imageUrl && (
-              <Image className="w-full h-16 object-cover rounded-lg" source={{ uri: p.imageUrl }} accessibilityLabel={p.name} />
-            )}
-            <Text className="text-white text-xs font-medium mt-1 truncate">
-              {p.name}
+    <View className="gap-3">
+      <Text className="text-sm font-medium text-white/50">Recommandations</Text>
+
+      <View className="gap-2">
+        {recommendations.map((provider) => (
+          <Pressable
+            key={provider._id}
+            accessibilityRole="button"
+            accessibilityLabel={`Voir le service ${provider.name}`}
+            onPress={() => {
+              router.push(`/service/${provider._id}`);
+            }}
+            className="overflow-hidden rounded-xl border border-white/5 bg-white/5 p-2 active:bg-white/10"
+          >
+            {provider.imageUrl ? (
+              <Image
+                className="h-16 w-full rounded-lg"
+                source={{ uri: provider.imageUrl }}
+                resizeMode="cover"
+                accessibilityLabel={provider.name}
+              />
+            ) : null}
+
+            <Text
+              className="mt-2 text-xs font-medium text-white"
+              numberOfLines={1}
+            >
+              {provider.name}
             </Text>
-            <Text className="text-orange-400 text-xs">{p.price}</Text>
-          </View>
-        ))}</View></View>
+
+            <Text className="text-xs text-orange-400">{provider.price}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
