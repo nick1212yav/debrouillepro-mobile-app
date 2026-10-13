@@ -10,23 +10,35 @@ import {
 } from "react-native";
 import { useState } from "react";
 import { Star } from "lucide-react-native";
-import { useServiceReviews } from "../hooks/useServiceReviews";
+import { useServiceReviewCreate } from "../hooks/useServiceReviews";
 import type { Id } from "@/convex/_generated/dataModel";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  providerId: Id<"serviceProviders">;
+  /**
+   * Réservation terminée à laquelle rattacher l'avis.
+   * V1 : obligatoire — un avis doit être lié à une prestation "done".
+   */
+  bookingId?: Id<"serviceBookings">;
 }
 
-export function ReviewSheet({ isOpen, onClose, providerId }: Props) {
+export function ReviewSheet({ isOpen, onClose, bookingId }: Props) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
-  const { addReview, loading } = useServiceReviews(providerId);
+  const [submitting, setSubmitting] = useState(false);
+  const { addReview } = useServiceReviewCreate();
 
   const handleSubmit = async () => {
-    const trimmedComment = comment.trim();
+    if (!bookingId) {
+      Alert.alert(
+        "Réservation requise",
+        "Un avis ne peut être laissé qu'après une prestation terminée.",
+      );
+      return;
+    }
 
+    const trimmedComment = comment.trim();
     if (!rating || !trimmedComment) {
       Alert.alert(
         "Informations requises",
@@ -35,13 +47,16 @@ export function ReviewSheet({ isOpen, onClose, providerId }: Props) {
       return;
     }
 
+    setSubmitting(true);
     try {
-      await addReview(rating, trimmedComment);
+      await addReview(bookingId, rating, trimmedComment);
       setRating(0);
       setComment("");
       onClose();
     } catch {
-      Alert.alert("Erreur", "Impossible d'envoyer ton avis.");
+      // toast déjà affiché par le hook
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -72,12 +87,21 @@ export function ReviewSheet({ isOpen, onClose, providerId }: Props) {
               Laisser un avis
             </Text>
 
+            {!bookingId && (
+              <View className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                <Text className="text-xs text-amber-300">
+                  Cet avis ne sera pas envoyé : aucune réservation terminée
+                  n'est associée. Ouvre une réservation terminée pour laisser un
+                  avis.
+                </Text>
+              </View>
+            )}
+
             <Text className="mb-3 text-sm text-white/60">Ta note</Text>
 
             <View className="mb-4 flex-row gap-3">
               {[1, 2, 3, 4, 5].map((value) => {
                 const selected = value <= rating;
-
                 return (
                   <Pressable
                     key={value}
@@ -106,19 +130,21 @@ export function ReviewSheet({ isOpen, onClose, providerId }: Props) {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
-              editable={!loading}
+              editable={!submitting}
             />
 
             <Pressable
               onPress={handleSubmit}
-              disabled={loading}
+              disabled={submitting || !bookingId}
               accessibilityRole="button"
               className={`mt-4 w-full items-center rounded-xl py-3.5 ${
-                loading ? "bg-orange-500/50" : "bg-orange-500"
+                submitting || !bookingId
+                  ? "bg-orange-500/50"
+                  : "bg-orange-500 active:bg-orange-600"
               }`}
             >
               <Text className="font-bold text-white">
-                {loading ? "Envoi en cours..." : "Envoyer mon avis"}
+                {submitting ? "Envoi en cours..." : "Envoyer mon avis"}
               </Text>
             </Pressable>
           </Pressable>

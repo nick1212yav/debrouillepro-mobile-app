@@ -7,14 +7,16 @@ import { adaptServiceProvider } from "../adapter";
 
 interface Props {
   providerId: Id<"serviceProviders">;
+  /** Dev/preview : autorise la lecture des prestataires isDemo. */
+  allowDemo?: boolean;
 }
 
-export function ServiceRecommendations({ providerId }: Props) {
+export function ServiceRecommendations({ providerId, allowDemo }: Props) {
   const router = useRouter();
 
-  // Référence conservée : vérifier l'API Convex générée avant migration.
-  const recsData = useQuery(api.serviceProviders.recommend, {
+  const recsData = useQuery(api.services.providers.recommend, {
     providerId,
+    allowDemo,
   });
 
   if (!recsData || recsData.length === 0) {
@@ -33,9 +35,7 @@ export function ServiceRecommendations({ providerId }: Props) {
             key={provider._id}
             accessibilityRole="button"
             accessibilityLabel={`Voir le service ${provider.name}`}
-            onPress={() => {
-              router.push(`/service/${provider._id}`);
-            }}
+            onPress={() => router.push(`/service/${provider._id}`)}
             className="overflow-hidden rounded-xl border border-white/5 bg-white/5 p-2 active:bg-white/10"
           >
             {provider.imageUrl ? (

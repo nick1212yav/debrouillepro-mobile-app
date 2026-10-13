@@ -4,7 +4,5 @@ export * from "./useServiceFavorite";
 export * from "./useServiceSearch";
 export * from "./useServiceAvailability";
 export * from "./useServiceReviews";
-export * from "./useServicePortfolio";
 export * from "./useServiceMap";
-export * from "./useServicePricing";
 export * from "./useServiceChat";
