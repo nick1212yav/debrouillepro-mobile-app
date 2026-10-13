@@ -21,7 +21,7 @@ interface Props {
 export function QuoteSheet({ isOpen, onClose, providerId }: Props) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const requestQuote = useMutation(api.serviceProviders.requestQuote);
+  const requestQuote = useMutation(api.services.quotes.requestQuote);
 
   const handleSubmit = async () => {
     const trimmedMessage = message.trim();
@@ -34,10 +34,7 @@ export function QuoteSheet({ isOpen, onClose, providerId }: Props) {
 
     setLoading(true);
     try {
-      await requestQuote({
-        providerId,
-        message: trimmedMessage,
-      });
+      await requestQuote({ providerId, message: trimmedMessage });
       setMessage("");
       onClose();
     } catch {
@@ -89,7 +86,9 @@ export function QuoteSheet({ isOpen, onClose, providerId }: Props) {
               disabled={loading}
               accessibilityRole="button"
               className={`mt-4 w-full items-center rounded-xl py-3.5 ${
-                loading ? "bg-orange-500/50" : "bg-orange-500"
+                loading
+                  ? "bg-orange-500/50"
+                  : "bg-orange-500 active:bg-orange-600"
               }`}
             >
               <Text className="font-bold text-white">

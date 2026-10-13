@@ -21,7 +21,6 @@ import {
   ServicePortfolio,
   ServiceCertificates,
   ServiceSafety,
-  ServiceHistory,
   ServiceAIAssistant,
   ServiceBooking,
 } from "@/features/service/components";
@@ -205,7 +204,6 @@ export default function ServiceDetailPage() {
           responseTime={provider.responseTime}
         />
         <ServiceReviews providerId={provider._id} />
-        <ServiceHistory providerId={provider._id} />
         <ServiceRecommendations
           providerId={provider._id}
           allowDemo={ALLOW_DEMO}
