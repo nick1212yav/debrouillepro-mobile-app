@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Image,
@@ -17,16 +18,20 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import {
   ArrowLeft,
   BookOpen,
+  Briefcase,
+  Calendar,
   Camera,
   CheckCircle,
   ChevronRight,
   Clock3,
+  FileText,
   Heart,
   MapPin,
   MessageCircle,
   Music,
   Phone,
   Plus,
+  Receipt,
   Search,
   Scissors,
   ShieldCheck,
@@ -87,18 +92,12 @@ function safeText(value: unknown): string {
 }
 
 function formatReviews(value: unknown): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "0";
-  }
-
+  if (typeof value !== "number" || !Number.isFinite(value)) return "0";
   return Math.max(0, Math.floor(value)).toLocaleString("fr-FR");
 }
 
 function formatRating(value: unknown): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "—";
-  }
-
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
   return Math.min(5, Math.max(0, value)).toFixed(1);
 }
 
@@ -132,15 +131,12 @@ function EmptyResults({
       <View style={styles.emptyIcon}>
         <Smile size={34} color="rgba(255,255,255,0.32)" />
       </View>
-
       <Text style={styles.emptyTitle}>Aucun service trouvé</Text>
-
       <Text style={styles.emptyDescription}>
         {hasSearch || urgentOnly
           ? "Aucun prestataire ne correspond aux critères sélectionnés."
           : "Aucun prestataire n'est actuellement disponible."}
       </Text>
-
       {(hasSearch || urgentOnly) && (
         <Pressable
           accessibilityRole="button"
@@ -193,23 +189,19 @@ function ServiceCard({
             <Wrench size={42} color="rgba(255,255,255,0.20)" />
           </View>
         )}
-
         <View style={styles.imageGradientOverlay} />
-
         {provider.urgent && (
           <View style={styles.urgentBadge}>
             <Zap size={12} color="#FCA5A5" />
             <Text style={styles.urgentText}>24h/24</Text>
           </View>
         )}
-
         {provider.verified && (
           <View style={styles.verifiedBadge}>
             <ShieldCheck size={13} color="#86EFAC" />
             <Text style={styles.verifiedText}>Vérifié</Text>
           </View>
         )}
-
         {!provider.available && (
           <View style={styles.unavailableOverlay}>
             <View style={styles.unavailableBadge}>
@@ -222,36 +214,29 @@ function ServiceCard({
       <View style={styles.cardBody}>
         <View style={styles.providerRow}>
           <ProviderAvatar name={name} />
-
           <View style={styles.providerIdentity}>
             <View style={styles.nameRow}>
               <Text numberOfLines={1} style={styles.providerName}>
                 {name}
               </Text>
-
               {provider.verified && <CheckCircle size={14} color="#4ADE80" />}
             </View>
-
             {specialty ? (
               <Text numberOfLines={1} style={styles.specialty}>
                 {specialty}
               </Text>
             ) : null}
-
             {location ? (
               <View style={styles.locationRow}>
                 <MapPin size={12} color="rgba(255,255,255,0.42)" />
-
                 <Text numberOfLines={1} style={styles.locationText}>
                   {location}
                 </Text>
               </View>
             ) : null}
           </View>
-
           <View style={styles.ratingContainer}>
             <Star size={13} color="#FBBF24" fill="#FBBF24" />
-
             <Text style={styles.ratingText}>{rating}</Text>
           </View>
         </View>
@@ -262,17 +247,13 @@ function ServiceCard({
           ) : (
             <Text style={styles.priceUnavailable}>Tarif sur demande</Text>
           )}
-
           {responseTime ? (
             <View style={styles.responseContainer}>
               <Clock3 size={12} color="rgba(255,255,255,0.35)" />
-
               <Text style={styles.responseText}>{responseTime}</Text>
             </View>
           ) : null}
-
           <Text style={styles.reviewCount}>{reviews} avis</Text>
-
           <ChevronRight size={16} color="rgba(255,255,255,0.30)" />
         </View>
       </View>
@@ -284,17 +265,14 @@ function LoadingCard() {
   return (
     <View style={styles.card}>
       <View style={styles.skeletonImage} />
-
       <View style={styles.skeletonBody}>
         <View style={styles.skeletonRow}>
           <View style={styles.skeletonAvatar} />
-
           <View style={styles.skeletonIdentity}>
             <View style={styles.skeletonLineLarge} />
             <View style={styles.skeletonLineSmall} />
           </View>
         </View>
-
         <View style={styles.skeletonLineMedium} />
       </View>
     </View>
@@ -303,53 +281,34 @@ function LoadingCard() {
 
 export default function ServicesPage({ onBack }: { onBack: () => void }) {
   const [filter, setFilter] = useState<ServiceCat>("Tout");
-
   const [search, setSearch] = useState("");
-
   const [selected, setSelected] = useState<Provider | null>(null);
-
   const [urgentOnly, setUrgentOnly] = useState(false);
-
   const [showRequest, setShowRequest] = useState(false);
-
   const [bookingModal, setBookingModal] = useState(false);
-
   const [bookingMessage, setBookingMessage] = useState("");
-
   const [bookingDate, setBookingDate] = useState("");
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  /*
-   * IMPORTANT :
-   * Aucun seed automatique.
-   *
-   * Les données affichées doivent provenir de Convex.
-   * Cette page ne crée pas artificiellement des prestataires.
-   */
+  const router = useRouter();
+
   const categoryArg = filter === "Tout" ? undefined : filter;
 
-  const providers = useQuery(api.serviceProviders.list, {
+  const providers = useQuery(api.services.providers.listProvidersPublic, {
     category: categoryArg,
+    allowDemo: true,
   });
 
-  const bookProvider = useMutation(api.serviceProviders.book);
+  const bookProvider = useMutation(api.services.bookings.book);
 
   const normalizedSearch = useMemo(() => normalizeSearch(search), [search]);
 
   const filteredProviders = useMemo(() => {
-    if (!providers) {
-      return undefined;
-    }
+    if (!providers) return undefined;
 
     return providers.filter((provider) => {
-      if (urgentOnly && !provider.urgent) {
-        return false;
-      }
-
-      if (!normalizedSearch) {
-        return true;
-      }
+      if (urgentOnly && !provider.urgent) return false;
+      if (!normalizedSearch) return true;
 
       const searchableText = normalizeSearch(
         [
@@ -371,56 +330,37 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
     setFilter("Tout");
   }, []);
 
-  const openProvider = useCallback((provider: Provider) => {
-    setSelected(provider);
-  }, []);
+  const openProvider = useCallback(
+    (provider: Provider) => {
+      router.push(`/service/${provider._id}`);
+    },
+    [router],
+  );
 
-  const closeProvider = useCallback(() => {
-    setSelected(null);
-  }, []);
+  const closeProvider = useCallback(() => setSelected(null), []);
 
   const openBooking = useCallback(() => {
-    if (!selected) {
-      return;
-    }
-
+    if (!selected) return;
     setBookingModal(true);
   }, [selected]);
 
   const closeBooking = useCallback(() => {
-    if (isSubmitting) {
-      return;
-    }
-
+    if (isSubmitting) return;
     setBookingModal(false);
     setBookingMessage("");
     setBookingDate("");
   }, [isSubmitting]);
 
   const handleBook = useCallback(async () => {
-    if (!selected) {
-      return;
-    }
+    if (!selected) return;
 
     const message = bookingMessage.trim();
-
-    if (!message) {
-      return;
-    }
-
-    if (message.length < 5) {
-      return;
-    }
-
-    if (message.length > 2000) {
-      return;
-    }
+    if (!message) return;
+    if (message.length < 5) return;
+    if (message.length > 2000) return;
 
     const scheduledAt = bookingDate.trim();
-
-    if (scheduledAt.length > 100) {
-      return;
-    }
+    if (scheduledAt.length > 100) return;
 
     setIsSubmitting(true);
 
@@ -436,11 +376,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
       setBookingMessage("");
       setBookingDate("");
     } catch {
-      /*
-       * Le backend reste la source de vérité.
-       * L'interface ne prétend pas que la réservation
-       * a réussi si Convex la refuse.
-       */
+      /* backend source de vérité */
     } finally {
       setIsSubmitting(false);
     }
@@ -450,13 +386,8 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
     setFilter(category);
   }, []);
 
-  const openRequest = useCallback(() => {
-    setShowRequest(true);
-  }, []);
-
-  const closeRequest = useCallback(() => {
-    setShowRequest(false);
-  }, []);
+  const openRequest = useCallback(() => setShowRequest(true), []);
+  const closeRequest = useCallback(() => setShowRequest(false), []);
 
   const resultCount = filteredProviders?.length ?? 0;
 
@@ -480,13 +411,10 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
 
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Services</Text>
-
             <Text style={styles.headerSubtitle}>
               {providers === undefined
                 ? "Recherche de prestataires…"
-                : `${resultCount} prestataire${
-                    resultCount > 1 ? "s" : ""
-                  } disponible${resultCount > 1 ? "s" : ""}`}
+                : `${resultCount} prestataire${resultCount > 1 ? "s" : ""} disponible${resultCount > 1 ? "s" : ""}`}
             </Text>
           </View>
 
@@ -500,6 +428,92 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
             ]}
           >
             <Plus size={19} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        {/* ───────────────── ACCÈS RAPIDE ───────────────── */}
+
+        <View style={styles.quickAccessRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mes services"
+            onPress={() => router.push("/service/mine")}
+            style={({ pressed }) => [
+              styles.quickAccessCard,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View
+              style={[
+                styles.quickAccessIcon,
+                { backgroundColor: "rgba(249,115,22,0.15)" },
+              ]}
+            >
+              <Briefcase size={16} color="#FB923C" />
+            </View>
+            <Text style={styles.quickAccessLabel}>Mes services</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mes réservations"
+            onPress={() => router.push("/service/bookings")}
+            style={({ pressed }) => [
+              styles.quickAccessCard,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View
+              style={[
+                styles.quickAccessIcon,
+                { backgroundColor: "rgba(79,70,229,0.18)" },
+              ]}
+            >
+              <Calendar size={16} color="#A5B4FC" />
+            </View>
+            <Text style={styles.quickAccessLabel}>Réservations</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.quickAccessRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mes devis"
+            onPress={() => router.push("/service/quotes")}
+            style={({ pressed }) => [
+              styles.quickAccessCard,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View
+              style={[
+                styles.quickAccessIcon,
+                { backgroundColor: "rgba(168,85,247,0.15)" },
+              ]}
+            >
+              <FileText size={16} color="#C4B5FD" />
+            </View>
+            <Text style={styles.quickAccessLabel}>Mes devis</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Mes factures"
+            onPress={() => router.push("/service/invoices")}
+            style={({ pressed }) => [
+              styles.quickAccessCard,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View
+              style={[
+                styles.quickAccessIcon,
+                { backgroundColor: "rgba(59,130,246,0.15)" },
+              ]}
+            >
+              <Receipt size={16} color="#93C5FD" />
+            </View>
+            <Text style={styles.quickAccessLabel}>Factures</Text>
           </Pressable>
         </View>
 
@@ -541,9 +555,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                 ? "Désactiver le filtre urgent"
                 : "Afficher uniquement les services urgents"
             }
-            accessibilityState={{
-              selected: urgentOnly,
-            }}
+            accessibilityState={{ selected: urgentOnly }}
             onPress={() => setUrgentOnly((value) => !value)}
             style={({ pressed }) => [
               styles.urgentFilter,
@@ -555,7 +567,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
               size={13}
               color={urgentOnly ? "#FCA5A5" : "rgba(255,255,255,0.55)"}
             />
-
             <Text
               style={[
                 styles.urgentFilterText,
@@ -576,7 +587,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
         >
           {CATEGORIES.map((category) => {
             const Icon = CATEGORY_ICONS[category];
-
             const active = filter === category;
 
             return (
@@ -584,9 +594,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                 key={category}
                 accessibilityRole="button"
                 accessibilityLabel={`Filtrer par ${category}`}
-                accessibilityState={{
-                  selected: active,
-                }}
+                accessibilityState={{ selected: active }}
                 onPress={() => selectCategory(category)}
                 style={({ pressed }) => [
                   styles.categoryChip,
@@ -598,7 +606,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                   size={14}
                   color={active ? "#FFFFFF" : "rgba(255,255,255,0.55)"}
                 />
-
                 <Text
                   style={[
                     styles.categoryText,
@@ -655,7 +662,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
         )}
       </ScrollView>
 
-      {/* ───────────────── PROVIDER DETAIL ───────────────── */}
+      {/* ───────────────── PROVIDER DETAIL (legacy — plus atteint via openProvider) ───────────────── */}
 
       {selected && (
         <View style={styles.fullScreenOverlay}>
@@ -663,9 +670,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
             <View style={styles.detailHero}>
               {selected.imageUrl ? (
                 <Image
-                  source={{
-                    uri: selected.imageUrl,
-                  }}
+                  source={{ uri: selected.imageUrl }}
                   style={styles.detailImage}
                   resizeMode="cover"
                   accessibilityLabel={safeText(selected.name)}
@@ -675,9 +680,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                   <Wrench size={56} color="rgba(255,255,255,0.20)" />
                 </View>
               )}
-
               <View style={styles.detailImageOverlay} />
-
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Fermer le service"
@@ -689,7 +692,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
               >
                 <X size={21} color="#FFFFFF" />
               </Pressable>
-
               <View style={styles.detailHeroContent}>
                 <View style={styles.detailBadges}>
                   {selected.urgent && (
@@ -700,7 +702,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                       </Text>
                     </View>
                   )}
-
                   {selected.verified && (
                     <View style={styles.detailVerified}>
                       <CheckCircle size={12} color="#86EFAC" />
@@ -708,11 +709,9 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                     </View>
                   )}
                 </View>
-
                 <Text numberOfLines={2} style={styles.detailProviderName}>
                   {safeText(selected.name) || "Prestataire"}
                 </Text>
-
                 {safeText(selected.specialty) ? (
                   <Text style={styles.detailSpecialty}>
                     {selected.specialty}
@@ -726,72 +725,52 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
               contentContainerStyle={styles.detailContent}
               showsVerticalScrollIndicator={false}
             >
-              {/* DESCRIPTION */}
-
               {safeText(selected.description) ? (
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>À propos</Text>
-
                   <Text style={styles.descriptionText}>
                     {selected.description}
                   </Text>
                 </View>
               ) : null}
 
-              {/* STATS */}
-
               <View style={styles.statsGrid}>
                 <View style={styles.statCard}>
                   <Star size={17} color="#FBBF24" fill="#FBBF24" />
-
                   <Text style={styles.statValue}>
                     {formatRating(selected.rating)}
                   </Text>
-
                   <Text style={styles.statLabel}>Note</Text>
                 </View>
-
                 <View style={styles.statCard}>
                   <MessageCircle size={17} color="#60A5FA" />
-
                   <Text style={styles.statValue}>
                     {formatReviews(selected.reviewCount)}
                   </Text>
-
                   <Text style={styles.statLabel}>Avis</Text>
                 </View>
-
                 <View style={styles.statCard}>
                   <Clock3 size={17} color="#A78BFA" />
-
                   <Text numberOfLines={1} style={styles.statValueSmall}>
                     {safeText(selected.responseTime) || "—"}
                   </Text>
-
                   <Text style={styles.statLabel}>Réponse</Text>
                 </View>
               </View>
 
-              {/* PRICE */}
-
               <View style={styles.detailSection}>
                 <Text style={styles.detailSectionTitle}>Tarification</Text>
-
                 <View style={styles.pricePanel}>
                   <Text style={styles.priceLabel}>Tarif annoncé</Text>
-
                   <Text style={styles.detailPrice}>
                     {safeText(selected.price) || "Sur demande"}
                   </Text>
                 </View>
               </View>
 
-              {/* SKILLS */}
-
               {selected.skills.length > 0 && (
                 <View style={styles.detailSection}>
                   <Text style={styles.detailSectionTitle}>Compétences</Text>
-
                   <View style={styles.skills}>
                     {selected.skills.map((skill) => (
                       <View key={skill} style={styles.skillChip}>
@@ -802,25 +781,19 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                 </View>
               )}
 
-              {/* LOCATION */}
-
               {safeText(selected.location) ? (
                 <View style={styles.locationPanel}>
                   <MapPin size={18} color="#FB923C" />
-
                   <View style={styles.locationContent}>
                     <Text style={styles.locationTitle}>
                       Zone d'intervention
                     </Text>
-
                     <Text style={styles.locationValue}>
                       {selected.location}
                     </Text>
                   </View>
                 </View>
               ) : null}
-
-              {/* AVAILABILITY */}
 
               <View style={styles.availabilityPanel}>
                 <View
@@ -831,14 +804,12 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                       : styles.offlineDot,
                   ]}
                 />
-
                 <View style={styles.availabilityContent}>
                   <Text style={styles.availabilityTitle}>
                     {selected.available
                       ? "Disponible actuellement"
                       : "Indisponible actuellement"}
                   </Text>
-
                   <Text style={styles.availabilityDescription}>
                     {selected.available
                       ? "Vous pouvez envoyer une demande de réservation."
@@ -846,8 +817,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                   </Text>
                 </View>
               </View>
-
-              {/* ACTIONS */}
 
               <View style={styles.actionsSection}>
                 <Authenticated>
@@ -863,7 +832,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                     ]}
                   >
                     <Phone size={17} color="#FFFFFF" />
-
                     <Text style={styles.primaryActionText}>
                       {selected.available ? "Réserver" : "Indisponible"}
                     </Text>
@@ -873,9 +841,8 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                     accessibilityRole="button"
                     accessibilityLabel="Contacter le prestataire"
                     onPress={() => {
-                      if (!selected.userId) {
-                        return;
-                      }
+                      if (!selected.userId) return;
+                      router.push(`/messages/new?userId=${selected.userId}`);
                     }}
                     style={({ pressed }) => [
                       styles.secondaryAction,
@@ -883,7 +850,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                     ]}
                   >
                     <MessageCircle size={17} color="#FFFFFF" />
-
                     <Text style={styles.secondaryActionText}>Message</Text>
                   </Pressable>
                 </Authenticated>
@@ -893,7 +859,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
                     <Text style={styles.authRequiredText}>
                       Connectez-vous pour réserver un service.
                     </Text>
-
                     <SignInButton />
                   </View>
                 </Unauthenticated>
@@ -903,7 +868,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
         </View>
       )}
 
-      {/* ───────────────── BOOKING ───────────────── */}
+      {/* ───────────────── BOOKING (legacy) ───────────────── */}
 
       {bookingModal && selected && (
         <View style={styles.modalRoot}>
@@ -913,19 +878,15 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
             onPress={closeBooking}
             style={styles.modalBackdrop}
           />
-
           <View style={styles.bookingSheet}>
             <View style={styles.sheetHandle} />
-
             <View style={styles.sheetHeader}>
               <View style={styles.sheetHeaderText}>
                 <Text style={styles.sheetTitle}>Réserver un service</Text>
-
                 <Text numberOfLines={1} style={styles.sheetSubtitle}>
                   {safeText(selected.name)}
                 </Text>
               </View>
-
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Fermer"
@@ -941,7 +902,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
             </View>
 
             <Text style={styles.inputLabel}>Décrivez votre besoin</Text>
-
             <TextInput
               value={bookingMessage}
               onChangeText={setBookingMessage}
@@ -959,8 +919,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
 
             <View style={styles.characterCount}>
               <Text style={styles.characterCountText}>
-                {bookingMessage.length}
-                /2000
+                {bookingMessage.length}/2000
               </Text>
             </View>
 
@@ -968,7 +927,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
               Date souhaitée
               <Text style={styles.optionalText}> (optionnel)</Text>
             </Text>
-
             <TextInput
               value={bookingDate}
               onChangeText={setBookingDate}
@@ -983,9 +941,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
               accessibilityRole="button"
               accessibilityLabel="Envoyer la demande de réservation"
               disabled={isSubmitting || bookingMessage.trim().length < 5}
-              onPress={() => {
-                void handleBook();
-              }}
+              onPress={() => void handleBook()}
               style={({ pressed }) => [
                 styles.confirmButton,
                 (isSubmitting || bookingMessage.trim().length < 5) &&
@@ -996,7 +952,6 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
               {isSubmitting ? (
                 <>
                   <ActivityIndicator size="small" color="#FFFFFF" />
-
                   <Text style={styles.confirmButtonText}>Envoi en cours…</Text>
                 </>
               ) : (
@@ -1030,19 +985,15 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
             onPress={closeRequest}
             style={styles.modalBackdrop}
           />
-
           <View style={styles.categorySheet}>
             <View style={styles.sheetHandle} />
-
             <View style={styles.sheetHeader}>
               <View style={styles.sheetHeaderText}>
                 <Text style={styles.sheetTitle}>Explorer les services</Text>
-
                 <Text style={styles.sheetSubtitle}>
                   Choisissez une catégorie
                 </Text>
               </View>
-
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Fermer"
@@ -1057,35 +1008,30 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
             </View>
 
             <View style={styles.categoryGrid}>
-              {CATEGORIES.filter((category) => category !== "Tout").map(
-                (category) => {
-                  const Icon = CATEGORY_ICONS[category];
-
-                  return (
-                    <Pressable
-                      key={category}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Voir les services ${category}`}
-                      onPress={() => {
-                        selectCategory(category);
-                        closeRequest();
-                      }}
-                      style={({ pressed }) => [
-                        styles.categoryTile,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <View style={styles.categoryTileIcon}>
-                        <Icon size={21} color="#FB923C" />
-                      </View>
-
-                      <Text style={styles.categoryTileText}>{category}</Text>
-
-                      <ChevronRight size={15} color="rgba(255,255,255,0.25)" />
-                    </Pressable>
-                  );
-                },
-              )}
+              {CATEGORIES.filter((c) => c !== "Tout").map((category) => {
+                const Icon = CATEGORY_ICONS[category];
+                return (
+                  <Pressable
+                    key={category}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Voir les services ${category}`}
+                    onPress={() => {
+                      selectCategory(category);
+                      closeRequest();
+                    }}
+                    style={({ pressed }) => [
+                      styles.categoryTile,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <View style={styles.categoryTileIcon}>
+                      <Icon size={21} color="#FB923C" />
+                    </View>
+                    <Text style={styles.categoryTileText}>{category}</Text>
+                    <ChevronRight size={15} color="rgba(255,255,255,0.25)" />
+                  </Pressable>
+                );
+              })}
             </View>
 
             <Pressable
@@ -1107,10 +1053,7 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#050812",
-  },
+  screen: { flex: 1, backgroundColor: "#050812" },
 
   header: {
     paddingTop: 18,
@@ -1139,9 +1082,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
   },
 
-  headerTitleContainer: {
-    flex: 1,
-  },
+  headerTitleContainer: { flex: 1 },
 
   headerTitle: {
     color: "#FFFFFF",
@@ -1167,6 +1108,44 @@ const styles = StyleSheet.create({
     borderColor: "rgba(129,140,248,0.35)",
   },
 
+  /* ─── ACCÈS RAPIDE ─── */
+
+  quickAccessRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+
+  quickAccessCard: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.075)",
+  },
+
+  quickAccessIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  quickAccessLabel: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  /* ─── SEARCH ─── */
+
   searchBox: {
     minHeight: 48,
     flexDirection: "row",
@@ -1176,6 +1155,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.045)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.09)",
+    marginTop: 6,
   },
 
   searchInput: {
@@ -1186,10 +1166,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  clearSearch: {
-    padding: 5,
-    marginRight: 5,
-  },
+  clearSearch: { padding: 5, marginRight: 5 },
 
   urgentFilter: {
     flexDirection: "row",
@@ -1213,15 +1190,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  urgentFilterTextActive: {
-    color: "#FCA5A5",
-  },
+  urgentFilterTextActive: { color: "#FCA5A5" },
 
-  categoryContent: {
-    gap: 8,
-    paddingTop: 12,
-    paddingRight: 16,
-  },
+  categoryContent: { gap: 8, paddingTop: 12, paddingRight: 16 },
 
   categoryChip: {
     flexDirection: "row",
@@ -1246,19 +1217,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  categoryTextActive: {
-    color: "#FFFFFF",
-  },
+  categoryTextActive: { color: "#FFFFFF" },
 
-  list: {
-    flex: 1,
-  },
+  list: { flex: 1 },
 
-  listContent: {
-    padding: 16,
-    paddingBottom: 40,
-    gap: 14,
-  },
+  listContent: { padding: 16, paddingBottom: 40, gap: 14 },
 
   card: {
     overflow: "hidden",
@@ -1268,21 +1231,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
   },
 
-  cardPressed: {
-    opacity: 0.78,
-    transform: [{ scale: 0.995 }],
-  },
+  cardPressed: { opacity: 0.78, transform: [{ scale: 0.995 }] },
 
-  cardImageContainer: {
-    height: 178,
-    position: "relative",
-    overflow: "hidden",
-  },
+  cardImageContainer: { height: 178, position: "relative", overflow: "hidden" },
 
-  cardImage: {
-    width: "100%",
-    height: "100%",
-  },
+  cardImage: { width: "100%", height: "100%" },
 
   cardImageFallback: {
     flex: 1,
@@ -1311,11 +1264,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(252,165,165,0.22)",
   },
 
-  urgentText: {
-    color: "#FECACA",
-    fontSize: 10,
-    fontWeight: "800",
-  },
+  urgentText: { color: "#FECACA", fontSize: 10, fontWeight: "800" },
 
   verifiedBadge: {
     position: "absolute",
@@ -1332,11 +1281,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(134,239,172,0.20)",
   },
 
-  verifiedText: {
-    color: "#BBF7D0",
-    fontSize: 10,
-    fontWeight: "800",
-  },
+  verifiedText: { color: "#BBF7D0", fontSize: 10, fontWeight: "800" },
 
   unavailableOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1352,15 +1297,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(127,29,29,0.85)",
   },
 
-  unavailableText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "800",
-  },
+  unavailableText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" },
 
-  cardBody: {
-    padding: 14,
-  },
+  cardBody: { padding: 14 },
 
   providerRow: {
     flexDirection: "row",
@@ -1379,22 +1318,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(129,140,248,0.18)",
   },
 
-  avatarText: {
-    color: "#C7D2FE",
-    fontSize: 13,
-    fontWeight: "900",
-  },
+  avatarText: { color: "#C7D2FE", fontSize: 13, fontWeight: "900" },
 
-  providerIdentity: {
-    flex: 1,
-    minWidth: 0,
-  },
+  providerIdentity: { flex: 1, minWidth: 0 },
 
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
 
   providerName: {
     flexShrink: 1,
@@ -1417,23 +1345,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  locationText: {
-    flex: 1,
-    color: "rgba(255,255,255,0.42)",
-    fontSize: 10,
-  },
+  locationText: { flex: 1, color: "rgba(255,255,255,0.42)", fontSize: 10 },
 
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
+  ratingContainer: { flexDirection: "row", alignItems: "center", gap: 4 },
 
-  ratingText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "800",
-  },
+  ratingText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
 
   cardMeta: {
     flexDirection: "row",
@@ -1444,11 +1360,7 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(255,255,255,0.06)",
   },
 
-  priceText: {
-    color: "#FB923C",
-    fontSize: 13,
-    fontWeight: "900",
-  },
+  priceText: { color: "#FB923C", fontSize: 13, fontWeight: "900" },
 
   priceUnavailable: {
     color: "rgba(255,255,255,0.48)",
@@ -1463,10 +1375,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
 
-  responseText: {
-    color: "rgba(255,255,255,0.43)",
-    fontSize: 10,
-  },
+  responseText: { color: "rgba(255,255,255,0.43)", fontSize: 10 },
 
   reviewCount: {
     marginLeft: "auto",
@@ -1474,19 +1383,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
 
-  skeletonImage: {
-    height: 178,
-    backgroundColor: "rgba(255,255,255,0.055)",
-  },
+  skeletonImage: { height: 178, backgroundColor: "rgba(255,255,255,0.055)" },
 
-  skeletonBody: {
-    padding: 14,
-  },
+  skeletonBody: { padding: 14 },
 
-  skeletonRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
+  skeletonRow: { flexDirection: "row", gap: 10 },
 
   skeletonAvatar: {
     width: 43,
@@ -1495,10 +1396,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.07)",
   },
 
-  skeletonIdentity: {
-    flex: 1,
-    gap: 8,
-  },
+  skeletonIdentity: { flex: 1, gap: 8 },
 
   skeletonLineLarge: {
     width: "68%",
@@ -1541,11 +1439,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  emptyTitle: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "800",
-  },
+  emptyTitle: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
 
   emptyDescription: {
     maxWidth: 340,
@@ -1566,11 +1460,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(129,140,248,0.22)",
   },
 
-  resetButtonText: {
-    color: "#C7D2FE",
-    fontSize: 12,
-    fontWeight: "800",
-  },
+  resetButtonText: { color: "#C7D2FE", fontSize: 12, fontWeight: "800" },
 
   limitNotice: {
     padding: 13,
@@ -1593,20 +1483,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#050812",
   },
 
-  detailScreen: {
-    flex: 1,
-    backgroundColor: "#050812",
-  },
+  detailScreen: { flex: 1, backgroundColor: "#050812" },
 
-  detailHero: {
-    height: 290,
-    position: "relative",
-  },
+  detailHero: { height: 290, position: "relative" },
 
-  detailImage: {
-    width: "100%",
-    height: "100%",
-  },
+  detailImage: { width: "100%", height: "100%" },
 
   detailImageFallback: {
     flex: 1,
@@ -1634,12 +1515,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.13)",
   },
 
-  detailHeroContent: {
-    position: "absolute",
-    left: 18,
-    right: 18,
-    bottom: 20,
-  },
+  detailHeroContent: { position: "absolute", left: 18, right: 18, bottom: 20 },
 
   detailBadges: {
     flexDirection: "row",
@@ -1658,11 +1534,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(127,29,29,0.78)",
   },
 
-  detailUrgentText: {
-    color: "#FECACA",
-    fontSize: 10,
-    fontWeight: "800",
-  },
+  detailUrgentText: { color: "#FECACA", fontSize: 10, fontWeight: "800" },
 
   detailVerified: {
     flexDirection: "row",
@@ -1674,11 +1546,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(20,83,45,0.78)",
   },
 
-  detailVerifiedText: {
-    color: "#BBF7D0",
-    fontSize: 10,
-    fontWeight: "800",
-  },
+  detailVerifiedText: { color: "#BBF7D0", fontSize: 10, fontWeight: "800" },
 
   detailProviderName: {
     color: "#FFFFFF",
@@ -1695,15 +1563,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  detailScroll: {
-    flex: 1,
-  },
+  detailScroll: { flex: 1 },
 
-  detailContent: {
-    padding: 16,
-    paddingBottom: 40,
-    gap: 15,
-  },
+  detailContent: { padding: 16, paddingBottom: 40, gap: 15 },
 
   detailSection: {
     padding: 16,
@@ -1726,10 +1588,7 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
 
-  statsGrid: {
-    flexDirection: "row",
-    gap: 9,
-  },
+  statsGrid: { flexDirection: "row", gap: 9 },
 
   statCard: {
     flex: 1,
@@ -1757,11 +1616,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  statLabel: {
-    marginTop: 2,
-    color: "rgba(255,255,255,0.38)",
-    fontSize: 10,
-  },
+  statLabel: { marginTop: 2, color: "rgba(255,255,255,0.38)", fontSize: 10 },
 
   pricePanel: {
     padding: 14,
@@ -1771,10 +1626,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(251,146,60,0.13)",
   },
 
-  priceLabel: {
-    color: "rgba(255,255,255,0.40)",
-    fontSize: 10,
-  },
+  priceLabel: { color: "rgba(255,255,255,0.40)", fontSize: 10 },
 
   detailPrice: {
     marginTop: 5,
@@ -1783,11 +1635,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 
-  skills: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  skills: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 
   skillChip: {
     paddingHorizontal: 11,
@@ -1815,9 +1663,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.07)",
   },
 
-  locationContent: {
-    flex: 1,
-  },
+  locationContent: { flex: 1 },
 
   locationTitle: {
     color: "rgba(255,255,255,0.42)",
@@ -1843,29 +1689,15 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.07)",
   },
 
-  availabilityDot: {
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-  },
+  availabilityDot: { width: 11, height: 11, borderRadius: 6 },
 
-  availableDot: {
-    backgroundColor: "#4ADE80",
-  },
+  availableDot: { backgroundColor: "#4ADE80" },
 
-  offlineDot: {
-    backgroundColor: "#64748B",
-  },
+  offlineDot: { backgroundColor: "#64748B" },
 
-  availabilityContent: {
-    flex: 1,
-  },
+  availabilityContent: { flex: 1 },
 
-  availabilityTitle: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "800",
-  },
+  availabilityTitle: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
 
   availabilityDescription: {
     marginTop: 3,
@@ -1874,9 +1706,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  actionsSection: {
-    gap: 10,
-  },
+  actionsSection: { gap: 10 },
 
   primaryAction: {
     minHeight: 52,
@@ -1890,11 +1720,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(129,140,248,0.30)",
   },
 
-  primaryActionText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "900",
-  },
+  primaryActionText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
 
   secondaryAction: {
     minHeight: 52,
@@ -1908,15 +1734,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.09)",
   },
 
-  secondaryActionText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "800",
-  },
+  secondaryActionText: { color: "#FFFFFF", fontSize: 13, fontWeight: "800" },
 
-  disabledAction: {
-    opacity: 0.45,
-  },
+  disabledAction: { opacity: 0.45 },
 
   authRequired: {
     alignItems: "center",
@@ -1982,15 +1802,9 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
 
-  sheetHeaderText: {
-    flex: 1,
-  },
+  sheetHeaderText: { flex: 1 },
 
-  sheetTitle: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
-  },
+  sheetTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "900" },
 
   sheetSubtitle: {
     marginTop: 4,
@@ -2014,10 +1828,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  optionalText: {
-    color: "rgba(255,255,255,0.30)",
-    fontWeight: "500",
-  },
+  optionalText: { color: "rgba(255,255,255,0.30)", fontWeight: "500" },
 
   messageInput: {
     minHeight: 120,
@@ -2037,10 +1848,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
-  characterCountText: {
-    color: "rgba(255,255,255,0.28)",
-    fontSize: 9,
-  },
+  characterCountText: { color: "rgba(255,255,255,0.28)", fontSize: 9 },
 
   dateInput: {
     minHeight: 48,
@@ -2054,9 +1862,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  disabledInput: {
-    opacity: 0.55,
-  },
+  disabledInput: { opacity: 0.55 },
 
   confirmButton: {
     minHeight: 52,
@@ -2068,15 +1874,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#4F46E5",
   },
 
-  confirmButtonDisabled: {
-    opacity: 0.42,
-  },
+  confirmButtonDisabled: { opacity: 0.42 },
 
-  confirmButtonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "900",
-  },
+  confirmButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
 
   cancelButton: {
     minHeight: 48,
@@ -2093,10 +1893,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  categoryGrid: {
-    gap: 9,
-    marginBottom: 8,
-  },
+  categoryGrid: { gap: 9, marginBottom: 8 },
 
   categoryTile: {
     minHeight: 58,
@@ -2126,7 +1923,5 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  pressed: {
-    opacity: 0.72,
-  },
+  pressed: { opacity: 0.72 },
 });
