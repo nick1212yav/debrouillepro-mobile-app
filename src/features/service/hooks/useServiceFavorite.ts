@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { Alert } from "react-native";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export function useServiceFavorite(
@@ -9,15 +9,31 @@ export function useServiceFavorite(
   initial = false,
 ) {
   const [isFavorited, setIsFavorited] = useState(initial);
-  const toggle = useMutation(api.serviceProviders.toggleFavorite);
-  const handleToggle = async () => {
+  const [loading, setLoading] = useState(false);
+
+  const toggleMutation = useMutation(api.services.favorites.toggleFavorite);
+
+  const toggle = async () => {
+    if (loading) return;
+
+    setLoading(true);
+
     try {
-      const { favorited } = await toggle({ providerId });
-      setIsFavorited(favorited);
-      toast.success(favorited ? "Ajouté aux favoris ❤️" : "Retiré des favoris");
+      const result = await toggleMutation({ providerId });
+      setIsFavorited(result.favorited);
     } catch {
-      toast.error("Erreur lors de l'opération");
+      Alert.alert(
+        "Favoris",
+        "Impossible de mettre à jour ce favori. Réessaie.",
+      );
+    } finally {
+      setLoading(false);
     }
   };
-  return { isFavorited, toggle: handleToggle };
+
+  return {
+    isFavorited,
+    loading,
+    toggle,
+  };
 }
