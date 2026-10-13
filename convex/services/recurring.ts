@@ -10,10 +10,15 @@
 //
 // MODÈLE D'ACCÈS :
 //   - `generateNextBooking` : client-callable, self-only, idempotent.
-//     Ne fait rien si `nextOccurrence > now` → pas de doublon possible.
-//   - `processDueRecurrings` : admin-only, batch, pour worker/cron.
+//   - `processDueRecurrings` : admin-only, batch.
+//   - `processDueRecurringsInternal` : internalMutation, worker cron.
+//
+// POLITIQUE DE SKIP :
+//   - Occurrence trop en retard (> GRACE) → avance sans générer
+//   - Prestataire inactif → avance sans générer (reprise auto quand actif)
+//   - Au-delà de MAX_SKIP périodes manquées → désactivation
 
-import { query, mutation } from "../_generated/server";
+import { query, mutation, internalMutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
@@ -35,6 +40,8 @@ const MIN_MESSAGE = 3;
 const MAX_MESSAGE = 2000;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MISSED_OCCURRENCE_GRACE_MS = 48 * 60 * 60 * 1000; // 48h
+const MAX_SKIP = 500;
 
 // ────────────────────────────────────────────────────────────────
 // AUTH
@@ -241,11 +248,8 @@ function validateEndsAt(
 
 /**
  * Avance d'une période.
- * - daily/weekly/biweekly : arithmétique fixe (le jour de semaine est
- *   déjà garanti par la validation à la création)
- * - monthly : utilise `anchorDay` (jour originel) borné au dernier jour
- *   du mois cible. Ex : anchor=31 → 31 janv, 28 févr, 31 mars, 30 avr.
- *   Jamais 28 mars après un 28 février.
+ * - daily/weekly/biweekly : arithmétique fixe
+ * - monthly : anchor borné au dernier jour du mois cible
  */
 function advance(
   ts: number,
@@ -256,19 +260,17 @@ function advance(
   if (pattern === "weekly") return ts + 7 * 24 * 60 * 60 * 1000;
   if (pattern === "biweekly") return ts + 14 * 24 * 60 * 60 * 1000;
 
-  // monthly
   const d = new Date(ts);
   const month = d.getUTCMonth();
   const year = d.getUTCFullYear();
   const currentDay = d.getUTCDate();
   const targetDayOfMonth = anchorDay ?? currentDay;
 
-  // Dernier jour du mois cible (mois + 1)
   const lastOfNextMonth = new Date(Date.UTC(year, month + 2, 0)).getUTCDate();
   const finalDay = Math.min(targetDayOfMonth, lastOfNextMonth);
 
   return Date.UTC(
-    d.getUTCFullYear(),
+    year,
     month + 1,
     finalDay,
     d.getUTCHours(),
@@ -282,13 +284,13 @@ async function logHistory(
   ctx: MutationCtx,
   providerId: Id<"serviceProviders">,
   event: string,
-  actorId: Id<"users">,
+  actorId: Id<"users"> | null,
   bookingId?: Id<"serviceBookings">,
 ): Promise<void> {
   await ctx.db.insert("serviceHistory", {
     providerId,
     event,
-    actorId,
+    actorId: actorId ?? undefined,
     bookingId,
     type: event,
     createdAt: Date.now(),
@@ -331,7 +333,6 @@ export const createRecurringBooking = mutation({
     const timeSlot = validateTimeSlot(args.timeSlot);
     const message = validateMessage(args.message);
 
-    // Cohérence date ↔ dayOfWeek (weekly/biweekly)
     assertDateMatchesDayOfWeek(args.startDate, args.dayOfWeek);
 
     const nextOccurrence = validateNextOccurrence(
@@ -415,7 +416,6 @@ export const updateRecurringBooking = mutation({
 
     validatePatternDayOfWeek(finalPattern, finalDayOfWeek);
 
-    // Recalcule nextOccurrence + anchor si startDate ou timeSlot change
     let finalNextOccurrence = recurring.nextOccurrence;
     let finalAnchor = recurring.anchorDayOfMonth ?? null;
 
@@ -431,8 +431,6 @@ export const updateRecurringBooking = mutation({
       );
       finalAnchor = parseUTCDate(dateStr).d;
     } else {
-      // Aucun changement de startDate/timeSlot :
-      // si dayOfWeek OU pattern a changé, on valide contre la date courante.
       const finalNeedsCheck =
         args.dayOfWeek !== undefined || args.pattern !== undefined;
 
@@ -443,7 +441,6 @@ export const updateRecurringBooking = mutation({
         assertDateMatchesDayOfWeek(currentDateStr, finalDayOfWeek);
       }
 
-      // Initialise l'anchor si absent (legacy)
       if (
         finalPattern === "monthly" &&
         recurring.anchorDayOfMonth === undefined
@@ -577,25 +574,39 @@ export const deleteRecurringBooking = mutation({
 });
 
 // ────────────────────────────────────────────────────────────────
-// POLITIQUE DE RATTRAPAGE
+// GÉNÉRATION — logique partagée
 // ────────────────────────────────────────────────────────────────
 //
-// Si une occurrence est manquée depuis plus de GRACE_MS, on ne crée
-// PAS de booking rétroactif. On avance nextOccurrence jusqu'à la
-// prochaine occurrence FUTURE, sans générer.
+// Politique de skip unifiée :
+//   - provider inactif OU occurrence > GRACE en retard
+//     → avance nextOccurrence au prochain slot futur, sans générer
+//   - dépassement de MAX_SKIP ou endsAt pendant le skip → désactivation
 //
-// Exemple : client disparaît 3 mois sur une récurrence daily.
-// On ne crée pas 90 bookings. On avance au prochain jour futur.
-//
-// Dans la fenêtre de grâce (< GRACE_MS en retard), on génère la
-// booking due normalement.
+// Empêche le blocage du cron (les récurrences bloquées ne s'accumulent plus).
 
-const MISSED_OCCURRENCE_GRACE_MS = 48 * 60 * 60 * 1000; // 48h
+export const generateNextBooking = mutation({
+  args: { recurringId: v.id("serviceRecurringBookings") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const recurring = await ctx.db.get(args.recurringId);
+    if (!recurring) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Récurrence introuvable",
+      });
+    }
+    if (recurring.userId !== user._id) {
+      throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé." });
+    }
+
+    return generateForRecurring(ctx, recurring, user._id);
+  },
+});
 
 async function generateForRecurring(
   ctx: MutationCtx,
   recurring: Doc<"serviceRecurringBookings">,
-  actorId: Id<"users">,
+  actorId: Id<"users"> | null,
 ): Promise<{
   generated: boolean;
   reason?:
@@ -629,7 +640,6 @@ async function generateForRecurring(
     };
   }
 
-  // Fin de récurrence déjà atteinte
   if (
     recurring.endsAt !== undefined &&
     recurring.nextOccurrence >= recurring.endsAt
@@ -645,25 +655,15 @@ async function generateForRecurring(
   }
 
   const provider = await ctx.db.get(recurring.providerId);
-  if (!provider || provider.status !== "active") {
-    return {
-      generated: false,
-      reason: "provider_inactive",
-      nextOccurrence: recurring.nextOccurrence,
-      active: recurring.active,
-    };
-  }
+  const providerActive = provider !== null && provider.status === "active";
 
-  // ── Politique de rattrapage : skip si trop en retard
   const latenessMs = now - recurring.nextOccurrence;
-  let scheduledOccurrence = recurring.nextOccurrence;
+  const tooLate = latenessMs > MISSED_OCCURRENCE_GRACE_MS;
 
-  if (latenessMs > MISSED_OCCURRENCE_GRACE_MS) {
-    // Avance nextOccurrence jusqu'à la première occurrence future,
-    // sans générer de booking pour les occurrences manquées.
+  // ── Skip nécessaire : provider inactif OU trop en retard
+  if (!providerActive || tooLate) {
     let cursor = recurring.nextOccurrence;
     let skipped = 0;
-    const MAX_SKIP = 500; // borne de sécurité (daily sur ~1 an et demi)
 
     while (cursor <= now && skipped < MAX_SKIP) {
       const next = advance(
@@ -671,7 +671,7 @@ async function generateForRecurring(
         recurring.pattern,
         recurring.anchorDayOfMonth ?? null,
       );
-      if (next === cursor) break; // garde-fou anti-boucle
+      if (next === cursor) break;
       cursor = next;
       skipped++;
 
@@ -692,7 +692,6 @@ async function generateForRecurring(
     }
 
     if (skipped >= MAX_SKIP) {
-      // Trop d'occurrences manquées : on désactive plutôt que boucler.
       await ctx.db.patch(recurring._id, {
         active: false,
         nextOccurrence: cursor,
@@ -712,29 +711,31 @@ async function generateForRecurring(
       };
     }
 
-    // cursor > now : nouvelle date valide, pas de booking pour le skip
+    const reason: "provider_inactive" | "skipped_missed" = !providerActive
+      ? "provider_inactive"
+      : "skipped_missed";
+
+    const eventName = !providerActive
+      ? "recurring.provider_inactive_skipped"
+      : "recurring.skipped_missed";
+
     await ctx.db.patch(recurring._id, {
       nextOccurrence: cursor,
       lastCreatedAt: now,
     });
-    await logHistory(
-      ctx,
-      recurring.providerId,
-      "recurring.skipped_missed",
-      actorId,
-    );
+    await logHistory(ctx, recurring.providerId, eventName, actorId);
 
     return {
       generated: false,
-      reason: "skipped_missed",
+      reason,
       nextOccurrence: cursor,
       active: true,
       skippedCount: skipped,
     };
   }
 
-  // ── Fenêtre de grâce : on génère normalement
-  const scheduledAt = new Date(scheduledOccurrence).toISOString();
+  // ── Fenêtre de grâce : génération normale
+  const scheduledAt = new Date(recurring.nextOccurrence).toISOString();
 
   const bookingId = await ctx.db.insert("serviceBookings", {
     providerId: recurring.providerId,
@@ -776,34 +777,8 @@ async function generateForRecurring(
 }
 
 // ────────────────────────────────────────────────────────────────
-// GÉNÉRATION — client (self-only, idempotent)
+// GÉNÉRATION — admin (batch, manuel)
 // ────────────────────────────────────────────────────────────────
-
-export const generateNextBooking = mutation({
-  args: { recurringId: v.id("serviceRecurringBookings") },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const recurring = await ctx.db.get(args.recurringId);
-    if (!recurring) {
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Récurrence introuvable",
-      });
-    }
-    if (recurring.userId !== user._id) {
-      throw new ConvexError({ code: "FORBIDDEN", message: "Accès refusé." });
-    }
-
-    return generateForRecurring(ctx, recurring, user._id);
-  },
-});
-
-// ────────────────────────────────────────────────────────────────
-// GÉNÉRATION AUTOMATIQUE — worker / cron (admin)
-// ────────────────────────────────────────────────────────────────
-//
-// Utilise l'index composite by_active_and_next → plus de starvation.
-// Idempotent : chaque appel avance nextOccurrence ou désactive la récurrence.
 
 export const processDueRecurrings = mutation({
   args: {
@@ -812,10 +787,8 @@ export const processDueRecurrings = mutation({
   handler: async (ctx, args) => {
     const admin = await requireAdmin(ctx);
     const maxBatch = clampLimit(args.maxBatch, 50);
-
     const now = Date.now();
 
-    // Index composite : active=true AND nextOccurrence <= now
     const dueActive = await ctx.db
       .query("serviceRecurringBookings")
       .withIndex("by_active_and_next", (q) =>
@@ -834,6 +807,56 @@ export const processDueRecurrings = mutation({
 
     for (const recurring of dueActive) {
       const res = await generateForRecurring(ctx, recurring, admin._id);
+      results.push({
+        recurringId: recurring._id,
+        generated: res.generated,
+        reason: res.reason,
+      });
+      if (res.generated) generated++;
+      else if (res.reason === "ended") ended++;
+      else skipped++;
+    }
+
+    return {
+      processed: dueActive.length,
+      generated,
+      ended,
+      skipped,
+      results,
+    };
+  },
+});
+
+// ────────────────────────────────────────────────────────────────
+// GÉNÉRATION — cron Convex (internal)
+// ────────────────────────────────────────────────────────────────
+
+export const processDueRecurringsInternal = internalMutation({
+  args: {
+    maxBatch: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const maxBatch = clampLimit(args.maxBatch, 50);
+    const now = Date.now();
+
+    const dueActive = await ctx.db
+      .query("serviceRecurringBookings")
+      .withIndex("by_active_and_next", (q) =>
+        q.eq("active", true).lte("nextOccurrence", now),
+      )
+      .take(maxBatch);
+
+    let generated = 0;
+    let ended = 0;
+    let skipped = 0;
+    const results: Array<{
+      recurringId: Id<"serviceRecurringBookings">;
+      generated: boolean;
+      reason?: string;
+    }> = [];
+
+    for (const recurring of dueActive) {
+      const res = await generateForRecurring(ctx, recurring, null);
       results.push({
         recurringId: recurring._id,
         generated: res.generated,
