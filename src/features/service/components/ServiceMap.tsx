@@ -1,5 +1,16 @@
+// src/features/service/components/ServiceMap.tsx
+//
+// Vue localisation native — sans carte interactive.
+//
+// Le composant affiche :
+//   - l'adresse textuelle du prestataire
+//   - un bouton "Itinéraire" qui ouvre Google Maps / Plans
+//   - un lien si latitude + longitude sont connues
+//
+// Aucune dépendance web (leaflet retiré).
+// Aucun rendu DOM dans une View React Native.
+
 import { View, Text, Pressable, Linking } from "react-native";
-import { useEffect, useRef } from "react";
 import { MapPin, Navigation } from "lucide-react-native";
 
 interface Props {
@@ -8,90 +19,75 @@ interface Props {
   longitude?: number;
 }
 
+function buildMapsUrl(
+  location: string,
+  latitude?: number,
+  longitude?: number,
+): string {
+  if (latitude !== undefined && longitude !== undefined) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+}
+
 export function ServiceMap({ location, latitude, longitude }: Props) {
-  const mapRef = useRef<View>(null);
-  const mapInstanceRef = useRef<any>(null);
+  const hasLocation = Boolean(location && location.trim().length > 0);
+  const hasCoordinates = latitude !== undefined && longitude !== undefined;
 
-  useEffect(() => {
-    if (!latitude || !longitude) return;
-    if (!mapRef.current) return;
-
-    let isMounted = true;
-
-    const loadMap = async () => {
-      try {
-        const L = await import("leaflet");
-        await import("leaflet/dist/leaflet.css");
-
-        if (!isMounted || !mapRef.current) return;
-
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.remove();
-          mapInstanceRef.current = null;
-        }
-
-        const map = L.map(mapRef.current, {
-          center: [latitude, longitude],
-          zoom: 14,
-          zoomControl: true,
-        });
-
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "© OpenStreetMap",
-          maxZoom: 19,
-        }).addTo(map);
-
-        const icon = L.divIcon({
-          className: "custom-marker",
-          html: `<div style="
-            background: #F97316;
-            width: 28px;
-            height: 28px;
-            border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg);
-            border: 3px solid white;
-            box-shadow: 0 4px 12px rgba(249,115,22,0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          ">
-            <div style="transform: rotate(45deg); color: white; font-size: 12px;">🔧</div>
-          </div>`,
-          iconSize: [28, 28],
-          iconAnchor: [14, 28],
-          popupAnchor: [0, -28],
-        });
-
-        const marker = L.marker([latitude, longitude], { icon }).addTo(map);
-        marker.bindPopup(`<strong>${location || "Emplacement"}</strong>`);
-
-        mapInstanceRef.current = map;
-        map.invalidateSize();
-      } catch (error) {
-        console.error("Erreur de chargement de la carte:", error);
-      }
-    };
-
-    loadMap();
-
-    return () => {
-      isMounted = false;
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-    };
-  }, [latitude, longitude, location]);
-
-  if (!latitude || !longitude) {
+  if (!hasLocation && !hasCoordinates) {
     return (
-      <View className="bg-white/5 rounded-2xl p-4"><Text className="text-sm font-medium text-white/50">Localisation</Text><View className="mt-2 rounded-xl h-48 flex items-center justify-center bg-white/5 border border-white/10"><View className="flex items-center gap-2 text-white/30"><MapPin size={16} /><Text className="text-sm">{location || "Carte non disponible"}</Text></View></View></View>
+      <View className="bg-white/5 rounded-2xl p-4">
+        <Text className="text-sm font-medium text-white/50">Localisation</Text>
+        <View className="mt-2 rounded-xl h-24 flex items-center justify-center bg-white/5 border border-white/10">
+          <View className="flex items-center gap-2">
+            <MapPin size={16} color="rgba(255,255,255,0.3)" />
+            <Text className="text-sm text-white/30">
+              Localisation non renseignée
+            </Text>
+          </View>
+        </View>
+      </View>
     );
   }
 
+  const displayLocation = hasLocation ? location! : `${latitude}, ${longitude}`;
+
+  const handleOpenMaps = async () => {
+    const url = buildMapsUrl(displayLocation, latitude, longitude);
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      }
+    } catch {
+      // Silent — pas de handler d'erreur UX nécessaire ici
+    }
+  };
+
   return (
-    <View className="bg-white/5 rounded-2xl p-4 space-y-2"><View className="flex items-center justify-between"><Text className="text-sm font-medium text-white/50">Localisation</Text><Pressable onPress={() => {
-            Linking.openURL(String(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`));
-          }} className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-white/60 transition-colors bg-white/5"><Navigation size={12} /><Text>Itinéraire</Text></Pressable></View><View className="rounded-xl overflow-hidden h-48 relative"><View ref={mapRef} className="w-full h-full" /><View className="absolute bottom-2 right-2 bg-black/60 text-white/60 text-[10px] px-2 py-1 rounded-full"><Text>OpenStreetMap</Text></View></View></View>
+    <View className="bg-white/5 rounded-2xl p-4">
+      <View className="flex items-center justify-between mb-3">
+        <Text className="text-sm font-medium text-white/50">Localisation</Text>
+        <Pressable
+          onPress={handleOpenMaps}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 active:bg-white/10"
+        >
+          <Navigation size={12} color="rgba(255,255,255,0.6)" />
+          <Text className="text-xs text-white/60">Itinéraire</Text>
+        </Pressable>
+      </View>
+
+      <View className="rounded-xl p-4 bg-white/5 border border-white/10">
+        <View className="flex flex-row items-start gap-2">
+          <MapPin size={16} color="#F97316" />
+          <Text className="text-sm text-white flex-1">{displayLocation}</Text>
+        </View>
+        {hasCoordinates && (
+          <Text className="text-xs text-white/40 mt-2">
+            Coordonnées GPS disponibles
+          </Text>
+        )}
+      </View>
+    </View>
   );
 }
