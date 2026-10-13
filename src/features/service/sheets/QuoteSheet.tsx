@@ -1,8 +1,15 @@
-import { View, Text, TextInput, Pressable } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+} from "react-native";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel";
 
 interface Props {
@@ -16,26 +23,82 @@ export function QuoteSheet({ isOpen, onClose, providerId }: Props) {
   const [loading, setLoading] = useState(false);
   const requestQuote = useMutation(api.serviceProviders.requestQuote);
 
-  if (!isOpen) return null;
-
   const handleSubmit = async () => {
-    if (!message.trim()) {
-      toast.error("Veuillez décrire votre demande");
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage || loading) {
+      if (!trimmedMessage) {
+        Alert.alert("Message requis", "Décris le travail à réaliser.");
+      }
       return;
     }
+
     setLoading(true);
     try {
-      await requestQuote({ providerId, message: message.trim() });
-      toast.success("Demande de devis envoyée !");
+      await requestQuote({
+        providerId,
+        message: trimmedMessage,
+      });
+      setMessage("");
       onClose();
     } catch {
-      toast.error("Erreur");
+      Alert.alert("Erreur", "Impossible d'envoyer la demande de devis.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70" onPress={onClose}><View className="w-full max-w-md rounded-t-3xl p-6 bg-[#0D1117] border border-white/10" onPress={(e) => e.stopPropagation()}><Text className="text-white font-bold text-lg mb-4">Demander un devis</Text><TextInput value={message} onChangeText={(value) => setMessage(value)} placeholder="Décrivez votre projet..." className="w-full rounded-xl p-3 text-sm text-white bg-white/5 border border-white/10" multiline textAlignVertical="top" /><Pressable onPress={handleSubmit} disabled={loading} className="w-full py-3.5 rounded-xl text-white font-bold mt-4 bg-gradient-to-r from-orange-500 to-red-500 disabled:opacity-50">{loading ? "Envoi..." : "Envoyer"}</Pressable></View></View>
+    <Modal
+      visible={isOpen}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
+        <Pressable
+          onPress={onClose}
+          className="flex-1 justify-end bg-black/70"
+          accessibilityLabel="Fermer la demande de devis"
+        >
+          <Pressable
+            onPress={(event) => event.stopPropagation()}
+            className="w-full rounded-t-3xl border-t border-white/10 bg-[#0D1117] p-6"
+          >
+            <Text className="mb-4 text-lg font-bold text-white">
+              Demander un devis
+            </Text>
+
+            <TextInput
+              value={message}
+              onChangeText={setMessage}
+              placeholder="Décris ton projet..."
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white"
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              editable={!loading}
+            />
+
+            <Pressable
+              onPress={handleSubmit}
+              disabled={loading}
+              accessibilityRole="button"
+              className={`mt-4 w-full items-center rounded-xl py-3.5 ${
+                loading ? "bg-orange-500/50" : "bg-orange-500"
+              }`}
+            >
+              <Text className="font-bold text-white">
+                {loading ? "Envoi en cours..." : "Envoyer la demande"}
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }

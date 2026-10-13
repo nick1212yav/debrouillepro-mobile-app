@@ -1,8 +1,18 @@
 import { Picker } from "@react-native-picker/picker";
-import { View, Text, Pressable, TextInput } from "react-native";
-import { useState, useCallback } from "react";
-import { X, MapPin, Loader2, Upload } from "lucide-react-native";
-import { toast } from "sonner";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useCallback, useState } from "react";
+import { X, MapPin, Loader2 } from "lucide-react-native";
+import * as Location from "expo-location";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import ImageUploader from "@/components/ImageUploader";
@@ -24,6 +34,16 @@ interface Props {
   onSuccess?: () => void;
 }
 
+interface GeocodingResult {
+  lat: string;
+  lon: string;
+  display_name?: string;
+}
+
+interface ReverseGeocodingResult {
+  display_name?: string;
+}
+
 export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
   const [name, setName] = useState("");
   const [specialty, setSpecialty] = useState("");
@@ -36,123 +56,197 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
   const [skills, setSkills] = useState<string[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // ✅ États pour la géolocalisation
   const [geocoding, setGeocoding] = useState(false);
-  const [latitude, setLatitude] = useState<number | undefined>(undefined);
-  const [longitude, setLongitude] = useState<number | undefined>(undefined);
+  const [latitude, setLatitude] = useState<number | undefined>();
+  const [longitude, setLongitude] = useState<number | undefined>();
 
   const create = useMutation(api.serviceProviders.create);
   const createPublication = useMutation(api.publications.createPublication);
 
-  // ✅ Géocodage direct (adresse → coordonnées)
   const geocodeLocation = useCallback(async (address: string) => {
-    if (!address.trim()) {
-      toast.warning("Veuillez saisir une adresse");
+    const trimmedAddress = address.trim();
+
+    if (!trimmedAddress) {
+      Alert.alert("Adresse requise", "Saisis une adresse à localiser.");
       return;
     }
+
     setGeocoding(true);
+
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
-        { headers: { "User-Agent": "DebrouillePro/1.0" } },
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmedAddress)}&limit=1`,
       );
-      const data = await response.json();
-      if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        setLatitude(lat);
-        setLongitude(lng);
-        if (data[0].display_name) {
-          setLocation(data[0].display_name);
-        }
-        toast.success("Adresse géolocalisée ✅");
-      } else {
-        toast.warning("Adresse non trouvée");
+
+      if (!response.ok) {
+        throw new Error("Le service de géocodage est indisponible.");
+      }
+
+      const data = (await response.json()) as GeocodingResult[];
+
+      if (!data.length) {
         setLatitude(undefined);
         setLongitude(undefined);
+        Alert.alert("Adresse introuvable", "Essaie une adresse plus précise.");
+        return;
       }
-    } catch {
-      toast.error("Erreur de géocodage");
+
+      const lat = Number.parseFloat(data[0].lat);
+      const lng = Number.parseFloat(data[0].lon);
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new Error("Les coordonnées retournées sont invalides.");
+      }
+
+      setLatitude(lat);
+      setLongitude(lng);
+
+      if (data[0].display_name) {
+        setLocation(data[0].display_name);
+      }
+
+      Alert.alert(
+        "Localisation réussie",
+        "Les coordonnées ont été enregistrées.",
+      );
+    } catch (error) {
       setLatitude(undefined);
       setLongitude(undefined);
+
+      Alert.alert(
+        "Erreur de géocodage",
+        error instanceof Error
+          ? error.message
+          : "Impossible de localiser cette adresse.",
+      );
     } finally {
       setGeocoding(false);
     }
   }, []);
 
-  // ✅ Détection GPS + reverse geocoding
-  const detectUserLocation = useCallback(() => {
-    if (!("geolocation" in navigator)) {
-      toast.error("Géolocalisation non supportée");
-      return;
-    }
+  const detectUserLocation = useCallback(async () => {
     setGeocoding(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setLatitude(lat);
-        setLongitude(lng);
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-            { headers: { "User-Agent": "DebrouillePro/1.0" } },
-          );
-          const data = await response.json();
-          if (data?.display_name) {
-            setLocation(data.display_name);
-          } else {
-            setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-          }
-          toast.success("Position détectée 📍");
-        } catch {
-          setLocation(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission refusée",
+          "Autorise la localisation pour détecter ta position actuelle.",
+        );
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      setLatitude(lat);
+      setLongitude(lng);
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        );
+
+        if (!response.ok) {
+          throw new Error("Géocodage inverse indisponible.");
         }
-        setGeocoding(false);
-      },
-      () => {
-        toast.error("Impossible de détecter la position");
-        setGeocoding(false);
-      },
-      { timeout: 10000, enableHighAccuracy: true },
-    );
+
+        const data = (await response.json()) as ReverseGeocodingResult;
+
+        setLocation(
+          data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        );
+      } catch {
+        setLocation(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+      }
+
+      Alert.alert("Position détectée", "La position a été renseignée.");
+    } catch {
+      Alert.alert(
+        "Localisation impossible",
+        "Vérifie que la localisation est activée sur ton appareil.",
+      );
+    } finally {
+      setGeocoding(false);
+    }
   }, []);
 
-  // ✅ Bouton principal : si l'adresse est saisie → géocode, sinon → GPS
   const handleGeolocate = useCallback(() => {
     if (location.trim()) {
-      geocodeLocation(location);
+      void geocodeLocation(location);
     } else {
-      detectUserLocation();
+      void detectUserLocation();
     }
   }, [location, geocodeLocation, detectUserLocation]);
 
+  const resetForm = () => {
+    setName("");
+    setSpecialty("");
+    setDescription("");
+    setPrice("");
+    setCurrency("USD");
+    setCategory("");
+    setLocation("");
+    setResponseTime("");
+    setSkills([]);
+    setImages([]);
+    setLatitude(undefined);
+    setLongitude(undefined);
+  };
+
   const handleSubmit = async () => {
+    if (isSubmitting || geocoding) return;
+
+    const trimmedName = name.trim();
+    const trimmedSpecialty = specialty.trim();
+    const trimmedDescription = description.trim();
+    const trimmedPrice = price.trim();
+    const trimmedLocation = location.trim();
+    const trimmedResponseTime = responseTime.trim();
+
     if (
-      !name ||
-      !specialty ||
-      !description ||
-      !price ||
+      !trimmedName ||
+      !trimmedSpecialty ||
+      !trimmedDescription ||
+      !trimmedPrice ||
       !category ||
-      !location
+      !trimmedLocation
     ) {
-      toast.error("Veuillez remplir tous les champs obligatoires");
+      Alert.alert(
+        "Champs obligatoires",
+        "Renseigne le nom, la spécialité, la description, le prix, la catégorie et la localisation.",
+      );
       return;
     }
+
+    if (!Number.isFinite(Number(trimmedPrice)) || Number(trimmedPrice) < 0) {
+      Alert.alert("Prix invalide", "Saisis un prix numérique positif ou nul.");
+      return;
+    }
+
     setIsSubmitting(true);
+
     try {
-      // 1️⃣ Créer le service dans serviceProviders
+      const normalizedSkills = skills
+        .map((skill) => skill.trim())
+        .filter(Boolean);
+
       const providerId = await create({
-        name,
-        specialty,
-        description,
-        price,
+        name: trimmedName,
+        specialty: trimmedSpecialty,
+        description: trimmedDescription,
+        price: trimmedPrice,
         currency,
         category,
-        location,
-        responseTime: responseTime || "Sur demande",
-        skills,
+        location: trimmedLocation,
+        responseTime: trimmedResponseTime || "Sur demande",
+        skills: normalizedSkills,
         imageUrl: images[0],
         coverImage: images.length > 1 ? images[1] : undefined,
         portfolio: images,
@@ -162,24 +256,21 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
         longitude,
       });
 
-      // Vérifier que providerId est valide
       if (!providerId) {
-        throw new Error("La création du service a échoué");
+        throw new Error("La création du service a échoué.");
       }
 
-      // 2️⃣ Créer une publication dans publications pour le feed
       const meta = JSON.stringify({
         providerId,
-        specialty,
-        price,
+        specialty: trimmedSpecialty,
+        price: trimmedPrice,
         currency,
         category,
-        responseTime,
-        skills,
+        responseTime: trimmedResponseTime || "Sur demande",
+        skills: normalizedSkills,
         latitude,
         longitude,
         isService: true,
-        // Ajouter des champs supplémentaires pour le rendu
         rating: 0,
         reviewCount: 0,
         available: true,
@@ -188,50 +279,269 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
 
       await createPublication({
         type: "service",
-        title: name,
-        description: `${description}\n\nSpécialité : ${specialty}\nPrix : ${price} ${currency}\nDisponibilité : ${responseTime}`,
-        location: location,
-        category: category,
-        images: images,
-        tags: [category, specialty.split(",")[0]?.trim() || "service"],
-        meta: meta,
+        title: trimmedName,
+        description:
+          `${trimmedDescription}\n\n` +
+          `Spécialité : ${trimmedSpecialty}\n` +
+          `Prix : ${trimmedPrice} ${currency}\n` +
+          `Disponibilité : ${trimmedResponseTime || "Sur demande"}`,
+        location: trimmedLocation,
+        category,
+        images,
+        tags: [category, trimmedSpecialty.split(",")[0]?.trim() || "service"],
+        meta,
         latitude,
         longitude,
       });
 
-      toast.success("Service publié !");
+      resetForm();
       onSuccess?.();
       onClose();
+
+      Alert.alert("Service publié", "Ton service a été publié avec succès.");
     } catch (error) {
-      console.error("❌ Erreur lors de la publication:", error);
-      toast.error(
+      console.error("Erreur lors de la publication du service:", error);
+
+      Alert.alert(
+        "Publication impossible",
         error instanceof Error
           ? error.message
-          : "Erreur lors de la publication",
+          : "Une erreur est survenue pendant la publication.",
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70" onPress={onClose}><View className="w-full max-w-md rounded-t-3xl p-6 bg-[#0D1117] border border-white/10" onPress={(e) => e.stopPropagation()}><View className="w-10 h-1 rounded-full mx-auto mb-5 bg-white/20" /><View className="flex items-center justify-between mb-4"><Text className="text-white font-bold text-lg">Publier un service</Text><Pressable onPress={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"><X size={18} className="text-white/60" /></Pressable></View><View className="space-y-3 max-h-[60vh] overflow-y-auto pr-1"><TextInput value={name} onChangeText={(value) => setName(value)} placeholder="Nom du prestataire *" className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" /><TextInput value={specialty} onChangeText={(value) => setSpecialty(value)} placeholder="Spécialité *" className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" /><TextInput value={description} onChangeText={(value) => setDescription(value)} placeholder="Description *" className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" multiline textAlignVertical="top" /><View className="flex gap-2"><TextInput value={price} onChangeText={(value) => setPrice(value)} placeholder="Prix *" className="flex-1 rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" keyboardType="numeric" /><Picker onValueChange={(value) => setCurrency(value)} className="rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none" selectedValue={currency}><Picker.Item label="USD" value="USD" /><Picker.Item label="EUR" value="EUR" /><Picker.Item label="CDF" value="CDF" /><Picker.Item label="CFA" value="CFA" /></Picker></View><Picker onValueChange={(value) => setCategory(value)} className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none" selectedValue={category}><Picker.Item label="Catégorie *" value="" />{CATEGORIES.map((c) => (
-              <Picker.Item label={c} value={c} />
-            ))}</Picker>{}<View className="space-y-2"><View className="rounded-2xl p-3.5" style={{ backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", borderStyle: "solid" }}><View className="flex items-center gap-2.5"><MapPin size={14} style={{  }} /><TextInput value={location} onChangeText={(value) => setLocation(value)} placeholder="Localisation *" className="flex-1 bg-transparent text-white text-sm placeholder:text-white/30 outline-none" editable={!(geocoding)} /><Pressable onPress={handleGeolocate} disabled={geocoding} className="flex-shrink-0 disabled:opacity-40 text-xs font-medium px-2 py-1 rounded-lg" style={{ backgroundColor: "rgba(245,158,11,0.2)" }}>{geocoding ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    "📍"
-                  )}</Pressable></View></View><Pressable onPress={detectUserLocation} disabled={geocoding} className="flex items-center gap-2 text-xs text-white/40 transition-colors"><MapPin size={12} /><Text>Utiliser ma position actuelle</Text></Pressable>{latitude && longitude && (
-              <View className="text-[10px] text-emerald-400/60 flex items-center gap-1"><Text>✅ Coordonnées GPS : {latitude.toFixed(4)},{" "}{longitude.toFixed(4)}</Text></View>
-            )}</View><TextInput value={responseTime} onChangeText={(value) => setResponseTime(value)} placeholder="Temps de réponse (ex: < 1h)" className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" /><View><Text className="text-xs text-white/40 block mb-1">Compétences (séparées par des virgules)
-            </Text><TextInput value={skills.join(", ")} onChangeText={(value) =>
-                setSkills(
-                  value
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                )} placeholder="Plomberie, Électricité, ..." className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/5 border border-white/10 outline-none placeholder:text-white/30" /></View><ImageUploader images={images} onChange={setImages} color="#F97316" /></View><Pressable onPress={handleSubmit} disabled={isSubmitting || geocoding} className="w-full py-3.5 rounded-xl text-white font-bold mt-4 bg-gradient-to-r from-orange-500 to-red-500 disabled:opacity-50">{isSubmitting ? "Publication..." : "Publier"}</Pressable></View></View>
+    <Modal
+      visible={isOpen}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
+        <Pressable
+          onPress={onClose}
+          className="flex-1 justify-end bg-black/70"
+          accessibilityLabel="Fermer le formulaire"
+        >
+          <Pressable
+            onPress={(event) => event.stopPropagation()}
+            className="max-h-[90%] w-full rounded-t-3xl border-t border-white/10 bg-[#0D1117] p-6"
+          >
+            <View className="mb-4 flex-row items-center justify-between">
+              <Text className="text-lg font-bold text-white">
+                Publier un service
+              </Text>
+
+              <Pressable
+                onPress={onClose}
+                disabled={isSubmitting}
+                accessibilityRole="button"
+                accessibilityLabel="Fermer"
+                className="h-9 w-9 items-center justify-center rounded-xl bg-white/5"
+              >
+                <X size={18} color="rgba(255,255,255,0.7)" />
+              </Pressable>
+            </View>
+
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 8 }}
+            >
+              <View className="gap-3">
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Nom du prestataire *"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white"
+                  editable={!isSubmitting}
+                />
+
+                <TextInput
+                  value={specialty}
+                  onChangeText={setSpecialty}
+                  placeholder="Spécialité *"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white"
+                  editable={!isSubmitting}
+                />
+
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="Description du service *"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white"
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  editable={!isSubmitting}
+                />
+
+                <View className="flex-row gap-2">
+                  <TextInput
+                    value={price}
+                    onChangeText={setPrice}
+                    placeholder="Prix *"
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white"
+                    keyboardType="decimal-pad"
+                    editable={!isSubmitting}
+                  />
+
+                  <View className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                    <Picker
+                      selectedValue={currency}
+                      onValueChange={(value: string) => setCurrency(value)}
+                      enabled={!isSubmitting}
+                      style={{ color: "white", width: 110 }}
+                      dropdownIconColor="white"
+                    >
+                      <Picker.Item label="USD" value="USD" />
+                      <Picker.Item label="CDF" value="CDF" />
+                      <Picker.Item label="EUR" value="EUR" />
+                      <Picker.Item label="CFA" value="CFA" />
+                    </Picker>
+                  </View>
+                </View>
+
+                <View className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                  <Picker
+                    selectedValue={category}
+                    onValueChange={(value: string) => setCategory(value)}
+                    enabled={!isSubmitting}
+                    style={{ color: "white" }}
+                    dropdownIconColor="white"
+                  >
+                    <Picker.Item label="Choisir une catégorie *" value="" />
+                    {CATEGORIES.map((item) => (
+                      <Picker.Item key={item} label={item} value={item} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <View
+                  className="rounded-2xl p-3"
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.06)",
+                    borderWidth: 1,
+                    borderColor: "rgba(255,255,255,0.1)",
+                  }}
+                >
+                  <View className="flex-row items-center gap-2">
+                    <MapPin size={16} color="rgba(255,255,255,0.6)" />
+                    <TextInput
+                      value={location}
+                      onChangeText={setLocation}
+                      placeholder="Localisation *"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      className="flex-1 text-sm text-white"
+                      editable={!geocoding && !isSubmitting}
+                    />
+
+                    <Pressable
+                      onPress={handleGeolocate}
+                      disabled={geocoding || isSubmitting}
+                      accessibilityRole="button"
+                      accessibilityLabel="Localiser l'adresse saisie"
+                      className="items-center justify-center rounded-lg px-3 py-2"
+                      style={{
+                        backgroundColor: "rgba(245,158,11,0.2)",
+                      }}
+                    >
+                      {geocoding ? (
+                        <Loader2 size={16} color="#FBBF24" />
+                      ) : (
+                        <Text className="text-xs font-medium text-amber-400">
+                          Localiser
+                        </Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+
+                <Pressable
+                  onPress={() => void detectUserLocation()}
+                  disabled={geocoding || isSubmitting}
+                  accessibilityRole="button"
+                  className="flex-row items-center gap-2 py-1"
+                >
+                  <MapPin size={14} color="rgba(255,255,255,0.5)" />
+                  <Text className="text-xs text-white/50">
+                    Utiliser ma position actuelle
+                  </Text>
+                </Pressable>
+
+                {latitude !== undefined && longitude !== undefined && (
+                  <Text className="text-xs text-emerald-400">
+                    Coordonnées GPS : {latitude.toFixed(5)},{" "}
+                    {longitude.toFixed(5)}
+                  </Text>
+                )}
+
+                <TextInput
+                  value={responseTime}
+                  onChangeText={setResponseTime}
+                  placeholder="Temps de réponse (ex. moins d'une heure)"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white"
+                  editable={!isSubmitting}
+                />
+
+                <View>
+                  <Text className="mb-2 text-xs text-white/50">
+                    Compétences séparées par des virgules
+                  </Text>
+                  <TextInput
+                    value={skills.join(", ")}
+                    onChangeText={(value) =>
+                      setSkills(
+                        value
+                          .split(",")
+                          .map((item) => item.trim())
+                          .filter(Boolean),
+                      )
+                    }
+                    placeholder="Plomberie, électricité..."
+                    placeholderTextColor="rgba(255,255,255,0.3)"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white"
+                    editable={!isSubmitting}
+                  />
+                </View>
+
+                <ImageUploader
+                  images={images}
+                  onChange={setImages}
+                  color="#F97316"
+                />
+              </View>
+            </ScrollView>
+
+            <Pressable
+              onPress={() => void handleSubmit()}
+              disabled={isSubmitting || geocoding}
+              accessibilityRole="button"
+              className={`mt-4 w-full items-center rounded-xl py-3.5 ${
+                isSubmitting || geocoding ? "bg-orange-500/50" : "bg-orange-500"
+              }`}
+            >
+              <Text className="font-bold text-white">
+                {isSubmitting
+                  ? "Publication en cours..."
+                  : "Publier le service"}
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }

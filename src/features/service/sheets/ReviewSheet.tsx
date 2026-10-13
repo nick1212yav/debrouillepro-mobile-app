@@ -1,59 +1,129 @@
-import { Pressable, View, TextInput, Text } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useState } from "react";
-import { X, Star } from "lucide-react-native";
-import { toast } from "sonner";
+import { Star } from "lucide-react-native";
 import { useServiceReviews } from "../hooks/useServiceReviews";
 import type { Id } from "@/convex/_generated/dataModel";
 
-export function ReviewSheet({
-  isOpen,
-  onClose,
-  providerId,
-}: {
+interface Props {
   isOpen: boolean;
   onClose: () => void;
   providerId: Id<"serviceProviders">;
-}) {
+}
+
+export function ReviewSheet({ isOpen, onClose, providerId }: Props) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const { addReview, loading } = useServiceReviews(providerId);
+
   const handleSubmit = async () => {
-    if (!rating || !comment) {
-      toast.error("Note et commentaire requis");
+    const trimmedComment = comment.trim();
+
+    if (!rating || !trimmedComment) {
+      Alert.alert(
+        "Informations requises",
+        "Choisis une note et ajoute un commentaire.",
+      );
       return;
     }
-    await addReview(rating, comment);
-    onClose();
+
+    try {
+      await addReview(rating, trimmedComment);
+      setRating(0);
+      setComment("");
+      onClose();
+    } catch {
+      Alert.alert("Erreur", "Impossible d'envoyer ton avis.");
+    }
   };
+
   return (
-<View>
-      {isOpen && (
-        <View className="fixed inset-0 z-50 flex items-end justify-center bg-black/70" onPress={onClose}>
-          <View className="w-full max-w-md rounded-t-3xl p-6 bg-[#0D1117] border border-white/10" onPress={(e) => e.stopPropagation()}>
-            <View className="w-10 h-1 rounded-full mx-auto mb-5 bg-white/20" />
-            <Text className="text-white font-bold text-lg mb-4">Laisser un avis
+    <Modal
+      visible={isOpen}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
+        <Pressable
+          onPress={onClose}
+          className="flex-1 justify-end bg-black/70"
+          accessibilityLabel="Fermer le formulaire d'avis"
+        >
+          <Pressable
+            onPress={(event) => event.stopPropagation()}
+            className="w-full rounded-t-3xl border-t border-white/10 bg-[#0D1117] p-6"
+          >
+            <View className="mb-5 h-1 w-10 self-center rounded-full bg-white/20" />
+
+            <Text className="mb-4 text-lg font-bold text-white">
+              Laisser un avis
             </Text>
-            <View className="flex gap-2 mb-3">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <Pressable key={s} onPress={() => setRating(s)}>
-                  <Star
-                    size={28}
-                    className={
-                      s <= rating
-                        ? "fill-yellow-400 text-yellow-400"
-                        : "text-white/20"
-                    }
-                  />
-                </Pressable>
-              ))}
+
+            <Text className="mb-3 text-sm text-white/60">Ta note</Text>
+
+            <View className="mb-4 flex-row gap-3">
+              {[1, 2, 3, 4, 5].map((value) => {
+                const selected = value <= rating;
+
+                return (
+                  <Pressable
+                    key={value}
+                    onPress={() => setRating(value)}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${value} étoile${value > 1 ? "s" : ""}`}
+                    accessibilityState={{ selected: rating === value }}
+                  >
+                    <Star
+                      size={28}
+                      color={selected ? "#FCD34D" : "rgba(255,255,255,0.2)"}
+                      fill={selected ? "#FCD34D" : "transparent"}
+                    />
+                  </Pressable>
+                );
+              })}
             </View>
-            <TextInput value={comment} onChangeText={(value) => setComment(value)} placeholder="Votre commentaire..." className="w-full rounded-xl p-3 text-sm text-white bg-white/5 border border-white/10 outline-none" multiline textAlignVertical="top" />
-            <Pressable onPress={handleSubmit} disabled={loading} className="w-full py-3.5 rounded-xl text-white font-bold mt-4 bg-gradient-to-r from-orange-500 to-red-500 disabled:opacity-50">
-              Envoyer
+
+            <TextInput
+              value={comment}
+              onChangeText={setComment}
+              placeholder="Partage ton expérience..."
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white"
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              editable={!loading}
+            />
+
+            <Pressable
+              onPress={handleSubmit}
+              disabled={loading}
+              accessibilityRole="button"
+              className={`mt-4 w-full items-center rounded-xl py-3.5 ${
+                loading ? "bg-orange-500/50" : "bg-orange-500"
+              }`}
+            >
+              <Text className="font-bold text-white">
+                {loading ? "Envoi en cours..." : "Envoyer mon avis"}
+              </Text>
             </Pressable>
-          </View>
-        </View>
-      )}
-    </View>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
