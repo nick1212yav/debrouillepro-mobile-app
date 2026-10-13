@@ -145,6 +145,31 @@ function assertOptionalCurrency(currency: string | undefined): void {
   }
 }
 
+/**
+ * Construit le champ `searchText` dénormalisé pour Search V2.
+ * Doit contenir name + specialty + description + skills + languages.
+ */
+function buildProviderSearchText(p: {
+  name: string;
+  specialty: string;
+  description: string;
+  skills: string[];
+  languages?: string[];
+}): string {
+  return [
+    p.name,
+    p.specialty,
+    p.description,
+    ...p.skills,
+    ...(p.languages ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
+const MAX_PROVIDERS_PER_USER = 10;
+
 // ────────────────────────────────────────────────────────────────
 // LECTURE — profil du propriétaire
 // ────────────────────────────────────────────────────────────────
@@ -216,6 +241,164 @@ export const getProviderById = query({
   },
 });
 
+// ────────────────────────────────────────────────────────────────
+// CRÉATION — V1
+// ────────────────────────────────────────────────────────────────
+//
+// Crée un provider directement en statut `active`, prêt à apparaître
+// dans le catalogue public. Le champ `verified` est géré par le module
+// verification — jamais accepté depuis cette mutation.
+//
+// Le champ `searchText` est calculé côté serveur pour Search V2.
+// Le champ `rating`/`reviewCount` démarre à 0.
+
+export const createProvider = mutation({
+  args: {
+    name: v.string(),
+    specialty: v.string(),
+    description: v.string(),
+    category: v.string(),
+    location: v.string(),
+    responseTime: v.string(),
+    skills: v.array(v.string()),
+
+    basePrice: v.optional(v.number()),
+    priceCurrency: v.optional(v.string()),
+    pricingModel: v.optional(
+      v.union(
+        v.literal("fixed"),
+        v.literal("hourly"),
+        v.literal("daily"),
+        v.literal("quote_only"),
+        v.literal("package"),
+      ),
+    ),
+    billingUnit: v.optional(v.string()),
+
+    imageUrl: v.optional(v.string()),
+    coverImage: v.optional(v.string()),
+    portfolio: v.optional(v.array(v.string())),
+
+    latitude: v.optional(v.number()),
+    longitude: v.optional(v.number()),
+
+    phone: v.optional(v.string()),
+    whatsapp: v.optional(v.string()),
+    website: v.optional(v.string()),
+    businessEmail: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    // Limite de providers par utilisateur
+    const existing = await ctx.db
+      .query("serviceProviders")
+      .withIndex("by_userId", (q) => q.eq("userId", user._id))
+      .collect();
+
+    const activeCount = existing.filter((p) => p.status !== "archived").length;
+
+    if (activeCount >= MAX_PROVIDERS_PER_USER) {
+      throw new ConvexError({
+        code: "TOO_MANY_PROVIDERS",
+        message: `Maximum ${MAX_PROVIDERS_PER_USER} profils prestataire par compte.`,
+      });
+    }
+
+    assertOptionalAmount(args.basePrice, "basePrice");
+    assertOptionalCurrency(args.priceCurrency);
+
+    const name = args.name.trim();
+    const specialty = args.specialty.trim();
+    const description = args.description.trim();
+    const location = args.location.trim();
+
+    if (name.length < 2 || name.length > 200) {
+      throw new ConvexError({
+        code: "INVALID_NAME",
+        message: "Nom invalide (2 à 200 caractères).",
+      });
+    }
+    if (specialty.length < 2 || specialty.length > 200) {
+      throw new ConvexError({
+        code: "INVALID_SPECIALTY",
+        message: "Spécialité invalide (2 à 200 caractères).",
+      });
+    }
+    if (description.length < 10 || description.length > 2000) {
+      throw new ConvexError({
+        code: "INVALID_DESCRIPTION",
+        message: "Description invalide (10 à 2000 caractères).",
+      });
+    }
+
+    const skills = args.skills
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+
+    const now = Date.now();
+
+    const searchText = buildProviderSearchText({
+      name,
+      specialty,
+      description,
+      skills,
+    });
+
+    const providerId = await ctx.db.insert("serviceProviders", {
+      userId: user._id,
+      name,
+      specialty,
+      category: args.category,
+      description,
+      location,
+      responseTime: args.responseTime || "Sur demande",
+      skills,
+
+      // Legacy V0 — conservé pour compat frontend
+      price:
+        args.basePrice !== undefined
+          ? `${args.basePrice} ${args.priceCurrency ?? "USD"}`
+          : "",
+      currency: args.priceCurrency ?? "USD",
+
+      // V1 structuré
+      basePrice: args.basePrice,
+      priceCurrency: args.priceCurrency,
+      pricingModel: args.pricingModel ?? "fixed",
+      billingUnit: args.billingUnit,
+
+      imageUrl: args.imageUrl,
+      coverImage: args.coverImage,
+      portfolio: args.portfolio,
+
+      latitude: args.latitude,
+      longitude: args.longitude,
+
+      phone: args.phone,
+      whatsapp: args.whatsapp,
+      website: args.website,
+      businessEmail: args.businessEmail,
+
+      rating: 0,
+      reviewCount: 0,
+      viewCount: 0,
+      verified: false,
+      available: true,
+      urgent: false,
+
+      status: "active",
+      createdAt: now,
+      publishedAt: now,
+      updatedAt: now,
+      isDemo: false,
+      searchText,
+    });
+
+    return { providerId, status: "active" as const };
+  },
+});
 // ────────────────────────────────────────────────────────────────
 // MISE À JOUR — patch construit explicitement, aucun cast
 // ────────────────────────────────────────────────────────────────

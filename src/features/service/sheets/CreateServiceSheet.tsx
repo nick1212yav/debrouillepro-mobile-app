@@ -60,7 +60,7 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
   const [latitude, setLatitude] = useState<number | undefined>();
   const [longitude, setLongitude] = useState<number | undefined>();
 
-  const create = useMutation(api.serviceProviders.create);
+  const createProvider = useMutation(api.services.providers.createProvider);
   const createPublication = useMutation(api.publications.createPublication);
 
   const geocodeLocation = useCallback(async (address: string) => {
@@ -225,8 +225,9 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
       return;
     }
 
-    if (!Number.isFinite(Number(trimmedPrice)) || Number(trimmedPrice) < 0) {
-      Alert.alert("Prix invalide", "Saisis un prix numérique positif ou nul.");
+    const basePrice = Number(trimmedPrice);
+    if (!Number.isFinite(basePrice) || basePrice < 0) {
+      Alert.alert("Prix invalide", "Saisis un prix numérique positif.");
       return;
     }
 
@@ -237,29 +238,33 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
         .map((skill) => skill.trim())
         .filter(Boolean);
 
-      const providerId = await create({
+      // ── 1. Création du provider V1 (visible immédiatement)
+      const result = await createProvider({
         name: trimmedName,
         specialty: trimmedSpecialty,
         description: trimmedDescription,
-        price: trimmedPrice,
-        currency,
         category,
         location: trimmedLocation,
         responseTime: trimmedResponseTime || "Sur demande",
         skills: normalizedSkills,
+        basePrice,
+        priceCurrency: currency,
+        pricingModel: "fixed",
         imageUrl: images[0],
         coverImage: images.length > 1 ? images[1] : undefined,
-        portfolio: images,
-        available: true,
-        verified: false,
+        portfolio: images.length > 0 ? images : undefined,
         latitude,
         longitude,
       });
 
-      if (!providerId) {
-        throw new Error("La création du service a échoué.");
-      }
+      const providerId = result.providerId;
 
+      // ── 2. Publication pour le feed (V0 publications — inchangé)
+      //
+      // DETTE : si createPublication échoue, le provider existe déjà
+      // dans le catalogue Services mais pas dans le feed. À résoudre via
+      // une action Convex transactionnelle (createProvider + createPublication
+      // en une opération) lors du chantier Publications.
       const meta = JSON.stringify({
         providerId,
         specialty: trimmedSpecialty,
@@ -298,10 +303,9 @@ export function CreateServiceSheet({ isOpen, onClose, onSuccess }: Props) {
       onSuccess?.();
       onClose();
 
-      Alert.alert("Service publié", "Ton service a été publié avec succès.");
+      Alert.alert("Service publié", "Ton service est en ligne.");
     } catch (error) {
-      console.error("Erreur lors de la publication du service:", error);
-
+      console.error("Erreur lors de la publication:", error);
       Alert.alert(
         "Publication impossible",
         error instanceof Error
