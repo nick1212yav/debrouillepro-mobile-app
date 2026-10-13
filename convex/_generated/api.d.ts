@@ -168,6 +168,7 @@ import type * as services_quotes from "../services/quotes.js";
 import type * as services_reports from "../services/reports.js";
 import type * as services_reviews from "../services/reviews.js";
 import type * as services_search from "../services/search.js";
+import type * as services_verification from "../services/verification.js";
 import type * as settings from "../settings.js";
 import type * as shortVideos from "../shortVideos.js";
 import type * as social from "../social.js";
@@ -352,6 +353,7 @@ declare const fullApi: ApiFromModules<{
   "services/reports": typeof services_reports;
   "services/reviews": typeof services_reviews;
   "services/search": typeof services_search;
+  "services/verification": typeof services_verification;
   settings: typeof settings;
   shortVideos: typeof shortVideos;
   social: typeof social;
