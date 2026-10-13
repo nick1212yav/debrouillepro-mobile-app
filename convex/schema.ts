@@ -6357,12 +6357,14 @@ export default defineSchema({
     nextOccurrence: v.number(),
     lastCreatedAt: v.optional(v.number()),
     endsAt: v.optional(v.number()),
+    anchorDayOfMonth: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_provider", ["providerId"])
     .index("by_user", ["userId"])
     .index("by_next", ["nextOccurrence"])
-    .index("by_active", ["active"]),
+    .index("by_active", ["active"])
+    .index("by_active_and_next", ["active", "nextOccurrence"]),
 
   servicePayments: defineTable({
     bookingId: v.id("serviceBookings"),
