@@ -23,4 +23,22 @@ crons.interval(
   internal.stories.cleanupExpiredStories,
 );
 
+/**
+ * Génération automatique des réservations récurrentes Services.
+ *
+ * - Cherche les récurrences actives dont `nextOccurrence <= now`
+ * - Génère un `serviceBooking` réel (status: "pending") pour chacune
+ * - Politique de rattrapage : skip silencieux au-delà de 48h de retard
+ * - Batché à 50 par exécution
+ *
+ * Fréquence 15 min : idempotent par construction (chaque appel avance
+ * `nextOccurrence` ou désactive la récurrence).
+ */
+crons.interval(
+  "process due recurring bookings",
+  { minutes: 15 },
+  internal.services.recurring.processDueRecurringsInternal,
+  { maxBatch: 50 },
+);
+
 export default crons;
