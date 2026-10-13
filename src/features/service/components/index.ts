@@ -21,7 +21,6 @@ export * from "./ServiceCoverage";
 export * from "./ServiceActions";
 export * from "./ServiceFooter";
 export * from "./ServiceStatistics";
-export * from "./ServiceHistory";
 export * from "./ServiceReviews";
 export * from "./ServiceQuestions";
 export * from "./ServiceRecommendations";
