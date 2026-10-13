@@ -2,18 +2,16 @@
 //
 // Backend Services V1 — réservations récurrentes.
 //
-// Une "recurring booking" est un GABARIT qui génère périodiquement
-// de vrais `serviceBookings`. Elle ne remplace pas un booking.
-//
 // RÈGLE TEMPORELLE UNIQUE :
 //   - le client fournit `startDate` (YYYY-MM-DD) + `timeSlot` (HH:MM)
 //   - le serveur calcule `nextOccurrence` = startDate à timeSlot UTC
-//   - à chaque génération, `nextOccurrence` avance d'une période
-//   - aucune divergence possible entre timeSlot et nextOccurrence
+//   - `anchorDayOfMonth` est persisté pour préserver l'intention
+//     mensuelle (31 janv → 28 févr → 31 mars, jamais 28 mars)
 //
-// DETTE DOCUMENTÉE : `processDueRecurrings` doit être appelée par un
-// cron Convex (à brancher dans un module transverse). En attendant,
-// elle reste exposée pour un worker manuel ou un admin.
+// MODÈLE D'ACCÈS :
+//   - `generateNextBooking` : client-callable, self-only, idempotent.
+//     Ne fait rien si `nextOccurrence > now` → pas de doublon possible.
+//   - `processDueRecurrings` : admin-only, batch, pour worker/cron.
 
 import { query, mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
@@ -159,22 +157,15 @@ function validatePatternDayOfWeek(
   }
 }
 
-/**
- * Compose un timestamp UTC à partir d'une date YYYY-MM-DD et d'un HH:MM.
- * Vérifie que la date existe réellement (rejette 2026-02-30).
- */
-function composeOccurrence(startDate: string, timeSlot: string): number {
-  if (!DATE_RE.test(startDate)) {
+function parseUTCDate(dateStr: string): { y: number; m: number; d: number } {
+  if (!DATE_RE.test(dateStr)) {
     throw new ConvexError({
       code: "INVALID_DATE",
       message: "startDate doit être au format YYYY-MM-DD.",
     });
   }
-  const [y, m, d] = startDate.split("-").map((n) => parseInt(n, 10));
-  const [hh, mm] = timeSlot.split(":").map((n) => parseInt(n, 10));
-
-  const dt = new Date(Date.UTC(y, m - 1, d, hh, mm, 0, 0));
-
+  const [y, m, d] = dateStr.split("-").map((n) => parseInt(n, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
   if (
     dt.getUTCFullYear() !== y ||
     dt.getUTCMonth() !== m - 1 ||
@@ -182,11 +173,35 @@ function composeOccurrence(startDate: string, timeSlot: string): number {
   ) {
     throw new ConvexError({
       code: "INVALID_DATE",
-      message: `La date "${startDate}" n'existe pas dans le calendrier.`,
+      message: `La date "${dateStr}" n'existe pas dans le calendrier.`,
     });
   }
+  return { y, m, d };
+}
 
-  return dt.getTime();
+function composeOccurrence(startDate: string, timeSlot: string): number {
+  const { y, m, d } = parseUTCDate(startDate);
+  const [hh, mm] = timeSlot.split(":").map((n) => parseInt(n, 10));
+  return Date.UTC(y, m - 1, d, hh, mm, 0, 0);
+}
+
+function dayOfWeekOfDate(dateStr: string): number {
+  const { y, m, d } = parseUTCDate(dateStr);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+function assertDateMatchesDayOfWeek(
+  startDate: string,
+  dayOfWeek: number | undefined,
+): void {
+  if (dayOfWeek === undefined) return;
+  const actual = dayOfWeekOfDate(startDate);
+  if (actual !== dayOfWeek) {
+    throw new ConvexError({
+      code: "DAY_OF_WEEK_MISMATCH",
+      message: `La date ${startDate} ne tombe pas sur le jour de la semaine indiqué (attendu ${dayOfWeek}, obtenu ${actual}).`,
+    });
+  }
 }
 
 function validateNextOccurrence(ts: number): number {
@@ -226,29 +241,41 @@ function validateEndsAt(
 
 /**
  * Avance d'une période.
- * - daily/weekly/biweekly : arithmétique fixe en millisecondes
- * - monthly : bornage au dernier jour du mois cible
- *   (ex : 31 janvier + 1 mois → 28/29 février, jamais 3 mars)
+ * - daily/weekly/biweekly : arithmétique fixe (le jour de semaine est
+ *   déjà garanti par la validation à la création)
+ * - monthly : utilise `anchorDay` (jour originel) borné au dernier jour
+ *   du mois cible. Ex : anchor=31 → 31 janv, 28 févr, 31 mars, 30 avr.
+ *   Jamais 28 mars après un 28 février.
  */
-function advance(ts: number, pattern: Pattern): number {
+function advance(
+  ts: number,
+  pattern: Pattern,
+  anchorDay: number | null,
+): number {
   if (pattern === "daily") return ts + 24 * 60 * 60 * 1000;
   if (pattern === "weekly") return ts + 7 * 24 * 60 * 60 * 1000;
   if (pattern === "biweekly") return ts + 14 * 24 * 60 * 60 * 1000;
 
   // monthly
   const d = new Date(ts);
-  const day = d.getUTCDate();
   const month = d.getUTCMonth();
   const year = d.getUTCFullYear();
+  const currentDay = d.getUTCDate();
+  const targetDayOfMonth = anchorDay ?? currentDay;
 
-  // Dernier jour du mois cible
+  // Dernier jour du mois cible (mois + 1)
   const lastOfNextMonth = new Date(Date.UTC(year, month + 2, 0)).getUTCDate();
-  const targetDay = Math.min(day, lastOfNextMonth);
+  const finalDay = Math.min(targetDayOfMonth, lastOfNextMonth);
 
-  d.setUTCMonth(month + 1);
-  d.setUTCDate(targetDay);
-
-  return d.getTime();
+  return Date.UTC(
+    d.getUTCFullYear(),
+    month + 1,
+    finalDay,
+    d.getUTCHours(),
+    d.getUTCMinutes(),
+    0,
+    0,
+  );
 }
 
 async function logHistory(
@@ -279,7 +306,7 @@ export const createRecurringBooking = mutation({
     dayOfWeek: v.optional(v.number()),
     timeSlot: v.string(),
     message: v.string(),
-    startDate: v.string(), // YYYY-MM-DD
+    startDate: v.string(),
     endsAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -304,13 +331,16 @@ export const createRecurringBooking = mutation({
     const timeSlot = validateTimeSlot(args.timeSlot);
     const message = validateMessage(args.message);
 
-    // nextOccurrence calculé par le serveur depuis startDate + timeSlot
+    // Cohérence date ↔ dayOfWeek (weekly/biweekly)
+    assertDateMatchesDayOfWeek(args.startDate, args.dayOfWeek);
+
     const nextOccurrence = validateNextOccurrence(
       composeOccurrence(args.startDate, timeSlot),
     );
     validateEndsAt(args.endsAt, nextOccurrence);
 
-    // Limite de récurrences actives par user
+    const anchorDayOfMonth = parseUTCDate(args.startDate).d;
+
     const existing = await ctx.db
       .query("serviceRecurringBookings")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -335,12 +365,13 @@ export const createRecurringBooking = mutation({
       active: true,
       nextOccurrence,
       endsAt: args.endsAt,
+      anchorDayOfMonth,
       createdAt: now,
     });
 
     await logHistory(ctx, args.providerId, "recurring.created", user._id);
 
-    return { recurringId, nextOccurrence };
+    return { recurringId, nextOccurrence, anchorDayOfMonth };
   },
 });
 
@@ -355,7 +386,7 @@ export const updateRecurringBooking = mutation({
     dayOfWeek: v.optional(v.number()),
     timeSlot: v.optional(v.string()),
     message: v.optional(v.string()),
-    startDate: v.optional(v.string()), // recompose nextOccurrence
+    startDate: v.optional(v.string()),
     endsAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -384,20 +415,32 @@ export const updateRecurringBooking = mutation({
 
     validatePatternDayOfWeek(finalPattern, finalDayOfWeek);
 
-    // Recalcule nextOccurrence si startDate ou timeSlot change
+    // Recalcule nextOccurrence + anchor si startDate ou timeSlot change
     let finalNextOccurrence = recurring.nextOccurrence;
+    let finalAnchor = recurring.anchorDayOfMonth ?? null;
+
     if (args.startDate !== undefined || args.timeSlot !== undefined) {
       const dateStr =
         args.startDate ??
         new Date(recurring.nextOccurrence).toISOString().slice(0, 10);
+
+      // Cohérence date ↔ dayOfWeek
+      assertDateMatchesDayOfWeek(dateStr, finalDayOfWeek);
+
       finalNextOccurrence = validateNextOccurrence(
         composeOccurrence(dateStr, finalTimeSlot),
       );
+      finalAnchor = parseUTCDate(dateStr).d;
+    } else if (args.pattern !== undefined) {
+      // Changement de pattern sans changement de date :
+      // on recalcule l'anchor à partir de nextOccurrence si nécessaire
+      if (recurring.anchorDayOfMonth === undefined) {
+        finalAnchor = new Date(recurring.nextOccurrence).getUTCDate();
+      }
     }
 
     const finalEndsAt =
       args.endsAt !== undefined ? args.endsAt : recurring.endsAt;
-    // Validation ensemble sur l'état final — corrige le point 2
     validateEndsAt(finalEndsAt, finalNextOccurrence);
 
     const patch: Partial<Doc<"serviceRecurringBookings">> = {};
@@ -411,10 +454,17 @@ export const updateRecurringBooking = mutation({
       patch.nextOccurrence = finalNextOccurrence;
     }
     if (args.endsAt !== undefined) patch.endsAt = args.endsAt;
+    if (finalAnchor !== null && finalAnchor !== recurring.anchorDayOfMonth) {
+      patch.anchorDayOfMonth = finalAnchor;
+    }
 
     await ctx.db.patch(args.recurringId, patch);
 
-    return { success: true, nextOccurrence: finalNextOccurrence };
+    return {
+      success: true,
+      nextOccurrence: finalNextOccurrence,
+      anchorDayOfMonth: finalAnchor,
+    };
   },
 });
 
@@ -465,7 +515,6 @@ export const resumeRecurringBooking = mutation({
       return { success: true, active: true, alreadyActive: true };
     }
 
-    // Refus si la date de fin est atteinte ou dépassée par nextOccurrence
     if (
       recurring.endsAt !== undefined &&
       recurring.nextOccurrence >= recurring.endsAt
@@ -584,7 +633,11 @@ async function generateForRecurring(
     createdAt: now,
   });
 
-  const next = advance(recurring.nextOccurrence, recurring.pattern);
+  const next = advance(
+    recurring.nextOccurrence,
+    recurring.pattern,
+    recurring.anchorDayOfMonth ?? null,
+  );
   const newActive =
     recurring.endsAt === undefined ? true : next < recurring.endsAt;
 
@@ -611,7 +664,7 @@ async function generateForRecurring(
 }
 
 // ────────────────────────────────────────────────────────────────
-// GÉNÉRATION — appelée par le client
+// GÉNÉRATION — client (self-only, idempotent)
 // ────────────────────────────────────────────────────────────────
 
 export const generateNextBooking = mutation({
@@ -634,16 +687,11 @@ export const generateNextBooking = mutation({
 });
 
 // ────────────────────────────────────────────────────────────────
-// GÉNÉRATION AUTOMATIQUE — worker / cron
+// GÉNÉRATION AUTOMATIQUE — worker / cron (admin)
 // ────────────────────────────────────────────────────────────────
 //
-// DETTE DOCUMENTÉE : à appeler depuis un cron Convex.
-// Cherche toutes les récurrences actives dont nextOccurrence <= now,
-// et génère un booking pour chacune. Idempotent par construction
-// (chaque appel avance nextOccurrence ou désactive la récurrence).
-//
-// Limite : `maxBatch` borne le nombre de générations par appel pour
-// éviter un pic. Le cron suivant traitera le reste.
+// Utilise l'index composite by_active_and_next → plus de starvation.
+// Idempotent : chaque appel avance nextOccurrence ou désactive la récurrence.
 
 export const processDueRecurrings = mutation({
   args: {
@@ -655,12 +703,13 @@ export const processDueRecurrings = mutation({
 
     const now = Date.now();
 
-    const candidates = await ctx.db
+    // Index composite : active=true AND nextOccurrence <= now
+    const dueActive = await ctx.db
       .query("serviceRecurringBookings")
-      .withIndex("by_next", (q) => q.lte("nextOccurrence", now))
-      .take(maxBatch * 3); // sur-échantillon, on filtre active après
-
-    const dueActive = candidates.filter((r) => r.active).slice(0, maxBatch);
+      .withIndex("by_active_and_next", (q) =>
+        q.eq("active", true).lte("nextOccurrence", now),
+      )
+      .take(maxBatch);
 
     let generated = 0;
     let ended = 0;
@@ -684,7 +733,6 @@ export const processDueRecurrings = mutation({
     }
 
     return {
-      scanned: candidates.length,
       processed: dueActive.length,
       generated,
       ended,
