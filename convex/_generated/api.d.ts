@@ -164,6 +164,7 @@ import type * as services_favorites from "../services/favorites.js";
 import type * as services_invoices from "../services/invoices.js";
 import type * as services_migrations from "../services/migrations.js";
 import type * as services_packages from "../services/packages.js";
+import type * as services_payments from "../services/payments.js";
 import type * as services_promotions from "../services/promotions.js";
 import type * as services_providers from "../services/providers.js";
 import type * as services_questions from "../services/questions.js";
@@ -354,6 +355,7 @@ declare const fullApi: ApiFromModules<{
   "services/invoices": typeof services_invoices;
   "services/migrations": typeof services_migrations;
   "services/packages": typeof services_packages;
+  "services/payments": typeof services_payments;
   "services/promotions": typeof services_promotions;
   "services/providers": typeof services_providers;
   "services/questions": typeof services_questions;
