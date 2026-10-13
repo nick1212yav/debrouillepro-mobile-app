@@ -6314,12 +6314,19 @@ export default defineSchema({
       v.literal("cancelled"),
     ),
     pdfUrl: v.optional(v.string()),
-    issuedAt: v.number(),
+    createdAt: v.number(),
+    issuedAt: v.optional(v.number()),
     paidAt: v.optional(v.number()),
   })
     .index("by_booking", ["bookingId"])
     .index("by_user", ["userId"])
+    .index("by_provider", ["providerId"])
     .index("by_number", ["number"]),
+
+  serviceInvoiceCounters: defineTable({
+    year: v.number(),
+    seq: v.number(),
+  }).index("by_year", ["year"]),
 
   serviceContracts: defineTable({
     bookingId: v.id("serviceBookings"),
