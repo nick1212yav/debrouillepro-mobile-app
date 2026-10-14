@@ -5,13 +5,15 @@ interface Props {
 }
 
 export function ServiceDescription({ description }: Props) {
-  if (!description) return null;
+  const normalized = description?.trim() ?? "";
+  if (!normalized) return null;
+
   return (
-    <View className="bg-white/5 rounded-2xl p-4">
-      <Text className="text-sm font-medium text-white/50 mb-2">Description</Text>
-      <Text className="text-white/80 text-sm leading-relaxed">
-        {description}
+    <View className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <Text className="mb-2 text-sm font-medium text-white/50">
+        Description
       </Text>
+      <Text className="text-sm leading-6 text-white/80">{normalized}</Text>
     </View>
   );
 }

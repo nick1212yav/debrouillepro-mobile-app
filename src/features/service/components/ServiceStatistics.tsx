@@ -1,15 +1,38 @@
-import { View, Text } from "react-native";
+import { Text, View } from "react-native";
 
-export function ServiceStatistics({
-  reviews,
-  rating,
-  responseTime,
-}: {
+interface Props {
   reviews: number;
   rating: number;
   responseTime: string;
-}) {
+}
+
+export function ServiceStatistics({ reviews, rating, responseTime }: Props) {
+  const safeRating = Number.isFinite(rating) ? rating : 0;
+  const safeReviews = Number.isFinite(reviews)
+    ? Math.max(0, Math.floor(reviews))
+    : 0;
+  const safeResponseTime = (responseTime ?? "").trim() || "Non précisé";
+
   return (
-    <View className="gap-3"><View className="p-3 rounded-xl bg-white/5 text-center"><Text className="text-orange-400 font-bold">{rating.toFixed(1)}</Text><Text className="text-white/40 text-xs">Note</Text></View><View className="p-3 rounded-xl bg-white/5 text-center"><Text className="text-white font-bold">{reviews}</Text><Text className="text-white/40 text-xs">Avis</Text></View><View className="p-3 rounded-xl bg-white/5 text-center"><Text className="text-white font-bold">{responseTime}</Text><Text className="text-white/40 text-xs">Réponse</Text></View></View>
+    <View className="flex-row gap-3">
+      <View className="flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-3">
+        <Text className="font-bold text-orange-400">
+          {safeRating.toFixed(1)}
+        </Text>
+        <Text className="mt-1 text-xs text-white/40">Note</Text>
+      </View>
+
+      <View className="flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-3">
+        <Text className="font-bold text-white">{safeReviews}</Text>
+        <Text className="mt-1 text-xs text-white/40">Avis</Text>
+      </View>
+
+      <View className="flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5 p-3">
+        <Text className="text-center font-bold text-white" numberOfLines={2}>
+          {safeResponseTime}
+        </Text>
+        <Text className="mt-1 text-center text-xs text-white/40">Réponse</Text>
+      </View>
+    </View>
   );
 }

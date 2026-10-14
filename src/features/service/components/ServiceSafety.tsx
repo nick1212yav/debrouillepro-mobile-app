@@ -1,31 +1,41 @@
 import { Text, View } from "react-native";
 import { Shield, CheckCircle } from "lucide-react-native";
 
+interface Props {
+  isVerified: boolean;
+  hasInsurance: boolean;
+  hasWarranty: boolean;
+}
+
 export function ServiceSafety({
   isVerified,
   hasInsurance,
   hasWarranty,
-}: {
-  isVerified: boolean;
-  hasInsurance: boolean;
-  hasWarranty: boolean;
-}) {
+}: Props) {
+  const hasAny = isVerified || hasInsurance || hasWarranty;
+  if (!hasAny) return null;
+
   return (
-    <View className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex flex-wrap gap-4">
+    <View className="flex-row flex-wrap gap-3 rounded-xl border border-emerald-500/10 bg-emerald-500/5 p-3">
       {isVerified && (
-        <Text className="flex items-center gap-1 text-emerald-400 text-xs">
-          <Shield size={14} /> Identité vérifiée
-        </Text>
+        <View className="flex-row items-center gap-1.5">
+          <Shield size={14} color="#34D399" />
+          <Text className="text-xs text-emerald-400">Identité vérifiée</Text>
+        </View>
       )}
+
       {hasInsurance && (
-        <Text className="flex items-center gap-1 text-amber-400 text-xs">
-          🛡️ Assurance
-        </Text>
+        <View className="flex-row items-center gap-1.5">
+          <Shield size={14} color="#FBBF24" />
+          <Text className="text-xs text-amber-400">Assurance</Text>
+        </View>
       )}
+
       {hasWarranty && (
-        <Text className="flex items-center gap-1 text-purple-400 text-xs">
-          ✅ Garantie
-        </Text>
+        <View className="flex-row items-center gap-1.5">
+          <CheckCircle size={14} color="#C084FC" />
+          <Text className="text-xs text-purple-400">Garantie</Text>
+        </View>
       )}
     </View>
   );
