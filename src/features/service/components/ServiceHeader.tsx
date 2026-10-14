@@ -1,5 +1,5 @@
 import { Pressable, View, Text } from "react-native";
-import { ArrowLeft, Share2, Heart, Shield, CheckCircle } from "lucide-react-native";
+import { ArrowLeft, Share2, Heart } from "lucide-react-native";
 import type { ServiceProvider } from "../types";
 
 export function ServiceHeader({
@@ -16,21 +16,45 @@ export function ServiceHeader({
   onBack?: () => void;
 }) {
   return (
-    <View className="flex items-center gap-3 px-4 pt-12 pb-3">
-      <Pressable onPress={onBack} className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5">
-        <ArrowLeft size={20} className="text-white" />
+    <View className="flex-row items-center gap-3 px-4 pt-12 pb-3">
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="Retour"
+        hitSlop={8}
+        className="w-10 h-10 rounded-2xl items-center justify-center bg-white/5 active:bg-white/10"
+      >
+        <ArrowLeft size={20} color="white" />
       </Pressable>
-      <Text className="text-white font-bold text-lg flex-1 truncate">{provider.name}</Text>
-      <Pressable onPress={onFavorite} className="p-2 rounded-xl bg-white/5">
+
+      <Text className="text-white font-bold text-lg flex-1" numberOfLines={1}>
+        {provider.name}
+      </Text>
+
+      <Pressable
+        onPress={onFavorite}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isFavorited ? "Retirer des favoris" : "Ajouter aux favoris"
+        }
+        hitSlop={8}
+        className="p-2 rounded-xl bg-white/5 active:bg-white/10"
+      >
         <Heart
           size={18}
-          className={
-            isFavorited ? "fill-red-500 text-red-500" : "text-white/60"
-          }
+          color={isFavorited ? "#EF4444" : "rgba(255,255,255,0.6)"}
+          fill={isFavorited ? "#EF4444" : "none"}
         />
       </Pressable>
-      <Pressable onPress={onShare} className="p-2 rounded-xl bg-white/5">
-        <Share2 size={18} className="text-white/60" />
+
+      <Pressable
+        onPress={onShare}
+        accessibilityRole="button"
+        accessibilityLabel="Partager"
+        hitSlop={8}
+        className="p-2 rounded-xl bg-white/5 active:bg-white/10"
+      >
+        <Share2 size={18} color="rgba(255,255,255,0.6)" />
       </Pressable>
     </View>
   );
