@@ -1,484 +1,829 @@
-# DébrouillePro — La marche complète : du premier au dernier module
+# DébrouillePro --- La marche complète : du premier au dernier module
 
-Dernière mise à jour : v0.9.0-rc1 — Wave 0 fermée (runtime release validée)
+**Version du document :** v0.9.0-rc1 --- Wave 0.4 Search V2 fermé\
+**Dernière mise à jour documentaire :** ajout du standard produit
+mobile-first et traçabilité du blocage runtime Services.
+
+> **Principe directeur :** une fonctionnalité n'est considérée comme
+> livrée que lorsque son code réel, ses dépendances backend, son
+> parcours utilisateur et ses preuves de validation concordent. Une
+> intention, une maquette ou une ancienne validation ne remplace pas une
+> preuve actuelle.
 
 ---
 
-# RELEASE CANDIDATE
+# 1. Protocole de validation
 
-```text
-Tag         : v0.9.0-rc1
-Commit      : b481aa359dd59c39ee2e0920fa43965d803fdd18
-Standalone  : ✅ bundle embarqué, aucune dépendance Metro
-Smoke test  : ✅ 10/10 sur device Android réel
-Tag distant : ✅ pushé sur origin/master
+## Par module
+
+### Étape 1 --- Backend Convex
+
+```powershell
+npx convex dev
 ```
 
-Politique RC :
+**Attendu :** `√ Convex functions ready!`
 
-- Wallet fonctionnel en lecture/ledger réel
-- Aucun faux crédit, aucun faux paiement
-- Recharge désactivée au lancement (B1-a.1)
-- Aucun provider de paiement activé sans validation E2E
+### Étape 2 --- TypeScript ciblé sur le module
 
----
-
-# PROTOCOLE DE VALIDATION (par module, identique à chaque fois)
-
-Étape 1 — Backend Convex
-npx convex dev
-→ Attendu : "√ Convex functions ready!"
-
-Étape 2 — TypeScript du module (filtré)
+```powershell
 npx tsc --noEmit 2>&1 | Select-String "features[/\\]<module>"
-→ Attendu : aucune sortie (0 erreur sur le module)
+```
 
-Étape 3 — Test manuel / Expo Dev Client
-cd C:\p
+**Attendu :** aucune sortie correspondant au périmètre ciblé. Ce
+contrôle filtré ne prouve pas que l'ensemble du projet passe TypeScript.
+
+### Étape 3 --- Test manuel
+
+```powershell
 npx expo start --dev-client -c
-→ Attendu : démarre sans crash
+```
 
-Étape 4 — Commit dédié
-git add <fichiers du module>
+**Attendu :** démarrage sans crash et vérification du parcours réel du
+module.
+
+Pour les validations Release Candidate, un **build release Android
+réel** et des tests runtime peuvent être exigés en complément.
+
+### Étape 4 --- Commit dédié
+
+```powershell
+git add <fichiers-du-module>
+git diff --cached --check
 git commit -m "<type>(<module>): close <num> — <résumé>"
 git push
+```
 
-Étape 5 — 🔒 MODULE FERMÉ
+Avant le commit, inspecter les fichiers staged et vérifier que les
+modifications hors périmètre ne sont pas incluses. Ne pas utiliser
+`git add .` à l'aveugle.
 
-Règles transverses :
+### Étape 5 --- Verrouillage
 
-- Aucun @ts-ignore / @ts-expect-error / as any dans le module
-- Chaque correction est faite à la source, jamais pour faire taire tsc
-- Le tsc complet est réservé à la fin du projet
+Un module ne passe à **🔒 CLOSED** que lorsque les critères convenus
+sont prouvés. Documenter toute dette restante ; ne pas présenter une
+vérification non réalisée comme réussie.
 
-Filtres tsc par module :
-Auth → features[/\\]auth
-Messages → features[/\\]messages
-Services → features[/\\]services
-Agri → features[/\\]agri
-Transport → features[/\\]transport
-Hebergement → features[/\\]hebergement
-Restauration→ features[/\\]restauration
-Network → features[/\\]network
-Community → features[/\\]community
-... (adapter au module en cours)
+## Règles transverses
 
----
+- Aucun `@ts-ignore`.
+- Aucun `@ts-expect-error`.
+- Aucun `as any` introduit pour masquer une erreur.
+- Toute correction est faite à la source.
+- Le `tsc` complet est réservé à la fin du projet, selon le protocole
+  global.
+- Une dette connue et explicitement reportée n'est pas présentée comme
+  résolue.
+- Un résultat filtré ne doit pas être décrit comme une réussite
+  TypeScript globale.
+- Une preuve ancienne ne valide pas automatiquement une modification
+  récente.
 
-# LA MÉTHODE UNIVERSELLE (par module)
+## Filtres TypeScript ciblés
 
-1.  AUDIT SOURCE → lire tout le code réel du module
-2.  SCHEMA → tables, champs, indexes, searchIndex
-3.  BACKEND → convex/<module>.ts : queries, mutations,
-    actions, auth, validations, pagination
-4.  FRONTEND HOOKS → src/features/<module>/ : useXxx()
-5.  FRONTEND PAGES → pages + composants + loading/error/empty
-6.  MESSAGES → tout point de contact → api.messages.conversations
-7.  NOTIFICATIONS → événements métier réels (pas inventés)
-8.  WALLET/PAYMENTS → si transaction (réservation, commande, paiement)
-9.  SEARCH V2 → adapter + registry + source
-10. TESTS MANUELS → parcours réel bout-en-bout
-11. → PROTOCOLE DE VALIDATION (ci-dessus)
+- Auth → `features[/\\]auth`
+- Messages → `features[/\\]messages`
+- Services → `features[/\\]service` ou le chemin exact réellement
+  utilisé par le module
+- Agri → `features[/\\]agri`
+- Transport → `features[/\\]transport`
+- Hébergement → `features[/\\]hebergement`
+- Restauration → `features[/\\]restauration`
+- Network → `features[/\\]network`
+- Community → `features[/\\]community`
 
----
-
-# VAGUE 0 — Verrouillage des 5 fondations
-
-## 🔒 0.1 — AUTH / USERS — CLOSED
-
-Statut : CLOSED
-Commit : 9db49d1f4 (pushed origin/master)
-Fichiers : 37 modifiés (+2549 / -750)
-Raccourcis : aucun (0 as any, 0 @ts-ignore, 0 @ts-expect-error)
-convex dev : ✅ Convex functions ready
-tsc (auth) : ✅ 0 erreur
-expo dev : ✅ démarre sans crash
-
-Changements livrés :
-
-- Migration Web → RN incomplète corrigée
-- Shim react-router-dom rétabli pour 7 fichiers
-- motion/react résolu
-- AuthGuard : prop morte requireEmailVerified retirée
-- LiveStreamingPage : commentaire obsolète api.users.getMe nettoyé
-
-Dettes documentées (non bloquantes, vague ultérieure "auth hardening") :
-
-- ~50 requireUser locaux dupliqués
-- isAdmin vs roles.includes("admin") : 2 conventions coexistantes
-- permissions : champ jamais lu/écrit
-- homePreferences, website : champs sans mutation
-- by_phone : index sans query
-- updateCurrentUser, getMyProfile, resolveCurrentUser : legacy
-- AuthGuard : non branché sur les routes
+Adapter le filtre à l'emplacement réel des fichiers et examiner la
+commande utilisée avant de conclure.
 
 ---
 
-## 🔒 0.2 — MESSAGES — CLOSED (partiel)
+# 2. Standard produit --- l'ambition DébrouillePro
 
-Statut : CLOSED partiel
-Commit : 1786717b1 (pushed origin/master)
-Fichiers : 14 modifiés (+1698 / -639)
-Raccourcis : aucun
-convex dev : ✅ Convex functions ready
-tsc (msg) : ✅ 0 erreur
-Runtime RC : ✅ liste + conversation validées sur APK standalone
+Les références visuelles définissent une **direction produit** ; elles
+ne prouvent pas que les écrans, interactions ou intégrations sont déjà
+implémentés. Elles guident les décisions sans autoriser l'invention de
+données ou de capacités.
 
-### Validés en condition réelle (15/21)
+## Les quatre piliers obligatoires
 
-| #    | Test             | Statut |
-| ---- | ---------------- | ------ |
-| T.01 | Texte            | 🟢     |
-| T.02 | Reply            | 🟢     |
-| T.03 | Emoji            | 🟢     |
-| T.04 | Photo            | 🟢     |
-| T.05 | Caméra           | 🟢     |
-| T.06 | Vidéo            | 🟢     |
-| T.07 | Vocal            | 🟢     |
-| T.08 | Localisation     | 🟢     |
-| T.09 | Contact          | 🟢     |
-| T.10 | Sondage          | 🟢     |
-| T.11 | Paiement         | 🟢     |
-| T.12 | Événement        | 🟢     |
-| T.13 | Emploi           | 🟢     |
-| T.14 | Immobilier       | 🟢     |
-| T.18 | Réactions / Pins | 🟢     |
+### 2.1 Une carte claire pour chaque module
 
-### Reportés au test final avant lancement (6/21)
+- Chaque module, service, annonce, profil ou objet métier doit avoir
+  une carte adaptée à son contenu.
+- La carte présente d'abord l'information utile à la décision :
+  identité, catégorie, statut, prix ou disponibilité lorsque ces
+  données existent.
+- La densité, la taille et la disposition sont adaptées à l'importance
+  de l'information ; éviter les cartes génériques interchangeables.
+- Les données absentes doivent être omises ou signalées proprement,
+  jamais inventées.
+- Les cartes doivent rester lisibles sur petits écrans et avec les
+  paramètres d'accessibilité du système.
 
-| #    | Test       | Raison                                             |
-| ---- | ---------- | -------------------------------------------------- |
-| T.15 | Temps réel | Nécessite 2 devices avec 2 comptes distincts       |
-| T.16 | Présence   | Idem — validation croisée A↔B                      |
-| T.17 | Typing     | Idem — indicateur vu par l'autre                   |
-| T.19 | Recherche  | Infra présente, recherche complète à finaliser     |
-| T.20 | Sécurité   | Blocage / signalement — non testé                  |
-| T.21 | Appels A/V | Audio + vidéo bidirectionnel — nécessite 2 devices |
+### 2.2 Des verbes d'action explicites
+
+Chaque carte expose des actions pertinentes pour son contexte, par
+exemple **Voir**, **Contacter**, **Demander un devis**, **Réserver**,
+**Payer**, **Localiser**, **Enregistrer** ou **Partager**, uniquement si
+l'action est réellement prise en charge.
+
+- L'action principale doit être immédiatement identifiable.
+- Les actions secondaires ne doivent pas rivaliser visuellement avec
+  l'action principale.
+- Chaque bouton doit produire un résultat réel, avec états de
+  chargement, succès et erreur appropriés.
+- Une action non disponible doit être désactivée ou expliquée ; elle
+  ne doit pas simuler une intégration fonctionnelle.
+- Les actions sensibles (paiement, suppression, réservation) doivent
+  avoir les validations et confirmations nécessaires.
+
+### 2.3 Une expérience React Native authentiquement native
+
+- Concevoir d'abord pour les interactions mobiles : toucher, glisser,
+  retour système, clavier, zones sûres, permissions et réseau
+  variable.
+- Utiliser les composants et APIs React Native / Expo appropriés ; ne
+  pas transposer simplement une page web dans un conteneur mobile.
+- Respecter les safe areas, le clavier, le contraste, les tailles
+  tactiles, le défilement et les performances.
+- Utiliser les animations natives adaptées, sans sacrifier
+  l'accessibilité ni la fluidité.
+- Vérifier les comportements sur un appareil ou build natif réel
+  lorsque le protocole l'exige.
+- Éviter les patterns visuels web (mise en page de bureau compressée,
+  boutons minuscules, surcharges de panneaux, interactions dépendant
+  d'un pointeur).
+
+### 2.4 Une hiérarchie visuelle réfléchie
+
+- Organiser chaque écran autour d'une tâche principale et d'une
+  hiérarchie nette.
+- Maintenir la cohérence des espacements, typographies, icônes,
+  couleurs, états et transitions.
+- Prévoir systématiquement les états `loading`, `error`, `empty` et
+  `data`.
+- Préserver la lisibilité sur des appareils de tailles différentes et
+  dans les conditions réseau réelles.
+- Favoriser une expérience premium, distinctive et cohérente, sans
+  effets décoratifs qui gênent la compréhension ou les performances.
+
+**Garde-fou produit :** les références visuelles guident le produit,
+mais ne justifient jamais l'invention de données ou d'intégrations.
+
+**Principe de qualité :** viser l'excellence africaine et internationale
+par la fiabilité, l'utilité, la rapidité et le soin d'exécution --- pas
+par des promesses non vérifiées.
+
+---
+
+# 3. La méthode universelle d'audit et de clôture
+
+1.  **AUDIT SOURCE** --- lire le code réel et les points d'entrée.
+2.  **SCHEMA** --- vérifier tables, champs, indexes et `searchIndex`.
+3.  **BACKEND** --- examiner queries, mutations, actions,
+    authentification, validations et pagination.
+4.  **FRONTEND HOOKS** --- suivre les hooks `useXxx()` et leurs états.
+5.  **FRONTEND PAGES** --- vérifier `loading`, `error`, `empty` et
+    `data`.
+6.  **MESSAGES** --- vérifier les points de contact réels et les
+    autorisations.
+7.  **NOTIFICATIONS** --- relier les événements métier réels aux
+    notifications.
+8.  **WALLET / PAYMENTS** --- vérifier transactions, idempotence et
+    garde-fous.
+9.  **SEARCH V2** --- contrôler index → alimentation → registry →
+    adapter → hook → UI.
+10. **TESTS MANUELS** --- exécuter un parcours réel de bout en bout.
+11. **PROTOCOLE DE VALIDATION** --- conserver les preuves et résultats.
+12. **DOCUMENTATION + COMMIT** --- mettre à jour le suivi, isoler le
+    périmètre et pousser le commit dédié.
+
+Ne déduire aucun comportement uniquement à partir du nom d'un fichier ou
+d'un composant : suivre l'appel jusqu'à son effet réel.
+
+---
+
+# 4. Vague 0 --- Fondations
+
+## 🔒 0.1 --- AUTH / USERS --- CLOSED
+
+**Commit de référence :** `9db49d1f4`\
+**Statut documenté :** 🟢 CLOSED
+
+- Backend Convex : validé selon le suivi existant.
+- TypeScript Auth : 0 erreur ciblée selon le suivi existant.
+- Validation runtime : documentée comme validée.
+- Aucun raccourci TypeScript introduit selon le suivi existant.
 
 ### Dettes documentées
 
-- **Bulle « publication partagée »** : envoie un `text` + `sharedPublicationId`
-  (pas de `PublicationMessage.tsx` dédié). À brancher en V2.
-- **`MessageAttachments.tsx`** : fond blanc/transparent `own`, correct sur les
-  deux thèmes.
-- **`ChatView.tsx`** : transfert de message retiré du menu (hors scope).
-- **`useLocation.ts`** : migration `navigator.geolocation` → `expo-location`.
-- **`app.json`** : permissions GPS + plugin `expo-location`.
-- **`expo-video`** ajouté en dépendance.
+- Des `requireUser` locaux subsistent à plusieurs endroits.
+- Deux conventions admin coexistent (`isAdmin` /
+  `roles.includes("admin")`).
+- Quelques champs et helpers legacy restent présents.
+
+Ces éléments sont hors périmètre de la clôture 0.1 et ne doivent pas
+être considérés comme résolus.
+
+## 🔒 0.2 --- MESSAGES --- CLOSED PARTIEL
+
+**Commit final historique :** `1786717b1` --- poussé sur
+`origin/master`\
+**Phase A :** `096798893` --- stabilisation compile\
+**Fichiers du commit final :** 14\
+**Diff documenté :** `+1698 / -639`\
+**TypeScript Messages :** 0 erreur ciblée selon le suivi\
+**Convex :** functions ready selon le suivi\
+**Expo :** démarrage validé selon le suivi
+
+### QA documentée --- 15/21
+
+Test Statut
 
 ---
 
-## 🔒 0.3 — NOTIFICATIONS — CLOSED (In-App)
+Texte 🟢
+Reply 🟢
+Emoji 🟢
+Photo 🟢
+Caméra 🟢
+Vidéo 🟢
+Vocal 🟢
+Localisation 🟢
+Contact 🟢
+Sondage 🟢
+Paiement 🟢
+Événement 🟢
+Emploi 🟢
+Immobilier 🟢
+Réactions / Pins 🟢
 
-Statut : CLOSED In-App
-Runtime RC : ✅ validé sur APK standalone
-Périmètre : notifications in-app uniquement
-Preuve : 46 notifications affichées, 37 non lues
-Sections : Épinglées + Récentes
-Catégories : Messages, Santé, Livraison, Paiements, Jobs, Agri, Transport
-Actions : actions contextuelles Santé validées
+### Reportés au test final --- 6/21
 
-### Périmètre validé
+Test Statut Raison
 
-- ✅ Backend `convex/notifications.ts`
-- ✅ Notifications Messages, Annonces, Community, Réservations
-- ✅ Hook `use-notifications.ts`
-- ✅ `NotificationCenter` — accès rapide
-- ✅ `NotificationsPage` — centre complet
-- ✅ Compteur non-lus
-- ✅ Lecture individuelle + marquage global
-- ✅ Dismiss / suppression logique
-- ✅ 18 types de notifications
-- ✅ Aucun `@ts-ignore`, `@ts-expect-error` ou `as any`
+---
+
+Temps réel ⏳ Deux appareils et deux comptes nécessaires
+Présence ⏳ Validation croisée A ↔ B
+Typing ⏳ Validation croisée A ↔ B
+Recherche 🟡 Recherche dans les messages à compléter
+Sécurité ⏳ Blocage / signalement non testés
+Appels A/V ⏳ Audio et vidéo bidirectionnels à valider
+
+### Dettes documentées
+
+- Publication partagée : représentation actuelle via `text` +
+  `sharedPublicationId`.
+- `MessageAttachments.tsx` : détail visuel documenté.
+- Transfert de message : hors périmètre actuel.
+- Migration `navigator.geolocation` → `expo-location` effectuée selon
+  le suivi.
+- Permissions GPS et plugin `expo-location` configurés selon le suivi.
+- `expo-video` ajouté selon le suivi.
+
+**Règle :** le module reste gelé et ne se rouvre qu'en cas de régression
+démontrée ou lors de la QA finale prévue. Les preuves historiques
+doivent être reconfirmées si les fichiers concernés changent.
+
+## 🔒 0.3 --- NOTIFICATIONS --- CLOSED (IN-APP)
+
+**Statut documenté :** 🟢 CLOSED --- Notifications In-App
+
+### Périmètre documenté
+
+- `convex/notifications.ts`
+- Notifications Messages
+- Notifications Annonces
+- Notifications Community / Réservations
+- `use-notifications.ts`
+- `NotificationCenter`
+- `NotificationsPage`
+- Compteur de non-lus
+- Lecture individuelle
+- Marquage global comme lu
+- Dismiss / suppression logique
+- 18 types de notifications supportés
+- Chaîne backend → frontend documentée comme fonctionnelle
+- Aucun `@ts-ignore`, `@ts-expect-error` ou `as any` introduit selon
+  le suivi
 
 ### Architecture UI
 
-Deux interfaces coexistent volontairement :
+`NotificationCenter` et `NotificationsPage` coexistent volontairement :
 
-1. `NotificationCenter` — accès rapide depuis Header/Home
-2. `NotificationsPage` — vue complète, lazy-loaded
+1.  **NotificationCenter** --- accès rapide depuis Home / Header.
+2.  **NotificationsPage** --- centre complet et consultation
+    approfondie.
 
-Il ne s'agit pas d'un doublon fonctionnel.
+Ils ne constituent pas un doublon fonctionnel.
+
+### QA runtime release documentée
+
+🟢 Validée selon le suivi existant.
+
+Preuve manuelle consignée : 46 notifications affichées, 37 non lues,
+filtres par source, sections épinglées / récentes, actions contextuelles
+visibles et aucun crash.
 
 ### Dettes documentées
 
-#### 🔴 Push natif Android / iOS
+#### 🔴 0.3b --- Push natif Android / iOS
 
-Backend expose : `registerPush`, `unregisterPush`, `hasPushSubscription`.
+Le backend expose les opérations de souscription, mais l'intégration
+native complète n'est pas encore consommée par `src/`.
 
-Aucune intégration native consommée depuis `src/`.
+À intégrer lors du chantier dédié :
 
-Absence : `expo-notifications`, `getExpoPushTokenAsync`, enregistrement
-automatique du token, pipeline FCM/APNs.
+- permission native ;
+- token Expo / FCM / APNs ;
+- enregistrement backend ;
+- delivery ;
+- tap / deep-link ;
+- foreground / background ;
+- validation Android et iOS.
 
-`pushSubscriptions` actuelle = structure Web Push (endpoint/p256dh/auth).
-
-**Décision : report volontaire → 0.3b Push natif.**
+**Décision :** report volontaire.
 
 #### 🟡 Services de notification des modules
 
-Existants mais pas production-ready :
-
-- `features/agri/services/AgriNotificationService.ts`
-- `features/hebergement/services/NotificationService.ts`
-- `features/restauration/services/NotificationService.ts`
-- `features/transport/services/NotificationService.ts`
-
-**Décision : report volontaire → à raccorder avec chaque module.**
+Les services Agri / Hébergement / Restauration / Transport restent des
+préparations ou stubs. Ils ne sont pas présentés comme des intégrations
+de notification production.
 
 #### 🟡 `networkNotifications`
 
-Table présente, aucune consommation frontend identifiée.
+Table conservée. Son rôle sera réévalué lors de l'audit Network.
 
-**Décision : ne pas supprimer — rôle réévalué lors de l'audit Network.**
+## 🔒 0.4 --- SEARCH V2 --- CLOSED (INFRASTRUCTURE)
 
----
+**Statut documenté :** 🟢 Infrastructure prête --- intégration
+progressive par module.
 
-## 🔒 0.4 — SEARCH V2 — CLOSED (Infrastructure)
+Search V2 est une couche transverse, pas un module métier indépendant.
 
-Statut : CLOSED Infrastructure
-Runtime RC : ✅ validé sur APK standalone
-Recherche : `mais`
-Résultats : Modules + Annonces
-Preuve : Immobilier, Maison, Maison bota
-Navigation : résultats affichés avec affordance de navigation
-Crash : aucun
+### Infrastructure documentée comme livrée
 
-Search V2 est une **couche transverse**, pas un module métier indépendant.
+- `convex/search.ts` --- entry points publics
+- `convex/search/engine.ts`
+- `convex/search/ranking.ts`
+- `convex/search/intent.ts`
+- `convex/search/location.ts`
+- `convex/search/normalize.ts`
+- `convex/search/entities.ts`
+- `convex/search/types.ts`
+- `convex/search/registry.ts`
+- Adapters `convex/search/sources/*`
+- 12 `searchIndex` déclarés dans `schema.ts`
+- `searchV2`
+- `smartSearch`
+- `searchPublications`
+- `searchUsers`
+- `getTrendingTags`
+- `AdvancedSearch`
+- `SmartSearch`
+- `SearchBar`
+- Recherche Messages dédiée
+- Hooks / recherches spécifiques présents dans plusieurs modules
 
-### Infrastructure livrée
+### Validation runtime documentée
 
-- ✅ `convex/search.ts` — entry points publics
-- ✅ `convex/search/engine.ts`, `ranking.ts`, `intent.ts`, `location.ts`,
-  `normalize.ts`, `entities.ts`, `types.ts`, `registry.ts`
-- ✅ Adapters `convex/search/sources/*`
-- ✅ 12 `searchIndex` déclarés dans `schema.ts`
-- ✅ `searchV2`, `smartSearch`, `searchPublications`, `searchUsers`,
-  `getTrendingTags`
-- ✅ Frontend : `AdvancedSearch`, `SmartSearch`, `SearchBar`
-- ✅ Hooks / recherches spécifiques dans plusieurs modules
+🟢 Validée sur le RC selon le suivi.
 
-### Stratégie d'intégration
+Test manuel consigné :
 
-Search V2 sera validée fonctionnellement **module par module**.
+- Recherche `mais`
+- 2 résultats agrégés observés
+- Modules : 1 résultat
+- Annonces : 2 résultats
+- Résultats distincts : `Immobilier`, `Maison`, `Maison bota`
+- Navigation par résultat visible
+- Aucun crash / écran blanc
 
-La clôture d'un module métier devra vérifier :
+### Règle d'intégration
 
-1. searchIndex
-2. alimentation de l'index
-3. registry
-4. adapter
-5. hook frontend
-6. UI
-7. recherche réelle
-8. filtres / ranking applicables
-9. test manuel
+Search V2 est validée fonctionnellement **module par module**. La
+clôture de chaque module métier devra vérifier :
 
-La présence d'un `searchIndex` dans le schéma ne constitue pas une preuve
-de couverture fonctionnelle complète.
+1.  `searchIndex`
+2.  alimentation réelle de l'index
+3.  registry
+4.  adapter
+5.  hook frontend
+6.  UI
+7.  recherche réelle
+8.  filtres / ranking applicables
+9.  test manuel
 
 ### Dettes documentées
 
-- 🟡 Plusieurs `as any` subsistent dans des composants/adapters Search.
-- 🟡 `AnnonceAISearch.tsx` utilise `window.webkitSpeechRecognition`,
-  incompatible avec l'architecture native.
-- 🟡 `events/search.ts` contient encore un cast temporaire.
-- 🟡 Certains adapters backend utilisent encore des casts `any`.
-- 🟡 La présence d'un `searchIndex` ne garantit pas que toutes les écritures
-  métier l'alimentent correctement.
-- 🟡 Couverture fonctionnelle de chaque index validée à la clôture du
-  module correspondant.
+- Plusieurs `as any` subsistent dans certains composants / adapters
+  Search.
+- `AnnonceAISearch.tsx` utilise `window.webkitSpeechRecognition`,
+  incompatible avec l'architecture native actuelle.
+- `events/search.ts` contient un cast temporaire.
+- Certains adapters backend utilisent encore des casts `any`.
+- La présence d'un `searchIndex` ne garantit pas à elle seule que
+  toutes les écritures métier l'alimentent correctement.
+- La couverture de chaque index sera validée à la clôture du module
+  correspondant.
+- Search Messages : infrastructure présente ; validation complète
+  reportée à la QA finale Messages.
+
+**Décision :** aucune réécriture globale de Search V2. Les corrections
+spécifiques seront traitées avec les modules concernés.
+
+## 🟡 0.5 --- WALLET / PAYMENTS --- IN PROGRESS
+
+**Statut documenté :** 🟡 IN PROGRESS\
+**Périmètre :** Payment Core + Wallet + Stripe backend + Native Stripe.
+
+### État technique consigné
+
+- 🟢 Payment Core
+- 🟢 Legacy frontend
+- 🟢 Stripe Backend
+- 🟢 Legacy deprecation
+- 🟡 Native Stripe --- E2E provider réel restant
+
+### Wallet --- état consigné
+
+- 🟢 Ledger en lecture
+- 🟢 Solde sans faux crédit
+- 🟢 Envoi / réception UI validés
+- 🟢 Historique disponible
+- 🟢 Gestion d'erreurs utilisateur
+- 🟢 Recharges désactivées au lancement
+
+### Règle de recharge au lancement
+
+Le bouton **Recharger** reste visible mais affiche :
+
+> **Recharges bientôt disponibles**\
+> La recharge du portefeuille sera disponible prochainement.
+
+Aucun provider n'est présenté comme opérationnel sans E2E réel.
+
+### Paiements
+
+- Stripe backend : 🟢 implémenté selon le suivi
+- Webhook vérifié côté serveur : 🟢 selon le suivi
+- Idempotence : 🟢 selon le suivi
+- Crédit wallet après événement vérifié : 🟢 selon le suivi
+- Native Stripe : 🟡 E2E réel dépendant d'un provider juridiquement
+  disponible pour l'entité RDC
+
+**Important :** Wallet / Payments n'est pas déclaré production-ready
+tant qu'un provider compatible avec l'entité RDC n'a pas été validé en
+E2E réel.
 
 ---
 
-## 🟡 0.5 — WALLET / PAYMENTS — IN PROGRESS
+# 5. Release Candidate
 
-Statut : IN PROGRESS
-Runtime RC : ✅ garde-fous validés sur APK standalone
+## 🏆 DébrouillePro `v0.9.0-rc1`
 
-### Wallet
+**Statut historique documenté :** 🟢 RELEASE CANDIDATE CERTIFIÉE
 
-- ✅ Lecture du ledger réel
-- ✅ Solde réel (0 CDF au boot)
-- ✅ Aucun faux crédit
-- ✅ Aucun faux paiement
-- ✅ Historique fonctionnel
+- Tag annoté : `v0.9.0-rc1`
+- Commit référencé : `b481aa359dd59c39ee2e0920fa43965d803fdd18`
+- Tag local : cohérent au moment de la certification
+- Tag distant : cohérent au moment de la certification
+- Working tree : propre au moment de la certification
+- Release APK : build réussi selon le suivi
+- Runtime RC : validé selon le suivi
+- Search V2 : runtime validé selon le suivi
+- Notifications In-App : runtime validé selon le suivi
+- Wallet : garde-fous actifs selon le suivi
+- Recharge : désactivée au lancement
+- Payments E2E : en attente d'un provider compatible RDC
 
-### Recharger
+### Dette RC conservée
 
-- ✅ Désactivé au lancement (B1-a.1)
-- ✅ Alerte « Recharges bientôt disponibles »
+- 1007 fichiers non conformes au format Prettier baseline ---
+  alignement progressif post-RC.
+- Plusieurs usages historiques de `error.message`.
+- `as any` Search identifiés et reportés.
+- Push natif 0.3b non intégré.
+- Payments provider E2E non validé pour une entité RDC.
 
-### Envoyer / Recevoir
-
-- ✅ Bloqués tant que le Payment Core outbound n'est pas disponible
-- ✅ Messages clairs, aucun débit fictif
-
-### Stripe
-
-- ✅ Intégré côté technique (adapter, webhook, provider dormant)
-- ⏸️ Non testé E2E (compte Stripe indisponible pour entité RDC)
-- 🟡 `STRIPE_SECRET_KEY` et `STRIPE_WEBHOOK_SECRET` non posés en dev
-
-### Mobile Money
-
-- ⏸️ Aucun provider activé
-- 🟡 Nécessite credentials + test E2E réel
-- 🟡 `PROVIDER_NOT_CONFIGURED` par design pour les 4 providers
-
-### Règles absolues
-
-- Aucun provider activé sans E2E réel validé
-- Aucun crédit ledger sans webhook vérifié
-- Aucun faux succès
-- `clientSecret` jamais persisté
-- Tolérance timestamp ±300s sur webhook Stripe
-
-### Chantiers post-RC pour clôturer 0.5
-
-1. Provider accessible à une entité RDC (Stripe Atlas, Flutterwave, etc.)
-2. Credentials posés en env
-3. Test E2E complet : intent → provider → webhook → ledger
-4. Validation 3DS + carte refusée + idempotence webhook
-5. Réactivation B1-a.1 (retrait du guard UI)
+**Le tag `v0.9.0-rc1` est gelé.** Toute modification ultérieure doit
+être évaluée sur son propre état de code et ses propres preuves. La
+certification historique ne valide pas automatiquement le code actuel.
 
 ---
 
-# VAGUE 1 — Modules backend-ready, frontend à brancher (7 modules)
+# 6. Vague 1 --- Modules backend-ready
 
-Ordre : Services d'abord.
-
-| #   | Module       | Backend                    | Frontend à faire                      |
-| --- | ------------ | -------------------------- | ------------------------------------- |
-| 1   | Services     | convex/serviceProviders.ts | brancher + Search + Notif + Msg + Pay |
-| 2   | Agri         | convex/agri.ts             | tout                                  |
-| 3   | Transport    | convex/transport.ts        | tout                                  |
-| 4   | Hebergement  | convex/hebergement.ts      | tout                                  |
-| 5   | Restauration | convex/restauration.ts     | tout                                  |
-| 6   | Network      | convex/network.ts          | tout                                  |
-| 7   | Community    | convex/community.ts        | tout                                  |
+**Statut global :** ⏳ progression module par module.\
+**Ordre recommandé :** Services d'abord, sans présumer de sa clôture.
 
 ---
 
-# VAGUE 2 — Modules presque clos à finaliser (8 modules)
-
-| #   | Module      | État actuel | Reste à faire        |
-| --- | ----------- | ----------- | -------------------- |
-| 1   | Marketplace | 10 appels   | DetailPage = 0 appel |
-| 2   | Santé       | très riche  | verrouiller + Search |
-| 3   | Éducation   | riche       | verrouiller          |
-| 4   | Emploi      | riche       | verrouiller + Search |
-| 5   | Immo        | branché     | Search + Notif       |
-| 6   | Voyages     | branché     | Search + Notif       |
-| 7   | Urbanisme   | riche       | verrouiller          |
-| 8   | Événements  | branché     | Search + Notif       |
+                  Ordre Module           Base backend à auditer     Travail de
+                                                                    clôture
 
 ---
 
-# VAGUE 3 — Contenu / expérience
+                      1 Services         APIs et tables réelles du  Brancher les
+                                         module Services            données, Search,
+                                                                    Notifications,
+                                                                    Messages et Pay
+                                                                    lorsque les flux
+                                                                    sont pertinents
 
-Media, Reels, Live (V2.1 déjà fait), Stories, Series, Creator,
-AIStudio, Templates, Editeur.
+                      2 Agri             `convex/agri.ts`           Audit complet,
+                                                                    données réelles,
+                                                                    hooks, pages et
+                                                                    intégrations
+                                                                    pertinentes
 
----
+                      3 Transport        `convex/transport.ts`      Audit complet,
+                                                                    données réelles,
+                                                                    hooks, pages et
+                                                                    intégrations
+                                                                    pertinentes
 
-# VAGUE 4 — Admin / outils / transverse
+                      4 Hébergement      `convex/hebergement.ts`    Audit complet,
+                                                                    données réelles,
+                                                                    hooks, pages et
+                                                                    intégrations
+                                                                    pertinentes
 
-Admin, Analytics, Settings, Reputation, Badges, Parrainage, Tracking,
-Documents, Agenda, SOS, Finances, Revenus, Premium, Subscriptions.
+                      5 Restauration     `convex/restauration.ts`   Audit complet,
+                                                                    données réelles,
+                                                                    hooks, pages et
+                                                                    intégrations
+                                                                    pertinentes
 
----
+                      6 Network          `convex/network.ts`        Audit complet,
+                                                                    données réelles,
+                                                                    hooks, pages et
+                                                                    intégrations
+                                                                    pertinentes
 
-# CHECKLIST DE CLÔTURE (par module)
-
-[ ] 1. Audit : tous les fichiers backend + frontend lus
-[ ] 2. Schema : tables + indexes + searchIndex cohérents
-[ ] 3. Backend : queries/mutations/actions protégés par auth
-[ ] 4. Hooks : src/features/<module>/ avec useXxx()
-[ ] 5. Pages : loading + error + empty + data
-[ ] 6. Messages : "Contacter" → getOrCreateDirect(userId)
-[ ] 7. Notifications : chaque événement métier → createNotification
-[ ] 8. Wallet : si transaction → createPaymentIntent
-[ ] 9. Search : adapter + source + registry
-[ ] 10. Tests manuels : parcours réel bout-en-bout
-[ ] 11. npx convex dev → 0 erreur
-[ ] 12. npx tsc --noEmit (filtré) → 0 erreur
-[ ] 13. Aucun raccourci : 0 as any, 0 @ts-ignore, 0 @ts-expect-error
-[ ] 14. npx expo start --dev-client -c → démarre sans crash
-[ ] 15. Commit dédié poussé
-[ ] 16. 🔒 MODULE FERMÉ
-
-Aucune case ne se coche par supposition. Chaque case a une preuve.
-
----
-
-# RÈGLE DE VERROUILLAGE
-
-MODULE FERMÉ =
-aucune dette technique connue
-
-- aucun TODO critique
-- aucun placeholder
-- aucun bouton cosmétique
-- aucune page vide
-- toutes les dépendances (Messages, Notif, Wallet, Search) branchées
-
-Un module clos ne se rouvre plus, sauf régression détectée.
+                      7 Community        `convex/community.ts`      Audit complet,
+                                                                    données réelles,
+                                                                    hooks, pages et
+                                                                    intégrations
+                                                                    pertinentes
 
 ---
 
-# ÉTAT GLOBAL
-
-Vague 0 :
-[x] 0.1 Auth 🔒 CLOSED (9db49d1f4)
-[x] 0.2 Messages 🔒 CLOSED (partiel) (1786717b1)
-[x] 0.3 Notifications 🔒 CLOSED (In-App) — runtime release validé
-[x] 0.4 Search V2 🔒 CLOSED (Infra) — runtime release validé
-[~] 0.5 Wallet/Payments 🟡 IN PROGRESS — garde-fous runtime validés
-
-Release Candidate :
-v0.9.0-rc1
-Commit : b481aa359
-Standalone : ✅
-Smoke test : ✅ 10/10
-Tag distant : ✅ pushé
-
-Vague 1 : [ ] non démarrée
-Vague 2 : [ ] non démarrée
-Vague 3 : [ ] non démarrée
-Vague 4 : [ ] non démarrée
+Les chemins backend du tableau sont des points de départ issus du suivi
+; confirmer les fichiers réellement utilisés avant toute modification.
+Ne pas créer une intégration uniquement pour satisfaire une liste.
 
 ---
 
-# DETTES TRANSVERSES (tracées, non bloquantes)
-
-- 🟡 ~1007 fichiers non-conformes à la config Prettier (80 + auto)
-  → baseline progressive post-RC
-- 🟡 Push natif Android / iOS — chantier 0.3b
-- 🟡 Providers Mobile Money — E2E réel non effectué
-- 🟡 Stripe E2E — compte RDC non disponible
-- 🟡 `as any` résiduels dans Search (adapters + 2 composants frontend)
-- 🟡 `window.webkitSpeechRecognition` dans `AnnonceAISearch.tsx` (Web-only)
-- 🟡 ~80 fichiers `error.message` en catch (B3 post-RC)
-- 🟡 `ReportButton.tsx` sanitization (P0 B3)
-- 🟡 `networkNotifications` non consommé
+# 7. Vague 2 --- Modules presque clos
 
 ---
 
-# RÈGLES DE MISE À JOUR DE CE FICHIER
+Module État documenté Reste à vérifier
+
+---
+
+Marketplace 10 appels recensés ; Revalider les appels
+DetailPage signalée à 0 réels et le parcours de
+appel dans l'audit détail
+historique
+
+Santé Module riche Verrouiller sur preuves
+et intégrer Search
+
+Éducation Module riche Verrouiller sur preuves
+
+Emploi Module riche Verrouiller et intégrer
+Search
+
+Immobilier Module branché selon le Vérifier Search +
+suivi Notifications et le
+parcours réel
+
+Voyages Module branché selon le Vérifier Search +
+suivi Notifications et le
+parcours réel
+
+Urbanisme Module riche Verrouiller sur preuves
+
+Événements Module branché selon le Vérifier Search +
+suivi Notifications et le
+parcours réel
+
+---
+
+Ces états sont des indications de travail, pas des validations
+actuelles. Toute clôture doit suivre le protocole de la section 1.
+
+---
+
+# 8. Vague 3 --- Contenu / expérience
+
+Périmètre de suivi : Media, Reels, Live, Stories, Series, Creator,
+AIStudio, Templates et Éditeur.
+
+Chaque sous-module est audité individuellement ; la richesse de
+l'interface ne prouve ni la persistance backend, ni les permissions, ni
+la qualité du runtime.
+
+---
+
+# 9. Vague 4 --- Admin / outils / transverse
+
+Périmètre de suivi : Admin, Analytics, Settings, Reputation, Badges,
+Parrainage, Tracking, Documents, Agenda, SOS, Finances, Revenus, Premium
+et Subscriptions.
+
+Les accès sensibles doivent être protégés côté serveur. Masquer un
+bouton côté client ne constitue pas un contrôle d'autorisation
+suffisant.
+
+---
+
+# 10. Checklist de clôture
+
+Chaque case doit être accompagnée d'une preuve datée ou d'un résultat
+observable.
+
+- [ ] 1. Audit : tous les fichiers backend + frontend du périmètre ont
+     été lus.
+- [ ] 2. Schema : tables + indexes + `searchIndex` sont cohérents.
+- [ ] 3. Backend : queries / mutations / actions sont protégées par
+     l'authentification et les validations nécessaires.
+- [ ] 4. Hooks : `src/features/<module>/` expose les hooks réellement
+     nécessaires.
+- [ ] 5. Pages : états `loading` + `error` + `empty` + `data` traités.
+- [ ] 6. Messages : `Contacter` utilise le parcours réel prévu,
+     notamment `getOrCreateDirect(userId)` lorsque pertinent.
+- [ ] 7. Notifications : événement métier réel → `createNotification`
+     lorsque pertinent.
+- [ ] 8. Wallet : transaction → `createPaymentIntent` lorsque le flux
+     de paiement l'exige ; aucune réussite simulée.
+- [ ] 9. Search : adapter + source + registry + indexation réelle.
+- [ ] 10. Tests manuels : parcours bout-en-bout exécuté.
+- [ ] 11. `npx convex dev` : aucune erreur bloquante.
+- [ ] 12. TypeScript ciblé : aucune erreur dans le périmètre filtré.
+- [ ] 13. Aucun raccourci TypeScript introduit.
+- [ ] 14. `npx expo start --dev-client -c` : démarrage sans crash.
+- [ ] 15. Test runtime du parcours principal, sur appareil/build
+      pertinent.
+- [ ] 16. Diff relu ; fichiers hors périmètre exclus.
+- [ ] 17. Commit dédié poussé sur `origin/master`.
+- [ ] 18. 🔒 MODULE FERMÉ uniquement après satisfaction des critères.
+
+Les éléments non applicables doivent être justifiés ; ils ne doivent pas
+être cochés par défaut.
+
+---
+
+# 11. Règle de verrouillage
+
+Un module fermé ne se rouvre que pour :
+
+- une régression démontrée ;
+- une faille de sécurité ;
+- une dette explicitement planifiée dans un chantier ultérieur ;
+- une QA finale qui révèle un défaut réel.
+
+Une clôture n'autorise pas à présenter les dettes reportées comme
+résolues. **Une preuve ancienne ne valide pas automatiquement une
+modification récente.** Après une modification, refaire au minimum les
+contrôles touchés par le changement.
+
+---
+
+# 12. État global
+
+## Vague 0 --- Fondations
+
+- [x] 0.1 Auth / Users --- 🔒 CLOSED (état historique documenté)
+- [x] 0.2 Messages --- 🔒 CLOSED PARTIEL (QA finale restante)
+- [x] 0.3 Notifications --- 🔒 CLOSED In-App (push natif reporté)
+- [x] 0.4 Search V2 --- 🔒 CLOSED Infrastructure (intégration métier
+      progressive)
+- \[\~\] 0.5 Wallet / Payments --- 🟡 IN PROGRESS (E2E provider RDC
+  restant)
+
+## Vague 1 --- Backend-ready
+
+- \[\~\] Services --- priorité actuelle ; audit et blocage runtime en
+  cours, non clos
+- [ ] Agri
+- [ ] Transport
+- [ ] Hébergement
+- [ ] Restauration
+- [ ] Network
+- [ ] Community
+
+## Vague 2 --- Presque clos
+
+- [ ] Marketplace
+- [ ] Santé
+- [ ] Éducation
+- [ ] Emploi
+- [ ] Immobilier
+- [ ] Voyages
+- [ ] Urbanisme
+- [ ] Événements
+
+## Vague 3 --- Contenu / expérience
+
+- [ ] Media / Reels / Live / Stories / Series / Creator / AIStudio /
+      Templates / Éditeur
+
+## Vague 4 --- Admin / outils / transverse
+
+- [ ] Admin / Analytics / Settings / Reputation / Badges / Parrainage
+      / Tracking / Documents / Agenda / SOS / Finances / Revenus / Premium
+      / Subscriptions
+
+---
+
+# 13. Règles de mise à jour du document
 
 À chaque module fermé :
 
-1. Passer le module de 🔄 EN COURS à 🔒 CLOSED
-2. Sous sa section, ajouter :
-   - commit SHA
-   - nb fichiers touchés
-   - preuve `convex dev` (✅)
-   - preuve `tsc` filtré (✅ 0 erreur)
-   - preuve `expo start --dev-client -c` (✅)
-   - liste des dettes documentées
-3. Passer le module suivant à 🔄 EN COURS
-4. Mettre à jour la section ÉTAT GLOBAL
+1.  Passer le module à `🔒 CLOSED` uniquement avec les preuves requises.
+2.  Ajouter les preuves techniques et runtime réellement obtenues.
+3.  Documenter les dettes réellement connues.
+4.  Ne jamais déclarer une intégration non testée comme opérationnelle.
+5.  Mettre à jour l'état global.
+6.  Créer un commit documentaire ou module dédié, selon le périmètre.
+7.  Pousser le commit sur `origin/master` seulement après vérification.
+8.  Vérifier que les fichiers hors périmètre ne sont pas inclus.
+9.  Ne pas mélanger une mise à jour de suivi documentaire avec un
+    correctif de code sans raison explicite.
+10. Ne pas réécrire l'historique du RC gelé pour donner l'impression
+    qu'une vérification ancienne couvre le code actuel.
 
-Aucune autre modification. La méthode, la marche et les règles de
-verrouillage restent stables sauf décision explicite.
+**Aucune modification opportuniste ne doit être mélangée à une clôture
+de module.**
+
+---
+
+# 14. Chantiers techniques ouverts
+
+## 🔴 Services --- fiche prestataire : écran noir sur Android
+
+**Route concernée :** `app/service/[id].tsx`\
+**Statut :** bloquant --- empêche la clôture du module Services.\
+**Symptôme consigné :** le conteneur natif fourni à l'écran aurait une
+largeur d'environ 1 px : `ROOT_LAYOUT { width: 0.3333, height: 804 }`
+avec une densité d'écran de 3. Le contenu semble atteindre la phase de
+rendu, mais reste invisible. La cause racine n'est pas encore confirmée.
+
+### Pistes consignées comme testées / éliminées dans le diagnostic précédent
+
+- Le composant `[id].tsx` lui-même : tests de rendu rouge, vert, modal
+  et `minWidth`.
+- Adaptateur, hooks, requête Convex et `adaptServiceProvider`.
+- `DefaultProviders`, `UIBridge` et `ThemeProvider`.
+- Wrapper `<View style={{ flex: 1 }}>` autour de `<Slot />`.
+- Remplacement de `<Slot />` par `<Stack />` à la racine : le
+  démarrage de l'application casse ; changement restauré.
+- `animation: "none"` / `slide_from_right` dans
+  `app/service/_layout.tsx`.
+
+Ces éléments reflètent les observations consignées dans le diagnostic ;
+ils ne constituent pas une preuve universelle qu'ils sont impossibles
+comme causes dans tout autre état du code.
+
+### Pistes restantes
+
+- Comparer la structure avec `app/messages/`, autre Stack imbriqué
+  signalé comme fonctionnel ; examiner `app/messages/_layout.tsx` et
+  les différences exactes.
+- Examiner les interactions entre `react-native-screens`, Reanimated
+  et la Nouvelle Architecture Android (`newArchEnabled`).
+- Reproduire la mesure de largeur dans le code actuel, vérifier quel
+  parent fournit la largeur et identifier à quel niveau elle devient
+  proche de zéro.
+- Vérifier les journaux runtime et la hiérarchie des vues sur un état
+  de code précisément identifié.
+
+### Contraintes de travail
+
+- Ne pas modifier `app/_layout.tsx` sans preuve ciblée : le `Slot`
+  racine doit rester en place tant qu'une cause n'exige pas autrement.
+- Ne pas toucher aux cinq composants Services déjà stagés sans
+  examiner d'abord le diff existant.
+- Ne pas committer `MARCHE_MODULES.md` avec un correctif Services.
+- Ne pas considérer l'écran comme réparé avant un test runtime
+  concluant sur Android.
+- Conserver une trace des expériences, résultats et changements
+  réversibles pour éviter de recommencer les mêmes essais.
+
+### Critère de résolution
+
+Le blocage ne sera marqué comme résolu qu'après affichage correct de la
+fiche prestataire, validation des états loading / erreur / données,
+vérification de la navigation retour et confirmation qu'aucune
+régression n'a été introduite. La clôture Services nécessite ensuite le
+reste de la checklist de la section 10.
+
+---
+
+**Document de pilotage :** ce fichier décrit le plan, les états
+consignés et les critères. Il ne remplace ni l'audit du code présent, ni
+les résultats de tests actuels, ni le diff Git.
