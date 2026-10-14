@@ -75,6 +75,10 @@ const MAX_RESULTS = 24;
  * - collect() massif
  * - pagination fictive
  * - chargement de toute la table
+ *
+ * NOTE : depuis la correction du crash Android, ces deux constantes
+ * ne servent plus qu'à calculer la taille d'un unique `.paginate()`.
+ * Convex interdit en effet plusieurs `.paginate()` dans une même query.
  */
 const MAX_SOURCE_PAGES = 6;
 
@@ -660,22 +664,6 @@ export const list = query({
       Math.max(1, args.paginationOpts.numItems),
     );
 
-    /*
-     * On ne fait PAS :
-     *
-     *   publications.collect()
-     *
-     * car cela pourrait charger une quantité incontrôlée
-     * de données.
-     *
-     * On avance dans la table par véritables pages Convex.
-     */
-    let cursor = args.paginationOpts.cursor;
-
-    let sourceDone = false;
-
-    let sourcePagesRead = 0;
-
     const candidates: NearbyCandidate[] = [];
 
     const now = Date.now();
@@ -683,106 +671,124 @@ export const list = query({
     /* ---------------------------------------------------------------------- */
     /* SOURCE SCAN                                                             */
     /* ---------------------------------------------------------------------- */
+    /*
+     * CONTRAINTE CONVEX :
+     *
+     *   Une query Convex ne peut appeler `.paginate()` qu'UNE seule fois
+     *   par invocation. L'implémentation précédente bouclait 6 fois,
+     *   ce qui provoquait l'erreur :
+     *
+     *   "This query or mutation function ran multiple paginated queries."
+     *
+     * → On demande donc 288 items en un seul paginate().
+     *   Convex itère en interne si nécessaire, mais du point de vue
+     *   de notre code, un seul appel est effectué.
+     *
+     * Le client actuel (HomeNearby.tsx) utilise `useQuery`, pas
+     * `usePaginatedQuery` — il ne consomme pas le cursor. Le cursor
+     * reste renvoyé pour compatibilité et évolution future.
+     */
 
-    while (
-      !sourceDone &&
-      sourcePagesRead < MAX_SOURCE_PAGES &&
-      candidates.length < MAX_RESULTS * 3
-    ) {
-      const sourcePage = await ctx.db
-        .query("publications")
-        .order("desc")
-        .paginate({
-          numItems: SOURCE_BATCH_SIZE,
-          cursor,
-        });
+    const SOURCE_SCAN_LIMIT = MAX_SOURCE_PAGES * SOURCE_BATCH_SIZE;
 
-      sourcePagesRead += 1;
+    const sourcePage = await ctx.db
+      .query("publications")
+      .order("desc")
+      .paginate({
+        numItems: SOURCE_SCAN_LIMIT,
+        cursor: args.paginationOpts.cursor,
+      });
 
-      sourceDone = sourcePage.isDone;
+    const sourceDone = sourcePage.isDone;
+    const nextCursor = sourcePage.continueCursor;
 
-      cursor = sourcePage.continueCursor;
+    for (const publication of sourcePage.page) {
+      /* ---------------------------------------------------------------- */
+      /* TYPE FILTER                                                       */
+      /* ---------------------------------------------------------------- */
 
-      for (const publication of sourcePage.page) {
-        /* ---------------------------------------------------------------- */
-        /* TYPE FILTER                                                       */
-        /* ---------------------------------------------------------------- */
+      if (!NEARBY_TYPES.includes(publication.type as NearbyType)) {
+        continue;
+      }
 
-        if (!NEARBY_TYPES.includes(publication.type as NearbyType)) {
-          continue;
-        }
+      /* ---------------------------------------------------------------- */
+      /* STATUS FILTER                                                     */
+      /* ---------------------------------------------------------------- */
 
-        /* ---------------------------------------------------------------- */
-        /* STATUS FILTER                                                     */
-        /* ---------------------------------------------------------------- */
+      if (publication.status !== "active") {
+        continue;
+      }
 
-        if (publication.status !== "active") {
-          continue;
-        }
+      /* ---------------------------------------------------------------- */
+      /* MODERATION FILTER                                                 */
+      /* ---------------------------------------------------------------- */
 
-        /* ---------------------------------------------------------------- */
-        /* MODERATION FILTER                                                 */
-        /* ---------------------------------------------------------------- */
+      if (publication.isHidden === true) {
+        continue;
+      }
 
-        if (publication.isHidden === true) {
-          continue;
-        }
+      /* ---------------------------------------------------------------- */
+      /* SELF FILTER                                                       */
+      /* ---------------------------------------------------------------- */
 
-        /* ---------------------------------------------------------------- */
-        /* SELF FILTER                                                       */
-        /* ---------------------------------------------------------------- */
+      if (publication.authorId === currentUser._id) {
+        continue;
+      }
 
-        if (publication.authorId === currentUser._id) {
-          continue;
-        }
+      /* ---------------------------------------------------------------- */
+      /* LOCATION FILTER                                                  */
+      /* ---------------------------------------------------------------- */
 
-        /* ---------------------------------------------------------------- */
-        /* LOCATION FILTER                                                  */
-        /* ---------------------------------------------------------------- */
+      if (
+        publication.latitude === undefined ||
+        publication.longitude === undefined
+      ) {
+        /*
+         * Une publication sans coordonnées
+         * ne peut pas honnêtement apparaître
+         * dans "Autour de vous".
+         */
+        continue;
+      }
 
-        if (
-          publication.latitude === undefined ||
-          publication.longitude === undefined
-        ) {
-          /*
-           * Une publication sans coordonnées
-           * ne peut pas honnêtement apparaître
-           * dans "Autour de vous".
-           */
-          continue;
-        }
+      if (!isValidCoordinate(publication.latitude, publication.longitude)) {
+        continue;
+      }
 
-        if (!isValidCoordinate(publication.latitude, publication.longitude)) {
-          continue;
-        }
+      /* ---------------------------------------------------------------- */
+      /* DISTANCE                                                          */
+      /* ---------------------------------------------------------------- */
 
-        /* ---------------------------------------------------------------- */
-        /* DISTANCE                                                          */
-        /* ---------------------------------------------------------------- */
+      const distanceKm = haversineDistanceKm(origin, {
+        latitude: publication.latitude,
+        longitude: publication.longitude,
+      });
 
-        const distanceKm = haversineDistanceKm(origin, {
-          latitude: publication.latitude,
-          longitude: publication.longitude,
-        });
+      if (distanceKm > radiusKm) {
+        continue;
+      }
 
-        if (distanceKm > radiusKm) {
-          continue;
-        }
+      /* ---------------------------------------------------------------- */
+      /* SCORE                                                             */
+      /* ---------------------------------------------------------------- */
 
-        /* ---------------------------------------------------------------- */
-        /* SCORE                                                             */
-        /* ---------------------------------------------------------------- */
+      const candidate = scoreCandidate(
+        publication,
+        distanceKm,
+        radiusKm,
+        feedCategories,
+        favoriteModules,
+        now,
+      );
 
-        const candidate = scoreCandidate(
-          publication,
-          distanceKm,
-          radiusKm,
-          feedCategories,
-          favoriteModules,
-          now,
-        );
+      candidates.push(candidate);
 
-        candidates.push(candidate);
+      /*
+       * Arrête le scan dès qu'il y a suffisamment de candidats.
+       * Comportement identique à l'ancienne boucle while.
+       */
+      if (candidates.length >= MAX_RESULTS * 3) {
+        break;
       }
     }
 
@@ -899,18 +905,15 @@ export const list = query({
 
     return {
       page,
-
       /*
-       * Si Convex n'a plus de données source,
-       * la pagination est terminée.
+       * `sourceDone` reflète l'épuisement réel de la table publications
+       * après ce scan unique de 288 items.
        *
-       * Si nous avons simplement trouvé peu de résultats
-       * dans le rayon, nous conservons le cursor réel
-       * afin que la page suivante poursuive la recherche.
+       * `nextCursor` permet au client de poursuivre si un jour il
+       * passe à `usePaginatedQuery`.
        */
       isDone: sourceDone,
-
-      continueCursor: cursor,
+      continueCursor: nextCursor,
     };
   },
 });
