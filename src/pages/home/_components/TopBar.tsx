@@ -1,16 +1,17 @@
 // src/pages/home/_components/TopBar.tsx
 import {
-  View,
-  Pressable,
-  Text,
+  AccessibilityInfo,
   Animated,
   Easing,
-  StyleSheet,
   Platform,
-  type ReactNode,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, Menu, Sparkles } from "lucide-react-native";
 
 import { useCurrentUser, getDisplayName } from "@/hooks/use-current-user.ts";
@@ -20,11 +21,22 @@ import UserAvatar from "@/components/ui/user-avatar.tsx";
  * TYPES
  * ========================================================================== */
 
+/**
+ * `true` → pastille pulsante ; nombre > 0 → pastille chiffrée (99+ au-delà) ;
+ * `false` / 0 / undefined → rien.
+ */
+type BadgeValue = boolean | number | undefined;
+
 interface TopBarProps {
   onMenuOpen: () => void;
   onProfileOpen: () => void;
   onNotificationsOpen: () => void;
   onRecompensesOpen?: () => void;
+
+  /** Nombre de notifications non lues. Rien n'est affiché si 0 / absent. */
+  notificationCount?: number;
+  /** Pastille sur le bouton menu (ex. nouveautés). Absente par défaut. */
+  menuBadge?: boolean;
 }
 
 interface Greeting {
@@ -54,8 +66,21 @@ const TAGLINES = [
 const TAGLINE_INTERVAL = 5000;
 const TAGLINE_TRANSITION = 350;
 
+const BUTTON_SIZE = 40;
+const BUTTON_RADIUS = 14;
+const BASE_COLOR = "#0A0818";
+
+const GLASS_GRADIENT = [
+  "rgba(255,255,255,0.08)",
+  "rgba(255,255,255,0.02)",
+] as const;
+const AVATAR_GRADIENT = [
+  "rgba(167,139,250,0.26)",
+  "rgba(99,102,241,0.08)",
+] as const;
+
 /* ============================================================================
- * GREETING
+ * HELPERS
  * ========================================================================== */
 
 function getGreeting(): Greeting {
@@ -67,70 +92,44 @@ function getGreeting(): Greeting {
   return { text: "Bonne nuit", emoji: "🌙" };
 }
 
-/* ============================================================================
- * GLASS ICON BUTTON
- * ========================================================================== */
+function useReduceMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
 
-function GlassIconButton({
-  children,
-  onPress,
-  label,
-  dot,
-}: {
-  children: ReactNode;
-  onPress: () => void;
-  label: string;
-  dot?: boolean;
-}) {
-  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    let mounted = true;
 
-  const onPressIn = () => {
-    Animated.spring(scale, {
-      toValue: 0.92,
-      useNativeDriver: true,
-      speed: 40,
-    }).start();
-  };
-  const onPressOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 40,
-    }).start();
-  };
+    void AccessibilityInfo.isReduceMotionEnabled().then((value) => {
+      if (mounted) setReduced(value);
+    });
 
-  return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        accessibilityLabel={label}
-        style={styles.iconButton}
-      >
-        <LinearGradient
-          colors={["rgba(255,255,255,0.07)", "rgba(255,255,255,0.02)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.iconButtonBorder} pointerEvents="none" />
-        {children}
-        {dot ? <PulseDot /> : null}
-      </Pressable>
-    </Animated.View>
-  );
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setReduced,
+    );
+
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  return reduced;
 }
 
 /* ============================================================================
- * PULSE DOT (notification indicator)
+ * PULSE DOT
  * ========================================================================== */
 
-function PulseDot() {
+function PulseDot({ reducedMotion }: { reducedMotion: boolean }) {
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    if (reducedMotion) {
+      pulse.setValue(0);
+      return;
+    }
+
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
@@ -145,25 +144,123 @@ function PulseDot() {
           useNativeDriver: true,
         }),
       ]),
-    ).start();
-  }, [pulse]);
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [pulse, reducedMotion]);
 
   const scale = pulse.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 1.6],
+    outputRange: [1, 1.7],
   });
   const opacity = pulse.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.85, 0.35],
+    outputRange: [0.85, 0.3],
   });
 
   return (
-    <View style={styles.pulseDotWrap} pointerEvents="none">
+    <View style={styles.dotWrap} pointerEvents="none">
       <Animated.View
-        style={[styles.pulseDotGlow, { opacity, transform: [{ scale }] }]}
+        style={[styles.dotGlow, { opacity, transform: [{ scale }] }]}
       />
-      <View style={styles.pulseDotCore} />
+      <View style={styles.dotCore} />
     </View>
+  );
+}
+
+/* ============================================================================
+ * BADGE (posé HORS du bouton : le bouton est en overflow hidden)
+ * ========================================================================== */
+
+function Badge({
+  value,
+  reducedMotion,
+}: {
+  value: BadgeValue;
+  reducedMotion: boolean;
+}) {
+  if (typeof value === "number" && value > 0) {
+    return (
+      <View style={styles.countBadge} pointerEvents="none">
+        <Text style={styles.countBadgeText} maxFontSizeMultiplier={1}>
+          {value > 99 ? "99+" : String(Math.floor(value))}
+        </Text>
+      </View>
+    );
+  }
+
+  if (value === true) {
+    return <PulseDot reducedMotion={reducedMotion} />;
+  }
+
+  return null;
+}
+
+/* ============================================================================
+ * GLASS BUTTON
+ *
+ * Pas de `Pressable style={({ pressed }) => ...}` : dans cette app, les styles
+ * renvoyés par une fonction `style` semblent ignorés. Le retour visuel passe
+ * par une animation d'échelle + ripple Android.
+ * ========================================================================== */
+
+function GlassButton({
+  children,
+  onPress,
+  label,
+  badge,
+  variant = "glass",
+  reducedMotion,
+}: {
+  children: ReactNode;
+  onPress: () => void;
+  label: string;
+  badge?: BadgeValue;
+  variant?: "glass" | "avatar";
+  reducedMotion: boolean;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const animateTo = (toValue: number) => {
+    if (reducedMotion) return;
+    Animated.spring(scale, {
+      toValue,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 4,
+    }).start();
+  };
+
+  const isAvatar = variant === "avatar";
+
+  return (
+    <Animated.View style={[styles.buttonWrap, { transform: [{ scale }] }]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => animateTo(0.92)}
+        onPressOut={() => animateTo(1)}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={4}
+        android_ripple={{ color: "rgba(167,139,250,0.22)" }}
+        style={styles.button}
+      >
+        <LinearGradient
+          colors={isAvatar ? AVATAR_GRADIENT : GLASS_GRADIENT}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          pointerEvents="none"
+          style={[styles.buttonBorder, isAvatar && styles.buttonBorderAvatar]}
+        />
+        {children}
+      </Pressable>
+
+      <Badge value={badge} reducedMotion={reducedMotion} />
+    </Animated.View>
   );
 }
 
@@ -171,11 +268,22 @@ function PulseDot() {
  * ANIMATED EMOJI
  * ========================================================================== */
 
-function AnimatedEmoji({ emoji }: { emoji: string }) {
+function AnimatedEmoji({
+  emoji,
+  reducedMotion,
+}: {
+  emoji: string;
+  reducedMotion: boolean;
+}) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    if (reducedMotion) {
+      anim.setValue(0);
+      return;
+    }
+
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(anim, {
           toValue: 1,
@@ -197,8 +305,11 @@ function AnimatedEmoji({ emoji }: { emoji: string }) {
         }),
         Animated.delay(4000),
       ]),
-    ).start();
-  }, [anim]);
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [anim, reducedMotion]);
 
   const rotate = anim.interpolate({
     inputRange: [-1, 0, 1],
@@ -212,6 +323,8 @@ function AnimatedEmoji({ emoji }: { emoji: string }) {
   return (
     <Animated.Text
       style={[styles.greetingEmoji, { transform: [{ rotate }, { scale }] }]}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
     >
       {emoji}
     </Animated.Text>
@@ -222,42 +335,60 @@ function AnimatedEmoji({ emoji }: { emoji: string }) {
  * ROTATING TAGLINE
  * ========================================================================== */
 
-function RotatingTagline() {
+function RotatingTagline({ reducedMotion }: { reducedMotion: boolean }) {
   const [idx, setIdx] = useState(() =>
     Math.floor(Math.random() * TAGLINES.length),
   );
   const anim = useRef(new Animated.Value(1)).current;
+  const running = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      Animated.timing(anim, {
+      if (reducedMotion) {
+        setIdx((current) => (current + 1) % TAGLINES.length);
+        return;
+      }
+
+      const out = Animated.timing(anim, {
         toValue: 0,
         duration: TAGLINE_TRANSITION,
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
-      }).start(() => {
+      });
+      running.current = out;
+
+      out.start(({ finished }) => {
+        if (!finished) return;
+
         setIdx((current) => (current + 1) % TAGLINES.length);
-        Animated.timing(anim, {
+
+        const back = Animated.timing(anim, {
           toValue: 1,
           duration: 300,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
-        }).start();
+        });
+        running.current = back;
+        back.start();
       });
     }, TAGLINE_INTERVAL);
 
-    return () => clearInterval(interval);
-  }, [anim]);
+    return () => {
+      clearInterval(interval);
+      running.current?.stop();
+    };
+  }, [anim, reducedMotion]);
 
   const translateY = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [7, 0],
+    outputRange: [6, 0],
   });
 
   return (
     <Animated.Text
       style={[styles.tagline, { opacity: anim, transform: [{ translateY }] }]}
       numberOfLines={1}
+      ellipsizeMode="tail"
     >
       {TAGLINES[idx]}
     </Animated.Text>
@@ -265,7 +396,7 @@ function RotatingTagline() {
 }
 
 /* ============================================================================
- * TOP BAR INNER
+ * TOP BAR
  * ========================================================================== */
 
 function TopBarInner({
@@ -273,38 +404,54 @@ function TopBarInner({
   onProfileOpen,
   onNotificationsOpen,
   onRecompensesOpen,
+  notificationCount,
+  menuBadge,
 }: TopBarProps) {
   const user = useCurrentUser();
+  const insets = useSafeAreaInsets();
+  const reducedMotion = useReduceMotion();
 
   const greeting = getGreeting();
   const displayName = getDisplayName(user).trim();
-  const firstName =
-    displayName.length > 0 ? displayName.split(/\s+/)[0] : "Nick";
+  const firstName = displayName.length > 0 ? displayName.split(/\s+/)[0] : "";
 
   /* Entrance animation */
-  const entrance = useRef(new Animated.Value(0)).current;
+  const entrance = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.timing(entrance, {
+    if (reducedMotion) {
+      entrance.setValue(1);
+      return;
+    }
+
+    const animation = Animated.timing(entrance, {
       toValue: 1,
-      duration: 550,
+      duration: 500,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start();
-  }, [entrance]);
+    });
 
-  const containerTranslateY = entrance.interpolate({
+    animation.start();
+    return () => animation.stop();
+  }, [entrance, reducedMotion]);
+
+  const translateY = entrance.interpolate({
     inputRange: [0, 1],
-    outputRange: [-18, 0],
+    outputRange: [-14, 0],
   });
+
+  const greetingLabel = firstName
+    ? `${greeting.text}, ${firstName}`
+    : greeting.text;
 
   return (
     <Animated.View
       style={[
         styles.root,
         {
+          paddingTop: Math.max(insets.top, 16) + 8,
           opacity: entrance,
-          transform: [{ translateY: containerTranslateY }],
+          transform: [{ translateY }],
         },
       ]}
     >
@@ -318,18 +465,16 @@ function TopBarInner({
           ]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
-          style={styles.topGlowInner}
+          style={StyleSheet.absoluteFill}
         />
       </View>
 
-      {/* Main glass container */}
       <View style={styles.container}>
-        {/* Base gradient */}
         <LinearGradient
           colors={[
-            "rgba(12,8,30,0.75)",
-            "rgba(8,11,29,0.55)",
-            "rgba(10,6,24,0.75)",
+            "rgba(40,24,88,0.55)",
+            "rgba(14,16,44,0.35)",
+            "rgba(28,14,64,0.55)",
           ]}
           locations={[0, 0.5, 1]}
           start={{ x: 0, y: 0 }}
@@ -337,102 +482,123 @@ function TopBarInner({
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Border ring */}
-        <View style={styles.containerBorder} pointerEvents="none" />
+        <View pointerEvents="none" style={styles.containerBorder} />
 
-        {/* Top hairline */}
-        <View style={styles.topHairline} pointerEvents="none">
+        <View pointerEvents="none" style={styles.topHairline}>
           <LinearGradient
             colors={[
               "rgba(255,255,255,0)",
-              "rgba(255,255,255,0.2)",
+              "rgba(255,255,255,0.22)",
               "rgba(255,255,255,0)",
             ]}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
-            style={{ flex: 1 }}
+            style={StyleSheet.absoluteFill}
           />
         </View>
 
-        {/* Top-right orb */}
-        <View style={styles.cornerOrb} pointerEvents="none" />
-
-        {/* Content row */}
+        {/* LIGNE 1 : menu · salutation · actions */}
         <View style={styles.contentRow}>
-          {/* Left — menu button */}
-          <GlassIconButton onPress={onMenuOpen} label="Ouvrir le menu" dot>
-            <Menu size={19} color="rgba(255,255,255,0.9)" strokeWidth={2.2} />
-          </GlassIconButton>
+          <GlassButton
+            onPress={onMenuOpen}
+            label="Ouvrir le menu"
+            badge={menuBadge}
+            reducedMotion={reducedMotion}
+          >
+            <Menu size={19} color="rgba(255,255,255,0.92)" strokeWidth={2.2} />
+          </GlassButton>
 
-          {/* Center — greeting + tagline */}
-          <View style={styles.centerBlock}>
-            <View style={styles.greetingRow}>
-              <Text style={styles.greetingText} numberOfLines={1}>
-                {greeting.text},{" "}
-                <Text style={styles.greetingName}>{firstName}</Text>
-              </Text>
-              <AnimatedEmoji emoji={greeting.emoji} />
-            </View>
-            <View style={styles.taglineWrap}>
-              <RotatingTagline />
-            </View>
+          <View
+            style={styles.greetingBlock}
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel={greetingLabel}
+          >
+            {firstName ? (
+              <>
+                <View style={styles.greetingTopRow}>
+                  <Text
+                    style={styles.greetingText}
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={1.2}
+                  >
+                    {greeting.text}
+                  </Text>
+                  <AnimatedEmoji
+                    emoji={greeting.emoji}
+                    reducedMotion={reducedMotion}
+                  />
+                </View>
+                <Text
+                  style={styles.greetingName}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  maxFontSizeMultiplier={1.2}
+                >
+                  {firstName}
+                </Text>
+              </>
+            ) : (
+              <View style={styles.greetingTopRow}>
+                <Text
+                  style={styles.greetingName}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={1.2}
+                >
+                  {greeting.text}
+                </Text>
+                <AnimatedEmoji
+                  emoji={greeting.emoji}
+                  reducedMotion={reducedMotion}
+                />
+              </View>
+            )}
           </View>
 
-          {/* Right — actions */}
           <View style={styles.rightActions}>
             {onRecompensesOpen ? (
-              <GlassIconButton
+              <GlassButton
                 onPress={onRecompensesOpen}
                 label="Ouvrir mes récompenses"
+                reducedMotion={reducedMotion}
               >
                 <Sparkles size={17} color="#C4B5FD" strokeWidth={2.2} />
-              </GlassIconButton>
+              </GlassButton>
             ) : null}
 
-            <GlassIconButton
+            <GlassButton
               onPress={onNotificationsOpen}
-              label="Notifications"
-              dot
+              label={
+                notificationCount && notificationCount > 0
+                  ? `Notifications, ${notificationCount} non lues`
+                  : "Notifications"
+              }
+              badge={notificationCount}
+              reducedMotion={reducedMotion}
             >
-              <Bell size={18} color="rgba(255,255,255,0.9)" strokeWidth={2.2} />
-            </GlassIconButton>
-
-            {/* Avatar button */}
-            <Pressable
-              onPress={onProfileOpen}
-              accessibilityLabel="Ouvrir mon profil"
-              style={({ pressed }) => [
-                styles.avatarButton,
-                pressed && styles.avatarButtonPressed,
-              ]}
-            >
-              <LinearGradient
-                colors={["rgba(167,139,250,0.24)", "rgba(99,102,241,0.08)"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
+              <Bell
+                size={18}
+                color="rgba(255,255,255,0.92)"
+                strokeWidth={2.2}
               />
-              <View style={styles.avatarButtonBorder} pointerEvents="none" />
+            </GlassButton>
+
+            <GlassButton
+              onPress={onProfileOpen}
+              label="Ouvrir mon profil"
+              variant="avatar"
+              reducedMotion={reducedMotion}
+            >
               <View style={styles.avatarInner}>
-                <UserAvatar user={user} size={32} showOnline />
+                <UserAvatar user={user} size="w-8 h-8" showOnline />
               </View>
-              <View style={styles.avatarRing} pointerEvents="none" />
-            </Pressable>
+            </GlassButton>
           </View>
         </View>
 
-        {/* Bottom hairline */}
-        <View style={styles.bottomHairline} pointerEvents="none">
-          <LinearGradient
-            colors={[
-              "rgba(167,139,250,0)",
-              "rgba(167,139,250,0.4)",
-              "rgba(167,139,250,0)",
-            ]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={{ flex: 1 }}
-          />
+        {/* LIGNE 2 : slogan sur toute la largeur (plus de troncature) */}
+        <View style={styles.taglineRow}>
+          <RotatingTagline reducedMotion={reducedMotion} />
         </View>
       </View>
     </Animated.View>
@@ -456,11 +622,9 @@ const styles = StyleSheet.create({
     position: "relative",
     zIndex: 20,
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "android" ? 44 : 54,
     paddingBottom: 12,
   },
 
-  /* ── Top glow ──────────────────────────────────── */
   topGlow: {
     position: "absolute",
     top: 0,
@@ -472,29 +636,34 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     overflow: "hidden",
   },
-  topGlowInner: {
-    flex: 1,
-  },
 
-  /* ── Main container ────────────────────────────── */
+  /* Base opaque : évite l'artefact d'ombre Android sur fond translucide. */
   container: {
     position: "relative",
-    borderRadius: 26,
+    borderRadius: 24,
     overflow: "hidden",
     paddingHorizontal: 12,
-    paddingVertical: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 18 },
-    elevation: 10,
+    paddingTop: 12,
+    paddingBottom: 10,
+    backgroundColor: BASE_COLOR,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.25,
+        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 14 },
+      },
+      default: {},
+    }),
   },
+
   containerBorder: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 26,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
+
   topHairline: {
     position: "absolute",
     top: 0,
@@ -502,164 +671,155 @@ const styles = StyleSheet.create({
     right: 0,
     height: 1,
   },
-  cornerOrb: {
-    position: "absolute",
-    top: -80,
-    right: -64,
-    width: 160,
-    height: 160,
-    borderRadius: 9999,
-    backgroundColor: "rgba(139,92,246,0.18)",
-  },
-  bottomHairline: {
-    position: "absolute",
-    bottom: 0,
-    left: "50%",
-    marginLeft: -48,
-    width: 96,
-    height: 1,
-  },
 
-  /* ── Content row ───────────────────────────────── */
+  /* ── Ligne 1 ── */
   contentRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
+    gap: 10,
   },
 
-  /* ── Icon button ───────────────────────────────── */
-  iconButton: {
-    position: "relative",
-    width: 40,
-    height: 40,
-    borderRadius: 16,
+  buttonWrap: {
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+  },
+
+  button: {
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: BUTTON_RADIUS,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
-  iconButtonBorder: {
+
+  buttonBorder: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 16,
+    borderRadius: BUTTON_RADIUS,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.09)",
   },
 
-  /* ── Pulse dot ─────────────────────────────────── */
-  pulseDotWrap: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    width: 6,
-    height: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pulseDotGlow: {
-    position: "absolute",
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#A78BFA",
-  },
-  pulseDotCore: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#C4B5FD",
-    shadowColor: "#A78BFA",
-    shadowOpacity: 0.9,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
+  buttonBorderAvatar: {
+    borderColor: "rgba(196,181,253,0.35)",
   },
 
-  /* ── Center block ──────────────────────────────── */
-  centerBlock: {
-    flex: 1,
-    minWidth: 0,
-    paddingHorizontal: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  greetingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    maxWidth: "100%",
-  },
-  greetingText: {
-    maxWidth: "100%",
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#fff",
-    letterSpacing: -0.4,
-    textAlign: "center",
-  },
-  greetingName: {
-    color: "#fff",
-    fontWeight: "900",
-  },
-  greetingEmoji: {
-    fontSize: 16,
-  },
-  taglineWrap: {
-    marginTop: 4,
-    height: 18,
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  tagline: {
-    maxWidth: 250,
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 0.2,
-    color: "rgba(255,255,255,0.45)",
-    textAlign: "center",
-  },
-
-  /* ── Right actions ─────────────────────────────── */
-  rightActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  /* ── Avatar button ─────────────────────────────── */
-  avatarButton: {
-    position: "relative",
-    width: 40,
-    height: 40,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 2,
-    overflow: "hidden",
-  },
-  avatarButtonPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.94 }],
-  },
-  avatarButtonBorder: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-  },
   avatarInner: {
     width: 32,
     height: 32,
-    borderRadius: 12,
+    borderRadius: 11,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+
+  rightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  /* ── Salutation (alignée à gauche, hiérarchie en deux lignes) ── */
+  greetingBlock: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+  },
+
+  greetingTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  greetingText: {
+    flexShrink: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.62)",
+  },
+
+  greetingName: {
+    flexShrink: 1,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+    color: "#FFFFFF",
+  },
+
+  greetingEmoji: {
+    fontSize: 13,
+    lineHeight: 16,
+  },
+
+  /* ── Ligne 2 : slogan ── */
+  taglineRow: {
+    marginTop: 10,
+    paddingTop: 9,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.08)",
+    height: 30,
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+
+  tagline: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+    letterSpacing: 0.1,
+    color: "rgba(255,255,255,0.62)",
+  },
+
+  /* ── Badges ── */
+  dotWrap: {
+    position: "absolute",
+    top: -1,
+    right: -1,
+    width: 10,
+    height: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  dotGlow: {
+    position: "absolute",
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#A78BFA",
+  },
+
+  dotCore: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#C4B5FD",
+    borderWidth: 2,
+    borderColor: BASE_COLOR,
+  },
+
+  countBadge: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#6366F1",
+    borderWidth: 2,
+    borderColor: BASE_COLOR,
+  },
+
+  countBadgeText: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "800",
+    color: "#FFFFFF",
   },
 });

@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
@@ -75,6 +76,13 @@ const FAB_RIGHT = 18;
 /** Marge minimum entre le FAB et l'inset bas. */
 const FAB_BOTTOM_GAP = 16;
 
+/**
+ * NOTE : aucun `Pressable style={({ pressed }) => ...}` dans ce fichier.
+ * Les styles retournés par une fonction `style` semblent ignorés dans cette
+ * app (chips sans fond, FAB sans cercle ni position). On utilise
+ * TouchableOpacity avec des styles statiques.
+ */
+
 /* ============================================================================
  * HELPERS
  * ========================================================================== */
@@ -115,17 +123,14 @@ function FilterChip({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <TouchableOpacity
       onPress={onPress}
+      activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}
       hitSlop={4}
-      style={({ pressed }) => [
-        styles.filterChip,
-        active && styles.filterChipActive,
-        pressed && styles.filterChipPressed,
-      ]}
+      style={[styles.filterChip, active && styles.filterChipActive]}
     >
       <Text
         style={[
@@ -135,7 +140,7 @@ function FilterChip({
       >
         {label}
       </Text>
-    </Pressable>
+    </TouchableOpacity>
   );
 }
 
@@ -410,14 +415,7 @@ export default function MessagesPage({
   if (isLoading) {
     return (
       <View
-        style={[
-          styles.page,
-          {
-            width,
-            height,
-            paddingTop: insets.top,
-          },
-        ]}
+        style={[styles.page, { width, height, paddingTop: insets.top }]}
         accessibilityLabel="Messagerie"
       >
         <View style={styles.centerContent}>
@@ -434,14 +432,7 @@ export default function MessagesPage({
   if (!currentUserId) {
     return (
       <View
-        style={[
-          styles.page,
-          {
-            width,
-            height,
-            paddingTop: insets.top,
-          },
-        ]}
+        style={[styles.page, { width, height, paddingTop: insets.top }]}
         accessibilityLabel="Messagerie"
       >
         <View style={styles.centerContentWithPadding}>
@@ -458,14 +449,7 @@ export default function MessagesPage({
   return (
     <>
       <View
-        style={[
-          styles.page,
-          {
-            width,
-            height,
-            paddingTop: insets.top,
-          },
-        ]}
+        style={[styles.page, { width, height, paddingTop: insets.top }]}
         accessibilityLabel="Messagerie"
       >
         {/* ==================================================================
@@ -497,18 +481,16 @@ export default function MessagesPage({
               </View>
 
               {onBack ? (
-                <Pressable
+                <TouchableOpacity
                   onPress={onBack}
+                  activeOpacity={0.7}
                   accessibilityRole="button"
                   accessibilityLabel="Retour"
                   hitSlop={8}
-                  style={({ pressed }) => [
-                    styles.backButton,
-                    pressed && styles.pressed,
-                  ]}
+                  style={styles.backButton}
                 >
                   <ArrowLeft size={22} color="rgba(255,255,255,0.86)" />
-                </Pressable>
+                </TouchableOpacity>
               ) : null}
             </View>
 
@@ -585,38 +567,39 @@ export default function MessagesPage({
                     Aucune conversation ne correspond à ce filtre.
                   </Text>
 
-                  <Pressable
+                  <TouchableOpacity
                     onPress={() => setFilter("all")}
+                    activeOpacity={0.8}
                     accessibilityRole="button"
                     accessibilityLabel="Afficher toutes les conversations"
-                    style={({ pressed }) => [
-                      styles.startConversationButton,
-                      pressed && styles.pressed,
-                    ]}
+                    style={styles.startConversationButton}
                   >
                     <Text style={styles.startConversationText}>
                       Voir toutes
                     </Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
 
-            {/* FAB — position bottom calculée avec la safe area */}
+            {/* FAB — calque plein panneau, bouton calé en bas à droite.
+                pointerEvents="box-none" : seul le bouton capte les touchers. */}
 
-            <Pressable
-              onPress={handleNewConversation}
-              accessibilityRole="button"
-              accessibilityLabel="Nouvelle conversation"
-              hitSlop={10}
-              style={({ pressed }) => [
-                styles.floatingButton,
-                { bottom: fabBottom },
-                pressed && styles.floatingButtonPressed,
-              ]}
+            <View
+              pointerEvents="box-none"
+              style={[styles.fabLayer, { paddingBottom: fabBottom }]}
             >
-              <Plus size={28} strokeWidth={2.6} color="#FFFFFF" />
-            </Pressable>
+              <TouchableOpacity
+                onPress={handleNewConversation}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityLabel="Nouvelle conversation"
+                hitSlop={10}
+                style={styles.floatingButton}
+              >
+                <Plus size={28} strokeWidth={2.6} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
           </View>
         ) : null}
 
@@ -662,21 +645,19 @@ export default function MessagesPage({
                 </Text>
 
                 {!isWide ? (
-                  <Pressable
+                  <TouchableOpacity
                     onPress={handleBackToConversations}
+                    activeOpacity={0.8}
                     accessibilityRole="button"
                     accessibilityLabel="Voir les conversations"
-                    style={({ pressed }) => [
-                      styles.startConversationButton,
-                      pressed && styles.pressed,
-                    ]}
+                    style={styles.startConversationButton}
                   >
                     <ArrowLeft size={18} color="#FFFFFF" />
 
                     <Text style={styles.startConversationText}>
                       Voir les conversations
                     </Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 ) : null}
               </View>
             )}
@@ -695,14 +676,7 @@ export default function MessagesPage({
         statusBarTranslucent
         onRequestClose={() => setIsNewConversationOpen(false)}
       >
-        <View
-          style={[
-            styles.modalRoot,
-            {
-              paddingTop: insets.top,
-            },
-          ]}
-        >
+        <View style={[styles.modalRoot, { paddingTop: insets.top }]}>
           <Pressable
             onPress={() => setIsNewConversationOpen(false)}
             style={styles.modalBackdrop}
@@ -711,9 +685,7 @@ export default function MessagesPage({
           <View
             style={[
               styles.newConversationSheet,
-              {
-                paddingBottom: Math.max(insets.bottom, 12),
-              },
+              { paddingBottom: Math.max(insets.bottom, 12) },
             ]}
           >
             <View style={styles.modalHandleContainer}>
@@ -729,25 +701,21 @@ export default function MessagesPage({
                 </Text>
               </View>
 
-              <Pressable
+              <TouchableOpacity
                 onPress={() => setIsNewConversationOpen(false)}
+                activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Fermer"
                 hitSlop={8}
-                style={({ pressed }) => [
-                  styles.modalCloseButton,
-                  pressed && styles.pressed,
-                ]}
+                style={styles.modalCloseButton}
               >
                 <X size={19} color="rgba(255,255,255,0.72)" />
-              </Pressable>
+              </TouchableOpacity>
             </View>
 
             <ScrollView
               style={styles.newConversationScroll}
-              contentContainerStyle={{
-                paddingBottom: 32,
-              }}
+              contentContainerStyle={{ paddingBottom: 32 }}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
@@ -806,527 +774,337 @@ export default function MessagesPage({
  * ========================================================================== */
 
 const styles = StyleSheet.create({
-  /* --------------------------------------------------------------------------
-   * PAGE
-   * ------------------------------------------------------------------------ */
+  /* ---- PAGE ---- */
 
   page: {
     flex: 1,
     flexDirection: "row",
-
     minWidth: 0,
     minHeight: 0,
-
     overflow: "hidden",
-
     backgroundColor: "#050509",
   },
 
-  centerContent: {
-    flex: 1,
-
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  centerContent: { flex: 1, alignItems: "center", justifyContent: "center" },
 
   centerContentWithPadding: {
     flex: 1,
-
     alignItems: "center",
     justifyContent: "center",
-
     padding: 24,
   },
 
-  /* --------------------------------------------------------------------------
-   * LIST PANEL
-   * ------------------------------------------------------------------------ */
+  /* ---- LIST PANEL ---- */
 
   listPanel: {
     position: "relative",
-
     minWidth: 0,
     minHeight: 0,
-
     overflow: "hidden",
-
     backgroundColor: "#050509",
-
     borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: "rgba(255,255,255,0.10)",
   },
 
-  listPanelWide: {
-    width: LIST_PANEL_WIDTH,
+  listPanelWide: { width: LIST_PANEL_WIDTH, flexGrow: 0, flexShrink: 0 },
 
-    flexGrow: 0,
-    flexShrink: 0,
-  },
+  listPanelMobile: { width: "100%", flex: 1, borderRightWidth: 0 },
 
-  listPanelMobile: {
-    width: "100%",
-
-    flex: 1,
-
-    borderRightWidth: 0,
-  },
-
-  /* --------------------------------------------------------------------------
-   * LIST HEADER
-   * ------------------------------------------------------------------------ */
+  /* ---- LIST HEADER ---- */
 
   listHeader: {
     width: "100%",
-
     flexDirection: "row",
     alignItems: "center",
-
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 12,
   },
 
-  listHeaderText: {
-    flex: 1,
-
-    minWidth: 0,
-  },
+  listHeaderText: { flex: 1, minWidth: 0 },
 
   pageTitle: {
     fontSize: 30,
     lineHeight: 36,
-
     fontWeight: "800",
     letterSpacing: -0.6,
-
     color: "#FFFFFF",
   },
 
   pageSubtitle: {
     marginTop: 3,
-
     fontSize: 14,
     lineHeight: 20,
-
     color: "rgba(255,255,255,0.45)",
   },
 
   backButton: {
     width: 42,
     height: 42,
-
     flexGrow: 0,
     flexShrink: 0,
-
     marginLeft: 10,
-
     alignItems: "center",
     justifyContent: "center",
-
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
     borderRadius: 21,
-
     backgroundColor: "rgba(255,255,255,0.04)",
   },
 
-  /* --------------------------------------------------------------------------
-   * SEARCH
-   * ------------------------------------------------------------------------ */
+  /* ---- SEARCH ---- */
 
-  searchContainer: {
-    width: "100%",
+  searchContainer: { width: "100%", paddingHorizontal: 12 },
 
-    paddingHorizontal: 12,
-  },
-
-  /* --------------------------------------------------------------------------
-   * FILTERS
-   * ------------------------------------------------------------------------ */
+  /* ---- FILTERS ---- */
 
   filtersContainer: {
     width: "100%",
-
     flexDirection: "row",
     alignItems: "center",
-
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 10,
-
     gap: 8,
   },
 
   filterChip: {
     minHeight: 40,
-
     flexGrow: 0,
     flexShrink: 0,
-
     alignItems: "center",
     justifyContent: "center",
-
     paddingHorizontal: 15,
-
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
     borderRadius: 999,
-
     backgroundColor: "rgba(255,255,255,0.04)",
   },
 
   filterChipActive: {
     borderColor: "rgba(139,92,246,0.50)",
-
     backgroundColor: "rgba(139,92,246,0.20)",
   },
 
-  filterChipPressed: {
-    opacity: 0.72,
-  },
+  filterChipText: { fontSize: 13, lineHeight: 18, fontWeight: "600" },
 
-  filterChipText: {
-    fontSize: 13,
-    lineHeight: 18,
+  filterChipTextActive: { color: "#FFFFFF" },
 
-    fontWeight: "600",
-  },
+  filterChipTextInactive: { color: "rgba(255,255,255,0.55)" },
 
-  filterChipTextActive: {
-    color: "#FFFFFF",
-  },
-
-  filterChipTextInactive: {
-    color: "rgba(255,255,255,0.55)",
-  },
-
-  /* --------------------------------------------------------------------------
-   * CONVERSATION AREA
-   * ------------------------------------------------------------------------ */
+  /* ---- CONVERSATION AREA ---- */
 
   conversationArea: {
     flex: 1,
-
     minHeight: 0,
     minWidth: 0,
-
     position: "relative",
-
     overflow: "hidden",
   },
 
-  conversationScroll: {
-    flex: 1,
-
-    minHeight: 0,
-    minWidth: 0,
-  },
+  conversationScroll: { flex: 1, minHeight: 0, minWidth: 0 },
 
   conversationContent: {
     width: "100%",
-
     paddingHorizontal: 8,
     paddingTop: 4,
-
     alignSelf: "stretch",
   },
 
   emptyContainer: {
     flex: 1,
-
     minHeight: 260,
-
     alignItems: "center",
     justifyContent: "center",
-
     paddingHorizontal: 24,
   },
 
   emptyTitle: {
     marginTop: 16,
-
     fontSize: 20,
     lineHeight: 26,
-
     fontWeight: "700",
     textAlign: "center",
-
     color: "#FFFFFF",
   },
 
   emptyDescription: {
     maxWidth: 320,
-
     marginTop: 8,
-
     fontSize: 14,
     lineHeight: 21,
-
     textAlign: "center",
-
     color: "rgba(255,255,255,0.40)",
   },
 
-  /* --------------------------------------------------------------------------
-   * FAB
-   * ------------------------------------------------------------------------ */
+  /* ---- FAB ---- */
 
-  floatingButton: {
+  fabLayer: {
     position: "absolute",
-
-    right: FAB_RIGHT,
-
-    width: FAB_SIZE,
-    height: FAB_SIZE,
-
-    flexGrow: 0,
-    flexShrink: 0,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    borderRadius: FAB_SIZE / 2,
-
-    backgroundColor: "#2563EB",
-
-    elevation: 10,
-
-    shadowColor: "#2563EB",
-    shadowOpacity: 0.42,
-    shadowRadius: 14,
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    paddingRight: FAB_RIGHT,
     zIndex: 50,
   },
 
-  floatingButtonPressed: {
-    opacity: 0.82,
-
-    transform: [{ scale: 0.94 }],
+  floatingButton: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: "#2563EB",
+    elevation: 10,
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.42,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
   },
 
-  /* --------------------------------------------------------------------------
-   * CHAT PANEL
-   * ------------------------------------------------------------------------ */
+  /* ---- CHAT PANEL ---- */
 
   chatPanel: {
     flex: 1,
-
     minWidth: 0,
     minHeight: 0,
-
     overflow: "hidden",
-
     backgroundColor: "#000000",
   },
 
   chatEmpty: {
     flex: 1,
-
     alignItems: "center",
     justifyContent: "center",
-
     paddingHorizontal: 24,
-
     backgroundColor: "#000000",
   },
 
   chatEmptyIcon: {
     width: 96,
     height: 96,
-
     marginBottom: 24,
-
     alignItems: "center",
     justifyContent: "center",
-
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
     borderRadius: 28,
-
     backgroundColor: "rgba(255,255,255,0.04)",
   },
 
   chatEmptyTitle: {
     fontSize: 30,
     lineHeight: 36,
-
     fontWeight: "700",
     letterSpacing: -0.5,
     textAlign: "center",
-
     color: "#FFFFFF",
   },
 
   chatEmptyDescription: {
     maxWidth: 380,
-
     marginTop: 12,
-
     fontSize: 14,
     lineHeight: 24,
-
     textAlign: "center",
-
     color: "rgba(255,255,255,0.40)",
   },
 
   startConversationButton: {
     flexDirection: "row",
     alignItems: "center",
-
     gap: 8,
-
     marginTop: 28,
-
     paddingHorizontal: 20,
     paddingVertical: 13,
-
     borderRadius: 12,
-
     backgroundColor: "#2563EB",
   },
 
   startConversationText: {
     fontSize: 14,
     lineHeight: 19,
-
     fontWeight: "700",
-
     color: "#FFFFFF",
   },
 
-  /* --------------------------------------------------------------------------
-   * MODAL
-   * ------------------------------------------------------------------------ */
+  /* ---- MODAL ---- */
 
   modalRoot: {
     flex: 1,
-
     justifyContent: "flex-end",
-
     backgroundColor: "rgba(0,0,0,0.65)",
   },
 
-  modalBackdrop: {
-    position: "absolute",
-
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-  },
+  modalBackdrop: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
 
   newConversationSheet: {
     maxHeight: "85%",
-
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.10)",
-
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-
     overflow: "hidden",
-
     backgroundColor: "#0B0B12",
   },
 
-  modalHandleContainer: {
-    alignItems: "center",
-
-    paddingTop: 8,
-  },
+  modalHandleContainer: { alignItems: "center", paddingTop: 8 },
 
   modalHandle: {
     width: 40,
     height: 4,
-
     borderRadius: 999,
-
     backgroundColor: "rgba(255,255,255,0.20)",
   },
 
   modalHeader: {
     width: "100%",
-
     flexDirection: "row",
     alignItems: "center",
-
     paddingHorizontal: 20,
     paddingVertical: 16,
-
     borderBottomWidth: StyleSheet.hairlineWidth,
-
     borderBottomColor: "rgba(255,255,255,0.10)",
   },
 
-  modalHeaderText: {
-    flex: 1,
-
-    minWidth: 0,
-
-    paddingRight: 16,
-  },
+  modalHeaderText: { flex: 1, minWidth: 0, paddingRight: 16 },
 
   modalTitle: {
     fontSize: 18,
     lineHeight: 24,
-
     fontWeight: "700",
-
     color: "#FFFFFF",
   },
 
   modalSubtitle: {
     marginTop: 4,
-
     fontSize: 14,
     lineHeight: 20,
-
     color: "rgba(255,255,255,0.40)",
   },
 
   modalCloseButton: {
     width: 36,
     height: 36,
-
     flexGrow: 0,
     flexShrink: 0,
-
     alignItems: "center",
     justifyContent: "center",
-
     borderRadius: 18,
-
     backgroundColor: "rgba(255,255,255,0.06)",
   },
 
-  newConversationScroll: {
-    flexGrow: 0,
-  },
+  newConversationScroll: { flexGrow: 0 },
 
-  /* --------------------------------------------------------------------------
-   * CALL OVERLAY
-   * ------------------------------------------------------------------------ */
+  /* ---- CALL OVERLAY ---- */
 
   callOverlay: {
     flex: 1,
-
     justifyContent: "center",
-
     paddingHorizontal: 16,
-
     backgroundColor: "rgba(0,0,0,0.90)",
-  },
-
-  /* --------------------------------------------------------------------------
-   * COMMON
-   * ------------------------------------------------------------------------ */
-
-  pressed: {
-    opacity: 0.72,
   },
 });

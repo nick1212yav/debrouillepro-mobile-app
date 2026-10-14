@@ -15,6 +15,7 @@ import {
   Text,
   View,
   useWindowDimensions,
+  type LayoutChangeEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
@@ -80,7 +81,7 @@ const COLORS = {
 
   white: "#FFFFFF",
   whiteSoft: "rgba(255,255,255,0.72)",
-  whiteMuted: "rgba(255,255,255,0.46)",
+  whiteMuted: "rgba(255,255,255,0.52)",
   whiteFaint: "rgba(255,255,255,0.22)",
 
   border: "rgba(255,255,255,0.09)",
@@ -105,10 +106,19 @@ const SHELL_GRADIENT_COLORS: readonly [string, string, string] =
 const BURST_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315] as const;
 const BURST_DISTANCE = 46;
 
-const PILL_INSET_X = 5;
-const PILL_HEIGHT = 40;
-const PILL_TOP = 7;
-const PILL_RADIUS = 15;
+const SHELL_HEIGHT = 76;
+const FADE_EXTRA = 28;
+
+/** Pastille : couvre l'icône ET le libellé, centrée sur l'onglet. */
+const PILL_WIDTH = 58;
+const PILL_HEIGHT = 50;
+const PILL_TOP = 11;
+const PILL_RADIUS = 16;
+
+/** Libellés : même ligne de base pour les onglets et pour « Créer ». */
+const LABEL_SIZE = 10;
+const LABEL_LINE = 13;
+const CREATE_LABEL_BOTTOM = 14;
 
 /* ============================================================================
  * TAB ITEM
@@ -146,8 +156,13 @@ const TabItem = memo(function TabItem({
     });
   }, [active, activeProgress, reducedMotion]);
 
+  /**
+   * IMPORTANT : on mesure le conteneur (enfant direct du groupe), pas le
+   * Pressable. Le Pressable remplit son conteneur, donc son `x` vaut toujours
+   * 0 : la pastille ne se déplaçait jamais vers le 2e onglet.
+   */
   const handleLayout = useCallback(
-    (event: { nativeEvent: { layout: { x: number; width: number } } }) => {
+    (event: LayoutChangeEvent) => {
       const { x, width } = event.nativeEvent.layout;
       onMeasure(tab.id, { x, width });
     },
@@ -214,9 +229,11 @@ const TabItem = memo(function TabItem({
   }));
 
   return (
-    <Animated.View style={[styles.tabItemContainer, containerAnimatedStyle]}>
+    <Animated.View
+      onLayout={handleLayout}
+      style={[styles.tabItemContainer, containerAnimatedStyle]}
+    >
       <Pressable
-        onLayout={handleLayout}
         onPress={handlePress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
@@ -233,7 +250,7 @@ const TabItem = memo(function TabItem({
       >
         <Animated.View style={[styles.iconContainer, iconAnimatedStyle]}>
           <Icon
-            size={21}
+            size={22}
             color={active ? COLORS.violetLight : COLORS.whiteMuted}
             strokeWidth={active ? 2.5 : 1.9}
           />
@@ -291,11 +308,13 @@ function TabsGroup({ tabs, activeId, onSelect }: TabsGroupProps) {
 
   const pillX = useSharedValue(0);
   const pillOpacity = useSharedValue(0);
+  const pillPlacedRef = useRef(false);
 
   useEffect(() => {
     const target = layouts[activeId as TabDefinition["id"]];
 
     if (!target || !activeInGroup) {
+      pillPlacedRef.current = false;
       pillOpacity.value = withTiming(0, {
         duration: 180,
         easing: Easing.out(Easing.cubic),
@@ -303,21 +322,27 @@ function TabsGroup({ tabs, activeId, onSelect }: TabsGroupProps) {
       return;
     }
 
+    // Pastille centrée sur l'onglet.
+    const targetX = target.x + (target.width - PILL_WIDTH) / 2;
+
     pillOpacity.value = withTiming(1, {
       duration: 220,
       easing: Easing.out(Easing.cubic),
     });
 
-    if (reducedMotion) {
-      pillX.value = target.x;
-      return;
+    if (reducedMotion || !pillPlacedRef.current) {
+      // Première apparition dans ce groupe : pas de glissement depuis
+      // une ancienne position.
+      pillX.value = targetX;
+    } else {
+      pillX.value = withSpring(targetX, {
+        damping: 22,
+        stiffness: 260,
+        mass: 0.7,
+      });
     }
 
-    pillX.value = withSpring(target.x, {
-      damping: 22,
-      stiffness: 260,
-      mass: 0.7,
-    });
+    pillPlacedRef.current = true;
   }, [activeId, activeInGroup, layouts, pillOpacity, pillX, reducedMotion]);
 
   const pillAnimatedStyle = useAnimatedStyle(() => ({
@@ -546,18 +571,13 @@ const CreateButton = memo(function CreateButton({
   }));
 
   const glowAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      ambient.value,
-      [0, 1],
-      [0.35, 0.72],
-      Extrapolation.CLAMP,
-    ),
+    opacity: interpolate(ambient.value, [0, 1], [0.45, 1], Extrapolation.CLAMP),
     transform: [
       {
         scale: interpolate(
           ambient.value,
           [0, 1],
-          [0.96, 1.14],
+          [0.96, 1.08],
           Extrapolation.CLAMP,
         ),
       },
@@ -567,13 +587,13 @@ const CreateButton = memo(function CreateButton({
   const innerAuraAnimatedStyle = useAnimatedStyle(() => {
     const inverse = 1 - ambient.value;
     return {
-      opacity: interpolate(inverse, [0, 1], [0.25, 0.55], Extrapolation.CLAMP),
+      opacity: interpolate(inverse, [0, 1], [0.5, 1], Extrapolation.CLAMP),
       transform: [
         {
           scale: interpolate(
             inverse,
             [0, 1],
-            [0.88, 1.02],
+            [0.94, 1.04],
             Extrapolation.CLAMP,
           ),
         },
@@ -658,37 +678,17 @@ const CreateButton = memo(function CreateButton({
 
   return (
     <View style={styles.createArea}>
+      {/* Halo : deux disques concentriques à faible opacité.
+          (L'ancien halo était un carré arrondi à bord net, visible comme
+          une boîte sombre derrière le bouton.) */}
       <Animated.View
         pointerEvents="none"
         style={[styles.createAura, glowAnimatedStyle]}
-      >
-        <LinearGradient
-          colors={[
-            "rgba(167,139,250,0.55)",
-            "rgba(99,102,241,0.28)",
-            "rgba(99,102,241,0)",
-          ]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-
+      />
       <Animated.View
         pointerEvents="none"
         style={[styles.createAuraInner, innerAuraAnimatedStyle]}
-      >
-        <LinearGradient
-          colors={[
-            "rgba(196,181,253,0.42)",
-            "rgba(139,92,246,0.18)",
-            "rgba(99,102,241,0)",
-          ]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
+      />
 
       <Animated.View style={[styles.createButtonShadow, buttonAnimatedStyle]}>
         <View pointerEvents="none" style={styles.burstContainer}>
@@ -743,7 +743,7 @@ const CreateButton = memo(function CreateButton({
       </Animated.View>
 
       <View pointerEvents="none" style={styles.createLabelRow}>
-        <Sparkles size={9} color="rgba(196,181,253,0.72)" strokeWidth={2.5} />
+        <Sparkles size={9} color="rgba(196,181,253,0.8)" strokeWidth={2.5} />
         <Text style={styles.createLabel}>Créer</Text>
       </View>
     </View>
@@ -844,6 +844,7 @@ function TabBar({ active, onChange, hidden = false }: TabBarProps) {
 
   const bottomInset = Math.max(insets.bottom, 0);
   const dynamicPaddingBottom = 12 + bottomInset;
+  const fadeHeight = SHELL_HEIGHT + dynamicPaddingBottom + FADE_EXTRA;
 
   return (
     <Animated.View
@@ -855,6 +856,15 @@ function TabBar({ active, onChange, hidden = false }: TabBarProps) {
         rootAnimatedStyle,
       ]}
     >
+      {/* Fond dégradé : le contenu défilant ne se voit plus sous/autour
+          de la barre flottante. Ne capte aucun toucher. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={["rgba(5,7,17,0)", "rgba(5,7,17,0.94)"]}
+        locations={[0, 0.55]}
+        style={[styles.bottomFade, { height: fadeHeight }]}
+      />
+
       <View style={[styles.container, { maxWidth }]}>
         <View pointerEvents="none" style={styles.ambientBacklight}>
           <LinearGradient
@@ -912,7 +922,7 @@ function TabBar({ active, onChange, hidden = false }: TabBarProps) {
           </Animated.View>
 
           {/* Content (not clipped — Create button can extend above) */}
-          <View style={styles.contentRow}>
+          <View style={styles.contentRow} accessibilityRole="tablist">
             <TabsGroup
               tabs={leftTabs}
               activeId={active}
@@ -970,6 +980,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
 
+  bottomFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+
   container: {
     width: "100%",
     alignSelf: "center",
@@ -988,7 +1005,7 @@ const styles = StyleSheet.create({
   },
 
   shell: {
-    height: 76,
+    height: SHELL_HEIGHT,
     borderRadius: 28,
     // Pas d'overflow: hidden → le bouton Create peut dépasser.
     // Pas de border ici → shellBorder la dessine.
@@ -1033,7 +1050,7 @@ const styles = StyleSheet.create({
   },
 
   contentRow: {
-    height: 76,
+    height: SHELL_HEIGHT,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
@@ -1053,9 +1070,9 @@ const styles = StyleSheet.create({
 
   slidingPill: {
     position: "absolute",
-    left: PILL_INSET_X,
+    left: 0,
     top: PILL_TOP,
-    width: 52,
+    width: PILL_WIDTH,
     height: PILL_HEIGHT,
     borderRadius: PILL_RADIUS,
     overflow: "hidden",
@@ -1103,9 +1120,9 @@ const styles = StyleSheet.create({
   tabLabel: {
     maxWidth: 58,
     marginTop: 3,
-    fontSize: 9,
-    lineHeight: 12,
-    letterSpacing: 0.15,
+    fontSize: LABEL_SIZE,
+    lineHeight: LABEL_LINE,
+    letterSpacing: 0.1,
     textAlign: "center",
     zIndex: 2,
   },
@@ -1128,26 +1145,27 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
 
+  // Centre du bouton = 11 px sous le haut de createArea (marginTop -19 + 30).
   createAura: {
     position: "absolute",
-    top: -9,
+    top: -33,
     left: "50%",
-    width: 78,
-    height: 78,
-    marginLeft: -39,
-    borderRadius: 27,
-    overflow: "hidden",
+    width: 88,
+    height: 88,
+    marginLeft: -44,
+    borderRadius: 44,
+    backgroundColor: "rgba(139,92,246,0.14)",
   },
 
   createAuraInner: {
     position: "absolute",
-    top: -2,
+    top: -24,
     left: "50%",
-    width: 64,
-    height: 64,
-    marginLeft: -32,
-    borderRadius: 22,
-    overflow: "hidden",
+    width: 70,
+    height: 70,
+    marginLeft: -35,
+    borderRadius: 35,
+    backgroundColor: "rgba(167,139,250,0.16)",
   },
 
   createButtonShadow: {
@@ -1203,19 +1221,20 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.52)",
   },
 
+  // Même ligne de base que les libellés des onglets.
   createLabelRow: {
     position: "absolute",
-    bottom: -1,
+    bottom: CREATE_LABEL_BOTTOM,
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
   },
 
   createLabel: {
-    fontSize: 9,
-    lineHeight: 12,
+    fontSize: LABEL_SIZE,
+    lineHeight: LABEL_LINE,
     fontWeight: "800",
-    letterSpacing: 0.45,
+    letterSpacing: 0.3,
     color: COLORS.violetLight,
   },
 
