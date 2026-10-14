@@ -332,6 +332,10 @@ export default function ServicesPage({ onBack }: { onBack: () => void }) {
 
   const openProvider = useCallback(
     (provider: Provider) => {
+      console.log("[ServicesPage] OPEN_PROVIDER", {
+        id: provider._id,
+        name: provider.name,
+      });
       router.push(`/service/${provider._id}`);
     },
     [router],
