@@ -551,8 +551,10 @@ export const confirmBooking = mutation({
 export const getProductReviews = query({
   args: { productId: v.id("agriProducts") },
   handler: async (ctx, args) => {
-    const reviews = await ctx.db.query("agriReviews").collect();
-    return reviews.filter((r) => r.productId === args.productId);
+    return await ctx.db
+      .query("agriReviews")
+      .withIndex("by_product", (q) => q.eq("productId", args.productId))
+      .collect();
   },
 });
 
@@ -757,10 +759,10 @@ export const getSellerProducts = query({
     const sellerIdCast = ctx.db.normalizeId("users", args.sellerId);
     if (!sellerIdCast) return [];
 
-    const products = await ctx.db.query("agriProducts").collect();
-    const sellerProducts = products.filter(
-      (p) => p.seller.userId === sellerIdCast,
-    );
+    const sellerProducts = await ctx.db
+      .query("agriProducts")
+      .withIndex("by_seller", (q) => q.eq("seller.userId", sellerIdCast))
+      .collect();
 
     return await Promise.all(
       sellerProducts.map(async (product) => ({
