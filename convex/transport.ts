@@ -92,12 +92,27 @@ export const getTransportRoute = query({
   args: { id: v.string() },
   handler: async (ctx, args) => {
     const db = ctx.db as any;
-    const route = await db.get(args.id);
-    if (!route)
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Trajet introuvable",
-      });
+    const id = args.id.trim();
+    if (!id) return null;
+
+    // Un id invalide ou d'une autre table ne doit pas faire planter l'écran :
+    // useQuery relance l'exception pendant le rendu, et Android reste noir.
+    let route: any;
+    try {
+      route = await db.get(id);
+    } catch {
+      return null;
+    }
+
+    if (
+      !route ||
+      typeof route.origin !== "string" ||
+      typeof route.destination !== "string" ||
+      typeof route.pricePerSeat !== "number"
+    ) {
+      return null;
+    }
+
     return route;
   },
 });
