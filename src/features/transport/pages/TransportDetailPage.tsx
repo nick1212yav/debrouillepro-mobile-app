@@ -1,14 +1,13 @@
-import { View } from "react-native";
+import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 
 // src/features/transport/pages/TransportDetailPage.tsx
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react-native";
+import { ArrowLeft, Loader2 } from "lucide-react-native";
 import { useState } from "react";
 
-// ─── Importations des 17 composants de l'architecture Premium ───
 import { TransportHero } from "../components/detail/TransportHero";
 import { TransportGallery } from "../components/detail/TransportGallery";
 import { TransportLiveMap } from "../components/detail/TransportLiveMap";
@@ -27,15 +26,28 @@ import { TransportRecommendations } from "../components/detail/TransportRecommen
 import { TransportNearby } from "../components/detail/TransportNearby";
 import { TransportStickyBar } from "../components/detail/TransportStickyBar";
 
+function readRouteId(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) {
+    const first = value.find((item) => typeof item === "string" && item.trim());
+    return typeof first === "string" ? first.trim() : "";
+  }
+  return "";
+}
+
 export default function TransportDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const id = readRouteId(params.id);
+  const router = useRouter();
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/");
+  };
   const [bookingLoading, setBookingLoading] = useState(false);
 
-  // Récupération des données depuis l'API Convex
   const route = useQuery(
     api.transport.getTransportRoute,
-    id ? { id: id as any } : "skip",
+    id ? { id } : "skip",
   );
   const bookRoute = useMutation(api.transport.bookTransportRoute);
 
@@ -64,13 +76,167 @@ export default function TransportDetailPage() {
     }
   };
 
-  if (!route) {
+  if (!id) {
     return (
-      <View className="h-full min-h-screen flex items-center justify-center bg-[#02040c]"><Loader2 className="w-8 h-8 text-violet-500 animate-spin" /></View>
+      <MissingTrip
+        message="Aucun identifiant de trajet n'a été transmis."
+        onBack={goBack}
+      />
     );
   }
 
+  if (route === undefined) {
+    return (
+      <View style={styles.loading}>
+        <Loader2 size={32} color="#8B5CF6" />
+      </View>
+    );
+  }
+
+  if (route === null) {
+    return (
+      <MissingTrip
+        message="Ce trajet est introuvable ou n'est plus disponible."
+        onBack={goBack}
+      />
+    );
+  }
+
+  const price =
+    typeof route.pricePerSeat === "number" ? route.pricePerSeat : 0;
+  const rating =
+    typeof route.driverRating === "number" ? route.driverRating : 4.9;
+  const seats =
+    typeof route.seatsAvailable === "number" ? route.seatsAvailable : 0;
+
   return (
-    <View className="min-h-screen flex flex-col bg-gradient-to-b from-[#020412] to-[#040618] text-white">{}<TransportHero origin={route.origin} destination={route.destination} departureTime={route.departureTime} driverRating={route.driverRating || 4.9} vehicleModel={route.vehicleModel} vehiclePlate={route.vehiclePlate} price={route.pricePerSeat} currency={route.currency} onBack={() => navigate(-1)} />{}<View className="flex-1 overflow-y-auto px-4 py-6 space-y-6 pb-40" style={{  }}>{}<TransportGallery />{}<TransportLiveMap origin={route.origin} destination={route.destination} />{}<TransportETA />{}<TransportDriverCard name={route.driverName} phone={route.driverPhone} rating={route.driverRating || 4.9} />{}<TransportVehicle vehicleModel={route.vehicleModel} vehiclePlate={route.vehiclePlate} />{}<TransportFeatures />{}<TransportTimeline origin={route.origin} destination={route.destination} />{}<TransportAvailability seatsAvailable={route.seatsAvailable} />{}<TransportSafety />{}<TransportReviews />{}<TransportCompany />{}<TransportStats />{}<TransportAI />{}<TransportRecommendations origin={route.origin} />{}<TransportNearby /></View>{}<TransportStickyBar price={route.pricePerSeat} currency={route.currency} seatsAvailable={route.seatsAvailable} isLoading={bookingLoading} onBook={handleBookingConfirm} /></View>
+    <View style={styles.screen}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <TransportHero
+          origin={route.origin}
+          destination={route.destination}
+          departureTime={route.departureTime}
+          driverRating={rating}
+          vehicleModel={route.vehicleModel}
+          vehiclePlate={route.vehiclePlate}
+          price={price}
+          currency={route.currency}
+          onBack={goBack}
+        />
+        <View style={styles.sections}>
+          <TransportGallery />
+          <TransportLiveMap
+            origin={route.origin}
+            destination={route.destination}
+          />
+          <TransportETA />
+          <TransportDriverCard
+            name={route.driverName || "Chauffeur"}
+            phone={route.driverPhone || route.phone || ""}
+            rating={rating}
+          />
+          <TransportVehicle
+            vehicleModel={route.vehicleModel}
+            vehiclePlate={route.vehiclePlate}
+          />
+          <TransportFeatures />
+          <TransportTimeline
+            origin={route.origin}
+            destination={route.destination}
+          />
+          <TransportAvailability seatsAvailable={seats} />
+          <TransportSafety />
+          <TransportReviews />
+          <TransportCompany />
+          <TransportStats />
+          <TransportAI />
+          <TransportRecommendations origin={route.origin} />
+          <TransportNearby />
+        </View>
+      </ScrollView>
+      <TransportStickyBar
+        price={price}
+        currency={route.currency}
+        seatsAvailable={seats}
+        isLoading={bookingLoading}
+        onBook={handleBookingConfirm}
+      />
+    </View>
   );
 }
+
+function MissingTrip({
+  message,
+  onBack,
+}: {
+  message: string;
+  onBack: () => void;
+}) {
+  return (
+    <View style={styles.missing}>
+      <Pressable
+        onPress={onBack}
+        style={styles.back}
+        accessibilityRole="button"
+      >
+        <ArrowLeft size={18} color="#FFFFFF" />
+      </Pressable>
+      <Text style={styles.missingTitle}>Trajet indisponible</Text>
+      <Text style={styles.missingBody}>{message}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#020412",
+  },
+  loading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#020412",
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 150,
+  },
+  sections: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    gap: 24,
+  },
+  missing: {
+    flex: 1,
+    backgroundColor: "#020412",
+    paddingHorizontal: 24,
+    paddingTop: 56,
+    gap: 12,
+  },
+  back: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  missingTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+    marginTop: 8,
+  },
+  missingBody: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+});

@@ -175,7 +175,7 @@ export function TransportCard({
   ));
 
   return (
-    <View initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{
+    <Pressable initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{
         delay: 0.05 + index * 0.04,
         type: "spring",
         damping: 20,
@@ -235,6 +235,6 @@ export function TransportCard({
                 ? "text-amber-400 bg-amber-500/10"
                 : "text-white/40 hover:text-white hover:bg-white/5"
             }`}><Bookmark size={14} className={bookmarked ? "fill-amber-400" : ""} /></Pressable></View>{}<Pressable whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onPress={handleBook} className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-all" style={{ boxShadow: `0 4px 16px ${color}40` }}><CalendarDays size={12} /><Text>Réserver</Text><ChevronRight size={12} className="opacity-60" /></Pressable></View>
-    </View>
+    </Pressable>
   );
 }

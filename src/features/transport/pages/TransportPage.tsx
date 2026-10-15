@@ -98,7 +98,7 @@ export default function TransportPage({ onBack }: { onBack: () => void }) {
                   )}
 
                   {filteredRoutes.map((route: any) => (
-                    <View key={route._id} onPress={() => navigate(`/transport/${route._id}`)} className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] flex flex-col gap-4 transition-colors">
+                    <Pressable key={route._id} onPress={() => navigate(`/transport/${route._id}`)} className="p-5 rounded-3xl border border-white/5 bg-white/[0.02] flex flex-col gap-4 transition-colors">
                       <View className="flex items-start justify-between"><View className="flex gap-3"><View className="w-10 h-10 rounded-2xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center text-violet-400"><Car size={18} /></View><View><Text className="text-sm font-bold text-white">{route.origin}→ {route.destination}[2]
                             </Text><Text className="text-[10px] text-white/40 font-semibold uppercase mt-0.5">{route.vehicleType}· {route.departureTime}</Text></View></View><Text className="text-base font-black text-violet-400">{formatMobilityPrice(
                             route.pricePerSeat,
@@ -108,7 +108,7 @@ export default function TransportPage({ onBack }: { onBack: () => void }) {
 
                       <View className="flex items-center justify-between border-t border-white/5 pt-3 text-xs"><Text className="text-white/50">{route.seatsAvailable}places libres
                         </Text><View className="flex items-center gap-1 text-violet-400 font-bold"><Text>Voir le trajet [2]</Text><ChevronRight size={14} /></View></View>
-                    </View>
+                    </Pressable>
                   ))}
                 </View>
               ) : (
