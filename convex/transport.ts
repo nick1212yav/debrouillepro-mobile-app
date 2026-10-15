@@ -104,7 +104,6 @@ export const getTransportRoute = query({
 
 export const createTransportRoute = mutation({
   args: {
-    // ---- Champs communs (Accepte toutes les catégories commerciales) ----
     vehicleType: v.union(
       v.literal("taxi"),
       v.literal("bus"),
@@ -134,28 +133,20 @@ export const createTransportRoute = mutation({
     images: v.optional(v.array(v.string())),
     description: v.optional(v.string()),
     status: v.optional(v.string()),
-
-    // ---- Covoiturage / Bus ----
     origin: v.optional(v.string()),
     destination: v.optional(v.string()),
     departureTime: v.optional(v.string()),
     seats: v.optional(v.number()),
     pricePerSeat: v.optional(v.number()),
-
-    // ---- Taxi / Moto ----
     driverName: v.optional(v.string()),
     phone: v.optional(v.string()),
     city: v.optional(v.string()),
     vehicleModel: v.optional(v.string()),
     vehiclePlate: v.optional(v.string()),
     pricePerKm: v.optional(v.number()),
-
-    // ---- Camion / Livraison ----
     capacity: v.optional(v.number()),
     weight: v.optional(v.number()),
     volume: v.optional(v.number()),
-
-    // ---- Bus ----
     routeName: v.optional(v.string()),
     schedule: v.optional(v.string()),
     ticketPrice: v.optional(v.number()),
@@ -166,14 +157,12 @@ export const createTransportRoute = mutation({
 
     let companyId = args.companyId;
 
-    // 1. Validation de l'existence du compte chauffeur dans transportDrivers
     const existingDriver = await db
       .query("transportDrivers")
       .withIndex("by_user", (q: any) => q.eq("userId", user._id))
       .unique();
 
     if (!existingDriver && !companyId) {
-      // Auto-création transparente du profil de conducteur si manquant
       await db.insert("transportDrivers", {
         userId: user._id,
         name: args.driverName || user.name || "Chauffeur",
@@ -203,7 +192,6 @@ export const createTransportRoute = mutation({
       });
     }
 
-    // 2. Traduction de la catégorie commerciale vers le véhicule physique autorisé par le schéma de la base
     let schemaVehicleType:
       | "taxi"
       | "bus"
@@ -220,33 +208,27 @@ export const createTransportRoute = mutation({
       schemaVehicleType = "minibus";
     else if (vt === "camion" || vt === "towtruck") schemaVehicleType = "camion";
     else if (vt === "rideshare") schemaVehicleType = "rideshare";
-    else schemaVehicleType = "voiture"; // Fallbacks pour rental, parcel, boat, flight
+    else schemaVehicleType = "voiture";
 
-    // 3. Alignement automatique du statut sur le modèle attendu
     const normalizedStatus =
       args.status === "active" ? "scheduled" : args.status || "scheduled";
 
-    // 4. Construction du payload de trajet (avec valeurs par défaut rigoureuses)
     const routeData: any = {
       ...args,
       vehicleType: schemaVehicleType,
-      driverId: user._id, // Associe l'ID de la table des utilisateurs
+      driverId: user._id,
       companyId: companyId || undefined,
-
-      // Fallbacks pour assurer la compatibilité avec un schéma strict qui exige v.string() ou v.number()
       origin: args.origin || "À la demande",
       destination: args.destination || "À la demande",
       departureTime: args.departureTime || "En service (Temps réel)",
       seats: args.seats || 1,
       seatsAvailable: args.seats || 1,
       pricePerSeat: args.pricePerSeat || args.ticketPrice || 0,
-
       status: normalizedStatus,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    // Ajustement de l'origine et destination pour les profils de proximité taxis/motos
     if (schemaVehicleType === "taxi" || schemaVehicleType === "moto") {
       routeData.origin = args.origin || "Service local (Zone d'activité)";
       routeData.destination =
@@ -254,7 +236,6 @@ export const createTransportRoute = mutation({
       routeData.departureTime = args.departureTime || "En service (Temps réel)";
     }
 
-    // 5. Nettoyage de sécurité universel (retire les champs null/undefined pour v.optional)
     Object.keys(routeData).forEach((key) => {
       if (routeData[key] === null || routeData[key] === undefined) {
         delete routeData[key];
@@ -1099,71 +1080,147 @@ export const getTransportPaymentStatus = query({
 
 export const updateTransportLocation = mutation({
   args: {
-    bookingId: v.string(),
+    bookingId: v.id("transportBookings"),
     lat: v.number(),
     lng: v.number(),
     speed: v.optional(v.number()),
     heading: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const db = ctx.db as any;
     const user = await requireUser(ctx);
-    const booking = await db.get(args.bookingId);
-    if (!booking)
+
+    if (
+      !Number.isFinite(args.lat) ||
+      args.lat < -90 ||
+      args.lat > 90 ||
+      !Number.isFinite(args.lng) ||
+      args.lng < -180 ||
+      args.lng > 180
+    ) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Coordonnées GPS invalides",
+      });
+    }
+
+    if (
+      args.speed !== undefined &&
+      (!Number.isFinite(args.speed) || args.speed < 0)
+    ) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Vitesse invalide",
+      });
+    }
+
+    if (
+      args.heading !== undefined &&
+      (!Number.isFinite(args.heading) ||
+        args.heading < 0 ||
+        args.heading >= 360)
+    ) {
+      throw new ConvexError({
+        code: "INVALID_ARGUMENT",
+        message: "Cap GPS invalide",
+      });
+    }
+
+    const booking = await ctx.db.get(args.bookingId);
+
+    if (!booking) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Réservation introuvable",
       });
-    let authorized = false;
-    if (booking.driverId) {
-      const driver = await db.get(booking.driverId);
-      if (driver?.userId === user._id) authorized = true;
     }
-    if (!authorized && !user.roles?.includes("admin"))
-      throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
-    await db.insert("transportTracking", {
+
+    let authorized = user.roles?.includes("admin") === true;
+
+    if (booking.driverId) {
+      const assignedDriver = await ctx.db.get(booking.driverId);
+
+      if (
+        assignedDriver &&
+        (String(assignedDriver._id) === String(user._id) ||
+          ("userId" in assignedDriver &&
+            String(assignedDriver.userId) === String(user._id)))
+      ) {
+        authorized = true;
+      }
+    }
+
+    if (!authorized) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message:
+          "Seul le chauffeur assigné ou un administrateur peut publier cette position",
+      });
+    }
+
+    const now = new Date().toISOString();
+
+    await ctx.db.insert("transportTracking", {
       bookingId: args.bookingId,
       lat: args.lat,
       lng: args.lng,
-      speed: args.speed || null,
-      heading: args.heading || null,
-      timestamp: new Date().toISOString(),
-    });
-    await db.patch(args.bookingId, {
-      lastLat: args.lat,
-      lastLng: args.lng,
-      lastUpdate: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      speed: args.speed,
+      heading: args.heading,
+      timestamp: now,
+      createdAt: now,
     });
   },
 });
 
 export const getTransportTracking = query({
-  args: { bookingId: v.string(), limit: v.optional(v.number()) },
+  args: {
+    bookingId: v.id("transportBookings"),
+    limit: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
-    const db = ctx.db as any;
     const user = await requireUser(ctx);
-    const booking = await db.get(args.bookingId);
-    if (!booking)
+    const booking = await ctx.db.get(args.bookingId);
+
+    if (!booking) {
       throw new ConvexError({
         code: "NOT_FOUND",
         message: "Réservation introuvable",
       });
-    if (booking.userId !== user._id && !user.roles?.includes("admin")) {
-      let authorized = false;
-      if (booking.driverId) {
-        const driver = await db.get(booking.driverId);
-        if (driver?.userId === user._id) authorized = true;
-      }
-      if (!authorized)
-        throw new ConvexError({ code: "FORBIDDEN", message: "Non autorisé" });
     }
-    const tracking = await db
+
+    let authorized =
+      String(booking.userId) === String(user._id) ||
+      user.roles?.includes("admin") === true;
+
+    if (booking.driverId) {
+      const assignedDriver = await ctx.db.get(booking.driverId);
+
+      if (
+        assignedDriver &&
+        (String(assignedDriver._id) === String(user._id) ||
+          ("userId" in assignedDriver &&
+            String(assignedDriver.userId) === String(user._id)))
+      ) {
+        authorized = true;
+      }
+    }
+
+    if (!authorized) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Accès au suivi non autorisé",
+      });
+    }
+
+    const requestedLimit = args.limit ?? 100;
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(200, Math.max(1, Math.floor(requestedLimit)))
+      : 100;
+
+    return await ctx.db
       .query("transportTracking")
-      .withIndex("by_booking", (q: any) => q.eq("bookingId", args.bookingId))
+      .withIndex("by_booking", (q) => q.eq("bookingId", args.bookingId))
       .order("desc")
-      .take(args.limit ?? 100);
-    return tracking;
+      .take(limit);
   },
 });
 
