@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 // ─── Helpers de validation de Session ──────────────────────────────────────────
 async function requireUser(ctx: QueryCtx | MutationCtx) {
@@ -457,6 +458,17 @@ export const createBooking = mutation({
       },
     });
 
+    // Notifier le vendeur de la nouvelle réservation
+    await ctx.runMutation(internal.notifications.insertForUser, {
+      userId: product.seller.userId,
+      type: "agri",
+      module: "agri",
+      title: "Nouvelle réservation",
+      body: `${user.name || "Un acheteur"} souhaite réserver ${args.quantity} ${product.quantity.unit} de « ${product.title} ».`,
+      actionPage: "agri",
+      priority: "normal",
+    });
+
     return { bookingId, total };
   },
 });
@@ -540,6 +552,18 @@ export const confirmBooking = mutation({
     }
 
     await ctx.db.patch(args.id, { status: "confirmed" });
+
+    // Notifier l'acheteur de la confirmation
+    await ctx.runMutation(internal.notifications.insertForUser, {
+      userId: booking.userId,
+      type: "agri",
+      module: "agri",
+      title: "Réservation confirmée",
+      body: `Votre réservation de ${booking.quantity} ${product.quantity.unit} de « ${product.title} » a été confirmée.`,
+      actionPage: "agri",
+      priority: "normal",
+    });
+
     return { success: true };
   },
 });
