@@ -3037,7 +3037,11 @@ export default defineSchema({
     .index("by_category", ["category"])
     .index("by_seller", ["seller.userId"])
     .index("by_city", ["location.city"])
-    .index("by_createdAt", ["createdAt"]),
+    .index("by_createdAt", ["createdAt"])
+    .searchIndex("search_agri_products", {
+      searchField: "title",
+      filterFields: ["category"],
+    }),
 
   agriBookings: defineTable({
     userId: v.id("users"),
